@@ -1,0 +1,142 @@
+import { useEffect } from 'react';
+import { useCalendarStore } from '@/store/calendarStore';
+import { tasksService } from '@/services/calendarService';
+import { notificationsService } from '@/services/notificationsService';
+import { Task, TaskRecurring, Subtask } from '@/types';
+
+function nextDeadline(iso: string, recurring: TaskRecurring): string {
+  const d = new Date(iso);
+  if (recurring === 'daily')   d.setDate(d.getDate() + 1);
+  if (recurring === 'weekly')  d.setDate(d.getDate() + 7);
+  if (recurring === 'monthly') d.setMonth(d.getMonth() + 1);
+  return d.toISOString();
+}
+
+export function useTasks() {
+  const { tasks, isLoading, setTasks, addTask, updateTask, deleteTask, setLoading } =
+    useCalendarStore();
+
+  useEffect(() => { load(); }, []);
+
+  const load = async () => {
+    try {
+      setLoading(true);
+      const data = await tasksService.getAllTasks();
+      const now = new Date();
+      // auto-unsnooze tasks whose snooze has expired
+      for (const task of data) {
+        if (task.status === 'snoozed' && task.snoozedUntil && new Date(task.snoozedUntil) <= now) {
+          task.status = 'pending';
+          tasksService.updateTask(task.id, { status: 'pending' }).catch(() => {});
+          notificationsService.cancelSnoozeReminder(task.id).catch(() => {});
+        }
+      }
+      setTasks(data);
+    } catch (_) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const create = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> => {
+    const task = await tasksService.addTask(data);
+    addTask(task);
+    return task;
+  };
+
+  const update = async (id: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    updateTask(id, updates);
+    try {
+      await tasksService.updateTask(id, updates);
+    } catch {
+      // revert on fail — reload from server
+      load();
+    }
+  };
+
+  const toggle = async (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const next = task.status === 'done' ? 'pending' : 'done';
+    await update(id, { status: next });
+    if (next === 'done') {
+      notificationsService.cancelTaskReminder(id).catch(() => {});
+      if (task.recurring && task.recurring !== 'none' && task.deadline) {
+        const newDeadline = nextDeadline(task.deadline, task.recurring);
+        await create({
+          title: task.title,
+          description: task.description,
+          deadline: newDeadline,
+          status: 'pending',
+          priority: task.priority,
+          difficulty: task.difficulty,
+          estimatedPomodoros: task.estimatedPomodoros,
+          tags: task.tags ?? [],
+          recurring: task.recurring,
+        });
+        notificationsService.scheduleTaskDeadlineReminder(id + '_next', task.title, newDeadline).catch(() => {});
+      }
+    }
+  };
+
+  const snooze = async (id: string, until: Date) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const snoozedUntil = until.toISOString();
+    updateTask(id, { status: 'snoozed', snoozedUntil });
+    notificationsService.cancelTaskReminder(id).catch(() => {});
+    notificationsService.scheduleSnoozeReminder(id, task.title, until).catch(() => {});
+    try {
+      await tasksService.updateTask(id, { status: 'snoozed', snoozedUntil });
+    } catch {
+      load();
+    }
+  };
+
+  const unsnooze = async (id: string) => {
+    updateTask(id, { status: 'pending', snoozedUntil: undefined });
+    notificationsService.cancelSnoozeReminder(id).catch(() => {});
+    try {
+      await tasksService.updateTask(id, { status: 'pending' });
+    } catch {
+      load();
+    }
+  };
+
+  const remove = async (id: string) => {
+    deleteTask(id);
+    notificationsService.cancelTaskReminder(id).catch(() => {});
+    await tasksService.deleteTask(id).catch(() => {});
+  };
+
+  const getById = (id: string) => tasks.find(t => t.id === id) ?? null;
+
+  const addSubtask = async (taskId: string, title: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const newSub: Subtask = { id: Date.now().toString(), title, done: false };
+    const subtasks = [...(task.subtasks ?? []), newSub];
+    updateTask(taskId, { subtasks });
+    await tasksService.updateTask(taskId, { subtasks }).catch(() => load());
+  };
+
+  const toggleSubtask = async (taskId: string, subtaskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const subtasks = (task.subtasks ?? []).map(s =>
+      s.id === subtaskId ? { ...s, done: !s.done } : s,
+    );
+    updateTask(taskId, { subtasks });
+    await tasksService.updateTask(taskId, { subtasks }).catch(() => load());
+  };
+
+  const removeSubtask = async (taskId: string, subtaskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const subtasks = (task.subtasks ?? []).filter(s => s.id !== subtaskId);
+    updateTask(taskId, { subtasks });
+    await tasksService.updateTask(taskId, { subtasks }).catch(() => load());
+  };
+
+  return { tasks, isLoading, reload: load, create, update, toggle, snooze, unsnooze, remove, getById, addSubtask, toggleSubtask, removeSubtask };
+}
