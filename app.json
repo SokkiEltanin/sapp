@@ -34,9 +34,16 @@
         "android.permission.health.READ_SLEEP"
       ]
     },
+    "updates": {
+      "url": "https://u.expo.dev/ff368301-082f-43b1-98ea-61c8963c01b2"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
       "expo-router",
       "expo-font",
+      "expo-updates",
       [
         "expo-notifications",
         {
