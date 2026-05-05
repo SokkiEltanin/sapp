@@ -1,13 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, Component, ReactNode } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    const { error } = this.state;
+    if (!error) return this.props.children;
+    return (
+      <View style={eb.wrap}>
+        <Text style={eb.title}>Crash — skopiuj ten błąd i wyślij</Text>
+        <ScrollView style={eb.scroll}>
+          <Text style={eb.msg}>{(error as Error).message}</Text>
+          <Text style={eb.stack}>{(error as Error).stack}</Text>
+        </ScrollView>
+      </View>
+    );
+  }
+}
+
+const eb = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: '#0D0D0D', padding: 20, paddingTop: 60 },
+  title: { color: '#FF5A5F', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  scroll: { flex: 1 },
+  msg: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  stack: { color: '#aaa', fontSize: 11, lineHeight: 16 },
+});
 
 export default function RootLayout() {
   useEffect(() => {
@@ -22,6 +49,7 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="light" backgroundColor={colors.bg.primary} />
@@ -47,5 +75,6 @@ export default function RootLayout() {
         <Toast />
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
