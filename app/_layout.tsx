@@ -6,6 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { auth } from '@/services/firebase';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
@@ -37,6 +39,15 @@ const eb = StyleSheet.create({
 });
 
 export default function RootLayout() {
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth).catch(() => {});
+      }
+    });
+    return unsub;
+  }, []);
+
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       const screen = response.notification.request.content.data?.screen as string | undefined;

@@ -1,13 +1,17 @@
 ﻿import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   ChevronLeft, Bell, BellOff, Moon, Sun,
   Smile, ListTodo, CalendarDays, Database, PiggyBank, Check, Footprints, Droplets,
-  Zap, ClipboardList,
+  Zap, ClipboardList, LogIn, User,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { GoogleAuthProvider, linkWithCredential, signInWithCredential, onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/services/firebase';
 
 import PressableScale from '@/components/ui/PressableScale';
 import InputField from '@/components/ui/InputField';
@@ -23,12 +27,43 @@ import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
 
+WebBrowser.maybeCompleteAuthSession();
+
 const APP_VERSION = '1.0.0';
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
   const { tasks, events } = useCalendarStore();
+
+  const [googleUser, setGoogleUser] = useState<string | null>(null);
+  const [googleLinking, setGoogleLinking] = useState(false);
+
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setGoogleUser(user?.isAnonymous === false ? (user.email ?? user.displayName) : null);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (response?.type !== 'success') return;
+    const { id_token } = response.params;
+    const credential = GoogleAuthProvider.credential(id_token);
+    setGoogleLinking(true);
+    const current = auth.currentUser;
+    const doLink = current?.isAnonymous
+      ? linkWithCredential(current, credential)
+      : signInWithCredential(auth, credential);
+    doLink
+      .then((result) => setGoogleUser(result.user.email ?? result.user.displayName))
+      .catch((e) => Alert.alert('Błąd', e.message))
+      .finally(() => setGoogleLinking(false));
+  }, [response]);
 
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [eveningHour, setEveningHour] = useState('20');
@@ -454,6 +489,43 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Account */}
+        <View>
+          <Text style={styles.sectionTitle}>Konto</Text>
+          <View style={styles.card}>
+            {googleUser ? (
+              <View style={styles.row}>
+                <View style={[styles.iconWrap, { backgroundColor: '#4285F418' }]}>
+                  <User size={16} color="#4285F4" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Zalogowano przez Google</Text>
+                  <Text style={styles.rowSub}>{googleUser}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.row}>
+                <View style={[styles.iconWrap, { backgroundColor: '#4285F418' }]}>
+                  {googleLinking
+                    ? <ActivityIndicator size="small" color="#4285F4" />
+                    : <LogIn size={16} color="#4285F4" />}
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Połącz z Google</Text>
+                  <Text style={styles.rowSub}>Synchronizacja między urządzeniami</Text>
+                </View>
+                <PressableScale
+                  onPress={() => promptAsync()}
+                  disabled={!request || googleLinking}
+                  style={styles.googleBtn}
+                >
+                  <Text style={styles.googleBtnText}>Połącz</Text>
+                </PressableScale>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* About */}
         <View>
           <Text style={styles.sectionTitle}>Aplikacja</Text>
@@ -581,6 +653,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
   },
   dataVal: { ...typography.h4, fontWeight: '800', color: colors.text.primary },
+  googleBtn: {
+    paddingHorizontal: spacing[3], paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: '#4285F418',
+    borderWidth: 1, borderColor: '#4285F435',
+  },
+  googleBtnText: { fontSize: 12, fontWeight: '700', color: '#4285F4' },
   aboutHeader: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     padding: spacing[4],
