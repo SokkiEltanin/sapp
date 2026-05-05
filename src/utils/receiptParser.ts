@@ -117,8 +117,10 @@ const FULL_RE  = /^(.+?)\s{2,}(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+[.,]\d{2})\s+(\d+
 const SIMPLE_RE = /^(.+?)\s{2,}(\d+[.,]\d{2})\s*$/;
 // Weight continuation: "0,538 kg × 4,99" or "1,200 kg x 3,59/kg"
 const WEIGHT_RE = /^(\d+[.,]\d+)\s*(?:kg|g|l|ml|szt)\.?\s*[x×*]\s*(\d+[.,]\d{2})(?:[/\\](?:kg|g|l|szt))?/i;
-// Discount line with keyword
-const DISCOUNT_KW_RE = /^(?:RABAT|OPUST|ZNIZKA|ZNIZK|PROMOCJA|OBNIŻKA|OBN|UPUST)\s*[-–]?(\d+[.,]\d{2})/i;
+// Lidl format: product info on its own line "QTY * UNIT TOTAL" (name was on previous line)
+const PRODUCT_INFO_RE = /^(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s*$/;
+// Discount line with keyword (incl. KDR = Karta Dużej Rodziny, Rabat grupowy, etc.)
+const DISCOUNT_KW_RE = /^(?:RABAT(?:\s+\w+)?|OPUST|ZNIZKA|ZNIZK|PROMOCJA|OBNIŻKA|OBN|UPUST|KDR)\s+[-–]?(\d+[.,]\d{2})/i;
 // Standalone negative price: "-2,99" or "* -2,99"
 const DISCOUNT_NEG_RE = /^\*?\s*-(\d+[.,]\d{2})\s*$/;
 // Standalone price on its own line (for multi-line products)
@@ -162,8 +164,9 @@ export function parseReceiptText(text: string): ParsedReceipt {
   const dateMatch = text.match(/(\d{2}[.\-/]\d{2}[.\-/]\d{2,4})/);
   if (dateMatch) date = dateMatch[1];
 
-  // Total
-  const totalMatch = text.match(TOTAL_RE);
+  // Total — prefer "Suma PLN X,XX" (Lidl) over bare "Suma X,XX" which can be a VAT subtotal
+  const totalPLNMatch = text.match(/SUMA\s+PLN\s+(\d+[.,]\d{2})/i);
+  const totalMatch = totalPLNMatch ?? text.match(TOTAL_RE);
   if (totalMatch) total = parseFloat(totalMatch[1].replace(',', '.'));
 
   const addProduct = (p: ReceiptProduct) => {
@@ -234,6 +237,22 @@ export function parseReceiptText(text: string): ParsedReceipt {
           continue;
         }
       }
+      // Lidl format: "QTY * UNIT TOTAL" on its own line after the name
+      const pim = line.match(PRODUCT_INFO_RE);
+      if (pim) {
+        const qty       = parseFloat(pim[1].replace(',', '.'));
+        const unit      = parseFloat(pim[2].replace(',', '.'));
+        const lineTotal = parseFloat(pim[3].replace(',', '.'));
+        if (lineTotal > 0 && lineTotal < 5000) {
+          addProduct({
+            name: pendingName, quantity: qty,
+            unitPrice: unit, finalPrice: lineTotal,
+            category: categorize(pendingName), promotion: promo,
+          });
+          pendingName = null;
+          continue;
+        }
+      }
       pendingName = null;
     }
 
@@ -272,7 +291,7 @@ export function parseReceiptText(text: string): ParsedReceipt {
       const nextRaw = lines[idx + 1];
       if (nextRaw) {
         const nextClean = stripVatCode(nextRaw.trim());
-        if (PRICE_ONLY_RE.test(nextClean) || nextClean.match(WEIGHT_RE)) {
+        if (PRICE_ONLY_RE.test(nextClean) || nextClean.match(WEIGHT_RE) || PRODUCT_INFO_RE.test(nextClean)) {
           pendingName = line;
         }
       }
