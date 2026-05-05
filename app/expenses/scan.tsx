@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Camera, Image as ImageIcon, Check, Tag } from 'lucide-react-native';
+import { X, Camera, Image as ImageIcon, Check, Tag, ClipboardList } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { incrementScanCount } from '@/utils/scanCounter';
 
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
@@ -36,6 +37,8 @@ export default function ScanReceiptModal() {
   const [sortMode, setSortMode]     = useState<SortMode>('order');
   const [editedCats, setEditedCats] = useState<Record<number, ExpenseCategory>>({});
   const [catPickerFor, setCatPickerFor] = useState<number | null>(null);
+  const [inputMode, setInputMode]   = useState<'ocr' | 'text'>('ocr');
+  const [pastedText, setPastedText] = useState('');
   const addExpense = useExpensesStore(s => s.addExpense);
 
   const getCategory = (i: number): ExpenseCategory =>
@@ -58,6 +61,17 @@ export default function ScanReceiptModal() {
   };
 
   const processImage = async (uri: string) => {
+    const count = await incrementScanCount();
+    if (count >= 900) {
+      await new Promise<void>(resolve =>
+        Alert.alert(
+          'Uwaga — limit skanów',
+          `Użyłeś ${count}/1000 darmowych skanów Google Vision w tym miesiącu. Przy 1000 zaczną się naliczać opłaty.`,
+          [{ text: 'Kontynuuj', onPress: () => resolve() }, { text: 'Anuluj', style: 'cancel', onPress: () => { resolve(); return; } }]
+        )
+      );
+      if (count >= 1000) return;
+    }
     setScanning(true);
     try {
       const text   = await extractTextFromImage(uri);
@@ -66,15 +80,30 @@ export default function ScanReceiptModal() {
         Alert.alert('Brak produktów', 'Nie udało się rozpoznać produktów. Spróbuj wyraźniejsze zdjęcie.');
         return;
       }
-      setReceipt(parsed);
-      setSelected(new Set(parsed.products.map((_, i) => i)));
-      setEditedCats({});
-      setCatPickerFor(null);
+      applyParsedReceipt(parsed);
     } catch (e: any) {
       Alert.alert('Błąd skanowania', e.message);
     } finally {
       setScanning(false);
     }
+  };
+
+  const processText = () => {
+    const text = pastedText.trim();
+    if (!text) { Alert.alert('Brak tekstu', 'Wklej tekst paragonu'); return; }
+    const parsed = parseReceiptText(text);
+    if (parsed.products.length === 0) {
+      Alert.alert('Brak produktów', 'Nie udało się rozpoznać produktów. Sprawdź format tekstu — musi zawierać linie z cenami (np. "1 * 7,99 7,99 C").');
+      return;
+    }
+    applyParsedReceipt(parsed);
+  };
+
+  const applyParsedReceipt = (parsed: ParsedReceipt) => {
+    setReceipt(parsed);
+    setSelected(new Set(parsed.products.map((_, i) => i)));
+    setEditedCats({});
+    setCatPickerFor(null);
   };
 
   // ── Selection ────────────────────────────────────────────────────────────────
@@ -168,6 +197,7 @@ export default function ScanReceiptModal() {
     setEditedCats({});
     setCatPickerFor(null);
     setSortMode('order');
+    setPastedText('');
   };
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -189,52 +219,95 @@ export default function ScanReceiptModal() {
       </View>
 
       {!receipt ? (
-        <View style={styles.scanArea}>
-          {scanning ? (
-            <View style={styles.scanningState}>
-              <View style={styles.scanFrame}>
-                <View style={[styles.scanCorner, styles.cornerTL]} />
-                <View style={[styles.scanCorner, styles.cornerTR]} />
-                <View style={[styles.scanCorner, styles.cornerBL]} />
-                <View style={[styles.scanCorner, styles.cornerBR]} />
-                <ActivityIndicator size="large" color={colors.text.secondary} />
-              </View>
-              <Text style={styles.scanningText}>Analizuję paragon...</Text>
-              <Text style={styles.scanningHint}>Rozpoznaję produkty i ceny</Text>
-            </View>
+        <>
+          {/* Mode toggle */}
+          <View style={styles.modeToggle}>
+            <PressableScale
+              onPress={() => setInputMode('ocr')}
+              style={[styles.modeBtn, inputMode === 'ocr' && styles.modeBtnActive]}
+            >
+              <Camera size={13} color={inputMode === 'ocr' ? colors.bg.primary : colors.text.muted} />
+              <Text style={[styles.modeBtnText, inputMode === 'ocr' && styles.modeBtnTextActive]}>Zdjęcie / Galeria</Text>
+            </PressableScale>
+            <PressableScale
+              onPress={() => setInputMode('text')}
+              style={[styles.modeBtn, inputMode === 'text' && styles.modeBtnActive]}
+            >
+              <ClipboardList size={13} color={inputMode === 'text' ? colors.bg.primary : colors.text.muted} />
+              <Text style={[styles.modeBtnText, inputMode === 'text' && styles.modeBtnTextActive]}>Wklej tekst</Text>
+            </PressableScale>
+          </View>
+
+          {inputMode === 'text' ? (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.textInputArea} keyboardShouldPersistTaps="handled">
+              <Text style={styles.textInputLabel}>Wklej tekst paragonu (np. skopiowany z aplikacji Lidl)</Text>
+              <TextInput
+                style={styles.pasteInput}
+                multiline
+                value={pastedText}
+                onChangeText={setPastedText}
+                placeholder={'Szpinak XXL baby 1\n                       1 * 7.99 7.99 C\n   KDR                         -0,80\n...'}
+                placeholderTextColor={colors.text.muted}
+                textAlignVertical="top"
+              />
+              <AnimatedButton
+                onPress={processText}
+                label="Analizuj paragon"
+                icon={<Check size={18} color={colors.bg.primary} />}
+                size="lg"
+                fullWidth
+                disabled={!pastedText.trim()}
+              />
+            </ScrollView>
           ) : (
-            <>
-              <View style={styles.viewfinder}>
-                <View style={[styles.scanCorner, styles.cornerTL]} />
-                <View style={[styles.scanCorner, styles.cornerTR]} />
-                <View style={[styles.scanCorner, styles.cornerBL]} />
-                <View style={[styles.scanCorner, styles.cornerBR]} />
-                <Camera size={40} color={colors.text.muted} />
-              </View>
-              <Text style={styles.scanTitle}>Zrób zdjęcie paragonu</Text>
-              <Text style={styles.scanSub}>
-                Rozpoznam produkty, ceny i promocje (1+1, %, rabaty)
-              </Text>
-              <View style={styles.btnRow}>
-                <AnimatedButton
-                  onPress={pickCamera}
-                  label="Aparat"
-                  icon={<Camera size={18} color={colors.bg.primary} />}
-                  size="lg"
-                  style={{ flex: 1 }}
-                />
-                <AnimatedButton
-                  onPress={pickGallery}
-                  label="Galeria"
-                  icon={<ImageIcon size={18} color={colors.text.secondary} />}
-                  variant="ghost"
-                  size="lg"
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </>
+            <View style={styles.scanArea}>
+              {scanning ? (
+                <View style={styles.scanningState}>
+                  <View style={styles.scanFrame}>
+                    <View style={[styles.scanCorner, styles.cornerTL]} />
+                    <View style={[styles.scanCorner, styles.cornerTR]} />
+                    <View style={[styles.scanCorner, styles.cornerBL]} />
+                    <View style={[styles.scanCorner, styles.cornerBR]} />
+                    <ActivityIndicator size="large" color={colors.text.secondary} />
+                  </View>
+                  <Text style={styles.scanningText}>Analizuję paragon...</Text>
+                  <Text style={styles.scanningHint}>Rozpoznaję produkty i ceny</Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.viewfinder}>
+                    <View style={[styles.scanCorner, styles.cornerTL]} />
+                    <View style={[styles.scanCorner, styles.cornerTR]} />
+                    <View style={[styles.scanCorner, styles.cornerBL]} />
+                    <View style={[styles.scanCorner, styles.cornerBR]} />
+                    <Camera size={40} color={colors.text.muted} />
+                  </View>
+                  <Text style={styles.scanTitle}>Zrób zdjęcie paragonu</Text>
+                  <Text style={styles.scanSub}>
+                    Rozpoznam produkty, ceny i promocje (1+1, %, rabaty)
+                  </Text>
+                  <View style={styles.btnRow}>
+                    <AnimatedButton
+                      onPress={pickCamera}
+                      label="Aparat"
+                      icon={<Camera size={18} color={colors.bg.primary} />}
+                      size="lg"
+                      style={{ flex: 1 }}
+                    />
+                    <AnimatedButton
+                      onPress={pickGallery}
+                      label="Galeria"
+                      icon={<ImageIcon size={18} color={colors.text.secondary} />}
+                      variant="ghost"
+                      size="lg"
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                </>
+              )}
+            </View>
           )}
-        </View>
+        </>
       ) : (
         <>
           {/* Receipt summary */}
@@ -478,6 +551,36 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border.default,
   },
   title: { ...typography.h4, color: colors.text.primary },
+
+  // ── Mode toggle ────────────────────────────────────────────────────────────
+  modeToggle: {
+    flexDirection: 'row', gap: spacing[2],
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+  },
+  modeBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing[2], paddingVertical: spacing[2], borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
+  },
+  modeBtnActive: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  modeBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '600', fontSize: 12 },
+  modeBtnTextActive: { color: colors.bg.primary },
+
+  // ── Text input area ─────────────────────────────────────────────────────────
+  textInputArea: {
+    padding: spacing[4], gap: spacing[4], paddingBottom: spacing[8],
+  },
+  textInputLabel: {
+    ...typography.caption, color: colors.text.muted, lineHeight: 18,
+  },
+  pasteInput: {
+    backgroundColor: colors.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border.default,
+    padding: spacing[4], color: colors.text.primary,
+    fontSize: 12, lineHeight: 18, minHeight: 220,
+    fontFamily: 'monospace',
+  },
 
   // ── Scan area ──────────────────────────────────────────────────────────────
   scanArea: {
