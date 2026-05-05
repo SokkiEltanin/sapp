@@ -7,12 +7,32 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBkE7_6Phyo9C6Mj5c_loYDWDLttqMRbWo",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "sokkisapp.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "sokkisapp",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "sokkisapp.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "1020705470960",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:1020705470960:web:ea4cea0c761d49ce2ec535",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-2042K265XB",
+        "EXPO_PUBLIC_GOOGLE_VISION_API_KEY": "AIzaSyAmP5HZ66UjcEK-cncMFyKZ0p4pNDCeUK4"
       }
     },
     "production": {
       "channel": "production",
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyBkE7_6Phyo9C6Mj5c_loYDWDLttqMRbWo",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "sokkisapp.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "sokkisapp",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "sokkisapp.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "1020705470960",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:1020705470960:web:ea4cea0c761d49ce2ec535",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-2042K265XB",
+        "EXPO_PUBLIC_GOOGLE_VISION_API_KEY": "AIzaSyAmP5HZ66UjcEK-cncMFyKZ0p4pNDCeUK4"
       }
     }
   },
