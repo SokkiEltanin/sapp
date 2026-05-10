@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing[4], paddingVertical: spacing[3],
     backgroundColor: colors.bg.card,
     borderRadius: radius.md, marginBottom: spacing[2],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: colors.border.default,
     overflow: 'hidden',
   },
   rowReceipt: {

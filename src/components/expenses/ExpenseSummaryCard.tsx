@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.border.default,
     padding: spacing[5],
     gap: spacing[3],
   },

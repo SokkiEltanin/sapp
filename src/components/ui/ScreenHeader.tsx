@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing[4],
     paddingBottom: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: colors.border.subtle,
   },
   left: { flex: 1, gap: 2 },
   title: { ...typography.h2, color: colors.text.primary, fontWeight: '700' },

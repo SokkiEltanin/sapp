@@ -6,8 +6,8 @@ import {
 import { router } from 'expo-router';
 import {
   LayoutDashboard, ListTodo, Wallet,
-  Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare, X,
-  Smile, Zap, ScanLine, NotebookPen,
+  Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare,
+  Smile, ScanLine, Target, Flame, BarChart2,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,8 +32,10 @@ const QUICK_ACTIONS = [
   { label: 'Przychód',        Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
   { label: 'Skan paragonu',   Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
   { label: 'Event',           Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },
+  { label: 'Focus',           Icon: Target,       color: colors.accent.purple, route: '/focus' },
+  { label: 'Nawyki',          Icon: Flame,        color: colors.accent.amber,  route: '/habits' },
+  { label: 'Statystyki tyg.', Icon: BarChart2,    color: colors.accent.blue,   route: '/weekly' },
   { label: 'Nastrój',         Icon: Smile,        color: colors.accent.pink,   route: '/(tabs)/mood' },
-  { label: 'Notatka',         Icon: NotebookPen,  color: colors.accent.amber,  route: '/notes' },
 ];
 
 const FAB_SIZE = 52;
