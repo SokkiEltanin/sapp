@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  ScanLine, BarChart2, ClipboardEdit, RefreshCcw,
+  ScanLine, BarChart2, RefreshCcw,
   ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
   Settings2, Lightbulb, AlertTriangle, Wallet,
 } from 'lucide-react-native';
@@ -252,6 +252,16 @@ export default function FinancesScreen() {
               : new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })
           }
           accentColor={colors.expenses}
+          rightSlot={
+            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+              <PressableScale onPress={() => router.push('/expenses/scan' as any)} style={styles.headerBtn}>
+                <ScanLine size={17} color={colors.accent.blue} />
+              </PressableScale>
+              <PressableScale onPress={() => router.push('/expenses/subscriptions' as any)} style={styles.headerBtn}>
+                <RefreshCcw size={17} color={colors.text.secondary} />
+              </PressableScale>
+            </View>
+          }
         />
 
         {/* Segment toggle */}
@@ -722,19 +732,6 @@ export default function FinancesScreen() {
           </ScrollView>
         )}
 
-        {/* Bottom action bar */}
-        <View style={styles.bottomBar}>
-          <PressableScale onPress={() => router.push('/expenses/scan')} style={styles.barBtn}>
-            <ScanLine size={18} color={colors.accent.blue} />
-          </PressableScale>
-          <View style={{ flex: 1 }} />
-          <PressableScale onPress={() => router.push('/expenses/subscriptions' as any)} style={styles.barBtn}>
-            <RefreshCcw size={18} color={colors.text.secondary} />
-          </PressableScale>
-          <PressableScale onPress={() => router.push('/expenses/templates' as any)} style={styles.barBtn}>
-            <ClipboardEdit size={18} color={colors.text.secondary} />
-          </PressableScale>
-        </View>
       </Animated.View>
     </SafeAreaView>
   );
@@ -775,22 +772,15 @@ const styles = StyleSheet.create({
   emptyTitle: { ...typography.h3, color: colors.text.secondary },
   emptySubtitle: { ...typography.body, color: colors.text.muted, textAlign: 'center', lineHeight: 22 },
 
-  bottomBar: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
-    backgroundColor: colors.bg.secondary,
-  },
-  barBtn: {
-    width: 44, height: 44, borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated,
-    borderWidth: 1, borderColor: colors.border.default,
+  headerBtn: {
+    width: 34, height: 34, borderRadius: radius.md,
+    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
 
   // ── Stats styles ──────────────────────────────────────────────────────────────
 
-  statsScroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
+  statsScroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 130 },
 
   monthPicker: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -812,7 +802,7 @@ const styles = StyleSheet.create({
 
   heroCard: {
     backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[5],
-    gap: spacing[3], borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    gap: spacing[3], borderWidth: 1, borderColor: colors.border.default,
   },
   heroHeader:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   heroLabel:     { fontSize: 10, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
@@ -827,7 +817,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.bg.card, borderRadius: radius.xl,
     padding: spacing[4], gap: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: colors.border.default,
   },
   alertCard: { borderColor: colors.accent.amber + '30', backgroundColor: colors.accent.amber + '08' },
   cardRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },

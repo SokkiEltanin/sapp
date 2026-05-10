@@ -580,7 +580,11 @@ export default function TasksScreen() {
           )}
 
           {/* Filter bar */}
-          <View style={styles.filterWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterWrap}
+          >
             {FILTERS.map(({ key, label }) => {
               const active = filter === key;
               return (
@@ -591,7 +595,7 @@ export default function TasksScreen() {
                 </PressableScale>
               );
             })}
-          </View>
+          </ScrollView>
 
           {/* Overdue rescue banner */}
           {overdueTasks.length > 0 && filter === 'all' && (
@@ -856,8 +860,8 @@ const styles = StyleSheet.create({
 
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
   },
   chipText: { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
