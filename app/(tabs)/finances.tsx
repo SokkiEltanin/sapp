@@ -161,6 +161,39 @@ export default function FinancesScreen() {
       .map(([tag, amount]) => ({ tag, amount, pct: total > 0 ? amount / total : 0 }));
   }, [expenses, thisMonthFn]);
 
+  // Most recent income (any month) for salary comparison
+  const lastIncome = useMemo(() =>
+    expenses.filter(isInc).sort((a, b) => b.date.localeCompare(a.date))[0] ?? null,
+    [expenses]);
+
+  // Top individual products from receipt scans this month
+  const topProducts = useMemo(() => {
+    const items: { name: string; price: number; date: string; cat: ExpenseCategory }[] = [];
+    for (const e of expenses) {
+      if (!isExp(e) || !thisMonthFn(e)) continue;
+      if (e.receiptItems?.length) {
+        for (const it of e.receiptItems) {
+          if (it.price > 0) items.push({ name: it.name, price: it.price, date: e.date.slice(5, 10).replace('-', '.'), cat: e.category });
+        }
+      }
+    }
+    return items.sort((a, b) => b.price - a.price).slice(0, 10);
+  }, [expenses, thisMonthFn]);
+
+  // Spending by day-of-week (Mon–Sun totals)
+  const weekdayBreakdown = useMemo(() => {
+    const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+    const totals = [0, 0, 0, 0, 0, 0, 0];
+    for (const e of expenses) {
+      if (!isExp(e) || !thisMonthFn(e)) continue;
+      const d = parseISO(e.date);
+      const dow = (d.getDay() + 6) % 7; // Mon=0
+      totals[dow] += e.amount;
+    }
+    const max = Math.max(...totals, 1);
+    return days.map((label, i) => ({ label, total: totals[i], pct: totals[i] / max }));
+  }, [expenses, thisMonthFn]);
+
   const thisMonthData = monthlyData.find(m => m.isSelected) ?? monthlyData[MONTHS_BACK - 1];
   const thisMonthExp  = thisMonthData.expenses;
   const thisMonthInc  = thisMonthData.income;
@@ -342,6 +375,57 @@ export default function FinancesScreen() {
                 </View>
               </View>
             </View>
+
+            {/* Salary vs expenses card */}
+            {lastIncome && thisMonthExp > 0 && (() => {
+              const ratio    = thisMonthExp / lastIncome.amount;
+              const leftover = lastIncome.amount - thisMonthExp;
+              const over     = leftover < 0;
+              const barColor = ratio >= 1 ? colors.accent.red : ratio >= 0.75 ? colors.accent.amber : colors.accent.green;
+              const incDate  = lastIncome.date.slice(0, 7);
+              const incLabel = format(parseISO(lastIncome.date + 'T12:00:00'), 'LLLL', { locale: pl });
+              return (
+                <View style={[styles.card, styles.salaryCard]}>
+                  <View style={styles.cardRow}>
+                    <TrendingUp size={13} color={colors.accent.green} />
+                    <Text style={[styles.cardLabel, { color: colors.accent.green }]}>Ostatni przychód ({incLabel})</Text>
+                    <Text style={[styles.cardMeta, { color: colors.accent.green }]}>+{lastIncome.amount.toFixed(0)} zł</Text>
+                  </View>
+
+                  {/* Big ratio */}
+                  <View style={styles.salaryRatioRow}>
+                    <Text style={[styles.salaryBigPct, { color: barColor }]}>
+                      {Math.round(ratio * 100)}%
+                    </Text>
+                    <Text style={styles.salaryRatioLabel}>wypłaty{'\n'}wydane</Text>
+                    <View style={{ flex: 1 }} />
+                    <View style={styles.salarySideStats}>
+                      <View style={styles.salarySideStat}>
+                        <Text style={[styles.salarySideVal, { color: colors.accent.red }]}>-{thisMonthExp.toFixed(0)} zł</Text>
+                        <Text style={styles.salarySideLabel}>wydatki</Text>
+                      </View>
+                      <View style={[styles.salarySideStat, { alignItems: 'flex-end' }]}>
+                        <Text style={[styles.salarySideVal, { color: over ? colors.accent.red : colors.accent.green }]}>
+                          {over ? '-' : '+'}{Math.abs(leftover).toFixed(0)} zł
+                        </Text>
+                        <Text style={styles.salarySideLabel}>{over ? 'brakuje' : 'zostaje'}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Progress bar */}
+                  <View style={styles.salaryBarTrack}>
+                    <View style={[styles.salaryBarFill, {
+                      width: `${Math.min(100, ratio * 100)}%`,
+                      backgroundColor: barColor,
+                    }]} />
+                  </View>
+                  <Text style={styles.salaryHint}>
+                    {ratio < 0.5 ? 'Oszczędzasz solidnie.' : ratio < 0.75 ? 'Całkiem dobrze, ale można lepiej.' : ratio < 1 ? 'Uwaga — zostało mało.' : 'Wydatki przekroczyły przychód!'}
+                  </Text>
+                </View>
+              );
+            })()}
 
             {/* Spending alerts */}
             {spendingAlerts.length > 0 && (
@@ -576,6 +660,59 @@ export default function FinancesScreen() {
               </View>
             )}
 
+            {/* Day-of-week spending pattern */}
+            {thisMonthExp > 0 && (
+              <View style={styles.card}>
+                <View style={styles.cardRow}>
+                  <BarChart2 size={13} color={colors.text.muted} />
+                  <Text style={styles.cardLabel}>Kiedy wydajesz najwięcej</Text>
+                </View>
+                <View style={styles.weekRow}>
+                  {weekdayBreakdown.map((d, i) => {
+                    const isMax = d.pct === 1 && d.total > 0;
+                    return (
+                      <View key={i} style={styles.weekCol}>
+                        <Text style={[styles.weekAmt, isMax && { color: colors.accent.red }]}>
+                          {d.total > 0 ? `${d.total.toFixed(0)}` : ''}
+                        </Text>
+                        <View style={styles.weekBarWrap}>
+                          <View style={[styles.weekBar, {
+                            height: Math.max(3, d.pct * 72),
+                            backgroundColor: isMax ? colors.accent.red : d.total > 0 ? colors.accent.red + '60' : 'rgba(255,255,255,0.05)',
+                          }]} />
+                        </View>
+                        <Text style={[styles.weekLabel, isMax && { color: colors.accent.red, fontWeight: '700' }]}>{d.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Top products from receipts */}
+            {topProducts.length > 0 && (
+              <View style={styles.card}>
+                <View style={styles.cardRow}>
+                  <TrendingDown size={13} color={colors.accent.purple} />
+                  <Text style={[styles.cardLabel, { color: colors.accent.purple }]}>Najdroższe produkty</Text>
+                  <Text style={styles.cardMeta}>{format(monthBase, 'LLL', { locale: pl })}</Text>
+                </View>
+                {topProducts.map((p, i) => {
+                  const meta = getCategoryMeta(p.cat);
+                  return (
+                    <View key={i} style={styles.productRow}>
+                      <Text style={styles.productRank}>#{i + 1}</Text>
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productName} numberOfLines={1}>{p.name}</Text>
+                        <Text style={styles.productDate}>{p.date} · {meta.label}</Text>
+                      </View>
+                      <Text style={styles.productPrice}>{p.price.toFixed(2)} zł</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             {expenses.length === 0 && (
               <View style={styles.empty}>
                 <Text style={styles.emptyTitle}>Brak danych</Text>
@@ -737,10 +874,10 @@ const styles = StyleSheet.create({
   catAmount:      { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   changeBadge:    { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
   changeBadgeText:{ fontSize: 10, fontWeight: '700' },
-  catBarTrack:    { height: 3, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  catBarFill:     { height: 3, borderRadius: radius.full },
-  budgetBarTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, overflow: 'hidden', marginTop: 2 },
-  budgetBarFill:  { height: 3, borderRadius: radius.full },
+  catBarTrack:    { height: 7, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
+  catBarFill:     { height: 7, borderRadius: radius.full },
+  budgetBarTrack: { height: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, overflow: 'hidden', marginTop: 2 },
+  budgetBarFill:  { height: 5, borderRadius: radius.full },
   catPct:         { fontSize: 9, color: colors.text.muted },
 
   txList: { marginLeft: 46, marginTop: spacing[1], marginBottom: spacing[2], gap: 4 },
@@ -751,7 +888,36 @@ const styles = StyleSheet.create({
 
   tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },
-  tagBarTrack: { flex: 1, height: 5, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  tagBarFill:  { height: 5, borderRadius: radius.full, backgroundColor: colors.accent.blue },
+  tagBarTrack: { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
+  tagBarFill:  { height: 7, borderRadius: radius.full, backgroundColor: colors.accent.blue },
   tagAmount:   { fontSize: 12, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
+
+  // ── Salary card ──────────────────────────────────────────────────────────────
+  salaryCard:      { borderColor: colors.accent.green + '22' },
+  salaryRatioRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  salaryBigPct:    { fontSize: 52, fontWeight: '900', letterSpacing: -2, lineHeight: 56 },
+  salaryRatioLabel:{ fontSize: 11, color: colors.text.muted, lineHeight: 16 },
+  salarySideStats: { gap: spacing[2] },
+  salarySideStat:  { gap: 1 },
+  salarySideVal:   { fontSize: 15, fontWeight: '800', letterSpacing: -0.5 },
+  salarySideLabel: { fontSize: 9, color: colors.text.muted },
+  salaryBarTrack:  { height: 10, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
+  salaryBarFill:   { height: 10, borderRadius: radius.full },
+  salaryHint:      { fontSize: 11, color: colors.text.muted, fontStyle: 'italic' },
+
+  // ── Weekday chart ────────────────────────────────────────────────────────────
+  weekRow:    { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  weekCol:    { flex: 1, alignItems: 'center', gap: 3 },
+  weekBarWrap:{ height: 80, justifyContent: 'flex-end', alignItems: 'center' },
+  weekBar:    { width: 18, borderRadius: 6, minHeight: 3 },
+  weekLabel:  { fontSize: 9, color: colors.text.muted },
+  weekAmt:    { fontSize: 7, color: colors.text.muted, textAlign: 'center' },
+
+  // ── Top products ─────────────────────────────────────────────────────────────
+  productRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' },
+  productRank:  { fontSize: 11, fontWeight: '700', color: colors.text.muted, width: 24 },
+  productInfo:  { flex: 1, gap: 1 },
+  productName:  { fontSize: 13, color: colors.text.primary, fontWeight: '500' },
+  productDate:  { fontSize: 10, color: colors.text.muted },
+  productPrice: { fontSize: 14, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
 });
