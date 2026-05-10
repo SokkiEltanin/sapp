@@ -130,13 +130,15 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         {/* FAB — floats above pill center */}
         <View style={s.fabRow} pointerEvents="box-none">
           <TouchableOpacity
-            style={s.fab}
+            style={[s.fab, { shadowColor: accentColor }]}
             onPress={open ? () => closeMenu() : openMenu}
-            activeOpacity={0.9}
+            activeOpacity={0.85}
           >
-            <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <Plus size={21} color="#000000" strokeWidth={2.8} />
-            </Animated.View>
+            <View style={[s.fabInner, { borderColor: accentColor + '60' }]}>
+              <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
+                <Plus size={20} color={accentColor} strokeWidth={2.5} />
+              </Animated.View>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -196,14 +198,23 @@ const s = StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 14,
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
+    elevation: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+  },
+  fabInner: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: colors.bg.elevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
 
   // ── Pill ────────────────────────────────────────────────────────

@@ -8,8 +8,8 @@ export const colors = {
   },
   text: {
     primary:   '#FFFFFF',
-    secondary: '#6B6B6B',
-    muted:     '#353535',
+    secondary: '#909090',
+    muted:     '#666666',
     inverse:   '#000000',
   },
   accent: {
@@ -27,10 +27,10 @@ export const colors = {
     warning:  '#FBBF24',
   },
   border: {
-    default: 'rgba(255,255,255,0.06)',
-    subtle:  'rgba(255,255,255,0.03)',
-    focus:   'rgba(255,255,255,0.22)',
-    card:    'rgba(255,255,255,0.06)',
+    default: 'rgba(255,255,255,0.12)',
+    subtle:  'rgba(255,255,255,0.06)',
+    focus:   'rgba(255,255,255,0.28)',
+    card:    'rgba(255,255,255,0.12)',
   },
   tint: {
     green:  'rgba(52,211,153,0.10)',

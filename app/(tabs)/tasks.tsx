@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   CheckCircle2, Circle, Clock, Flame, Timer,
-  Search, RefreshCw, AlarmClock, BellOff, BarChart2, CheckSquare, Target,
+  Search, RefreshCw, AlarmClock, BellOff, CheckSquare,
   Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo,
 } from 'lucide-react-native';
 
@@ -521,27 +521,36 @@ export default function TasksScreen() {
             {snoozedTasks.length > 0 ? ` · ${snoozedTasks.length} odłożonych` : ''}
           </Text>
         </View>
-        <View style={styles.viewToggle}>
+        <View style={styles.headerRight}>
           <TouchableOpacity
-            onPress={() => setViewMode('list')}
-            style={[styles.toggleTab, viewMode === 'list' && styles.toggleTabActive]}
-            activeOpacity={0.7}
+            onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}
+            style={[styles.headerBtn, showSearch && styles.headerBtnActive]}
+            activeOpacity={0.75}
           >
-            <ListTodo size={13} color={viewMode === 'list' ? colors.text.primary : colors.text.muted} />
-            <Text style={[styles.toggleTabText, viewMode === 'list' && styles.toggleTabTextActive]}>
-              Lista
-            </Text>
+            <Search size={16} color={showSearch ? colors.text.primary : colors.text.secondary} />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setViewMode('calendar')}
-            style={[styles.toggleTab, viewMode === 'calendar' && styles.toggleTabActive]}
-            activeOpacity={0.7}
-          >
-            <CalendarDays size={13} color={viewMode === 'calendar' ? colors.text.primary : colors.text.muted} />
-            <Text style={[styles.toggleTabText, viewMode === 'calendar' && styles.toggleTabTextActive]}>
-              Kalen.
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.viewToggle}>
+            <TouchableOpacity
+              onPress={() => setViewMode('list')}
+              style={[styles.toggleTab, viewMode === 'list' && styles.toggleTabActive]}
+              activeOpacity={0.7}
+            >
+              <ListTodo size={13} color={viewMode === 'list' ? colors.text.primary : colors.text.muted} />
+              <Text style={[styles.toggleTabText, viewMode === 'list' && styles.toggleTabTextActive]}>
+                Lista
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setViewMode('calendar')}
+              style={[styles.toggleTab, viewMode === 'calendar' && styles.toggleTabActive]}
+              activeOpacity={0.7}
+            >
+              <CalendarDays size={13} color={viewMode === 'calendar' ? colors.text.primary : colors.text.muted} />
+              <Text style={[styles.toggleTabText, viewMode === 'calendar' && styles.toggleTabTextActive]}>
+                Kalen.
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -656,26 +665,6 @@ export default function TasksScreen() {
           />
         </>
       )}
-
-      {/* Bottom action bar */}
-      <View style={styles.bottomBar}>
-        <PressableScale
-          onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}
-          style={[styles.barBtn, showSearch && styles.barBtnActive]}
-        >
-          <Search size={18} color={showSearch ? colors.accent.purple : colors.text.secondary} />
-        </PressableScale>
-        <PressableScale onPress={() => router.push('/focus' as any)} style={styles.barBtn}>
-          <Target size={18} color={colors.accent.purple} />
-        </PressableScale>
-        <View style={{ flex: 1 }} />
-        <PressableScale onPress={() => router.push('/weekly' as any)} style={styles.barBtn}>
-          <BarChart2 size={18} color={colors.text.secondary} />
-        </PressableScale>
-        <PressableScale onPress={() => router.push('/habits' as any)} style={styles.barBtn}>
-          <Flame size={18} color={colors.text.secondary} />
-        </PressableScale>
-      </View>
 
       <CompletionMoodModal
         visible={moodModal}
@@ -793,7 +782,17 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
   subtitle: { fontSize: 12, color: colors.text.muted, marginTop: 3 },
-  headerBtns: { flexDirection: 'row', gap: spacing[2] },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  headerBtn: {
+    width: 36, height: 36, borderRadius: radius.md,
+    backgroundColor: colors.bg.card, borderWidth: 1,
+    borderColor: colors.border.default,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
   viewToggle: {
     flexDirection: 'row',
     backgroundColor: colors.bg.card,
@@ -808,16 +807,6 @@ const styles = StyleSheet.create({
   toggleTabActive: { backgroundColor: colors.bg.elevated },
   toggleTabText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
   toggleTabTextActive: { color: colors.text.primary },
-  searchBtn: {
-    width: 38, height: 38, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1,
-    borderColor: colors.border.default,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  searchBtnActive: {
-    backgroundColor: colors.accent.purple + '18',
-    borderColor: colors.accent.purple + '40',
-  },
   searchBarWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginHorizontal: spacing[4], marginBottom: spacing[2],
@@ -847,7 +836,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12, fontWeight: '500', color: colors.text.secondary },
   filterTextActive: { color: colors.text.inverse },
 
-  list: { paddingHorizontal: spacing[4], paddingBottom: 20 },
+  list: { paddingHorizontal: spacing[4], paddingBottom: 130 },
 
   cardWrap: { marginBottom: spacing[2] }, // used by done/snoozed cards (no Swipeable wrapper)
   taskCard: {
@@ -892,23 +881,6 @@ const styles = StyleSheet.create({
   tagPillTextActive: { color: colors.accent.blue, fontWeight: '700' },
   tagPillClear: { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.15)' },
   tagPillClearText: { fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
-
-  bottomBar: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
-    backgroundColor: colors.bg.secondary,
-  },
-  barBtn: {
-    width: 44, height: 44, borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated,
-    borderWidth: 1, borderColor: colors.border.default,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  barBtnActive: {
-    backgroundColor: colors.accent.purple + '18',
-    borderColor: colors.accent.purple + '40',
-  },
 
   overdueBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
