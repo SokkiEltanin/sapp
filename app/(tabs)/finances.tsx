@@ -173,7 +173,7 @@ export default function FinancesScreen() {
       if (!isExp(e) || !thisMonthFn(e)) continue;
       if (e.receiptItems?.length) {
         for (const it of e.receiptItems) {
-          if (it.price > 0) items.push({ name: it.name, price: it.price, date: e.date.slice(5, 10).replace('-', '.'), cat: e.category });
+          if (it.price > 0) items.push({ name: it.name, price: it.price, date: e.date.slice(5, 10).replace('-', '.'), cat: e.category as ExpenseCategory });
         }
       }
     }
