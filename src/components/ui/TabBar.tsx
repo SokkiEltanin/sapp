@@ -7,11 +7,12 @@ import { router } from 'expo-router';
 import {
   LayoutDashboard, ListTodo, Wallet,
   Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare, X,
-  Smile, Zap,
+  Smile, Zap, ScanLine, NotebookPen,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendarStore } from '@/store/calendarStore';
+import { useTimeAccent } from '@/hooks/useTimeAccent';
 
 type BottomTabBarProps = {
   state: { index: number; routes: { name: string }[] };
@@ -26,24 +27,30 @@ const TABS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Nowe zadanie', Icon: CheckSquare, color: colors.accent.purple, route: '/tasks/add' },
-  { label: 'Wydatek',      Icon: Receipt,     color: colors.accent.red,    route: '/expenses/add' },
-  { label: 'Przychód',     Icon: TrendingUp,  color: colors.accent.green,  route: '/expenses/add?type=income' },
-  { label: 'Event',        Icon: CalendarPlus, color: colors.accent.blue,  route: '/calendar/add' },
-  { label: 'Nastrój',      Icon: Smile,       color: colors.accent.pink,   route: '/(tabs)/mood' },
-  { label: 'Nawyki',       Icon: Zap,         color: colors.accent.purple, route: '/habits' },
+  { label: 'Nowe zadanie',    Icon: CheckSquare,  color: colors.accent.purple, route: '/tasks/add' },
+  { label: 'Wydatek',         Icon: Receipt,      color: colors.accent.red,    route: '/expenses/add' },
+  { label: 'Przychód',        Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
+  { label: 'Skan paragonu',   Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
+  { label: 'Event',           Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },
+  { label: 'Nastrój',         Icon: Smile,        color: colors.accent.pink,   route: '/(tabs)/mood' },
+  { label: 'Notatka',         Icon: NotebookPen,  color: colors.accent.amber,  route: '/notes' },
 ];
+
+const FAB_SIZE = 52;
+const FAB_OVERLAP = 20;
 
 export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const pendingCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending').length);
+  const { color: accentColor } = useTimeAccent();
 
   const fabProgress  = useRef(new Animated.Value(0)).current;
   const itemAnims    = useRef(QUICK_ACTIONS.map(() => new Animated.Value(0))).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  const tabBarH = 60 + (insets.bottom || 16);
+  const pillH    = 64;
+  const menuBase = FAB_SIZE - FAB_OVERLAP + pillH + (insets.bottom || 16) + 16;
 
   const openMenu = () => {
     setOpen(true);
@@ -74,12 +81,9 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
     inputRange: [0, 1], outputRange: ['0deg', '45deg'], extrapolate: 'clamp',
   });
 
-  // Tab 0 = index, Tab 1 = tasks, Tab 2 = finances
-  const leftTab  = TABS[0];
-  const rightTabs = TABS.slice(1);
-
   return (
     <>
+      {/* ── Quick actions menu ─────────────────────────────────────── */}
       <Modal
         visible={open}
         transparent
@@ -88,16 +92,16 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         onRequestClose={() => closeMenu()}
       >
         <Animated.View
-          style={[styles.backdrop, { opacity: backdropAnim }]}
+          style={[s.backdrop, { opacity: backdropAnim }]}
           pointerEvents="box-none"
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
         </Animated.View>
 
-        <View style={[styles.quickMenu, { bottom: tabBarH + 12 }]}>
+        <View style={[s.quickMenu, { bottom: menuBase + 12 }]}>
           {QUICK_ACTIONS.map((action, i) => {
             const translateY = itemAnims[i].interpolate({
-              inputRange: [0, 1], outputRange: [20, 0], extrapolate: 'clamp',
+              inputRange: [0, 1], outputRange: [16, 0], extrapolate: 'clamp',
             });
             return (
               <Animated.View
@@ -105,13 +109,13 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                 style={{ opacity: itemAnims[i], transform: [{ translateY }] }}
               >
                 <TouchableOpacity
-                  style={styles.quickItem}
+                  style={s.quickItem}
                   onPress={() => closeMenu(() => router.push(action.route as any))}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.quickLabel}>{action.label}</Text>
-                  <View style={[styles.quickIcon, { backgroundColor: action.color + '22', borderColor: action.color + '50' }]}>
-                    <action.Icon size={18} color={action.color} />
+                  <Text style={s.quickLabel}>{action.label}</Text>
+                  <View style={[s.quickIcon, { backgroundColor: action.color + '1A', borderColor: action.color + '44' }]}>
+                    <action.Icon size={17} color={action.color} />
                   </View>
                 </TouchableOpacity>
               </Animated.View>
@@ -120,121 +124,150 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         </View>
       </Modal>
 
-      <View style={[styles.bar, { paddingBottom: insets.bottom || spacing[3] }]}>
-        {/* Left: Today */}
-        {(() => {
-          const focused = state.index === 0;
-          const Tab = leftTab;
-          return (
-            <TouchableOpacity
-              key={Tab.name}
-              style={styles.tabItem}
-              onPress={() => navigation.navigate(Tab.name)}
-              activeOpacity={0.7}
-            >
-              <Tab.Icon size={22} color={focused ? colors.text.primary : colors.text.muted} strokeWidth={focused ? 2 : 1.5} />
-              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{Tab.label}</Text>
-              {focused && <View style={styles.activeDot} />}
-            </TouchableOpacity>
-          );
-        })()}
+      {/* ── Bar container ──────────────────────────────────────────── */}
+      <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]}>
 
-        {/* Center FAB */}
-        <View style={styles.fabWrap}>
+        {/* FAB — floats above pill center */}
+        <View style={s.fabRow} pointerEvents="box-none">
           <TouchableOpacity
-            style={styles.fab}
+            style={s.fab}
             onPress={open ? () => closeMenu() : openMenu}
-            activeOpacity={0.85}
+            activeOpacity={0.9}
           >
             <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <Plus size={22} color={colors.text.inverse} strokeWidth={2.5} />
+              <Plus size={21} color="#000000" strokeWidth={2.8} />
             </Animated.View>
           </TouchableOpacity>
         </View>
 
-        {/* Right: Tasks + Finances */}
-        {rightTabs.map((tab, i) => {
-          const focused = state.index === i + 1;
-          const showBadge = tab.name === 'tasks' && pendingCount > 0;
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              style={styles.tabItem}
-              onPress={() => navigation.navigate(tab.name)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.iconWrap}>
-                <tab.Icon size={22} color={focused ? colors.text.primary : colors.text.muted} strokeWidth={focused ? 2 : 1.5} />
-                {showBadge && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{pendingCount > 99 ? '99' : pendingCount}</Text>
-                  </View>
+        {/* Pill */}
+        <View style={s.pill}>
+          {TABS.map((tab, i) => {
+            const focused = state.index === i;
+            const showBadge = tab.name === 'tasks' && pendingCount > 0;
+            return (
+              <TouchableOpacity
+                key={tab.name}
+                style={s.tabItem}
+                onPress={() => navigation.navigate(tab.name)}
+                activeOpacity={0.75}
+              >
+                <View style={s.iconWrap}>
+                  <tab.Icon
+                    size={21}
+                    color={focused ? '#FFFFFF' : colors.text.secondary}
+                    strokeWidth={focused ? 2 : 1.5}
+                  />
+                  {showBadge && (
+                    <View style={s.badge}>
+                      <Text style={s.badgeText}>{pendingCount > 99 ? '99' : pendingCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[s.tabLabel, focused && s.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+                {focused && (
+                  <View style={[s.activeLine, { backgroundColor: accentColor }]} />
                 )}
-              </View>
-              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{tab.label}</Text>
-              {focused && <View style={styles.activeDot} />}
-            </TouchableOpacity>
-          );
-        })}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    backgroundColor: colors.bg.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.default,
-    paddingTop: spacing[2],
-    alignItems: 'center',
+const s = StyleSheet.create({
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    backgroundColor: 'transparent',
   },
+
+  // ── FAB row ─────────────────────────────────────────────────────
+  fabRow: {
+    alignItems: 'center',
+    marginBottom: -FAB_OVERLAP,
+    zIndex: 10,
+  },
+  fab: {
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 14,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+  },
+
+  // ── Pill ────────────────────────────────────────────────────────
+  pill: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(14,14,14,0.98)',
+    borderRadius: 28,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 8,
+    paddingTop: FAB_OVERLAP + 4,
+    paddingBottom: 10,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+  },
+
+  // ── Tab items ────────────────────────────────────────────────────
   tabItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 3,
-    paddingVertical: spacing[1],
-    position: 'relative',
+    gap: 4,
+    paddingTop: 2,
   },
-  tabLabel: { fontSize: 9, fontWeight: '500', color: colors.text.muted, letterSpacing: 0.2 },
-  tabLabelActive: { color: colors.text.primary },
-  activeDot: {
-    position: 'absolute',
-    bottom: -spacing[1],
-    width: 3, height: 3, borderRadius: 2,
-    backgroundColor: colors.text.primary,
+  iconWrap: { position: 'relative' },
+  tabLabel: {
+    fontSize: 9,
+    fontWeight: '500',
+    color: colors.text.secondary,
+    letterSpacing: 0.3,
+  },
+  tabLabelActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  activeLine: {
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+    marginTop: 2,
   },
 
-  iconWrap: { position: 'relative' },
+  // ── Badge ────────────────────────────────────────────────────────
   badge: {
     position: 'absolute', top: -5, right: -8,
-    minWidth: 16, height: 16, borderRadius: 8,
+    minWidth: 15, height: 15, borderRadius: 8,
     backgroundColor: colors.accent.red,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1.5,
-    borderColor: colors.bg.card,
+    borderColor: '#000000',
   },
   badgeText: { fontSize: 8, fontWeight: '700', color: '#fff', lineHeight: 11 },
 
-  fabWrap: { flex: 1, alignItems: 'center', marginTop: -20 },
-  fab: {
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: colors.text.primary,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: colors.bg.primary,
-    elevation: 4,
-  },
-
+  // ── Quick actions menu ───────────────────────────────────────────
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
   },
-
   quickMenu: {
     position: 'absolute',
-    right: spacing[5],
+    right: 24,
     gap: spacing[3],
     alignItems: 'flex-end',
   },
@@ -244,18 +277,18 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   quickIcon: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 46, height: 46, borderRadius: 23,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1,
   },
   quickLabel: {
     fontSize: 13, fontWeight: '600',
     color: colors.text.primary,
-    backgroundColor: colors.bg.elevated,
+    backgroundColor: 'rgba(18,18,18,0.96)',
     paddingHorizontal: spacing[3], paddingVertical: 7,
     borderRadius: radius.md,
     overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
   },
 });
