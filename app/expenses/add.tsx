@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
-  Platform, Alert,
+  Platform, Alert, InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -103,30 +103,29 @@ export default function AddExpenseModal() {
         note,
         date: dateParsed,
       });
-      addExpense(expense);
-
-      // Budget check for expenses
-      if (txType === 'expense') {
-        const budgets = await getBudgets();
-        const limit = budgets[expCat];
-        if (limit && limit > 0) {
-          const nowM = new Date().toISOString().slice(0, 7); // YYYY-MM
-          const monthSpent = expenses
-            .filter(e => (!e.type || e.type === 'expense') && e.category === expCat && e.date.startsWith(nowM))
-            .reduce((s, e) => s + e.amount, 0) + parsed;
-          const pct = monthSpent / limit;
-          const label = CATEGORY_META[expCat]?.label ?? expCat;
-          if (pct >= 1) {
-            toast.error(`Budżet "${label}" przekroczony! ${monthSpent.toFixed(0)}/${limit} zł`);
-            notificationsService.notifyCategoryLimit(label, monthSpent, limit);
-          } else if (pct >= 0.85) {
-            toast.info(`Uwaga: ${Math.round(pct * 100)}% budżetu "${label}" wykorzystane`);
-            notificationsService.notifyCategoryLimit(label, monthSpent, limit);
+      router.back();
+      InteractionManager.runAfterInteractions(async () => {
+        addExpense(expense);
+        if (txType === 'expense') {
+          const budgets = await getBudgets();
+          const limit = budgets[expCat];
+          if (limit && limit > 0) {
+            const nowM = new Date().toISOString().slice(0, 7);
+            const monthSpent = expenses
+              .filter(e => (!e.type || e.type === 'expense') && e.category === expCat && e.date.startsWith(nowM))
+              .reduce((s, e) => s + e.amount, 0) + parsed;
+            const pct = monthSpent / limit;
+            const label = CATEGORY_META[expCat]?.label ?? expCat;
+            if (pct >= 1) {
+              toast.error(`Budżet "${label}" przekroczony! ${monthSpent.toFixed(0)}/${limit} zł`);
+              notificationsService.notifyCategoryLimit(label, monthSpent, limit);
+            } else if (pct >= 0.85) {
+              toast.info(`Uwaga: ${Math.round(pct * 100)}% budżetu "${label}" wykorzystane`);
+              notificationsService.notifyCategoryLimit(label, monthSpent, limit);
+            }
           }
         }
-      }
-
-      router.back();
+      });
     } catch (e: any) {
       Alert.alert('Błąd', e.message);
     } finally {

@@ -2,7 +2,7 @@
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TextInput,
-  TouchableOpacity,
+  TouchableOpacity, InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -297,10 +297,12 @@ export default function AddTaskScreen() {
         tags,
         recurring,
       });
-      addTask(task);
-      notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
       toast.success('Zadanie dodane');
       router.back();
+      InteractionManager.runAfterInteractions(() => {
+        addTask(task);
+        notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
+      });
     } catch (e: any) {
       toast.error(e.message ?? 'Błąd zapisu');
     } finally {

@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  KeyboardAvoidingView, Platform, Alert,
+  KeyboardAvoidingView, Platform, Alert, InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -59,10 +59,13 @@ export default function AddCalendarModal() {
           priority,
           tags: [],
         });
-        addTask(task);
-        if (deadlineIso) {
-          notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
-        }
+        router.back();
+        InteractionManager.runAfterInteractions(() => {
+          addTask(task);
+          if (deadlineIso) {
+            notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
+          }
+        });
       } else {
         const event = await calendarService.addEvent({
           title: title.trim(),
@@ -74,12 +77,13 @@ export default function AddCalendarModal() {
           priority,
           color: eventColor,
         });
-        addEvent(event);
-        if (event.startTime) {
-          notificationsService.scheduleEventReminder(event.id, event.title, event.date, event.startTime).catch(() => {});
-        }
-      }
-      router.back();
+        router.back();
+        InteractionManager.runAfterInteractions(() => {
+          addEvent(event);
+          if (event.startTime) {
+            notificationsService.scheduleEventReminder(event.id, event.title, event.date, event.startTime).catch(() => {});
+          }
+        });
     } catch (e: any) {
       Alert.alert('Błąd', e.message);
     } finally {
