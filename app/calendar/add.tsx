@@ -84,6 +84,7 @@ export default function AddCalendarModal() {
             notificationsService.scheduleEventReminder(event.id, event.title, event.date, event.startTime).catch(() => {});
           }
         });
+      }
     } catch (e: any) {
       Alert.alert('Błąd', e.message);
     } finally {
