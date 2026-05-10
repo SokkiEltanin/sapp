@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -44,8 +44,14 @@ const rw = StyleSheet.create({
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { events, updateEvent, deleteEvent } = useCalendarStore();
+  const { events, updateEvent, deleteEvent, setEvents } = useCalendarStore();
   const event = events.find(e => e.id === id);
+
+  useEffect(() => {
+    if (events.length === 0) {
+      calendarService.getAllEvents().then(setEvents).catch(() => {});
+    }
+  }, []);
 
   const [editing, setEditing]       = useState(false);
   const [title, setTitle]           = useState(event?.title ?? '');

@@ -51,16 +51,23 @@ export function useExpenses() {
       .filter((e) => isIncome(e) && isWithinInterval(parseISO(e.date), { start: monthStart, end: monthEnd }))
       .reduce((s, e) => s + e.amount, 0);
 
-    const byCat = expenses
+    const allByCat = expenses
       .filter(isExpense)
       .reduce<Record<string, number>>((acc, e) => {
         acc[e.category] = (acc[e.category] ?? 0) + e.amount;
         return acc;
       }, {});
-    const topCatKey = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0]?.[0] as ExpenseCategory | undefined;
+    const topCatKey = Object.entries(allByCat).sort((a, b) => b[1] - a[1])[0]?.[0] as ExpenseCategory | undefined;
     const topCategory = topCatKey ? (CATEGORY_META as any)[topCatKey]?.label : undefined;
 
-    return { thisWeek, lastWeek, monthExpenses, monthIncome, topCategory };
+    const monthCategorySpend = expenses
+      .filter(e => isExpense(e) && isWithinInterval(parseISO(e.date), { start: monthStart, end: monthEnd }))
+      .reduce<Record<string, number>>((acc, e) => {
+        acc[e.category] = (acc[e.category] ?? 0) + e.amount;
+        return acc;
+      }, {});
+
+    return { thisWeek, lastWeek, monthExpenses, monthIncome, topCategory, monthCategorySpend };
   }, [expenses]);
 
   const grouped = useMemo(() => {

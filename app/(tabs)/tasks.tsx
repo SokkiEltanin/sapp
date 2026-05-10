@@ -1,4 +1,5 @@
 ﻿import { useState, useMemo, useRef } from 'react';
+import CalendarView from '@/components/calendar/CalendarView';
 import {
   View, Text, StyleSheet, SectionList, RefreshControl,
   TouchableOpacity, Alert, Modal, Pressable, ScrollView, Animated, TextInput,
@@ -8,18 +9,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   CheckCircle2, Circle, Clock, Flame, Timer,
-  ChevronDown, Filter, Search, RefreshCw, AlarmClock, BellOff, BarChart2, CheckSquare, Target,
-  Trash2, Plus, CalendarClock, X as XIcon,
+  Search, RefreshCw, AlarmClock, BellOff, BarChart2, CheckSquare, Target,
+  Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import AnimatedButton from '@/components/ui/AnimatedButton';
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
 import { Task, TaskDifficulty, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useTabSwipe } from '@/hooks/useTabSwipe';
 
 // ─── Snooze options ───────────────────────────────────────────────────────────
 
@@ -364,8 +365,10 @@ const sh = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
+  const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks, isLoading, reload, toggle, remove, update, snooze, unsnooze } = useTasks();
   const startPomodoro = usePomodoroStore(s => s.startFor);
+  const [viewMode, setViewMode]     = useState<'list' | 'calendar'>('list');
   const [filter, setFilter]         = useState<FilterKey>('all');
   const [moodModal, setMoodModal]   = useState(false);
   const [completedTask, setCompletedTask] = useState<Task | null>(null);
@@ -507,7 +510,8 @@ export default function TasksScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top']} {...panHandlers}>
+      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -517,137 +521,160 @@ export default function TasksScreen() {
             {snoozedTasks.length > 0 ? ` · ${snoozedTasks.length} odłożonych` : ''}
           </Text>
         </View>
-        <View style={styles.headerBtns}>
-          <PressableScale onPress={() => router.push('/focus' as any)} style={styles.searchBtn}>
-            <Target size={16} color={colors.accent.purple} />
-          </PressableScale>
-          <PressableScale onPress={() => router.push('/weekly' as any)} style={styles.searchBtn}>
-            <BarChart2 size={16} color={colors.text.muted} />
-          </PressableScale>
-          <PressableScale
-            onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}
-            style={[styles.searchBtn, showSearch && styles.searchBtnActive]}
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            onPress={() => setViewMode('list')}
+            style={[styles.toggleTab, viewMode === 'list' && styles.toggleTabActive]}
+            activeOpacity={0.7}
           >
-            <Search size={18} color={showSearch ? colors.accent.purple : colors.text.muted} />
-          </PressableScale>
+            <ListTodo size={13} color={viewMode === 'list' ? colors.text.primary : colors.text.muted} />
+            <Text style={[styles.toggleTabText, viewMode === 'list' && styles.toggleTabTextActive]}>
+              Lista
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setViewMode('calendar')}
+            style={[styles.toggleTab, viewMode === 'calendar' && styles.toggleTabActive]}
+            activeOpacity={0.7}
+          >
+            <CalendarDays size={13} color={viewMode === 'calendar' ? colors.text.primary : colors.text.muted} />
+            <Text style={[styles.toggleTabText, viewMode === 'calendar' && styles.toggleTabTextActive]}>
+              Kalen.
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search bar */}
-      {showSearch && (
-        <View style={styles.searchBarWrap}>
-          <Search size={14} color={colors.text.muted} />
-          <TextInput
-            autoFocus
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Szukaj zadań, tagów..."
-            placeholderTextColor={colors.text.muted}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
-              <XIcon size={14} color={colors.text.muted} />
+      {viewMode === 'calendar' ? (
+        <CalendarView tasks={tasks} onToggleTask={handleToggle} />
+      ) : (
+        <>
+          {/* Search bar */}
+          {showSearch && (
+            <View style={styles.searchBarWrap}>
+              <Search size={14} color={colors.text.muted} />
+              <TextInput
+                autoFocus
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Szukaj zadań, tagów..."
+                placeholderTextColor={colors.text.muted}
+                style={styles.searchInput}
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+                  <XIcon size={14} color={colors.text.muted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Filter bar */}
+          <View style={styles.filterWrap}>
+            {FILTERS.map(({ key, label }) => {
+              const active = filter === key;
+              return (
+                <PressableScale key={key} onPress={() => setFilter(key)}>
+                  <View style={[styles.filterPill, active && styles.filterPillActive]}>
+                    <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+                  </View>
+                </PressableScale>
+              );
+            })}
+          </View>
+
+          {/* Overdue rescue banner */}
+          {overdueTasks.length > 0 && filter === 'all' && (
+            <TouchableOpacity
+              style={styles.overdueBanner}
+              onPress={() => setRescueOpen(true)}
+              activeOpacity={0.8}
+            >
+              <CalendarClock size={14} color={colors.bg.primary} />
+              <Text style={styles.overdueBannerText}>
+                {overdueTasks.length} przeterminowanych — naciśnij aby wyczyścić
+              </Text>
             </TouchableOpacity>
           )}
-        </View>
-      )}
 
-      {/* Filter bar */}
-      <View style={styles.filterWrap}>
-        {FILTERS.map(({ key, label }) => {
-          const active = filter === key;
-          return (
-            <PressableScale key={key} onPress={() => setFilter(key)}>
-              <View style={[styles.filterPill, active && styles.filterPillActive]}>
-                <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
-              </View>
-            </PressableScale>
-          );
-        })}
-      </View>
-
-      {/* Overdue rescue banner */}
-      {overdueTasks.length > 0 && filter === 'all' && (
-        <TouchableOpacity
-          style={styles.overdueBanner}
-          onPress={() => setRescueOpen(true)}
-          activeOpacity={0.8}
-        >
-          <CalendarClock size={14} color={colors.bg.primary} />
-          <Text style={styles.overdueBannerText}>
-            {overdueTasks.length} przeterminowanych — naciśnij aby wyczyścić
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Tag filter strip */}
-      {allTags.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tagStrip}
-        >
-          {selectedTag && (
-            <PressableScale onPress={() => setSelectedTag(null)}>
-              <View style={[styles.tagPill, styles.tagPillClear]}>
-                <Text style={styles.tagPillClearText}>✕ wyczyść</Text>
-              </View>
-            </PressableScale>
+          {/* Tag filter strip */}
+          {allTags.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tagStrip}
+            >
+              {selectedTag && (
+                <PressableScale onPress={() => setSelectedTag(null)}>
+                  <View style={[styles.tagPill, styles.tagPillClear]}>
+                    <Text style={styles.tagPillClearText}>wyczysc</Text>
+                  </View>
+                </PressableScale>
+              )}
+              {allTags.map(tag => {
+                const active = selectedTag === tag;
+                return (
+                  <PressableScale key={tag} onPress={() => setSelectedTag(active ? null : tag)}>
+                    <View style={[styles.tagPill, active && styles.tagPillActive]}>
+                      <Text style={[styles.tagPillText, active && styles.tagPillTextActive]}>#{tag}</Text>
+                    </View>
+                  </PressableScale>
+                );
+              })}
+            </ScrollView>
           )}
-          {allTags.map(tag => {
-            const active = selectedTag === tag;
-            return (
-              <PressableScale key={tag} onPress={() => setSelectedTag(active ? null : tag)}>
-                <View style={[styles.tagPill, active && styles.tagPillActive]}>
-                  <Text style={[styles.tagPillText, active && styles.tagPillTextActive]}>#{tag}</Text>
-                </View>
-              </PressableScale>
-            );
-          })}
-        </ScrollView>
+
+          <SectionList
+            sections={displaySections}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            renderSectionHeader={({ section }) =>
+              section.title ? (
+                <SectionHeader title={section.title} count={section.data.length} accent={section.accent} />
+              ) : null
+            }
+            refreshControl={
+              <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} />
+            }
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>
+                  {filter === 'done' ? 'Brak ukończonych' : filter === 'snoozed' ? 'Brak odłożonych' : 'Brak zadań'}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {filter === 'done'
+                    ? 'Zaznacz zadania jako ukończone'
+                    : filter === 'snoozed'
+                    ? 'Odłóż zadanie, żeby schować je tymczasowo'
+                    : 'Naciśnij + żeby dodać pierwsze zadanie'}
+                </Text>
+              </View>
+            }
+          />
+        </>
       )}
 
-      <SectionList
-        sections={displaySections}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        renderSectionHeader={({ section }) =>
-          section.title ? (
-            <SectionHeader title={section.title} count={section.data.length} accent={section.accent} />
-          ) : null
-        }
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} />
-        }
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>
-              {filter === 'done' ? 'Brak ukończonych' : filter === 'snoozed' ? 'Brak odłożonych' : 'Brak zadań'}
-            </Text>
-            <Text style={styles.emptySub}>
-              {filter === 'done'
-                ? 'Zaznacz zadania jako ukończone'
-                : filter === 'snoozed'
-                ? 'Odłóż zadanie, żeby schować je tymczasowo'
-                : 'Naciśnij + żeby dodać pierwsze zadanie'}
-            </Text>
-          </View>
-        }
-      />
-
-      {/* FAB */}
-      <View style={styles.fab}>
-        <AnimatedButton
-          onPress={() => router.push('/tasks/add' as any)}
-          label="Nowe zadanie"
-          icon={<Plus size={17} color={colors.bg.primary} />}
-          size="lg"
-          fullWidth
-        />
+      {/* Bottom action bar */}
+      <View style={styles.bottomBar}>
+        <PressableScale
+          onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}
+          style={[styles.barBtn, showSearch && styles.barBtnActive]}
+        >
+          <Search size={18} color={showSearch ? colors.accent.purple : colors.text.secondary} />
+        </PressableScale>
+        <PressableScale onPress={() => router.push('/focus' as any)} style={styles.barBtn}>
+          <Target size={18} color={colors.accent.purple} />
+        </PressableScale>
+        <View style={{ flex: 1 }} />
+        <PressableScale onPress={() => router.push('/weekly' as any)} style={styles.barBtn}>
+          <BarChart2 size={18} color={colors.text.secondary} />
+        </PressableScale>
+        <PressableScale onPress={() => router.push('/habits' as any)} style={styles.barBtn}>
+          <Flame size={18} color={colors.text.secondary} />
+        </PressableScale>
       </View>
 
       <CompletionMoodModal
@@ -749,6 +776,7 @@ export default function TasksScreen() {
           </View>
         </Modal>
       )}
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -757,7 +785,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg.primary },
 
   header: {
-    flexDirection: 'row', alignItems: 'flex-end',
+    flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing[4],
     paddingTop: spacing[4],
@@ -766,6 +794,20 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
   subtitle: { fontSize: 12, color: colors.text.muted, marginTop: 3 },
   headerBtns: { flexDirection: 'row', gap: spacing[2] },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.bg.card,
+    borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.border.default,
+    overflow: 'hidden',
+  },
+  toggleTab: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  toggleTabActive: { backgroundColor: colors.bg.elevated },
+  toggleTabText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  toggleTabTextActive: { color: colors.text.primary },
   searchBtn: {
     width: 38, height: 38, borderRadius: radius.md,
     backgroundColor: colors.bg.card, borderWidth: 1,
@@ -805,7 +847,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12, fontWeight: '500', color: colors.text.secondary },
   filterTextActive: { color: colors.text.inverse },
 
-  list: { paddingHorizontal: spacing[4], paddingBottom: 120 },
+  list: { paddingHorizontal: spacing[4], paddingBottom: 20 },
 
   cardWrap: { marginBottom: spacing[2] }, // used by done/snoozed cards (no Swipeable wrapper)
   taskCard: {
@@ -851,7 +893,22 @@ const styles = StyleSheet.create({
   tagPillClear: { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.15)' },
   tagPillClearText: { fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
 
-  fab: { position: 'absolute', bottom: spacing[6], left: spacing[4], right: spacing[4] },
+  bottomBar: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderTopWidth: 1, borderTopColor: colors.border.subtle,
+    backgroundColor: colors.bg.secondary,
+  },
+  barBtn: {
+    width: 44, height: 44, borderRadius: radius.md,
+    backgroundColor: colors.bg.elevated,
+    borderWidth: 1, borderColor: colors.border.default,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  barBtnActive: {
+    backgroundColor: colors.accent.purple + '18',
+    borderColor: colors.accent.purple + '40',
+  },
 
   overdueBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],

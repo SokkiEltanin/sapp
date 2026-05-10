@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, collection, doc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { getAuth, Auth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, getAuth, Auth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
@@ -17,5 +18,21 @@ const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) 
 
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
-export const auth: Auth = getAuth(app);
+
+let _auth: Auth;
+try {
+  _auth = initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
+} catch {
+  _auth = getAuth(app);
+}
+export const auth: Auth = _auth;
 export default app;
+
+function uid(): string {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  return user.uid;
+}
+
+export const userCol = (col: string) => collection(db, 'users', uid(), col);
+export const userDoc = (col: string, id: string) => doc(db, 'users', uid(), col, id);

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, Trash2, Edit3, Save, TrendingDown, TrendingUp, Check, Tag } from 'lucide-react-native';
+import { ArrowLeft, Trash2, Edit3, Save, TrendingDown, TrendingUp, Check, Tag, Calendar, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -14,7 +14,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
-import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
+import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
@@ -24,8 +24,14 @@ const INCOME_TAGS  = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
 
 export default function ExpenseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { expenses, updateExpense, deleteExpense } = useExpensesStore();
+  const { expenses, updateExpense, deleteExpense, setExpenses } = useExpensesStore();
   const expense = expenses.find(e => e.id === id);
+
+  useEffect(() => {
+    if (expenses.length === 0) {
+      expensesService.getAll().then(setExpenses).catch(() => {});
+    }
+  }, []);
 
   const isInc = expense?.type === 'income';
 
@@ -38,6 +44,11 @@ export default function ExpenseDetailScreen() {
   const [tags, setTags]         = useState<string[]>(expense?.tags ?? []);
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving]     = useState(false);
+  const [itemsExpanded, setItemsExpanded] = useState(true);
+  const [dateInput, setDateInput] = useState(() => {
+    const d = new Date(expense?.date ?? Date.now());
+    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+  });
 
   if (!expense) {
     return (
@@ -73,12 +84,22 @@ export default function ExpenseDetailScreen() {
     }
     setSaving(true);
     try {
-      const updates = {
+      // Parse DD.MM.YYYY date input
+    let dateParsed = expense.date;
+    const parts = dateInput.split('.');
+    if (parts.length === 3) {
+      const [d, m, y] = parts.map(Number);
+      const dt = new Date(y, m - 1, d, 12, 0, 0);
+      if (!isNaN(dt.getTime())) dateParsed = dt.toISOString();
+    }
+
+    const updates = {
         type: txType,
         amount: parsed,
         note: note.trim(),
         category: editIsIncome ? incCat : expCat,
         tags,
+        date: dateParsed,
         updatedAt: new Date().toISOString(),
       };
       updateExpense(id!, updates);
@@ -136,9 +157,6 @@ export default function ExpenseDetailScreen() {
                 <Edit3 size={18} color={colors.text.secondary} />
               </PressableScale>
             )}
-            <PressableScale onPress={handleDelete} style={s.iconBtn}>
-              <Trash2 size={18} color={colors.accent.red} />
-            </PressableScale>
           </View>
         </View>
 
@@ -183,6 +201,69 @@ export default function ExpenseDetailScreen() {
               />
             ) : (
               expense.note ? <Text style={s.noteText}>{expense.note}</Text> : null
+            )}
+          </View>
+
+          {/* Receipt breakdown */}
+          {expense.receiptItems && expense.receiptItems.length > 0 && (
+            <View style={s.card}>
+              <TouchableOpacity
+                style={s.receiptHeader}
+                onPress={() => setItemsExpanded(x => !x)}
+                activeOpacity={0.7}
+              >
+                <ShoppingCart size={14} color={colors.accent.blue} />
+                <Text style={[s.cardLabel, { color: colors.accent.blue, flex: 1 }]}>
+                  PRODUKTY ({expense.receiptItems.length})
+                </Text>
+                {itemsExpanded
+                  ? <ChevronUp size={14} color={colors.text.muted} />
+                  : <ChevronDown size={14} color={colors.text.muted} />
+                }
+              </TouchableOpacity>
+              {itemsExpanded && expense.receiptItems.map((it, idx) => {
+                const meta = getCategoryMeta(it.category);
+                return (
+                  <View key={idx} style={s.receiptItem}>
+                    <View style={s.receiptItemLeft}>
+                      <Text style={s.receiptItemName} numberOfLines={1}>{it.name}</Text>
+                      <Text style={s.receiptItemMeta}>
+                        {it.quantity > 1 ? `${it.quantity} szt. · ` : ''}{meta.label}
+                        {it.discount ? ` · -${it.discount.toFixed(2)} zł` : ''}
+                      </Text>
+                    </View>
+                    <Text style={s.receiptItemPrice}>{it.price.toFixed(2)} zł</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Date row */}
+          <View style={s.card}>
+            <Text style={s.cardLabel}>Data</Text>
+            {editing ? (
+              <View style={s.dateRow}>
+                <Calendar size={14} color={colors.text.muted} />
+                <TextInput
+                  value={dateInput}
+                  onChangeText={setDateInput}
+                  style={s.dateInput}
+                  placeholder="DD.MM.RRRR"
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="numeric"
+                  maxLength={10}
+                />
+              </View>
+            ) : (
+              <View style={s.dateRow}>
+                <Calendar size={14} color={colors.text.muted} />
+                <Text style={s.dateTxt}>
+                  {new Date(expense.date).toLocaleDateString('pl-PL', {
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  })}
+                </Text>
+              </View>
             )}
           </View>
 
@@ -298,6 +379,11 @@ export default function ExpenseDetailScreen() {
               ? `\nEdytowano: ${new Date(expense.updatedAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}`
               : ''}
           </Text>
+
+          <PressableScale onPress={handleDelete} style={s.deleteBtn}>
+            <Trash2 size={16} color={colors.accent.red} />
+            <Text style={s.deleteBtnText}>Usuń transakcję</Text>
+          </PressableScale>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -404,7 +490,33 @@ const s = StyleSheet.create({
   tagBadgeText: { fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
   emptyTags: { fontSize: 13, color: colors.text.muted },
 
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dateInput: {
+    flex: 1, fontSize: 15, color: colors.text.primary,
+    paddingVertical: 0, fontWeight: '600',
+  },
+  dateTxt: { fontSize: 14, color: colors.text.secondary },
+
   meta: { fontSize: 11, color: colors.text.muted, paddingHorizontal: spacing[1], lineHeight: 18 },
+
+  receiptHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  receiptItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: spacing[2],
+    borderTopWidth: 1, borderTopColor: colors.border.subtle,
+  },
+  receiptItemLeft: { flex: 1, gap: 2 },
+  receiptItemName: { fontSize: 13, fontWeight: '500', color: colors.text.primary },
+  receiptItemMeta: { fontSize: 10, color: colors.text.muted },
+  receiptItemPrice: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[4], borderRadius: radius.xl,
+    borderWidth: 1, borderColor: colors.accent.red + '40',
+    backgroundColor: colors.accent.red + '0E',
+  },
+  deleteBtnText: { fontSize: 14, fontWeight: '600', color: colors.accent.red },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFoundText: { color: colors.text.secondary, fontSize: 16 },

@@ -4,12 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   ChevronLeft, Bell, BellOff, Moon, Sun,
-  Smile, ListTodo, CalendarDays, Database, PiggyBank, Check, Footprints, Droplets,
+  Smile, ListTodo, CalendarDays, Database, Check,
   Zap, ClipboardList, LogIn, User,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, linkWithCredential, signInWithCredential, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/services/firebase';
 
@@ -21,13 +20,16 @@ import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { getBudgets, saveBudgets, MonthlyBudgets } from '@/utils/budgets';
-import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
+import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS } from '@/utils/tagBudgets';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
+import { Plus, Trash2, Tag } from 'lucide-react-native';
 
-WebBrowser.maybeCompleteAuthSession();
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+});
 
 const APP_VERSION = '1.0.0';
 
@@ -39,10 +41,6 @@ export default function SettingsScreen() {
   const [googleUser, setGoogleUser] = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  });
-
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setGoogleUser(user?.isAnonymous === false ? (user.email ?? user.displayName) : null);
@@ -50,20 +48,28 @@ export default function SettingsScreen() {
     return unsub;
   }, []);
 
-  useEffect(() => {
-    if (response?.type !== 'success') return;
-    const { id_token } = response.params;
-    const credential = GoogleAuthProvider.credential(id_token);
+  const handleGoogleSignIn = async () => {
     setGoogleLinking(true);
-    const current = auth.currentUser;
-    const doLink = current?.isAnonymous
-      ? linkWithCredential(current, credential)
-      : signInWithCredential(auth, credential);
-    doLink
-      .then((result) => setGoogleUser(result.user.email ?? result.user.displayName))
-      .catch((e) => Alert.alert('Błąd', e.message))
-      .finally(() => setGoogleLinking(false));
-  }, [response]);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken ?? (userInfo as any).idToken;
+      if (!idToken) throw new Error('Brak id_token');
+      const credential = GoogleAuthProvider.credential(idToken);
+      const current = auth.currentUser;
+      const doLink = current?.isAnonymous
+        ? linkWithCredential(current, credential)
+        : signInWithCredential(auth, credential);
+      const result = await doLink;
+      setGoogleUser(result.user.email ?? result.user.displayName);
+    } catch (e: any) {
+      if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
+        Alert.alert('Błąd', e.message);
+      }
+    } finally {
+      setGoogleLinking(false);
+    }
+  };
 
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [eveningHour, setEveningHour] = useState('20');
@@ -72,15 +78,17 @@ export default function SettingsScreen() {
   const [morningMin, setMorningMin]   = useState('00');
   const [morningEnabled, setMorningEnabled] = useState(false);
   const [briefingEnabled, setBriefingEnabled] = useState(false);
-  const [briefingHour, setBriefingHour]   = useState('7');
-  const [briefingMin, setBriefingMin]     = useState('30');
+  const [briefingHour, setBriefingHour]   = useState('8');
+  const [briefingMin, setBriefingMin]     = useState('00');
   const [habitNotifEnabled, setHabitNotifEnabled] = useState(false);
   const [habitHour, setHabitHour]         = useState('21');
   const [habitMin, setHabitMin]           = useState('00');
 
   const [budgetInputs, setBudgetInputs] = useState<Partial<Record<ExpenseCategory, string>>>({});
-  const [stepGoal, setStepGoal]   = useState('10000');
-  const [waterGoal, setWaterGoal] = useState('8');
+  const [tagRules, setTagRules] = useState<TagBudgetRule[]>([]);
+  const [newTag, setNewTag] = useState('');
+  const [newTagLimit, setNewTagLimit] = useState('');
+  const [newTagPeriod, setNewTagPeriod] = useState<'week' | 'month'>('month');
 
   useEffect(() => {
     getBudgets().then(b => {
@@ -90,11 +98,37 @@ export default function SettingsScreen() {
       }
       setBudgetInputs(inputs);
     });
-    getHealthGoals().then(g => {
-      setStepGoal(String(g.stepGoal));
-      setWaterGoal(String(g.waterGoal));
-    });
+    getTagBudgetRules().then(setTagRules);
   }, []);
+
+  const handleAddTagRule = async () => {
+    const tag = newTag.trim().toLowerCase();
+    const limit = parseFloat(newTagLimit.replace(',', '.'));
+    if (!tag || !limit || limit <= 0) return;
+    if (tagRules.some(r => r.tag === tag && r.period === newTagPeriod)) {
+      toast.error('Reguła dla tego tagu już istnieje');
+      return;
+    }
+    const rule: TagBudgetRule = {
+      id: Date.now().toString(),
+      tag,
+      limit,
+      period: newTagPeriod,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...tagRules, rule];
+    setTagRules(updated);
+    await saveTagBudgetRules(updated);
+    setNewTag('');
+    setNewTagLimit('');
+    toast.success(`Reguła dla "${tag}" dodana`);
+  };
+
+  const handleDeleteTagRule = async (id: string) => {
+    const updated = tagRules.filter(r => r.id !== id);
+    setTagRules(updated);
+    await saveTagBudgetRules(updated);
+  };
 
   const handleSaveBudgets = async () => {
     const budgets: MonthlyBudgets = {};
@@ -128,7 +162,10 @@ export default function SettingsScreen() {
         await notificationsService.cancelMorningReminder();
       }
       if (briefingEnabled && !isNaN(bh) && !isNaN(bm)) {
-        await notificationsService.scheduleDailyTaskBriefing(bh, bm);
+        const today = new Date().toISOString().slice(0, 10);
+        const taskCount = tasks.filter(t => t.status !== 'done' && (t.deadline?.startsWith(today) || t.scheduledDate === today)).length;
+        const eventCount = events.filter(e => e.date === today).length;
+        await notificationsService.scheduleDailyTaskBriefing(bh, bm, { taskCount, eventCount });
       } else {
         await notificationsService.cancelDailyTaskBriefing();
       }
@@ -379,57 +416,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Health goals */}
-        <View>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Cele zdrowotne</Text>
-            <PressableScale
-              onPress={async () => {
-                const s = parseInt(stepGoal) || 10000;
-                const w = parseInt(waterGoal) || 8;
-                await saveHealthGoals({ stepGoal: s, waterGoal: w });
-                toast.success('Cele zapisane');
-              }}
-              style={styles.saveBudgetBtn}
-            >
-              <Check size={14} color={colors.accent.success} />
-              <Text style={styles.saveBudgetText}>Zapisz</Text>
-            </PressableScale>
-          </View>
-          <View style={styles.card}>
-            <View style={styles.budgetRow}>
-              <View style={[styles.iconWrap, { backgroundColor: colors.accent.green + '18' }]}>
-                <Footprints size={14} color={colors.accent.green} />
-              </View>
-              <Text style={styles.rowLabel}>Cel kroków</Text>
-              <TextInput
-                value={stepGoal}
-                onChangeText={setStepGoal}
-                placeholder="10000"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="number-pad"
-                style={styles.budgetInput}
-              />
-              <Text style={styles.budgetCur}>krok.</Text>
-            </View>
-            <View style={[styles.budgetRow, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
-              <View style={[styles.iconWrap, { backgroundColor: colors.accent.blue + '18' }]}>
-                <Droplets size={14} color={colors.accent.blue} />
-              </View>
-              <Text style={styles.rowLabel}>Cel wody</Text>
-              <TextInput
-                value={waterGoal}
-                onChangeText={setWaterGoal}
-                placeholder="8"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="number-pad"
-                style={styles.budgetInput}
-              />
-              <Text style={styles.budgetCur}>szkl.</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Monthly budgets */}
         <View>
           <View style={styles.sectionHeader}>
@@ -465,6 +451,85 @@ export default function SettingsScreen() {
                   </View>
                 );
               })}
+          </View>
+        </View>
+
+        {/* Tag budgets */}
+        <View>
+          <Text style={styles.sectionTitle}>Limity na tagi</Text>
+          <View style={styles.card}>
+            {/* Existing rules */}
+            {tagRules.map((rule, i) => (
+              <View key={rule.id} style={[styles.budgetRow, i > 0 && { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }]}>
+                <View style={[styles.iconWrap, { backgroundColor: colors.accent.purple + '18' }]}>
+                  <Tag size={13} color={colors.accent.purple} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>{rule.tag}</Text>
+                  <Text style={styles.rowSub}>{rule.period === 'week' ? 'tygodniowo' : 'miesięcznie'}</Text>
+                </View>
+                <Text style={[styles.rowLabel, { color: colors.accent.amber }]}>{rule.limit} zł</Text>
+                <PressableScale onPress={() => handleDeleteTagRule(rule.id)} style={{ padding: 6, marginLeft: 4 }}>
+                  <Trash2 size={14} color={colors.accent.danger} />
+                </PressableScale>
+              </View>
+            ))}
+
+            {/* Suggested tags */}
+            {tagRules.length === 0 && (
+              <View style={{ paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2] }}>
+                <Text style={styles.rowSub}>Sugerowane tagi z paragonów:</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  {SUGGESTED_TAGS.map(t => (
+                    <PressableScale key={t} onPress={() => setNewTag(t)}
+                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
+                        backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default }}>
+                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>{t}</Text>
+                    </PressableScale>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Add new rule */}
+            <View style={{ padding: spacing[4], gap: spacing[3], borderTopWidth: tagRules.length > 0 ? 1 : 0, borderTopColor: 'rgba(255,255,255,0.05)' }}>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                <TextInput
+                  value={newTag}
+                  onChangeText={setNewTag}
+                  placeholder="tag (np. słodycze)"
+                  placeholderTextColor={colors.text.muted}
+                  style={[styles.budgetInput, { flex: 2, textAlign: 'left', paddingHorizontal: spacing[3],
+                    backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
+                />
+                <TextInput
+                  value={newTagLimit}
+                  onChangeText={setNewTagLimit}
+                  placeholder="limit zł"
+                  placeholderTextColor={colors.text.muted}
+                  keyboardType="decimal-pad"
+                  style={[styles.budgetInput, { flex: 1, textAlign: 'right', paddingHorizontal: spacing[3],
+                    backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {(['week', 'month'] as const).map(p => (
+                  <PressableScale key={p} onPress={() => setNewTagPeriod(p)}
+                    style={{ flex: 1, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center',
+                      backgroundColor: newTagPeriod === p ? colors.accent.purple + '22' : colors.bg.elevated,
+                      borderWidth: 1, borderColor: newTagPeriod === p ? colors.accent.purple : colors.border.default }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: newTagPeriod === p ? colors.accent.purple : colors.text.secondary }}>
+                      {p === 'week' ? 'Tygodniowo' : 'Miesięcznie'}
+                    </Text>
+                  </PressableScale>
+                ))}
+                <PressableScale onPress={handleAddTagRule}
+                  style={{ paddingHorizontal: spacing[4], paddingVertical: 8, borderRadius: radius.md, alignItems: 'center',
+                    backgroundColor: colors.accent.purple + '22', borderWidth: 1, borderColor: colors.accent.purple + '50' }}>
+                  <Plus size={16} color={colors.accent.purple} />
+                </PressableScale>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -515,8 +580,8 @@ export default function SettingsScreen() {
                   <Text style={styles.rowSub}>Synchronizacja między urządzeniami</Text>
                 </View>
                 <PressableScale
-                  onPress={() => promptAsync()}
-                  disabled={!request || googleLinking}
+                  onPress={handleGoogleSignIn}
+                  disabled={googleLinking}
                   style={styles.googleBtn}
                 >
                   <Text style={styles.googleBtnText}>Połącz</Text>

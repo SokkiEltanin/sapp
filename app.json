@@ -17,6 +17,7 @@
       "supportsTablet": false
     },
     "android": {
+      "backgroundColor": "#0A0A0A",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0D0D"
@@ -34,7 +35,7 @@
       ]
     },
     "updates": {
-      "url": "https://u.expo.dev/ff368301-082f-43b1-98ea-61c8963c01b2"
+      "url": "https://u.expo.dev/3d6fc00f-2c99-41c3-ab5d-5a9beaf477d1"
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -49,6 +50,13 @@
           "color": "#6C63FF",
           "sounds": []
         }
+      ],
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a"
+        }
       ]
     ],
     "experiments": {
@@ -57,8 +65,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ff368301-082f-43b1-98ea-61c8963c01b2"
+        "projectId": "3d6fc00f-2c99-41c3-ab5d-5a9beaf477d1"
       }
-    }
+    },
+    "owner": "sappeltanin"
   }
 }

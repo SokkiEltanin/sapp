@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet,
+  LayoutDashboard, ListTodo, Wallet,
   Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare, X,
-  Smile, Heart, Zap,
+  Smile, Zap,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,9 +20,8 @@ type BottomTabBarProps = {
 };
 
 const TABS = [
-  { name: 'index',    label: 'Home',    Icon: LayoutDashboard },
+  { name: 'index',    label: 'Dziś',    Icon: LayoutDashboard },
   { name: 'tasks',    label: 'Zadania', Icon: ListTodo },
-  { name: 'calendar', label: 'Kalen.',  Icon: CalendarDays },
   { name: 'finances', label: 'Finanse', Icon: Wallet },
 ];
 
@@ -32,7 +31,6 @@ const QUICK_ACTIONS = [
   { label: 'Przychód',     Icon: TrendingUp,  color: colors.accent.green,  route: '/expenses/add?type=income' },
   { label: 'Event',        Icon: CalendarPlus, color: colors.accent.blue,  route: '/calendar/add' },
   { label: 'Nastrój',      Icon: Smile,       color: colors.accent.pink,   route: '/(tabs)/mood' },
-  { label: 'Zdrowie',      Icon: Heart,       color: colors.accent.amber,  route: '/(tabs)/health' },
   { label: 'Nawyki',       Icon: Zap,         color: colors.accent.purple, route: '/habits' },
 ];
 
@@ -76,9 +74,12 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
     inputRange: [0, 1], outputRange: ['0deg', '45deg'], extrapolate: 'clamp',
   });
 
+  // Tab 0 = index, Tab 1 = tasks, Tab 2 = finances
+  const leftTab  = TABS[0];
+  const rightTabs = TABS.slice(1);
+
   return (
     <>
-      {/* Full-screen overlay rendered via Modal so it can cover screen content */}
       <Modal
         visible={open}
         transparent
@@ -86,7 +87,6 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         animationType="none"
         onRequestClose={() => closeMenu()}
       >
-        {/* Dimmed backdrop */}
         <Animated.View
           style={[styles.backdrop, { opacity: backdropAnim }]}
           pointerEvents="box-none"
@@ -94,7 +94,6 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
         </Animated.View>
 
-        {/* Quick action items — anchored above the tab bar */}
         <View style={[styles.quickMenu, { bottom: tabBarH + 12 }]}>
           {QUICK_ACTIONS.map((action, i) => {
             const translateY = itemAnims[i].interpolate({
@@ -121,10 +120,41 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         </View>
       </Modal>
 
-      {/* Tab bar */}
       <View style={[styles.bar, { paddingBottom: insets.bottom || spacing[3] }]}>
-        {TABS.slice(0, 2).map((tab, i) => {
-          const focused = state.index === i;
+        {/* Left: Today */}
+        {(() => {
+          const focused = state.index === 0;
+          const Tab = leftTab;
+          return (
+            <TouchableOpacity
+              key={Tab.name}
+              style={styles.tabItem}
+              onPress={() => navigation.navigate(Tab.name)}
+              activeOpacity={0.7}
+            >
+              <Tab.Icon size={22} color={focused ? colors.text.primary : colors.text.muted} strokeWidth={focused ? 2 : 1.5} />
+              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{Tab.label}</Text>
+              {focused && <View style={styles.activeDot} />}
+            </TouchableOpacity>
+          );
+        })()}
+
+        {/* Center FAB */}
+        <View style={styles.fabWrap}>
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={open ? () => closeMenu() : openMenu}
+            activeOpacity={0.85}
+          >
+            <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
+              <Plus size={22} color={colors.text.inverse} strokeWidth={2.5} />
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Right: Tasks + Finances */}
+        {rightTabs.map((tab, i) => {
+          const focused = state.index === i + 1;
           const showBadge = tab.name === 'tasks' && pendingCount > 0;
           return (
             <TouchableOpacity
@@ -141,35 +171,6 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                   </View>
                 )}
               </View>
-              <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{tab.label}</Text>
-              {focused && <View style={styles.activeDot} />}
-            </TouchableOpacity>
-          );
-        })}
-
-        {/* Center FAB */}
-        <View style={styles.fabWrap}>
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={open ? () => closeMenu() : openMenu}
-            activeOpacity={0.85}
-          >
-            <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <Plus size={22} color={colors.text.inverse} strokeWidth={2.5} />
-            </Animated.View>
-          </TouchableOpacity>
-        </View>
-
-        {TABS.slice(2).map((tab, i) => {
-          const focused = state.index === i + 2;
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              style={styles.tabItem}
-              onPress={() => navigation.navigate(tab.name)}
-              activeOpacity={0.7}
-            >
-              <tab.Icon size={22} color={focused ? colors.text.primary : colors.text.muted} strokeWidth={focused ? 2 : 1.5} />
               <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{tab.label}</Text>
               {focused && <View style={styles.activeDot} />}
             </TouchableOpacity>
@@ -226,7 +227,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  // Modal overlay
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.65)',

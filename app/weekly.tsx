@@ -17,6 +17,8 @@ import { useTasks } from '@/hooks/useTasks';
 import { useHabits } from '@/hooks/useHabits';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
+import { expensesService } from '@/services/expensesService';
+import { moodService } from '@/services/moodService';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MOOD_COLORS, MOOD_LABELS, MoodEntry, Habit } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -128,8 +130,17 @@ export default function WeeklyScreen() {
 
   const { tasks }                        = useTasks();
   const { habits, getLast7, completions } = useHabits();
-  const { expenses }         = useExpensesStore();
-  const { entries: mood }    = useMoodStore();
+  const { expenses, setExpenses }         = useExpensesStore();
+  const { entries: mood, setEntries: setMoodEntries } = useMoodStore();
+
+  useEffect(() => {
+    if (expenses.length === 0) {
+      expensesService.getAll().then(setExpenses).catch(() => {});
+    }
+    if (mood.length === 0) {
+      moodService.getAll().then(setMoodEntries).catch(() => {});
+    }
+  }, []);
 
   const dates     = useMemo(() => getWeekDates(weekOffset), [weekOffset]);
   const prevDates = useMemo(() => getWeekDates(weekOffset - 1), [weekOffset]);
@@ -172,6 +183,27 @@ export default function WeeklyScreen() {
     [tasks, dates]);
 
   const maxTaskDay = Math.max(...taskDailyDone, 1);
+
+  const taskStats = useMemo(() => {
+    const done = tasks.filter(t => t.status === 'done' && t.createdAt && t.updatedAt);
+    const byDiff: Record<number, number[]> = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    done.forEach(t => {
+      const d = t.difficulty ?? 3;
+      const days = Math.max(0, Math.round(
+        (new Date(t.updatedAt).getTime() - new Date(t.createdAt).getTime()) / 86400000
+      ));
+      (byDiff[d] ??= []).push(days);
+    });
+    const avgByDiff = ([1, 2, 3, 4, 5] as const).map(d => ({
+      difficulty: d,
+      avg: byDiff[d].length > 0 ? byDiff[d].reduce((a, b) => a + b, 0) / byDiff[d].length : null,
+      count: byDiff[d].length,
+    }));
+    const withDl = done.filter(t => t.deadline);
+    const onTime = withDl.filter(t => t.updatedAt.split('T')[0] <= t.deadline!);
+    const adherence = withDl.length > 0 ? Math.round((onTime.length / withDl.length) * 100) : null;
+    return { avgByDiff, adherence, onTime: onTime.length, withDl: withDl.length, total: done.length };
+  }, [tasks]);
 
   // ── Mood ───────────────────────────────────────────────────────────────────
 
@@ -312,6 +344,37 @@ export default function WeeklyScreen() {
             </View>
           </View>
           <WeekBars values={taskDailyDone} max={maxTaskDay} color={colors.accent.purple} dates={dates} />
+
+          {taskStats.total >= 3 && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.statsSubLabel}>Czas ukończenia wg trudności</Text>
+              <View style={styles.diffRow}>
+                {taskStats.avgByDiff.filter(d => d.count > 0).map(d => {
+                  const DIFF_LABELS = ['', 'XS', 'S', 'M', 'H', 'XH'];
+                  const DIFF_COLORS = ['', colors.accent.green, colors.accent.blue, colors.accent.amber, colors.accent.red, colors.accent.pink];
+                  const avgDays = d.avg != null ? (d.avg < 1 ? '<1' : d.avg.toFixed(1)) : '—';
+                  return (
+                    <View key={d.difficulty} style={[styles.diffTile, { borderColor: DIFF_COLORS[d.difficulty] + '35' }]}>
+                      <Text style={[styles.diffLabel, { color: DIFF_COLORS[d.difficulty] }]}>{DIFF_LABELS[d.difficulty]}</Text>
+                      <Text style={styles.diffDays}>{avgDays}</Text>
+                      <Text style={styles.diffUnit}>dni</Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {taskStats.adherence !== null && (
+                <View style={styles.adherenceRow}>
+                  <View style={[styles.adherencePill, { backgroundColor: (taskStats.adherence >= 80 ? colors.accent.green : taskStats.adherence >= 50 ? colors.accent.amber : colors.accent.red) + '18' }]}>
+                    <Text style={[styles.adherenceVal, { color: taskStats.adherence >= 80 ? colors.accent.green : taskStats.adherence >= 50 ? colors.accent.amber : colors.accent.red }]}>
+                      {taskStats.adherence}%
+                    </Text>
+                    <Text style={styles.adherenceLabel}>terminowość ({taskStats.onTime}/{taskStats.withDl})</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
         </SCard>
 
         {/* ── Mood ── */}
@@ -610,4 +673,21 @@ const styles = StyleSheet.create({
   habitPct: { fontSize: 10, fontWeight: '700', width: 24, textAlign: 'right' },
 
   empty: { fontSize: 13, color: colors.text.muted, paddingVertical: spacing[1] },
+
+  divider: { height: 1, backgroundColor: colors.border.subtle, marginVertical: spacing[1] },
+  statsSubLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+
+  diffRow: { flexDirection: 'row', gap: spacing[2] },
+  diffTile: {
+    flex: 1, alignItems: 'center', gap: 1, paddingVertical: spacing[2],
+    borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.bg.elevated,
+  },
+  diffLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  diffDays: { fontSize: 16, fontWeight: '900', color: colors.text.primary, letterSpacing: -0.5 },
+  diffUnit: { fontSize: 8, color: colors.text.muted },
+
+  adherenceRow: { alignItems: 'flex-start' },
+  adherencePill: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
+  adherenceVal: { fontSize: 15, fontWeight: '900', letterSpacing: -0.3 },
+  adherenceLabel: { fontSize: 10, color: colors.text.secondary, fontWeight: '500' },
 });

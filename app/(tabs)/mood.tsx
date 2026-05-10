@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag } from 'lucide-react-native';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -204,6 +205,19 @@ export default function MoodScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const { openCheckIn } = useLocalSearchParams<{ openCheckIn?: string }>();
+
+  // Auto-open check-in modal when navigated from notification.
+  // If there's already a today entry, open it in edit mode; otherwise new.
+  useFocusEffect(
+    useCallback(() => {
+      if (openCheckIn === 'true') {
+        setEditingEntry(todayEntry);
+        setModalOpen(true);
+      }
+    }, [openCheckIn, todayEntry]),
+  );
 
   useEffect(() => { load(); }, []);
   const load = async () => {

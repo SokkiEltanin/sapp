@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import { Plus, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
-import AnimatedButton from '@/components/ui/AnimatedButton';
 import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
@@ -16,6 +15,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useTabSwipe } from '@/hooks/useTabSwipe';
 
 const MONTH_NAMES = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -35,6 +35,7 @@ function fmtDay(dateStr: string) {
 }
 
 export default function CalendarScreen() {
+  const { panHandlers, animatedStyle } = useTabSwipe();
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
@@ -137,14 +138,20 @@ export default function CalendarScreen() {
   const isToday = selectedDate === todayStr();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
+      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
       <ScreenHeader
         title="Kalendarz"
         subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
         rightSlot={
-          <PressableScale onPress={goToday} style={styles.todayBtn}>
-            <Text style={styles.todayBtnText}>Dziś</Text>
-          </PressableScale>
+          <View style={styles.headerRight}>
+            <PressableScale onPress={goToday} style={styles.todayBtn}>
+              <Text style={styles.todayBtnText}>Dziś</Text>
+            </PressableScale>
+            <PressableScale onPress={() => router.push('/calendar/add')} style={styles.addBtn}>
+              <Plus size={16} color={colors.text.primary} />
+            </PressableScale>
+          </View>
         }
       />
 
@@ -262,15 +269,7 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.fab}>
-        <AnimatedButton
-          onPress={() => router.push('/calendar/add')}
-          label="Dodaj zadanie / wydarzenie"
-          icon={<Plus size={17} color={colors.bg.primary} />}
-          size="lg"
-          fullWidth
-        />
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -278,12 +277,18 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
 
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   todayBtn: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.md, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
   todayBtnText: { ...typography.caption, color: colors.text.secondary, fontWeight: '600', fontSize: 11 },
+  addBtn: {
+    width: 32, height: 32, borderRadius: radius.md,
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   monthNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -354,6 +359,5 @@ const styles = StyleSheet.create({
   emptyText: { ...typography.label, color: colors.text.secondary },
   emptyHint: { ...typography.caption, color: colors.text.muted },
 
-  fab: { position: 'absolute', bottom: spacing[6], left: spacing[4], right: spacing[4] },
 });
 

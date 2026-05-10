@@ -1,5 +1,19 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Subscription } from '@/types';
+
+// ─── Humor pool for task reminders ────────────────────────────────────────────
+const HUMOR: Array<(t: string) => string> = [
+  (t) => `Hej, ciekawostka — "${t}" samo się nie zrobi 🤔`,
+  (t) => `"${t}" nadal czeka. Wytrwale. Cierpliwie. Osądzająco.`,
+  (t) => `Dzień dobry! "${t}" było wczoraj, będzie jutro... a może jednak dziś?`,
+  (t) => `Naukowy fakt: unikanie "${t}" nie sprawia że znika.`,
+  (t) => `Mała przypominajka: "${t}". Wiedziałeś że zapomnisz, prawda? 😅`,
+  (t) => `"${t}" — ostatnia szansa przed nocną paniką 🌙`,
+  (t) => `Alert: "${t}" osiągnęło stan krytycznego bycia-nieskończonym 🚨`,
+  (t) => `Fun fact: "${t}" nie zrobi się magic-way. Sory.`,
+  (t) => `"${t}" wysyła pozdrowienia z Twojej listy zaległości 👋`,
+  (t) => `Przypomnienie od Twojego bardziej produktywnego ja: zrób "${t}" już dziś.`,
+];
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -57,13 +71,23 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync('morning-mood').catch(() => {});
   },
 
-  async scheduleDailyTaskBriefing(hour = 7, minute = 30): Promise<string> {
+  async scheduleDailyTaskBriefing(
+    hour = 8, minute = 0,
+    context?: { taskCount?: number; eventCount?: number; habitCount?: number },
+  ): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-briefing').catch(() => {});
+    const parts: string[] = [];
+    if (context?.taskCount) parts.push(`${context.taskCount} ${context.taskCount === 1 ? 'zadanie' : context.taskCount <= 4 ? 'zadania' : 'zadań'} na dziś`);
+    if (context?.eventCount) parts.push(`${context.eventCount} ${context.eventCount === 1 ? 'wydarzenie' : 'wydarzeń'}`);
+    if (context?.habitCount) parts.push(`${context.habitCount} ${context.habitCount === 1 ? 'nawyk' : 'nawyków'} do zrobienia`);
+    const body = parts.length > 0
+      ? `Czeka na Ciebie: ${parts.join(', ')}. Dobrego dnia!`
+      : 'Zaplanuj swój dzień i sprawdź zadania.';
     const id = await Notifications.scheduleNotificationAsync({
       identifier: 'daily-briefing',
       content: {
         title: 'Dzień dobry — plan dnia',
-        body: 'Sprawdź dzisiejsze zadania i zaplanuj dzień.',
+        body,
         data: { screen: 'tasks' },
       },
       trigger: {
@@ -102,26 +126,67 @@ export const notificationsService = {
   },
 
   async scheduleTaskDeadlineReminder(taskId: string, title: string, deadlineIso: string): Promise<void> {
-    const date = new Date(deadlineIso);
-    date.setHours(date.getHours() - 1); // 1h before deadline
-    if (date <= new Date()) return;
+    const deadline = new Date(deadlineIso);
+    const now = new Date();
 
+    // 1 day before at 9:00 — humorous reminder
+    const dayBefore = new Date(deadline);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    dayBefore.setHours(9, 0, 0, 0);
+    if (dayBefore > now) {
+      const msg = HUMOR[Math.floor(Math.random() * HUMOR.length)](title);
+      await Notifications.scheduleNotificationAsync({
+        identifier: `task-humor-${taskId}`,
+        content: {
+          title: 'Jutro deadline 👀',
+          body: msg,
+          data: { screen: 'tasks', taskId },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: dayBefore },
+      }).catch(() => {});
+    }
+
+    // 1h before deadline — urgent
+    const hourBefore = new Date(deadline);
+    hourBefore.setHours(hourBefore.getHours() - 1);
+    if (hourBefore <= now) return;
     await Notifications.scheduleNotificationAsync({
       identifier: `task-${taskId}`,
       content: {
-        title: 'Zbliża się deadline',
+        title: 'Zbliża się deadline 🚨',
         body: `"${title}" — zostało mniej niż godzina!`,
-        data: { screen: 'calendar', taskId },
+        data: { screen: 'tasks', taskId },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: hourBefore },
     });
   },
 
   async cancelTaskReminder(taskId: string): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(`task-${taskId}`).catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync(`task-humor-${taskId}`).catch(() => {});
+  },
+
+  // ─── Subscription reminders ────────────────────────────────────────────────
+
+  async scheduleSubscriptionReminder(sub: Subscription): Promise<void> {
+    if (!sub.active || sub.reminderDaysBefore <= 0) return;
+    const fire = new Date(sub.nextBillingDate + 'T09:00:00');
+    fire.setDate(fire.getDate() - sub.reminderDaysBefore);
+    if (fire <= new Date()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: `sub-${sub.id}`,
+      content: {
+        title: `Subskrypcja: ${sub.name}`,
+        body: `Za ${sub.reminderDaysBefore} ${sub.reminderDaysBefore === 1 ? 'dzień' : 'dni'} odnowi się za ${sub.amount.toFixed(2)} zł. Pamiętaj o anulowaniu jeśli nie chcesz płacić!`,
+        data: { screen: 'subscriptions', subId: sub.id },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+    }).catch(() => {});
+  },
+
+  async cancelSubscriptionReminder(subId: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(`sub-${subId}`).catch(() => {});
   },
 
   async scheduleEventReminder(eventId: string, title: string, dateIso: string, startTime?: string): Promise<void> {
@@ -136,7 +201,7 @@ export const notificationsService = {
       content: {
         title: 'Nadchodzące wydarzenie',
         body: `"${title}" za 30 minut`,
-        data: { screen: 'calendar' },
+        data: { screen: 'calendar_event', eventId },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -156,7 +221,7 @@ export const notificationsService = {
       content: {
         title: 'Czas wrócić do zadania',
         body: `"${title}" — drzemka skończona!`,
-        data: { screen: 'calendar', taskId },
+        data: { screen: 'tasks', taskId },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -188,6 +253,21 @@ export const notificationsService = {
 
   async cancelHabitReminder(habitId: string): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(`habit-${habitId}`).catch(() => {});
+  },
+
+  async notifyCategoryLimit(categoryLabel: string, spent: number, limit: number): Promise<void> {
+    const pct = Math.round((spent / limit) * 100);
+    const exceeded = pct >= 100;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: exceeded ? `Budżet przekroczony: ${categoryLabel}` : `Budżet prawie wyczerpany: ${categoryLabel}`,
+        body: exceeded
+          ? `Wydałeś ${spent.toFixed(0)} zł z limitu ${limit} zł (${pct}%). Uważaj!`
+          : `Już ${pct}% budżetu na ${categoryLabel} — zostało ${(limit - spent).toFixed(0)} zł.`,
+        data: { screen: 'finances' },
+      },
+      trigger: null,
+    }).catch(() => {});
   },
 
   async cancelAll(): Promise<void> {

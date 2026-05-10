@@ -6,12 +6,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Check, CalendarDays, Flag, AlignLeft, Timer, Tag, Clock, RefreshCw } from 'lucide-react-native';
+import { X, Check, CalendarDays, Flag, AlignLeft, Timer, Tag, Clock, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react-native';
 
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import PressableScale from '@/components/ui/PressableScale';
 import InputField from '@/components/ui/InputField';
 import GlassCard from '@/components/ui/GlassCard';
+import DatePickerField from '@/components/ui/DatePickerField';
 import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring } from '@/types';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
@@ -212,6 +213,49 @@ const sec = StyleSheet.create({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+
+// ─── Time slot picker ─────────────────────────────────────────────────────────
+
+function TimeSlotPicker({ hour, minute, onChange }: {
+  hour: number; minute: number; onChange: (h: number, m: number) => void;
+}) {
+  return (
+    <View style={tp.row}>
+      <View style={tp.unit}>
+        <TouchableOpacity onPress={() => onChange((hour + 23) % 24, minute)} style={tp.arrow}>
+          <ChevronUp size={14} color={colors.text.secondary} />
+        </TouchableOpacity>
+        <Text style={tp.digit}>{pad2(hour)}</Text>
+        <TouchableOpacity onPress={() => onChange((hour + 1) % 24, minute)} style={tp.arrow}>
+          <ChevronDown size={14} color={colors.text.secondary} />
+        </TouchableOpacity>
+      </View>
+      <Text style={tp.sep}>:</Text>
+      <View style={tp.unit}>
+        <TouchableOpacity onPress={() => onChange(hour, (minute + 55) % 60)} style={tp.arrow}>
+          <ChevronUp size={14} color={colors.text.secondary} />
+        </TouchableOpacity>
+        <Text style={tp.digit}>{pad2(minute)}</Text>
+        <TouchableOpacity onPress={() => onChange(hour, (minute + 5) % 60)} style={tp.arrow}>
+          <ChevronDown size={14} color={colors.text.secondary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const tp = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  unit: { alignItems: 'center', gap: 2 },
+  arrow: {
+    width: 32, height: 26, borderRadius: radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center',
+  },
+  digit: { fontSize: 22, fontWeight: '800', color: colors.text.primary, minWidth: 38, textAlign: 'center' },
+  sep: { fontSize: 22, fontWeight: '800', color: colors.text.muted, marginBottom: 2 },
+});
+
 export default function AddTaskScreen() {
   const [title, setTitle]           = useState('');
   const [description, setDescription] = useState('');
@@ -223,6 +267,9 @@ export default function AddTaskScreen() {
   const [tags, setTags]             = useState<string[]>([]);
   const [recurring, setRecurring]   = useState<TaskRecurring>('none');
   const [saving, setSaving]         = useState(false);
+  const [timeEnabled, setTimeEnabled] = useState(false);
+  const [timeHour, setTimeHour]     = useState(9);
+  const [timeMin, setTimeMin]       = useState(0);
 
   const { selectedDate, addTask } = useCalendarStore();
 
@@ -233,13 +280,15 @@ export default function AddTaskScreen() {
     }
     setSaving(true);
     try {
-      const deadlineDate = deadline.trim() || selectedDate || todayStr();
+      const deadlineDate = deadline || selectedDate || todayStr();
       const deadlineIso  = deadlineDate + 'T23:59:00.000Z';
+      const scheduledTime = timeEnabled ? `${pad2(timeHour)}:${pad2(timeMin)}` : undefined;
       const task = await tasksService.addTask({
         title: title.trim(),
         description: description.trim() || undefined,
         deadline: deadlineIso,
-        scheduledDate: scheduledDate.trim() || selectedDate || undefined,
+        scheduledDate: scheduledDate || selectedDate || undefined,
+        scheduledTime,
         status: 'pending' as TaskStatus,
         priority,
         difficulty: difficulty ?? undefined,
@@ -362,28 +411,64 @@ export default function AddTaskScreen() {
             </GlassCard>
           </View>
 
-          {/* Deadline */}
+          {/* Deadline + scheduling */}
           <View>
             <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<CalendarDays size={12} color={colors.text.muted} />} label="Termin" />
+              <SectionLabel icon={<CalendarDays size={12} color={colors.text.muted} />} label="Termin / Zaplanuj" />
               <View style={{ gap: spacing[3] }}>
-                <InputField
+                {/* Quick date chips */}
+                <View style={styles.chipRow}>
+                  {[
+                    { label: 'Dziś',    offset: 0 },
+                    { label: 'Jutro',   offset: 1 },
+                    { label: '+2 dni',  offset: 2 },
+                    { label: '+7 dni',  offset: 7 },
+                  ].map(({ label, offset }) => {
+                    const d = new Date(); d.setDate(d.getDate() + offset);
+                    const iso = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+                    const active = deadline === iso;
+                    return (
+                      <TouchableOpacity
+                        key={label}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => { setDeadline(iso); if (!scheduledDate) setScheduledDate(iso); }}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <DatePickerField
                   value={deadline}
-                  onChangeText={setDeadline}
-                  placeholder={selectedDate || todayStr()}
-                  leftSlot={<Clock size={14} color={colors.text.muted} />}
-                  keyboardType="numbers-and-punctuation"
-                  containerStyle={styles.inputInCard}
+                  onChange={(d) => { setDeadline(d); if (!scheduledDate) setScheduledDate(d); }}
+                  placeholder="Termin (opcjonalnie)"
                 />
-                <InputField
-                  label="Zaplanuj na dzień"
+                <DatePickerField
                   value={scheduledDate}
-                  onChangeText={setScheduledDate}
-                  placeholder={selectedDate || todayStr()}
-                  leftSlot={<CalendarDays size={14} color={colors.text.muted} />}
-                  keyboardType="numbers-and-punctuation"
-                  containerStyle={styles.inputInCard}
+                  onChange={setScheduledDate}
+                  placeholder="Zaplanuj na dzień (opcjonalnie)"
                 />
+
+                {/* Optional time slot */}
+                <TouchableOpacity
+                  style={[styles.timeToggle, timeEnabled && styles.timeToggleActive]}
+                  onPress={() => setTimeEnabled(v => !v)}
+                  activeOpacity={0.75}
+                >
+                  <Clock size={13} color={timeEnabled ? colors.accent.blue : colors.text.muted} />
+                  <Text style={[styles.timeToggleText, timeEnabled && { color: colors.accent.blue }]}>
+                    {timeEnabled ? `Godzina: ${pad2(timeHour)}:${pad2(timeMin)}` : 'Dodaj godzinę (opcjonalnie)'}
+                  </Text>
+                </TouchableOpacity>
+
+                {timeEnabled && (
+                  <TimeSlotPicker
+                    hour={timeHour} minute={timeMin}
+                    onChange={(h, m) => { setTimeHour(h); setTimeMin(m); }}
+                  />
+                )}
               </View>
             </GlassCard>
           </View>
@@ -460,6 +545,25 @@ const styles = StyleSheet.create({
   prioritySub: { fontSize: 10, color: colors.text.muted },
 
   inputInCard: { backgroundColor: 'rgba(255,255,255,0.04)' },
+
+  chipRow: { flexDirection: 'row', gap: spacing[2] },
+  chip: {
+    paddingHorizontal: spacing[3], paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  chipActive: { borderColor: colors.accent.blue, backgroundColor: colors.accent.blue + '20' },
+  chipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  chipTextActive: { color: colors.accent.blue },
+
+  timeToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  timeToggleActive: { borderColor: colors.accent.blue + '40', backgroundColor: colors.accent.blue + '10' },
+  timeToggleText: { fontSize: 13, fontWeight: '500', color: colors.text.muted },
 
   descInput: {
     ...typography.body, color: colors.text.primary,

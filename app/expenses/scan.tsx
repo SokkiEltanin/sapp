@@ -1,19 +1,18 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Camera, Image as ImageIcon, Check, Tag, ClipboardList } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { incrementScanCount } from '@/utils/scanCounter';
+import { X, Check, Tag, PenLine } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
-import { parseReceiptText, ParsedReceipt, ReceiptProduct } from '@/utils/receiptParser';
-import { extractTextFromImage } from '@/services/ocrService';
+import DatePickerField from '@/components/ui/DatePickerField';
+import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/utils/receiptParser';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
-import { ExpenseCategory } from '@/types';
+import { loadProductMemory, applyProductMemory, saveProductCategories } from '@/utils/productMemory';
+import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import * as LucideIcons from 'lucide-react-native';
 
@@ -27,65 +26,36 @@ const SORT_OPTS: { mode: SortMode; label: string }[] = [
   { mode: 'price',    label: 'Cena ↓'   },
 ];
 
+function todayIso() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ScanReceiptModal() {
   const [receipt, setReceipt]       = useState<ParsedReceipt | null>(null);
   const [selected, setSelected]     = useState<Set<number>>(new Set());
   const [saving, setSaving]         = useState(false);
-  const [scanning, setScanning]     = useState(false);
   const [sortMode, setSortMode]     = useState<SortMode>('order');
   const [editedCats, setEditedCats] = useState<Record<number, ExpenseCategory>>({});
+  const [editedPrices, setEditedPrices] = useState<Record<number, string>>({});
   const [catPickerFor, setCatPickerFor] = useState<number | null>(null);
-  const [inputMode, setInputMode]   = useState<'ocr' | 'text'>('ocr');
   const [pastedText, setPastedText] = useState('');
+  const [dateInput, setDateInput]   = useState(todayIso);
   const addExpense = useExpensesStore(s => s.addExpense);
 
   const getCategory = (i: number): ExpenseCategory =>
     editedCats[i] ?? (receipt?.products[i].category ?? 'other');
 
-  // ── Camera / gallery ────────────────────────────────────────────────────────
-
-  const pickCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Brak uprawnień', 'Potrzebuję dostępu do aparatu'); return; }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.85, base64: false });
-    if (!result.canceled) processImage(result.assets[0].uri);
-  };
-
-  const pickGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Brak uprawnień', 'Potrzebuję dostępu do galerii'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.85, base64: false });
-    if (!result.canceled) processImage(result.assets[0].uri);
-  };
-
-  const processImage = async (uri: string) => {
-    const count = await incrementScanCount();
-    if (count >= 900) {
-      await new Promise<void>(resolve =>
-        Alert.alert(
-          'Uwaga — limit skanów',
-          `Użyłeś ${count}/1000 darmowych skanów Google Vision w tym miesiącu. Przy 1000 zaczną się naliczać opłaty.`,
-          [{ text: 'Kontynuuj', onPress: () => resolve() }, { text: 'Anuluj', style: 'cancel', onPress: () => { resolve(); return; } }]
-        )
-      );
-      if (count >= 1000) return;
+  const getPrice = (i: number): number => {
+    const edited = editedPrices[i];
+    if (edited !== undefined) {
+      const parsed = parseFloat(edited.replace(',', '.'));
+      return isNaN(parsed) ? (receipt?.products[i].finalPrice ?? 0) : parsed;
     }
-    setScanning(true);
-    try {
-      const text   = await extractTextFromImage(uri);
-      const parsed = parseReceiptText(text);
-      if (parsed.products.length === 0) {
-        Alert.alert('Brak produktów', 'Nie udało się rozpoznać produktów. Spróbuj wyraźniejsze zdjęcie.');
-        return;
-      }
-      applyParsedReceipt(parsed);
-    } catch (e: any) {
-      Alert.alert('Błąd skanowania', e.message);
-    } finally {
-      setScanning(false);
-    }
+    return receipt?.products[i].finalPrice ?? 0;
   };
 
   const processText = () => {
@@ -99,11 +69,15 @@ export default function ScanReceiptModal() {
     applyParsedReceipt(parsed);
   };
 
-  const applyParsedReceipt = (parsed: ParsedReceipt) => {
+  const applyParsedReceipt = async (parsed: ParsedReceipt) => {
     setReceipt(parsed);
     setSelected(new Set(parsed.products.map((_, i) => i)));
-    setEditedCats({});
     setCatPickerFor(null);
+    setEditedPrices({});
+    if (parsed.date) setDateInput(parsed.date);
+    const memory = await loadProductMemory();
+    const remembered = await applyProductMemory(parsed.products, memory);
+    setEditedCats(remembered);
   };
 
   // ── Selection ────────────────────────────────────────────────────────────────
@@ -165,23 +139,59 @@ export default function ScanReceiptModal() {
     if (!receipt || selected.size === 0) return;
     setSaving(true);
     try {
-      const now = new Date().toISOString();
-      for (const i of selected) {
-        const p   = receipt.products[i];
-        const cat = getCategory(i);
-        const expense = await expensesService.add({
-          type: 'expense',
-          amount: p.finalPrice,
-          currency: 'PLN',
-          category: cat,
-          tags: [
-            ...(p.promotion ? [p.promotion] : []),
-            receipt.storeName ? receipt.storeName.toLowerCase().split(' ')[0] : '',
-          ].filter(Boolean),
-          note: p.name + (p.quantity > 1 ? ` (${p.quantity} szt.)` : ''),
-          date: now,
-        });
-        addExpense(expense);
+      let dateParsed = new Date().toISOString();
+      if (dateInput) {
+        const parts = dateInput.split('-').map(Number);
+        if (parts.length === 3) {
+          const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+          if (!isNaN(dt.getTime())) dateParsed = dt.toISOString();
+        }
+      }
+
+      const receiptItems: ReceiptItem[] = Array.from(selected).map(i => {
+        const p = receipt.products[i];
+        const finalPrice = getPrice(i);
+        const item: ReceiptItem = {
+          name: p.name,
+          price: finalPrice,
+          category: getCategory(i),
+          quantity: p.quantity,
+          unitPrice: p.unitPrice,
+          tags: getFoodTags(p.name),
+        };
+        if (p.discount != null) item.discount = p.discount;
+        return item;
+      });
+
+      const total = receiptItems.reduce((s, it) => s + it.price, 0);
+
+      // Dominant category by amount
+      const catAmts = new Map<ExpenseCategory, number>();
+      for (const it of receiptItems) catAmts.set(it.category, (catAmts.get(it.category) ?? 0) + it.price);
+      const dominantCat = [...catAmts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'groceries';
+
+      // Tags: store + unique food sub-tags
+      const storeTag = receipt.storeName?.toLowerCase().split(' ')[0];
+      const foodTags = [...new Set(receiptItems.flatMap(it => it.tags))];
+      const tags = [storeTag, ...foodTags].filter(Boolean) as string[];
+
+      const expense = await expensesService.add({
+        type: 'expense',
+        amount: Math.round(total * 100) / 100,
+        currency: 'PLN',
+        category: dominantCat,
+        tags,
+        note: receipt.storeName || 'Paragon',
+        date: dateParsed,
+        ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
+        receiptItems,
+      });
+      addExpense(expense);
+      // Persist user-corrected categories for future receipts
+      if (receipt) {
+        const parsedCats: Record<number, ExpenseCategory> = {};
+        receipt.products.forEach((p, i) => { parsedCats[i] = p.category; });
+        saveProductCategories(receipt.products, editedCats, parsedCats).catch(() => {});
       }
       router.back();
     } catch (e: any) {
@@ -195,9 +205,11 @@ export default function ScanReceiptModal() {
     setReceipt(null);
     setSelected(new Set());
     setEditedCats({});
+    setEditedPrices({});
     setCatPickerFor(null);
     setSortMode('order');
     setPastedText('');
+    setDateInput(todayIso());
   };
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -208,7 +220,7 @@ export default function ScanReceiptModal() {
         <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
-        <Text style={styles.title}>Skanuj paragon</Text>
+        <Text style={styles.title}>Wklej paragon</Text>
         {receipt ? (
           <PressableScale onPress={resetScan} style={styles.closeBtn}>
             <X size={16} color={colors.text.muted} />
@@ -219,95 +231,30 @@ export default function ScanReceiptModal() {
       </View>
 
       {!receipt ? (
-        <>
-          {/* Mode toggle */}
-          <View style={styles.modeToggle}>
-            <PressableScale
-              onPress={() => setInputMode('ocr')}
-              style={[styles.modeBtn, inputMode === 'ocr' && styles.modeBtnActive]}
-            >
-              <Camera size={13} color={inputMode === 'ocr' ? colors.bg.primary : colors.text.muted} />
-              <Text style={[styles.modeBtnText, inputMode === 'ocr' && styles.modeBtnTextActive]}>Zdjęcie / Galeria</Text>
-            </PressableScale>
-            <PressableScale
-              onPress={() => setInputMode('text')}
-              style={[styles.modeBtn, inputMode === 'text' && styles.modeBtnActive]}
-            >
-              <ClipboardList size={13} color={inputMode === 'text' ? colors.bg.primary : colors.text.muted} />
-              <Text style={[styles.modeBtnText, inputMode === 'text' && styles.modeBtnTextActive]}>Wklej tekst</Text>
-            </PressableScale>
-          </View>
-
-          {inputMode === 'text' ? (
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.textInputArea} keyboardShouldPersistTaps="handled">
-              <Text style={styles.textInputLabel}>Wklej tekst paragonu (np. skopiowany z aplikacji Lidl)</Text>
-              <TextInput
-                style={styles.pasteInput}
-                multiline
-                value={pastedText}
-                onChangeText={setPastedText}
-                placeholder={'Szpinak XXL baby 1\n                       1 * 7.99 7.99 C\n   KDR                         -0,80\n...'}
-                placeholderTextColor={colors.text.muted}
-                textAlignVertical="top"
-              />
-              <AnimatedButton
-                onPress={processText}
-                label="Analizuj paragon"
-                icon={<Check size={18} color={colors.bg.primary} />}
-                size="lg"
-                fullWidth
-                disabled={!pastedText.trim()}
-              />
-            </ScrollView>
-          ) : (
-            <View style={styles.scanArea}>
-              {scanning ? (
-                <View style={styles.scanningState}>
-                  <View style={styles.scanFrame}>
-                    <View style={[styles.scanCorner, styles.cornerTL]} />
-                    <View style={[styles.scanCorner, styles.cornerTR]} />
-                    <View style={[styles.scanCorner, styles.cornerBL]} />
-                    <View style={[styles.scanCorner, styles.cornerBR]} />
-                    <ActivityIndicator size="large" color={colors.text.secondary} />
-                  </View>
-                  <Text style={styles.scanningText}>Analizuję paragon...</Text>
-                  <Text style={styles.scanningHint}>Rozpoznaję produkty i ceny</Text>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.viewfinder}>
-                    <View style={[styles.scanCorner, styles.cornerTL]} />
-                    <View style={[styles.scanCorner, styles.cornerTR]} />
-                    <View style={[styles.scanCorner, styles.cornerBL]} />
-                    <View style={[styles.scanCorner, styles.cornerBR]} />
-                    <Camera size={40} color={colors.text.muted} />
-                  </View>
-                  <Text style={styles.scanTitle}>Zrób zdjęcie paragonu</Text>
-                  <Text style={styles.scanSub}>
-                    Rozpoznam produkty, ceny i promocje (1+1, %, rabaty)
-                  </Text>
-                  <View style={styles.btnRow}>
-                    <AnimatedButton
-                      onPress={pickCamera}
-                      label="Aparat"
-                      icon={<Camera size={18} color={colors.bg.primary} />}
-                      size="lg"
-                      style={{ flex: 1 }}
-                    />
-                    <AnimatedButton
-                      onPress={pickGallery}
-                      label="Galeria"
-                      icon={<ImageIcon size={18} color={colors.text.secondary} />}
-                      variant="ghost"
-                      size="lg"
-                      style={{ flex: 1 }}
-                    />
-                  </View>
-                </>
-              )}
-            </View>
-          )}
-        </>
+        <View style={{ flex: 1, padding: spacing[4], gap: spacing[3] }}>
+          <TextInput
+            style={styles.pasteInput}
+            multiline
+            value={pastedText}
+            onChangeText={setPastedText}
+            placeholder={'Wklej tu cały tekst paragonu z aplikacji Lidl, Biedronka itp.\n\nNp.:\nPolędwica z kurczaka\n      1 * 9.99 9.99 C\n   Lidl Plus voucher  -1,00\nJaja ściółkowe M\n      1 * 10.49 10.49 C'}
+            placeholderTextColor={colors.text.muted}
+            textAlignVertical="top"
+            autoFocus
+          />
+          <AnimatedButton
+            onPress={processText}
+            label="Analizuj paragon"
+            icon={<Check size={18} color={colors.bg.primary} />}
+            size="lg"
+            fullWidth
+            disabled={!pastedText.trim()}
+          />
+          <PressableScale onPress={() => router.push('/expenses/manual' as any)} style={styles.manualBtn}>
+            <PenLine size={14} color={colors.text.secondary} />
+            <Text style={styles.manualBtnText}>Wpisz ręcznie produkty</Text>
+          </PressableScale>
+        </View>
       ) : (
         <>
           {/* Receipt summary */}
@@ -323,6 +270,23 @@ export default function ScanReceiptModal() {
               )}
               <Text style={styles.total}>Razem: {receipt.total.toFixed(2)} zł</Text>
             </View>
+            {(() => {
+              const diff = Math.abs(receipt.subtotal - receipt.total);
+              if (receipt.total > 0 && receipt.subtotal > 0 && diff > 0.05) {
+                const over = receipt.subtotal > receipt.total;
+                return (
+                  <View style={styles.mismatchBadge}>
+                    <Text style={styles.mismatchText}>
+                      {over
+                        ? `Suma produktów (${receipt.subtotal.toFixed(2)} zł) > kwota na paragonie — brakuje rabatów lub produktów`
+                        : `Suma produktów (${receipt.subtotal.toFixed(2)} zł) < kwota na paragonie — mogły zostać pominięte pozycje`
+                      }
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
           </View>
 
           {/* Sort bar */}
@@ -386,6 +350,8 @@ export default function ScanReceiptModal() {
                         catPickerOpen={catPickerFor === i}
                         onCategoryPress={() => setCatPickerFor(catPickerFor === i ? null : i)}
                         onCategoryChange={c => changeCategory(i, c)}
+                        priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
+                        onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
                       />
                     ))}
                   </View>
@@ -402,15 +368,18 @@ export default function ScanReceiptModal() {
                   catPickerOpen={catPickerFor === i}
                   onCategoryPress={() => setCatPickerFor(catPickerFor === i ? null : i)}
                   onCategoryChange={c => changeCategory(i, c)}
+                  priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
+                  onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
                 />
               ))
             )}
           </ScrollView>
 
           <View style={styles.footer}>
+            <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data paragonu" />
             <AnimatedButton
               onPress={saveSelected}
-              label={saving ? 'Zapisuję...' : `Dodaj ${selected.size} produktów`}
+              label={saving ? 'Zapisuję...' : `Zapisz paragon (${selected.size} poz.)`}
               icon={<Check size={18} color={colors.bg.primary} />}
               size="lg"
               fullWidth
@@ -461,6 +430,7 @@ function CategoryPicker({ current, onSelect }: {
 function ProductRow({
   product, category, selected, onToggle,
   catPickerOpen, onCategoryPress, onCategoryChange,
+  priceValue, onPriceChange,
 }: {
   product: ReceiptProduct;
   category: ExpenseCategory;
@@ -469,19 +439,18 @@ function ProductRow({
   catPickerOpen: boolean;
   onCategoryPress: () => void;
   onCategoryChange: (cat: ExpenseCategory) => void;
+  priceValue: string;
+  onPriceChange: (v: string) => void;
 }) {
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
 
   return (
     <View style={styles.productWrap}>
-      <PressableScale
-        onPress={onToggle}
-        style={[styles.productRow, selected && styles.productRowSelected]}
-      >
-        <View style={[styles.checkbox, selected && styles.checkboxDone]}>
+      <View style={[styles.productRow, selected && styles.productRowSelected]}>
+        <PressableScale onPress={onToggle} style={[styles.checkbox, selected && styles.checkboxDone]}>
           {selected && <Check size={12} color={colors.bg.primary} />}
-        </View>
+        </PressableScale>
 
         {/* Category icon */}
         <View style={styles.catIconWrap}>
@@ -492,7 +461,6 @@ function ProductRow({
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
           <View style={styles.productMeta}>
-            {/* Tappable category chip */}
             <PressableScale onPress={onCategoryPress}>
               <View style={[
                 styles.catChip,
@@ -503,7 +471,6 @@ function ProductRow({
                 </Text>
               </View>
             </PressableScale>
-
             {product.quantity > 1 && (
               <Text style={styles.productMetaText}>· {product.quantity} szt.</Text>
             )}
@@ -516,16 +483,25 @@ function ProductRow({
           </View>
         </View>
 
-        {/* Price */}
+        {/* Editable price */}
         <View style={styles.priceCol}>
           {product.discount != null && product.discount > 0 && (
             <Text style={styles.originalPrice}>
               {(product.finalPrice + product.discount).toFixed(2)} zł
             </Text>
           )}
-          <Text style={styles.price}>{product.finalPrice.toFixed(2)} zł</Text>
+          <View style={styles.priceInputWrap}>
+            <TextInput
+              value={priceValue}
+              onChangeText={onPriceChange}
+              style={styles.priceInput}
+              keyboardType="decimal-pad"
+              selectTextOnFocus
+            />
+            <Text style={styles.priceCur}>zł</Text>
+          </View>
         </View>
-      </PressableScale>
+      </View>
 
       {/* Inline category picker */}
       {catPickerOpen && (
@@ -552,63 +528,23 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.h4, color: colors.text.primary },
 
-  // ── Mode toggle ────────────────────────────────────────────────────────────
-  modeToggle: {
-    flexDirection: 'row', gap: spacing[2],
-    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
-  },
-  modeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing[2], paddingVertical: spacing[2], borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
-  },
-  modeBtnActive: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
-  modeBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '600', fontSize: 12 },
-  modeBtnTextActive: { color: colors.bg.primary },
-
-  // ── Text input area ─────────────────────────────────────────────────────────
-  textInputArea: {
-    padding: spacing[4], gap: spacing[4], paddingBottom: spacing[8],
-  },
-  textInputLabel: {
-    ...typography.caption, color: colors.text.muted, lineHeight: 18,
-  },
+  // ── Text paste input ────────────────────────────────────────────────────────
   pasteInput: {
+    flex: 1,
     backgroundColor: colors.bg.card, borderRadius: radius.lg,
     borderWidth: 1, borderColor: colors.border.default,
     padding: spacing[4], color: colors.text.primary,
-    fontSize: 12, lineHeight: 18, minHeight: 220,
+    fontSize: 12, lineHeight: 18,
     fontFamily: 'monospace',
   },
 
-  // ── Scan area ──────────────────────────────────────────────────────────────
-  scanArea: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: spacing[8], gap: spacing[5],
+  manualBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[3], borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: colors.bg.card,
   },
-  viewfinder: {
-    width: 180, height: 220, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg,
-  },
-  scanFrame: {
-    width: 180, height: 220, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.lg,
-  },
-  scanCorner: {
-    position: 'absolute', width: 22, height: 22,
-    borderColor: colors.text.secondary, borderWidth: 3,
-  },
-  cornerTL: { top: 10, left: 10, borderBottomWidth: 0, borderRightWidth: 0, borderTopLeftRadius: 6 },
-  cornerTR: { top: 10, right: 10, borderBottomWidth: 0, borderLeftWidth: 0, borderTopRightRadius: 6 },
-  cornerBL: { bottom: 10, left: 10, borderTopWidth: 0, borderRightWidth: 0, borderBottomLeftRadius: 6 },
-  cornerBR: { bottom: 10, right: 10, borderTopWidth: 0, borderLeftWidth: 0, borderBottomRightRadius: 6 },
-  scanTitle: { ...typography.h3, color: colors.text.primary, textAlign: 'center' },
-  scanSub: { ...typography.body, color: colors.text.secondary, textAlign: 'center', lineHeight: 22 },
-  scanningState: { alignItems: 'center', gap: spacing[4] },
-  scanningText: { ...typography.body, color: colors.text.primary, fontWeight: '600' },
-  scanningHint: { ...typography.caption, color: colors.text.muted },
-  btnRow: { flexDirection: 'row', gap: spacing[3], width: '100%' },
+  manualBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
 
   // ── Receipt meta ───────────────────────────────────────────────────────────
   receiptMeta: {
@@ -623,6 +559,13 @@ const styles = StyleSheet.create({
   },
   discountText: { ...typography.caption, color: colors.accent.success, fontWeight: '600' },
   total: { ...typography.label, color: colors.text.primary, fontWeight: '700' },
+  mismatchBadge: {
+    backgroundColor: colors.accent.warning + '18',
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing[2], paddingVertical: 4,
+    borderLeftWidth: 2, borderLeftColor: colors.accent.warning,
+  },
+  mismatchText: { fontSize: 10, color: colors.accent.warning, fontWeight: '500', lineHeight: 15 },
 
   // ── Sort bar ───────────────────────────────────────────────────────────────
   sortBar: {
@@ -706,6 +649,13 @@ const styles = StyleSheet.create({
   priceCol: { alignItems: 'flex-end', gap: 1 },
   originalPrice: { ...typography.caption, color: colors.text.muted, textDecorationLine: 'line-through' },
   price: { ...typography.label, fontWeight: '700', color: colors.text.primary },
+  priceInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  priceInput: {
+    fontSize: 13, fontWeight: '700', color: colors.text.primary,
+    minWidth: 44, textAlign: 'right', paddingVertical: 0,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.15)',
+  },
+  priceCur: { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
 
   // ── Category picker ────────────────────────────────────────────────────────
   pickerScroll: {
@@ -727,5 +677,5 @@ const styles = StyleSheet.create({
   pickerLabel: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
 
   // ── Footer ─────────────────────────────────────────────────────────────────
-  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  footer: { padding: spacing[4], gap: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle },
 });

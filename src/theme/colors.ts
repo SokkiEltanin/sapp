@@ -8,8 +8,8 @@ export const colors = {
   },
   text: {
     primary:   '#F0F0F0',
-    secondary: '#888888',
-    muted:     '#3A3A3A',
+    secondary: '#A0A0A0',
+    muted:     '#656565',
     inverse:   '#0A0A0A',
   },
   accent: {

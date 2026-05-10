@@ -1,22 +1,24 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
   Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { X, Check, Tag, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { X, Check, Tag, TrendingDown, TrendingUp, ClipboardList } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
 import InputField from '@/components/ui/InputField';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
+import DatePickerField from '@/components/ui/DatePickerField';
 import { ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
-import { getBudgets } from '@/utils/budgets';
+import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
 
@@ -27,21 +29,39 @@ const EXPENSE_TAGS = ['słodycze', 'warzywa', 'mięso', 'napoje', 'fast food', '
 const INCOME_TAGS = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
 
 export default function AddExpenseModal() {
-  const { type } = useLocalSearchParams<{ type?: TransactionType }>();
+  const { type, prefillAmount, prefillCategory, prefillNote } = useLocalSearchParams<{
+    type?: TransactionType;
+    prefillAmount?: string;
+    prefillCategory?: string;
+    prefillNote?: string;
+  }>();
   const [txType, setTxType] = useState<TransactionType>(type === 'income' ? 'income' : 'expense');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [expCat, setExpCat] = useState<ExpenseCategory>('other');
-  const [incCat, setIncCat] = useState<IncomeCategory>('salary');
+  const [amount, setAmount] = useState(prefillAmount ?? '');
+  const [note, setNote] = useState(prefillNote ?? '');
+  const [expCat, setExpCat] = useState<ExpenseCategory>((prefillCategory as ExpenseCategory) ?? 'other');
+  const [incCat, setIncCat] = useState<IncomeCategory>((prefillCategory as IncomeCategory) ?? 'salary');
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving] = useState(false);
+  const [budgets, setBudgets] = useState<MonthlyBudgets>({});
+  const [dateInput, setDateInput] = useState(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
   const addExpense  = useExpensesStore((s) => s.addExpense);
   const expenses    = useExpensesStore((s) => s.expenses);
+
+  useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
 
   const isIncome = txType === 'income';
   const amountColor = isIncome ? colors.accent.success : colors.text.primary;
   const quickTags = isIncome ? INCOME_TAGS : EXPENSE_TAGS;
+
+  const nowM = new Date().toISOString().slice(0, 7);
+  const monthSpendByCat = expenses
+    .filter(e => (!e.type || e.type === 'expense') && e.date.startsWith(nowM))
+    .reduce<Record<string, number>>((acc, e) => { acc[e.category] = (acc[e.category] ?? 0) + e.amount; return acc; }, {});
 
   const toggleTag = (tag: string) =>
     setTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
@@ -65,6 +85,15 @@ export default function AddExpenseModal() {
     }
     setSaving(true);
     try {
+      let dateParsed = new Date().toISOString();
+      if (dateInput) {
+        const parts = dateInput.split('-').map(Number);
+        if (parts.length === 3) {
+          const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+          if (!isNaN(dt.getTime())) dateParsed = dt.toISOString();
+        }
+      }
+
       const expense = await expensesService.add({
         type: txType,
         amount: parsed,
@@ -72,7 +101,7 @@ export default function AddExpenseModal() {
         category: isIncome ? incCat : expCat,
         tags,
         note,
-        date: new Date().toISOString(),
+        date: dateParsed,
       });
       addExpense(expense);
 
@@ -86,10 +115,13 @@ export default function AddExpenseModal() {
             .filter(e => (!e.type || e.type === 'expense') && e.category === expCat && e.date.startsWith(nowM))
             .reduce((s, e) => s + e.amount, 0) + parsed;
           const pct = monthSpent / limit;
+          const label = CATEGORY_META[expCat]?.label ?? expCat;
           if (pct >= 1) {
-            toast.error(`Budżet "${CATEGORY_META[expCat]?.label}" przekroczony! ${monthSpent.toFixed(0)}/${limit} zł`);
+            toast.error(`Budżet "${label}" przekroczony! ${monthSpent.toFixed(0)}/${limit} zł`);
+            notificationsService.notifyCategoryLimit(label, monthSpent, limit);
           } else if (pct >= 0.85) {
-            toast.info(`Uwaga: ${Math.round(pct * 100)}% budżetu "${CATEGORY_META[expCat]?.label}" wykorzystane`);
+            toast.info(`Uwaga: ${Math.round(pct * 100)}% budżetu "${label}" wykorzystane`);
+            notificationsService.notifyCategoryLimit(label, monthSpent, limit);
           }
         }
       }
@@ -116,7 +148,9 @@ export default function AddExpenseModal() {
           <Text style={styles.headerTitle}>
             {isIncome ? 'Nowy przychód' : 'Nowy wydatek'}
           </Text>
-          <View style={{ width: 36 }} />
+          <PressableScale onPress={() => router.push('/expenses/templates' as any)} style={styles.closeBtn}>
+            <ClipboardList size={18} color={colors.text.secondary} />
+          </PressableScale>
         </View>
 
         {/* Type toggle */}
@@ -172,6 +206,9 @@ export default function AddExpenseModal() {
             />
           </View>
 
+          {/* Date */}
+          <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Wybierz datę" />
+
           {/* Category */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Kategoria</Text>
@@ -179,6 +216,11 @@ export default function AddExpenseModal() {
               {(isIncome ? INCOME_CATS : EXPENSE_CATS).map(([key, meta]) => {
                 const IconComp = (LucideIcons as any)[meta.icon];
                 const selected = isIncome ? incCat === key : expCat === key;
+                const budgetLimit = !isIncome ? budgets[key as ExpenseCategory] : undefined;
+                const budgetSpent = !isIncome ? (monthSpendByCat[key] ?? 0) : 0;
+                const budgetPct = budgetLimit ? budgetSpent / budgetLimit : 0;
+                const budgetOver = budgetLimit ? budgetSpent >= budgetLimit : false;
+
                 return (
                   <PressableScale
                     key={key}
@@ -191,9 +233,16 @@ export default function AddExpenseModal() {
                     <View style={styles.categoryIcon}>
                       {IconComp && <IconComp size={16} color={selected ? meta.color : colors.text.muted} />}
                     </View>
-                    <Text style={[styles.categoryLabel, selected && styles.categoryLabelSelected]}>
-                      {meta.label}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.categoryLabel, selected && styles.categoryLabelSelected]}>
+                        {meta.label}
+                      </Text>
+                      {budgetLimit != null && budgetLimit > 0 && (
+                        <Text style={[styles.budgetHint, budgetOver && { color: colors.accent.danger }]}>
+                          {budgetOver ? 'przekroczony' : `${(budgetLimit - budgetSpent).toFixed(0)} zł`}
+                        </Text>
+                      )}
+                    </View>
                     {selected && (
                       <View style={styles.checkDot}>
                         <Check size={9} color={colors.bg.primary} />
@@ -310,6 +359,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     backgroundColor: colors.bg.card, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border.default,
+    width: '48%',
   },
   categoryItemSelected: {
     borderColor: 'rgba(255,255,255,0.4)',
@@ -322,6 +372,7 @@ const styles = StyleSheet.create({
   },
   categoryLabel: { ...typography.bodySmall, color: colors.text.secondary, fontWeight: '500' },
   categoryLabelSelected: { color: colors.text.primary, fontWeight: '700' },
+  budgetHint: { fontSize: 9, color: colors.text.muted, fontWeight: '500', marginTop: 1 },
   checkDot: {
     width: 15, height: 15, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center', marginLeft: 1,

@@ -1,5 +1,5 @@
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { userCol, userDoc } from './firebase';
 import { MoodEntry } from '@/types';
 
 const COL = 'mood';
@@ -9,13 +9,13 @@ const strip = <T extends Record<string, any>>(obj: T): T =>
 
 export const moodService = {
   async getAll(): Promise<MoodEntry[]> {
-    const q = query(collection(db, COL), orderBy('date', 'desc'));
+    const q = query(userCol(COL), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as MoodEntry));
   },
 
   async getByDate(date: string): Promise<MoodEntry | null> {
-    const q = query(collection(db, COL), where('date', '==', date));
+    const q = query(userCol(COL), where('date', '==', date));
     const snap = await getDocs(q);
     if (snap.empty) return null;
     const d = snap.docs[0];
@@ -25,15 +25,15 @@ export const moodService = {
   async add(entry: Omit<MoodEntry, 'id' | 'createdAt' | 'updatedAt'>): Promise<MoodEntry> {
     const now = new Date().toISOString();
     const data = strip({ ...entry, createdAt: now, updatedAt: now });
-    const ref = await addDoc(collection(db, COL), data);
+    const ref = await addDoc(userCol(COL), data);
     return { ...entry, id: ref.id, createdAt: now, updatedAt: now };
   },
 
   async update(id: string, updates: Partial<MoodEntry>): Promise<void> {
-    await updateDoc(doc(db, COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
+    await updateDoc(userDoc(COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
   },
 
   async remove(id: string): Promise<void> {
-    await deleteDoc(doc(db, COL, id));
+    await deleteDoc(userDoc(COL, id));
   },
 };

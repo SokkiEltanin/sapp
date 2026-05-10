@@ -21,6 +21,16 @@ export type IncomeCategory =
   | 'investment'
   | 'other_income';
 
+export interface ReceiptItem {
+  name: string;
+  price: number;        // final price after discounts
+  category: ExpenseCategory;
+  quantity: number;
+  unitPrice: number;
+  discount?: number;
+  tags: string[];       // food sub-tags: 'mięso', 'nabiał', 'słodycze', etc.
+}
+
 export interface Expense {
   id: string;
   type?: TransactionType; // undefined treated as 'expense' for backward compat
@@ -31,6 +41,22 @@ export interface Expense {
   note: string;
   date: string; // ISO string
   receiptImageUrl?: string;
+  storeName?: string;       // for receipt expenses
+  receiptItems?: ReceiptItem[];  // products when saved as single receipt
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExpenseTemplate {
+  id: string;
+  name: string;
+  type: TransactionType;
+  amount: number;
+  currency: string;
+  category: ExpenseCategory | IncomeCategory;
+  tags: string[];
+  note: string;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +68,25 @@ export interface ExpenseFilters {
   tags?: string[];
   minAmount?: number;
   maxAmount?: number;
+}
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+export type BillingCycle = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string;
+  category: ExpenseCategory;
+  billingCycle: BillingCycle;
+  nextBillingDate: string; // ISO date YYYY-MM-DD
+  reminderDaysBefore: number; // 0 = off
+  active: boolean;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Calendar / Tasks ─────────────────────────────────────────────────────────
@@ -76,6 +121,7 @@ export interface Task {
   description?: string;
   deadline?: string;        // ISO date
   scheduledDate?: string;   // YYYY-MM-DD — day it's planned for
+  scheduledTime?: string;   // HH:MM — optional time slot
   status: TaskStatus;
   priority: EventPriority;
   difficulty?: TaskDifficulty;

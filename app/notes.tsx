@@ -1,19 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  Alert, KeyboardAvoidingView, Platform, Modal, Pressable,
+  Alert, KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft, Plus, Pin, PinOff, Trash2, Search, X, Tag,
-  FileText, ChevronRight, ClipboardList,
+  FileText, Bold, Italic, Underline, Type, ClipboardList,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
-
 import PressableScale from '@/components/ui/PressableScale';
 import { Note, getAllNotes, createNote, updateNote, deleteNote } from '@/utils/notesStorage';
+import {
+  RichBlock, makeBlock, serializeBlocks, deserializeBlocks,
+  blocksToPlainText, RICH_COLORS, RICH_SIZES,
+} from '@/utils/richText';
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
 
@@ -30,26 +33,150 @@ function fmtDate(iso: string) {
   return `${d.getDate()}.${pad(d.getMonth() + 1)}`;
 }
 
+// ─── Rich text toolbar ────────────────────────────────────────────────────────
+
+function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
+  block: RichBlock | undefined;
+  onToggle: (key: 'bold' | 'italic' | 'underline') => void;
+  onColor: (color: string | undefined) => void;
+  onSize: (size: number | undefined) => void;
+  onAdd: () => void;
+}) {
+  if (!block) return null;
+
+  const activeSize = block.size ?? 15;
+
+  return (
+    <View style={tb.wrap}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={tb.row}
+        keyboardShouldPersistTaps="always"
+      >
+        {/* Format toggles */}
+        <TouchableOpacity
+          onPress={() => onToggle('bold')}
+          style={[tb.btn, block.bold && tb.btnActive]}
+          activeOpacity={0.7}
+        >
+          <Bold size={14} color={block.bold ? colors.bg.primary : colors.text.secondary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onToggle('italic')}
+          style={[tb.btn, block.italic && tb.btnActive]}
+          activeOpacity={0.7}
+        >
+          <Italic size={14} color={block.italic ? colors.bg.primary : colors.text.secondary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onToggle('underline')}
+          style={[tb.btn, block.underline && tb.btnActive]}
+          activeOpacity={0.7}
+        >
+          <Underline size={14} color={block.underline ? colors.bg.primary : colors.text.secondary} />
+        </TouchableOpacity>
+
+        <View style={tb.sep} />
+
+        {/* Sizes */}
+        {RICH_SIZES.map(({ size, label }) => (
+          <TouchableOpacity
+            key={size}
+            onPress={() => onSize(size === 15 ? undefined : size)}
+            style={[tb.sizeBtn, activeSize === size && tb.sizeBtnActive]}
+            activeOpacity={0.7}
+          >
+            <Text style={[tb.sizeTxt, activeSize === size && tb.sizeTxtActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+
+        <View style={tb.sep} />
+
+        {/* Colors */}
+        {RICH_COLORS.map(({ key, value, dot }) => {
+          const active = (block.color ?? undefined) === value;
+          return (
+            <TouchableOpacity
+              key={key}
+              onPress={() => onColor(value)}
+              style={[tb.dot, { backgroundColor: dot }, active && tb.dotActive]}
+              activeOpacity={0.7}
+            />
+          );
+        })}
+
+        <View style={tb.sep} />
+
+        {/* Add block */}
+        <TouchableOpacity onPress={onAdd} style={tb.btn} activeOpacity={0.7}>
+          <Plus size={14} color={colors.text.secondary} />
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+}
+
+const tb = StyleSheet.create({
+  wrap: {
+    borderTopWidth: 1, borderTopColor: colors.border.subtle,
+    backgroundColor: colors.bg.elevated,
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2], gap: spacing[1],
+  },
+  btn: {
+    width: 32, height: 32, borderRadius: radius.sm,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  btnActive: { backgroundColor: colors.text.primary },
+  sep: { width: 1, height: 18, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: spacing[1] },
+  sizeBtn: {
+    paddingHorizontal: spacing[2], height: 28, borderRadius: radius.sm,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  sizeBtnActive: { backgroundColor: colors.text.primary },
+  sizeTxt: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  sizeTxtActive: { color: colors.bg.primary },
+  dot: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  dotActive: { borderWidth: 3, borderColor: colors.text.primary },
+});
+
 // ─── Note editor modal ────────────────────────────────────────────────────────
 
 function NoteEditorModal({ note, visible, onClose, onSave }: {
   note: Note | null;
   visible: boolean;
   onClose: () => void;
-  onSave: (title: string, body: string, tags: string[]) => void;
+  onSave: (title: string, blocks: RichBlock[], tags: string[]) => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [body, setBody]   = useState('');
+  const [title, setTitle]     = useState('');
+  const [blocks, setBlocks]   = useState<RichBlock[]>([makeBlock()]);
   const [tagInput, setTagInput] = useState('');
-  const [tags, setTags]   = useState<string[]>([]);
-  const bodyRef = useRef<TextInput>(null);
+  const [tags, setTags]       = useState<string[]>([]);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+
+  const blockRefs = useRef<Map<string, TextInput | null>>(new Map());
 
   useEffect(() => {
     if (visible) {
       setTitle(note?.title ?? '');
-      setBody(note?.body ?? '');
+      setBlocks(
+        note?.bodyRich
+          ? deserializeBlocks(note.bodyRich)
+          : note?.body
+            ? note.body.split('\n').map(l => makeBlock(l))
+            : [makeBlock()]
+      );
       setTags(note?.tags ?? []);
       setTagInput('');
+      setFocusedId(null);
     }
   }, [visible, note]);
 
@@ -62,14 +189,76 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
   const removeTag = (t: string) => setTags(prev => prev.filter(x => x !== t));
 
   const handleSave = () => {
-    if (!title.trim() && !body.trim()) { onClose(); return; }
-    onSave(title.trim(), body.trim(), tags);
+    const hasContent = title.trim() || blocksToPlainText(blocks).trim();
+    if (!hasContent) { onClose(); return; }
+    onSave(title.trim(), blocks, tags);
   };
+
+  // Block management
+  const updateBlockText = (id: string, text: string) => {
+    // Detect Enter → split block
+    if (text.includes('\n')) {
+      const idx = blocks.findIndex(b => b.id === id);
+      if (idx === -1) return;
+      const [before, ...rest] = text.split('\n');
+      const after = rest.join('\n');
+      const { id: _id, text: _text, ...style } = blocks[idx];
+      const newBlock = makeBlock(after);
+      const newBlocks = [
+        ...blocks.slice(0, idx),
+        { ...blocks[idx], text: before },
+        newBlock,
+        ...blocks.slice(idx + 1),
+      ];
+      setBlocks(newBlocks);
+      setTimeout(() => { blockRefs.current.get(newBlock.id)?.focus(); }, 50);
+      return;
+    }
+    setBlocks(prev => prev.map(b => b.id === id ? { ...b, text } : b));
+  };
+
+  const handleBlockKeyPress = (id: string, key: string) => {
+    if (key === 'Backspace') {
+      const idx = blocks.findIndex(b => b.id === id);
+      if (idx > 0 && blocks[idx].text === '') {
+        const prevId = blocks[idx - 1].id;
+        setBlocks(prev => prev.filter(b => b.id !== id));
+        setFocusedId(prevId);
+        setTimeout(() => { blockRefs.current.get(prevId)?.focus(); }, 50);
+      }
+    }
+  };
+
+  const addBlock = () => {
+    const newBlock = makeBlock();
+    setBlocks(prev => [...prev, newBlock]);
+    setTimeout(() => { blockRefs.current.get(newBlock.id)?.focus(); }, 50);
+  };
+
+  const applyToggle = (key: 'bold' | 'italic' | 'underline') => {
+    if (!focusedId) return;
+    setBlocks(prev => prev.map(b => b.id === focusedId ? { ...b, [key]: !b[key] } : b));
+  };
+
+  const applyColor = (color: string | undefined) => {
+    if (!focusedId) return;
+    setBlocks(prev => prev.map(b => b.id === focusedId ? { ...b, color } : b));
+  };
+
+  const applySize = (size: number | undefined) => {
+    if (!focusedId) return;
+    setBlocks(prev => prev.map(b => b.id === focusedId ? { ...b, size } : b));
+  };
+
+  const focusedBlock = blocks.find(b => b.id === focusedId);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleSave}>
       <SafeAreaView style={em.safe} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           {/* Header */}
           <View style={em.header}>
             <PressableScale onPress={handleSave} style={em.backBtn}>
@@ -81,13 +270,13 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
             </TouchableOpacity>
           </View>
 
+          {/* Content */}
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={em.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Title */}
             <TextInput
               value={title}
               onChangeText={setTitle}
@@ -95,21 +284,36 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
               placeholderTextColor={colors.text.muted}
               style={em.titleInput}
               returnKeyType="next"
-              onSubmitEditing={() => bodyRef.current?.focus()}
+              onSubmitEditing={() => blockRefs.current.get(blocks[0]?.id)?.focus()}
             />
 
-            {/* Body */}
-            <TextInput
-              ref={bodyRef}
-              value={body}
-              onChangeText={setBody}
-              placeholder="Zacznij pisać..."
-              placeholderTextColor={colors.text.muted + 'BB'}
-              style={em.bodyInput}
-              multiline
-              textAlignVertical="top"
-              autoFocus={!note}
-            />
+            {/* Rich blocks */}
+            {blocks.map((block) => (
+              <TextInput
+                key={block.id}
+                ref={r => { blockRefs.current.set(block.id, r); }}
+                value={block.text}
+                onChangeText={text => updateBlockText(block.id, text)}
+                onFocus={() => setFocusedId(block.id)}
+                onKeyPress={({ nativeEvent: { key } }) => handleBlockKeyPress(block.id, key)}
+                placeholder={block.id === blocks[0]?.id ? 'Zacznij pisać...' : undefined}
+                placeholderTextColor={colors.text.muted + 'BB'}
+                multiline
+                textAlignVertical="top"
+                style={[
+                  em.blockInput,
+                  {
+                    fontWeight: block.bold ? '700' : '400',
+                    fontStyle: block.italic ? 'italic' : 'normal',
+                    textDecorationLine: block.underline ? 'underline' : 'none',
+                    textDecorationColor: block.underline && block.color ? block.color : undefined,
+                    color: block.color ?? colors.text.primary,
+                    fontSize: block.size ?? 15,
+                    lineHeight: (block.size ?? 15) * 1.65,
+                  },
+                ]}
+              />
+            ))}
 
             {/* Tags */}
             <View style={em.tagSection}>
@@ -118,6 +322,7 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
                 <TextInput
                   value={tagInput}
                   onChangeText={setTagInput}
+                  onFocus={() => setFocusedId(null)}
                   placeholder="Dodaj tag..."
                   placeholderTextColor={colors.text.muted}
                   style={em.tagInput}
@@ -142,6 +347,15 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
               )}
             </View>
           </ScrollView>
+
+          {/* Rich toolbar — stays above keyboard */}
+          <RichToolbar
+            block={focusedBlock}
+            onToggle={applyToggle}
+            onColor={applyColor}
+            onSize={applySize}
+            onAdd={addBlock}
+          />
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
@@ -162,23 +376,21 @@ const em = StyleSheet.create({
   },
   headerTitle: { ...typography.h4, color: colors.text.primary, flex: 1 },
   saveBtn: {
-    backgroundColor: colors.text.primary,
-    borderRadius: radius.md,
+    backgroundColor: colors.text.primary, borderRadius: radius.md,
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
   },
   saveBtnText: { fontSize: 13, fontWeight: '700', color: colors.bg.primary },
-  scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: 60 },
+  scroll: { padding: spacing[4], gap: spacing[2], paddingBottom: 24 },
   titleInput: {
     fontSize: 22, fontWeight: '800', color: colors.text.primary,
-    paddingVertical: spacing[2],
+    paddingVertical: spacing[2], marginBottom: spacing[2],
   },
-  bodyInput: {
-    fontSize: 16, color: colors.text.primary,
-    lineHeight: 26,
-    minHeight: 200,
-    paddingVertical: spacing[2],
+  blockInput: {
+    color: colors.text.primary,
+    paddingVertical: spacing[1],
+    minHeight: 28,
   },
-  tagSection: { gap: spacing[2], marginTop: spacing[2] },
+  tagSection: { gap: spacing[2], marginTop: spacing[3] },
   tagInputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.bg.card,
@@ -206,7 +418,11 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
   onDelete: () => void;
   onConvert: () => void;
 }) {
-  const preview = note.body.trim().replace(/\n+/g, ' ');
+  const plainBody = note.bodyRich
+    ? blocksToPlainText(deserializeBlocks(note.bodyRich))
+    : note.body;
+  const preview = plainBody.trim().replace(/\n+/g, ' ');
+
   return (
     <PressableScale onPress={onPress} style={[nc.wrap, note.pinned && nc.pinned]}>
       <View style={nc.topRow}>
@@ -235,6 +451,12 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
         <Text style={nc.body} numberOfLines={2}>{preview}</Text>
       )}
 
+      {note.bodyRich && (
+        <View style={nc.richBadge}>
+          <Type size={8} color={colors.accent.blue + 'AA'} />
+        </View>
+      )}
+
       <View style={nc.footer}>
         <Text style={nc.time}>{fmtDate(note.updatedAt)}</Text>
         {note.tags.length > 0 && (
@@ -260,28 +482,21 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
 
 const nc = StyleSheet.create({
   wrap: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.xl,
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: colors.border.default,
-    padding: spacing[4],
-    gap: spacing[2],
+    padding: spacing[4], gap: spacing[2],
   },
-  pinned: {
-    borderColor: colors.accent.amber + '40',
-    backgroundColor: colors.accent.amber + '08',
-  },
+  pinned: { borderColor: colors.accent.amber + '40', backgroundColor: colors.accent.amber + '08' },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   title: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text.primary, lineHeight: 20 },
   titleEmpty: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text.secondary, lineHeight: 20, fontStyle: 'italic' },
   body: { fontSize: 13, color: colors.text.secondary, lineHeight: 20 },
+  richBadge: { position: 'absolute', top: spacing[3], right: 80 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] },
   time: { fontSize: 11, color: colors.text.muted },
   tagRow: { flexDirection: 'row', gap: spacing[1], flex: 1 },
   tag: { fontSize: 10, color: colors.accent.blue + 'AA' },
-  pinnedBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    marginLeft: 'auto',
-  },
+  pinnedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' },
   pinnedText: { fontSize: 9, color: colors.accent.amber, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: spacing[1] },
   actionBtn: { padding: 3 },
@@ -290,6 +505,7 @@ const nc = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NotesScreen() {
+  const { noteId } = useLocalSearchParams<{ noteId?: string }>();
   const [notes, setNotes]           = useState<Note[]>([]);
   const [query, setQuery]           = useState('');
   const [searching, setSearching]   = useState(false);
@@ -298,17 +514,26 @@ export default function NotesScreen() {
   const { create: createTask }      = useTasks();
 
   const loadNotes = useCallback(async () => {
-    setNotes(await getAllNotes());
-  }, []);
+    const loaded = await getAllNotes();
+    setNotes(loaded);
+    // Auto-open a specific note if noteId param was passed (e.g. from search)
+    if (noteId) {
+      const target = loaded.find(n => n.id === noteId);
+      if (target) { setEditorNote(target); setEditorOpen(true); }
+    }
+  }, [noteId]);
 
   useEffect(() => { loadNotes(); }, []);
 
   const filtered = query.trim()
     ? notes.filter(n => {
         const q = query.toLowerCase();
+        const plain = n.bodyRich
+          ? blocksToPlainText(deserializeBlocks(n.bodyRich))
+          : n.body;
         return (
           n.title.toLowerCase().includes(q) ||
-          n.body.toLowerCase().includes(q) ||
+          plain.toLowerCase().includes(q) ||
           n.tags.some(t => t.includes(q))
         );
       })
@@ -327,13 +552,17 @@ export default function NotesScreen() {
     setEditorOpen(true);
   };
 
-  const handleSave = async (title: string, body: string, tags: string[]) => {
+  const handleSave = async (title: string, blocks: RichBlock[], tags: string[]) => {
     setEditorOpen(false);
+    const body = blocksToPlainText(blocks);
+    const hasFormatting = blocks.some(b => b.bold || b.italic || b.underline || b.color || b.size);
+    const bodyRich = hasFormatting ? serializeBlocks(blocks) : undefined;
+
     if (editorNote) {
-      await updateNote(editorNote.id, { title, body, tags });
+      await updateNote(editorNote.id, { title, body, bodyRich, tags });
       toast.success('Notatka zaktualizowana');
     } else {
-      await createNote({ title, body, tags });
+      await createNote({ title, body, bodyRich, tags });
       toast.success('Notatka zapisana');
     }
     loadNotes();
@@ -397,7 +626,6 @@ export default function NotesScreen() {
         </PressableScale>
       </View>
 
-      {/* Search bar */}
       {searching && (
         <View style={styles.searchBar}>
           <Search size={14} color={colors.text.muted} />
@@ -514,8 +742,7 @@ const styles = StyleSheet.create({
 
   groupLabel: {
     fontSize: 10, fontWeight: '700', color: colors.text.muted,
-    letterSpacing: 1.2, textTransform: 'uppercase',
-    marginBottom: spacing[2],
+    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing[2],
   },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4], padding: spacing[8] },
@@ -526,10 +753,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
-  emptySub: {
-    fontSize: 14, color: colors.text.muted, textAlign: 'center',
-    lineHeight: 21,
-  },
+  emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 21 },
   emptyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.text.primary, borderRadius: radius.full,

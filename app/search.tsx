@@ -1,17 +1,20 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
-  TouchableOpacity, KeyboardAvoidingView, Platform,
+  TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Search, X, CheckSquare, CalendarDays, Receipt, CheckCircle2, FileText } from 'lucide-react-native';
+import { Search, X, CheckSquare, CalendarDays, Receipt, CheckCircle2, FileText, Clock } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta } from '@/utils/categories';
 import { Note, getAllNotes } from '@/utils/notesStorage';
+import { blocksToPlainText, deserializeBlocks } from '@/utils/richText';
+import { expensesService } from '@/services/expensesService';
+import { calendarService, tasksService } from '@/services/calendarService';
 import { colors, spacing, radius, typography } from '@/theme';
 
 function highlight(text: string, query: string): { part: string; match: boolean }[] {
@@ -43,10 +46,33 @@ const hl = StyleSheet.create({
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
-  const { tasks, events } = useCalendarStore();
-  const { expenses } = useExpensesStore();
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => { getAllNotes().then(setNotes); }, []);
+  const { tasks, events, setTasks, setEvents } = useCalendarStore();
+  const { expenses, setExpenses } = useExpensesStore();
+
+  // Load data into stores if not already loaded
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      await Promise.all([
+        expenses.length === 0
+          ? expensesService.getAll().then(d => { if (active) setExpenses(d); }).catch(() => {})
+          : Promise.resolve(),
+        tasks.length === 0
+          ? tasksService.getAllTasks().then(d => { if (active) setTasks(d); }).catch(() => {})
+          : Promise.resolve(),
+        events.length === 0
+          ? calendarService.getAllEvents().then(d => { if (active) setEvents(d); }).catch(() => {})
+          : Promise.resolve(),
+        getAllNotes().then(d => { if (active) setNotes(d); }),
+      ]);
+      if (active) setLoading(false);
+    };
+    load();
+    return () => { active = false; };
+  }, []);
 
   const q = query.trim();
 
@@ -90,13 +116,26 @@ export default function SearchScreen() {
     if (!q) return [];
     const lower = q.toLowerCase();
     return notes
-      .filter(n =>
-        n.title.toLowerCase().includes(lower) ||
-        n.body.toLowerCase().includes(lower) ||
-        n.tags.some(t => t.includes(lower))
-      )
+      .filter(n => {
+        const body = n.bodyRich
+          ? blocksToPlainText(deserializeBlocks(n.bodyRich))
+          : n.body;
+        return (
+          n.title.toLowerCase().includes(lower) ||
+          body.toLowerCase().includes(lower) ||
+          n.tags.some(t => t.includes(lower))
+        );
+      })
       .slice(0, 5);
   }, [notes, q]);
+
+  // Recent items for empty state
+  const recentExpenses = useMemo(() =>
+    [...expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+  [expenses]);
+  const pendingTasks = useMemo(() =>
+    tasks.filter(t => t.status === 'pending').slice(0, 4),
+  [tasks]);
 
   const hasResults = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length > 0;
   const total = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length;
@@ -118,7 +157,8 @@ export default function SearchScreen() {
               autoFocus
               returnKeyType="search"
             />
-            {q.length > 0 && (
+            {loading && <ActivityIndicator size="small" color={colors.text.muted} style={{ marginLeft: 4 }} />}
+            {q.length > 0 && !loading && (
               <PressableScale onPress={() => setQuery('')} style={styles.clearBtn}>
                 <X size={14} color={colors.text.muted} />
               </PressableScale>
@@ -138,15 +178,81 @@ export default function SearchScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {!q && (
-            <View style={styles.empty}>
-              <Search size={36} color={colors.text.muted} strokeWidth={1.2} />
-              <Text style={styles.emptyTitle}>Szukaj w całej aplikacji</Text>
-              <Text style={styles.emptySub}>Zadania, wydarzenia, transakcje</Text>
-            </View>
+          {/* Empty query — show recent */}
+          {!q && !loading && (
+            <>
+              {recentExpenses.length > 0 && (
+                <View style={styles.section}>
+                  <View style={styles.sectionRow}>
+                    <Clock size={12} color={colors.text.muted} />
+                    <Text style={[styles.sectionTitle, { color: colors.text.muted }]}>Ostatnie transakcje</Text>
+                  </View>
+                  {recentExpenses.map(exp => {
+                    const meta = getCategoryMeta(exp.category);
+                    const isIncome = exp.type === 'income';
+                    const label = exp.note || meta.label;
+                    return (
+                      <TouchableOpacity
+                        key={exp.id}
+                        style={styles.row}
+                        onPress={() => router.push(`/expenses/${exp.id}` as any)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[styles.rowIcon, { backgroundColor: meta.color + '20' }]}>
+                          <Receipt size={14} color={meta.color} />
+                        </View>
+                        <View style={styles.rowInfo}>
+                          <Text style={hl.base} numberOfLines={1}>{label}</Text>
+                          <Text style={styles.rowMeta}>{exp.date.split('T')[0]}</Text>
+                        </View>
+                        <Text style={[styles.rowAmount, { color: isIncome ? colors.accent.success : colors.text.secondary }]}>
+                          {isIncome ? '+' : '-'}{exp.amount.toFixed(2)} zł
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {pendingTasks.length > 0 && (
+                <View style={styles.section}>
+                  <View style={styles.sectionRow}>
+                    <CheckSquare size={12} color={colors.accent.purple} />
+                    <Text style={[styles.sectionTitle, { color: colors.accent.purple }]}>Do zrobienia</Text>
+                  </View>
+                  {pendingTasks.map(task => (
+                    <TouchableOpacity
+                      key={task.id}
+                      style={styles.row}
+                      onPress={() => router.push(`/tasks/${task.id}` as any)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.rowIcon, { backgroundColor: colors.accent.purple + '18' }]}>
+                        <CheckSquare size={14} color={colors.accent.purple} />
+                      </View>
+                      <View style={styles.rowInfo}>
+                        <Text style={hl.base} numberOfLines={1}>{task.title}</Text>
+                        {task.deadline && (
+                          <Text style={styles.rowMeta}>{task.deadline.split('T')[0]}</Text>
+                        )}
+                      </View>
+                      {task.priority === 'high' && <View style={styles.urgentDot} />}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {recentExpenses.length === 0 && pendingTasks.length === 0 && (
+                <View style={styles.empty}>
+                  <Search size={36} color={colors.text.muted} strokeWidth={1.2} />
+                  <Text style={styles.emptyTitle}>Szukaj w całej aplikacji</Text>
+                  <Text style={styles.emptySub}>Zadania, wydarzenia, transakcje, notatki</Text>
+                </View>
+              )}
+            </>
           )}
 
-          {q && !hasResults && (
+          {q && !hasResults && !loading && (
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>Brak wyników</Text>
               <Text style={styles.emptySub}>Spróbuj innej frazy</Text>
@@ -267,7 +373,7 @@ export default function SearchScreen() {
                 <TouchableOpacity
                   key={note.id}
                   style={styles.row}
-                  onPress={() => router.push('/notes' as any)}
+                  onPress={() => router.push({ pathname: '/notes', params: { noteId: note.id } } as any)}
                   activeOpacity={0.75}
                 >
                   <View style={[styles.rowIcon, { backgroundColor: colors.accent.blue + '18' }]}>
@@ -300,14 +406,10 @@ const styles = StyleSheet.create({
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.bg.elevated,
-    borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  input: {
-    flex: 1, fontSize: 14, color: colors.text.primary,
-    paddingVertical: 0,
-  },
+  input: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 0 },
   clearBtn: {
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -334,8 +436,7 @@ const styles = StyleSheet.create({
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.lg,
+    backgroundColor: colors.bg.card, borderRadius: radius.lg,
     borderWidth: 1, borderColor: colors.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
@@ -346,8 +447,5 @@ const styles = StyleSheet.create({
   rowInfo: { flex: 1, gap: 3 },
   rowMeta: { ...typography.caption, color: colors.text.muted, fontSize: 11 },
   rowAmount: { ...typography.label, fontWeight: '700', fontSize: 13 },
-  urgentDot: {
-    width: 7, height: 7, borderRadius: 4,
-    backgroundColor: colors.accent.red,
-  },
+  urgentDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent.red },
 });

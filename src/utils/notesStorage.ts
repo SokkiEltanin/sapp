@@ -4,6 +4,7 @@ export interface Note {
   id: string;
   title: string;
   body: string;
+  bodyRich?: string;  // JSON-serialized RichBlock[] — present only when formatted
   tags: string[];
   pinned: boolean;
   createdAt: string;
@@ -33,13 +34,14 @@ export async function getAllNotes(): Promise<Note[]> {
   });
 }
 
-export async function createNote(data: Pick<Note, 'title' | 'body' | 'tags'>): Promise<Note> {
+export async function createNote(data: Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags'>): Promise<Note> {
   const notes = await load();
   const now = new Date().toISOString();
   const note: Note = {
     id: Date.now().toString(),
     title: data.title,
     body: data.body,
+    bodyRich: data.bodyRich,
     tags: data.tags,
     pinned: false,
     createdAt: now,
@@ -50,7 +52,7 @@ export async function createNote(data: Pick<Note, 'title' | 'body' | 'tags'>): P
   return note;
 }
 
-export async function updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'body' | 'tags' | 'pinned'>>): Promise<void> {
+export async function updateNote(id: string, updates: Partial<Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'pinned'>>): Promise<void> {
   const notes = await load();
   const idx = notes.findIndex(n => n.id === id);
   if (idx === -1) return;

@@ -1,4 +1,4 @@
-import { useEffect, Component, ReactNode } from 'react';
+import { useEffect, useState, Component, ReactNode } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -39,48 +39,87 @@ const eb = StyleSheet.create({
 });
 
 export default function RootLayout() {
+  const [authReady, setAuthReady] = useState(false);
+
   useEffect(() => {
+    // Fallback: show app after 4s regardless (prevents permanent black screen)
+    const timer = setTimeout(() => setAuthReady(true), 4000);
     const unsub = onAuthStateChanged(auth, (user) => {
+      clearTimeout(timer);
       if (!user) {
-        signInAnonymously(auth).catch(() => {});
+        signInAnonymously(auth)
+          .then(() => setAuthReady(true))
+          .catch(() => setAuthReady(true));
+      } else {
+        setAuthReady(true);
       }
     });
-    return unsub;
+    return () => { unsub(); clearTimeout(timer); };
   }, []);
 
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      const screen = response.notification.request.content.data?.screen as string | undefined;
-      if (screen === 'mood')     router.push('/(tabs)/mood' as any);
-      else if (screen === 'calendar') router.push('/(tabs)/calendar' as any);
-      else if (screen === 'tasks')   router.push('/(tabs)/tasks' as any);
-      else if (screen === 'habits')  router.push('/habits' as any);
+    function handleNotifResponse(response: Notifications.NotificationResponse) {
+      const data = (response.notification.request.content.data ?? {}) as Record<string, any>;
+      const { screen, taskId, eventId } = data;
+
+      if (screen === 'mood') {
+        router.push({ pathname: '/(tabs)/mood', params: { openCheckIn: 'true' } } as any);
+      } else if (screen === 'tasks') {
+        if (taskId) router.push(`/tasks/${taskId}` as any);
+        else        router.push('/(tabs)/tasks' as any);
+      } else if (screen === 'calendar' || screen === 'calendar_event') {
+        if (eventId) router.push(`/calendar/${eventId}` as any);
+        else         router.push('/(tabs)/tasks' as any);
+      } else if (screen === 'habits') {
+        router.push('/habits' as any);
+      } else if (screen === 'subscriptions') {
+        router.push('/expenses/subscriptions' as any);
+      } else if (screen === 'finances') {
+        router.push('/(tabs)/finances' as any);
+      }
+    }
+
+    // Foreground / background tap
+    const sub = Notifications.addNotificationResponseReceivedListener(handleNotifResponse);
+
+    // Cold-start: app opened by tapping a notification when it was killed
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) setTimeout(() => handleNotifResponse(response), 300);
     });
+
     return () => sub.remove();
   }, []);
+
+  if (!authReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
+    );
+  }
 
   return (
     <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style="light" backgroundColor={colors.bg.primary} />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg.primary } }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="expenses/add" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="expenses/scan" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="expenses/stats" />
-          <Stack.Screen name="expenses/[id]" />
-          <Stack.Screen name="settings" />
-          <Stack.Screen name="search" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="calendar/add" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="tasks/add" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="tasks/[id]" />
-          <Stack.Screen name="calendar/[id]" />
-          <Stack.Screen name="pomodoro" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="habits" />
-          <Stack.Screen name="weekly" />
-          <Stack.Screen name="focus" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="notes" />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg.primary }, animation: 'fade' }}>
+          <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+          <Stack.Screen name="expenses/add" options={{ animation: 'fade' }} />
+          <Stack.Screen name="expenses/scan" options={{ animation: 'fade' }} />
+          <Stack.Screen name="expenses/manual" options={{ animation: 'fade' }} />
+          <Stack.Screen name="expenses/subscriptions" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="expenses/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="search" options={{ animation: 'fade' }} />
+          <Stack.Screen name="calendar/add" options={{ animation: 'fade', contentStyle: { backgroundColor: colors.bg.secondary } }} />
+          <Stack.Screen name="tasks/add" options={{ animation: 'fade' }} />
+          <Stack.Screen name="tasks/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="calendar/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="pomodoro" options={{ animation: 'fade' }} />
+          <Stack.Screen name="habits" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="weekly" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="focus" options={{ animation: 'fade' }} />
+          <Stack.Screen name="notes" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="expenses/templates" options={{ animation: 'fade' }} />
         </Stack>
         <PomodoroIndicator />
         <Toast />
