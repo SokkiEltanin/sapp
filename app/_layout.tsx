@@ -103,15 +103,15 @@ export default function RootLayout() {
         <StatusBar style="light" backgroundColor={colors.bg.primary} />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg.primary }, animation: 'fade' }}>
           <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
-          <Stack.Screen name="expenses/add" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="expenses/add" options={{ animation: 'fade' }} />
           <Stack.Screen name="expenses/scan" options={{ animation: 'fade' }} />
-          <Stack.Screen name="expenses/manual" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="expenses/manual" options={{ animation: 'fade' }} />
           <Stack.Screen name="expenses/subscriptions" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="expenses/[id]" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="search" options={{ animation: 'fade' }} />
-          <Stack.Screen name="calendar/add" options={{ animation: 'slide_from_bottom' }} />
-          <Stack.Screen name="tasks/add" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="calendar/add" options={{ animation: 'fade' }} />
+          <Stack.Screen name="tasks/add" options={{ animation: 'fade' }} />
           <Stack.Screen name="tasks/[id]" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="calendar/[id]" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="pomodoro" options={{ animation: 'fade' }} />
