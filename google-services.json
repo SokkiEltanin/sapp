@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1020705470960",
+    "project_id": "sokkisapp",
+    "storage_bucket": "sokkisapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1020705470960:android:d349482366b8a1752ec535",
+        "android_client_info": {
+          "package_name": "sokkieltanin.sapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1020705470960-o6ubrbsb7tmmbma9ei0rmlu3oct6j0e6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "sokkieltanin.sapp",
+            "certificate_hash": "7a0c1a34b9602d00c5f51755ecd51db7ff3eb29d"
+          }
+        },
+        {
+          "client_id": "1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwSAg6a8oKitkn7x5oAQ-7BwVT7gUGt5E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
