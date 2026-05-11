@@ -86,9 +86,8 @@ export default function AddCalendarModal() {
         });
       }
     } catch (e: any) {
-      Alert.alert('Błąd', e.message);
-    } finally {
       setSaving(false);
+      Alert.alert('Błąd', e.message);
     }
   };
 

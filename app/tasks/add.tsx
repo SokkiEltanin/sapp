@@ -304,9 +304,8 @@ export default function AddTaskScreen() {
         notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
       });
     } catch (e: any) {
-      toast.error(e.message ?? 'Błąd zapisu');
-    } finally {
       setSaving(false);
+      toast.error(e.message ?? 'Błąd zapisu');
     }
   };
 
