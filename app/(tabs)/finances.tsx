@@ -91,16 +91,26 @@ export default function FinancesScreen() {
   }, [expenses, monthOffset]);
   const maxMonthly = Math.max(...monthlyData.flatMap(m => [m.expenses, m.income]), 1);
 
-  const dailyData = useMemo(() => {
-    const days = new Date(monthBase.getFullYear(), monthBase.getMonth() + 1, 0).getDate();
-    return Array.from({ length: days }, (_, i) => {
-      const date    = new Date(monthBase.getFullYear(), monthBase.getMonth(), i + 1);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const total   = expenses.filter(e => isExp(e) && e.date.startsWith(dateStr)).reduce((s, e) => s + e.amount, 0);
-      return { dateStr, total, isToday: isCurrentMonth && i + 1 === today.getDate(), day: i + 1 };
-    });
-  }, [expenses, monthBase]);
-  const maxDaily = Math.max(...dailyData.map(d => d.total), 1);
+  const weeklyData = useMemo(() => {
+    const year = monthBase.getFullYear();
+    const month = monthBase.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthStr = format(monthBase, 'yyyy-MM');
+    const weeks: { label: string; total: number; hasToday: boolean }[] = [];
+    let dayStart = 1;
+    while (dayStart <= daysInMonth) {
+      const dayEnd = Math.min(dayStart + 6, daysInMonth);
+      const total = expenses
+        .filter(e => isExp(e) && e.date.startsWith(monthStr))
+        .filter(e => { const d = parseInt(e.date.slice(8, 10), 10); return d >= dayStart && d <= dayEnd; })
+        .reduce((s, e) => s + e.amount, 0);
+      const hasToday = isCurrentMonth && today.getDate() >= dayStart && today.getDate() <= dayEnd;
+      weeks.push({ label: `${dayStart}–${dayEnd}`, total, hasToday });
+      dayStart += 7;
+    }
+    return weeks;
+  }, [expenses, monthBase, isCurrentMonth]);
+  const maxWeekly = Math.max(...weeklyData.map(w => w.total), 1);
 
   const catBreakdown = useMemo(() => {
     const byCurr: Record<string, number> = {};
@@ -475,12 +485,12 @@ export default function FinancesScreen() {
                   <TouchableOpacity key={i} style={styles.monthCol} onPress={() => setMonthOffset(MONTHS_BACK - 1 - i)}>
                     <View style={styles.barsWrap}>
                       <View style={[styles.bar, {
-                        height: Math.max(3, (m.income / maxMonthly) * 72),
+                        height: Math.max(3, (m.income / maxMonthly) * 100),
                         backgroundColor: colors.accent.green,
                         opacity: m.income > 0 ? (m.isSelected ? 1 : 0.5) : 0.15,
                       }]} />
                       <View style={[styles.bar, {
-                        height: Math.max(3, (m.expenses / maxMonthly) * 72),
+                        height: Math.max(3, (m.expenses / maxMonthly) * 100),
                         backgroundColor: colors.accent.red,
                         opacity: m.expenses > 0 ? (m.isSelected ? 1 : 0.5) : 0.15,
                       }]} />
@@ -503,40 +513,37 @@ export default function FinancesScreen() {
               </View>
             </View>
 
-            {/* Daily chart */}
+            {/* Weekly chart */}
             <View style={styles.card}>
               <View style={styles.cardRow}>
                 <TrendingDown size={13} color={colors.text.muted} />
-                <Text style={styles.cardLabel}>{format(monthBase, 'LLLL', { locale: pl })} — dziennie</Text>
+                <Text style={styles.cardLabel}>{format(monthBase, 'LLLL', { locale: pl })} — tygodniowo</Text>
               </View>
-              <View style={styles.dailyChart}>
-                {dailyData.map((d, i) => {
-                  const barH = d.total > 0 ? Math.max(3, (d.total / maxDaily) * 64) : 2;
-                  const show = i % 5 === 0 || d.isToday || i === dailyData.length - 1;
+              <View style={styles.weeklyChart}>
+                {weeklyData.map((w, i) => {
+                  const barH = w.total > 0 ? Math.max(8, (w.total / maxWeekly) * 110) : 4;
                   return (
-                    <View key={i} style={styles.dailyCol}>
-                      <View style={styles.dailyBarWrap}>
-                        <View style={[styles.dailyBar, {
+                    <View key={i} style={styles.weeklyCol}>
+                      <Text style={[styles.weeklyAmt, w.hasToday && { color: colors.accent.red }]}>
+                        {w.total > 0 ? (w.total >= 1000 ? `${(w.total / 1000).toFixed(1)}k` : w.total.toFixed(0)) : ''}
+                      </Text>
+                      <View style={styles.weeklyBarWrap}>
+                        <View style={[styles.weeklyBar, {
                           height: barH,
-                          backgroundColor: d.isToday ? colors.accent.red : d.total > 0 ? colors.accent.red + '70' : 'rgba(255,255,255,0.05)',
-                          width: d.isToday ? 5 : 3,
+                          backgroundColor: w.hasToday ? colors.accent.red : w.total > 0 ? colors.accent.red + '80' : 'rgba(255,255,255,0.07)',
                         }]} />
                       </View>
-                      {show && (
-                        <Text style={[styles.dailyLabel, d.isToday && { color: colors.accent.red }]}>
-                          {d.isToday ? 'dziś' : String(d.day)}
-                        </Text>
-                      )}
+                      <Text style={[styles.weeklyLabel, w.hasToday && { color: colors.accent.red, fontWeight: '700' }]}>
+                        {w.label}
+                      </Text>
                     </View>
                   );
                 })}
               </View>
               <View style={styles.dailyLegendRow}>
-                <Text style={styles.dailyLegend}>Maks.: {maxDaily.toFixed(0)} zł</Text>
+                <Text style={styles.dailyLegend}>Maks. tydzień: {maxWeekly.toFixed(0)} zł</Text>
                 <Text style={styles.dailyLegend}>
-                  Śr./dzień: {dailyData.filter(d => d.total > 0).length > 0
-                    ? (dailyData.reduce((s, d) => s + d.total, 0) / dailyData.filter(d => d.total > 0).length).toFixed(0)
-                    : '0'} zł
+                  Razem: {weeklyData.reduce((s, w) => s + w.total, 0).toFixed(0)} zł
                 </Text>
               </View>
             </View>
@@ -829,24 +836,25 @@ const styles = StyleSheet.create({
   alertText: { fontSize: 12, color: colors.text.secondary, lineHeight: 18 },
   alertPct:  { fontSize: 12, fontWeight: '700', minWidth: 44, textAlign: 'right' },
 
-  chartArea:        { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1], height: 96 },
+  chartArea:        { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1], height: 130 },
   monthCol:         { flex: 1, alignItems: 'center', gap: 4 },
   barsWrap:         { flex: 1, width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 2 },
-  bar:              { width: 8, borderRadius: 4, minHeight: 3 },
-  monthLbl:         { fontSize: 9, color: colors.text.muted },
+  bar:              { width: 11, borderRadius: 5, minHeight: 3 },
+  monthLbl:         { fontSize: 11, color: colors.text.muted },
   monthLblSelected: { color: colors.text.primary, fontWeight: '700' },
   monthDot:         { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent.blue },
   chartLegend:      { flexDirection: 'row', gap: spacing[3], alignItems: 'center', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', flexWrap: 'wrap' },
   legendItem:       { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   legendDot:        { width: 8, height: 8, borderRadius: 4 },
   legendText:       { fontSize: 11, color: colors.text.muted },
-  legendHint:       { fontSize: 9, color: colors.text.muted, flex: 1, textAlign: 'right' },
+  legendHint:       { fontSize: 10, color: colors.text.muted, flex: 1, textAlign: 'right' },
 
-  dailyChart:     { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
-  dailyCol:       { flex: 1, alignItems: 'center', gap: 2 },
-  dailyBarWrap:   { height: 68, justifyContent: 'flex-end', alignItems: 'center' },
-  dailyBar:       { borderRadius: 2, minHeight: 2 },
-  dailyLabel:     { fontSize: 7, color: colors.text.muted, textAlign: 'center' },
+  weeklyChart:    { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[2] },
+  weeklyCol:      { flex: 1, alignItems: 'center', gap: spacing[2] },
+  weeklyBarWrap:  { height: 120, justifyContent: 'flex-end', alignItems: 'center', width: '100%' },
+  weeklyBar:      { width: '80%', borderRadius: radius.md, minHeight: 4 },
+  weeklyLabel:    { fontSize: 11, color: colors.text.muted, textAlign: 'center' },
+  weeklyAmt:      { fontSize: 11, fontWeight: '700', color: colors.text.secondary, textAlign: 'center', minHeight: 16 },
   dailyLegendRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
   dailyLegend:    { fontSize: 10, color: colors.text.muted },
 
@@ -898,10 +906,10 @@ const styles = StyleSheet.create({
   // ── Weekday chart ────────────────────────────────────────────────────────────
   weekRow:    { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   weekCol:    { flex: 1, alignItems: 'center', gap: 3 },
-  weekBarWrap:{ height: 80, justifyContent: 'flex-end', alignItems: 'center' },
-  weekBar:    { width: 18, borderRadius: 6, minHeight: 3 },
-  weekLabel:  { fontSize: 9, color: colors.text.muted },
-  weekAmt:    { fontSize: 7, color: colors.text.muted, textAlign: 'center' },
+  weekBarWrap:{ height: 96, justifyContent: 'flex-end', alignItems: 'center' },
+  weekBar:    { width: 22, borderRadius: 7, minHeight: 3 },
+  weekLabel:  { fontSize: 11, color: colors.text.muted },
+  weekAmt:    { fontSize: 10, color: colors.text.muted, textAlign: 'center' },
 
   // ── Top products ─────────────────────────────────────────────────────────────
   productRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.03)' },

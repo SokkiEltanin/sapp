@@ -584,6 +584,7 @@ export default function TasksScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterWrap}
+            style={{ flexGrow: 0, flexShrink: 0 }}
           >
             {FILTERS.map(({ key, label }) => {
               const active = filter === key;

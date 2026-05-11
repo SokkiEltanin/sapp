@@ -27,15 +27,15 @@ const TABS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Nowe zadanie',    Icon: CheckSquare,  color: colors.accent.purple, route: '/tasks/add' },
-  { label: 'Wydatek',         Icon: Receipt,      color: colors.accent.red,    route: '/expenses/add' },
-  { label: 'Przychód',        Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
-  { label: 'Skan paragonu',   Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
-  { label: 'Event',           Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },
-  { label: 'Focus',           Icon: Target,       color: colors.accent.purple, route: '/focus' },
-  { label: 'Nawyki',          Icon: Flame,        color: colors.accent.amber,  route: '/habits' },
-  { label: 'Statystyki tyg.', Icon: BarChart2,    color: colors.accent.blue,   route: '/weekly' },
   { label: 'Nastrój',         Icon: Smile,        color: colors.accent.pink,   route: '/(tabs)/mood' },
+  { label: 'Statystyki tyg.', Icon: BarChart2,    color: colors.accent.blue,   route: '/weekly' },
+  { label: 'Nawyki',          Icon: Flame,        color: colors.accent.amber,  route: '/habits' },
+  { label: 'Focus',           Icon: Target,       color: colors.accent.purple, route: '/focus' },
+  { label: 'Event',           Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },
+  { label: 'Przychód',        Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
+  { label: 'Wydatek',         Icon: Receipt,      color: colors.accent.red,    route: '/expenses/add' },
+  { label: 'Skan paragonu',   Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
+  { label: 'Nowe zadanie',    Icon: CheckSquare,  color: colors.accent.purple, route: '/tasks/add' },
 ];
 
 const FAB_SIZE = 52;
