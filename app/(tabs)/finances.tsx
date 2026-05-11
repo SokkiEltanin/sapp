@@ -403,7 +403,7 @@ export default function FinancesScreen() {
               const over     = leftover < 0;
               const barColor = ratio >= 1 ? colors.accent.red : ratio >= 0.75 ? colors.accent.amber : colors.accent.green;
               const incDate  = lastIncome.date.slice(0, 7);
-              const incLabel = format(parseISO(lastIncome.date + 'T12:00:00'), 'LLLL', { locale: pl });
+              const incLabel = format(parseISO(lastIncome.date.slice(0, 10) + 'T12:00:00'), 'LLLL', { locale: pl });
               return (
                 <View style={[styles.card, styles.salaryCard]}>
                   <View style={styles.cardRow}>
