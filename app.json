@@ -35,7 +35,7 @@
       ]
     },
     "updates": {
-      "url": "https://u.expo.dev/3d6fc00f-2c99-41c3-ab5d-5a9beaf477d1"
+      "url": "https://u.expo.dev/33853b1e-53bc-4779-91e4-18e0714c53c4"
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -65,9 +65,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "3d6fc00f-2c99-41c3-ab5d-5a9beaf477d1"
+        "projectId": "33853b1e-53bc-4779-91e4-18e0714c53c4"
       }
     },
-    "owner": "sappeltanin"
+    "owner": "sapp_v2"
   }
 }
