@@ -75,23 +75,6 @@ const STORE_BRANDS: { pattern: RegExp; name: string }[] = [
 // ─── Category keywords ────────────────────────────────────────────────────────
 
 const CATEGORY_KEYWORDS: Record<ExpenseCategory, string[]> = {
-  food: [
-    // restauracje i fast food
-    'pizza', 'burger', 'kebab', 'sushi', 'hot dog', 'zupa', 'kanapka',
-    'obiad', 'kolacja', 'śniadanie', 'danie', 'posiłek', 'fast food',
-    'mcdonald', 'kfc', 'subway', 'dominos', 'restauracj', 'kawiarni',
-    'bistro', 'bar mleczny', 'pierogarn', 'naleśnikar', 'lodziar',
-    'pizzer', 'stek', 'steak', 'ramen', 'pho', 'wok', 'tortilla',
-    'falafel', 'gyros', 'shawarma', 'burrito', 'taco', 'wrap',
-    'burger king', 'pizza hut', 'subway', 'papa johns',
-    'starbucks', 'costa', 'green caffe', 'coffeeheaven', 'nero',
-    // Pyszne/Glovo/Wolt
-    'pyszne', 'glovo', 'wolt', 'uber eats',
-    // dania polskie
-    'pierogi', 'bigos', 'żurek', 'barszcz', 'schabowy', 'kotlet miel',
-    'placek', 'naleśnik', 'gołąbk', 'kopytka', 'kluski', 'gulasz',
-    'rosół', 'zrazy', 'flaki', 'grill', 'bbq', 'kebab', 'zapiekank',
-  ],
   groceries: [
     // ─ nabiał ─
     'mleko', 'mleka', 'mleczko', 'ser ', 'serek', 'masło', 'jaj', 'jajk',
@@ -402,7 +385,7 @@ export function getFoodTags(name: string): string[] {
 function categorize(name: string): ExpenseCategory {
   const lower = name.toLowerCase();
   // health before groceries to catch pharmacy keywords
-  const order: ExpenseCategory[] = ['health', 'transport', 'entertainment', 'clothing', 'housing', 'subscriptions', 'food', 'groceries'];
+  const order: ExpenseCategory[] = ['health', 'transport', 'entertainment', 'clothing', 'housing', 'subscriptions', 'groceries'];
   for (const cat of order) {
     const keywords = CATEGORY_KEYWORDS[cat];
     if (cat === 'other') continue;

@@ -195,9 +195,8 @@ export default function ScanReceiptModal() {
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Błąd', e.message);
-    } finally {
       setSaving(false);
+      Alert.alert('Błąd', e.message);
     }
   };
 

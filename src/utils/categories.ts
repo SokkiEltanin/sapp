@@ -3,7 +3,6 @@ import { ExpenseCategory, IncomeCategory } from '@/types';
 export const CATEGORY_META: Record<ExpenseCategory, {
   label: string; icon: string; color: string; gradient: readonly [string, string];
 }> = {
-  food:          { label: 'Jedzenie',    icon: 'UtensilsCrossed', color: '#FF6584', gradient: ['#FF6584', '#FF9FAF'] },
   groceries:     { label: 'Zakupy',      icon: 'ShoppingCart',    color: '#43D98F', gradient: ['#43D98F', '#7AEDB5'] },
   transport:     { label: 'Transport',   icon: 'Car',             color: '#55B4FF', gradient: ['#55B4FF', '#8ACEFF'] },
   entertainment: { label: 'Rozrywka',    icon: 'Gamepad2',        color: '#6C63FF', gradient: ['#6C63FF', '#9B8FFF'] },

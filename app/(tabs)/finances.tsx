@@ -55,6 +55,8 @@ export default function FinancesScreen() {
   const [budgets, setBudgets]     = useState<MonthlyBudgets>({});
   const [monthOffset, setMonthOffset] = useState(0);
   const [expandedCat, setExpandedCat] = useState<ExpenseCategory | null>(null);
+  const [expandedTag, setExpandedTag] = useState<string | null>(null);
+  const [tagProductSort, setTagProductSort] = useState<'price' | 'date'>('price');
 
   const today = new Date();
 
@@ -153,6 +155,25 @@ export default function FinancesScreen() {
     return items;
   }, [catTransactions, expandedCat]);
 
+  const tagProducts = useMemo(() => {
+    if (!expandedTag) return [];
+    const items: { name: string; price: number; date: string }[] = [];
+    for (const e of expenses) {
+      if (!isExp(e) || !thisMonthFn(e)) continue;
+      if (e.receiptItems?.length) {
+        for (const it of e.receiptItems) {
+          if (it.tags.includes(expandedTag)) {
+            items.push({ name: it.name, price: it.price, date: e.date.slice(5, 10).replace('-', '.') });
+          }
+        }
+      } else if (e.tags.includes(expandedTag)) {
+        items.push({ name: e.note || e.storeName || '—', price: e.amount, date: e.date.slice(5, 10).replace('-', '.') });
+      }
+    }
+    if (tagProductSort === 'price') return items.sort((a, b) => b.price - a.price);
+    return items.sort((a, b) => b.date.localeCompare(a.date));
+  }, [expenses, expandedTag, tagProductSort, thisMonthFn]);
+
   const tagBreakdown = useMemo(() => {
     const byTag: Record<string, number> = {};
     for (const e of expenses) {
@@ -209,6 +230,10 @@ export default function FinancesScreen() {
   const thisMonthInc  = thisMonthData.income;
   const balance       = thisMonthInc - thisMonthExp;
   const balanceColor  = balance >= 0 ? colors.accent.green : colors.accent.red;
+  const avgDailySpend = useMemo(() => {
+    const day = isCurrentMonth ? today.getDate() : new Date(end).getDate();
+    return day > 0 && thisMonthExp > 0 ? thisMonthExp / day : 0;
+  }, [thisMonthExp, isCurrentMonth, today, end]);
 
   const spendingAlerts = useMemo(
     () => catBreakdown.filter(c => c.prevAmount > 0 && c.amount > c.prevAmount * 1.5),
@@ -393,6 +418,17 @@ export default function FinancesScreen() {
                   </Text>
                   <Text style={styles.heroStatLabel}>wydatki</Text>
                 </View>
+                {avgDailySpend > 0 && (
+                  <>
+                    <View style={styles.heroSep} />
+                    <View style={styles.heroStat}>
+                      <Text style={[styles.heroStatVal, { color: colors.text.muted }]}>
+                        {avgDailySpend.toFixed(0)} zł
+                      </Text>
+                      <Text style={styles.heroStatLabel}>śr/dzień</Text>
+                    </View>
+                  </>
+                )}
               </View>
             </View>
 
@@ -664,16 +700,55 @@ export default function FinancesScreen() {
                 <View style={styles.cardRow}>
                   <TrendingDown size={13} color={colors.accent.blue} />
                   <Text style={[styles.cardLabel, { color: colors.accent.blue }]}>Wydatki — co kupujesz</Text>
+                  <Text style={styles.cardMeta2}>dotknij by zobaczyć produkty</Text>
                 </View>
-                {tagBreakdown.map(({ tag, amount, pct }) => (
-                  <View key={tag} style={styles.tagRow}>
-                    <Text style={styles.tagName}>{tag}</Text>
-                    <View style={styles.tagBarTrack}>
-                      <View style={[styles.tagBarFill, { width: `${pct * 100}%` }]} />
+                {tagBreakdown.map(({ tag, amount, pct }) => {
+                  const isTagExpanded = expandedTag === tag;
+                  return (
+                    <View key={tag}>
+                      <TouchableOpacity
+                        onPress={() => setExpandedTag(isTagExpanded ? null : tag)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.tagRow, isTagExpanded && styles.tagRowExpanded]}>
+                          <Text style={[styles.tagName, isTagExpanded && { color: colors.accent.blue }]}>{tag}</Text>
+                          <View style={styles.tagBarTrack}>
+                            <View style={[styles.tagBarFill, { width: `${pct * 100}%` }]} />
+                          </View>
+                          <Text style={styles.tagAmount}>{amount.toFixed(0)} zł</Text>
+                        </View>
+                      </TouchableOpacity>
+                      {isTagExpanded && (
+                        <View style={styles.tagProductList}>
+                          <View style={styles.tagSortRow}>
+                            <TouchableOpacity
+                              onPress={() => setTagProductSort('price')}
+                              style={[styles.tagSortBtn, tagProductSort === 'price' && styles.tagSortBtnActive]}
+                            >
+                              <Text style={[styles.tagSortBtnText, tagProductSort === 'price' && styles.tagSortBtnTextActive]}>Cena</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => setTagProductSort('date')}
+                              style={[styles.tagSortBtn, tagProductSort === 'date' && styles.tagSortBtnActive]}
+                            >
+                              <Text style={[styles.tagSortBtnText, tagProductSort === 'date' && styles.tagSortBtnTextActive]}>Data</Text>
+                            </TouchableOpacity>
+                          </View>
+                          {tagProducts.length > 0
+                            ? tagProducts.map((p, idx) => (
+                              <View key={idx} style={styles.txRow}>
+                                <Text style={styles.txDate}>{p.date}</Text>
+                                <Text style={styles.txNote} numberOfLines={1}>{p.name}</Text>
+                                <Text style={styles.txAmt}>{p.price.toFixed(2)} zł</Text>
+                              </View>
+                            ))
+                            : <Text style={styles.tagNoProducts}>Brak produktów z tagiem "{tag}"</Text>
+                          }
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.tagAmount}>{amount.toFixed(0)} zł</Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
 
@@ -884,11 +959,20 @@ const styles = StyleSheet.create({
   txNote: { flex: 1, fontSize: 12, color: colors.text.secondary },
   txAmt:  { fontSize: 12, fontWeight: '700', color: colors.text.primary },
 
-  tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
-  tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },
-  tagBarTrack: { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  tagBarFill:  { height: 7, borderRadius: radius.full, backgroundColor: colors.accent.blue },
-  tagAmount:   { fontSize: 12, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
+  tagRow:            { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
+  tagRowExpanded:    { backgroundColor: 'rgba(85,180,255,0.06)', borderRadius: radius.md, paddingHorizontal: spacing[2] },
+  tagName:           { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },
+  tagBarTrack:       { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
+  tagBarFill:        { height: 7, borderRadius: radius.full, backgroundColor: colors.accent.blue },
+  tagAmount:         { fontSize: 12, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
+  tagProductList:    { marginLeft: spacing[2], marginBottom: spacing[2], gap: 2 },
+  tagSortRow:        { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[2], paddingTop: spacing[1] },
+  tagSortBtn:        { paddingHorizontal: spacing[3], paddingVertical: 4, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  tagSortBtnActive:  { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue + '50' },
+  tagSortBtnText:    { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
+  tagSortBtnTextActive: { color: colors.accent.blue },
+  tagNoProducts:     { fontSize: 12, color: colors.text.muted, fontStyle: 'italic', paddingVertical: spacing[2] },
+  cardMeta2:         { fontSize: 9, color: colors.text.muted, fontStyle: 'italic' },
 
   // ── Salary card ──────────────────────────────────────────────────────────────
   salaryCard:      { borderColor: colors.accent.green + '22' },

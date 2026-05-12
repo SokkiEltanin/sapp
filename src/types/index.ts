@@ -3,7 +3,6 @@
 export type TransactionType = 'expense' | 'income';
 
 export type ExpenseCategory =
-  | 'food'
   | 'groceries'
   | 'transport'
   | 'entertainment'

@@ -231,6 +231,15 @@ export default function ExpenseDetailScreen() {
                         {it.quantity > 1 ? `${it.quantity} szt. · ` : ''}{meta.label}
                         {it.discount ? ` · -${it.discount.toFixed(2)} zł` : ''}
                       </Text>
+                      {it.tags?.length > 0 && (
+                        <View style={s.itemTagsRow}>
+                          {it.tags.map(tag => (
+                            <View key={tag} style={s.itemTagBadge}>
+                              <Text style={s.itemTagText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
                     </View>
                     <Text style={s.receiptItemPrice}>{it.price.toFixed(2)} zł</Text>
                   </View>
@@ -509,6 +518,9 @@ const s = StyleSheet.create({
   receiptItemName: { fontSize: 13, fontWeight: '500', color: colors.text.primary },
   receiptItemMeta: { fontSize: 10, color: colors.text.muted },
   receiptItemPrice: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  itemTagsRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
+  itemTagBadge: { paddingHorizontal: 6, paddingVertical: 2, backgroundColor: colors.accent.blue + '18', borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '30' },
+  itemTagText:  { fontSize: 9, color: colors.accent.blue, fontWeight: '600' },
 
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],

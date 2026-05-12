@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -24,10 +24,13 @@ interface Item {
   id: string;
   name: string;
   price: string;
+  quantity: string;
   category: ExpenseCategory;
+  tags: string[];
 }
 
 const ALL_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
+const ITEM_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje', 'chemia'];
 
 function CategoryPicker({ current, onSelect }: {
   current: ExpenseCategory;
@@ -66,16 +69,27 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
   onDelete: () => void;
 }) {
   const [catOpen, setCatOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
   const meta = getCategoryMeta(item.category);
+  const qty = parseFloat(item.quantity) || 1;
+  const unitPrice = parseFloat(item.price.replace(',', '.')) || 0;
+  const lineTotal = qty * unitPrice;
+
+  const toggleTag = (tag: string) => {
+    const next = item.tags.includes(tag)
+      ? item.tags.filter(t => t !== tag)
+      : [...item.tags, tag];
+    onUpdate({ tags: next });
+  };
 
   return (
     <View style={styles.itemWrap}>
-      <View style={styles.itemRow}>
-        <View style={styles.itemNumWrap}>
-          <Text style={styles.itemNum}>{index + 1}</Text>
-        </View>
-
-        <View style={styles.itemFields}>
+      <View style={styles.itemCard}>
+        {/* Name row */}
+        <View style={styles.nameRow}>
+          <View style={styles.itemNumWrap}>
+            <Text style={styles.itemNum}>{index + 1}</Text>
+          </View>
           <TextInput
             value={item.name}
             onChangeText={name => onUpdate({ name })}
@@ -84,29 +98,65 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
             style={styles.nameInput}
             returnKeyType="next"
           />
-          <View style={styles.itemBottom}>
-            <PressableScale
-              onPress={() => setCatOpen(o => !o)}
-              style={[styles.catChip, catOpen && { borderColor: meta.color, backgroundColor: meta.color + '18' }]}
-            >
-              <Text style={[styles.catChipText, catOpen && { color: meta.color }]}>{meta.label}</Text>
-            </PressableScale>
-            <TextInput
-              value={item.price}
-              onChangeText={price => onUpdate({ price })}
-              placeholder="0,00"
-              placeholderTextColor={colors.text.muted}
-              style={styles.priceInput}
-              keyboardType="decimal-pad"
-              returnKeyType="done"
-            />
-            <Text style={styles.priceSuffix}>zł</Text>
-          </View>
+          <TouchableOpacity onPress={onDelete} style={styles.deleteBtn} hitSlop={8}>
+            <Trash2 size={15} color="rgba(255,255,255,0.2)" />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={onDelete} style={styles.deleteBtn} hitSlop={8}>
-          <Trash2 size={15} color='rgba(255,255,255,0.2)' />
-        </TouchableOpacity>
+        {/* Qty × price row */}
+        <View style={styles.priceRow}>
+          <View style={styles.qtyWrap}>
+            <Text style={styles.qtyLabel}>szt.</Text>
+            <TextInput
+              value={item.quantity}
+              onChangeText={quantity => onUpdate({ quantity })}
+              placeholder="1"
+              placeholderTextColor={colors.text.muted}
+              style={styles.qtyInput}
+              keyboardType="decimal-pad"
+            />
+          </View>
+          <Text style={styles.timesSign}>×</Text>
+          <TextInput
+            value={item.price}
+            onChangeText={price => onUpdate({ price })}
+            placeholder="0,00"
+            placeholderTextColor={colors.text.muted}
+            style={styles.unitPriceInput}
+            keyboardType="decimal-pad"
+            returnKeyType="done"
+          />
+          <Text style={styles.priceSuffix}>zł</Text>
+          {qty > 1 && unitPrice > 0 && (
+            <>
+              <Text style={styles.eqSign}>=</Text>
+              <Text style={styles.lineTotalText}>{lineTotal.toFixed(2)} zł</Text>
+            </>
+          )}
+        </View>
+
+        {/* Category & tags row */}
+        <View style={styles.metaRow}>
+          <PressableScale
+            onPress={() => { setCatOpen(o => !o); setTagsOpen(false); }}
+            style={[styles.catChip, catOpen && { borderColor: meta.color, backgroundColor: meta.color + '18' }]}
+          >
+            <Text style={[styles.catChipText, catOpen && { color: meta.color }]}>{meta.label}</Text>
+          </PressableScale>
+          <PressableScale
+            onPress={() => { setTagsOpen(o => !o); setCatOpen(false); }}
+            style={[
+              styles.tagsToggleBtn,
+              tagsOpen && styles.tagsToggleBtnActive,
+              item.tags.length > 0 && styles.tagsToggleBtnFilled,
+            ]}
+          >
+            {item.tags.length > 0
+              ? <Text style={styles.tagsToggleText} numberOfLines={1}>{item.tags.join(' · ')}</Text>
+              : <Text style={styles.tagsTogglePlaceholder}>+ tagi</Text>
+            }
+          </PressableScale>
+        </View>
       </View>
 
       {catOpen && (
@@ -114,6 +164,23 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
           current={item.category}
           onSelect={cat => { onUpdate({ category: cat }); setCatOpen(false); }}
         />
+      )}
+
+      {tagsOpen && (
+        <View style={styles.tagPicker}>
+          {ITEM_TAGS.map(tag => {
+            const active = item.tags.includes(tag);
+            return (
+              <PressableScale
+                key={tag}
+                onPress={() => toggleTag(tag)}
+                style={[styles.tagPickerItem, active && styles.tagPickerItemActive]}
+              >
+                <Text style={[styles.tagPickerText, active && { color: colors.accent.blue }]}>{tag}</Text>
+              </PressableScale>
+            );
+          })}
+        </View>
       )}
     </View>
   );
@@ -135,13 +202,13 @@ export default function ManualReceiptScreen() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: '',
       price: '',
+      quantity: '1',
       category: 'groceries',
+      tags: [],
     };
   }
 
-  const addItem = () => {
-    setItems(prev => [...prev, makeItem()]);
-  };
+  const addItem = () => setItems(prev => [...prev, makeItem()]);
 
   const updateItem = (id: string, updates: Partial<Item>) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
@@ -155,7 +222,10 @@ export default function ManualReceiptScreen() {
   };
 
   const validItems = items.filter(it => it.name.trim() && parseFloat(it.price.replace(',', '.')) > 0);
-  const total = validItems.reduce((s, it) => s + parseFloat(it.price.replace(',', '.')), 0);
+  const total = validItems.reduce((s, it) => {
+    const qty = Math.max(1, parseFloat(it.quantity) || 1);
+    return s + parseFloat(it.price.replace(',', '.')) * qty;
+  }, 0);
 
   const save = async () => {
     if (validItems.length === 0) {
@@ -175,13 +245,21 @@ export default function ManualReceiptScreen() {
       const store = storeName.trim();
 
       const receiptItems: ReceiptItem[] = validItems.map(it => {
-        const price = parseFloat(it.price.replace(',', '.'));
-        return { name: it.name.trim(), price, category: it.category, quantity: 1, unitPrice: price, tags: getFoodTags(it.name) };
+        const unitPrice = parseFloat(it.price.replace(',', '.'));
+        const qty = Math.max(1, parseFloat(it.quantity) || 1);
+        const price = Math.round(unitPrice * qty * 100) / 100;
+        return {
+          name: it.name.trim(),
+          price,
+          category: it.category,
+          quantity: qty,
+          unitPrice,
+          tags: it.tags.length > 0 ? it.tags : getFoodTags(it.name),
+        };
       });
 
       const totalAmount = receiptItems.reduce((s, it) => s + it.price, 0);
 
-      // Dominant category by amount
       const catAmts = new Map<ExpenseCategory, number>();
       for (const it of receiptItems) catAmts.set(it.category, (catAmts.get(it.category) ?? 0) + it.price);
       const dominantCat = [...catAmts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'groceries';
@@ -203,7 +281,6 @@ export default function ManualReceiptScreen() {
       });
       addExpense(expense);
 
-      // Budget alerts per category
       const budgets = await getBudgets();
       const nowM = dateParsed.slice(0, 7);
       for (const [cat, addedAmt] of catAmts) {
@@ -223,9 +300,8 @@ export default function ManualReceiptScreen() {
 
       router.back();
     } catch (e: any) {
-      Alert.alert('Błąd', e.message);
-    } finally {
       setSaving(false);
+      Alert.alert('Błąd', e.message);
     }
   };
 
@@ -253,7 +329,6 @@ export default function ManualReceiptScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Store name */}
           <View style={styles.storeWrap}>
             <ShoppingCart size={14} color={colors.text.muted} />
             <TextInput
@@ -266,14 +341,12 @@ export default function ManualReceiptScreen() {
             />
           </View>
 
-          {/* Date */}
           <DatePickerField
             value={dateInput}
             onChange={setDateInput}
             placeholder="Data zakupu"
           />
 
-          {/* Items */}
           <View style={styles.itemsLabel}>
             <Text style={styles.labelText}>PRODUKTY</Text>
             <Text style={styles.labelCount}>{validItems.length} z {items.length}</Text>
@@ -335,7 +408,7 @@ const styles = StyleSheet.create({
   title: { ...typography.h4, color: colors.text.primary },
   subtitle: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
 
-  scroll: { padding: spacing[4], gap: spacing[3] },
+  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[6] },
 
   storeWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -352,36 +425,85 @@ const styles = StyleSheet.create({
   labelText: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
   labelCount: { fontSize: 10, color: colors.text.muted },
 
+  // ── Item card ────────────────────────────────────────────────────────────────
   itemWrap: { gap: 0 },
-  itemRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2],
+  itemCard: {
     backgroundColor: colors.bg.card, borderRadius: radius.lg,
     borderWidth: 1, borderColor: colors.border.default,
-    padding: spacing[3],
+    padding: spacing[3], gap: spacing[2],
   },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   itemNumWrap: {
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center', justifyContent: 'center', marginTop: 2,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   itemNum: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
-  itemFields: { flex: 1, gap: spacing[2] },
-  nameInput: { fontSize: 14, color: colors.text.primary, paddingVertical: 0 },
-  itemBottom: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  nameInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 0 },
+  deleteBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+
+  // qty × price row
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  qtyWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.bg.elevated, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: colors.border.default,
+    paddingHorizontal: spacing[2], paddingVertical: 5,
+  },
+  qtyLabel: { fontSize: 9, color: colors.text.muted, fontWeight: '500' },
+  qtyInput: {
+    fontSize: 14, fontWeight: '700', color: colors.text.primary,
+    width: 30, textAlign: 'center', paddingVertical: 0,
+  },
+  timesSign: { fontSize: 13, color: colors.text.muted },
+  unitPriceInput: {
+    flex: 1, fontSize: 16, fontWeight: '700', color: colors.text.primary,
+    textAlign: 'right', paddingVertical: 0,
+  },
+  priceSuffix: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
+  eqSign: { fontSize: 12, color: colors.text.muted },
+  lineTotalText: { fontSize: 13, fontWeight: '800', color: colors.accent.green, letterSpacing: -0.3 },
+
+  // category & tags row
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   catChip: {
-    paddingHorizontal: spacing[2], paddingVertical: 4, borderRadius: radius.sm,
+    paddingHorizontal: spacing[2], paddingVertical: 5, borderRadius: radius.sm,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   catChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
-  priceInput: {
-    flex: 1, fontSize: 15, fontWeight: '700', color: colors.text.primary,
-    textAlign: 'right', paddingVertical: 0,
+  tagsToggleBtn: {
+    flex: 1, paddingHorizontal: spacing[2], paddingVertical: 5,
+    borderRadius: radius.sm, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  priceSuffix: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
-  deleteBtn: {
-    width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginTop: 2,
+  tagsToggleBtnActive: {
+    borderColor: colors.accent.blue + '60',
+    backgroundColor: colors.accent.blue + '0C',
   },
+  tagsToggleBtnFilled: { borderColor: colors.accent.blue + '40' },
+  tagsToggleText: { fontSize: 10, color: colors.accent.blue, fontWeight: '600' },
+  tagsTogglePlaceholder: { fontSize: 10, color: colors.text.muted },
+
+  tagPicker: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2],
+    backgroundColor: colors.bg.elevated,
+    borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md,
+    borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+  },
+  tagPickerItem: {
+    paddingHorizontal: spacing[3], paddingVertical: 7,
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  tagPickerItemActive: {
+    borderColor: colors.accent.blue + '60',
+    backgroundColor: colors.accent.blue + '18',
+  },
+  tagPickerText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
 
   pickerScroll: {
     backgroundColor: colors.bg.elevated,
