@@ -8,11 +8,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft, Plus, Pin, PinOff, Trash2, Search, X, Tag,
   FileText, Bold, Italic, Underline, Type, ClipboardList,
+  Folder, FolderOpen, FolderPlus, ChevronDown,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
 import PressableScale from '@/components/ui/PressableScale';
-import { Note, getAllNotes, createNote, updateNote, deleteNote } from '@/utils/notesStorage';
+import {
+  Note, getAllNotes, createNote, updateNote, deleteNote,
+  loadFolders, createFolder, renameFolder, deleteFolder,
+} from '@/utils/notesStorage';
 import {
   RichBlock, makeBlock, serializeBlocks, deserializeBlocks,
   blocksToPlainText, RICH_COLORS, RICH_SIZES,
@@ -54,7 +58,6 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
         contentContainerStyle={tb.row}
         keyboardShouldPersistTaps="always"
       >
-        {/* Format toggles */}
         <TouchableOpacity
           onPress={() => onToggle('bold')}
           style={[tb.btn, block.bold && tb.btnActive]}
@@ -79,7 +82,6 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
 
         <View style={tb.sep} />
 
-        {/* Sizes */}
         {RICH_SIZES.map(({ size, label }) => (
           <TouchableOpacity
             key={size}
@@ -93,7 +95,6 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
 
         <View style={tb.sep} />
 
-        {/* Colors */}
         {RICH_COLORS.map(({ key, value, dot }) => {
           const active = (block.color ?? undefined) === value;
           return (
@@ -108,7 +109,6 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
 
         <View style={tb.sep} />
 
-        {/* Add block */}
         <TouchableOpacity onPress={onAdd} style={tb.btn} activeOpacity={0.7}>
           <Plus size={14} color={colors.text.secondary} />
         </TouchableOpacity>
@@ -148,18 +148,94 @@ const tb = StyleSheet.create({
   dotActive: { borderWidth: 3, borderColor: colors.text.primary },
 });
 
+// ─── Folder picker (inline dropdown in editor) ────────────────────────────────
+
+function FolderPicker({ folders, value, onChange }: {
+  folders: string[];
+  value: string | undefined;
+  onChange: (f: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={fp.wrap}>
+      <TouchableOpacity
+        style={fp.trigger}
+        onPress={() => setOpen(o => !o)}
+        activeOpacity={0.75}
+      >
+        <Folder size={13} color={value ? colors.accent.blue : colors.text.muted} />
+        <Text style={[fp.triggerText, value && { color: colors.accent.blue }]}>
+          {value ?? 'Bez katalogu'}
+        </Text>
+        <ChevronDown size={12} color={colors.text.muted} />
+      </TouchableOpacity>
+
+      {open && (
+        <View style={fp.dropdown}>
+          <TouchableOpacity
+            style={[fp.option, !value && fp.optionActive]}
+            onPress={() => { onChange(undefined); setOpen(false); }}
+            activeOpacity={0.75}
+          >
+            <Text style={[fp.optionText, !value && fp.optionTextActive]}>Bez katalogu</Text>
+          </TouchableOpacity>
+          {folders.map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[fp.option, value === f && fp.optionActive]}
+              onPress={() => { onChange(f); setOpen(false); }}
+              activeOpacity={0.75}
+            >
+              <Folder size={11} color={value === f ? colors.accent.blue : colors.text.muted} />
+              <Text style={[fp.optionText, value === f && fp.optionTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const fp = StyleSheet.create({
+  wrap: { position: 'relative', zIndex: 10 },
+  trigger: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    alignSelf: 'flex-start',
+  },
+  triggerText: { fontSize: 12, color: colors.text.muted, fontWeight: '600' },
+  dropdown: {
+    position: 'absolute', top: 38, left: 0, right: 0, zIndex: 20,
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+    overflow: 'hidden', minWidth: 160,
+  },
+  option: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+  },
+  optionActive: { backgroundColor: colors.accent.blue + '15' },
+  optionText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
+  optionTextActive: { color: colors.accent.blue, fontWeight: '700' },
+});
+
 // ─── Note editor modal ────────────────────────────────────────────────────────
 
-function NoteEditorModal({ note, visible, onClose, onSave }: {
+function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   note: Note | null;
   visible: boolean;
   onClose: () => void;
-  onSave: (title: string, blocks: RichBlock[], tags: string[]) => void;
+  onSave: (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => void;
+  folders: string[];
 }) {
-  const [title, setTitle]     = useState('');
-  const [blocks, setBlocks]   = useState<RichBlock[]>([makeBlock()]);
-  const [tagInput, setTagInput] = useState('');
-  const [tags, setTags]       = useState<string[]>([]);
+  const [title, setTitle]         = useState('');
+  const [blocks, setBlocks]       = useState<RichBlock[]>([makeBlock()]);
+  const [tagInput, setTagInput]   = useState('');
+  const [tags, setTags]           = useState<string[]>([]);
+  const [folder, setFolder]       = useState<string | undefined>(undefined);
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
   const blockRefs = useRef<Map<string, TextInput | null>>(new Map());
@@ -175,6 +251,7 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
             : [makeBlock()]
       );
       setTags(note?.tags ?? []);
+      setFolder(note?.folder);
       setTagInput('');
       setFocusedId(null);
     }
@@ -191,18 +268,15 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
   const handleSave = () => {
     const hasContent = title.trim() || blocksToPlainText(blocks).trim();
     if (!hasContent) { onClose(); return; }
-    onSave(title.trim(), blocks, tags);
+    onSave(title.trim(), blocks, tags, folder);
   };
 
-  // Block management
   const updateBlockText = (id: string, text: string) => {
-    // Detect Enter → split block
     if (text.includes('\n')) {
       const idx = blocks.findIndex(b => b.id === id);
       if (idx === -1) return;
       const [before, ...rest] = text.split('\n');
       const after = rest.join('\n');
-      const { id: _id, text: _text, ...style } = blocks[idx];
       const newBlock = makeBlock(after);
       const newBlocks = [
         ...blocks.slice(0, idx),
@@ -287,7 +361,6 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
               onSubmitEditing={() => blockRefs.current.get(blocks[0]?.id)?.focus()}
             />
 
-            {/* Rich blocks */}
             {blocks.map((block) => (
               <TextInput
                 key={block.id}
@@ -315,8 +388,12 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
               />
             ))}
 
-            {/* Tags */}
-            <View style={em.tagSection}>
+            {/* Folder + tags row */}
+            <View style={em.metaSection}>
+              {folders.length > 0 && (
+                <FolderPicker folders={folders} value={folder} onChange={setFolder} />
+              )}
+
               <View style={em.tagInputRow}>
                 <Tag size={13} color={colors.text.muted} />
                 <TextInput
@@ -348,7 +425,6 @@ function NoteEditorModal({ note, visible, onClose, onSave }: {
             </View>
           </ScrollView>
 
-          {/* Rich toolbar — stays above keyboard */}
           <RichToolbar
             block={focusedBlock}
             onToggle={applyToggle}
@@ -390,7 +466,7 @@ const em = StyleSheet.create({
     paddingVertical: spacing[1],
     minHeight: 28,
   },
-  tagSection: { gap: spacing[2], marginTop: spacing[3] },
+  metaSection: { gap: spacing[2], marginTop: spacing[3] },
   tagInputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.bg.card,
@@ -459,20 +535,25 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
 
       <View style={nc.footer}>
         <Text style={nc.time}>{fmtDate(note.updatedAt)}</Text>
+        {note.folder && (
+          <View style={nc.folderBadge}>
+            <Folder size={8} color={colors.accent.purple + 'CC'} />
+            <Text style={nc.folderText}>{note.folder}</Text>
+          </View>
+        )}
         {note.tags.length > 0 && (
           <View style={nc.tagRow}>
-            {note.tags.slice(0, 3).map(t => (
+            {note.tags.slice(0, 2).map(t => (
               <Text key={t} style={nc.tag}>#{t}</Text>
             ))}
-            {note.tags.length > 3 && (
-              <Text style={nc.tag}>+{note.tags.length - 3}</Text>
+            {note.tags.length > 2 && (
+              <Text style={nc.tag}>+{note.tags.length - 2}</Text>
             )}
           </View>
         )}
         {note.pinned && (
           <View style={nc.pinnedBadge}>
             <Pin size={8} color={colors.accent.amber} />
-            <Text style={nc.pinnedText}>Przypięta</Text>
           </View>
         )}
       </View>
@@ -492,12 +573,18 @@ const nc = StyleSheet.create({
   titleEmpty: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text.secondary, lineHeight: 20, fontStyle: 'italic' },
   body: { fontSize: 13, color: colors.text.secondary, lineHeight: 20 },
   richBadge: { position: 'absolute', top: spacing[3], right: 80 },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1], flexWrap: 'wrap' },
   time: { fontSize: 11, color: colors.text.muted },
-  tagRow: { flexDirection: 'row', gap: spacing[1], flex: 1 },
+  folderBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: colors.accent.purple + '15',
+    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.accent.purple + '25',
+    paddingHorizontal: 5, paddingVertical: 2,
+  },
+  folderText: { fontSize: 9, color: colors.accent.purple + 'CC', fontWeight: '600' },
+  tagRow: { flexDirection: 'row', gap: spacing[1] },
   tag: { fontSize: 10, color: colors.accent.blue + 'AA' },
-  pinnedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' },
-  pinnedText: { fontSize: 9, color: colors.accent.amber, fontWeight: '600' },
+  pinnedBadge: { marginLeft: 'auto' },
   actions: { flexDirection: 'row', gap: spacing[1] },
   actionBtn: { padding: 3 },
 });
@@ -506,38 +593,53 @@ const nc = StyleSheet.create({
 
 export default function NotesScreen() {
   const { noteId } = useLocalSearchParams<{ noteId?: string }>();
-  const [notes, setNotes]           = useState<Note[]>([]);
-  const [query, setQuery]           = useState('');
-  const [searching, setSearching]   = useState(false);
-  const [editorNote, setEditorNote] = useState<Note | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const { create: createTask }      = useTasks();
+  const [notes, setNotes]             = useState<Note[]>([]);
+  const [folders, setFolders]         = useState<string[]>([]);
+  const [activeFolder, setActiveFolder] = useState<string | null>(null); // null = all
+  const [query, setQuery]             = useState('');
+  const [searching, setSearching]     = useState(false);
+  const [editorNote, setEditorNote]   = useState<Note | null>(null);
+  const [editorOpen, setEditorOpen]   = useState(false);
+  const [newFolderMode, setNewFolderMode] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const { create: createTask }        = useTasks();
 
-  const loadNotes = useCallback(async () => {
-    const loaded = await getAllNotes();
+  const loadAll = useCallback(async () => {
+    const [loaded, loadedFolders] = await Promise.all([getAllNotes(), loadFolders()]);
     setNotes(loaded);
-    // Auto-open a specific note if noteId param was passed (e.g. from search)
+    setFolders(loadedFolders);
     if (noteId) {
       const target = loaded.find(n => n.id === noteId);
       if (target) { setEditorNote(target); setEditorOpen(true); }
     }
   }, [noteId]);
 
-  useEffect(() => { loadNotes(); }, []);
+  useEffect(() => { loadAll(); }, []);
 
-  const filtered = query.trim()
-    ? notes.filter(n => {
-        const q = query.toLowerCase();
-        const plain = n.bodyRich
-          ? blocksToPlainText(deserializeBlocks(n.bodyRich))
-          : n.body;
+  // Folder counts
+  const folderCount = (f: string) => notes.filter(n => n.folder === f).length;
+  const uncategorizedCount = notes.filter(n => !n.folder).length;
+
+  // Filter pipeline
+  const filtered = (() => {
+    let result = notes;
+    if (activeFolder !== null) {
+      result = result.filter(n => n.folder === activeFolder);
+    }
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      result = result.filter(n => {
+        const plain = n.bodyRich ? blocksToPlainText(deserializeBlocks(n.bodyRich)) : n.body;
         return (
           n.title.toLowerCase().includes(q) ||
           plain.toLowerCase().includes(q) ||
-          n.tags.some(t => t.includes(q))
+          n.tags.some(t => t.includes(q)) ||
+          (n.folder ?? '').toLowerCase().includes(q)
         );
-      })
-    : notes;
+      });
+    }
+    return result;
+  })();
 
   const pinned   = filtered.filter(n => n.pinned);
   const unpinned = filtered.filter(n => !n.pinned);
@@ -552,25 +654,25 @@ export default function NotesScreen() {
     setEditorOpen(true);
   };
 
-  const handleSave = async (title: string, blocks: RichBlock[], tags: string[]) => {
+  const handleSave = async (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => {
     setEditorOpen(false);
     const body = blocksToPlainText(blocks);
     const hasFormatting = blocks.some(b => b.bold || b.italic || b.underline || b.color || b.size);
     const bodyRich = hasFormatting ? serializeBlocks(blocks) : undefined;
 
     if (editorNote) {
-      await updateNote(editorNote.id, { title, body, bodyRich, tags });
+      await updateNote(editorNote.id, { title, body, bodyRich, tags, folder });
       toast.success('Notatka zaktualizowana');
     } else {
-      await createNote({ title, body, bodyRich, tags });
+      await createNote({ title, body, bodyRich, tags, folder: folder ?? (activeFolder ?? undefined) });
       toast.success('Notatka zapisana');
     }
-    loadNotes();
+    loadAll();
   };
 
   const handlePin = async (note: Note) => {
     await updateNote(note.id, { pinned: !note.pinned });
-    loadNotes();
+    loadAll();
   };
 
   const handleConvert = (note: Note) => {
@@ -599,10 +701,41 @@ export default function NotesScreen() {
         onPress: async () => {
           await deleteNote(note.id);
           toast.info('Usunięto');
-          loadNotes();
+          loadAll();
         },
       },
     ]);
+  };
+
+  const handleCreateFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) { setNewFolderMode(false); return; }
+    await createFolder(name);
+    setNewFolderName('');
+    setNewFolderMode(false);
+    loadAll();
+    toast.success(`Katalog "${name}" utworzony`);
+  };
+
+  const handleDeleteFolder = (name: string) => {
+    const count = folderCount(name);
+    Alert.alert(
+      'Usuń katalog',
+      count > 0
+        ? `Usunąć katalog "${name}"? ${count} notatek trafi do bez katalogu.`
+        : `Usunąć katalog "${name}"?`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Usuń', style: 'destructive',
+          onPress: async () => {
+            await deleteFolder(name);
+            if (activeFolder === name) setActiveFolder(null);
+            loadAll();
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -625,6 +758,74 @@ export default function NotesScreen() {
           <Plus size={20} color={colors.bg.primary} />
         </PressableScale>
       </View>
+
+      {/* Folder tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.folderScroll}
+        contentContainerStyle={styles.folderRow}
+        keyboardShouldPersistTaps="always"
+      >
+        {/* All */}
+        <TouchableOpacity
+          style={[styles.folderChip, activeFolder === null && styles.folderChipActive]}
+          onPress={() => setActiveFolder(null)}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.folderChipText, activeFolder === null && styles.folderChipTextActive]}>
+            Wszystkie {notes.length > 0 && `(${notes.length})`}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Dynamic folders */}
+        {folders.map(f => (
+          <TouchableOpacity
+            key={f}
+            style={[styles.folderChip, activeFolder === f && styles.folderChipActive]}
+            onPress={() => setActiveFolder(f)}
+            onLongPress={() => handleDeleteFolder(f)}
+            activeOpacity={0.75}
+          >
+            <Folder size={10} color={activeFolder === f ? colors.bg.primary : colors.accent.purple + 'CC'} />
+            <Text style={[styles.folderChipText, activeFolder === f && styles.folderChipTextActive]}>
+              {f} ({folderCount(f)})
+            </Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* New folder button / inline input */}
+        {newFolderMode ? (
+          <View style={styles.newFolderInput}>
+            <TextInput
+              value={newFolderName}
+              onChangeText={setNewFolderName}
+              placeholder="Nazwa katalogu..."
+              placeholderTextColor={colors.text.muted}
+              style={styles.newFolderText}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleCreateFolder}
+              onBlur={() => { if (!newFolderName.trim()) setNewFolderMode(false); }}
+            />
+            <TouchableOpacity onPress={handleCreateFolder} hitSlop={8}>
+              <Text style={styles.newFolderConfirm}>OK</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setNewFolderMode(false); setNewFolderName(''); }} hitSlop={8}>
+              <X size={12} color={colors.text.muted} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.folderChipNew}
+            onPress={() => setNewFolderMode(true)}
+            activeOpacity={0.75}
+          >
+            <FolderPlus size={11} color={colors.text.muted} />
+            <Text style={styles.folderChipNewText}>Nowy</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
 
       {searching && (
         <View style={styles.searchBar}>
@@ -668,6 +869,11 @@ export default function NotesScreen() {
           {filtered.length === 0 && (
             <View style={styles.emptyInline}>
               <Text style={styles.emptyTitle}>Brak wyników</Text>
+              {activeFolder !== null && (
+                <Text style={styles.emptySub}>
+                  Brak notatek w katalogu "{activeFolder}"
+                </Text>
+              )}
             </View>
           )}
           {pinned.length > 0 && (
@@ -706,6 +912,7 @@ export default function NotesScreen() {
         visible={editorOpen}
         onClose={() => setEditorOpen(false)}
         onSave={handleSave}
+        folders={folders}
       />
     </SafeAreaView>
   );
@@ -729,6 +936,44 @@ const styles = StyleSheet.create({
   },
   addBtn: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
 
+  // ── Folder tabs ─────────────────────────────────────────────────────────────
+  folderScroll: {
+    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    maxHeight: 48,
+  },
+  folderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[4], paddingVertical: spacing[2],
+  },
+  folderChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: colors.bg.card,
+  },
+  folderChipActive: {
+    backgroundColor: colors.text.primary, borderColor: colors.text.primary,
+  },
+  folderChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  folderChipTextActive: { color: colors.bg.primary },
+  folderChipNew: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed',
+  },
+  folderChipNewText: { fontSize: 11, color: colors.text.muted },
+  newFolderInput: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '50',
+    paddingHorizontal: spacing[3], paddingVertical: 5,
+    minWidth: 140,
+  },
+  newFolderText: { flex: 1, fontSize: 12, color: colors.text.primary, paddingVertical: 0 },
+  newFolderConfirm: { fontSize: 12, fontWeight: '700', color: colors.accent.blue },
+
+  // ── Search ──────────────────────────────────────────────────────────────────
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginHorizontal: spacing[4], marginBottom: spacing[2],
@@ -760,5 +1005,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[5], paddingVertical: spacing[3],
   },
   emptyBtnText: { fontSize: 14, fontWeight: '700', color: colors.bg.primary },
-  emptyInline: { alignItems: 'center', paddingVertical: spacing[8] },
+  emptyInline: { alignItems: 'center', paddingVertical: spacing[8], gap: spacing[2] },
 });

@@ -209,19 +209,50 @@ export default function WeeklyScreen() {
     mood.filter(e => e.date >= dates[0] && e.date <= dates[6]),
     [mood, dates]);
 
-  const avgMood   = weekMood.length ? weekMood.reduce((a, b) => a + b.mood, 0) / weekMood.length : 0;
-  const avgEnergy = weekMood.length ? weekMood.reduce((a, b) => a + b.energy, 0) / weekMood.length : 0;
+  // Per-day averages (handles multiple entries/day)
+  const moodByDay = useMemo(() => {
+    const map: Record<string, MoodEntry[]> = {};
+    for (const e of weekMood) {
+      (map[e.date] ??= []).push(e);
+    }
+    return map;
+  }, [weekMood]);
 
-  const moodDailyValues = useMemo(() =>
-    dates.map(d => weekMood.find(e => e.date === d)?.mood ?? 0),
-    [weekMood, dates]);
+  const dayAvg = (d: string) => {
+    const es = moodByDay[d];
+    if (!es?.length) return null;
+    const mood = es.reduce((a, b) => a + b.mood, 0) / es.length;
+    const energy = es.reduce((a, b) => a + b.energy, 0) / es.length;
+    return { mood, energy, count: es.length };
+  };
 
-  const moodDailyColors = useMemo(() =>
-    dates.map(d => {
-      const e = weekMood.find(x => x.date === d);
-      return e ? MOOD_COLORS[e.mood] : 'rgba(255,255,255,0.07)';
-    }),
-    [weekMood, dates]);
+  const loggedDays  = dates.filter(d => moodByDay[d]?.length);
+  const totalEntries = weekMood.length;
+  const avgMood   = loggedDays.length
+    ? loggedDays.reduce((a, d) => a + (dayAvg(d)?.mood ?? 0), 0) / loggedDays.length : 0;
+  const avgEnergy = loggedDays.length
+    ? loggedDays.reduce((a, d) => a + (dayAvg(d)?.energy ?? 0), 0) / loggedDays.length : 0;
+
+  // Trend: avg of first half vs second half of logged days
+  const moodTrend = useMemo(() => {
+    if (loggedDays.length < 3) return null;
+    const mid = Math.floor(loggedDays.length / 2);
+    const firstAvg = loggedDays.slice(0, mid).reduce((a, d) => a + (dayAvg(d)?.mood ?? 0), 0) / mid;
+    const lastAvg  = loggedDays.slice(-mid).reduce((a, d) => a + (dayAvg(d)?.mood ?? 0), 0) / mid;
+    const delta = lastAvg - firstAvg;
+    if (Math.abs(delta) < 0.3) return 'stable' as const;
+    return delta > 0 ? 'up' as const : 'down' as const;
+  }, [loggedDays]);
+
+  const bestDay = useMemo(() => {
+    if (!loggedDays.length) return null;
+    return loggedDays.reduce((best, d) => (dayAvg(d)?.mood ?? 0) > (dayAvg(best)?.mood ?? 0) ? d : best);
+  }, [loggedDays]);
+
+  const worstDay = useMemo(() => {
+    if (!loggedDays.length) return null;
+    return loggedDays.reduce((worst, d) => (dayAvg(d)?.mood ?? 0) < (dayAvg(worst)?.mood ?? 0) ? d : worst);
+  }, [loggedDays]);
 
   // ── Habits ─────────────────────────────────────────────────────────────────
 
@@ -378,7 +409,7 @@ export default function WeeklyScreen() {
         >
           {weekMood.length > 0 ? (
             <>
-              {/* Summary stats */}
+              {/* Top stats row */}
               <View style={styles.statRow}>
                 <View style={styles.statBox}>
                   <Text style={[styles.statBig, { color: avgMood >= 4 ? colors.accent.green : avgMood >= 3 ? colors.accent.amber : colors.accent.red }]}>
@@ -392,49 +423,52 @@ export default function WeeklyScreen() {
                 <View style={styles.statBox}>
                   <View style={styles.energyRow}>
                     <Zap size={14} color={colors.accent.amber} />
-                    <Text style={[styles.statBig, { color: colors.accent.amber }]}>
-                      {avgEnergy.toFixed(1)}
-                    </Text>
+                    <Text style={[styles.statBig, { color: colors.accent.amber }]}>{avgEnergy.toFixed(1)}</Text>
                   </View>
                   <Text style={styles.statSub}>{ENERGY_LABELS[Math.round(avgEnergy) as MoodLevel]}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statBox}>
-                  <Text style={[styles.statBig, { color: colors.text.secondary }]}>
-                    {weekMood.length}/7
-                  </Text>
-                  <Text style={styles.statSub}>check-inów</Text>
+                  <Text style={[styles.statBig, { color: colors.text.secondary }]}>{loggedDays.length}/7</Text>
+                  <Text style={styles.statSub}>dni {totalEntries > loggedDays.length ? `(${totalEntries} wpisów)` : 'z wpisem'}</Text>
                 </View>
               </View>
 
-              {/* Per-day mood grid */}
+              {/* Per-day mood grid — shows avg per day when multiple entries */}
               <View style={styles.moodGrid}>
                 {dates.map((d, i) => {
-                  const entry = weekMood.find(e => e.date === d);
+                  const avg   = dayAvg(d);
                   const isToday = d === dateStr(new Date());
-                  const col = entry ? MOOD_COLORS[entry.mood] : null;
+                  const col   = avg ? MOOD_COLORS[Math.round(avg.mood) as MoodLevel] : null;
+                  const isBest  = d === bestDay && loggedDays.length > 1;
+                  const isWorst = d === worstDay && loggedDays.length > 1;
                   return (
                     <View key={d} style={styles.moodDayCol}>
-                      <Text style={[styles.moodDayLabel, isToday && styles.moodDayLabelToday]}>
-                        {DAY_SHORT[i]}
-                      </Text>
+                      <Text style={[styles.moodDayLabel, isToday && styles.moodDayLabelToday]}>{DAY_SHORT[i]}</Text>
                       <View style={[
                         styles.moodDayBox,
                         col
-                          ? { backgroundColor: col + '22', borderColor: col + '55' }
+                          ? { backgroundColor: col + '22', borderColor: col + (isBest ? 'CC' : isWorst ? '88' : '55') }
                           : { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
                         isToday && { borderWidth: 1.5 },
                       ]}>
-                        {entry ? (
-                          <Text style={[styles.moodDayNum, { color: col! }]}>{entry.mood}</Text>
+                        {avg ? (
+                          <Text style={[styles.moodDayNum, { color: col! }]}>
+                            {avg.mood % 1 === 0 ? avg.mood : avg.mood.toFixed(1)}
+                          </Text>
                         ) : (
                           <Text style={styles.moodDayEmpty}>—</Text>
                         )}
+                        {avg && avg.count > 1 && (
+                          <Text style={[styles.moodDayCount, { color: col! }]}>{avg.count}×</Text>
+                        )}
                       </View>
-                      {entry && (
+                      {avg && (
                         <View style={styles.moodEnergyRow}>
-                          <Zap size={7} color={MOOD_COLORS[entry.energy]} />
-                          <Text style={[styles.moodEnergyVal, { color: MOOD_COLORS[entry.energy] }]}>{entry.energy}</Text>
+                          <Zap size={7} color={MOOD_COLORS[Math.round(avg.energy) as MoodLevel]} />
+                          <Text style={[styles.moodEnergyVal, { color: MOOD_COLORS[Math.round(avg.energy) as MoodLevel] }]}>
+                            {avg.energy % 1 === 0 ? avg.energy : avg.energy.toFixed(1)}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -442,7 +476,39 @@ export default function WeeklyScreen() {
                 })}
               </View>
 
-              {/* Mood legend — only levels present this week */}
+              {/* Trend + best/worst row */}
+              <View style={styles.moodMetaRow}>
+                {moodTrend && (
+                  <View style={[styles.moodTrendBadge, {
+                    backgroundColor: moodTrend === 'up' ? colors.accent.green + '18' : moodTrend === 'down' ? colors.accent.red + '18' : 'rgba(255,255,255,0.06)',
+                    borderColor:     moodTrend === 'up' ? colors.accent.green + '40' : moodTrend === 'down' ? colors.accent.red + '40' : 'rgba(255,255,255,0.1)',
+                  }]}>
+                    <Text style={[styles.moodTrendText, {
+                      color: moodTrend === 'up' ? colors.accent.green : moodTrend === 'down' ? colors.accent.red : colors.text.muted,
+                    }]}>
+                      {moodTrend === 'up' ? '↑ Poprawa' : moodTrend === 'down' ? '↓ Spadek' : '→ Stabilny'}
+                    </Text>
+                  </View>
+                )}
+                {bestDay && loggedDays.length > 1 && (
+                  <View style={styles.moodBestWorst}>
+                    <Text style={styles.moodBWLabel}>Najlepszy</Text>
+                    <Text style={[styles.moodBWDay, { color: colors.accent.green }]}>
+                      {DAY_SHORT[dates.indexOf(bestDay)]}
+                    </Text>
+                  </View>
+                )}
+                {worstDay && loggedDays.length > 1 && bestDay !== worstDay && (
+                  <View style={styles.moodBestWorst}>
+                    <Text style={styles.moodBWLabel}>Najtrudniejszy</Text>
+                    <Text style={[styles.moodBWDay, { color: colors.accent.red }]}>
+                      {DAY_SHORT[dates.indexOf(worstDay)]}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Mood legend */}
               <View style={styles.moodLegend}>
                 {([1,2,3,4,5] as MoodLevel[]).filter(l => weekMood.some(e => e.mood === l)).map(l => (
                   <View key={l} style={styles.moodLegendItem}>
@@ -452,10 +518,10 @@ export default function WeeklyScreen() {
                 ))}
               </View>
 
-              {/* Top mood tags if any */}
+              {/* Top tags */}
               {(() => {
                 const allTags = weekMood.flatMap(e => e.tags ?? []);
-                if (allTags.length === 0) return null;
+                if (!allTags.length) return null;
                 const counts = allTags.reduce((acc, t) => ({ ...acc, [t]: (acc[t] ?? 0) + 1 }), {} as Record<string, number>);
                 const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
                 return (
@@ -469,6 +535,27 @@ export default function WeeklyScreen() {
                         </View>
                       ))}
                     </View>
+                  </>
+                );
+              })()}
+
+              {/* Notes preview if any */}
+              {(() => {
+                const withNotes = weekMood.filter(e => e.note?.trim());
+                if (!withNotes.length) return null;
+                return (
+                  <>
+                    <View style={styles.divider} />
+                    <Text style={styles.statsSubLabel}>Notatki ({withNotes.length})</Text>
+                    {withNotes.slice(0, 3).map(e => (
+                      <View key={e.id} style={styles.moodNoteRow}>
+                        <View style={[styles.moodNoteDot, { backgroundColor: MOOD_COLORS[e.mood] }]} />
+                        <Text style={styles.moodNoteDate}>
+                          {DAY_SHORT[dates.indexOf(e.date)] ?? e.date.slice(5)}
+                        </Text>
+                        <Text style={styles.moodNoteText} numberOfLines={2}>{e.note}</Text>
+                      </View>
+                    ))}
                   </>
                 );
               })()}
@@ -710,10 +797,26 @@ const styles = StyleSheet.create({
     width: '100%', aspectRatio: 1, borderRadius: 7,
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
-  moodDayNum: { fontSize: 15, fontWeight: '900', letterSpacing: -0.5 },
+  moodDayNum: { fontSize: 14, fontWeight: '900', letterSpacing: -0.5 },
+  moodDayCount: { fontSize: 7, fontWeight: '700', opacity: 0.7, lineHeight: 8 },
   moodDayEmpty: { fontSize: 9, color: colors.text.muted },
   moodEnergyRow: { flexDirection: 'row', alignItems: 'center', gap: 1 },
   moodEnergyVal: { fontSize: 8, fontWeight: '700' },
+
+  moodMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
+  moodTrendBadge: {
+    paddingHorizontal: spacing[2], paddingVertical: 4,
+    borderRadius: radius.sm, borderWidth: 1,
+  },
+  moodTrendText: { fontSize: 11, fontWeight: '700' },
+  moodBestWorst: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  moodBWLabel: { fontSize: 9, color: colors.text.muted },
+  moodBWDay: { fontSize: 12, fontWeight: '800' },
+
+  moodNoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  moodNoteDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
+  moodNoteDate: { fontSize: 10, fontWeight: '700', color: colors.text.muted, width: 16, marginTop: 2 },
+  moodNoteText: { flex: 1, fontSize: 12, color: colors.text.secondary, lineHeight: 17 },
 
   moodLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   moodLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
