@@ -35,15 +35,35 @@ export async function saveProductCategories(
   products: { name: string }[],
   categories: Record<number, ExpenseCategory>,
   parsed: Record<number, ExpenseCategory>,
+  editedNames?: Record<number, string>,
 ): Promise<void> {
   try {
     const memory = await loadProductMemory();
     for (const [idxStr, cat] of Object.entries(categories)) {
       const idx = parseInt(idxStr);
       const parsedCat = parsed[idx];
-      if (cat !== parsedCat) {
-        memory[normalize(products[idx].name)] = cat;
+      const name = editedNames?.[idx]?.trim() || products[idx].name;
+      if ((cat !== parsedCat || editedNames?.[idx]) && name) {
+        memory[normalize(name)] = cat;
       }
+    }
+    const entries = Object.entries(memory);
+    const trimmed = entries.length > MAX_ENTRIES
+      ? Object.fromEntries(entries.slice(-MAX_ENTRIES))
+      : memory;
+    await AsyncStorage.setItem(KEY, JSON.stringify(trimmed));
+  } catch {}
+}
+
+export async function saveCustomProductsToMemory(
+  products: { name: string; category: ExpenseCategory }[],
+): Promise<void> {
+  if (products.length === 0) return;
+  try {
+    const memory = await loadProductMemory();
+    for (const p of products) {
+      const name = p.name.trim();
+      if (name) memory[normalize(name)] = p.category;
     }
     const entries = Object.entries(memory);
     const trimmed = entries.length > MAX_ENTRIES

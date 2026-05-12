@@ -10,6 +10,7 @@ import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
+import DatePickerField from '@/components/ui/DatePickerField';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
@@ -47,7 +48,8 @@ export default function ExpenseDetailScreen() {
   const [itemsExpanded, setItemsExpanded] = useState(true);
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date(expense?.date ?? Date.now());
-    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   });
 
   if (!expense) {
@@ -86,9 +88,8 @@ export default function ExpenseDetailScreen() {
     try {
       // Parse DD.MM.YYYY date input
     let dateParsed = expense.date;
-    const parts = dateInput.split('.');
-    if (parts.length === 3) {
-      const [d, m, y] = parts.map(Number);
+    if (dateInput) {
+      const [y, m, d] = dateInput.split('-').map(Number);
       const dt = new Date(y, m - 1, d, 12, 0, 0);
       if (!isNaN(dt.getTime())) dateParsed = dt.toISOString();
     }
@@ -252,18 +253,7 @@ export default function ExpenseDetailScreen() {
           <View style={s.card}>
             <Text style={s.cardLabel}>Data</Text>
             {editing ? (
-              <View style={s.dateRow}>
-                <Calendar size={14} color={colors.text.muted} />
-                <TextInput
-                  value={dateInput}
-                  onChangeText={setDateInput}
-                  style={s.dateInput}
-                  placeholder="DD.MM.RRRR"
-                  placeholderTextColor={colors.text.muted}
-                  keyboardType="numeric"
-                  maxLength={10}
-                />
-              </View>
+              <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data transakcji" />
             ) : (
               <View style={s.dateRow}>
                 <Calendar size={14} color={colors.text.muted} />

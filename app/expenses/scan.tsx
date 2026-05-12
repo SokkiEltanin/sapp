@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Check, Tag, PenLine } from 'lucide-react-native';
+import { X, Check, Tag, PenLine, Plus, Trash2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
@@ -11,7 +11,7 @@ import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
-import { loadProductMemory, applyProductMemory, saveProductCategories } from '@/utils/productMemory';
+import { loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import * as LucideIcons from 'lucide-react-native';
@@ -39,9 +39,12 @@ export default function ScanReceiptModal() {
   const [selected, setSelected]     = useState<Set<number>>(new Set());
   const [saving, setSaving]         = useState(false);
   const [sortMode, setSortMode]     = useState<SortMode>('order');
-  const [editedCats, setEditedCats] = useState<Record<number, ExpenseCategory>>({});
+  const [editedCats, setEditedCats]   = useState<Record<number, ExpenseCategory>>({});
   const [editedPrices, setEditedPrices] = useState<Record<number, string>>({});
+  const [editedNames, setEditedNames] = useState<Record<number, string>>({});
   const [catPickerFor, setCatPickerFor] = useState<number | null>(null);
+  const [customProducts, setCustomProducts] = useState<{ name: string; price: string; category: ExpenseCategory }[]>([]);
+  const [customCatPickerFor, setCustomCatPickerFor] = useState<number | null>(null);
   const [pastedText, setPastedText] = useState('');
   const [dateInput, setDateInput]   = useState(todayIso);
   const addExpense = useExpensesStore(s => s.addExpense);
@@ -56,6 +59,20 @@ export default function ScanReceiptModal() {
       return isNaN(parsed) ? (receipt?.products[i].finalPrice ?? 0) : parsed;
     }
     return receipt?.products[i].finalPrice ?? 0;
+  };
+
+  const getProductName = (i: number): string =>
+    editedNames[i] ?? (receipt?.products[i].name ?? '');
+
+  const addCustomProduct = () => {
+    setCustomProducts(prev => [...prev, { name: '', price: '0.00', category: 'groceries' }]);
+    setCustomCatPickerFor(null);
+    setCatPickerFor(null);
+  };
+
+  const removeCustomProduct = (idx: number) => {
+    setCustomProducts(prev => prev.filter((_, i) => i !== idx));
+    if (customCatPickerFor === idx) setCustomCatPickerFor(null);
   };
 
   const processText = () => {
@@ -74,6 +91,9 @@ export default function ScanReceiptModal() {
     setSelected(new Set(parsed.products.map((_, i) => i)));
     setCatPickerFor(null);
     setEditedPrices({});
+    setEditedNames({});
+    setCustomProducts([]);
+    setCustomCatPickerFor(null);
     if (parsed.date) setDateInput(parsed.date);
     const memory = await loadProductMemory();
     const remembered = await applyProductMemory(parsed.products, memory);
@@ -136,7 +156,8 @@ export default function ScanReceiptModal() {
   // ── Save ──────────────────────────────────────────────────────────────────────
 
   const saveSelected = async () => {
-    if (!receipt || selected.size === 0) return;
+    const validCustom = customProducts.filter(p => p.name.trim());
+    if (!receipt || (selected.size === 0 && validCustom.length === 0)) return;
     setSaving(true);
     try {
       let dateParsed = new Date().toISOString();
@@ -148,29 +169,41 @@ export default function ScanReceiptModal() {
         }
       }
 
-      const receiptItems: ReceiptItem[] = Array.from(selected).map(i => {
+      const parsedItems: ReceiptItem[] = Array.from(selected).map(i => {
         const p = receipt.products[i];
         const finalPrice = getPrice(i);
+        const name = getProductName(i);
         const item: ReceiptItem = {
-          name: p.name,
+          name,
           price: finalPrice,
           category: getCategory(i),
           quantity: p.quantity,
           unitPrice: p.unitPrice,
-          tags: getFoodTags(p.name),
+          tags: getFoodTags(name),
         };
         if (p.discount != null) item.discount = p.discount;
         return item;
       });
 
+      const customItems: ReceiptItem[] = validCustom.map(p => {
+        const price = parseFloat(p.price.replace(',', '.')) || 0;
+        return {
+          name: p.name.trim(),
+          price,
+          category: p.category,
+          quantity: 1,
+          unitPrice: price,
+          tags: getFoodTags(p.name),
+        };
+      });
+
+      const receiptItems = [...parsedItems, ...customItems];
       const total = receiptItems.reduce((s, it) => s + it.price, 0);
 
-      // Dominant category by amount
       const catAmts = new Map<ExpenseCategory, number>();
       for (const it of receiptItems) catAmts.set(it.category, (catAmts.get(it.category) ?? 0) + it.price);
       const dominantCat = [...catAmts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'groceries';
 
-      // Tags: store + unique food sub-tags
       const storeTag = receipt.storeName?.toLowerCase().split(' ')[0];
       const foodTags = [...new Set(receiptItems.flatMap(it => it.tags))];
       const tags = [storeTag, ...foodTags].filter(Boolean) as string[];
@@ -187,11 +220,12 @@ export default function ScanReceiptModal() {
         receiptItems,
       });
       addExpense(expense);
-      // Persist user-corrected categories for future receipts
-      if (receipt) {
-        const parsedCats: Record<number, ExpenseCategory> = {};
-        receipt.products.forEach((p, i) => { parsedCats[i] = p.category; });
-        saveProductCategories(receipt.products, editedCats, parsedCats).catch(() => {});
+      // Persist corrections to memory for future receipts
+      const parsedCats: Record<number, ExpenseCategory> = {};
+      receipt.products.forEach((p, i) => { parsedCats[i] = p.category; });
+      saveProductCategories(receipt.products, editedCats, parsedCats, editedNames).catch(() => {});
+      if (validCustom.length > 0) {
+        saveCustomProductsToMemory(validCustom.map(p => ({ name: p.name.trim(), category: p.category }))).catch(() => {});
       }
       router.back();
     } catch (e: any) {
@@ -205,7 +239,10 @@ export default function ScanReceiptModal() {
     setSelected(new Set());
     setEditedCats({});
     setEditedPrices({});
+    setEditedNames({});
     setCatPickerFor(null);
+    setCustomProducts([]);
+    setCustomCatPickerFor(null);
     setSortMode('order');
     setPastedText('');
     setDateInput(todayIso());
@@ -320,6 +357,7 @@ export default function ScanReceiptModal() {
           >
             <Text style={styles.sectionLabel}>
               Wybierz co dodać ({selected.size} z {receipt.products.length})
+              {customProducts.length > 0 ? ` + ${customProducts.filter(p => p.name.trim()).length} ręcznych` : ''}
             </Text>
 
             {groups ? (
@@ -347,10 +385,12 @@ export default function ScanReceiptModal() {
                         selected={selected.has(i)}
                         onToggle={() => toggleProduct(i)}
                         catPickerOpen={catPickerFor === i}
-                        onCategoryPress={() => setCatPickerFor(catPickerFor === i ? null : i)}
+                        onCategoryPress={() => { setCatPickerFor(catPickerFor === i ? null : i); setCustomCatPickerFor(null); }}
                         onCategoryChange={c => changeCategory(i, c)}
                         priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
                         onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
+                        productName={getProductName(i)}
+                        onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
                       />
                     ))}
                   </View>
@@ -365,24 +405,54 @@ export default function ScanReceiptModal() {
                   selected={selected.has(i)}
                   onToggle={() => toggleProduct(i)}
                   catPickerOpen={catPickerFor === i}
-                  onCategoryPress={() => setCatPickerFor(catPickerFor === i ? null : i)}
+                  onCategoryPress={() => { setCatPickerFor(catPickerFor === i ? null : i); setCustomCatPickerFor(null); }}
                   onCategoryChange={c => changeCategory(i, c)}
                   priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
                   onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
+                  productName={getProductName(i)}
+                  onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
                 />
               ))
             )}
+
+            {/* Custom (manually added) products */}
+            {customProducts.length > 0 && (
+              <Text style={[styles.sectionLabel, { marginTop: spacing[3] }]}>
+                Dodane ręcznie ({customProducts.filter(p => p.name.trim()).length})
+              </Text>
+            )}
+            {customProducts.map((cp, idx) => (
+              <CustomProductRow
+                key={`custom-${idx}`}
+                product={cp}
+                onRemove={() => removeCustomProduct(idx)}
+                onNameChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, name: v } : p))}
+                onPriceChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, price: v } : p))}
+                onCategoryChange={c => {
+                  setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, category: c } : p));
+                  setCustomCatPickerFor(null);
+                }}
+                catPickerOpen={customCatPickerFor === idx}
+                onCategoryPress={() => { setCustomCatPickerFor(customCatPickerFor === idx ? null : idx); setCatPickerFor(null); }}
+              />
+            ))}
+
+            {/* Add product button */}
+            <PressableScale onPress={addCustomProduct} style={styles.addProductBtn}>
+              <Plus size={14} color={colors.accent.green} />
+              <Text style={styles.addProductBtnText}>Dodaj produkt ręcznie</Text>
+            </PressableScale>
           </ScrollView>
 
           <View style={styles.footer}>
             <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data paragonu" />
             <AnimatedButton
               onPress={saveSelected}
-              label={saving ? 'Zapisuję...' : `Zapisz paragon (${selected.size} poz.)`}
+              label={saving ? 'Zapisuję...' : `Zapisz paragon (${selected.size + customProducts.filter(p => p.name.trim()).length} poz.)`}
               icon={<Check size={18} color={colors.bg.primary} />}
               size="lg"
               fullWidth
-              disabled={saving || selected.size === 0}
+              disabled={saving || (selected.size === 0 && customProducts.filter(p => p.name.trim()).length === 0)}
             />
           </View>
         </>
@@ -429,7 +499,7 @@ function CategoryPicker({ current, onSelect }: {
 function ProductRow({
   product, category, selected, onToggle,
   catPickerOpen, onCategoryPress, onCategoryChange,
-  priceValue, onPriceChange,
+  priceValue, onPriceChange, productName, onNameChange,
 }: {
   product: ReceiptProduct;
   category: ExpenseCategory;
@@ -440,6 +510,8 @@ function ProductRow({
   onCategoryChange: (cat: ExpenseCategory) => void;
   priceValue: string;
   onPriceChange: (v: string) => void;
+  productName: string;
+  onNameChange: (v: string) => void;
 }) {
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
@@ -458,7 +530,13 @@ function ProductRow({
 
         {/* Product info */}
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={1}>{product.name}</Text>
+          <TextInput
+            value={productName}
+            onChangeText={onNameChange}
+            style={styles.productNameInput}
+            placeholder={product.name}
+            placeholderTextColor={colors.text.muted}
+          />
           <View style={styles.productMeta}>
             <PressableScale onPress={onCategoryPress}>
               <View style={[
@@ -505,6 +583,73 @@ function ProductRow({
       {/* Inline category picker */}
       {catPickerOpen && (
         <CategoryPicker current={category} onSelect={onCategoryChange} />
+      )}
+    </View>
+  );
+}
+
+// ─── CustomProductRow ─────────────────────────────────────────────────────────
+
+function CustomProductRow({
+  product, onRemove, onNameChange, onPriceChange, onCategoryChange,
+  catPickerOpen, onCategoryPress,
+}: {
+  product: { name: string; price: string; category: ExpenseCategory };
+  onRemove: () => void;
+  onNameChange: (name: string) => void;
+  onPriceChange: (price: string) => void;
+  onCategoryChange: (cat: ExpenseCategory) => void;
+  catPickerOpen: boolean;
+  onCategoryPress: () => void;
+}) {
+  const meta     = getCategoryMeta(product.category);
+  const IconComp = (LucideIcons as any)[meta.icon];
+
+  return (
+    <View style={styles.productWrap}>
+      <View style={[styles.productRow, styles.customRow]}>
+        {/* Delete */}
+        <PressableScale onPress={onRemove} style={styles.deleteCustomBtn}>
+          <Trash2 size={13} color={colors.accent.red} />
+        </PressableScale>
+
+        {/* Category icon */}
+        <View style={[styles.catIconWrap, { backgroundColor: meta.color + '18' }]}>
+          {IconComp && <IconComp size={16} color={meta.color} />}
+        </View>
+
+        {/* Name + category chip */}
+        <View style={styles.productInfo}>
+          <TextInput
+            value={product.name}
+            onChangeText={onNameChange}
+            style={[styles.productNameInput, { color: colors.text.primary }]}
+            placeholder="Nazwa produktu..."
+            placeholderTextColor={colors.text.muted}
+            autoFocus={product.name === ''}
+          />
+          <PressableScale onPress={onCategoryPress}>
+            <View style={[styles.catChip, { borderColor: meta.color + '60', backgroundColor: meta.color + '14' }]}>
+              <Text style={[styles.catChipText, { color: meta.color }]}>{meta.label}</Text>
+            </View>
+          </PressableScale>
+        </View>
+
+        {/* Editable price */}
+        <View style={styles.priceInputWrap}>
+          <TextInput
+            value={product.price}
+            onChangeText={onPriceChange}
+            style={styles.priceInput}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+          <Text style={styles.priceCur}>zł</Text>
+        </View>
+      </View>
+
+      {catPickerOpen && (
+        <CategoryPicker current={product.category} onSelect={onCategoryChange} />
       )}
     </View>
   );
@@ -677,4 +822,30 @@ const styles = StyleSheet.create({
 
   // ── Footer ─────────────────────────────────────────────────────────────────
   footer: { padding: spacing[4], gap: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+
+  // ── Editable product name ─────────────────────────────────────────────────
+  productNameInput: {
+    fontSize: 13, fontWeight: '500', color: colors.text.primary,
+    padding: 0, flex: 1,
+  },
+
+  // ── Custom product row ────────────────────────────────────────────────────
+  customRow: {
+    borderColor: colors.accent.green + '30',
+    backgroundColor: colors.accent.green + '06',
+  },
+  deleteCustomBtn: {
+    width: 28, height: 28, borderRadius: radius.sm,
+    backgroundColor: colors.accent.red + '15', borderWidth: 1, borderColor: colors.accent.red + '30',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // ── Add product button ────────────────────────────────────────────────────
+  addProductBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[3], borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.accent.green + '40', borderStyle: 'dashed',
+    backgroundColor: colors.accent.green + '08', marginTop: spacing[1],
+  },
+  addProductBtnText: { fontSize: 13, fontWeight: '600', color: colors.accent.green },
 });
