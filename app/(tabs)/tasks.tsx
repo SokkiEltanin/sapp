@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import {
   CheckCircle2, Circle, Clock, Flame, Timer,
   Search, RefreshCw, AlarmClock, BellOff, CheckSquare,
-  Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo,
+  Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo, BarChart2,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -522,6 +522,13 @@ export default function TasksScreen() {
           </Text>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            onPress={() => router.push('/weekly' as any)}
+            style={styles.headerBtn}
+            activeOpacity={0.75}
+          >
+            <BarChart2 size={16} color={colors.accent.blue} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}
             style={[styles.headerBtn, showSearch && styles.headerBtnActive]}

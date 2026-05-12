@@ -44,7 +44,7 @@ export const tasksService = {
   },
 
   async updateTask(id: string, updates: Partial<Task>): Promise<void> {
-    await updateDoc(userDoc(TASKS_COL, id), { ...updates, updatedAt: new Date().toISOString() });
+    await updateDoc(userDoc(TASKS_COL, id), strip({ ...updates, updatedAt: new Date().toISOString() }));
   },
 
   async deleteTask(id: string): Promise<void> {
