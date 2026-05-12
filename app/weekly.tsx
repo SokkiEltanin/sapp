@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import {
   ArrowLeft, ChevronLeft, ChevronRight,
   CheckCircle2, Smile, Zap, TrendingDown, TrendingUp,
-  Footprints, Flame, Moon, Timer,
+  Flame, Moon, Timer,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -20,7 +20,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
-import { MOOD_COLORS, MOOD_LABELS, MoodEntry, Habit } from '@/types';
+import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, Habit, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -124,7 +124,6 @@ const wb = StyleSheet.create({
 
 export default function WeeklyScreen() {
   const [weekOffset, setWeekOffset]     = useState(0);
-  const [stepData, setStepData]         = useState<number[]>(Array(7).fill(0));
   const [sleepData, setSleepData]       = useState<{ h: number; quality?: string }[]>(Array(7).fill({ h: 0 }));
   const [pomodoroData, setPomodoroData] = useState<Record<string, PomodoroSession[]>>({});
 
@@ -147,7 +146,7 @@ export default function WeeklyScreen() {
   const isCurrentWeek = weekOffset === 0;
   const isFutureWeek  = weekOffset > 0;
 
-  // Load step + sleep + pomodoro data for selected week
+  // Load sleep + pomodoro data for selected week
   useEffect(() => {
     (async () => {
       const [healthResults, pomSessions] = await Promise.all([
@@ -158,7 +157,6 @@ export default function WeeklyScreen() {
         if (!r) return null;
         try { return JSON.parse(r); } catch { return null; }
       });
-      setStepData(parsed.map(p => p?.steps ?? 0));
       setSleepData(parsed.map(p => ({ h: (p?.sleepH ?? 0) + (p?.sleepM ?? 0) / 60, quality: p?.sleepQuality })));
       setPomodoroData(pomSessions);
     })();
@@ -272,11 +270,6 @@ export default function WeeklyScreen() {
     dates.reduce((sum, d) => sum + (pomodoroData[d]?.length ?? 0), 0),
     [pomodoroData, dates]);
 
-  // ── Steps ──────────────────────────────────────────────────────────────────
-
-  const totalSteps = stepData.reduce((a, b) => a + b, 0);
-  const maxStepDay = Math.max(...stepData, 1);
-
   // ── Sleep ──────────────────────────────────────────────────────────────────
 
   const sleepDays     = sleepData.filter(s => s.h > 0);
@@ -385,12 +378,15 @@ export default function WeeklyScreen() {
         >
           {weekMood.length > 0 ? (
             <>
+              {/* Summary stats */}
               <View style={styles.statRow}>
                 <View style={styles.statBox}>
                   <Text style={[styles.statBig, { color: avgMood >= 4 ? colors.accent.green : avgMood >= 3 ? colors.accent.amber : colors.accent.red }]}>
                     {avgMood.toFixed(1)}
                   </Text>
-                  <Text style={styles.statSub}>śr. nastrój</Text>
+                  <Text style={[styles.statSub, { color: avgMood >= 4 ? colors.accent.green : avgMood >= 3 ? colors.accent.amber : colors.accent.red }]}>
+                    {MOOD_LABELS[Math.round(avgMood) as MoodLevel]}
+                  </Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statBox}>
@@ -400,7 +396,7 @@ export default function WeeklyScreen() {
                       {avgEnergy.toFixed(1)}
                     </Text>
                   </View>
-                  <Text style={styles.statSub}>śr. energia</Text>
+                  <Text style={styles.statSub}>{ENERGY_LABELS[Math.round(avgEnergy) as MoodLevel]}</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statBox}>
@@ -410,25 +406,72 @@ export default function WeeklyScreen() {
                   <Text style={styles.statSub}>check-inów</Text>
                 </View>
               </View>
-              {/* Mood bars with per-day color */}
-              <View style={wb.row}>
-                {moodDailyValues.map((v, i) => {
-                  const h = v > 0 ? Math.max(6, (v / 5) * 48) : 2;
-                  const isToday = dates[i] === dateStr(new Date());
+
+              {/* Per-day mood grid */}
+              <View style={styles.moodGrid}>
+                {dates.map((d, i) => {
+                  const entry = weekMood.find(e => e.date === d);
+                  const isToday = d === dateStr(new Date());
+                  const col = entry ? MOOD_COLORS[entry.mood] : null;
                   return (
-                    <View key={i} style={wb.col}>
-                      <View style={wb.barWrap}>
-                        <View style={[
-                          wb.bar,
-                          { height: h, backgroundColor: moodDailyColors[i] },
-                          isToday && { width: 12 },
-                        ]} />
+                    <View key={d} style={styles.moodDayCol}>
+                      <Text style={[styles.moodDayLabel, isToday && styles.moodDayLabelToday]}>
+                        {DAY_SHORT[i]}
+                      </Text>
+                      <View style={[
+                        styles.moodDayBox,
+                        col
+                          ? { backgroundColor: col + '22', borderColor: col + '55' }
+                          : { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
+                        isToday && { borderWidth: 1.5 },
+                      ]}>
+                        {entry ? (
+                          <Text style={[styles.moodDayNum, { color: col! }]}>{entry.mood}</Text>
+                        ) : (
+                          <Text style={styles.moodDayEmpty}>—</Text>
+                        )}
                       </View>
-                      <Text style={[wb.day, isToday && wb.dayToday]}>{DAY_SHORT[i]}</Text>
+                      {entry && (
+                        <View style={styles.moodEnergyRow}>
+                          <Zap size={7} color={MOOD_COLORS[entry.energy]} />
+                          <Text style={[styles.moodEnergyVal, { color: MOOD_COLORS[entry.energy] }]}>{entry.energy}</Text>
+                        </View>
+                      )}
                     </View>
                   );
                 })}
               </View>
+
+              {/* Mood legend — only levels present this week */}
+              <View style={styles.moodLegend}>
+                {([1,2,3,4,5] as MoodLevel[]).filter(l => weekMood.some(e => e.mood === l)).map(l => (
+                  <View key={l} style={styles.moodLegendItem}>
+                    <View style={[styles.moodLegendDot, { backgroundColor: MOOD_COLORS[l] }]} />
+                    <Text style={styles.moodLegendText}>{MOOD_LABELS[l]}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Top mood tags if any */}
+              {(() => {
+                const allTags = weekMood.flatMap(e => e.tags ?? []);
+                if (allTags.length === 0) return null;
+                const counts = allTags.reduce((acc, t) => ({ ...acc, [t]: (acc[t] ?? 0) + 1 }), {} as Record<string, number>);
+                const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+                return (
+                  <>
+                    <View style={styles.divider} />
+                    <View style={styles.moodTagRow}>
+                      {top.map(([tag, cnt]) => (
+                        <View key={tag} style={styles.moodTagBadge}>
+                          <Text style={styles.moodTagText}>{tag}</Text>
+                          {cnt > 1 && <Text style={styles.moodTagCount}>{cnt}×</Text>}
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                );
+              })()}
             </>
           ) : (
             <Text style={styles.empty}>Brak wpisów w tym tygodniu</Text>
@@ -535,39 +578,6 @@ export default function WeeklyScreen() {
             <WeekBars values={pomoDailyMins} max={pomoMaxDay} color={colors.accent.purple} dates={dates} />
           </SCard>
         )}
-
-        {/* ── Steps ── */}
-        <SCard
-          icon={<Footprints size={13} color={colors.accent.blue} />}
-          label="Kroki"
-          accent={colors.accent.blue}
-        >
-          <View style={styles.statRow}>
-            <View style={styles.statBox}>
-              <Text style={[styles.statBig, { color: colors.accent.blue }]}>
-                {(totalSteps / 1000).toFixed(1)}k
-              </Text>
-              <Text style={styles.statSub}>łącznie</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Text style={[styles.statBig, { color: colors.text.secondary }]}>
-                {stepData.filter(s => s > 0).length > 0
-                  ? Math.round(totalSteps / stepData.filter(s => s > 0).length / 100) / 10 + 'k'
-                  : '—'}
-              </Text>
-              <Text style={styles.statSub}>dziennie śr.</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Text style={[styles.statBig, { color: colors.accent.green }]}>
-                {stepData.filter(s => s >= 10_000).length}
-              </Text>
-              <Text style={styles.statSub}>dni celu</Text>
-            </View>
-          </View>
-          <WeekBars values={stepData} max={maxStepDay} color={colors.accent.blue} dates={dates} />
-        </SCard>
 
         {/* ── Sleep ── */}
         {sleepDays.length > 0 && (
@@ -690,4 +700,33 @@ const styles = StyleSheet.create({
   adherencePill: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   adherenceVal: { fontSize: 15, fontWeight: '900', letterSpacing: -0.3 },
   adherenceLabel: { fontSize: 10, color: colors.text.secondary, fontWeight: '500' },
+
+  // ── Mood grid ──────────────────────────────────────────────────────────────
+  moodGrid: { flexDirection: 'row', gap: 5 },
+  moodDayCol: { flex: 1, alignItems: 'center', gap: 4 },
+  moodDayLabel: { fontSize: 8, color: colors.text.muted, fontWeight: '500' },
+  moodDayLabelToday: { color: colors.text.secondary, fontWeight: '700' },
+  moodDayBox: {
+    width: '100%', aspectRatio: 1, borderRadius: 7,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  moodDayNum: { fontSize: 15, fontWeight: '900', letterSpacing: -0.5 },
+  moodDayEmpty: { fontSize: 9, color: colors.text.muted },
+  moodEnergyRow: { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  moodEnergyVal: { fontSize: 8, fontWeight: '700' },
+
+  moodLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  moodLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  moodLegendDot: { width: 7, height: 7, borderRadius: 2 },
+  moodLegendText: { fontSize: 9, color: colors.text.muted, fontWeight: '500' },
+
+  moodTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  moodTagBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.sm,
+    backgroundColor: colors.accent.pink + '15',
+    borderWidth: 1, borderColor: colors.accent.pink + '30',
+  },
+  moodTagText: { fontSize: 10, color: colors.accent.pink, fontWeight: '600' },
+  moodTagCount: { fontSize: 9, color: colors.accent.pink + 'AA', fontWeight: '700' },
 });

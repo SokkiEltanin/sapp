@@ -48,7 +48,7 @@ export default function ScanReceiptModal() {
   const [editedPrices, setEditedPrices] = useState<Record<number, string>>({});
   const [editedNames, setEditedNames] = useState<Record<number, string>>({});
   const [catPickerFor, setCatPickerFor] = useState<number | null>(null);
-  const [customProducts, setCustomProducts] = useState<{ name: string; price: string; category: ExpenseCategory; tags: string[] }[]>([]);
+  const [customProducts, setCustomProducts] = useState<{ name: string; price: string; quantity: string; category: ExpenseCategory; tags: string[] }[]>([]);
   const [customCatPickerFor, setCustomCatPickerFor] = useState<number | null>(null);
   const [editedTags, setEditedTags]   = useState<Record<number, string[]>>({});
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
@@ -76,7 +76,7 @@ export default function ScanReceiptModal() {
     editedTags[i] ?? getFoodTags(getProductName(i));
 
   const addCustomProduct = () => {
-    setCustomProducts(prev => [...prev, { name: '', price: '0.00', category: 'groceries', tags: [] }]);
+    setCustomProducts(prev => [...prev, { name: '', price: '0.00', quantity: '1', category: 'groceries', tags: [] }]);
     setCustomCatPickerFor(null);
     setCatPickerFor(null);
   };
@@ -205,12 +205,13 @@ export default function ScanReceiptModal() {
 
       const customItems: ReceiptItem[] = validCustom.map(p => {
         const price = parseFloat(p.price.replace(',', '.')) || 0;
+        const qty   = parseFloat(p.quantity.replace(',', '.')) || 1;
         return {
           name: p.name.trim(),
           price,
           category: p.category,
-          quantity: 1,
-          unitPrice: price,
+          quantity: qty,
+          unitPrice: qty !== 1 ? price / qty : price,
           tags: p.tags.length > 0 ? p.tags : getFoodTags(p.name),
         };
       });
@@ -460,6 +461,7 @@ export default function ScanReceiptModal() {
                 onRemove={() => removeCustomProduct(idx)}
                 onNameChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, name: v } : p))}
                 onPriceChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, price: v } : p))}
+                onQuantityChange={v => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, quantity: v } : p))}
                 onCategoryChange={c => {
                   setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, category: c } : p));
                   setCustomCatPickerFor(null);
@@ -687,13 +689,14 @@ function ProductRow({
 // ─── CustomProductRow ─────────────────────────────────────────────────────────
 
 function CustomProductRow({
-  product, onRemove, onNameChange, onPriceChange, onCategoryChange,
+  product, onRemove, onNameChange, onPriceChange, onQuantityChange, onCategoryChange,
   catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange,
 }: {
-  product: { name: string; price: string; category: ExpenseCategory; tags: string[] };
+  product: { name: string; price: string; quantity: string; category: ExpenseCategory; tags: string[] };
   onRemove: () => void;
   onNameChange: (name: string) => void;
   onPriceChange: (price: string) => void;
+  onQuantityChange: (qty: string) => void;
   onCategoryChange: (cat: ExpenseCategory) => void;
   catPickerOpen: boolean;
   onCategoryPress: () => void;
@@ -753,16 +756,30 @@ function CustomProductRow({
           )}
         </View>
 
-        {/* Editable price */}
-        <View style={styles.priceInputWrap}>
-          <TextInput
-            value={product.price}
-            onChangeText={onPriceChange}
-            style={styles.priceInput}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
-          />
-          <Text style={styles.priceCur}>zł</Text>
+        {/* Qty + price */}
+        <View style={styles.customPriceCol}>
+          <View style={styles.priceInputWrap}>
+            <TextInput
+              value={product.price}
+              onChangeText={onPriceChange}
+              style={styles.priceInput}
+              keyboardType="decimal-pad"
+              selectTextOnFocus
+            />
+            <Text style={styles.priceCur}>zł</Text>
+          </View>
+          <View style={styles.qtyRow}>
+            <TextInput
+              value={product.quantity}
+              onChangeText={onQuantityChange}
+              style={styles.qtyInput}
+              keyboardType="decimal-pad"
+              selectTextOnFocus
+              placeholder="1"
+              placeholderTextColor={colors.text.muted}
+            />
+            <Text style={styles.qtySuffix}>szt/kg</Text>
+          </View>
         </View>
       </View>
 
@@ -957,6 +974,16 @@ const styles = StyleSheet.create({
     fontSize: 13, fontWeight: '500', color: colors.text.primary,
     padding: 0, flex: 1,
   },
+
+  // ── Custom product qty/price column ──────────────────────────────────────
+  customPriceCol: { alignItems: 'flex-end', gap: 3 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  qtyInput: {
+    fontSize: 10, fontWeight: '600', color: colors.text.muted,
+    minWidth: 32, textAlign: 'right', paddingVertical: 0,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  qtySuffix: { fontSize: 9, color: colors.text.muted },
 
   // ── Custom product row ────────────────────────────────────────────────────
   customRow: {

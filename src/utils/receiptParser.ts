@@ -600,7 +600,7 @@ export function parseReceiptText(text: string): ParsedReceipt {
 
     // Weight inline: "0,523 kg x 12,99/kg 6,79" — update last product
     const wil = raw.match(WEIGHT_INLINE_RE);
-    if (wil && lastProduct !== null) {
+    if (wil && lastProduct !== null && pendingName === null) {
       const lp  = lastProduct as ReceiptProduct;
       const qty = parseFloat(wil[1].replace(',', '.'));
       const u   = parseFloat(wil[2].replace(',', '.'));
@@ -615,7 +615,7 @@ export function parseReceiptText(text: string): ParsedReceipt {
     }
 
     const wm = raw.match(WEIGHT_RE);
-    if (wm && lastProduct !== null) {
+    if (wm && lastProduct !== null && pendingName === null) {
       const lp  = lastProduct as ReceiptProduct;
       const qty = parseFloat(wm[1].replace(',', '.'));
       const u   = parseFloat(wm[2].replace(',', '.'));
