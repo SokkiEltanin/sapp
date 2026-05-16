@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Habit } from '@/types';
 import { getHabits, saveHabits, getCompletions, setCompletions } from '@/utils/habits';
 import { notificationsService } from '@/services/notificationsService';
+import { haptic } from '@/utils/haptics';
 
 function applyReminder(habit: Habit) {
   if (habit.reminderTime) {
@@ -49,9 +50,9 @@ export function useHabits() {
 
   const toggle = useCallback(async (habitId: string) => {
     const current = completions[today] ?? [];
-    const next = current.includes(habitId)
-      ? current.filter(id => id !== habitId)
-      : [...current, habitId];
+    const completing = !current.includes(habitId);
+    const next = completing ? [...current, habitId] : current.filter(id => id !== habitId);
+    if (completing) haptic.success(); else haptic.tap();
     setComp(prev => ({ ...prev, [today]: next }));
     await setCompletions(today, next);
   }, [completions, today]);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
   Animated, Pressable, TouchableOpacity,
@@ -65,8 +66,10 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     }
   }, [visible]);
 
-  const toggleTag = (tag: string) =>
+  const toggleTag = (tag: string) => {
+    haptic.tap();
     setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
 
   const handleSave = async () => {
     if (!mood || !energy) {
@@ -88,8 +91,10 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
         });
         addEntry(entry);
       }
+      haptic.success();
       onClose();
     } catch (e: any) {
+      haptic.error();
       Alert.alert('Błąd', e.message);
     } finally {
       setSaving(false);

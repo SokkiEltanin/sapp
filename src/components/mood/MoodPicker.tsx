@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const ENERGY_COLORS: Record<MoodLevel, string> = {
   1: '#6B7280',
@@ -28,6 +29,7 @@ function MoodOption({ level, selected, onSelect, color }: {
       Animated.timing(scale, { toValue: 0.94, duration: 60, useNativeDriver: true }),
       Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 280 } as any),
     ]).start();
+    haptic.medium();
     onSelect();
   };
 

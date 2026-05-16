@@ -4,13 +4,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Play, Pause, SkipForward, RotateCcw, Timer } from 'lucide-react-native';
+import { X, Play, Pause, SkipForward, RotateCcw, Timer, Volume2, VolumeX } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
 import { usePomodoroStore, PomodoroMode } from '@/store/pomodoroStore';
 import { tasksService } from '@/services/calendarService';
 import { useCalendarStore } from '@/store/calendarStore';
+import { useFocusSound, FocusSound, FOCUS_SOUND_LABELS } from '@/hooks/useFocusSound';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,6 +103,7 @@ export default function PomodoroScreen() {
     pause, resume, reset, nextRound,
   } = usePomodoroStore();
   const updateTaskStore = useCalendarStore(s => s.updateTask);
+  const { selected: focusSound, setSelected: setFocusSound } = useFocusSound(isRunning);
 
   const totalSecs = mode === 'work'
     ? workMins * 60
@@ -222,6 +224,30 @@ export default function PomodoroScreen() {
                 );
               })}
             </View>
+
+            {/* Focus sounds */}
+            <View style={styles.soundRow}>
+              {focusSound === 'off'
+                ? <VolumeX size={12} color={colors.text.muted} />
+                : <Volume2 size={12} color={colors.accent.blue} />}
+              <Text style={styles.soundRowLabel}>Dźwięk tła</Text>
+            </View>
+            <View style={styles.soundBtns}>
+              {(['off', 'rain', 'noise', 'cafe'] as FocusSound[]).map(s => {
+                const active = focusSound === s;
+                return (
+                  <PressableScale
+                    key={s}
+                    onPress={() => setFocusSound(s)}
+                    style={[styles.soundBtn, active && styles.soundBtnActive]}
+                  >
+                    <Text style={[styles.soundBtnText, active && styles.soundBtnTextActive]}>
+                      {FOCUS_SOUND_LABELS[s]}
+                    </Text>
+                  </PressableScale>
+                );
+              })}
+            </View>
           </GlassCard>
         </View>
       </View>
@@ -297,5 +323,18 @@ const styles = StyleSheet.create({
   minText: { fontSize: 16, fontWeight: '700', color: colors.text.secondary },
   minTextActive: { color: colors.bg.primary },
   minUnit: { fontSize: 8, color: colors.text.muted, marginTop: 1 },
+
+  soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4], marginBottom: spacing[2] },
+  soundRowLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  soundBtns: { flexDirection: 'row', gap: spacing[2] },
+  soundBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing[2],
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  soundBtnActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue + '50' },
+  soundBtnText: { fontSize: 11, fontWeight: '500', color: colors.text.muted },
+  soundBtnTextActive: { color: colors.accent.blue, fontWeight: '700' },
 });
 

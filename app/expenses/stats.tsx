@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, BarChart2, Settings2, ShoppingCart, AlertTriangle, UtensilsCrossed } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, BarChart2, Settings2, ShoppingCart, AlertTriangle, UtensilsCrossed, RefreshCw } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -13,6 +13,7 @@ import { expensesService } from '@/services/expensesService';
 import { Expense, ExpenseCategory } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { detectFixedCosts } from '@/utils/fixedCosts';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const MONTHS_BACK = 6;
@@ -167,6 +168,9 @@ export default function StatsScreen() {
     catBreakdown.filter(c => c.prevAmount > 0 && c.amount > c.prevAmount * 1.5),
   [catBreakdown]);
 
+  // ── Fixed / recurring cost detection (uses all-time data, not just selected month)
+  const fixedCosts = useMemo(() => detectFixedCosts(expenses), [expenses]);
+
   // ── Food (groceries) stats: this month vs prev month + tag subcategories
   const foodStats = useMemo(() => {
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -178,6 +182,11 @@ export default function StatsScreen() {
     const thisTotal = thisGroc.reduce((s, e) => s + e.amount, 0);
     const prevTotal = prevGroc.reduce((s, e) => s + e.amount, 0);
     const weekTotal = weekGroc.reduce((s, e) => s + e.amount, 0);
+
+    const daysInMonth = new Date(monthBase.getFullYear(), monthBase.getMonth() + 1, 0).getDate();
+    const daysElapsed = isCurrentMonth ? today.getDate() : daysInMonth;
+    const dailyRate   = daysElapsed > 0 ? thisTotal / daysElapsed : 0;
+    const projection  = isCurrentMonth ? dailyRate * daysInMonth : null;
 
     const byTag: Record<string, { curr: number; prev: number }> = {};
     for (const tag of FOOD_TAGS) byTag[tag] = { curr: 0, prev: 0 };
@@ -192,8 +201,8 @@ export default function StatsScreen() {
         for (const tag of it.tags) { if (byTag[tag]) byTag[tag].prev += it.price; }
       }
     }
-    return { thisTotal, prevTotal, weekTotal, byTag };
-  }, [expenses, thisMonth, prevMonth, today]);
+    return { thisTotal, prevTotal, weekTotal, dailyRate, projection, daysElapsed, daysInMonth, byTag };
+  }, [expenses, thisMonth, prevMonth, today, monthBase, isCurrentMonth]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -416,6 +425,30 @@ export default function StatsScreen() {
               )}
             </View>
 
+            {/* Spending velocity */}
+            {foodStats.dailyRate > 0 && (
+              <View style={styles.velocityRow}>
+                <View style={styles.velocityStat}>
+                  <Text style={styles.velocityVal}>{foodStats.dailyRate.toFixed(1)} <Text style={styles.velocityUnit}>zł/dzień</Text></Text>
+                  <Text style={styles.velocityLabel}>średnio ({foodStats.daysElapsed} dni)</Text>
+                </View>
+                {foodStats.projection != null && (
+                  <>
+                    <View style={styles.foodSep} />
+                    <View style={styles.velocityStat}>
+                      <Text style={[styles.velocityVal, {
+                        color: foodStats.projection > (foodStats.prevTotal || foodStats.projection) * 1.1
+                          ? colors.accent.amber : colors.text.primary,
+                      }]}>
+                        {foodStats.projection.toFixed(0)} <Text style={styles.velocityUnit}>zł</Text>
+                      </Text>
+                      <Text style={styles.velocityLabel}>prognoza miesiąca</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
+
             {/* Tag subcategory breakdown */}
             {FOOD_TAGS.filter(t => foodStats.byTag[t].curr > 0 || foodStats.byTag[t].prev > 0).map(tag => {
               const { curr, prev } = foodStats.byTag[tag];
@@ -438,6 +471,34 @@ export default function StatsScreen() {
                 </View>
               );
             })}
+          </View>
+        )}
+
+        {/* Fixed / recurring costs */}
+        {fixedCosts.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardRow}>
+              <RefreshCw size={13} color={colors.accent.purple} />
+              <Text style={[styles.cardLabel, { color: colors.accent.purple }]}>Stałe koszty</Text>
+              <Text style={styles.cardMeta}>
+                {fixedCosts.reduce((s, c) => s + c.amount, 0).toFixed(0)} zł/mies.
+              </Text>
+            </View>
+            {fixedCosts.slice(0, 8).map((fc, i) => {
+              const confColor = fc.confidence === 'high' ? colors.accent.green : fc.confidence === 'medium' ? colors.accent.amber : colors.text.muted;
+              return (
+                <View key={i} style={styles.fixedRow}>
+                  <View style={[styles.fixedConfDot, { backgroundColor: confColor }]} />
+                  <Text style={styles.fixedName} numberOfLines={1}>{fc.name}</Text>
+                  <Text style={styles.fixedOcc}>{fc.occurrences}×</Text>
+                  <Text style={styles.fixedAmt}>{fc.amount.toFixed(0)} zł</Text>
+                </View>
+              );
+            })}
+            <Text style={styles.fixedHint}>
+              Wykryto na podstawie historii transakcji.
+              Zielony = wysoka pewność, żółty = średnia, szary = niska.
+            </Text>
           </View>
         )}
 
@@ -669,6 +730,13 @@ const styles = StyleSheet.create({
   filterBtnText:     { fontSize: 10, fontWeight: '500', color: colors.text.muted },
   filterBtnTextActive: { color: colors.accent.green, fontWeight: '700' },
 
+  // Food velocity
+  velocityRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[1], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: spacing[2] },
+  velocityStat:  { alignItems: 'center', gap: 2 },
+  velocityVal:   { fontSize: 16, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
+  velocityUnit:  { fontSize: 10, fontWeight: '400', color: colors.text.muted },
+  velocityLabel: { fontSize: 10, color: colors.text.muted },
+
   // Food stats
   foodWeekLabel:     { fontSize: 10, color: colors.text.muted },
   foodMonthRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
@@ -685,6 +753,14 @@ const styles = StyleSheet.create({
   foodTagBarFill:    { height: 4, borderRadius: radius.full, backgroundColor: colors.accent.green },
   foodTagAmt:        { fontSize: 11, fontWeight: '700', color: colors.text.primary, width: 46, textAlign: 'right' },
   foodTagChange:     { fontSize: 10, width: 38, textAlign: 'right', color: colors.text.muted },
+
+  // Fixed costs
+  fixedRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4 },
+  fixedConfDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  fixedName:    { flex: 1, fontSize: 13, color: colors.text.secondary },
+  fixedOcc:     { fontSize: 10, color: colors.text.muted, width: 22, textAlign: 'right' },
+  fixedAmt:     { fontSize: 13, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
+  fixedHint:    { fontSize: 10, color: colors.text.muted, lineHeight: 15, marginTop: spacing[1] },
 
   tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },

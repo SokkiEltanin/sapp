@@ -22,6 +22,13 @@ import {
   getCurrentWeekStart, getPrevWeekStart, getWeekBounds,
   shouldAutoGenerate, markGenerated,
 } from '@/utils/weeklyReports';
+import {
+  MonthlyReport, YearlyReport,
+  loadMonthlyReports, saveMonthlyReport, generateMonthlyReport,
+  loadYearlyReports, saveYearlyReport, generateYearlyReport,
+  shouldAutoGenerateMonthly, markMonthlyGenerated,
+  getCurrentMonth, getPrevMonth, getMonthBounds,
+} from '@/utils/monthlyReports';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -120,10 +127,14 @@ export default function StatsScreen() {
   const { entries: moodEntries, setEntries: setMood } = useMoodStore();
   const { events, tasks, setEvents } = useCalendarStore();
 
-  const [weekOffset, setWeekOffset]   = useState(0);
-  const [reports, setReports]         = useState<WeeklyReport[]>([]);
-  const [expandedReport, setExpanded] = useState<string | null>(null);
-  const [generating, setGenerating]   = useState(false);
+  const [weekOffset, setWeekOffset]       = useState(0);
+  const [heatOffset, setHeatOffset]       = useState(0); // months back from current
+  const [reportTab, setReportTab]         = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [reports, setReports]             = useState<WeeklyReport[]>([]);
+  const [monthlyReports, setMonthlyRep]   = useState<MonthlyReport[]>([]);
+  const [yearlyReports, setYearlyRep]     = useState<YearlyReport[]>([]);
+  const [expandedReport, setExpanded]     = useState<string | null>(null);
+  const [generating, setGenerating]       = useState(false);
 
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
@@ -134,7 +145,27 @@ export default function StatsScreen() {
       );
     }
     loadReports().then(setReports);
+    loadMonthlyReports().then(setMonthlyRep);
+    loadYearlyReports().then(setYearlyRep);
   }, []);
+
+  // Auto-generate monthly report on first 3 days of the month
+  useEffect(() => {
+    if (expenses.length === 0 && moodEntries.length === 0) return;
+    shouldAutoGenerateMonthly().then(async (should) => {
+      if (!should) return;
+      const prev = getPrevMonth();
+      const report = generateMonthlyReport({ month: prev, moodEntries, tasks, expenses, events });
+      await saveMonthlyReport(report);
+      await markMonthlyGenerated(prev);
+      setMonthlyRep(await loadMonthlyReports());
+      // Also regenerate yearly report for that year
+      const year = parseInt(prev.slice(0, 4));
+      const yearly = generateYearlyReport({ year, moodEntries, tasks, expenses, events });
+      await saveYearlyReport(yearly);
+      setYearlyRep(await loadYearlyReports());
+    });
+  }, [expenses.length, moodEntries.length]);
 
   // Auto-generate report for previous week on Monday/Tuesday
   useEffect(() => {
@@ -169,10 +200,7 @@ export default function StatsScreen() {
     const prevWeekStart = getPrevWeekStart(weekStart);
     const report = generateReport({
       weekStart,
-      moodEntries,
-      tasks,
-      expenses,
-      events,
+      moodEntries, tasks, expenses, events,
       prevWeekMoodEntries: moodEntries.filter(e => {
         const pw = getWeekBounds(prevWeekStart);
         return e.date >= pw.start && e.date <= pw.end;
@@ -180,6 +208,22 @@ export default function StatsScreen() {
     });
     await saveReport(report);
     setReports(await loadReports());
+    setGenerating(false);
+  };
+
+  const generateManualMonthly = async (month: string) => {
+    setGenerating(true);
+    const report = generateMonthlyReport({ month, moodEntries, tasks, expenses, events });
+    await saveMonthlyReport(report);
+    setMonthlyRep(await loadMonthlyReports());
+    setGenerating(false);
+  };
+
+  const generateManualYearly = async (year: number) => {
+    setGenerating(true);
+    const report = generateYearlyReport({ year, moodEntries, tasks, expenses, events });
+    await saveYearlyReport(report);
+    setYearlyRep(await loadYearlyReports());
     setGenerating(false);
   };
 
@@ -196,6 +240,45 @@ export default function StatsScreen() {
     }
     return map;
   }, [moodEntries]);
+
+  // ── Mood calendar heatmap
+  const heatMonthLabel = useMemo(() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + heatOffset);
+    return `${MONTH_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+  }, [heatOffset]);
+
+  const heatGrid = useMemo(() => {
+    const base = new Date();
+    base.setDate(1);
+    base.setMonth(base.getMonth() + heatOffset);
+    const year  = base.getFullYear();
+    const month = base.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDow = new Date(year, month, 1).getDay();
+    const startCol = firstDow === 0 ? 6 : firstDow - 1; // Mon=0
+
+    type HeatCell = null | { day: number; dateStr: string; avgMood: number | null; isToday: boolean };
+    const todayStr = toStr(new Date());
+    const grid: HeatCell[][] = [];
+    let row: HeatCell[] = Array.from({ length: startCol }, () => null);
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${pad(month + 1)}-${pad(d)}`;
+      const entries = moodByDay[dateStr] ?? [];
+      const avgMood = entries.length
+        ? entries.reduce((a, b) => a + b.mood, 0) / entries.length
+        : null;
+      row.push({ day: d, dateStr, avgMood, isToday: dateStr === todayStr });
+      if (row.length === 7) { grid.push(row); row = []; }
+    }
+    if (row.length) {
+      while (row.length < 7) row.push(null);
+      grid.push(row);
+    }
+    return grid;
+  }, [heatOffset, moodByDay]);
 
   const weekMoodDays = useMemo(() =>
     weekDates.map(d => ({ date: d, avg: dayAvg(moodByDay[d] ?? []) })),
@@ -398,6 +481,80 @@ export default function StatsScreen() {
           )}
         </View>
 
+        {/* ── Mood heatmap ─────────────────────────────────────────────── */}
+        <View style={s.card}>
+          <View style={s.cardRow}>
+            <Calendar size={13} color={colors.accent.pink} />
+            <Text style={[s.cardLabel, { color: colors.accent.pink }]}>Kalendarz nastrojów</Text>
+          </View>
+
+          {/* Month navigation */}
+          <View style={s.heatNavRow}>
+            <TouchableOpacity onPress={() => setHeatOffset(o => o - 1)} style={s.heatNavBtn}>
+              <ChevronLeft size={14} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <Text style={s.heatMonthLabel}>{heatMonthLabel}</Text>
+            <TouchableOpacity
+              onPress={() => setHeatOffset(o => Math.min(o + 1, 0))}
+              style={[s.heatNavBtn, heatOffset >= 0 && s.navBtnDisabled]}
+              disabled={heatOffset >= 0}
+            >
+              <ChevronRight size={14} color={heatOffset >= 0 ? colors.text.muted : colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Day headers */}
+          <View style={s.heatHeaderRow}>
+            {DAY_SHORT.map(d => (
+              <Text key={d} style={s.heatHeaderCell}>{d}</Text>
+            ))}
+          </View>
+
+          {/* Grid */}
+          <View style={s.heatGridWrap}>
+            {heatGrid.map((week, ri) => (
+              <View key={ri} style={s.heatWeekRow}>
+                {week.map((cell, ci) => {
+                  if (!cell) return <View key={ci} style={s.heatCellEmpty} />;
+                  const bg = cell.avgMood
+                    ? moodColor(cell.avgMood)
+                    : cell.isToday
+                    ? 'rgba(255,255,255,0.10)'
+                    : 'rgba(255,255,255,0.04)';
+                  return (
+                    <View key={ci} style={[
+                      s.heatCell,
+                      { backgroundColor: bg },
+                      cell.isToday && s.heatCellToday,
+                    ]}>
+                      <Text style={[
+                        s.heatCellDay,
+                        cell.avgMood ? s.heatCellDayFilled : cell.isToday ? { color: colors.accent.blue } : null,
+                      ]}>
+                        {cell.day}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+
+          {/* Legend */}
+          <View style={s.heatLegend}>
+            {([1, 2, 3, 4, 5] as const).map(lvl => (
+              <View key={lvl} style={s.heatLegendItem}>
+                <View style={[s.heatLegendDot, { backgroundColor: MOOD_COLORS[lvl] }]} />
+                <Text style={s.heatLegendText}>{lvl}</Text>
+              </View>
+            ))}
+            <View style={s.heatLegendItem}>
+              <View style={[s.heatLegendDot, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+              <Text style={s.heatLegendText}>brak</Text>
+            </View>
+          </View>
+        </View>
+
         {/* ── Financial context ────────────────────────────────────────── */}
         {(weekTotal > 0 || weekInc > 0) && (
           <View style={s.card}>
@@ -555,113 +712,219 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* ── Weekly reports ───────────────────────────────────────────── */}
+        {/* ── Reports ─────────────────────────────────────────────────── */}
         <View style={s.card}>
           <View style={s.cardRow}>
             <FileText size={13} color={colors.accent.purple} />
-            <Text style={[s.cardLabel, { color: colors.accent.purple }]}>Raporty tygodniowe</Text>
+            <Text style={[s.cardLabel, { color: colors.accent.purple }]}>Raporty</Text>
             <TouchableOpacity
-              onPress={() => generateManual(getWeekBounds(weekDates[0]).start)}
+              onPress={() => {
+                if (reportTab === 'weekly') generateManual(getWeekBounds(weekDates[0]).start);
+                else if (reportTab === 'monthly') generateManualMonthly(getPrevMonth());
+                else generateManualYearly(new Date().getFullYear());
+              }}
               style={s.genBtn}
               disabled={generating}
             >
               <RefreshCw size={11} color={generating ? colors.text.muted : colors.accent.purple} />
               <Text style={[s.genBtnText, generating && { color: colors.text.muted }]}>
-                {generating ? 'Generuje...' : 'Generuj'}
+                {generating ? '...' : 'Generuj'}
               </Text>
             </TouchableOpacity>
           </View>
 
-          {reports.length === 0 ? (
-            <Text style={s.emptyMood}>Brak raportów. Raporty generują się automatycznie co poniedziałek.</Text>
-          ) : (
-            reports.slice(0, 12).map(r => {
-              const expanded = expandedReport === r.id;
-              const mc = r.mood.avgMood !== null ? moodColor(r.mood.avgMood) : colors.text.muted;
-              const from = r.weekStart.slice(5).replace('-', '.');
-              const to   = r.weekEnd.slice(5).replace('-', '.');
-              return (
-                <TouchableOpacity
-                  key={r.id}
-                  onPress={() => setExpanded(expanded ? null : r.id)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[s.reportRow, expanded && s.reportRowExpanded]}>
-                    {/* Mood dot */}
-                    <View style={[s.reportMoodDot, { backgroundColor: mc }]}>
-                      {r.mood.avgMood !== null && (
-                        <Text style={s.reportMoodVal}>{r.mood.avgMood.toFixed(1)}</Text>
-                      )}
-                    </View>
+          {/* Report type tabs */}
+          <View style={s.reportTabRow}>
+            {(['weekly', 'monthly', 'yearly'] as const).map(tab => (
+              <TouchableOpacity
+                key={tab}
+                style={[s.reportTabBtn, reportTab === tab && s.reportTabBtnActive]}
+                onPress={() => { setReportTab(tab); setExpanded(null); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.reportTabText, reportTab === tab && s.reportTabTextActive]}>
+                  {tab === 'weekly' ? 'Tygodniowe' : tab === 'monthly' ? 'Miesięczne' : 'Roczne'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-                    <View style={s.reportInfo}>
-                      <Text style={s.reportWeek}>{from} – {to}</Text>
-                      <Text style={s.reportHighlight} numberOfLines={expanded ? 5 : 1}>
-                        {r.highlight}
-                      </Text>
+          {/* Weekly reports */}
+          {reportTab === 'weekly' && (
+            reports.length === 0
+              ? <Text style={s.emptyMood}>Brak raportów. Generują się automatycznie co poniedziałek.</Text>
+              : reports.slice(0, 12).map(r => {
+                const expanded = expandedReport === r.id;
+                const mc = r.mood.avgMood !== null ? moodColor(r.mood.avgMood) : colors.text.muted;
+                return (
+                  <TouchableOpacity key={r.id} onPress={() => setExpanded(expanded ? null : r.id)} activeOpacity={0.75}>
+                    <View style={[s.reportRow, expanded && s.reportRowExpanded]}>
+                      <View style={[s.reportMoodDot, { backgroundColor: mc }]}>
+                        {r.mood.avgMood !== null && <Text style={s.reportMoodVal}>{r.mood.avgMood.toFixed(1)}</Text>}
+                      </View>
+                      <View style={s.reportInfo}>
+                        <Text style={s.reportWeek}>{r.weekStart.slice(5).replace('-', '.')} – {r.weekEnd.slice(5).replace('-', '.')}</Text>
+                        <Text style={s.reportHighlight} numberOfLines={expanded ? 5 : 1}>{r.highlight}</Text>
+                      </View>
+                      <View style={s.reportQuick}>
+                        {r.tasks.total > 0 && <Text style={s.reportQuickText}>{Math.round(r.tasks.rate * 100)}%</Text>}
+                        {r.finances.sweetsSpend > 0 && <Text style={[s.reportQuickText, { color: colors.accent.amber }]}>{r.finances.sweetsSpend.toFixed(0)} zł</Text>}
+                      </View>
                     </View>
+                    {expanded && (
+                      <View style={s.reportDetail}>
+                        <View style={s.reportDetailRow}>
+                          <View style={s.reportDetailStat}>
+                            <Text style={[s.reportDetailVal, { color: mc }]}>{r.mood.avgMood?.toFixed(1) ?? '—'}</Text>
+                            <Text style={s.reportDetailLabel}>śr. nastrój</Text>
+                          </View>
+                          <View style={s.reportDetailStat}>
+                            <Text style={s.reportDetailVal}>{r.mood.loggedDays}/7</Text>
+                            <Text style={s.reportDetailLabel}>dni</Text>
+                          </View>
+                          {r.tasks.total > 0 && (
+                            <View style={s.reportDetailStat}>
+                              <Text style={s.reportDetailVal}>{r.tasks.completed}/{r.tasks.total}</Text>
+                              <Text style={s.reportDetailLabel}>zadania</Text>
+                            </View>
+                          )}
+                          {r.finances.totalSpend > 0 && (
+                            <View style={s.reportDetailStat}>
+                              <Text style={s.reportDetailVal}>{r.finances.totalSpend.toFixed(0)}</Text>
+                              <Text style={s.reportDetailLabel}>wydatki zł</Text>
+                            </View>
+                          )}
+                        </View>
+                        {r.mood.topNote && <Text style={s.reportDetailNote}>"{r.mood.topNote}"</Text>}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+          )}
 
-                    {/* Quick stats */}
-                    <View style={s.reportQuick}>
-                      {r.tasks.total > 0 && (
-                        <Text style={s.reportQuickText}>{Math.round(r.tasks.rate * 100)}%</Text>
-                      )}
-                      {r.finances.sweetsSpend > 0 && (
-                        <Text style={[s.reportQuickText, { color: colors.accent.amber }]}>
-                          {r.finances.sweetsSpend.toFixed(0)} zł
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Expanded details */}
-                  {expanded && (
-                    <View style={s.reportDetail}>
-                      <View style={s.reportDetailRow}>
-                        <View style={s.reportDetailStat}>
-                          <Text style={[s.reportDetailVal, { color: mc }]}>
-                            {r.mood.avgMood?.toFixed(1) ?? '—'}
+          {/* Monthly reports */}
+          {reportTab === 'monthly' && (
+            monthlyReports.length === 0
+              ? <Text style={s.emptyMood}>Brak raportów miesięcznych. Naciśnij "Generuj" aby stworzyć.</Text>
+              : monthlyReports.slice(0, 12).map(r => {
+                const expanded = expandedReport === r.id;
+                const mc = r.mood.avgMood !== null ? moodColor(r.mood.avgMood) : colors.text.muted;
+                const balColor = r.finances.balance >= 0 ? colors.accent.green : colors.accent.red;
+                return (
+                  <TouchableOpacity key={r.id} onPress={() => setExpanded(expanded ? null : r.id)} activeOpacity={0.75}>
+                    <View style={[s.reportRow, expanded && s.reportRowExpanded]}>
+                      <View style={[s.reportMoodDot, { backgroundColor: mc }]}>
+                        {r.mood.avgMood !== null && <Text style={s.reportMoodVal}>{r.mood.avgMood.toFixed(1)}</Text>}
+                      </View>
+                      <View style={s.reportInfo}>
+                        <Text style={s.reportWeek}>{r.month.replace('-', '/')}</Text>
+                        <Text style={s.reportHighlight} numberOfLines={expanded ? 5 : 1}>{r.highlight}</Text>
+                      </View>
+                      <View style={s.reportQuick}>
+                        {r.finances.balance !== 0 && (
+                          <Text style={[s.reportQuickText, { color: balColor }]}>
+                            {r.finances.balance >= 0 ? '+' : ''}{r.finances.balance.toFixed(0)} zł
                           </Text>
-                          <Text style={s.reportDetailLabel}>śr. nastrój</Text>
-                        </View>
-                        <View style={s.reportDetailStat}>
-                          <Text style={s.reportDetailVal}>{r.mood.loggedDays}/7</Text>
-                          <Text style={s.reportDetailLabel}>dni z wpisem</Text>
-                        </View>
-                        {r.tasks.total > 0 && (
-                          <View style={s.reportDetailStat}>
-                            <Text style={s.reportDetailVal}>
-                              {r.tasks.completed}/{r.tasks.total}
-                            </Text>
-                            <Text style={s.reportDetailLabel}>zadania</Text>
-                          </View>
-                        )}
-                        {r.finances.totalSpend > 0 && (
-                          <View style={s.reportDetailStat}>
-                            <Text style={s.reportDetailVal}>{r.finances.totalSpend.toFixed(0)}</Text>
-                            <Text style={s.reportDetailLabel}>wydatki zł</Text>
-                          </View>
                         )}
                       </View>
-                      {r.finances.sweetsSpend > 0 && (
-                        <Text style={s.reportDetailNote}>
-                          Słodycze: {r.finances.sweetsSpend.toFixed(0)} zł
-                          {r.finances.foodSpend > 0 ? ` (${Math.round(r.finances.sweetsSpend / r.finances.foodSpend * 100)}% jedzenia)` : ''}
-                        </Text>
-                      )}
-                      {r.finances.income > 0 && (
-                        <Text style={[s.reportDetailNote, { color: colors.accent.green }]}>
-                          Wpływ: +{r.finances.income.toFixed(0)} zł
-                        </Text>
-                      )}
-                      {r.mood.topNote && (
-                        <Text style={s.reportDetailNote}>"{r.mood.topNote}"</Text>
-                      )}
                     </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })
+                    {expanded && (
+                      <View style={s.reportDetail}>
+                        <View style={s.reportDetailRow}>
+                          <View style={s.reportDetailStat}>
+                            <Text style={[s.reportDetailVal, { color: mc }]}>{r.mood.avgMood?.toFixed(1) ?? '—'}</Text>
+                            <Text style={s.reportDetailLabel}>śr. nastrój</Text>
+                          </View>
+                          <View style={s.reportDetailStat}>
+                            <Text style={s.reportDetailVal}>{r.mood.loggedDays}</Text>
+                            <Text style={s.reportDetailLabel}>dni z wpisem</Text>
+                          </View>
+                          {r.tasks.total > 0 && (
+                            <View style={s.reportDetailStat}>
+                              <Text style={s.reportDetailVal}>{r.tasks.completed}/{r.tasks.total}</Text>
+                              <Text style={s.reportDetailLabel}>zadania</Text>
+                            </View>
+                          )}
+                          <View style={s.reportDetailStat}>
+                            <Text style={[s.reportDetailVal, { color: balColor }]}>
+                              {r.finances.balance >= 0 ? '+' : ''}{r.finances.balance.toFixed(0)}
+                            </Text>
+                            <Text style={s.reportDetailLabel}>saldo zł</Text>
+                          </View>
+                        </View>
+                        {r.finances.foodSpend > 0 && (
+                          <Text style={s.reportDetailNote}>
+                            Jedzenie: {r.finances.foodSpend.toFixed(0)} zł
+                            {r.finances.sweetsSpend > 0 ? ` · słodycze: ${r.finances.sweetsSpend.toFixed(0)} zł` : ''}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+          )}
+
+          {/* Yearly reports */}
+          {reportTab === 'yearly' && (
+            yearlyReports.length === 0
+              ? <Text style={s.emptyMood}>Brak raportów rocznych. Naciśnij "Generuj" aby stworzyć.</Text>
+              : yearlyReports.map(r => {
+                const expanded = expandedReport === r.id;
+                const mc = r.mood.avgMood !== null ? moodColor(r.mood.avgMood) : colors.text.muted;
+                const balColor = r.finances.balance >= 0 ? colors.accent.green : colors.accent.red;
+                return (
+                  <TouchableOpacity key={r.id} onPress={() => setExpanded(expanded ? null : r.id)} activeOpacity={0.75}>
+                    <View style={[s.reportRow, expanded && s.reportRowExpanded]}>
+                      <View style={[s.reportMoodDot, { backgroundColor: mc }]}>
+                        {r.mood.avgMood !== null && <Text style={s.reportMoodVal}>{r.mood.avgMood.toFixed(1)}</Text>}
+                      </View>
+                      <View style={s.reportInfo}>
+                        <Text style={s.reportWeek}>{r.year}</Text>
+                        <Text style={s.reportHighlight} numberOfLines={expanded ? 5 : 1}>{r.highlight}</Text>
+                      </View>
+                      <View style={s.reportQuick}>
+                        {r.finances.balance !== 0 && (
+                          <Text style={[s.reportQuickText, { color: balColor }]}>
+                            {r.finances.balance >= 0 ? '+' : ''}{r.finances.balance.toFixed(0)} zł
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    {expanded && (
+                      <View style={s.reportDetail}>
+                        <View style={s.reportDetailRow}>
+                          <View style={s.reportDetailStat}>
+                            <Text style={[s.reportDetailVal, { color: mc }]}>{r.mood.avgMood?.toFixed(1) ?? '—'}</Text>
+                            <Text style={s.reportDetailLabel}>śr. nastrój</Text>
+                          </View>
+                          <View style={s.reportDetailStat}>
+                            <Text style={s.reportDetailVal}>{r.mood.loggedDays}</Text>
+                            <Text style={s.reportDetailLabel}>dni z wpisem</Text>
+                          </View>
+                          {r.tasks.total > 0 && (
+                            <View style={s.reportDetailStat}>
+                              <Text style={s.reportDetailVal}>{r.tasks.completed}</Text>
+                              <Text style={s.reportDetailLabel}>zadań done</Text>
+                            </View>
+                          )}
+                          <View style={s.reportDetailStat}>
+                            <Text style={s.reportDetailVal}>{r.finances.avgMonthlySpend.toFixed(0)}</Text>
+                            <Text style={s.reportDetailLabel}>śr. mies. zł</Text>
+                          </View>
+                        </View>
+                        {r.mood.bestMonth && (
+                          <Text style={s.reportDetailNote}>
+                            Najlepszy miesiąc: {r.mood.bestMonth}
+                            {r.mood.worstMonth && r.mood.worstMonth !== r.mood.bestMonth ? ` · najgorszy: ${r.mood.worstMonth}` : ''}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
           )}
         </View>
 
@@ -775,6 +1038,31 @@ const s = StyleSheet.create({
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot:   { width: 8, height: 8, borderRadius: 4 },
   legendText:  { fontSize: 10, color: colors.text.muted },
+
+  // Mood heatmap
+  heatNavRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heatNavBtn:      { width: 28, height: 28, borderRadius: radius.sm, backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default, alignItems: 'center', justifyContent: 'center' },
+  heatMonthLabel:  { fontSize: 13, fontWeight: '700', color: colors.text.primary, textTransform: 'capitalize' },
+  heatHeaderRow:   { flexDirection: 'row', gap: 3 },
+  heatHeaderCell:  { flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase' },
+  heatGridWrap:    { gap: 3 },
+  heatWeekRow:     { flexDirection: 'row', gap: 3 },
+  heatCell:        { flex: 1, aspectRatio: 1, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  heatCellEmpty:   { flex: 1, aspectRatio: 1 },
+  heatCellToday:   { borderWidth: 1.5, borderColor: colors.accent.blue + '80' },
+  heatCellDay:     { fontSize: 10, fontWeight: '500', color: 'rgba(255,255,255,0.25)' },
+  heatCellDayFilled: { color: '#fff', fontWeight: '700' },
+  heatLegend:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  heatLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  heatLegendDot:   { width: 10, height: 10, borderRadius: 3 },
+  heatLegendText:  { fontSize: 10, color: colors.text.muted },
+
+  // Report tabs
+  reportTabRow:      { flexDirection: 'row', gap: spacing[2] },
+  reportTabBtn:      { flex: 1, paddingVertical: spacing[2], borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)' },
+  reportTabBtnActive:{ backgroundColor: colors.accent.purple + '20', borderColor: colors.accent.purple + '50' },
+  reportTabText:     { fontSize: 11, fontWeight: '500', color: colors.text.muted },
+  reportTabTextActive:{ color: colors.accent.purple, fontWeight: '700' },
 
   // Reports
   genBtn:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.purple + '44', backgroundColor: colors.accent.purple + '10' },

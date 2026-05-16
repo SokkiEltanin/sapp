@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import {
   CheckCircle2, Circle, Clock, Flame, Timer,
   Search, RefreshCw, AlarmClock, BellOff, CheckSquare,
-  Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo, BarChart2,
+  Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo, BarChart2, Lightbulb,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -77,11 +77,12 @@ function fmtDl(iso: string) {
   return `${parseInt(day)}.${parseInt(m)}`;
 }
 
-type FilterKey = 'all' | 'today' | 'week' | 'done' | 'snoozed';
+type FilterKey = 'all' | 'today' | 'week' | 'done' | 'snoozed' | 'parking';
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Wszystkie' },
   { key: 'today',   label: 'Dziś' },
   { key: 'week',    label: 'Tydzień' },
+  { key: 'parking', label: 'Parking' },
   { key: 'done',    label: 'Ukończone' },
   { key: 'snoozed', label: 'Odłożone' },
 ];
@@ -403,6 +404,10 @@ export default function TasksScreen() {
       case 'snoozed':
         return [...snoozedTasks].sort((a, b) =>
           (a.snoozedUntil ?? '').localeCompare(b.snoozedUntil ?? ''));
+      case 'parking':
+        return tasks
+          .filter(t => t.status !== 'done' && t.status !== 'snoozed' && !t.deadline)
+          .sort(byPriority);
       default:
         return [];
     }
@@ -595,15 +600,34 @@ export default function TasksScreen() {
           >
             {FILTERS.map(({ key, label }) => {
               const active = filter === key;
+              const isParking = key === 'parking';
               return (
                 <PressableScale key={key} onPress={() => setFilter(key)}>
-                  <View style={[styles.filterPill, active && styles.filterPillActive]}>
-                    <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+                  <View style={[
+                    styles.filterPill,
+                    active && (isParking ? styles.filterPillParking : styles.filterPillActive),
+                    isParking && !active && styles.filterPillParkingIdle,
+                  ]}>
+                    {isParking && <Lightbulb size={10} color={active ? colors.accent.amber : colors.text.muted} />}
+                    <Text style={[
+                      styles.filterText,
+                      active && (isParking ? styles.filterTextParking : styles.filterTextActive),
+                    ]}>{label}</Text>
                   </View>
                 </PressableScale>
               );
             })}
           </ScrollView>
+
+          {/* Parking lot info banner */}
+          {filter === 'parking' && (
+            <View style={styles.parkingBanner}>
+              <Lightbulb size={14} color={colors.accent.amber} />
+              <Text style={styles.parkingBannerText}>
+                Pomysły bez terminu — dodaj deadline gdy będziesz gotowy
+              </Text>
+            </View>
+          )}
 
           {/* Overdue rescue banner */}
           {overdueTasks.length > 0 && filter === 'all' && (
@@ -663,13 +687,15 @@ export default function TasksScreen() {
             ListEmptyComponent={
               <View style={styles.empty}>
                 <Text style={styles.emptyTitle}>
-                  {filter === 'done' ? 'Brak ukończonych' : filter === 'snoozed' ? 'Brak odłożonych' : 'Brak zadań'}
+                  {filter === 'done' ? 'Brak ukończonych' : filter === 'snoozed' ? 'Brak odłożonych' : filter === 'parking' ? 'Parking pusty' : 'Brak zadań'}
                 </Text>
                 <Text style={styles.emptySub}>
                   {filter === 'done'
                     ? 'Zaznacz zadania jako ukończone'
                     : filter === 'snoozed'
                     ? 'Odłóż zadanie, żeby schować je tymczasowo'
+                    : filter === 'parking'
+                    ? 'Dodaj zadanie bez terminu — trafi tu automatycznie'
                     : 'Naciśnij + żeby dodać pierwsze zadanie'}
                 </Text>
               </View>
@@ -836,6 +862,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[4], paddingBottom: spacing[3],
   },
   filterPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[4], paddingVertical: 8,
     borderRadius: radius.full, borderWidth: 1,
     borderColor: colors.border.default,
@@ -902,6 +929,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   overdueBannerText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary, flex: 1 },
+
+  parkingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: colors.accent.amber + '15',
+    borderWidth: 1, borderColor: colors.accent.amber + '35',
+    marginHorizontal: spacing[4], marginBottom: spacing[2],
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  parkingBannerText: { fontSize: 12, color: colors.accent.amber, flex: 1 },
+  filterPillParking: { backgroundColor: colors.accent.amber + '20', borderColor: colors.accent.amber + '60' },
+  filterPillParkingIdle: { borderColor: colors.accent.amber + '35' },
+  filterTextParking: { color: colors.accent.amber, fontWeight: '700' },
 
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text.secondary },

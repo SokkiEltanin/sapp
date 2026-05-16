@@ -3,6 +3,7 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { Task, TaskRecurring, Subtask } from '@/types';
+import { haptic } from '@/utils/haptics';
 
 function nextDeadline(iso: string, recurring: TaskRecurring): string {
   const d = new Date(iso);
@@ -58,6 +59,7 @@ export function useTasks() {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const next = task.status === 'done' ? 'pending' : 'done';
+    if (next === 'done') haptic.success(); else haptic.tap();
     await update(id, { status: next });
     if (next === 'done') {
       notificationsService.cancelTaskReminder(id).catch(() => {});
