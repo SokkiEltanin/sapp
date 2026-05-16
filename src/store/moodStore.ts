@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodEntry } from '@/types';
 
 interface MoodState {
@@ -14,37 +16,54 @@ interface MoodState {
   setLoading: (loading: boolean) => void;
 }
 
-export const useMoodStore = create<MoodState>((set) => ({
-  entries: [],
-  todayEntry: null,
-  isLoading: false,
+function todayStr() { return new Date().toISOString().split('T')[0]; }
 
-  setEntries: (entries) => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayEntry = entries.find((e) => e.date === today) ?? null;
-    set({ entries, todayEntry });
-  },
-  addEntry: (entry) =>
-    set((state) => {
-      const today = new Date().toISOString().split('T')[0];
-      return {
-        entries: [entry, ...state.entries],
-        todayEntry: entry.date === today ? entry : state.todayEntry,
-      };
+export const useMoodStore = create<MoodState>()(
+  persist(
+    (set) => ({
+      entries: [],
+      todayEntry: null,
+      isLoading: false,
+
+      setEntries: (entries) => {
+        const today = todayStr();
+        const todayEntry = entries.filter(e => e.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+        set({ entries, todayEntry });
+      },
+      addEntry: (entry) =>
+        set((state) => {
+          const today = todayStr();
+          return {
+            entries: [entry, ...state.entries],
+            todayEntry: entry.date === today ? entry : state.todayEntry,
+          };
+        }),
+      updateEntry: (id, updates) =>
+        set((state) => {
+          const entries = state.entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
+          const today = todayStr();
+          const todayEntry = entries.filter(e => e.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+          return { entries, todayEntry };
+        }),
+      deleteEntry: (id) =>
+        set((state) => {
+          const entries = state.entries.filter((e) => e.id !== id);
+          const today = todayStr();
+          return { entries, todayEntry: entries.filter(e => e.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null };
+        }),
+      setTodayEntry: (todayEntry) => set({ todayEntry }),
+      setLoading: (isLoading) => set({ isLoading }),
     }),
-  updateEntry: (id, updates) =>
-    set((state) => {
-      const entries = state.entries.map((e) => (e.id === id ? { ...e, ...updates } : e));
-      const today = new Date().toISOString().split('T')[0];
-      const todayEntry = entries.find((e) => e.date === today) ?? null;
-      return { entries, todayEntry };
-    }),
-  deleteEntry: (id) =>
-    set((state) => {
-      const entries = state.entries.filter((e) => e.id !== id);
-      const today = new Date().toISOString().split('T')[0];
-      return { entries, todayEntry: entries.find((e) => e.date === today) ?? null };
-    }),
-  setTodayEntry: (todayEntry) => set({ todayEntry }),
-  setLoading: (isLoading) => set({ isLoading }),
-}));
+    {
+      name: 'mood-store-v1',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ entries: state.entries }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const today = todayStr();
+          state.todayEntry = state.entries.filter(e => e.date === today).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+        }
+      },
+    },
+  ),
+);

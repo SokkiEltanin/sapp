@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarEvent, Task } from '@/types';
 
 interface CalendarState {
@@ -21,30 +23,39 @@ interface CalendarState {
   setLoading: (loading: boolean) => void;
 }
 
-export const useCalendarStore = create<CalendarState>((set) => ({
-  events: [],
-  tasks: [],
-  selectedDate: new Date().toISOString().split('T')[0],
-  isLoading: false,
+export const useCalendarStore = create<CalendarState>()(
+  persist(
+    (set) => ({
+      events: [],
+      tasks: [],
+      selectedDate: new Date().toISOString().split('T')[0],
+      isLoading: false,
 
-  setEvents: (events) => set({ events }),
-  addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
-  updateEvent: (id, updates) =>
-    set((state) => ({
-      events: state.events.map((e) => (e.id === id ? { ...e, ...updates } : e)),
-    })),
-  deleteEvent: (id) =>
-    set((state) => ({ events: state.events.filter((e) => e.id !== id) })),
+      setEvents: (events) => set({ events }),
+      addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
+      updateEvent: (id, updates) =>
+        set((state) => ({
+          events: state.events.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+        })),
+      deleteEvent: (id) =>
+        set((state) => ({ events: state.events.filter((e) => e.id !== id) })),
 
-  setTasks: (tasks) => set({ tasks }),
-  addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
-  updateTask: (id, updates) =>
-    set((state) => ({
-      tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-    })),
-  deleteTask: (id) =>
-    set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
+      setTasks: (tasks) => set({ tasks }),
+      addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),
+      updateTask: (id, updates) =>
+        set((state) => ({
+          tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+        })),
+      deleteTask: (id) =>
+        set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) })),
 
-  setSelectedDate: (selectedDate) => set({ selectedDate }),
-  setLoading: (isLoading) => set({ isLoading }),
-}));
+      setSelectedDate: (selectedDate) => set({ selectedDate }),
+      setLoading: (isLoading) => set({ isLoading }),
+    }),
+    {
+      name: 'calendar-store-v1',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ events: state.events, tasks: state.tasks }),
+    },
+  ),
+);
