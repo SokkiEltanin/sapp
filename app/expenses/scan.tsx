@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -13,7 +13,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import {
   loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory,
-  loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory,
+  loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -55,7 +55,10 @@ export default function ScanReceiptModal() {
   const [customTagPickerFor, setCustomTagPickerFor] = useState<number | null>(null);
   const [pastedText, setPastedText] = useState('');
   const [dateInput, setDateInput]   = useState(todayIso);
+  const [tagFreq, setTagFreq]       = useState<Record<string, number>>({});
   const addExpense = useExpensesStore(s => s.addExpense);
+
+  useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
 
   const getCategory = (i: number): ExpenseCategory =>
     editedCats[i] ?? (receipt?.products[i].category ?? 'other');
@@ -420,6 +423,7 @@ export default function ScanReceiptModal() {
                         onTagsChange={tags => setEditedTags(prev => ({ ...prev, [i]: tags }))}
                         tagPickerOpen={tagPickerFor === i}
                         onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
+                        tagFreq={tagFreq}
                       />
                     ))}
                   </View>
@@ -444,6 +448,7 @@ export default function ScanReceiptModal() {
                   onTagsChange={tags => setEditedTags(prev => ({ ...prev, [i]: tags }))}
                   tagPickerOpen={tagPickerFor === i}
                   onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
+                  tagFreq={tagFreq}
                 />
               ))
             )}
@@ -471,6 +476,7 @@ export default function ScanReceiptModal() {
                 tagPickerOpen={customTagPickerFor === idx}
                 onTagPickerPress={() => { setCustomTagPickerFor(customTagPickerFor === idx ? null : idx); setCustomCatPickerFor(null); setCatPickerFor(null); setTagPickerFor(null); }}
                 onTagsChange={tags => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, tags } : p))}
+                tagFreq={tagFreq}
               />
             ))}
 
@@ -533,10 +539,15 @@ function CategoryPicker({ current, onSelect }: {
 
 // ─── TagPicker ────────────────────────────────────────────────────────────────
 
-function TagPicker({ activeTags, onToggle }: {
+function TagPicker({ activeTags, onToggle, freq = {} }: {
   activeTags: string[];
   onToggle: (tag: string) => void;
+  freq?: Record<string, number>;
 }) {
+  const sorted = useMemo(
+    () => [...ITEM_TAGS].sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0)),
+    [freq],
+  );
   return (
     <ScrollView
       horizontal
@@ -544,7 +555,7 @@ function TagPicker({ activeTags, onToggle }: {
       style={styles.pickerScroll}
       contentContainerStyle={styles.pickerRow}
     >
-      {ITEM_TAGS.map(tag => {
+      {sorted.map(tag => {
         const active = activeTags.includes(tag);
         return (
           <PressableScale key={tag} onPress={() => onToggle(tag)}>
@@ -566,7 +577,7 @@ function ProductRow({
   product, category, selected, onToggle,
   catPickerOpen, onCategoryPress, onCategoryChange,
   priceValue, onPriceChange, productName, onNameChange,
-  productTags, onTagsChange, tagPickerOpen, onTagPickerPress,
+  productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
 }: {
   product: ReceiptProduct;
   category: ExpenseCategory;
@@ -583,6 +594,7 @@ function ProductRow({
   onTagsChange: (tags: string[]) => void;
   tagPickerOpen: boolean;
   onTagPickerPress: () => void;
+  tagFreq?: Record<string, number>;
 }) {
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
@@ -674,6 +686,7 @@ function ProductRow({
       {tagPickerOpen && (
         <TagPicker
           activeTags={productTags}
+          freq={tagFreq}
           onToggle={tag => {
             const next = productTags.includes(tag)
               ? productTags.filter(t => t !== tag)
@@ -690,7 +703,7 @@ function ProductRow({
 
 function CustomProductRow({
   product, onRemove, onNameChange, onPriceChange, onQuantityChange, onCategoryChange,
-  catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange,
+  catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange, tagFreq,
 }: {
   product: { name: string; price: string; quantity: string; category: ExpenseCategory; tags: string[] };
   onRemove: () => void;
@@ -703,6 +716,7 @@ function CustomProductRow({
   tagPickerOpen: boolean;
   onTagPickerPress: () => void;
   onTagsChange: (tags: string[]) => void;
+  tagFreq?: Record<string, number>;
 }) {
   const meta     = getCategoryMeta(product.category);
   const IconComp = (LucideIcons as any)[meta.icon];
@@ -789,6 +803,7 @@ function CustomProductRow({
       {tagPickerOpen && (
         <TagPicker
           activeTags={product.tags}
+          freq={tagFreq}
           onToggle={tag => {
             const next = product.tags.includes(tag)
               ? product.tags.filter(t => t !== tag)

@@ -118,6 +118,19 @@ export async function saveCustomTagsToMemory(
 
 // ─── Custom products memory ───────────────────────────────────────────────────
 
+// ─── Tag frequency ────────────────────────────────────────────────────────────
+
+export async function getTagFrequency(): Promise<Record<string, number>> {
+  const memory = await loadTagMemory();
+  const freq: Record<string, number> = {};
+  for (const tags of Object.values(memory)) {
+    for (const tag of tags) {
+      freq[tag] = (freq[tag] ?? 0) + 1;
+    }
+  }
+  return freq;
+}
+
 export async function saveCustomProductsToMemory(
   products: { name: string; category: ExpenseCategory }[],
 ): Promise<void> {

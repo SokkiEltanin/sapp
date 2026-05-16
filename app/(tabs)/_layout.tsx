@@ -10,6 +10,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="tasks" />
       <Tabs.Screen name="finances" />
+      <Tabs.Screen name="stats" />
       <Tabs.Screen name="calendar" options={{ href: null }} />
       <Tabs.Screen name="mood"    options={{ href: null }} />
       <Tabs.Screen name="health"  options={{ href: null }} />

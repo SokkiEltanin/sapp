@@ -2,9 +2,9 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, BarChart2, Settings2, Lightbulb, AlertTriangle } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, BarChart2, Settings2, ShoppingCart, AlertTriangle, UtensilsCrossed } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
-import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -16,6 +16,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const MONTHS_BACK = 6;
+const FOOD_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje'];
 
 function isExpense(e: Expense) { return !e.type || e.type === 'expense'; }
 function isIncome(e: Expense)  { return e.type === 'income'; }
@@ -41,6 +42,7 @@ export default function StatsScreen() {
   const [budgets, setBudgets]           = useState<MonthlyBudgets>({});
   const [monthOffset, setMonthOffset]   = useState(0); // 0 = current, 1 = previous, ...
   const [expandedCat, setExpandedCat]   = useState<ExpenseCategory | null>(null);
+  const [dailyFilter, setDailyFilter]   = useState<'all' | 'food'>('all');
 
   useEffect(() => { getBudgets().then(setBudgets); }, []);
   useEffect(() => {
@@ -78,11 +80,13 @@ export default function StatsScreen() {
     return Array.from({ length: daysInMonth }, (_, i) => {
       const date = new Date(monthBase.getFullYear(), monthBase.getMonth(), i + 1);
       const dateStr = format(date, 'yyyy-MM-dd');
-      const total = expenses.filter(e => isExpense(e) && e.date.startsWith(dateStr)).reduce((s, e) => s + e.amount, 0);
+      const total = expenses
+        .filter(e => isExpense(e) && e.date.startsWith(dateStr) && (dailyFilter === 'all' || e.category === 'groceries'))
+        .reduce((s, e) => s + e.amount, 0);
       const isToday = isCurrentMonth && i + 1 === today.getDate();
       return { date: dateStr, total, isToday, day: i + 1 };
     });
-  }, [expenses, monthBase]);
+  }, [expenses, monthBase, dailyFilter]);
   const maxDaily = Math.max(...dailyData.map(d => d.total), 1);
 
   // ── Category breakdown for selected month (with vs prev month)
@@ -115,18 +119,24 @@ export default function StatsScreen() {
       .slice(0, 20);
   }, [expenses, expandedCat, thisMonth]);
 
-  // ── Flat product list for expanded category (receipt items)
+  // ── Flat product list for expanded category (receipt items) sorted by unit price
   const catProducts = useMemo(() => {
     if (!expandedCat) return [];
-    const items: { date: string; name: string; price: number }[] = [];
+    const items: { date: string; name: string; price: number; unitPrice: number; qty: number }[] = [];
     for (const e of catTransactions) {
       if (e.receiptItems?.length) {
         for (const it of e.receiptItems) {
-          items.push({ date: e.date.slice(5, 10).replace('-', '.'), name: it.name, price: it.price });
+          items.push({
+            date: e.date.slice(5, 10).replace('-', '.'),
+            name: it.name,
+            price: it.price,
+            unitPrice: it.unitPrice > 0 ? it.unitPrice : it.price,
+            qty: it.quantity > 0 ? it.quantity : 1,
+          });
         }
       }
     }
-    return items;
+    return items.sort((a, b) => b.unitPrice - a.unitPrice);
   }, [catTransactions, expandedCat]);
 
   // ── Tag breakdown
@@ -157,38 +167,33 @@ export default function StatsScreen() {
     catBreakdown.filter(c => c.prevAmount > 0 && c.amount > c.prevAmount * 1.5),
   [catBreakdown]);
 
-  const insights = useMemo(() => {
-    const msgs: { text: string; good?: boolean; bad?: boolean }[] = [];
-    const prevIdx = MONTHS_BACK - 1 - monthOffset - 1;
-    const prevData = monthlyData[prevIdx];
-    const currData = thisMonthData;
+  // ── Food (groceries) stats: this month vs prev month + tag subcategories
+  const foodStats = useMemo(() => {
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd   = endOfWeek(today, { weekStartsOn: 1 });
+    const thisGroc  = expenses.filter(e => isExpense(e) && thisMonth(e) && e.category === 'groceries');
+    const prevGroc  = expenses.filter(e => isExpense(e) && prevMonth(e) && e.category === 'groceries');
+    const weekGroc  = expenses.filter(e => isExpense(e) && e.category === 'groceries' && isWithinInterval(parseISO(e.date), { start: weekStart, end: weekEnd }));
 
-    if (prevData?.expenses > 0 && currData.expenses > 0) {
-      const diff = currData.expenses - prevData.expenses;
-      const pct = Math.abs(diff / prevData.expenses * 100).toFixed(0);
-      if (diff > 0) msgs.push({ text: `Wydałeś o ${pct}% więcej niż poprzednio.`, bad: true });
-      else if (diff < 0) msgs.push({ text: `Wydałeś o ${pct}% mniej niż poprzednio.`, good: true });
+    const thisTotal = thisGroc.reduce((s, e) => s + e.amount, 0);
+    const prevTotal = prevGroc.reduce((s, e) => s + e.amount, 0);
+    const weekTotal = weekGroc.reduce((s, e) => s + e.amount, 0);
+
+    const byTag: Record<string, { curr: number; prev: number }> = {};
+    for (const tag of FOOD_TAGS) byTag[tag] = { curr: 0, prev: 0 };
+
+    for (const e of thisGroc) {
+      for (const it of (e.receiptItems ?? [])) {
+        for (const tag of it.tags) { if (byTag[tag]) byTag[tag].curr += it.price; }
+      }
     }
-    if (catBreakdown.length > 0) {
-      const top = catBreakdown[0];
-      msgs.push({ text: `Dominuje ${top.meta.label} — ${Math.round(top.pct * 100)}% wydatków.` });
+    for (const e of prevGroc) {
+      for (const it of (e.receiptItems ?? [])) {
+        for (const tag of it.tags) { if (byTag[tag]) byTag[tag].prev += it.price; }
+      }
     }
-    const day = isCurrentMonth ? today.getDate() : new Date(end).getDate();
-    if (day > 0 && thisMonthExp > 0) {
-      msgs.push({ text: `Średnio ${(thisMonthExp / day).toFixed(0)} zł dziennie.` });
-    }
-    const overBudget = catBreakdown.filter(c => { const b = budgets[c.cat]; return b != null && c.amount > b; });
-    overBudget.forEach(c => {
-      const b = budgets[c.cat]!;
-      msgs.push({ text: `${c.meta.label} przekracza budżet o ${(c.amount - b).toFixed(0)} zł.`, bad: true });
-    });
-    if (balance > 0 && thisMonthInc > 0) {
-      msgs.push({ text: `Zaoszczędziłeś ${balance.toFixed(0)} zł.`, good: true });
-    } else if (balance < -50 && thisMonthInc > 0) {
-      msgs.push({ text: `Wydatki przekraczają przychody o ${Math.abs(balance).toFixed(0)} zł.`, bad: true });
-    }
-    return msgs;
-  }, [monthlyData, catBreakdown, budgets, thisMonthExp, thisMonthInc, balance, isCurrentMonth]);
+    return { thisTotal, prevTotal, weekTotal, byTag };
+  }, [expenses, thisMonth, prevMonth, today]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -321,6 +326,20 @@ export default function StatsScreen() {
             <Text style={styles.cardLabel}>
               {format(monthBase, 'LLLL', { locale: pl })} — dziennie
             </Text>
+            <View style={styles.filterRow}>
+              <TouchableOpacity
+                style={[styles.filterBtn, dailyFilter === 'all' && styles.filterBtnActive]}
+                onPress={() => setDailyFilter('all')}
+              >
+                <Text style={[styles.filterBtnText, dailyFilter === 'all' && styles.filterBtnTextActive]}>Wszystko</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.filterBtn, dailyFilter === 'food' && styles.filterBtnActive]}
+                onPress={() => setDailyFilter('food')}
+              >
+                <Text style={[styles.filterBtnText, dailyFilter === 'food' && styles.filterBtnTextActive]}>Jedzenie</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.dailyChart}>
             {dailyData.map((d, i) => {
@@ -356,21 +375,69 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Insights */}
-        {insights.length > 0 && (
+        {/* Food spending comparison */}
+        {(foodStats.thisTotal > 0 || foodStats.prevTotal > 0) && (
           <View style={styles.card}>
             <View style={styles.cardRow}>
-              <Lightbulb size={13} color={colors.accent.amber} />
-              <Text style={[styles.cardLabel, { color: colors.accent.amber }]}>Spostrzeżenia</Text>
+              <ShoppingCart size={13} color={colors.accent.green} />
+              <Text style={[styles.cardLabel, { color: colors.accent.green }]}>Jedzenie</Text>
+              {foodStats.weekTotal > 0 && (
+                <Text style={styles.foodWeekLabel}>ten tyg.: {foodStats.weekTotal.toFixed(0)} zł</Text>
+              )}
             </View>
-            {insights.map((ins, i) => (
-              <View key={i} style={styles.insightRow}>
-                <View style={[styles.insightDot, { backgroundColor: ins.good ? colors.accent.green : ins.bad ? colors.accent.red : colors.text.muted }]} />
-                <Text style={[styles.insightText, ins.good && { color: colors.accent.green }, ins.bad && { color: colors.accent.red }]}>
-                  {ins.text}
-                </Text>
+
+            {/* This month vs last month */}
+            <View style={styles.foodMonthRow}>
+              <View style={styles.foodMonthStat}>
+                <Text style={styles.foodMonthVal}>{foodStats.thisTotal.toFixed(0)} <Text style={styles.foodMonthUnit}>zł</Text></Text>
+                <Text style={styles.foodMonthLabel}>ten miesiąc</Text>
               </View>
-            ))}
+              {foodStats.prevTotal > 0 && (
+                <>
+                  <View style={styles.foodSep} />
+                  <View style={styles.foodMonthStat}>
+                    <Text style={[styles.foodMonthVal, { color: colors.text.secondary }]}>{foodStats.prevTotal.toFixed(0)} <Text style={styles.foodMonthUnit}>zł</Text></Text>
+                    <Text style={styles.foodMonthLabel}>poprzedni</Text>
+                  </View>
+                  {(() => {
+                    const diff = foodStats.thisTotal - foodStats.prevTotal;
+                    const pct = Math.abs(diff / foodStats.prevTotal * 100).toFixed(0);
+                    if (Math.abs(diff) < 5) return null;
+                    const good = diff < 0;
+                    return (
+                      <View style={[styles.foodChangeBadge, { backgroundColor: (good ? colors.accent.green : colors.accent.red) + '1A' }]}>
+                        <Text style={[styles.foodChangeBadgeText, { color: good ? colors.accent.green : colors.accent.red }]}>
+                          {diff > 0 ? '+' : ''}{pct}%
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </>
+              )}
+            </View>
+
+            {/* Tag subcategory breakdown */}
+            {FOOD_TAGS.filter(t => foodStats.byTag[t].curr > 0 || foodStats.byTag[t].prev > 0).map(tag => {
+              const { curr, prev } = foodStats.byTag[tag];
+              const change = prev > 0 ? pctLabel(curr, prev) : null;
+              return (
+                <View key={tag} style={styles.foodTagRow}>
+                  <Text style={styles.foodTagName}>{tag}</Text>
+                  <View style={styles.foodTagBarTrack}>
+                    <View style={[styles.foodTagBarFill, {
+                      width: foodStats.thisTotal > 0 ? `${Math.min(1, curr / foodStats.thisTotal) * 100}%` : '0%',
+                    }]} />
+                  </View>
+                  <Text style={styles.foodTagAmt}>{curr.toFixed(0)} zł</Text>
+                  {change && (
+                    <Text style={[styles.foodTagChange, { color: change.color }]}>{change.text}</Text>
+                  )}
+                  {prev > 0 && curr === 0 && (
+                    <Text style={styles.foodTagChange}>vs {prev.toFixed(0)} zł</Text>
+                  )}
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -442,7 +509,9 @@ export default function StatsScreen() {
                           <View key={i} style={styles.txRow}>
                             <Text style={styles.txDate}>{p.date}</Text>
                             <Text style={styles.txNote} numberOfLines={1}>{p.name}</Text>
-                            <Text style={styles.txAmt}>{p.price.toFixed(2)} zł</Text>
+                            <Text style={styles.txAmt}>
+                              {p.unitPrice.toFixed(2)} zł{p.qty > 1 ? `/szt · x${p.qty}` : '/szt'}
+                            </Text>
                           </View>
                         ))
                       ) : (
@@ -593,9 +662,29 @@ const styles = StyleSheet.create({
   txNote:      { flex: 1, fontSize: 12, color: colors.text.secondary },
   txAmt:       { fontSize: 12, fontWeight: '700', color: colors.text.primary },
 
-  insightRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
-  insightDot:  { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
-  insightText: { flex: 1, fontSize: 13, color: colors.text.secondary, lineHeight: 20 },
+  // Daily filter
+  filterRow:         { flexDirection: 'row', gap: 4, marginLeft: 'auto' },
+  filterBtn:         { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default },
+  filterBtnActive:   { backgroundColor: colors.accent.green + '20', borderColor: colors.accent.green + '60' },
+  filterBtnText:     { fontSize: 10, fontWeight: '500', color: colors.text.muted },
+  filterBtnTextActive: { color: colors.accent.green, fontWeight: '700' },
+
+  // Food stats
+  foodWeekLabel:     { fontSize: 10, color: colors.text.muted },
+  foodMonthRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  foodMonthStat:     { alignItems: 'center', gap: 2 },
+  foodMonthVal:      { fontSize: 22, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
+  foodMonthUnit:     { fontSize: 12, fontWeight: '400', color: colors.text.muted },
+  foodMonthLabel:    { fontSize: 10, color: colors.text.muted },
+  foodSep:           { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.07)' },
+  foodChangeBadge:   { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full },
+  foodChangeBadgeText:{ fontSize: 13, fontWeight: '800' },
+  foodTagRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  foodTagName:       { fontSize: 11, color: colors.text.secondary, width: 68, fontWeight: '500' },
+  foodTagBarTrack:   { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
+  foodTagBarFill:    { height: 4, borderRadius: radius.full, backgroundColor: colors.accent.green },
+  foodTagAmt:        { fontSize: 11, fontWeight: '700', color: colors.text.primary, width: 46, textAlign: 'right' },
+  foodTagChange:     { fontSize: 10, width: 38, textAlign: 'right', color: colors.text.muted },
 
   tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },

@@ -21,9 +21,10 @@ type BottomTabBarProps = {
 };
 
 const TABS = [
-  { name: 'index',    label: 'Dziś',    Icon: LayoutDashboard },
-  { name: 'tasks',    label: 'Zadania', Icon: ListTodo },
-  { name: 'finances', label: 'Finanse', Icon: Wallet },
+  { name: 'index',    label: 'Dziś',       Icon: LayoutDashboard },
+  { name: 'tasks',    label: 'Zadania',    Icon: ListTodo },
+  { name: 'finances', label: 'Finanse',    Icon: Wallet },
+  { name: 'stats',    label: 'Statystyki', Icon: BarChart2 },
 ];
 
 const QUICK_ACTIONS = [

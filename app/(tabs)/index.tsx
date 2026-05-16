@@ -6,8 +6,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  CheckCircle2, Circle, ChevronRight,
-  TrendingUp, TrendingDown, Timer,
+  CheckCircle2, ChevronRight,
+  TrendingUp, TrendingDown,
   Flame, Smile, Zap, CalendarDays,
   Settings, Search, Droplets, Dumbbell,
   BookOpen, Moon, Heart, Sun, Bike,
@@ -23,9 +23,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { usePomodoroToday } from '@/hooks/usePomodoroToday';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
-import { usePomodoroStore } from '@/store/pomodoroStore';
-import { toast } from '@/store/toastStore';
-import { Task, MOOD_LABELS, MOOD_COLORS, Habit } from '@/types';
+import { MOOD_COLORS } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -71,69 +69,6 @@ function humorLine(mood?: number, pending = 0, done = 0): string {
   return opts[(new Date().getDate()) % opts.length];
 }
 
-// ─── Task item ────────────────────────────────────────────────────────────────
-
-function TaskItem({ task, onToggle, onPomodoro }: {
-  task: Task;
-  onToggle: (id: string) => void;
-  onPomodoro: (task: Task) => void;
-}) {
-  const done    = task.status === 'done';
-  const urgent  = task.priority === 'high' && !done;
-  const overdue = !done && (task.deadline?.split('T')[0] ?? '') < todayStr();
-  const dl      = task.deadline ? task.deadline.slice(5, 10).replace('-', '.') : null;
-
-  return (
-    <TouchableOpacity
-      style={[ti.row, done && ti.rowDone]}
-      onPress={() => router.push(`/tasks/${task.id}` as any)}
-      activeOpacity={0.75}
-    >
-      <TouchableOpacity
-        style={ti.check}
-        onPress={() => onToggle(task.id)}
-        hitSlop={8}
-        activeOpacity={0.75}
-      >
-        {done
-          ? <CheckCircle2 size={18} color={colors.accent.green} />
-          : <Circle size={18} color={urgent ? colors.accent.red : 'rgba(255,255,255,0.18)'} />}
-      </TouchableOpacity>
-      <View style={ti.info}>
-        <Text style={[ti.title, done && ti.titleDone]} numberOfLines={1}>{task.title}</Text>
-        {(dl || (task.tags?.length ?? 0) > 0) && (
-          <View style={ti.meta}>
-            {dl && <Text style={[ti.dl, overdue && { color: colors.accent.red }]}>{overdue ? 'po terminie' : dl}</Text>}
-            {task.tags?.slice(0, 2).map(t => <Text key={t} style={ti.tag}>#{t}</Text>)}
-          </View>
-        )}
-      </View>
-      {urgent && <Flame size={13} color={colors.accent.red} />}
-      {!done && (task.estimatedPomodoros ?? 0) > 0 && (
-        <TouchableOpacity onPress={() => onPomodoro(task)} style={ti.pomBtn} hitSlop={8}>
-          <Timer size={14} color={colors.accent.purple} />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-const ti = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
-  },
-  rowDone: { opacity: 0.35 },
-  check: { width: 18, height: 18 },
-  info: { flex: 1 },
-  title: { fontSize: 14, fontWeight: '500', color: colors.text.primary, lineHeight: 19 },
-  titleDone: { textDecorationLine: 'line-through', color: colors.text.secondary },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
-  dl: { fontSize: 11, color: colors.text.secondary },
-  tag: { fontSize: 10, color: colors.text.muted },
-  pomBtn: { padding: 4 },
-});
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -142,14 +77,12 @@ export default function DashboardScreen() {
   const { color: accentColor, greeting } = useTimeAccent();
 
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
-  const { tasks, isLoading: tasksLoading, reload: reloadTasks, toggle } = useTasks();
+  const { tasks, isLoading: tasksLoading, reload: reloadTasks } = useTasks();
   const { habits, todayDone: habitsDone, toggle: toggleHabit } = useHabits();
   const pomodoro    = usePomodoroToday();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries } = useMoodStore();
   const { events, setEvents } = useCalendarStore();
-  const startPomodoro = usePomodoroStore(s => s.startFor);
-
   useEffect(() => {
     if (events.length === 0) {
       import('@/services/calendarService').then(({ calendarService }) => {
@@ -173,18 +106,6 @@ export default function DashboardScreen() {
   const todayEvents = useMemo(() =>
     events.filter(e => e.date === today), [events, today]);
 
-  const { todayPreviewTasks, upcomingPreviewTasks } = useMemo(() => {
-    const byPriority = (a: Task, b: Task) => {
-      const po: Record<string, number> = { high: 0, normal: 1, low: 2 };
-      return (po[a.priority] ?? 1) - (po[b.priority] ?? 1) || (a.deadline ?? 'z').localeCompare(b.deadline ?? 'z');
-    };
-    const todayOnes = pendingTasks.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today).sort(byPriority);
-    const upcoming  = pendingTasks.filter(t => !t.deadline?.startsWith(today) && t.scheduledDate !== today).sort(byPriority);
-    return {
-      todayPreviewTasks:    todayOnes.slice(0, 4),
-      upcomingPreviewTasks: upcoming.slice(0, Math.max(0, 5 - Math.min(todayOnes.length, 4))),
-    };
-  }, [pendingTasks, today]);
 
   const todayDoneCount = useMemo(() =>
     tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(today)).length,
@@ -199,17 +120,6 @@ export default function DashboardScreen() {
     }
     return unique.reverse();
   }, [moodEntries]);
-
-  const handleToggle = (id: string) => {
-    const t = tasks.find(x => x.id === id);
-    toggle(id);
-    if (t?.status !== 'done') toast.success('Zadanie ukończone');
-  };
-
-  const handlePomodoro = (task: Task) => {
-    startPomodoro(task.id, task.title);
-    router.push('/pomodoro' as any);
-  };
 
   const habitsTotal     = habits.length;
   const habitsDoneCount = habits.filter(h => habitsDone.includes(h.id)).length;
@@ -264,83 +174,44 @@ export default function DashboardScreen() {
           </View>
 
           {/* ── Tasks hero ──────────────────────────────────────────────── */}
-          <View style={s.card}>
-            {/* Header */}
-            <View style={s.taskHeader}>
-              <View style={s.taskCountRow}>
-                <Text style={s.taskBig}>{pendingTasks.length}</Text>
-                <View>
-                  <Text style={s.taskLabel}>{plTasks(pendingTasks.length)}</Text>
-                  {todayTasks.length > 0 && (
-                    <Text style={[s.taskSub, { color: accentColor }]}>{todayTasks.length} na dziś</Text>
-                  )}
+          <PressableScale onPress={() => router.push('/(tabs)/tasks' as any)}>
+            <View style={s.card}>
+              <View style={s.taskHeader}>
+                <View style={s.taskCountRow}>
+                  <Text style={s.taskBig}>{pendingTasks.length}</Text>
+                  <View>
+                    <Text style={s.taskLabel}>{plTasks(pendingTasks.length)}</Text>
+                    {todayTasks.length > 0 && (
+                      <Text style={[s.taskSub, { color: accentColor }]}>{todayTasks.length} na dziś</Text>
+                    )}
+                  </View>
                 </View>
+                <View style={{ flex: 1 }} />
+                {todayDoneCount > 0 && (
+                  <View style={s.doneBadge}>
+                    <CheckCircle2 size={10} color={colors.accent.green} />
+                    <Text style={s.doneBadgeText}>{todayDoneCount} dziś</Text>
+                  </View>
+                )}
+                <ChevronRight size={16} color={colors.text.muted} />
               </View>
-              <View style={{ flex: 1 }} />
-              {todayDoneCount > 0 && (
-                <View style={s.doneBadge}>
-                  <CheckCircle2 size={10} color={colors.accent.green} />
-                  <Text style={s.doneBadgeText}>{todayDoneCount} dziś</Text>
+
+              {/* Progress bar */}
+              {todayTotal > 0 && (
+                <View style={s.progressRow}>
+                  <View style={s.progressTrack}>
+                    <View style={[s.progressFill, { width: `${todayProgress * 100}%`, backgroundColor: accentColor }]} />
+                  </View>
+                  <Text style={s.progressLabel}>{todayDoneCount}/{todayTotal} dziś</Text>
                 </View>
               )}
-              <PressableScale onPress={() => router.push('/(tabs)/tasks' as any)} style={s.seeAll}>
-                <Text style={s.seeAllText}>Wszystkie</Text>
-                <ChevronRight size={12} color={colors.text.muted} />
+
+              <PressableScale onPress={(e) => { e.stopPropagation?.(); router.push('/tasks/add' as any); }} style={s.addRow}>
+                <Plus size={12} color={colors.text.muted} />
+                <Text style={s.addText}>Dodaj zadanie</Text>
               </PressableScale>
             </View>
-
-            {/* Progress bar */}
-            {todayTotal > 0 && (
-              <View style={s.progressRow}>
-                <View style={s.progressTrack}>
-                  <View style={[s.progressFill, { width: `${todayProgress * 100}%`, backgroundColor: accentColor }]} />
-                </View>
-                <Text style={s.progressLabel}>{todayDoneCount}/{todayTotal}</Text>
-              </View>
-            )}
-
-            {/* Task groups */}
-            {(todayPreviewTasks.length > 0 || upcomingPreviewTasks.length > 0) ? (
-              <View>
-                {todayPreviewTasks.length > 0 && (
-                  <>
-                    <Text style={s.groupLabel}>DZIŚ</Text>
-                    {todayPreviewTasks.map(t => (
-                      <TaskItem key={t.id} task={t} onToggle={handleToggle} onPomodoro={handlePomodoro} />
-                    ))}
-                  </>
-                )}
-                {upcomingPreviewTasks.length > 0 && (
-                  <>
-                    <Text style={[s.groupLabel, todayPreviewTasks.length > 0 && { marginTop: spacing[2] }]}>
-                      NADCHODZĄCE
-                    </Text>
-                    {upcomingPreviewTasks.map(t => (
-                      <TaskItem key={t.id} task={t} onToggle={handleToggle} onPomodoro={handlePomodoro} />
-                    ))}
-                  </>
-                )}
-              </View>
-            ) : todayDoneCount > 0 ? (
-              <View style={s.emptyRow}>
-                <CheckCircle2 size={15} color={colors.accent.green} />
-                <Text style={s.emptyText}>
-                  {todayDoneCount === 1 ? 'Zadanie ukończone.' : `${todayDoneCount} zadań ukończonych dziś.`} Szacun.
-                </Text>
-              </View>
-            ) : (
-              <View style={s.emptyRow}>
-                <CheckCircle2 size={15} color={colors.text.muted} />
-                <Text style={s.emptyText}>Wszystko gotowe. Serio? Wow.</Text>
-              </View>
-            )}
-
-            {/* Add task shortcut */}
-            <PressableScale onPress={() => router.push('/tasks/add' as any)} style={s.addRow}>
-              <Plus size={12} color={colors.text.muted} />
-              <Text style={s.addText}>Dodaj zadanie</Text>
-            </PressableScale>
-          </View>
+          </PressableScale>
 
           {/* ── Stats row ───────────────────────────────────────────────── */}
           <View style={s.statsRow}>
@@ -381,7 +252,7 @@ export default function DashboardScreen() {
           {(() => {
             const mc = todayEntry ? MOOD_COLORS[todayEntry.mood] : colors.accent.pink;
             return (
-              <PressableScale onPress={openCheckIn}>
+              <PressableScale onPress={() => router.push('/(tabs)/stats' as any)}>
                 <View style={[s.moodIsland, { borderColor: mc + '44', backgroundColor: mc + '0A' }]}>
                   <View style={[s.moodPill, { backgroundColor: mc + '1A' }]}>
                     <Smile size={12} color={mc} />
@@ -399,9 +270,13 @@ export default function DashboardScreen() {
                       {(last7Mood.reduce((a, b) => a + b.mood, 0) / last7Mood.length).toFixed(1)}
                     </Text>
                   )}
-                  <View style={[s.checkInBtn, { borderColor: mc + '44', backgroundColor: mc + '18' }]}>
+                  <TouchableOpacity
+                    onPress={(ev) => { ev.stopPropagation?.(); openCheckIn(); }}
+                    style={[s.checkInBtn, { borderColor: mc + '44', backgroundColor: mc + '18' }]}
+                    hitSlop={8}
+                  >
                     <Text style={[s.checkInText, { color: mc }]}>+ check-in</Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
               </PressableScale>
             );
