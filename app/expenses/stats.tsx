@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, BarChart2, Settings2, ShoppingCart, AlertTriangle, UtensilsCrossed, RefreshCw } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, BarChart2, Settings2, ShoppingCart, Lightbulb, Star, RefreshCw } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
+import Svg, { Polyline, Line as SvgLine, Circle as SvgCircle } from 'react-native-svg';
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -18,6 +19,7 @@ import { colors, spacing, radius, typography } from '@/theme';
 
 const MONTHS_BACK = 6;
 const FOOD_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje'];
+const SKIP_BILL_CATS: ExpenseCategory[] = ['housing', 'subscriptions'];
 
 function isExpense(e: Expense) { return !e.type || e.type === 'expense'; }
 function isIncome(e: Expense)  { return e.type === 'income'; }
@@ -40,10 +42,13 @@ function pctLabel(curr: number, prev: number): { text: string; color: string } |
 export default function StatsScreen() {
   const { expenses, setExpenses } = useExpensesStore();
   const today = new Date();
+  const { width: screenW } = useWindowDimensions();
+  const chartW = screenW - 64; // outer padding (16*2) + card padding (16*2)
   const [budgets, setBudgets]           = useState<MonthlyBudgets>({});
-  const [monthOffset, setMonthOffset]   = useState(0); // 0 = current, 1 = previous, ...
+  const [monthOffset, setMonthOffset]   = useState(0);
   const [expandedCat, setExpandedCat]   = useState<ExpenseCategory | null>(null);
   const [dailyFilter, setDailyFilter]   = useState<'all' | 'food'>('all');
+  const [selectedDay, setSelectedDay]   = useState<string | null>(null);
 
   useEffect(() => { getBudgets().then(setBudgets); }, []);
   useEffect(() => {
@@ -140,11 +145,12 @@ export default function StatsScreen() {
     return items.sort((a, b) => b.unitPrice - a.unitPrice);
   }, [catTransactions, expandedCat]);
 
-  // ── Tag breakdown
+  // ── Tag breakdown (skips fixed-cost categories: housing, subscriptions)
   const tagBreakdown = useMemo(() => {
     const byTag: Record<string, number> = {};
     for (const e of expenses) {
       if (!isExpense(e) || !thisMonth(e)) continue;
+      if (SKIP_BILL_CATS.includes(e.category as ExpenseCategory)) continue;
       const items = e.receiptItems;
       if (items?.length) {
         for (const it of items) for (const tag of it.tags) byTag[tag] = (byTag[tag] ?? 0) + it.price;
@@ -228,6 +234,61 @@ export default function StatsScreen() {
     return { thisTotal, prevTotal, weekTotal, dailyRate, projection, daysElapsed, daysInMonth, byTag };
   }, [expenses, thisMonth, prevMonth, today, monthBase, isCurrentMonth]);
 
+  // ── 30-day line chart data
+  const thirtyDayData = useMemo(() => {
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - 29 + i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const exp = expenses.filter(e => isExpense(e) && e.date.startsWith(ds)).reduce((s, e) => s + e.amount, 0);
+      const inc = expenses.filter(e => isIncome(e)  && e.date.startsWith(ds)).reduce((s, e) => s + e.amount, 0);
+      return { ds, exp, inc, day: d.getDate(), month: d.getMonth() };
+    });
+  }, [expenses]);
+
+  // ── Top 3 most expensive products per unit price: this week + this month
+  const topProducts = useMemo(() => {
+    const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)); weekStart.setHours(0,0,0,0);
+    const items: { date: string; name: string; unitPrice: number; inWeek: boolean }[] = [];
+    for (const e of expenses) {
+      if (!isExpense(e) || !thisMonth(e)) continue;
+      const eDate = new Date(e.date);
+      const inWeek = eDate >= weekStart;
+      for (const it of (e.receiptItems ?? [])) {
+        const up = it.unitPrice > 0 ? it.unitPrice : it.price;
+        if (up > 0) items.push({ date: e.date.slice(5,10).replace('-','.'), name: it.name, unitPrice: up, inWeek });
+      }
+    }
+    const byUP = (a: typeof items[0], b: typeof items[0]) => b.unitPrice - a.unitPrice;
+    return {
+      week:  items.filter(i => i.inWeek).sort(byUP).filter((v, i, a) => a.findIndex(x => x.name === v.name) === i).slice(0, 3),
+      month: items.sort(byUP).filter((v, i, a) => a.findIndex(x => x.name === v.name) === i).slice(0, 3),
+    };
+  }, [expenses, thisMonth, today]);
+
+  // ── Transactions for selected day (drill-down)
+  const dayDrilldown = useMemo(() => {
+    if (!selectedDay) return [];
+    return expenses
+      .filter(e => isExpense(e) && e.date.startsWith(selectedDay) && (dailyFilter === 'all' || e.category === 'groceries'))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+  }, [selectedDay, expenses, dailyFilter]);
+
+  // ── Smart insights
+  const insights = useMemo(() => {
+    const topCat = catBreakdown[0];
+    const daysElapsed = isCurrentMonth ? today.getDate() : new Date(monthBase.getFullYear(), monthBase.getMonth()+1, 0).getDate();
+    const dailyRate = daysElapsed > 0 ? thisMonthExp / daysElapsed : 0;
+    const foodPct = thisMonthExp > 0 ? Math.round((foodStats.thisTotal / thisMonthExp) * 100) : 0;
+    const budgetCats = Object.entries(budgets).filter(([, v]) => v && v > 0);
+    const overBudgetCount = budgetCats.filter(([cat]) => {
+      const spent = catBreakdown.find(c => c.cat === cat)?.amount ?? 0;
+      return spent > (budgets[cat as ExpenseCategory] ?? 0);
+    }).length;
+    return { topCat, dailyRate, foodPct, overBudgetCount };
+  }, [catBreakdown, thisMonthExp, isCurrentMonth, today, monthBase, foodStats, budgets]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -279,37 +340,43 @@ export default function StatsScreen() {
           </View>
         </View>
 
-        {/* Spending spike alerts */}
-        {spendingAlerts.length > 0 && (
-          <View style={[styles.card, styles.alertCard]}>
-            <View style={styles.cardRow}>
-              <AlertTriangle size={13} color={colors.accent.amber} />
-              <Text style={[styles.cardLabel, { color: colors.accent.amber }]}>Wzrost wydatków</Text>
-            </View>
-            {spendingAlerts.map(({ cat, amount, prevAmount, meta, change }) => {
-              const Icon = (LucideIcons as any)[meta.icon];
-              return (
-                <View key={cat} style={styles.alertRow}>
-                  <View style={[styles.alertIcon, { backgroundColor: colors.accent.amber + '18' }]}>
-                    {Icon && <Icon size={12} color={colors.accent.amber} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.alertText}>
-                      <Text style={{ fontWeight: '700' }}>{meta.label}</Text>
-                      {' — '}{amount.toFixed(0)} zł vs {prevAmount.toFixed(0)} zł poprzednio
-                    </Text>
-                    <Text style={styles.alertHint}>
-                      {cat === 'groceries' || meta.label.toLowerCase().includes('słod') || meta.label.toLowerCase().includes('spoż')
-                        ? `Hej, uważaj na ${meta.label.toLowerCase()} — kieszeń też ma granice 🍭`
-                        : `Wydałeś ${change?.text} więcej na ${meta.label.toLowerCase()} niż w poprzednim miesiącu.`}
-                    </Text>
-                  </View>
-                  <Text style={[styles.alertPct, { color: colors.accent.amber }]}>{change?.text}</Text>
+        {/* 30-day income vs expenses line chart */}
+        {thirtyDayData.some(d => d.exp > 0 || d.inc > 0) && (() => {
+          const H = 72;
+          const maxV = Math.max(...thirtyDayData.map(d => Math.max(d.exp, d.inc)), 1);
+          const pts = (vals: number[]) => vals.map((v, i) => {
+            const x = (i / 29) * (chartW - 4);
+            const y = H - (v / maxV) * H;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          }).join(' ');
+          const first = thirtyDayData[0];
+          const last  = thirtyDayData[29];
+          const firstLabel = `${first.day}.${String(first.month+1).padStart(2,'0')}`;
+          const lastLabel  = `${last.day}.${String(last.month+1).padStart(2,'0')}`;
+          return (
+            <View style={styles.card}>
+              <View style={styles.cardRow}>
+                <TrendingUp size={13} color={colors.text.muted} />
+                <Text style={styles.cardLabel}>Ostatnie 30 dni</Text>
+              </View>
+              <Svg width={chartW - 4} height={H + 4} style={{ marginLeft: 2 }}>
+                <SvgLine x1={0} y1={H} x2={chartW - 4} y2={H} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                <Polyline points={pts(thirtyDayData.map(d => d.exp))} fill="none" stroke={colors.accent.red} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+                <Polyline points={pts(thirtyDayData.map(d => d.inc))} fill="none" stroke={colors.accent.green} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+              </Svg>
+              <View style={styles.lineChartFooter}>
+                <Text style={styles.lineChartDate}>{firstLabel}</Text>
+                <View style={styles.lineChartLegend}>
+                  <View style={[styles.lineChartDot, { backgroundColor: colors.accent.red }]} />
+                  <Text style={styles.lineChartLegendText}>wydatki</Text>
+                  <View style={[styles.lineChartDot, { backgroundColor: colors.accent.green }]} />
+                  <Text style={styles.lineChartLegendText}>przychody</Text>
                 </View>
-              );
-            })}
-          </View>
-        )}
+                <Text style={styles.lineChartDate}>{lastLabel}</Text>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Budget velocity alerts */}
         {velocityAlerts.length > 0 && (
@@ -407,26 +474,45 @@ export default function StatsScreen() {
             {dailyData.map((d, i) => {
               const barH = d.total > 0 ? Math.max(3, (d.total / maxDaily) * 64) : 2;
               const show = (i % 5 === 0) || d.isToday || i === dailyData.length - 1;
+              const isSelected = selectedDay === d.date;
               return (
-                <View key={i} style={styles.dailyCol}>
+                <TouchableOpacity key={i} style={styles.dailyCol} onPress={() => setSelectedDay(isSelected ? null : d.date)} activeOpacity={0.7}>
                   <View style={styles.dailyBarWrap}>
                     <View style={[styles.dailyBar, {
                       height: barH,
-                      backgroundColor: d.isToday
+                      backgroundColor: isSelected
+                        ? colors.accent.blue
+                        : d.isToday
                         ? colors.accent.red
                         : d.total > 0 ? colors.accent.red + '70' : 'rgba(255,255,255,0.05)',
-                      width: d.isToday ? 5 : 3,
+                      width: isSelected || d.isToday ? 5 : 3,
                     }]} />
                   </View>
                   {show && (
-                    <Text style={[styles.dailyLabel, d.isToday && { color: colors.accent.red }]}>
+                    <Text style={[styles.dailyLabel, d.isToday && { color: colors.accent.red }, isSelected && { color: colors.accent.blue }]}>
                       {d.isToday ? 'dziś' : String(d.day)}
                     </Text>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
+
+          {/* Drill-down: transactions for selected day */}
+          {selectedDay && (
+            <View style={styles.drillDown}>
+              <Text style={styles.drillDownLabel}>
+                {selectedDay.slice(8,10)}.{selectedDay.slice(5,7)} — {dayDrilldown.length > 0 ? `${dayDrilldown.reduce((s,e)=>s+e.amount,0).toFixed(2)} zł` : 'brak wydatków'}
+              </Text>
+              {dayDrilldown.map(e => (
+                <View key={e.id} style={styles.drillRow}>
+                  <Text style={styles.drillNote} numberOfLines={1}>{e.storeName || e.note || '—'}</Text>
+                  <Text style={styles.drillAmt}>{e.amount.toFixed(2)} zł</Text>
+                </View>
+              ))}
+              {dayDrilldown.length === 0 && <Text style={styles.drillEmpty}>Brak transakcji tego dnia</Text>}
+            </View>
+          )}
           <View style={styles.dailyLegendRow}>
             <Text style={styles.dailyLegend}>Maks.: {maxDaily.toFixed(0)} zł</Text>
             <Text style={styles.dailyLegend}>
@@ -551,6 +637,96 @@ export default function StatsScreen() {
             <Text style={styles.fixedHint}>
               Wykryto na podstawie historii transakcji.
               Zielony = wysoka pewność, żółty = średnia, szary = niska.
+            </Text>
+          </View>
+        )}
+
+        {/* Top 3 most expensive products per unit price */}
+        {(topProducts.week.length > 0 || topProducts.month.length > 0) && (
+          <View style={styles.card}>
+            <View style={styles.cardRow}>
+              <Star size={13} color={colors.accent.amber} />
+              <Text style={[styles.cardLabel, { color: colors.accent.amber }]}>Najdroższe produkty</Text>
+              <Text style={styles.cardMeta}>per sztuka</Text>
+            </View>
+            {topProducts.week.length > 0 && (
+              <>
+                <Text style={styles.topProdSection}>Ten tydzień</Text>
+                {topProducts.week.map((p, i) => (
+                  <View key={i} style={styles.topProdRow}>
+                    <Text style={styles.topProdRank}>{i + 1}</Text>
+                    <Text style={styles.topProdName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={styles.topProdDate}>{p.date}</Text>
+                    <Text style={styles.topProdPrice}>{p.unitPrice.toFixed(2)} zł</Text>
+                  </View>
+                ))}
+              </>
+            )}
+            {topProducts.month.length > 0 && (
+              <>
+                <Text style={[styles.topProdSection, { marginTop: spacing[2] }]}>Ten miesiąc</Text>
+                {topProducts.month.map((p, i) => (
+                  <View key={i} style={styles.topProdRow}>
+                    <Text style={styles.topProdRank}>{i + 1}</Text>
+                    <Text style={styles.topProdName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={styles.topProdDate}>{p.date}</Text>
+                    <Text style={styles.topProdPrice}>{p.unitPrice.toFixed(2)} zł</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Spostrzeżenia — smart insights */}
+        {thisMonthExp > 0 && (
+          <View style={styles.card}>
+            <View style={styles.cardRow}>
+              <Lightbulb size={13} color={colors.accent.blue} />
+              <Text style={[styles.cardLabel, { color: colors.accent.blue }]}>Spostrzeżenia</Text>
+            </View>
+            <View style={styles.insightsList}>
+              {insights.dailyRate > 0 && (
+                <View style={styles.insightItem}>
+                  <View style={[styles.insightDot, { backgroundColor: colors.accent.red }]} />
+                  <Text style={styles.insightText}>
+                    Wydajesz średnio <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{insights.dailyRate.toFixed(0)} zł/dzień</Text> w tym miesiącu
+                  </Text>
+                </View>
+              )}
+              {insights.topCat && (
+                <View style={styles.insightItem}>
+                  <View style={[styles.insightDot, { backgroundColor: insights.topCat.meta.color }]} />
+                  <Text style={styles.insightText}>
+                    Największy wydatek: <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{insights.topCat.meta.label} ({insights.topCat.amount.toFixed(0)} zł)</Text>
+                  </Text>
+                </View>
+              )}
+              {insights.foodPct > 0 && (
+                <View style={styles.insightItem}>
+                  <View style={[styles.insightDot, { backgroundColor: colors.accent.green }]} />
+                  <Text style={styles.insightText}>
+                    Jedzenie stanowi <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{insights.foodPct}%</Text> wszystkich wydatków
+                  </Text>
+                </View>
+              )}
+              {insights.overBudgetCount > 0 && (
+                <View style={styles.insightItem}>
+                  <View style={[styles.insightDot, { backgroundColor: colors.accent.red }]} />
+                  <Text style={styles.insightText}>
+                    <Text style={{ color: colors.accent.red, fontWeight: '700' }}>{insights.overBudgetCount} {insights.overBudgetCount === 1 ? 'kategoria' : 'kategorie'}</Text> przekroczyły budżet
+                  </Text>
+                </View>
+              )}
+              {insights.overBudgetCount === 0 && Object.keys(budgets).length > 0 && (
+                <View style={styles.insightItem}>
+                  <View style={[styles.insightDot, { backgroundColor: colors.accent.green }]} />
+                  <Text style={styles.insightText}>Wszystkie kategorie w granicach budżetu</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.insightNote}>
+              Saldo ({balance >= 0 ? '+' : ''}{balance.toFixed(0)} zł) to co zostało z przychodów — nie zaoszczędzone.
             </Text>
           </View>
         )}
@@ -818,6 +994,36 @@ const styles = StyleSheet.create({
   fixedOcc:     { fontSize: 10, color: colors.text.muted, width: 22, textAlign: 'right' },
   fixedAmt:     { fontSize: 13, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
   fixedHint:    { fontSize: 10, color: colors.text.muted, lineHeight: 15, marginTop: spacing[1] },
+
+  // 30-day line chart
+  lineChartFooter:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[2] },
+  lineChartDate:       { fontSize: 9, color: colors.text.muted },
+  lineChartLegend:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  lineChartDot:        { width: 8, height: 8, borderRadius: 4 },
+  lineChartLegendText: { fontSize: 10, color: colors.text.muted },
+
+  // Daily drill-down
+  drillDown:    { backgroundColor: colors.bg.elevated, borderRadius: radius.md, padding: spacing[3], gap: spacing[2], borderWidth: 1, borderColor: colors.accent.blue + '30' },
+  drillDownLabel: { fontSize: 11, fontWeight: '700', color: colors.accent.blue, marginBottom: 4 },
+  drillRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  drillNote:    { flex: 1, fontSize: 12, color: colors.text.secondary },
+  drillAmt:     { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  drillEmpty:   { fontSize: 11, color: colors.text.muted, textAlign: 'center', paddingVertical: 4 },
+
+  // Top products
+  topProdSection: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  topProdRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4 },
+  topProdRank:    { fontSize: 11, fontWeight: '800', color: colors.accent.amber, width: 14 },
+  topProdName:    { flex: 1, fontSize: 13, color: colors.text.secondary },
+  topProdDate:    { fontSize: 10, color: colors.text.muted, width: 36 },
+  topProdPrice:   { fontSize: 13, fontWeight: '800', color: colors.text.primary, width: 60, textAlign: 'right' },
+
+  // Spostrzeżenia
+  insightsList: { gap: spacing[2] },
+  insightItem:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  insightDot:   { width: 7, height: 7, borderRadius: 4, marginTop: 4, flexShrink: 0 },
+  insightText:  { flex: 1, fontSize: 13, color: colors.text.secondary, lineHeight: 19 },
+  insightNote:  { fontSize: 10, color: colors.text.muted, lineHeight: 15, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', marginTop: spacing[1] },
 
   tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },

@@ -352,6 +352,7 @@ export default function StatsScreen() {
   }, [weekOffset, moodByDay, expenses]);
 
   const maxSweets = Math.max(...weekOverview.map(w => w.sweets), 1);
+  const maxFood   = Math.max(...weekOverview.map(w => w.food), 1);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -540,43 +541,34 @@ export default function StatsScreen() {
             ))}
           </View>
 
-          {/* Legend */}
-          <View style={s.heatLegend}>
-            {([1, 2, 3, 4, 5] as const).map(lvl => (
-              <View key={lvl} style={s.heatLegendItem}>
-                <View style={[s.heatLegendDot, { backgroundColor: MOOD_COLORS[lvl] }]} />
-                <Text style={s.heatLegendText}>{lvl}</Text>
-              </View>
-            ))}
-            <View style={s.heatLegendItem}>
-              <View style={[s.heatLegendDot, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
-              <Text style={s.heatLegendText}>brak</Text>
-            </View>
-          </View>
         </View>
 
-        {/* ── Financial context ────────────────────────────────────────── */}
+        {/* ── Tydzień finansowo ────────────────────────────────────────── */}
         {(weekTotal > 0 || weekInc > 0) && (
           <View style={s.card}>
             <View style={s.cardRow}>
               <Wallet size={13} color={colors.accent.blue} />
-              <Text style={[s.cardLabel, { color: colors.accent.blue }]}>Kontekst finansowy</Text>
+              <Text style={[s.cardLabel, { color: colors.accent.blue }]}>Tydzień finansowo</Text>
             </View>
 
-            {/* Income badge */}
-            {weekInc > 0 && (
-              <View style={s.incomeRow}>
-                <TrendingUp size={12} color={colors.accent.green} />
-                <Text style={[s.incomeText, { color: colors.accent.green }]}>Wpływ: +{weekInc.toFixed(0)} zł</Text>
-              </View>
-            )}
-
-            {/* Spending summary */}
+            {/* Stats row */}
             <View style={s.finRow}>
               <View style={s.finStat}>
                 <Text style={s.finVal}>{weekTotal.toFixed(0)}</Text>
-                <Text style={s.finLabel}>wszystko zł</Text>
+                <Text style={s.finLabel}>wydatki zł</Text>
               </View>
+              {weekInc > 0 && (
+                <>
+                  <View style={s.finSep} />
+                  <View style={s.finStat}>
+                    <View style={s.finIconRow}>
+                      <TrendingUp size={10} color={colors.accent.green} />
+                      <Text style={[s.finVal, { color: colors.accent.green }]}>{weekInc.toFixed(0)}</Text>
+                    </View>
+                    <Text style={s.finLabel}>przychody zł</Text>
+                  </View>
+                </>
+              )}
               {weekFood > 0 && (
                 <>
                   <View style={s.finSep} />
@@ -586,15 +578,6 @@ export default function StatsScreen() {
                       <Text style={[s.finVal, { color: colors.accent.green }]}>{weekFood.toFixed(0)}</Text>
                     </View>
                     <Text style={s.finLabel}>jedzenie zł</Text>
-                  </View>
-                </>
-              )}
-              {weekSweets > 0 && (
-                <>
-                  <View style={s.finSep} />
-                  <View style={s.finStat}>
-                    <Text style={[s.finVal, { color: colors.accent.amber }]}>{weekSweets.toFixed(0)}</Text>
-                    <Text style={s.finLabel}>słodycze zł</Text>
                   </View>
                 </>
               )}
@@ -620,21 +603,10 @@ export default function StatsScreen() {
               </View>
             )}
 
-            {/* Mood-spend insight */}
-            {weekAvgMood !== null && weekTotal > 0 && (
-              <View style={s.insightBox}>
-                <Text style={s.insightText}>
-                  {weekSweets > 0 && weekAvgMood < 3
-                    ? `Słaby tydzień i ${weekSweets.toFixed(0)} zł na słodycze — klasyk.`
-                    : weekInc > 500 && weekAvgMood >= 3.5
-                    ? `Dobry humor i wpływ ${weekInc.toFixed(0)} zł — ma sens.`
-                    : weekSweets > weekFood * 0.3
-                    ? `Słodycze to aż ${Math.round(weekSweets / weekFood * 100)}% wydatków na jedzenie.`
-                    : weekAvgMood >= 4
-                    ? `Dobry tydzień — nastrój ${weekAvgMood.toFixed(1)}/5.`
-                    : `Śr. wydatek na jedzenie: ${weekFood.toFixed(0)} zł`}
-                </Text>
-              </View>
+            {weekSweets > 0 && weekFood > 0 && (
+              <Text style={s.finNote}>
+                Słodycze: {weekSweets.toFixed(0)} zł ({Math.round(weekSweets / weekFood * 100)}% jedzenia tego tygodnia)
+              </Text>
             )}
           </View>
         )}
@@ -660,12 +632,14 @@ export default function StatsScreen() {
         <View style={s.card}>
           <View style={s.cardRow}>
             <Text style={s.cardLabel}>Ostatnie {WEEKS_BACK} tygodni</Text>
-            <Text style={s.cardMeta}>nastrój + słodycze</Text>
+            <Text style={s.cardMeta}>nastrój · jedzenie · słodycze</Text>
           </View>
 
           {weekOverview.map((w, i) => {
-            const col = w.avgMood ? moodColor(w.avgMood) : 'rgba(255,255,255,0.08)';
-            const sweetsH = maxSweets > 0 ? (w.sweets / maxSweets) * 32 : 0;
+            const col      = w.avgMood ? moodColor(w.avgMood) : 'rgba(255,255,255,0.08)';
+            const sweetsH  = maxSweets > 0 ? (w.sweets / maxSweets) * 32 : 0;
+            const foodH    = maxFood   > 0 ? (w.food   / maxFood)   * 32 : 0;
+            const sweetsPct = w.food > 0 ? Math.round(w.sweets / w.food * 100) : 0;
             return (
               <TouchableOpacity
                 key={i}
@@ -676,22 +650,19 @@ export default function StatsScreen() {
                 <Text style={[s.overviewLabel, w.isCurrent && { color: colors.text.primary, fontWeight: '600' }]}>
                   {w.label}
                 </Text>
-                {/* Mood dot */}
                 <View style={[s.overviewDot, { backgroundColor: col }]}>
-                  {w.avgMood && (
-                    <Text style={s.overviewDotVal}>{w.avgMood.toFixed(1)}</Text>
-                  )}
+                  {w.avgMood && <Text style={s.overviewDotVal}>{w.avgMood.toFixed(1)}</Text>}
                 </View>
-                {/* Sweets bar */}
-                <View style={s.overviewSweetsWrap}>
-                  <View style={[s.overviewSweetsBar, { height: Math.max(sweetsH, 2), backgroundColor: colors.accent.amber + (w.sweets > 0 ? 'CC' : '20') }]} />
+                {/* Food bar (green) */}
+                <View style={s.overviewBarsWrap}>
+                  <View style={[s.overviewBar, { height: Math.max(foodH, 2), backgroundColor: colors.accent.green + (w.food > 0 ? 'AA' : '20') }]} />
+                  <View style={[s.overviewBar, { height: Math.max(sweetsH, 2), backgroundColor: colors.accent.amber + (w.sweets > 0 ? 'CC' : '20') }]} />
                 </View>
-                {w.sweets > 0 && (
-                  <Text style={s.overviewSweetsAmt}>{w.sweets.toFixed(0)} zł</Text>
-                )}
-                {w.income > 0 && (
-                  <View style={s.overviewIncomeDot} />
-                )}
+                <View style={s.overviewAmtCol}>
+                  {w.food > 0 && <Text style={[s.overviewAmt, { color: colors.accent.green }]}>{w.food.toFixed(0)}</Text>}
+                  {w.sweets > 0 && <Text style={[s.overviewAmt, { color: colors.accent.amber }]}>{sweetsPct}%</Text>}
+                </View>
+                {w.income > 0 && <View style={s.overviewIncomeDot} />}
               </TouchableOpacity>
             );
           })}
@@ -702,12 +673,12 @@ export default function StatsScreen() {
               <Text style={s.legendText}>nastrój</Text>
             </View>
             <View style={s.legendItem}>
-              <View style={[s.legendDot, { backgroundColor: colors.accent.amber }]} />
-              <Text style={s.legendText}>słodycze</Text>
+              <View style={[s.legendDot, { backgroundColor: colors.accent.green }]} />
+              <Text style={s.legendText}>jedzenie zł</Text>
             </View>
             <View style={s.legendItem}>
-              <View style={[s.overviewIncomeDot]} />
-              <Text style={s.legendText}>wpływ</Text>
+              <View style={[s.legendDot, { backgroundColor: colors.accent.amber }]} />
+              <Text style={s.legendText}>słodycze %</Text>
             </View>
           </View>
         </View>
@@ -1016,6 +987,7 @@ const s = StyleSheet.create({
   bigExpAmt:   { fontSize: 12, fontWeight: '700' },
   insightBox:  { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.md, padding: spacing[3] },
   insightText: { fontSize: 12, color: colors.text.secondary, lineHeight: 18, fontStyle: 'italic' },
+  finNote:     { fontSize: 11, color: colors.text.muted, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
 
   // Events
   eventRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4 },
@@ -1032,6 +1004,10 @@ const s = StyleSheet.create({
   overviewSweetsWrap: { flex: 1, height: 36, justifyContent: 'flex-end', alignItems: 'center' },
   overviewSweetsBar:  { width: 8, borderRadius: 4 },
   overviewSweetsAmt:  { width: 38, fontSize: 9, color: colors.accent.amber, textAlign: 'right' },
+  overviewBarsWrap:   { flex: 1, height: 36, flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', gap: 3 },
+  overviewBar:        { width: 7, borderRadius: 3, minHeight: 2 },
+  overviewAmtCol:     { width: 42, alignItems: 'flex-end', gap: 1 },
+  overviewAmt:        { fontSize: 9, fontWeight: '600' },
   overviewIncomeDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent.green },
 
   overviewLegend: { flexDirection: 'row', gap: spacing[3], alignItems: 'center', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },

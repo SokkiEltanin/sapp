@@ -24,6 +24,7 @@ import { usePomodoroToday } from '@/hooks/usePomodoroToday';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { MOOD_COLORS } from '@/types';
+import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -83,12 +84,14 @@ export default function DashboardScreen() {
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries } = useMoodStore();
   const { events, setEvents } = useCalendarStore();
+  const [budgets, setBudgets] = useState<MonthlyBudgets>({});
   useEffect(() => {
     if (events.length === 0) {
       import('@/services/calendarService').then(({ calendarService }) => {
         calendarService.getAllEvents().then(setEvents).catch(() => {});
       });
     }
+    getBudgets().then(setBudgets);
   }, []);
 
   const today     = todayStr();
@@ -110,6 +113,26 @@ export default function DashboardScreen() {
   const todayDoneCount = useMemo(() =>
     tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(today)).length,
     [tasks, today]);
+
+  const budgetRemaining = useMemo(() => {
+    const totalBudget = Object.values(budgets).reduce((s, v) => s + (v ?? 0), 0);
+    if (totalBudget <= 0) return null;
+    const remaining = totalBudget - stats.monthExpenses;
+    return { remaining, totalBudget, pct: Math.min(1, stats.monthExpenses / totalBudget) };
+  }, [budgets, stats.monthExpenses]);
+
+  const nextDeadline = useMemo(() => {
+    const upcoming = pendingTasks
+      .filter(t => t.deadline)
+      .sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? ''))[0];
+    if (!upcoming?.deadline) return null;
+    const d = upcoming.deadline.split('T')[0];
+    if (d === today) return { label: 'dziś', title: upcoming.title };
+    const tomorrow = (() => { const t = new Date(); t.setDate(t.getDate()+1); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; })();
+    if (d === tomorrow) return { label: 'jutro', title: upcoming.title };
+    const [, m, dd] = d.split('-');
+    return { label: `${parseInt(dd)}.${parseInt(m)}`, title: upcoming.title };
+  }, [pendingTasks, today]);
 
   const last7Mood = useMemo(() => {
     const seen = new Set<string>();
@@ -215,28 +238,46 @@ export default function DashboardScreen() {
 
           {/* ── Stats row ───────────────────────────────────────────────── */}
           <View style={s.statsRow}>
-            <PressableScale style={s.statTile} onPress={() => router.push('/(tabs)/finances' as any)}>
-              {balPos
-                ? <TrendingUp size={12} color={colors.accent.green} />
-                : <TrendingDown size={12} color={colors.accent.red} />}
-              <Text style={[s.statVal, { color: balPos ? colors.text.primary : colors.accent.red }]}>
-                {balPos ? '+' : ''}{Math.round(balance)}
-              </Text>
-              <Text style={s.statLabel}>saldo zł</Text>
+            {/* Tile 1: Budget remaining OR month balance */}
+            <PressableScale style={s.statTile} onPress={() => router.push('/expenses/stats' as any)}>
+              {budgetRemaining
+                ? <>
+                    <TrendingDown size={12} color={budgetRemaining.remaining >= 0 ? colors.accent.green : colors.accent.red} />
+                    <Text style={[s.statVal, { color: budgetRemaining.remaining >= 0 ? colors.text.primary : colors.accent.red }]}>
+                      {Math.round(Math.abs(budgetRemaining.remaining))}
+                    </Text>
+                    <Text style={s.statLabel}>{budgetRemaining.remaining >= 0 ? 'zostało zł' : 'przekr. zł'}</Text>
+                    <View style={s.budgetBar}>
+                      <View style={[s.budgetFill, { width: `${budgetRemaining.pct * 100}%`, backgroundColor: budgetRemaining.pct >= 1 ? colors.accent.red : colors.accent.green }]} />
+                    </View>
+                  </>
+                : <>
+                    {balPos ? <TrendingUp size={12} color={colors.accent.green} /> : <TrendingDown size={12} color={colors.accent.red} />}
+                    <Text style={[s.statVal, { color: balPos ? colors.text.primary : colors.accent.red }]}>{balPos ? '+' : ''}{Math.round(balance)}</Text>
+                    <Text style={s.statLabel}>saldo zł</Text>
+                  </>
+              }
             </PressableScale>
 
+            {/* Tile 2: Next deadline */}
             <PressableScale style={s.statTile} onPress={() => router.push('/(tabs)/tasks' as any)}>
-              <CalendarDays size={12} color={todayEvents.length > 0 ? colors.accent.blue : colors.text.muted} />
-              <Text style={s.statVal}>{todayEvents.length}</Text>
-              <Text style={s.statLabel}>dziś</Text>
+              <CalendarDays size={12} color={nextDeadline ? colors.accent.purple : colors.text.muted} />
+              <Text style={[s.statVal, { fontSize: nextDeadline ? 13 : 15 }]}>
+                {nextDeadline ? nextDeadline.label : '—'}
+              </Text>
+              <Text style={s.statLabel} numberOfLines={1}>
+                {nextDeadline ? nextDeadline.title.slice(0, 10) : 'deadline'}
+              </Text>
             </PressableScale>
 
+            {/* Tile 3: Habits */}
             <PressableScale style={s.statTile} onPress={() => router.push('/habits' as any)}>
               <Flame size={12} color={habitsTotal > 0 && habitsDoneCount === habitsTotal ? colors.accent.amber : colors.text.muted} />
               <Text style={s.statVal}>{habitsTotal > 0 ? `${habitsDoneCount}/${habitsTotal}` : '—'}</Text>
               <Text style={s.statLabel}>nawyki</Text>
             </PressableScale>
 
+            {/* Tile 4: Focus */}
             <PressableScale style={s.statTile} onPress={() => router.push('/focus' as any)}>
               <BrainCircuit size={12} color={pomodoro.totalMins > 0 ? colors.accent.purple : colors.text.muted} />
               <Text style={s.statVal}>
@@ -404,7 +445,9 @@ const s = StyleSheet.create({
     paddingVertical: spacing[3], paddingHorizontal: spacing[2],
   },
   statVal:   { fontSize: 15, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
-  statLabel: { fontSize: 9, fontWeight: '500', color: colors.text.muted },
+  statLabel: { fontSize: 9, fontWeight: '500', color: colors.text.muted, textAlign: 'center' },
+  budgetBar: { width: '100%', height: 2, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 1, overflow: 'hidden', marginTop: 2 },
+  budgetFill:{ height: 2, borderRadius: 1 },
 
   // Mood island
   moodIsland: {
