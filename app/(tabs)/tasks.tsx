@@ -90,8 +90,25 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 interface Section { title: string; accent: string; data: Task[] }
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
-function byPriority(a: Task, b: Task) {
-  return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
+
+function smartSort(a: Task, b: Task): number {
+  // 1. Priority
+  const pDiff = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
+  if (pDiff !== 0) return pDiff;
+  // 2. Deadline proximity (earlier = more urgent)
+  if (a.deadline && b.deadline) {
+    const dDiff = a.deadline.localeCompare(b.deadline);
+    if (dDiff !== 0) return dDiff;
+  } else if (a.deadline) {
+    return -1;
+  } else if (b.deadline) {
+    return 1;
+  }
+  // 3. More estimated work surfaces earlier (so you plan it first)
+  const pomoDiff = (b.estimatedPomodoros ?? 0) - (a.estimatedPomodoros ?? 0);
+  if (pomoDiff !== 0) return pomoDiff;
+  // 4. Difficulty tiebreak
+  return (b.difficulty ?? 0) - (a.difficulty ?? 0);
 }
 
 function buildSections(tasks: Task[]): Section[] {
@@ -107,7 +124,7 @@ function buildSections(tasks: Task[]): Section[] {
     ['Późniejsze',      colors.text.muted,    pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d > weekEnd; })],
     ['Bez terminu',     colors.text.muted,    pending.filter(t => !t.deadline)],
   ];
-  return groups.filter(([,, data]) => data.length > 0).map(([title, accent, data]) => ({ title, accent, data: [...data].sort(byPriority) }));
+  return groups.filter(([,, data]) => data.length > 0).map(([title, accent, data]) => ({ title, accent, data: [...data].sort(smartSort) }));
 }
 
 // ─── Difficulty indicator ──────────────────────────────────────────────────────
@@ -407,7 +424,7 @@ export default function TasksScreen() {
       case 'parking':
         return tasks
           .filter(t => t.status !== 'done' && t.status !== 'snoozed' && !t.deadline)
-          .sort(byPriority);
+          .sort(smartSort);
       default:
         return [];
     }

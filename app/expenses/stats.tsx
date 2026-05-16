@@ -168,6 +168,30 @@ export default function StatsScreen() {
     catBreakdown.filter(c => c.prevAmount > 0 && c.amount > c.prevAmount * 1.5),
   [catBreakdown]);
 
+  // ── Budget velocity alerts (on current month, pace exceeds budget before month end)
+  const velocityAlerts = useMemo(() => {
+    if (!isCurrentMonth) return [];
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const daysElapsed = today.getDate();
+    if (daysElapsed < 5) return [];
+    const daysRemaining = daysInMonth - daysElapsed;
+    return catBreakdown
+      .filter(({ cat, amount }) => {
+        const budget = budgets[cat];
+        if (!budget || budget <= 0 || amount <= 0 || amount >= budget) return false;
+        const dailyRate = amount / daysElapsed;
+        const projection = dailyRate * daysInMonth;
+        return projection > budget;
+      })
+      .map(({ cat, amount, meta }) => {
+        const budget = budgets[cat]!;
+        const dailyRate = amount / daysElapsed;
+        const daysLeft = Math.round((budget - amount) / dailyRate);
+        const projection = Math.round(dailyRate * daysInMonth);
+        return { cat, amount, meta, budget, daysLeft, projection, daysRemaining };
+      });
+  }, [catBreakdown, budgets, isCurrentMonth, today]);
+
   // ── Fixed / recurring cost detection (uses all-time data, not just selected month)
   const fixedCosts = useMemo(() => detectFixedCosts(expenses), [expenses]);
 
@@ -275,12 +299,41 @@ export default function StatsScreen() {
                       {' — '}{amount.toFixed(0)} zł vs {prevAmount.toFixed(0)} zł poprzednio
                     </Text>
                     <Text style={styles.alertHint}>
-                      {cat === 'food' || meta.label.toLowerCase().includes('słod') || meta.label.toLowerCase().includes('spoż')
+                      {cat === 'groceries' || meta.label.toLowerCase().includes('słod') || meta.label.toLowerCase().includes('spoż')
                         ? `Hej, uważaj na ${meta.label.toLowerCase()} — kieszeń też ma granice 🍭`
                         : `Wydałeś ${change?.text} więcej na ${meta.label.toLowerCase()} niż w poprzednim miesiącu.`}
                     </Text>
                   </View>
                   <Text style={[styles.alertPct, { color: colors.accent.amber }]}>{change?.text}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Budget velocity alerts */}
+        {velocityAlerts.length > 0 && (
+          <View style={[styles.card, styles.velocityAlertCard]}>
+            <View style={styles.cardRow}>
+              <TrendingUp size={13} color={colors.accent.red} />
+              <Text style={[styles.cardLabel, { color: colors.accent.red }]}>Uwaga — budżet</Text>
+            </View>
+            {velocityAlerts.map(({ cat, amount, meta, budget, daysLeft, projection }) => {
+              const Icon = (LucideIcons as any)[meta.icon];
+              const pct = Math.round(amount / budget * 100);
+              return (
+                <View key={cat} style={styles.velAlertRow}>
+                  <View style={[styles.alertIcon, { backgroundColor: colors.accent.red + '18' }]}>
+                    {Icon && <Icon size={12} color={colors.accent.red} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.velAlertTitle}>
+                      {meta.label} — {pct}% budżetu ({amount.toFixed(0)}/{budget.toFixed(0)} zł)
+                    </Text>
+                    <Text style={styles.velAlertSub}>
+                      W tym tempie przekroczysz limit za {daysLeft} {daysLeft === 1 ? 'dzień' : 'dni'} · prognoza: {projection} zł
+                    </Text>
+                  </View>
                 </View>
               );
             })}
@@ -670,6 +723,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
   alertCard: { borderColor: colors.accent.amber + '30', backgroundColor: colors.accent.amber + '08' },
+  velocityAlertCard: { borderColor: colors.accent.red + '30', backgroundColor: colors.accent.red + '06' },
+  velAlertRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  velAlertTitle: { fontSize: 12, color: colors.text.secondary, fontWeight: '600', lineHeight: 17 },
+  velAlertSub:   { fontSize: 11, color: colors.accent.red, lineHeight: 16, marginTop: 2 },
   cardRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   cardLabel: { ...typography.label, color: colors.text.secondary, flex: 1, fontWeight: '600' },
   cardMeta:  { ...typography.label, fontWeight: '700' },

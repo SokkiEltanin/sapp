@@ -382,7 +382,7 @@ export function getFoodTags(name: string): string[] {
     .map(([tag]) => tag);
 }
 
-function categorize(name: string): ExpenseCategory {
+export function categorize(name: string): ExpenseCategory {
   const lower = name.toLowerCase();
   // health before groceries to catch pharmacy keywords
   const order: ExpenseCategory[] = ['health', 'transport', 'entertainment', 'clothing', 'housing', 'subscriptions', 'groceries'];

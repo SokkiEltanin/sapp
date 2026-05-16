@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -15,7 +15,7 @@ import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { getBudgets } from '@/utils/budgets';
-import { getFoodTags } from '@/utils/receiptParser';
+import { getFoodTags, categorize } from '@/utils/receiptParser';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -70,10 +70,32 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
 }) {
   const [catOpen, setCatOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [suggCat, setSuggCat] = useState<ExpenseCategory | null>(null);
+  const suggTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meta = getCategoryMeta(item.category);
   const qty = parseFloat(item.quantity) || 1;
   const unitPrice = parseFloat(item.price.replace(',', '.')) || 0;
   const lineTotal = qty * unitPrice;
+
+  const handleNameChange = (name: string) => {
+    onUpdate({ name });
+    if (suggTimer.current) clearTimeout(suggTimer.current);
+    if (name.trim().length < 3) { setSuggCat(null); return; }
+    suggTimer.current = setTimeout(() => {
+      const cat = categorize(name);
+      setSuggCat(cat !== item.category ? cat : null);
+    }, 300);
+  };
+
+  const applySugg = () => {
+    if (!suggCat) return;
+    const foodTags = getFoodTags(item.name);
+    onUpdate({
+      category: suggCat,
+      tags: item.tags.length === 0 && foodTags.length > 0 ? foodTags : item.tags,
+    });
+    setSuggCat(null);
+  };
 
   const toggleTag = (tag: string) => {
     const next = item.tags.includes(tag)
@@ -92,7 +114,7 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
           </View>
           <TextInput
             value={item.name}
-            onChangeText={name => onUpdate({ name })}
+            onChangeText={handleNameChange}
             placeholder="Nazwa produktu"
             placeholderTextColor={colors.text.muted}
             style={styles.nameInput}
@@ -102,6 +124,14 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
             <Trash2 size={15} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
         </View>
+
+        {suggCat && (
+          <TouchableOpacity onPress={applySugg} style={styles.catSugg} activeOpacity={0.75}>
+            <Text style={styles.catSuggText}>
+              Może być: {getCategoryMeta(suggCat).label} — zastosuj
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Qty × price row */}
         <View style={styles.priceRow}>
@@ -521,6 +551,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   pickerLabel: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+
+  catSugg: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing[2], paddingVertical: 4,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accent.blue + '18',
+    borderWidth: 1, borderColor: colors.accent.blue + '40',
+  },
+  catSuggText: { fontSize: 10, fontWeight: '600', color: colors.accent.blue },
 
   addItemBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],

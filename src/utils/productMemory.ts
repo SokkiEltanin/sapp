@@ -11,6 +11,41 @@ function normalize(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+// ─── Fuzzy matching (trigram similarity) ──────────────────────────────────────
+
+function trigrams(s: string): Set<string> {
+  const result = new Set<string>();
+  const padded = `  ${s}  `;
+  for (let i = 0; i < padded.length - 2; i++) {
+    result.add(padded.slice(i, i + 3));
+  }
+  return result;
+}
+
+function trigramSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const ta = trigrams(a);
+  const tb = trigrams(b);
+  let intersection = 0;
+  for (const t of ta) { if (tb.has(t)) intersection++; }
+  return (2 * intersection) / (ta.size + tb.size);
+}
+
+const FUZZY_THRESHOLD = 0.60; // minimum similarity to apply memory
+
+function findFuzzyMatch<V>(key: string, memory: Record<string, V>): V | undefined {
+  const keys = Object.keys(memory);
+  if (keys.length === 0) return undefined;
+  let bestScore = FUZZY_THRESHOLD;
+  let bestVal: V | undefined;
+  for (const k of keys) {
+    const score = trigramSimilarity(key, k);
+    if (score > bestScore) { bestScore = score; bestVal = memory[k]; }
+  }
+  return bestVal;
+}
+
 export async function loadProductMemory(): Promise<ProductMemory> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
@@ -27,7 +62,8 @@ export async function applyProductMemory(
   const result: Record<number, ExpenseCategory> = {};
   for (let i = 0; i < products.length; i++) {
     const key = normalize(products[i].name);
-    if (memory[key]) result[i] = memory[key];
+    result[i] = memory[key] ?? findFuzzyMatch(key, memory) ?? (undefined as any);
+    if (result[i] == null) delete result[i];
   }
   return result;
 }
@@ -76,7 +112,8 @@ export async function applyTagMemory(
   const result: Record<number, string[]> = {};
   for (let i = 0; i < products.length; i++) {
     const key = normalize(products[i].name);
-    if (memory[key]?.length) result[i] = memory[key];
+    const val = memory[key] ?? findFuzzyMatch(key, memory);
+    if (val?.length) result[i] = val;
   }
   return result;
 }
