@@ -18,6 +18,53 @@ import { detectFixedCosts } from '@/utils/fixedCosts';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const MONTHS_BACK = 6;
+
+// ─── 30-day line chart component ──────────────────────────────────────────────
+
+function LineChart30Day({ data, width }: { data: { ds: string; exp: number; inc: number; day: number; month: number }[]; width: number }) {
+  const H = 72;
+  const w = Math.max(width - 4, 100);
+  const hasData = data.some(d => d.exp > 0 || d.inc > 0);
+  const maxV = Math.max(...data.map(d => Math.max(d.exp, d.inc)), 1);
+
+  const pts = (vals: number[]) =>
+    vals.map((v, i) => `${((i / 29) * w).toFixed(1)},${(H - (v / maxV) * H).toFixed(1)}`).join(' ');
+
+  const first = data[0];
+  const last  = data[29];
+  const fLabel = `${first.day}.${String(first.month + 1).padStart(2, '0')}`;
+  const lLabel = `${last.day}.${String(last.month + 1).padStart(2, '0')}`;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardRow}>
+        <TrendingUp size={13} color={colors.text.muted} />
+        <Text style={styles.cardLabel}>Ostatnie 30 dni</Text>
+      </View>
+      {hasData ? (
+        <Svg width={w} height={H + 4}>
+          <SvgLine x1={0} y1={H} x2={w} y2={H} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+          <Polyline points={pts(data.map(d => d.exp))} fill="none" stroke={colors.accent.red} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <Polyline points={pts(data.map(d => d.inc))} fill="none" stroke={colors.accent.green} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        </Svg>
+      ) : (
+        <View style={{ height: H, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 12, color: colors.text.muted }}>Brak danych z ostatnich 30 dni</Text>
+        </View>
+      )}
+      <View style={styles.lineChartFooter}>
+        <Text style={styles.lineChartDate}>{fLabel}</Text>
+        <View style={styles.lineChartLegend}>
+          <View style={[styles.lineChartDot, { backgroundColor: colors.accent.red }]} />
+          <Text style={styles.lineChartLegendText}>wydatki</Text>
+          <View style={[styles.lineChartDot, { backgroundColor: colors.accent.green }]} />
+          <Text style={styles.lineChartLegendText}>przychody</Text>
+        </View>
+        <Text style={styles.lineChartDate}>{lLabel}</Text>
+      </View>
+    </View>
+  );
+}
 const FOOD_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje'];
 const SKIP_BILL_CATS: ExpenseCategory[] = ['housing', 'subscriptions'];
 
@@ -341,42 +388,7 @@ export default function StatsScreen() {
         </View>
 
         {/* 30-day income vs expenses line chart */}
-        {thirtyDayData.some(d => d.exp > 0 || d.inc > 0) && (() => {
-          const H = 72;
-          const maxV = Math.max(...thirtyDayData.map(d => Math.max(d.exp, d.inc)), 1);
-          const pts = (vals: number[]) => vals.map((v, i) => {
-            const x = (i / 29) * (chartW - 4);
-            const y = H - (v / maxV) * H;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          }).join(' ');
-          const first = thirtyDayData[0];
-          const last  = thirtyDayData[29];
-          const firstLabel = `${first.day}.${String(first.month+1).padStart(2,'0')}`;
-          const lastLabel  = `${last.day}.${String(last.month+1).padStart(2,'0')}`;
-          return (
-            <View style={styles.card}>
-              <View style={styles.cardRow}>
-                <TrendingUp size={13} color={colors.text.muted} />
-                <Text style={styles.cardLabel}>Ostatnie 30 dni</Text>
-              </View>
-              <Svg width={chartW - 4} height={H + 4} style={{ marginLeft: 2 }}>
-                <SvgLine x1={0} y1={H} x2={chartW - 4} y2={H} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-                <Polyline points={pts(thirtyDayData.map(d => d.exp))} fill="none" stroke={colors.accent.red} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-                <Polyline points={pts(thirtyDayData.map(d => d.inc))} fill="none" stroke={colors.accent.green} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-              </Svg>
-              <View style={styles.lineChartFooter}>
-                <Text style={styles.lineChartDate}>{firstLabel}</Text>
-                <View style={styles.lineChartLegend}>
-                  <View style={[styles.lineChartDot, { backgroundColor: colors.accent.red }]} />
-                  <Text style={styles.lineChartLegendText}>wydatki</Text>
-                  <View style={[styles.lineChartDot, { backgroundColor: colors.accent.green }]} />
-                  <Text style={styles.lineChartLegendText}>przychody</Text>
-                </View>
-                <Text style={styles.lineChartDate}>{lastLabel}</Text>
-              </View>
-            </View>
-          );
-        })()}
+        <LineChart30Day data={thirtyDayData} width={chartW} />
 
         {/* Budget velocity alerts */}
         {velocityAlerts.length > 0 && (

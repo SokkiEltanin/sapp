@@ -354,6 +354,21 @@ export default function StatsScreen() {
   const maxSweets = Math.max(...weekOverview.map(w => w.sweets), 1);
   const maxFood   = Math.max(...weekOverview.map(w => w.food), 1);
 
+  // Mood-food correlation: split weeks into good/bad mood, compare avg food spend
+  const moodFoodCorr = useMemo(() => {
+    const withMood = weekOverview.filter(w => w.avgMood !== null);
+    if (withMood.length < 3) return null;
+    const goodMood = withMood.filter(w => w.avgMood! >= 3.5);
+    const badMood  = withMood.filter(w => w.avgMood! < 3.5);
+    const avgFood  = (arr: typeof withMood) => arr.length > 0 ? arr.reduce((s, w) => s + w.food, 0) / arr.length : 0;
+    const avgSweets = (arr: typeof withMood) => arr.length > 0 ? arr.reduce((s, w) => s + w.sweets, 0) / arr.length : 0;
+    return {
+      goodFood: avgFood(goodMood), badFood: avgFood(badMood),
+      goodSweets: avgSweets(goodMood), badSweets: avgSweets(badMood),
+      goodCount: goodMood.length, badCount: badMood.length,
+    };
+  }, [weekOverview]);
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
@@ -681,6 +696,41 @@ export default function StatsScreen() {
               <Text style={s.legendText}>słodycze %</Text>
             </View>
           </View>
+
+          {/* Mood-food correlation insight */}
+          {moodFoodCorr && (moodFoodCorr.goodCount > 0 || moodFoodCorr.badCount > 0) && (
+            <View style={s.corrBox}>
+              <Text style={s.corrTitle}>Korelacja nastrój ↔ jedzenie</Text>
+              <View style={s.corrRow}>
+                <View style={s.corrStat}>
+                  <View style={[s.corrDot, { backgroundColor: MOOD_COLORS[4] }]} />
+                  <Text style={s.corrLabel}>Dobry nastrój ({moodFoodCorr.goodCount} tydz.)</Text>
+                  <Text style={s.corrVal}>{moodFoodCorr.goodFood.toFixed(0)} zł jedzenie</Text>
+                  {moodFoodCorr.goodSweets > 0 && (
+                    <Text style={[s.corrSub, { color: colors.accent.amber }]}>{moodFoodCorr.goodSweets.toFixed(0)} zł słodycze</Text>
+                  )}
+                </View>
+                <View style={s.corrDivider} />
+                <View style={s.corrStat}>
+                  <View style={[s.corrDot, { backgroundColor: MOOD_COLORS[2] }]} />
+                  <Text style={s.corrLabel}>Słaby nastrój ({moodFoodCorr.badCount} tydz.)</Text>
+                  <Text style={s.corrVal}>{moodFoodCorr.badFood.toFixed(0)} zł jedzenie</Text>
+                  {moodFoodCorr.badSweets > 0 && (
+                    <Text style={[s.corrSub, { color: colors.accent.amber }]}>{moodFoodCorr.badSweets.toFixed(0)} zł słodycze</Text>
+                  )}
+                </View>
+              </View>
+              {moodFoodCorr.badSweets > 0 && moodFoodCorr.goodSweets > 0 && (
+                <Text style={s.corrInsight}>
+                  {moodFoodCorr.badSweets > moodFoodCorr.goodSweets * 1.2
+                    ? `Przy słabym nastroju jesz ${Math.round((moodFoodCorr.badSweets / moodFoodCorr.goodSweets - 1) * 100)}% więcej słodyczy.`
+                    : moodFoodCorr.goodSweets > moodFoodCorr.badSweets * 1.2
+                    ? `Przy dobrym nastroju wydajesz ${Math.round((moodFoodCorr.goodSweets / moodFoodCorr.badSweets - 1) * 100)}% więcej na słodycze.`
+                    : 'Nastrój nie ma dużego wpływu na słodycze w twoim przypadku.'}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
         {/* ── Reports ─────────────────────────────────────────────────── */}
@@ -1032,6 +1082,18 @@ const s = StyleSheet.create({
   heatLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   heatLegendDot:   { width: 10, height: 10, borderRadius: 3 },
   heatLegendText:  { fontSize: 10, color: colors.text.muted },
+
+  // Correlation box
+  corrBox:     { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.md, padding: spacing[3], gap: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', marginTop: spacing[1] },
+  corrTitle:   { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  corrRow:     { flexDirection: 'row', gap: spacing[3] },
+  corrStat:    { flex: 1, gap: 3 },
+  corrDot:     { width: 8, height: 8, borderRadius: 4 },
+  corrLabel:   { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
+  corrVal:     { fontSize: 14, fontWeight: '800', color: colors.text.primary },
+  corrSub:     { fontSize: 11, fontWeight: '600' },
+  corrDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.07)' },
+  corrInsight: { fontSize: 12, color: colors.text.secondary, lineHeight: 17, fontStyle: 'italic', paddingTop: spacing[1], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', marginTop: spacing[1] },
 
   // Report tabs
   reportTabRow:      { flexDirection: 'row', gap: spacing[2] },
