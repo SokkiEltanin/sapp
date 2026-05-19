@@ -84,6 +84,8 @@ export interface Subscription {
   reminderDaysBefore: number; // 0 = off
   active: boolean;
   note?: string;
+  durationMonths?: number; // 0 = forever, N = auto-deactivate after N months
+  startDate?: string; // ISO date YYYY-MM-DD, set on creation when durationMonths > 0
   createdAt: string;
   updatedAt: string;
 }
@@ -210,12 +212,16 @@ export const HABIT_ICONS = [
 ] as const;
 
 export type HabitIcon = typeof HABIT_ICONS[number];
+export type HabitType = 'check' | 'count';
 
 export interface Habit {
   id: string;
   title: string;
   color: string;
   icon: HabitIcon | string;
+  type?: HabitType;      // default 'check'
+  dailyGoal?: number;    // for count type (e.g. 8 glasses)
+  unit?: string;         // e.g. 'szkl.', 'ml', 'min'
   reminderTime?: string; // HH:mm or undefined = no reminder
   createdAt: string;
 }

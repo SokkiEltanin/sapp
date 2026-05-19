@@ -1,19 +1,79 @@
 import * as Notifications from 'expo-notifications';
-import { Subscription } from '@/types';
+import { Subscription, Task } from '@/types';
 
-// ─── Humor pool for task reminders ────────────────────────────────────────────
-const HUMOR: Array<(t: string) => string> = [
-  (t) => `Hej, ciekawostka — "${t}" samo się nie zrobi 🤔`,
-  (t) => `"${t}" nadal czeka. Wytrwale. Cierpliwie. Osądzająco.`,
-  (t) => `Dzień dobry! "${t}" było wczoraj, będzie jutro... a może jednak dziś?`,
-  (t) => `Naukowy fakt: unikanie "${t}" nie sprawia że znika.`,
-  (t) => `Mała przypominajka: "${t}". Wiedziałeś że zapomnisz, prawda? 😅`,
-  (t) => `"${t}" — ostatnia szansa przed nocną paniką 🌙`,
-  (t) => `Alert: "${t}" osiągnęło stan krytycznego bycia-nieskończonym 🚨`,
-  (t) => `Fun fact: "${t}" nie zrobi się magic-way. Sory.`,
-  (t) => `"${t}" wysyła pozdrowienia z Twojej listy zaległości 👋`,
-  (t) => `Przypomnienie od Twojego bardziej produktywnego ja: zrób "${t}" już dziś.`,
+// ─── Keyword detection ────────────────────────────────────────────────────────
+
+const KW_UNI = [
+  'ur', 'uni', 'uczelnia', 'akademia', 'egzamin', 'zaliczenie', 'kolokwium',
+  'wykład', 'ćwiczenia', 'laboratorium', 'studia', 'indeks', 'sprawozdanie',
+  'referat', 'semestr', 'dziekanat', 'prowadzący',
 ];
+const KW_WORK = [
+  'praca', 'projekt', 'raport', 'prezentacja', 'meeting', 'spotkanie',
+  'klient', 'firma', 'szef', 'mail', 'kontrakt', 'faktura', 'oferta',
+];
+const KW_HOME = [
+  'posprzątać', 'sprzątanie', 'zmywanie', 'pranie', 'gotowanie',
+  'zakupy', 'sklep', 'rachunki', 'czynsz', 'opłata',
+];
+const KW_HEALTH = [
+  'lekarz', 'doktor', 'wizyta', 'apteka', 'lek', 'trening',
+  'siłownia', 'bieganie', 'basen', 'sport',
+];
+
+type TaskCategory = 'uni' | 'work' | 'home' | 'health' | 'other';
+
+function detectCategory(title: string): TaskCategory {
+  const t = title.toLowerCase();
+  if (KW_UNI.some(k => t.includes(k)))    return 'uni';
+  if (KW_WORK.some(k => t.includes(k)))   return 'work';
+  if (KW_HOME.some(k => t.includes(k)))   return 'home';
+  if (KW_HEALTH.some(k => t.includes(k))) return 'health';
+  return 'other';
+}
+
+function buildDigestMessage(titles: string[]): { title: string; body: string } {
+  const n = titles.length;
+  const cats = titles.map(detectCategory);
+
+  if (n === 1) {
+    const cat = cats[0];
+    const prefix = cat === 'uni'    ? 'Zajęcia/oddanie'
+                 : cat === 'work'   ? 'Do pracy'
+                 : cat === 'home'   ? 'Domowe'
+                 : cat === 'health' ? 'Zdrowie'
+                 : 'Deadline';
+    return {
+      title: `${prefix} jutro`,
+      body:  `"${titles[0]}" — ogarnij to dziś wieczorem.`,
+    };
+  }
+
+  if (n === 2) {
+    return {
+      title: `2 zadania jutro`,
+      body:  `"${titles[0]}" i "${titles[1]}" — nie zostawiaj na ostatnią chwilę.`,
+    };
+  }
+
+  // n >= 3: pick the most important one (uni > work > home > health > other)
+  const priority: TaskCategory[] = ['uni', 'work', 'home', 'health', 'other'];
+  let topIdx = 0;
+  for (const pCat of priority) {
+    const idx = cats.indexOf(pCat);
+    if (idx >= 0) { topIdx = idx; break; }
+  }
+  const topTitle = titles[topIdx];
+  const topCat = cats[topIdx];
+  const emoji = topCat === 'uni' ? '📚' : topCat === 'work' ? '💼' : topCat === 'home' ? '🏠' : topCat === 'health' ? '💪' : '📋';
+
+  return {
+    title: `${n} zadań jutro ${emoji}`,
+    body:  `Między innymi: "${topTitle}" i ${n - 1} ${n - 1 === 1 ? 'inne' : n - 1 <= 4 ? 'inne' : 'innych'}.`,
+  };
+}
+
+// ─── Notifications setup ──────────────────────────────────────────────────────
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -25,6 +85,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// ─── Service ──────────────────────────────────────────────────────────────────
+
 export const notificationsService = {
   async requestPermissions(): Promise<boolean> {
     const { status } = await Notifications.requestPermissionsAsync();
@@ -33,7 +95,7 @@ export const notificationsService = {
 
   async scheduleDailyMoodReminder(hour = 20, minute = 0): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-mood').catch(() => {});
-    const id = await Notifications.scheduleNotificationAsync({
+    return Notifications.scheduleNotificationAsync({
       identifier: 'daily-mood',
       content: {
         title: 'Codzienny check-in',
@@ -42,16 +104,14 @@ export const notificationsService = {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
+        hour, minute,
       },
     });
-    return id;
   },
 
   async scheduleMorningMoodReminder(hour = 8, minute = 0): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('morning-mood').catch(() => {});
-    const id = await Notifications.scheduleNotificationAsync({
+    return Notifications.scheduleNotificationAsync({
       identifier: 'morning-mood',
       content: {
         title: 'Dzień dobry',
@@ -60,11 +120,9 @@ export const notificationsService = {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
+        hour, minute,
       },
     });
-    return id;
   },
 
   async cancelMorningReminder(): Promise<void> {
@@ -77,13 +135,13 @@ export const notificationsService = {
   ): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-briefing').catch(() => {});
     const parts: string[] = [];
-    if (context?.taskCount) parts.push(`${context.taskCount} ${context.taskCount === 1 ? 'zadanie' : context.taskCount <= 4 ? 'zadania' : 'zadań'} na dziś`);
-    if (context?.eventCount) parts.push(`${context.eventCount} ${context.eventCount === 1 ? 'wydarzenie' : 'wydarzeń'}`);
-    if (context?.habitCount) parts.push(`${context.habitCount} ${context.habitCount === 1 ? 'nawyk' : 'nawyków'} do zrobienia`);
+    if (context?.taskCount) parts.push(`${context.taskCount} zadań`);
+    if (context?.eventCount) parts.push(`${context.eventCount} wydarzeń`);
+    if (context?.habitCount) parts.push(`${context.habitCount} nawyków`);
     const body = parts.length > 0
-      ? `Czeka na Ciebie: ${parts.join(', ')}. Dobrego dnia!`
+      ? `Na dziś: ${parts.join(', ')}. Do dzieła!`
       : 'Zaplanuj swój dzień i sprawdź zadania.';
-    const id = await Notifications.scheduleNotificationAsync({
+    return Notifications.scheduleNotificationAsync({
       identifier: 'daily-briefing',
       content: {
         title: 'Dzień dobry — plan dnia',
@@ -92,11 +150,9 @@ export const notificationsService = {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
+        hour, minute,
       },
     });
-    return id;
   },
 
   async cancelDailyTaskBriefing(): Promise<void> {
@@ -105,7 +161,7 @@ export const notificationsService = {
 
   async scheduleDailyHabitReminder(hour = 21, minute = 0): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
-    const id = await Notifications.scheduleNotificationAsync({
+    return Notifications.scheduleNotificationAsync({
       identifier: 'daily-habits',
       content: {
         title: 'Nawyki na dziś',
@@ -114,51 +170,92 @@ export const notificationsService = {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
+        hour, minute,
       },
     });
-    return id;
   },
 
   async cancelDailyHabitReminder(): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
   },
 
+  // ─── Smart deadline digests ──────────────────────────────────────────────────
+  // One grouped notification per deadline date (day-before at 9 AM).
+  // Call this with ALL pending tasks whenever the task list changes.
+
+  async scheduleDeadlineDigests(tasks: Task[]): Promise<void> {
+    const now = new Date();
+    const nowDate = now.toISOString().slice(0, 10);
+
+    // Group pending tasks by deadline date
+    const byDate: Record<string, string[]> = {};
+    for (const t of tasks) {
+      if (t.status !== 'pending') continue;
+      if (!t.deadline) continue;
+      const dateStr = t.deadline.slice(0, 10);
+      if (dateStr <= nowDate) continue; // skip past/today deadlines for digest
+      if (!byDate[dateStr]) byDate[dateStr] = [];
+      byDate[dateStr].push(t.title);
+    }
+
+    // Find which dates are within next 7 days (no point scheduling further)
+    const in7Days = new Date(now);
+    in7Days.setDate(in7Days.getDate() + 7);
+
+    // Cancel all existing digests
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+    for (const notif of scheduled) {
+      if (notif.identifier?.startsWith('digest-')) {
+        await Notifications.cancelScheduledNotificationAsync(notif.identifier).catch(() => {});
+      }
+    }
+
+    // Schedule one digest per date
+    for (const [dateStr, titles] of Object.entries(byDate)) {
+      const deadlineDate = new Date(dateStr + 'T09:00:00');
+      if (deadlineDate > in7Days) continue;
+
+      // Fire at 9 AM the day before deadline
+      const fire = new Date(deadlineDate);
+      fire.setDate(fire.getDate() - 1);
+      fire.setHours(9, 0, 0, 0);
+      if (fire <= now) continue;
+
+      const { title, body } = buildDigestMessage(titles);
+      await Notifications.scheduleNotificationAsync({
+        identifier: `digest-${dateStr}`,
+        content: { title, body, data: { screen: 'tasks' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+      }).catch(() => {});
+    }
+  },
+
+  // ─── Per-task: urgent 1h-before only (no per-task spam) ─────────────────────
+
   async scheduleTaskDeadlineReminder(taskId: string, title: string, deadlineIso: string): Promise<void> {
     const deadline = new Date(deadlineIso);
     const now = new Date();
 
-    // 1 day before at 9:00 — humorous reminder
-    const dayBefore = new Date(deadline);
-    dayBefore.setDate(dayBefore.getDate() - 1);
-    dayBefore.setHours(9, 0, 0, 0);
-    if (dayBefore > now) {
-      const msg = HUMOR[Math.floor(Math.random() * HUMOR.length)](title);
-      await Notifications.scheduleNotificationAsync({
-        identifier: `task-humor-${taskId}`,
-        content: {
-          title: 'Jutro deadline 👀',
-          body: msg,
-          data: { screen: 'tasks', taskId },
-        },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: dayBefore },
-      }).catch(() => {});
-    }
-
-    // 1h before deadline — urgent
+    // 1h before deadline — urgent, kept per-task since it's time-sensitive
     const hourBefore = new Date(deadline);
     hourBefore.setHours(hourBefore.getHours() - 1);
     if (hourBefore <= now) return;
+
+    const cat = detectCategory(title);
+    const urgentBody = cat === 'uni'    ? `"${title}" — czas oddawać, uczelnia nie czeka!`
+                     : cat === 'work'   ? `"${title}" — zostało mniej niż godzina, do pracy!`
+                     : cat === 'home'   ? `"${title}" — ostatni moment, bierz się za to!`
+                     : `"${title}" — mniej niż godzina!`;
+
     await Notifications.scheduleNotificationAsync({
       identifier: `task-${taskId}`,
       content: {
-        title: 'Zbliża się deadline 🚨',
-        body: `"${title}" — zostało mniej niż godzina!`,
+        title: 'Deadline za godzinę',
+        body: urgentBody,
         data: { screen: 'tasks', taskId },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: hourBefore },
-    });
+    }).catch(() => {});
   },
 
   async cancelTaskReminder(taskId: string): Promise<void> {
@@ -178,7 +275,7 @@ export const notificationsService = {
       identifier: `sub-${sub.id}`,
       content: {
         title: `Subskrypcja: ${sub.name}`,
-        body: `Za ${sub.reminderDaysBefore} ${sub.reminderDaysBefore === 1 ? 'dzień' : 'dni'} odnowi się za ${sub.amount.toFixed(2)} zł. Pamiętaj o anulowaniu jeśli nie chcesz płacić!`,
+        body: `Za ${sub.reminderDaysBefore} ${sub.reminderDaysBefore === 1 ? 'dzień' : 'dni'} — ${sub.amount.toFixed(2)} zł. Sprawdź czy chcesz przedłużyć.`,
         data: { screen: 'subscriptions', subId: sub.id },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
@@ -199,15 +296,12 @@ export const notificationsService = {
     await Notifications.scheduleNotificationAsync({
       identifier: `event-${eventId}`,
       content: {
-        title: 'Nadchodzące wydarzenie',
-        body: `"${title}" za 30 minut`,
+        title: 'Za 30 minut',
+        body: `"${title}" — czas się przygotować.`,
         data: { screen: 'calendar_event', eventId },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: fire,
-      },
-    });
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+    }).catch(() => {});
   },
 
   async cancelEventReminder(eventId: string): Promise<void> {
@@ -220,14 +314,11 @@ export const notificationsService = {
       identifier: `snooze-${taskId}`,
       content: {
         title: 'Czas wrócić do zadania',
-        body: `"${title}" — drzemka skończona!`,
+        body: `"${title}" — drzemka skończona. Do roboty!`,
         data: { screen: 'tasks', taskId },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: until,
-      },
-    });
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: until },
+    }).catch(() => {});
   },
 
   async cancelSnoozeReminder(taskId: string): Promise<void> {
@@ -245,10 +336,9 @@ export const notificationsService = {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
+        hour, minute,
       },
-    });
+    }).catch(() => {});
   },
 
   async cancelHabitReminder(habitId: string): Promise<void> {

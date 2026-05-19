@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import {
   ScanLine, BarChart2, RefreshCcw,
   ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
-  Settings2, Lightbulb, AlertTriangle, Wallet,
+  Settings2, Lightbulb, AlertTriangle, Wallet, Tag,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
@@ -57,6 +57,7 @@ export default function FinancesScreen() {
   const [expandedCat, setExpandedCat] = useState<ExpenseCategory | null>(null);
   const [expandedTag, setExpandedTag] = useState<string | null>(null);
   const [tagProductSort, setTagProductSort] = useState<'price' | 'date'>('price');
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
 
   const today = new Date();
 
@@ -271,10 +272,35 @@ export default function FinancesScreen() {
     return msgs;
   }, [monthlyData, catBreakdown, budgets, thisMonthExp, thisMonthInc, balance, isCurrentMonth]);
 
-  const sections = grouped.map(([date, items]) => ({
-    title: formatDate(date + 'T12:00:00'),
-    data: items,
-  }));
+  // All tags that appear in current expenses (for filter pills)
+  const availableTags = useMemo(() => {
+    const freq: Record<string, number> = {};
+    for (const e of expenses) {
+      if (!isExp(e)) continue;
+      for (const tag of e.tags) if (tag) freq[tag] = (freq[tag] ?? 0) + 1;
+      if (e.receiptItems) {
+        for (const it of e.receiptItems) for (const t of it.tags) freq[t] = (freq[t] ?? 0) + 1;
+      }
+    }
+    return Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 12).map(([tag]) => tag);
+  }, [expenses]);
+
+  const sections = useMemo(() => {
+    const filtered = activeTagFilter
+      ? grouped.map(([date, items]) => [
+          date,
+          items.filter(e => {
+            if (e.tags.includes(activeTagFilter)) return true;
+            if (e.receiptItems?.some(it => it.tags.includes(activeTagFilter))) return true;
+            return false;
+          }),
+        ] as [string, typeof items]).filter(([, items]) => items.length > 0)
+      : grouped;
+    return filtered.map(([date, items]) => ({
+      title: formatDate(date + 'T12:00:00'),
+      data: items,
+    }));
+  }, [grouped, activeTagFilter]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
@@ -328,14 +354,45 @@ export default function FinancesScreen() {
               <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} />
             }
             ListHeaderComponent={
-              <ExpenseSummaryCard
-                monthExpenses={stats.monthExpenses}
-                monthIncome={stats.monthIncome}
-                thisWeek={stats.thisWeek}
-                lastWeek={stats.lastWeek}
-                topCategory={stats.topCategory}
-                monthCategorySpend={stats.monthCategorySpend}
-              />
+              <>
+                <ExpenseSummaryCard
+                  monthExpenses={stats.monthExpenses}
+                  monthIncome={stats.monthIncome}
+                  thisWeek={stats.thisWeek}
+                  lastWeek={stats.lastWeek}
+                  topCategory={stats.topCategory}
+                  monthCategorySpend={stats.monthCategorySpend}
+                />
+                {availableTags.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tagFilterRow}
+                    style={{ marginBottom: 8 }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => setActiveTagFilter(null)}
+                      style={[styles.tagChip, !activeTagFilter && styles.tagChipActive]}
+                      activeOpacity={0.7}
+                    >
+                      <Tag size={10} color={!activeTagFilter ? colors.accent.blue : colors.text.muted} />
+                      <Text style={[styles.tagChipText, !activeTagFilter && styles.tagChipTextActive]}>Wszystkie</Text>
+                    </TouchableOpacity>
+                    {availableTags.map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        onPress={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                        style={[styles.tagChip, activeTagFilter === tag && styles.tagChipActive]}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.tagChipText, activeTagFilter === tag && styles.tagChipTextActive]}>
+                          {tag}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
             }
             renderSectionHeader={({ section: { title } }) => (
               <View style={styles.sectionHeader}>
@@ -821,6 +878,17 @@ export default function FinancesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
+
+  tagFilterRow: { flexDirection: 'row', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[1] },
+  tagChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: 6,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: colors.border.default, backgroundColor: colors.bg.card,
+  },
+  tagChipActive: { backgroundColor: colors.accent.blue + '18', borderColor: colors.accent.blue },
+  tagChipText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  tagChipTextActive: { color: colors.accent.blue },
 
   segWrap: {
     flexDirection: 'row',

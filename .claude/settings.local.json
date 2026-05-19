@@ -56,7 +56,19 @@
       "Bash(node -e \"const l=require\\('lucide-react-native'\\); console.log\\(Object.keys\\(l\\).filter\\(k=>k.toLowerCase\\(\\).includes\\('cookie'\\)||k.toLowerCase\\(\\).includes\\('candy'\\)||k.toLowerCase\\(\\).includes\\('cake'\\)||k.toLowerCase\\(\\).includes\\('sweet'\\)\\)\\); console.log\\('version:', require\\('./node_modules/lucide-react-native/package.json'\\).version\\);\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('version','?'\\)\\)\")",
       "Bash(python -c \"import sys; icons=[l.strip\\(\\).replace\\('.js',''\\) for l in sys.stdin]; print\\([i for i in icons if any\\(k in i.lower\\(\\) for k in ['cookie','candy','cake','sweet','shop','bag','cart']\\)][:20]\\)\")",
-      "Bash(eas whoami *)"
+      "Bash(eas whoami *)",
+      "Bash(eas build:cancel 90c05709-69c1-4d8f-aa1a-85dc1850a183)",
+      "WebFetch(domain:expo.dev)",
+      "Bash(eas credentials *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Sokki\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Sokki-Desktop-Sapp\\\\70053c66-711d-4b91-bbfe-6217455beb5a\\\\tasks\\\\b40yiz6nq.output\" -ErrorAction SilentlyContinue)",
+      "Bash(git commit -m 'feat: stats tab, food analytics, dashboard overhaul, tag frequency *)",
+      "Bash(git commit -m 'feat: offline persist stores, weekly reports auto-generation + history *)",
+      "Bash(git push *)",
+      "PowerShell(cd \"C:\\\\Users\\\\Sokki\\\\Desktop\\\\Sapp\"; npx tsc --noEmit --skipLibCheck 2>&1 | Select-String -Pattern \"expenses.stats|tabs..stats|tabs..index\" | Where-Object { $_ -notmatch \"232\" })",
+      "PowerShell(cd \"C:\\\\Users\\\\Sokki\\\\Desktop\\\\Sapp\"; npx tsc --noEmit --skipLibCheck 2>&1 | Select-String -Pattern \"error TS\" | Where-Object { $_ -match \"expenses.stats|stats\\\\.tsx|index\\\\.tsx\" })",
+      "PowerShell(cd \"C:\\\\Users\\\\Sokki\\\\Desktop\\\\Sapp\"; npx tsc --noEmit --skipLibCheck 2>&1 | Select-String \"error TS\" | Where-Object { $_ -match \"expenses.stats|tabs..stats\" })",
+      "Bash(node -e \"const p = require\\('./node_modules/@react-native-google-signin/google-signin/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(node -e \"const p = require\\('./node_modules/@react-native-google-signin/google-signin'\\); console.log\\(Object.keys\\(p\\)\\)\")"
     ]
   }
 }

@@ -4,6 +4,22 @@ import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
+const MOOD_EMOJIS: Record<MoodLevel, string> = {
+  1: '😩',
+  2: '😕',
+  3: '😐',
+  4: '😊',
+  5: '🤩',
+};
+
+const ENERGY_EMOJIS: Record<MoodLevel, string> = {
+  1: '😴',
+  2: '😌',
+  3: '⚡',
+  4: '✨',
+  5: '🚀',
+};
+
 const ENERGY_COLORS: Record<MoodLevel, string> = {
   1: '#6B7280',
   2: '#55B4FF',
@@ -19,15 +35,15 @@ interface Props {
   mode?: 'mood' | 'energy';
 }
 
-function MoodOption({ level, selected, onSelect, color }: {
-  level: MoodLevel; selected: boolean; onSelect: () => void; color: string; label: string;
+function MoodOption({ level, selected, onSelect, color, emoji }: {
+  level: MoodLevel; selected: boolean; onSelect: () => void; color: string; emoji: string;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
     Animated.sequence([
-      Animated.timing(scale, { toValue: 0.94, duration: 60, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 20, stiffness: 280 } as any),
+      Animated.timing(scale, { toValue: 0.88, duration: 70, useNativeDriver: true }),
+      Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 280 } as any),
     ]).start();
     haptic.medium();
     onSelect();
@@ -36,15 +52,15 @@ function MoodOption({ level, selected, onSelect, color }: {
   return (
     <Animated.View style={[styles.optionWrap, { transform: [{ scale }] }]}>
       <Pressable onPress={handlePress} style={{ flex: 1 }}>
-        {selected ? (
-          <View style={[styles.pill, { backgroundColor: color }]}>
-            <Text style={styles.pillTextSelected}>{level}</Text>
-          </View>
-        ) : (
-          <View style={[styles.pill, styles.pillIdle]}>
-            <Text style={styles.pillText}>{level}</Text>
-          </View>
-        )}
+        <View style={[
+          styles.pill,
+          selected ? { backgroundColor: color, borderColor: color } : styles.pillIdle,
+        ]}>
+          <Text style={styles.emoji}>{emoji}</Text>
+          {selected && (
+            <View style={[styles.selDot, { backgroundColor: '#fff' }]} />
+          )}
+        </View>
       </Pressable>
     </Animated.View>
   );
@@ -53,6 +69,7 @@ function MoodOption({ level, selected, onSelect, color }: {
 export default function MoodPicker({ value, onChange, label = 'Jak się czujesz?', mode = 'mood' }: Props) {
   const moodColors = mode === 'energy' ? ENERGY_COLORS : MOOD_COLORS;
   const moodLabels = mode === 'energy' ? ENERGY_LABELS : MOOD_LABELS;
+  const moodEmojis = mode === 'energy' ? ENERGY_EMOJIS : MOOD_EMOJIS;
 
   return (
     <View style={styles.container}>
@@ -62,7 +79,7 @@ export default function MoodPicker({ value, onChange, label = 'Jak się czujesz?
           <MoodOption
             key={level}
             level={level}
-            label={moodLabels[level]}
+            emoji={moodEmojis[level]}
             color={moodColors[level]}
             selected={value === level}
             onSelect={() => onChange(level)}
@@ -87,14 +104,16 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing[2] },
   optionWrap: { flex: 1, borderRadius: radius.md },
   pill: {
-    height: 48, borderRadius: radius.md,
+    height: 54, borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5,
+    gap: 3,
   },
   pillIdle: {
     backgroundColor: colors.bg.elevated,
-    borderWidth: 1, borderColor: colors.border.default,
+    borderColor: colors.border.default,
   },
-  pillText:         { ...typography.h4, color: colors.text.muted, fontWeight: '700' },
-  pillTextSelected: { ...typography.h4, color: colors.white, fontWeight: '800' },
-  selectedLabel:    { ...typography.label, fontWeight: '600', textAlign: 'center', fontSize: 12 },
+  emoji: { fontSize: 24 },
+  selDot: { width: 5, height: 5, borderRadius: 3 },
+  selectedLabel: { ...typography.label, fontWeight: '600', textAlign: 'center', fontSize: 13 },
 });

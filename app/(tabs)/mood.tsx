@@ -17,6 +17,9 @@ import { toast } from '@/store/toastStore';
 
 const DOW_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 
+const MOOD_EMOJIS: Record<MoodLevel, string> = { 1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩' };
+const ENERGY_EMOJIS: Record<MoodLevel, string> = { 1: '😴', 2: '😌', 3: '⚡', 4: '✨', 5: '🚀' };
+
 function MoodInsights({ entries }: { entries: MoodEntry[] }) {
   if (entries.length < 5) return null;
 
@@ -288,7 +291,7 @@ export default function MoodScreen() {
               <View style={styles.heroRow}>
                 <View style={[styles.moodBubble, { borderColor: todayColor + '44' }]}>
                   {todayEntry
-                    ? <Text style={[styles.moodNum, { color: todayColor }]}>{todayEntry.mood}</Text>
+                    ? <Text style={[styles.moodNum, { color: todayColor }]}>{MOOD_EMOJIS[todayEntry.mood]}</Text>
                     : <Smile size={20} color={colors.text.muted} />
                   }
                 </View>
@@ -302,7 +305,7 @@ export default function MoodScreen() {
                 </View>
                 {todayEntry && (
                   <View style={styles.energyBadge}>
-                    <Zap size={11} color={colors.accent.warning} />
+                    <Text style={styles.energyEmoji}>{ENERGY_EMOJIS[todayEntry.energy]}</Text>
                     <Text style={styles.energyText}>{todayEntry.energy}/5</Text>
                   </View>
                 )}
@@ -388,8 +391,7 @@ export default function MoodScreen() {
                       <View style={styles.entryTop}>
                         <Text style={[styles.entryMoodLabel, { color: mc }]}>{MOOD_LABELS[entry.mood]}</Text>
                         <View style={styles.entryEnergy}>
-                          <Zap size={9} color={colors.text.muted} />
-                          <Text style={styles.entryEnergyText}>{entry.energy}</Text>
+                          <Text style={styles.entryEnergyEmoji}>{ENERGY_EMOJIS[entry.energy]}</Text>
                         </View>
                         <Text style={styles.entryDate}>{fmtShort(entry.date)}</Text>
                       </View>
@@ -446,6 +448,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent.warning + '18',
     paddingHorizontal: spacing[2], paddingVertical: spacing[1], borderRadius: radius.sm,
   },
+  energyEmoji: { fontSize: 14 },
   energyText: { ...typography.caption, color: colors.accent.warning, fontWeight: '700', fontSize: 11 },
   heroNote: { ...typography.bodySmall, color: colors.text.secondary, lineHeight: 18 },
   cta: { ...typography.caption, color: colors.text.muted },
@@ -483,6 +486,7 @@ const styles = StyleSheet.create({
   entryMoodLabel: { ...typography.label, fontWeight: '700', fontSize: 13 },
   entryEnergy: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   entryEnergyText: { ...typography.caption, color: colors.text.muted, fontSize: 10 },
+  entryEnergyEmoji: { fontSize: 12 },
   entryDate: { ...typography.caption, color: colors.text.muted, marginLeft: 'auto' },
   entryNote: { ...typography.caption, color: colors.text.secondary, lineHeight: 16 },
 

@@ -33,6 +33,7 @@ export function useTasks() {
         }
       }
       setTasks(data);
+      notificationsService.scheduleDeadlineDigests(data).catch(() => {});
     } catch (_) {
     } finally {
       setLoading(false);

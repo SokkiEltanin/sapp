@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert,
   TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform,
@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   X, Plus, ChevronLeft, RefreshCcw, Trash2,
-  Check, Bell, BellOff, Calendar, Edit2,
+  Check, Bell, BellOff, Calendar, Edit2, CreditCard,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
@@ -16,6 +16,7 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
+import { expensesService } from '@/services/expensesService';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -34,9 +35,18 @@ const REMINDER_OPTS = [
   { days: 7,  label: '7 dni przed'   },
 ];
 
+const DURATION_OPTS: { value: number; label: string }[] = [
+  { value: 0,  label: 'Zawsze' },
+  { value: 1,  label: '1 mies.' },
+  { value: 2,  label: '2 mies.' },
+  { value: 3,  label: '3 mies.' },
+  { value: 6,  label: '6 mies.' },
+  { value: 12, label: '12 mies.' },
+];
+
 const ALL_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
 
-// ─── Days until helper ────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysUntil(isoDate: string): number {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -51,6 +61,25 @@ function urgencyColor(days: number): string {
   return colors.accent.green;
 }
 
+function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
+  const d = new Date(current + 'T00:00:00');
+  switch (cycle) {
+    case 'weekly':    d.setDate(d.getDate() + 7); break;
+    case 'monthly':   d.setMonth(d.getMonth() + 1); break;
+    case 'quarterly': d.setMonth(d.getMonth() + 3); break;
+    case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d.toISOString().split('T')[0];
+}
+
+function isDurationExpired(sub: Subscription): boolean {
+  if (!sub.durationMonths || sub.durationMonths === 0 || !sub.startDate) return false;
+  const end = new Date(sub.startDate + 'T00:00:00');
+  end.setMonth(end.getMonth() + sub.durationMonths);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return end <= today;
+}
+
 // ─── Add/Edit Form ────────────────────────────────────────────────────────────
 
 interface FormState {
@@ -61,6 +90,7 @@ interface FormState {
   reminderDaysBefore: number;
   category: ExpenseCategory;
   note: string;
+  durationMonths: number;
 }
 
 const emptyForm = (): FormState => {
@@ -68,7 +98,7 @@ const emptyForm = (): FormState => {
   return {
     name: '', amount: '', billingCycle: 'monthly',
     nextBillingDate: d.toISOString().split('T')[0].split('-').reverse().join('.'),
-    reminderDaysBefore: 3, category: 'subscriptions', note: '',
+    reminderDaysBefore: 3, category: 'subscriptions', note: '', durationMonths: 0,
   };
 };
 
@@ -77,6 +107,7 @@ function subToForm(s: Subscription): FormState {
     name: s.name, amount: String(s.amount), billingCycle: s.billingCycle,
     nextBillingDate: s.nextBillingDate.split('-').reverse().join('.'),
     reminderDaysBefore: s.reminderDaysBefore, category: s.category, note: s.note ?? '',
+    durationMonths: s.durationMonths ?? 0,
   };
 }
 
@@ -99,26 +130,91 @@ export default function SubscriptionsScreen() {
   const [saving, setSaving] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
 
+  // Payment confirmation modal
+  const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
+  const [paymentConfirming, setPaymentConfirming] = useState(false);
+  const checkedRef = useRef(false);
+
   const setF = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   const openAdd = () => { setEditing(null); setForm(emptyForm()); setModalVisible(true); };
   const openEdit = (s: Subscription) => { setEditing(s); setForm(subToForm(s)); setModalVisible(true); };
 
+  // Auto-deactivate expired-duration subs and build payment queue on load
+  useEffect(() => {
+    if (checkedRef.current || subscriptions.length === 0) return;
+    checkedRef.current = true;
+
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    subscriptions.forEach((sub) => {
+      if (sub.active && isDurationExpired(sub)) {
+        update(sub.id, { active: false });
+      }
+    });
+
+    const due = subscriptions.filter(
+      (sub) => sub.active && !isDurationExpired(sub) && sub.nextBillingDate <= todayStr,
+    );
+    if (due.length > 0) setPaymentQueue(due);
+  }, [subscriptions]);
+
+  const currentPayment = paymentQueue[0] ?? null;
+
+  const handlePaymentYes = useCallback(async () => {
+    if (!currentPayment) return;
+    setPaymentConfirming(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await expensesService.add({
+        type: 'expense',
+        amount: currentPayment.amount,
+        currency: currentPayment.currency,
+        category: currentPayment.category,
+        tags: [],
+        note: `Subskrypcja: ${currentPayment.name}`,
+        date: today,
+      });
+      const next = advanceNextBillingDate(currentPayment.nextBillingDate, currentPayment.billingCycle);
+      await update(currentPayment.id, { nextBillingDate: next });
+    } catch {
+      // silently skip
+    } finally {
+      setPaymentConfirming(false);
+      setPaymentQueue((q) => q.slice(1));
+    }
+  }, [currentPayment, update]);
+
+  const handlePaymentNo = useCallback(() => {
+    setPaymentQueue((q) => q.slice(1));
+  }, []);
+
   const saveForm = useCallback(async () => {
-    const { name, amount, billingCycle, nextBillingDate, reminderDaysBefore, category, note } = form;
+    const { name, amount, billingCycle, nextBillingDate, reminderDaysBefore, category, note, durationMonths } = form;
     if (!name.trim()) { Alert.alert('Brak nazwy', 'Podaj nazwę subskrypcji'); return; }
     const amt = parseFloat(amount.replace(',', '.'));
     if (isNaN(amt) || amt <= 0) { Alert.alert('Błędna kwota', 'Podaj prawidłową kwotę'); return; }
     const dateIso = parseDate(nextBillingDate);
     if (!dateIso) { Alert.alert('Błędna data', 'Format: DD.MM.RRRR'); return; }
 
+    const today = new Date().toISOString().split('T')[0];
+
     setSaving(true);
     try {
       if (editing) {
-        await update(editing.id, { name: name.trim(), amount: amt, billingCycle, nextBillingDate: dateIso, reminderDaysBefore, category, note: note.trim() || undefined });
+        await update(editing.id, {
+          name: name.trim(), amount: amt, billingCycle, nextBillingDate: dateIso,
+          reminderDaysBefore, category, note: note.trim() || undefined, durationMonths,
+        });
       } else {
-        await add({ name: name.trim(), amount: amt, currency: 'PLN', billingCycle, nextBillingDate: dateIso, reminderDaysBefore, category, active: true, note: note.trim() || undefined });
+        await add({
+          name: name.trim(), amount: amt, currency: 'PLN', billingCycle,
+          nextBillingDate: dateIso, reminderDaysBefore, category, active: true,
+          note: note.trim() || undefined, durationMonths,
+          startDate: durationMonths > 0 ? today : undefined,
+        });
       }
       setModalVisible(false);
     } catch (e: any) {
@@ -201,6 +297,39 @@ export default function SubscriptionsScreen() {
         )}
       </ScrollView>
 
+      {/* Payment confirmation modal */}
+      {currentPayment && (
+        <Modal visible transparent animationType="fade" onRequestClose={handlePaymentNo}>
+          <View style={s.payOverlay}>
+            <View style={s.payCard}>
+              <View style={s.payIconWrap}>
+                <CreditCard size={24} color={colors.accent.blue} />
+              </View>
+              <Text style={s.payTitle}>Płatność należna</Text>
+              <Text style={s.payName}>{currentPayment.name}</Text>
+              <Text style={s.payAmount}>{currentPayment.amount.toFixed(2)} zł</Text>
+              <Text style={s.payHint}>Czy opłaciłeś tę subskrypcję?</Text>
+              {paymentQueue.length > 1 && (
+                <Text style={s.payQueue}>+{paymentQueue.length - 1} kolejnych</Text>
+              )}
+              <View style={s.payBtns}>
+                <PressableScale onPress={handlePaymentNo} style={s.payBtnNo}>
+                  <Text style={s.payBtnNoText}>Nie teraz</Text>
+                </PressableScale>
+                <PressableScale
+                  onPress={handlePaymentYes}
+                  style={[s.payBtnYes, paymentConfirming && { opacity: 0.6 }]}
+                  disabled={paymentConfirming}
+                >
+                  <Check size={16} color={colors.bg.primary} />
+                  <Text style={s.payBtnYesText}>{paymentConfirming ? 'Zapisuję...' : 'Tak, opłaciłem'}</Text>
+                </PressableScale>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Add/Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -254,6 +383,22 @@ export default function SubscriptionsScreen() {
                     ))}
                   </View>
                 </View>
+              </View>
+
+              {/* Duration */}
+              <Text style={s.fieldLabel}>Czas trwania</Text>
+              <View style={s.pillRow}>
+                {DURATION_OPTS.map((d) => (
+                  <PressableScale
+                    key={d.value}
+                    onPress={() => setF('durationMonths', d.value)}
+                    style={[s.pill, form.durationMonths === d.value && s.pillActive]}
+                  >
+                    <Text style={[s.pillText, form.durationMonths === d.value && s.pillTextActive]}>
+                      {d.label}
+                    </Text>
+                  </PressableScale>
+                ))}
               </View>
 
               {/* Next billing date */}
@@ -362,6 +507,9 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
   const days  = daysUntil(sub.nextBillingDate);
   const color = urgencyColor(days);
   const nextLabel = days < 0 ? 'zaległa' : days === 0 ? 'dziś!' : `za ${days} dni`;
+  const durLabel = sub.durationMonths && sub.durationMonths > 0
+    ? `${sub.durationMonths} mies.`
+    : null;
 
   return (
     <View style={[s.item, !sub.active && s.itemInactive]}>
@@ -370,7 +518,11 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
       </View>
       <View style={s.itemBody}>
         <Text style={[s.itemName, !sub.active && { color: colors.text.muted }]}>{sub.name}</Text>
-        <Text style={s.itemCycle}>{sub.amount.toFixed(2)} zł{cycle?.short} · {nextLabel}</Text>
+        <Text style={s.itemCycle}>
+          {sub.amount.toFixed(2)} zł{cycle?.short}
+          {durLabel ? ` · ${durLabel}` : ''}
+          {' · '}{nextLabel}
+        </Text>
         {sub.reminderDaysBefore > 0 && sub.active && (
           <View style={s.itemBell}>
             <Bell size={9} color={colors.accent.amber} />
@@ -461,6 +613,41 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: spacing[12], gap: spacing[4] },
   emptyTitle: { ...typography.h3, color: colors.text.secondary },
   emptyText: { ...typography.body, color: colors.text.muted, textAlign: 'center', lineHeight: 22 },
+
+  // ── Payment confirmation overlay ──────────────────────────────────────────
+  payOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: spacing[6],
+  },
+  payCard: {
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: colors.border.default,
+    padding: spacing[6], alignItems: 'center', gap: spacing[2], width: '100%',
+  },
+  payIconWrap: {
+    width: 52, height: 52, borderRadius: radius.full,
+    backgroundColor: colors.accent.blue + '18',
+    alignItems: 'center', justifyContent: 'center', marginBottom: spacing[1],
+  },
+  payTitle: { ...typography.caption, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  payName: { ...typography.h3, color: colors.text.primary, textAlign: 'center' },
+  payAmount: { fontSize: 28, fontWeight: '800', color: colors.accent.blue },
+  payHint: { ...typography.body, color: colors.text.secondary, textAlign: 'center', marginTop: spacing[1] },
+  payQueue: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  payBtns: { flexDirection: 'row', gap: spacing[3], marginTop: spacing[3], width: '100%' },
+  payBtnNo: {
+    flex: 1, paddingVertical: spacing[3], borderRadius: radius.md,
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    alignItems: 'center',
+  },
+  payBtnNoText: { ...typography.bodySmall, color: colors.text.secondary, fontWeight: '600' },
+  payBtnYes: {
+    flex: 2, paddingVertical: spacing[3], borderRadius: radius.md,
+    backgroundColor: colors.accent.blue, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+  },
+  payBtnYesText: { ...typography.bodySmall, color: colors.bg.primary, fontWeight: '700' },
 
   // ── Modal / form ──────────────────────────────────────────────────────────
   modal: { flex: 1, backgroundColor: colors.bg.secondary },

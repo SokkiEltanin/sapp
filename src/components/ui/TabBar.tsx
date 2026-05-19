@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import {
   LayoutDashboard, ListTodo, Wallet,
   Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare,
-  Smile, ScanLine, Target, Flame, BarChart2,
+  Smile, ScanLine, Target, Flame, CalendarDays, BarChart2,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +24,7 @@ const TABS = [
   { name: 'index',    label: 'Dziś',       Icon: LayoutDashboard },
   { name: 'tasks',    label: 'Zadania',    Icon: ListTodo },
   { name: 'finances', label: 'Finanse',    Icon: Wallet },
-  { name: 'stats',    label: 'Statystyki', Icon: BarChart2 },
+  { name: 'stats',    label: 'Kalendarz',  Icon: CalendarDays },
 ];
 
 const QUICK_ACTIONS = [

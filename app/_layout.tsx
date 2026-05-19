@@ -3,14 +3,17 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '@/services/firebase';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
+import { appSettings } from '@/utils/appSettings';
+import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
@@ -38,8 +41,40 @@ const eb = StyleSheet.create({
   stack: { color: '#aaa', fontSize: 11, lineHeight: 16 },
 });
 
+const MOOD_POPUP_KEY = 'last_mood_auto_popup';
+const SIX_HOURS_MS  = 6 * 60 * 60 * 1000;
+
+function AutoMoodPopup() {
+  const [visible, setVisible] = useState(false);
+
+  const check = async () => {
+    try {
+      const lastStr = await AsyncStorage.getItem(MOOD_POPUP_KEY);
+      const now = Date.now();
+      if (!lastStr || now - parseInt(lastStr) > SIX_HOURS_MS) {
+        await AsyncStorage.setItem(MOOD_POPUP_KEY, String(now));
+        setVisible(true);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    // Slight delay so app finishes loading before showing modal
+    const timer = setTimeout(check, 2000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') check();
+    });
+    return () => { clearTimeout(timer); sub.remove(); };
+  }, []);
+
+  if (!visible) return null;
+  return <MoodCheckInModal visible={visible} onClose={() => setVisible(false)} existingEntry={null} />;
+}
+
 export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => { appSettings.loadAll(); }, []);
 
   useEffect(() => {
     // Fallback: show app after 4s regardless (prevents permanent black screen)
@@ -123,6 +158,7 @@ export default function RootLayout() {
         </Stack>
         <PomodoroIndicator />
         <Toast />
+        <AutoMoodPopup />
       </SafeAreaProvider>
     </GestureHandlerRootView>
     </ErrorBoundary>

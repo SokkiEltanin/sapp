@@ -25,10 +25,13 @@ import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
-import { Plus, Trash2, Tag } from 'lucide-react-native';
+import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
+import { appSettings } from '@/utils/appSettings';
+import { googleCalendarService } from '@/services/googleCalendarService';
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
 });
 
 const APP_VERSION = '1.0.0';
@@ -38,8 +41,9 @@ export default function SettingsScreen() {
   const { expenses } = useExpensesStore();
   const { tasks, events } = useCalendarStore();
 
-  const [googleUser, setGoogleUser] = useState<string | null>(null);
+  const [googleUser, setGoogleUser]   = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
+  const [hapticsOn, setHapticsOn]     = useState(appSettings.isHapticsEnabled());
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -62,6 +66,11 @@ export default function SettingsScreen() {
         : signInWithCredential(auth, credential);
       const result = await doLink;
       setGoogleUser(result.user.email ?? result.user.displayName);
+      // Store calendar access token
+      try {
+        const tokens = await GoogleSignin.getTokens();
+        await googleCalendarService.storeToken(tokens.accessToken);
+      } catch {}
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         Alert.alert('Błąd', e.message);
@@ -222,6 +231,28 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+        {/* Haptics */}
+        <View>
+          <Text style={styles.sectionTitle}>Interfejs</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.iconWrap}>
+                <Vibrate size={16} color={colors.text.secondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>Wibracje</Text>
+                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Haptyczne potwierdzenia przycisków</Text>
+              </View>
+              <Switch
+                value={hapticsOn}
+                onValueChange={(v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); }}
+                trackColor={{ false: colors.bg.elevated, true: colors.accent.purple + '80' }}
+                thumbColor={hapticsOn ? colors.accent.purple : colors.text.muted}
+              />
+            </View>
+          </View>
+        </View>
 
         {/* Notifications */}
         <View>

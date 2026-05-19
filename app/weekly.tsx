@@ -258,7 +258,7 @@ export default function WeeklyScreen() {
 
   const habitWeekData = useMemo(() =>
     habits.map(h => ({
-      days: dates.filter(d => (completions[d] ?? []).includes(h.id)).length,
+      days: dates.filter(d => (completions[d]?.[h.id] ?? 0) >= 1).length,
     })),
     [habits, completions, dates],
   );
