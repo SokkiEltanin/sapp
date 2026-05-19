@@ -46,14 +46,14 @@ export default function CalendarTabScreen() {
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
   const [refreshing, setRefreshing] = useState(false);
-  const [monthExpanded, setMonthExpanded] = useState(false);
+  const [monthExpanded, setMonthExpanded] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [gcalEvents, setGcalEvents] = useState<CalendarEvent[]>([]);
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalAvailable, setGcalAvailable] = useState(false);
 
-  const gridHeight  = useRef(new Animated.Value(0)).current;
-  const gridOpacity = useRef(new Animated.Value(0)).current;
+  const gridHeight  = useRef(new Animated.Value(330)).current;
+  const gridOpacity = useRef(new Animated.Value(1)).current;
 
   const toggleMonth = () => {
     const next = !monthExpanded;

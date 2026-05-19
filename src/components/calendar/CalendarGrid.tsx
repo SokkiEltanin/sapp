@@ -31,6 +31,10 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
   while (cells.length % 7 !== 0) cells.push(null);
 
   const ds = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
+  const evColor = (day: number) => {
+    const ev = events.find(e => e.date.startsWith(ds(day)));
+    return ev ? (ev.color ?? 'rgba(255,255,255,0.4)') : null;
+  };
   const hasEv = (day: number) => events.some(e => e.date.startsWith(ds(day)));
   const hasTk = (day: number) => tasks.some(t => t.deadline?.startsWith(ds(day)) && t.status !== 'done');
   const hasHighTk = (day: number) => tasks.some(
@@ -56,6 +60,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
             const isTd = d === todayStr;
             const isWeekend = i >= 5;
             const ev = hasEv(day);
+            const evCol = evColor(day);
             const tk = hasTk(day);
             const urgent = hasHighTk(day);
             const mood = moodFor(day);
@@ -79,7 +84,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                   )}
                   {(ev || tk) && (
                     <View style={styles.dots}>
-                      {ev && <View style={[styles.dot, sel && styles.dotSel]} />}
+                      {ev && <View style={[styles.dot, sel ? styles.dotSel : { backgroundColor: evCol ?? 'rgba(255,255,255,0.4)' }]} />}
                       {tk && <View style={[
                         styles.dot,
                         urgent && !sel ? styles.dotUrgent : undefined,
