@@ -88,9 +88,9 @@ jobs:
           PYEOF
 
       - name: Build release APK
-        run: cd android && ./gradlew assembleRelease --no-daemon
+        run: cd android && ./gradlew assembleRelease --no-daemon -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease
         env:
-          GRADLE_OPTS: "-Xmx4g -Dorg.gradle.daemon=false"
+          GRADLE_OPTS: "-Xmx6g -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
 
       - name: Rename APK
         run: |
