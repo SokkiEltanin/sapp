@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Plus, ChevronLeft, ChevronRight, CalendarDays, RefreshCw } from 'lucide-react-native';
@@ -54,6 +54,19 @@ export default function CalendarTabScreen() {
 
   const gridHeight  = useRef(new Animated.Value(330)).current;
   const gridOpacity = useRef(new Animated.Value(1)).current;
+
+  const monthSwipePR = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, { dx, dy }) =>
+        Math.abs(dx) > 18 && Math.abs(dx) > Math.abs(dy) * 2,
+      onPanResponderRelease: (_, { dx, vx }) => {
+        if (Math.abs(dx) > 50 || Math.abs(vx) > 0.4) {
+          if (dx < 0) setViewMonth(m => { if (m === 11) { setViewYear(y => y + 1); return 0; } return m + 1; });
+          else         setViewMonth(m => { if (m === 0)  { setViewYear(y => y - 1); return 11; } return m - 1; });
+        }
+      },
+    }),
+  ).current;
 
   const toggleMonth = () => {
     const next = !monthExpanded;
@@ -193,7 +206,7 @@ export default function CalendarTabScreen() {
           contentContainerStyle={{ paddingBottom: 120 }}
         >
           {/* Month nav + collapsible grid */}
-          <View>
+          <View {...monthSwipePR.panHandlers}>
             <View style={styles.monthNav}>
               <PressableScale onPress={prevMonth} style={styles.navBtn}>
                 <ChevronLeft size={18} color={colors.text.secondary} />

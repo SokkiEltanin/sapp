@@ -33,6 +33,8 @@ import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { Animated } from 'react-native';
 import { weatherService, DayWeather, WeatherIcon } from '@/services/weatherService';
+import { googleCalendarService } from '@/services/googleCalendarService';
+import { CalendarEvent } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import {
@@ -218,6 +220,7 @@ export default function DashboardScreen() {
   const [yearlyReports, setYearlyRep]   = useState<YearlyReport[]>([]);
   const [expandedReport, setExpanded]   = useState<string | null>(null);
   const [generating, setGenerating]     = useState(false);
+  const [gcalEvents, setGcalEvents]     = useState<CalendarEvent[]>([]);
 
   useEffect(() => {
     if (events.length === 0) {
@@ -232,6 +235,9 @@ export default function DashboardScreen() {
     loadMonthlyReports().then(setMonthlyRep);
     loadYearlyReports().then(setYearlyRep);
     weatherService.getWeather().then(setWeatherData).catch(() => {});
+    googleCalendarService.getStoredToken().then(token => {
+      if (token) googleCalendarService.fetchEvents(1, 2).then(setGcalEvents).catch(() => {});
+    });
   }, []);
 
   // Auto-generate monthly report
@@ -316,6 +322,12 @@ export default function DashboardScreen() {
     [pendingTasks, today],
   );
   const todayEvents = useMemo(() => events.filter(e => e.date === today), [events, today]);
+  const tomorrow = useMemo(() => {
+    const t = new Date(); t.setDate(t.getDate() + 1);
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  }, []);
+  const gcalToday    = useMemo(() => gcalEvents.filter(e => e.date === today).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')), [gcalEvents, today]);
+  const gcalTomorrow = useMemo(() => gcalEvents.filter(e => e.date === tomorrow).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')), [gcalEvents, tomorrow]);
   const todayDoneCount = useMemo(() =>
     tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(today)).length,
     [tasks, today],
@@ -977,6 +989,40 @@ export default function DashboardScreen() {
             </View>
           )}
 
+          {/* ── Google Calendar: dziś + jutro ──────────────────────────────── */}
+          {(gcalToday.length > 0 || gcalTomorrow.length > 0) && (
+            <View style={s.statCard}>
+              <View style={s.statCardRow}>
+                <CalendarDays size={13} color={'#039BE5'} />
+                <Text style={[s.statCardLabel, { color: '#039BE5' }]}>Google Kalendarz</Text>
+              </View>
+              {gcalToday.length > 0 && (
+                <>
+                  <Text style={s.gcalDayLabel}>Dziś</Text>
+                  {gcalToday.map(e => (
+                    <View key={e.id} style={s.gcalRow}>
+                      <View style={[s.gcalDot, { backgroundColor: e.color ?? '#039BE5' }]} />
+                      {e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
+                      <Text style={s.gcalTitle} numberOfLines={1}>{e.title}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+              {gcalTomorrow.length > 0 && (
+                <>
+                  <Text style={[s.gcalDayLabel, { marginTop: gcalToday.length > 0 ? 8 : 0 }]}>Jutro</Text>
+                  {gcalTomorrow.map(e => (
+                    <View key={e.id} style={s.gcalRow}>
+                      <View style={[s.gcalDot, { backgroundColor: e.color ?? '#039BE5' }]} />
+                      {e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
+                      <Text style={s.gcalTitle} numberOfLines={1}>{e.title}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </View>
+          )}
+
           {/* ── Calendar events this week ────────────────────────────────────── */}
           {statWeekEvents.length > 0 && (
             <View style={s.statCard}>
@@ -1515,6 +1561,12 @@ const s = StyleSheet.create({
   eventDot:   { width: 8, height: 8, borderRadius: 4 },
   eventDate:  { fontSize: 10, color: colors.text.muted, width: 32 },
   eventTitle: { flex: 1, fontSize: 13, color: colors.text.secondary },
+
+  gcalDayLabel: { fontSize: 9, fontWeight: '700', color: '#039BE5', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  gcalRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
+  gcalDot:      { width: 6, height: 6, borderRadius: 3 },
+  gcalTime:     { fontSize: 10, color: colors.text.muted, width: 36, fontWeight: '600' },
+  gcalTitle:    { flex: 1, fontSize: 13, color: colors.text.secondary },
 
   // 8-week overview
   overviewRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
