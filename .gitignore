@@ -1,5 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# Keystore (never commit - stored as GitHub secret)
+*.keystore
+
 # dependencies
 node_modules/
 
