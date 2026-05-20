@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { PanResponder, Animated, Dimensions } from 'react-native';
 import { router, usePathname, useFocusEffect } from 'expo-router';
 
-const TABS = ['/', '/tasks', '/finances'] as const;
+const TABS = ['/', '/tasks', '/finances', '/stats'] as const;
 const { width: W } = Dimensions.get('window');
 
 // Set before navigate() so the incoming screen reads it in useFocusEffect
