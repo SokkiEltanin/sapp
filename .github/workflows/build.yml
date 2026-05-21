@@ -42,6 +42,9 @@ jobs:
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com
           EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: 1020705470960-h29iavvvn5e1iipg76kdbn8cih7vg5oo.apps.googleusercontent.com
 
+      - name: Copy google-services.json to Android project
+        run: cp google-services.json android/app/google-services.json
+
       - name: Setup signing keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/sapp-release.keystore
