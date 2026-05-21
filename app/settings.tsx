@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -172,12 +173,13 @@ export default function SettingsScreen() {
         await notificationsService.cancelMorningReminder();
       }
       if (briefingEnabled && !isNaN(bh) && !isNaN(bm)) {
-        const today = new Date().toISOString().slice(0, 10);
-        const taskCount = tasks.filter(t => t.status !== 'done' && (t.deadline?.startsWith(today) || t.scheduledDate === today)).length;
-        const eventCount = events.filter(e => e.date === today).length;
-        await notificationsService.scheduleDailyTaskBriefing(bh, bm, { taskCount, eventCount });
+        await AsyncStorage.setItem('notif_todo_enabled', 'true');
+        await AsyncStorage.setItem('notif_todo_hour', String(bh));
+        await AsyncStorage.setItem('notif_todo_min', String(bm));
+        await notificationsService.scheduleDailyTodoList(bh, bm, tasks);
       } else {
-        await notificationsService.cancelDailyTaskBriefing();
+        await AsyncStorage.setItem('notif_todo_enabled', 'false');
+        await notificationsService.cancelDailyTodoList();
       }
       if (habitNotifEnabled && !isNaN(hh) && !isNaN(hmm)) {
         await notificationsService.scheduleDailyHabitReminder(hh, hmm);
@@ -349,14 +351,14 @@ export default function SettingsScreen() {
                   </View>
                 )}
 
-                {/* Daily task briefing */}
+                {/* Daily todo list */}
                 <View style={[styles.row, { paddingTop: 0 }]}>
                   <View style={styles.iconWrap}>
                     <ClipboardList size={14} color={colors.text.secondary} />
                   </View>
                   <View style={styles.rowText}>
-                    <Text style={styles.rowLabel}>Poranny plan dnia</Text>
-                    <Text style={styles.rowSub}>Przypomnienie o zadaniach rano</Text>
+                    <Text style={styles.rowLabel}>Lista zadań</Text>
+                    <Text style={styles.rowSub}>Dziś, jutro i bezterminowe</Text>
                   </View>
                   <Switch
                     value={briefingEnabled}

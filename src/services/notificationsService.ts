@@ -179,9 +179,57 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
   },
 
-  // ─── Smart deadline digests ──────────────────────────────────────────────────
-  // One grouped notification per deadline date (day-before at 9 AM).
-  // Call this with ALL pending tasks whenever the task list changes.
+  // ─── Daily todo list ──────────────────────────────────────────────────────────
+  // Single notification showing tasks due today, tomorrow, and no-deadline count.
+  // Reschedule on every app open so content stays fresh.
+
+  async scheduleDailyTodoList(hour: number, minute: number, tasks: Task[]): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync('daily-todo-list').catch(() => {});
+
+    function pad(n: number) { return String(n).padStart(2, '0'); }
+    const now = new Date();
+    const todayStr    = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    const tomorrowD   = new Date(now); tomorrowD.setDate(now.getDate() + 1);
+    const tomorrowStr = `${tomorrowD.getFullYear()}-${pad(tomorrowD.getMonth()+1)}-${pad(tomorrowD.getDate())}`;
+
+    const pending = tasks.filter(t => t.status === 'pending');
+    if (pending.length === 0) return;
+
+    const todayT     = pending.filter(t => t.deadline?.startsWith(todayStr) || t.scheduledDate === todayStr);
+    const tomorrowT  = pending.filter(t => t.deadline?.startsWith(tomorrowStr) || t.scheduledDate === tomorrowStr);
+    const noDeadline = pending.filter(t => !t.deadline && !t.scheduledDate);
+
+    const shorten = (arr: Task[]) => {
+      const names = arr.slice(0, 2).map(t => t.title).join(', ');
+      return arr.length > 2 ? `${names} +${arr.length - 2}` : names;
+    };
+
+    const parts: string[] = [];
+    if (todayT.length)     parts.push(`Dziś: ${shorten(todayT)}`);
+    if (tomorrowT.length)  parts.push(`Jutro: ${shorten(tomorrowT)}`);
+    if (noDeadline.length) parts.push(`Bezterminowe: ${shorten(noDeadline)}`);
+
+    if (parts.length === 0) return;
+
+    const n = pending.length;
+    const title = `${n} ${n === 1 ? 'zadanie' : n <= 4 ? 'zadania' : 'zadań'} do zrobienia`;
+
+    const fire = new Date(now);
+    fire.setHours(hour, minute, 0, 0);
+    if (fire <= now) fire.setDate(fire.getDate() + 1);
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'daily-todo-list',
+      content: { title, body: parts.join(' · '), data: { screen: 'tasks' } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+    }).catch(() => {});
+  },
+
+  async cancelDailyTodoList(): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync('daily-todo-list').catch(() => {});
+  },
+
+  // ─── Smart deadline digests (legacy — kept for recurring tasks) ───────────────
 
   async scheduleDeadlineDigests(tasks: Task[]): Promise<void> {
     const now = new Date();

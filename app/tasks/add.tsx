@@ -280,8 +280,7 @@ export default function AddTaskScreen() {
     }
     setSaving(true);
     try {
-      const deadlineDate = deadline || selectedDate || todayStr();
-      const deadlineIso  = deadlineDate + 'T23:59:00.000Z';
+      const deadlineIso   = deadline ? deadline + 'T23:59:00.000Z' : undefined;
       const scheduledTime = timeEnabled ? `${pad2(timeHour)}:${pad2(timeMin)}` : undefined;
       const task = await tasksService.addTask({
         title: title.trim(),
@@ -301,7 +300,6 @@ export default function AddTaskScreen() {
       router.back();
       InteractionManager.runAfterInteractions(() => {
         addTask(task);
-        notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
       });
     } catch (e: any) {
       setSaving(false);
@@ -419,11 +417,17 @@ export default function AddTaskScreen() {
               <View style={{ gap: spacing[3] }}>
                 {/* Quick date chips */}
                 <View style={styles.chipRow}>
+                  <TouchableOpacity
+                    style={[styles.chip, !deadline && styles.chipNone]}
+                    onPress={() => { setDeadline(''); setScheduledDate(''); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.chipText, !deadline && styles.chipNoneText]}>Bez terminu</Text>
+                  </TouchableOpacity>
                   {[
-                    { label: 'Dziś',    offset: 0 },
-                    { label: 'Jutro',   offset: 1 },
-                    { label: '+2 dni',  offset: 2 },
-                    { label: '+7 dni',  offset: 7 },
+                    { label: 'Dziś',   offset: 0 },
+                    { label: 'Jutro',  offset: 1 },
+                    { label: '+7 dni', offset: 7 },
                   ].map(({ label, offset }) => {
                     const d = new Date(); d.setDate(d.getDate() + offset);
                     const iso = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
@@ -553,9 +557,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  chipActive: { borderColor: colors.accent.blue, backgroundColor: colors.accent.blue + '20' },
-  chipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
-  chipTextActive: { color: colors.accent.blue },
+  chipActive:    { borderColor: colors.accent.blue,  backgroundColor: colors.accent.blue  + '20' },
+  chipNone:      { borderColor: colors.accent.green, backgroundColor: colors.accent.green + '15' },
+  chipText:      { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  chipTextActive:{ color: colors.accent.blue },
+  chipNoneText:  { color: colors.accent.green, fontWeight: '700' },
 
   timeToggle: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],

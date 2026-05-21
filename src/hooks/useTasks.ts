@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalendarStore } from '@/store/calendarStore';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
@@ -33,7 +34,18 @@ export function useTasks() {
         }
       }
       setTasks(data);
-      notificationsService.scheduleDeadlineDigests(data).catch(() => {});
+      // Reschedule daily todo list with fresh task data
+      AsyncStorage.getItem('notif_todo_enabled').then(enabled => {
+        if (enabled !== 'true') return;
+        return Promise.all([
+          AsyncStorage.getItem('notif_todo_hour'),
+          AsyncStorage.getItem('notif_todo_min'),
+        ]).then(([h, m]) => {
+          const hour = parseInt(h ?? '9');
+          const min  = parseInt(m ?? '0');
+          notificationsService.scheduleDailyTodoList(hour, min, data).catch(() => {});
+        });
+      }).catch(() => {});
     } catch (_) {
     } finally {
       setLoading(false);
@@ -77,7 +89,6 @@ export function useTasks() {
           tags: task.tags ?? [],
           recurring: task.recurring,
         });
-        notificationsService.scheduleTaskDeadlineReminder(id + '_next', task.title, newDeadline).catch(() => {});
       }
     }
   };

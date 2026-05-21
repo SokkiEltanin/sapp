@@ -62,9 +62,6 @@ export default function AddCalendarModal() {
         router.back();
         InteractionManager.runAfterInteractions(() => {
           addTask(task);
-          if (deadlineIso) {
-            notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, deadlineIso).catch(() => {});
-          }
         });
       } else {
         const event = await calendarService.addEvent({
