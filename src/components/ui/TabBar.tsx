@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import {
   LayoutDashboard, ListTodo, Wallet,
   Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare,
-  Smile, ScanLine, Target, Flame, CalendarDays, BarChart2,
+  Smile, ScanLine, Target, Flame, CalendarDays, BarChart2, Briefcase,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +29,7 @@ const TABS = [
 
 const QUICK_ACTIONS = [
   { label: 'Nastrój',         Icon: Smile,        color: colors.accent.pink,   route: '/(tabs)/mood' },
-  { label: 'Statystyki tyg.', Icon: BarChart2,    color: colors.accent.blue,   route: '/weekly' },
+  { label: 'Praca',           Icon: Briefcase,    color: '#60A5FA',            route: '/work/add' },
   { label: 'Nawyki',          Icon: Flame,        color: colors.accent.amber,  route: '/habits' },
   { label: 'Focus',           Icon: Target,       color: colors.accent.purple, route: '/focus' },
   { label: 'Event',           Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },

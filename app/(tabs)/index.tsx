@@ -14,6 +14,7 @@ import {
   BrainCircuit, Plus, ShoppingCart,
   Wallet, FileText, RefreshCw, Calendar,
   Cloud, CloudDrizzle, CloudRain, Snowflake, CloudLightning,
+  Briefcase,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -29,6 +30,9 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, MoodLevel, Expense } from '@/types';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { colors, spacing, radius } from '@/theme';
+import { useWorkStore } from '@/store/workStore';
+import { useWorkEarnings } from '@/hooks/useWorkEarnings';
+import { workService } from '@/services/workService';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { Animated } from 'react-native';
@@ -205,6 +209,8 @@ export default function DashboardScreen() {
   const { tasks, isLoading: tasksLoading, reload: reloadTasks } = useTasks();
   const { habits, todayDone: habitsDone, toggle: toggleHabit, getStreak } = useHabits();
   const pomodoro    = usePomodoroToday();
+  const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
+  const workEarnings = useWorkEarnings(workShifts, workSettings);
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood } = useMoodStore();
   const { events, tasks: calTasks, setEvents } = useCalendarStore();
@@ -231,6 +237,8 @@ export default function DashboardScreen() {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
     if (moodEntries.length === 0) moodService.getAll().then(setMood).catch(() => {});
     getBudgets().then(setBudgets);
+    workService.getSettings().then(setWorkSettings).catch(() => {});
+    workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     loadReports().then(setReports);
     loadMonthlyReports().then(setMonthlyRep);
     loadYearlyReports().then(setYearlyRep);
@@ -750,6 +758,36 @@ export default function DashboardScreen() {
               </View>
             </View>
           )}
+
+          {/* ── Work earnings widget ────────────────────────────────────── */}
+          {workEarnings.isWorking && workEarnings.activeShift && (() => {
+            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked } = workEarnings;
+            const h = Math.floor(secondsWorked / 3600);
+            const m = Math.floor((secondsWorked % 3600) / 60);
+            const timeLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+            return (
+              <TouchableOpacity onPress={() => router.push('/work/add' as any)} activeOpacity={0.85}>
+                <View style={s.workCard}>
+                  <View style={s.workHeader}>
+                    <View style={s.workIconWrap}>
+                      <Briefcase size={16} color="#60A5FA" />
+                    </View>
+                    <View style={s.workTitles}>
+                      <Text style={s.workTitle}>W pracy</Text>
+                      <Text style={s.workSub}>{timeLabel} z {Math.floor(shiftDurationMin / 60)}h {shiftDurationMin % 60 > 0 ? `${shiftDurationMin % 60}m` : ''}</Text>
+                    </View>
+                    <View style={s.workEarnCol}>
+                      <Text style={s.workEarned}>{totalEarned.toFixed(2)} zł</Text>
+                      <Text style={s.workRate}>+{perSecond.toFixed(4)} zł/s</Text>
+                    </View>
+                  </View>
+                  <View style={s.workProgressTrack}>
+                    <View style={[s.workProgressFill, { width: `${progressPct * 100}%` }]} />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          })()}
 
           {/* ══ STATS SECTION ══════════════════════════════════════════════════ */}
 
@@ -1638,4 +1676,21 @@ const s = StyleSheet.create({
   reportDetailVal:    { fontSize: 16, fontWeight: '800', color: colors.text.primary },
   reportDetailLabel:  { fontSize: 9, color: colors.text.muted },
   reportDetailNote:   { fontSize: 12, color: colors.text.secondary, lineHeight: 17, fontStyle: 'italic' },
+
+  // Work earnings widget
+  workCard: {
+    backgroundColor: 'rgba(96,165,250,0.08)', borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(96,165,250,0.25)',
+    padding: spacing[4], gap: spacing[3],
+  },
+  workHeader:       { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  workIconWrap:     { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(96,165,250,0.15)', alignItems: 'center', justifyContent: 'center' },
+  workTitles:       { flex: 1, gap: 2 },
+  workTitle:        { fontSize: 14, fontWeight: '700', color: colors.text.primary },
+  workSub:          { fontSize: 11, color: colors.text.muted },
+  workEarnCol:      { alignItems: 'flex-end', gap: 2 },
+  workEarned:       { fontSize: 20, fontWeight: '900', color: '#60A5FA', letterSpacing: -0.5 },
+  workRate:         { fontSize: 10, color: 'rgba(96,165,250,0.7)' },
+  workProgressTrack:{ height: 3, backgroundColor: 'rgba(96,165,250,0.15)', borderRadius: 2, overflow: 'hidden' },
+  workProgressFill: { height: 3, backgroundColor: '#60A5FA', borderRadius: 2 },
 });

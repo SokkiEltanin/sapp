@@ -199,6 +199,34 @@ export interface HealthDay {
   sleep?: SleepSession;
 }
 
+// ─── Work Shifts & Earnings ───────────────────────────────────────────────────
+
+export interface WorkShift {
+  id: string;
+  date: string;       // YYYY-MM-DD
+  startTime: string;  // HH:mm
+  endTime: string;    // HH:mm
+  note?: string;
+  monthlySalary: number;
+  hoursPerMonth: number; // e.g. 168
+  currency: string;
+  createdAt: string;
+}
+
+export interface WorkSettings {
+  monthlySalary: number;
+  hoursPerMonth: number;
+  currency: string;
+  notifyEveryMinutes: number; // 0 = off
+}
+
+export const DEFAULT_WORK_SETTINGS: WorkSettings = {
+  monthlySalary: 5000,
+  hoursPerMonth: 168,
+  currency: 'PLN',
+  notifyEveryMinutes: 0,
+};
+
 // ─── Habits ───────────────────────────────────────────────────────────────────
 
 export const HABIT_COLORS = [
