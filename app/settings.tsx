@@ -34,7 +34,7 @@ GoogleSignin.configure({
   scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
 });
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '6.0.0';
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
@@ -73,7 +73,7 @@ export default function SettingsScreen() {
       } catch {}
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
-        Alert.alert('Błąd', e.message);
+        Alert.alert('Błąd logowania', `${e.message}\n\nKod: ${e.code ?? 'brak'}`);
       }
     } finally {
       setGoogleLinking(false);

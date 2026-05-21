@@ -89,6 +89,9 @@ jobs:
           print("Signing config injected.")
           PYEOF
 
+      - name: Print keystore SHA-1 (for verification)
+        run: keytool -list -v -keystore android/app/sapp-release.keystore -alias sapp -storepass sapp123release 2>&1 | grep "SHA1:"
+
       - name: Build release APK
         run: cd android && ./gradlew assembleRelease --no-daemon -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease
         env:
