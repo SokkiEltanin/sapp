@@ -7,18 +7,18 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1020705470960:android:d349482366b8a1752ec535",
+        "mobilesdk_app_id": "1:1020705470960:android:6e1b8b40d6b31c6e2ec535",
         "android_client_info": {
-          "package_name": "sokkieltanin.sapp"
+          "package_name": "com.sokki.sapp"
         }
       },
       "oauth_client": [
         {
-          "client_id": "1020705470960-o6ubrbsb7tmmbma9ei0rmlu3oct6j0e6.apps.googleusercontent.com",
+          "client_id": "1020705470960-nel2cekaackgi2ctbf0qgcujmfs2p9p9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "sokkieltanin.sapp",
-            "certificate_hash": "7a0c1a34b9602d00c5f51755ecd51db7ff3eb29d"
+            "package_name": "com.sokki.sapp",
+            "certificate_hash": "a07035432fe53944e21f00f6738dada27eeafc88"
           }
         },
         {
