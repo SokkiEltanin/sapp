@@ -13,9 +13,148 @@ import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
 
-// ─── Mood Insights ────────────────────────────────────────────────────────────
+// ─── Keyword analysis from free-text notes ────────────────────────────────────
 
 const DOW_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
+
+const PL_STOPWORDS = new Set([
+  'i','w','z','do','na','że','się','jest','to','nie','ale','jak','też','już',
+  'ten','ta','tam','tak','bo','po','przy','przez','od','dla','go','mu','ich',
+  'jej','tego','temu','mnie','mi','ja','ty','on','ona','my','wy','oni','co',
+  'kto','czy','ani','by','być','mieć','mam','masz','mają','mamy','bardzo',
+  'jeszcze','tylko','właśnie','jednak','teraz','tutaj','trochę','dużo','więc',
+  'może','chyba','dzisiaj','dziś','wczoraj','jutro','czasem','zawsze','nigdy',
+  'każdy','coś','nic','tej','jest','są','był','była','było','będzie','będę',
+  'sobie','swój','swoją','jego','jej','nam','nas','was','was','tego','tych',
+  'było','który','która','które','tego','przy','nad','pod','przed','między',
+  'żeby','kiedy','gdzie','skąd','wtedy','potem','zaraz','już','znowu','chyba',
+]);
+
+interface KeywordStat {
+  word: string;
+  goodCount: number;
+  badCount: number;
+  totalCount: number;
+  sentiment: number; // -1..+1
+}
+
+function extractKeywords(entries: MoodEntry[]): { positive: KeywordStat[]; negative: KeywordStat[] } {
+  const stats: Record<string, { good: number; bad: number }> = {};
+
+  for (const entry of entries) {
+    if (!entry.note?.trim()) continue;
+    const isGood = entry.mood >= 4;
+    const isBad  = entry.mood <= 2;
+    if (!isGood && !isBad) continue; // skip neutral entries (mood 3)
+
+    const words = entry.note
+      .toLowerCase()
+      .replace(/[^a-ząćęłńóśźżA-ZĄĆĘŁŃÓŚŹŻ\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !PL_STOPWORDS.has(w) && !/^\d+$/.test(w));
+
+    for (const word of words) {
+      if (!stats[word]) stats[word] = { good: 0, bad: 0 };
+      if (isGood) stats[word].good++;
+      if (isBad)  stats[word].bad++;
+    }
+  }
+
+  const all: KeywordStat[] = Object.entries(stats)
+    .map(([word, s]) => ({
+      word,
+      goodCount: s.good,
+      badCount: s.bad,
+      totalCount: s.good + s.bad,
+      sentiment: (s.good - s.bad) / (s.good + s.bad),
+    }))
+    .filter(k => k.totalCount >= 2);
+
+  const positive = all
+    .filter(k => k.sentiment > 0.2)
+    .sort((a, b) => b.sentiment * Math.log(b.totalCount + 1) - a.sentiment * Math.log(a.totalCount + 1))
+    .slice(0, 8);
+
+  const negative = all
+    .filter(k => k.sentiment < -0.2)
+    .sort((a, b) => a.sentiment * Math.log(b.totalCount + 1) - b.sentiment * Math.log(a.totalCount + 1))
+    .slice(0, 8);
+
+  return { positive, negative };
+}
+
+function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
+  const withNotes = entries.filter(e => e.note?.trim() && (e.mood >= 4 || e.mood <= 2));
+  if (withNotes.length < 4) return null;
+
+  const { positive, negative } = extractKeywords(entries);
+  if (positive.length === 0 && negative.length === 0) return null;
+
+  return (
+    <View style={kw.card}>
+      <View style={kw.header}>
+        <Tag size={13} color={colors.text.muted} />
+        <Text style={kw.title}>Twoje słowa kluczowe</Text>
+      </View>
+      <Text style={kw.subtitle}>Na podstawie Twoich notatek i nastroju</Text>
+
+      {positive.length > 0 && (
+        <View style={kw.section}>
+          <Text style={[kw.sectionLabel, { color: '#4CAF50' }]}>Co Cię uszczęśliwia</Text>
+          <View style={kw.chips}>
+            {positive.map(k => (
+              <View key={k.word} style={[kw.chip, { backgroundColor: '#4CAF5018', borderColor: '#4CAF5040' }]}>
+                <Text style={[kw.chipWord, { color: '#4CAF50' }]}>{k.word}</Text>
+                {k.totalCount > 2 && (
+                  <Text style={[kw.chipCount, { color: '#4CAF5099' }]}>{k.totalCount}×</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {negative.length > 0 && (
+        <View style={kw.section}>
+          <Text style={[kw.sectionLabel, { color: colors.accent.red }]}>Co Cię stresuje / denerwuje</Text>
+          <View style={kw.chips}>
+            {negative.map(k => (
+              <View key={k.word} style={[kw.chip, { backgroundColor: colors.accent.red + '18', borderColor: colors.accent.red + '40' }]}>
+                <Text style={[kw.chipWord, { color: colors.accent.red }]}>{k.word}</Text>
+                {k.totalCount > 2 && (
+                  <Text style={[kw.chipCount, { color: colors.accent.red + '99' }]}>{k.totalCount}×</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const kw = StyleSheet.create({
+  card: {
+    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+  },
+  header:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title: {
+    fontSize: 10, fontWeight: '700', color: colors.text.muted,
+    textTransform: 'uppercase', letterSpacing: 0.8,
+  },
+  subtitle: { fontSize: 11, color: colors.text.muted, marginTop: -spacing[1] },
+  section:  { gap: spacing[2] },
+  sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: 5,
+    borderRadius: radius.full, borderWidth: 1,
+  },
+  chipWord:  { fontSize: 12, fontWeight: '600' },
+  chipCount: { fontSize: 10, fontWeight: '500' },
+});
 
 const MOOD_EMOJIS: Record<MoodLevel, string> = { 1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩' };
 const ENERGY_EMOJIS: Record<MoodLevel, string> = { 1: '😴', 2: '😌', 3: '⚡', 4: '✨', 5: '🚀' };
@@ -368,6 +507,7 @@ export default function MoodScreen() {
 
         {/* Insights */}
         <MoodInsights entries={entries} />
+        <KeywordInsights entries={entries} />
 
         {/* Recent entries */}
         {recent.length > 0 && (
