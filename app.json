@@ -23,6 +23,7 @@
         "backgroundColor": "#0D0D0D"
       },
       "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json",
       "package": "com.sokki.sapp",
       "permissions": [
         "android.permission.INTERNET",

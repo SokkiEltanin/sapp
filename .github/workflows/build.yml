@@ -89,6 +89,11 @@ jobs:
           print("Signing config injected.")
           PYEOF
 
+      - name: Verify google-services.json placement
+        run: |
+          echo "--- android/app/google-services.json ---"
+          cat android/app/google-services.json | grep -E "package_name|certificate_hash"
+
       - name: Print keystore SHA-1 (for verification)
         run: keytool -list -v -keystore android/app/sapp-release.keystore -alias sapp -storepass sapp123release 2>&1 | grep "SHA1:"
 

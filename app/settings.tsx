@@ -30,7 +30,8 @@ import { appSettings } from '@/utils/appSettings';
 import { googleCalendarService } from '@/services/googleCalendarService';
 
 GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  webClientId: '1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com',
+  offlineAccess: true,
   scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
 });
 
