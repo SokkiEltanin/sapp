@@ -2,11 +2,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
   Modal, TouchableOpacity, NativeScrollEvent, NativeSyntheticEvent,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Briefcase, X } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Briefcase, List, LayoutGrid } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -30,6 +29,8 @@ const MONTH_NAMES = [
 const MONTH_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 const DAY_SHORT = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
+
+type CalMode = 'week' | 'month' | 'detailed';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -71,7 +72,6 @@ function MonthModal({
   events, tasks, moodEntries,
   workColor, onEventPress, onAddEvent,
 }: MonthModalProps) {
-  // All events for the viewed month, grouped by date
   const monthEvents = useMemo(() => {
     const prefix = `${viewYear}-${pad(viewMonth + 1)}`;
     const filtered = events
@@ -103,7 +103,6 @@ function MonthModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={m.safe} edges={['top', 'bottom']}>
-        {/* Header */}
         <View style={m.header}>
           <TouchableOpacity onPress={onPrevMonth} style={m.navBtn} activeOpacity={0.7}>
             <ChevronLeft size={18} color={colors.text.secondary} />
@@ -130,7 +129,6 @@ function MonthModal({
           contentContainerStyle={m.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Full calendar grid */}
           <View style={m.gridWrap}>
             <CalendarGrid
               year={viewYear}
@@ -143,7 +141,6 @@ function MonthModal({
             />
           </View>
 
-          {/* Month event list */}
           {monthEvents.length > 0 ? (
             <View style={m.eventList}>
               <Text style={m.listHeader}>Eventy w tym miesiącu</Text>
@@ -232,19 +229,15 @@ const m = StyleSheet.create({
   headerRight:{ flexDirection: 'row', gap: spacing[2], marginLeft: spacing[1] },
   addBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-
   scroll:     { paddingBottom: 40 },
   gridWrap:   { paddingHorizontal: spacing[2], paddingTop: spacing[3], paddingBottom: spacing[3] },
-
   eventList:  { paddingHorizontal: spacing[4], gap: spacing[2] },
   listHeader: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: spacing[1], marginTop: spacing[2] },
-
   dayGroup:   { gap: spacing[1] },
   dayLabel:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4, paddingHorizontal: spacing[2], borderRadius: radius.md },
   dayLabelSel:{ backgroundColor: 'rgba(255,255,255,0.04)' },
   dayLabelText:{ fontSize: 11, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
   todayDot:   { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent.blue },
-
   eventRow:   { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', minHeight: 52, gap: 0 },
   colorBar:   { width: 3, alignSelf: 'stretch' },
   eventMeta:  { width: 68, paddingVertical: spacing[3], paddingLeft: spacing[3], gap: 2 },
@@ -255,7 +248,6 @@ const m = StyleSheet.create({
   eventDesc:  { fontSize: 11, color: colors.text.muted, marginTop: 2 },
   workBadge:  { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, marginRight: spacing[3] },
   workBadgeText:{ fontSize: 9, fontWeight: '700' },
-
   emptyMonth: { alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] },
   emptyMonthText:{ fontSize: 14, color: colors.text.muted, fontWeight: '500' },
 });
@@ -270,6 +262,7 @@ export default function CalendarScreen() {
   const { settings: workSettings } = useWorkStore();
 
   const now = new Date();
+  const [calMode, setCalMode]       = useState<CalMode>('month');
   const [viewYear, setViewYear]     = useState(now.getFullYear());
   const [viewMonth, setViewMonth]   = useState(now.getMonth());
   const [refreshing, setRefreshing] = useState(false);
@@ -363,6 +356,62 @@ export default function CalendarScreen() {
   const hasSelected = selectedEvents.length > 0 || selectedTasks.length > 0;
   const isToday = selectedDate === todayStr();
 
+  // ─── Shared day detail section ─────────────────────────────────────────────
+  const DayDetail = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>
+        {hasSelected ? fmtDay(selectedDate) : 'Nadchodzące zadania'}
+      </Text>
+
+      {hasSelected ? (
+        <>
+          {selectedEvents.some(e => e.startTime) ? (
+            <DayTimeline
+              events={selectedEvents}
+              date={selectedDate}
+              onPress={(id) => router.push(`/calendar/${id}` as any)}
+              onAddAtTime={(time) => router.push(`/calendar/add?startTime=${time}&type=event` as any)}
+            />
+          ) : (
+            selectedEvents.map((ev) => (
+              <PressableScale key={ev.id} onPress={() => router.push(`/calendar/${ev.id}` as any)}>
+                <View style={styles.eventRow}>
+                  {ev.color && <View style={[styles.evColorBar, { backgroundColor: ev.color }]} />}
+                  <View style={styles.evTime}>
+                    <Text style={styles.evTimeText}>{ev.startTime ?? '—'}</Text>
+                    {ev.endTime && <Text style={styles.evTimeSub}>{ev.endTime}</Text>}
+                  </View>
+                  <View style={styles.evInfo}>
+                    <Text style={styles.evTitle}>{ev.title}</Text>
+                    {ev.description ? (
+                      <Text style={styles.evDesc} numberOfLines={1}>{ev.description}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              </PressableScale>
+            ))
+          )}
+          {selectedTasks.map((t, i) => (
+            <TaskItem
+              key={t.id} task={t} index={selectedEvents.length + i}
+              onToggle={toggleTask}
+              onPress={(id) => router.push(`/tasks/${id}` as any)}
+            />
+          ))}
+        </>
+      ) : upcomingTasks.length > 0 ? (
+        upcomingTasks.map((t, i) => (
+          <TaskItem key={t.id} task={t} index={i} onToggle={toggleTask} onPress={(id) => router.push(`/tasks/${id}` as any)} />
+        ))
+      ) : (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>Brak zadań</Text>
+          <Text style={styles.emptyHint}>Dotknij "Dodaj" poniżej</Text>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
       {/* Full-screen month modal */}
@@ -398,107 +447,148 @@ export default function CalendarScreen() {
         }
       />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
-        {/* Month nav — tap to expand full screen */}
-        <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
-          <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
-            <ChevronLeft size={18} color={colors.text.secondary} />
-          </TouchableOpacity>
+      {/* Mode toggle bar */}
+      <View style={styles.modeBar}>
+        <TouchableOpacity
+          style={[styles.modeTab, calMode === 'week' && styles.modeTabActive]}
+          onPress={() => setCalMode('week')}
+          activeOpacity={0.7}
+        >
+          <CalendarDays size={13} color={calMode === 'week' ? colors.text.primary : colors.text.muted} />
+          <Text style={[styles.modeTabText, calMode === 'week' && styles.modeTabTextActive]}>Tydzień</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, calMode === 'month' && styles.modeTabActive]}
+          onPress={() => setCalMode('month')}
+          activeOpacity={0.7}
+        >
+          <LayoutGrid size={13} color={calMode === 'month' ? colors.text.primary : colors.text.muted} />
+          <Text style={[styles.modeTabText, calMode === 'month' && styles.modeTabTextActive]}>Miesiąc</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, calMode === 'detailed' && styles.modeTabActive]}
+          onPress={() => setCalMode('detailed')}
+          activeOpacity={0.7}
+        >
+          <List size={13} color={calMode === 'detailed' ? colors.text.primary : colors.text.muted} />
+          <Text style={[styles.modeTabText, calMode === 'detailed' && styles.modeTabTextActive]}>Szczegółowy</Text>
+        </TouchableOpacity>
+      </View>
 
-          <View style={styles.monthTitleBtn}>
-            <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
-            <Text style={styles.yearLabel}>{viewYear}</Text>
-            <CalendarDays size={12} color={colors.text.muted} style={{ marginLeft: 4 }} />
-            <View style={styles.expandHint}>
-              <ChevronDown size={10} color={colors.text.muted} />
+      {/* ── Week view ──────────────────────────────────────────────────────── */}
+      {calMode === 'week' && (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          <View style={styles.weekCard}>
+            <View style={styles.weekNavRow}>
+              <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.weekNavBtn}>
+                <ChevronLeft size={15} color={colors.text.muted} />
+              </PressableScale>
+              <WeekStrip
+                selectedDate={selectedDate}
+                events={events}
+                tasks={tasks}
+                moodEntries={moodEntries}
+                weekOffset={weekOffset}
+                onSelectDate={(d) => { setSelectedDate(d); setWeekOffset(0); }}
+              />
+              <PressableScale onPress={() => setWeekOffset(w => w + 1)} style={styles.weekNavBtn}>
+                <ChevronRight size={15} color={colors.text.muted} />
+              </PressableScale>
             </View>
           </View>
+          <DayDetail />
+        </ScrollView>
+      )}
 
-          <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
-            <ChevronRight size={18} color={colors.text.secondary} />
+      {/* ── Month compact view ─────────────────────────────────────────────── */}
+      {calMode === 'month' && (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          {/* Month nav — tap to expand full screen */}
+          <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
+            <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
+              <ChevronLeft size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <View style={styles.monthTitleBtn}>
+              <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
+              <Text style={styles.yearLabel}>{viewYear}</Text>
+              <View style={styles.expandHint}>
+                <ChevronDown size={10} color={colors.text.muted} />
+              </View>
+            </View>
+            <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
+              <ChevronRight size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
 
-        {/* Week strip — always visible */}
-        <View style={styles.weekCard}>
-          <View style={styles.weekNavRow}>
-            <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.weekNavBtn}>
-              <ChevronLeft size={15} color={colors.text.muted} />
-            </PressableScale>
-            <WeekStrip
+          <View style={styles.gridCard}>
+            <CalendarGrid
+              year={viewYear}
+              month={viewMonth}
               selectedDate={selectedDate}
               events={events}
               tasks={tasks}
               moodEntries={moodEntries}
-              weekOffset={weekOffset}
-              onSelectDate={(d) => { setSelectedDate(d); setWeekOffset(0); }}
+              onSelectDate={handleSelectDate}
             />
-            <PressableScale onPress={() => setWeekOffset(w => w + 1)} style={styles.weekNavBtn}>
-              <ChevronRight size={15} color={colors.text.muted} />
-            </PressableScale>
           </View>
-        </View>
 
-        {/* Day detail */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            {hasSelected ? fmtDay(selectedDate) : 'Nadchodzące zadania'}
-          </Text>
+          <DayDetail />
+        </ScrollView>
+      )}
 
-          {hasSelected ? (
-            <>
-              {selectedEvents.some(e => e.startTime) ? (
-                <DayTimeline
-                  events={selectedEvents}
-                  date={selectedDate}
-                  onPress={(id) => router.push(`/calendar/${id}` as any)}
-                  onAddAtTime={(time) => router.push(`/calendar/add?startTime=${time}&type=event` as any)}
-                />
-              ) : (
-                selectedEvents.map((ev) => (
-                  <PressableScale key={ev.id} onPress={() => router.push(`/calendar/${ev.id}` as any)}>
-                    <View style={styles.eventRow}>
-                      {ev.color && <View style={[styles.evColorBar, { backgroundColor: ev.color }]} />}
-                      <View style={styles.evTime}>
-                        <Text style={styles.evTimeText}>{ev.startTime ?? '—'}</Text>
-                        {ev.endTime && <Text style={styles.evTimeSub}>{ev.endTime}</Text>}
-                      </View>
-                      <View style={styles.evInfo}>
-                        <Text style={styles.evTitle}>{ev.title}</Text>
-                        {ev.description ? (
-                          <Text style={styles.evDesc} numberOfLines={1}>{ev.description}</Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  </PressableScale>
-                ))
-              )}
-              {selectedTasks.map((t, i) => (
-                <TaskItem
-                  key={t.id} task={t} index={selectedEvents.length + i}
-                  onToggle={toggleTask}
-                  onPress={(id) => router.push(`/tasks/${id}` as any)}
-                />
-              ))}
-            </>
-          ) : upcomingTasks.length > 0 ? (
-            upcomingTasks.map((t, i) => (
-              <TaskItem key={t.id} task={t} index={i} onToggle={toggleTask} onPress={(id) => router.push(`/tasks/${id}` as any)} />
-            ))
-          ) : (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>Brak zadań</Text>
-              <Text style={styles.emptyHint}>Dotknij "Dodaj" poniżej</Text>
+      {/* ── Monthly detailed view ──────────────────────────────────────────── */}
+      {calMode === 'detailed' && (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
+            <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
+              <ChevronLeft size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <View style={styles.monthTitleBtn}>
+              <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
+              <Text style={styles.yearLabel}>{viewYear}</Text>
+              <View style={styles.expandHint}>
+                <ChevronDown size={10} color={colors.text.muted} />
+              </View>
             </View>
-          )}
-        </View>
-      </ScrollView>
+            <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
+              <ChevronRight size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+
+          <View style={styles.gridCard}>
+            <CalendarGrid
+              year={viewYear}
+              month={viewMonth}
+              selectedDate={selectedDate}
+              events={events}
+              tasks={tasks}
+              moodEntries={moodEntries}
+              onSelectDate={handleSelectDate}
+              detailed
+            />
+          </View>
+
+          <DayDetail />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -519,6 +609,29 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
+  // Mode toggle
+  modeBar: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: spacing[1],
+  },
+  modeTab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: spacing[2],
+    borderRadius: radius.md,
+    borderWidth: 1, borderColor: 'transparent',
+  },
+  modeTabActive: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  modeTabText: { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
+  modeTabTextActive: { color: colors.text.primary, fontWeight: '700' },
+
+  // Month nav
   monthNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2],
@@ -538,8 +651,16 @@ const styles = StyleSheet.create({
   yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },
   expandHint: { marginLeft: 2, opacity: 0.5 },
 
+  gridCard: {
+    marginHorizontal: spacing[2], marginTop: spacing[1],
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
+    overflow: 'hidden',
+  },
+
+  // Week view
   weekCard: {
-    marginHorizontal: spacing[2], marginTop: spacing[2],
+    marginHorizontal: spacing[2], marginTop: spacing[3],
     backgroundColor: colors.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
   },

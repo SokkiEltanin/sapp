@@ -203,7 +203,7 @@ function WeatherIco({ icon, size, color }: { icon: WeatherIcon; size: number; co
 const WAVE_W = 320;
 const WAVE_H = 72;
 
-function WaveChart({ data, color }: { data: number[]; color: string }) {
+function WaveChart({ data, color, dotColors }: { data: number[]; color: string; dotColors?: (string | null)[] }) {
   if (data.length < 2) return null;
   const max = Math.max(...data, 1);
   const pts = data.map((v, i) => ({
@@ -230,14 +230,17 @@ function WaveChart({ data, color }: { data: number[]; color: string }) {
       </Defs>
       <Path d={fill} fill={`url(#wg_${color.replace('#', '')})`} />
       <Path d={line} stroke={color} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-      {pts.map((p, i) => (
-        <Path
-          key={i}
-          d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0`}
-          fill={color}
-          opacity={data[i] > 0 ? '1' : '0.2'}
-        />
-      ))}
+      {pts.map((p, i) => {
+        const dotColor = dotColors?.[i] ?? color;
+        return (
+          <Path
+            key={i}
+            d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -4 0 a 4 4 0 1 0 8 0 a 4 4 0 1 0 -8 0`}
+            fill={dotColor}
+            opacity={data[i] > 0 ? '1' : '0.2'}
+          />
+        );
+      })}
     </Svg>
   );
 }
@@ -1233,6 +1236,7 @@ export default function DashboardScreen() {
               <WaveChart
                 data={weekOverview.map(w => waveTab === 'food' ? w.food : w.sweets)}
                 color={waveTab === 'food' ? colors.accent.green : colors.accent.amber}
+                dotColors={weekOverview.map(w => w.avgMood ? moodColor(w.avgMood) : null)}
               />
               {/* week labels below chart */}
               <View style={s.waveLabels}>
@@ -1255,60 +1259,6 @@ export default function DashboardScreen() {
                 ))}
               </View>
             </View>
-
-            {weekOverview.map((w, i) => {
-              const col = w.avgMood ? moodColor(w.avgMood) : 'rgba(255,255,255,0.08)';
-              const sweetsPct = w.food > 0 ? Math.round(w.sweets / w.food * 100) : 0;
-              return (
-                <TouchableOpacity
-                  key={i}
-                  style={[s.overviewRow, w.isCurrent && s.overviewRowCurrent]}
-                  onPress={() => setStatsWeekOffset(w.offset)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.overviewLabel, w.isCurrent && { color: colors.text.primary, fontWeight: '600' }]}>
-                    {w.label}
-                  </Text>
-                  <View style={[s.overviewDot, { backgroundColor: col }]}>
-                    {w.avgMood && <Text style={s.overviewDotVal}>{w.avgMood.toFixed(1)}</Text>}
-                  </View>
-                  <View style={s.overviewWeather}>
-                    {w.weather
-                      ? <>
-                          <WeatherIco icon={w.weather.icon} size={11} color={colors.text.muted} />
-                          <Text style={s.overviewTemp}>{w.weather.avgTemp}°</Text>
-                        </>
-                      : <Text style={s.overviewTemp}>—</Text>
-                    }
-                  </View>
-                  <View style={s.overviewAmtCol}>
-                    {w.food > 0 && <Text style={[s.overviewAmt, { color: colors.accent.green }]}>{w.food.toFixed(0)} zł</Text>}
-                    {w.sweets > 0 && <Text style={[s.overviewAmt, { color: colors.accent.amber }]}>{sweetsPct}%</Text>}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            <View style={s.overviewLegend}>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: colors.accent.pink }]} />
-                <Text style={s.legendText}>nastrój</Text>
-              </View>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: colors.accent.green }]} />
-                <Text style={s.legendText}>jedzenie zł</Text>
-              </View>
-              <View style={s.legendItem}>
-                <View style={[s.legendDot, { backgroundColor: colors.accent.amber }]} />
-                <Text style={s.legendText}>słodycze %</Text>
-              </View>
-              {weatherData.length > 0 && (
-                <View style={s.legendItem}>
-                  <Cloud size={9} color={colors.text.muted} />
-                  <Text style={s.legendText}>pogoda °C</Text>
-                </View>
-              )}
-            </View>
-
             {moodFoodCorr && (moodFoodCorr.goodCount > 0 || moodFoodCorr.badCount > 0) && (
               <View style={s.corrBox}>
                 <Text style={s.corrTitle}>Korelacja nastrój ↔ jedzenie</Text>

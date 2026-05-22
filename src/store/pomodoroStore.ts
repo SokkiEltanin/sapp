@@ -3,6 +3,12 @@ import { logSession } from '@/utils/pomodoroHistory';
 
 export type PomodoroMode = 'work' | 'break' | 'long_break';
 
+export interface PomodoroMilestone {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
 interface PomodoroState {
   taskId: string | null;
   taskTitle: string | null;
@@ -13,6 +19,7 @@ interface PomodoroState {
   remaining: number;
   isRunning: boolean;
   completedRounds: number;
+  milestones: PomodoroMilestone[];
 
   startFor: (taskId: string | null, taskTitle: string | null) => void;
   pause: () => void;
@@ -21,6 +28,9 @@ interface PomodoroState {
   tick: () => void;
   nextRound: () => void;
   setWorkMins: (v: number) => void;
+  addMilestone: (label: string) => void;
+  toggleMilestone: (id: string) => void;
+  clearMilestones: () => void;
 }
 
 let _interval: ReturnType<typeof setInterval> | null = null;
@@ -39,11 +49,12 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => ({
   remaining: 25 * 60,
   isRunning: false,
   completedRounds: 0,
+  milestones: [],
 
   startFor: (taskId, taskTitle) => {
     clearTick();
     const { workMins } = get();
-    set({ taskId, taskTitle, mode: 'work', remaining: workMins * 60, isRunning: true, completedRounds: 0 });
+    set({ taskId, taskTitle, mode: 'work', remaining: workMins * 60, isRunning: true, completedRounds: 0, milestones: [] });
     _interval = setInterval(() => get().tick(), 1000);
   },
 
@@ -100,4 +111,17 @@ export const usePomodoroStore = create<PomodoroState>((set, get) => ({
     clearTick();
     set({ workMins: v, remaining: v * 60, isRunning: false, mode: 'work' });
   },
+
+  addMilestone: (label) => {
+    const id = Date.now().toString();
+    set(s => ({ milestones: [...s.milestones, { id, label, done: false }] }));
+  },
+
+  toggleMilestone: (id) => {
+    set(s => ({
+      milestones: s.milestones.map(m => m.id === id ? { ...m, done: !m.done } : m),
+    }));
+  },
+
+  clearMilestones: () => set({ milestones: [] }),
 }));

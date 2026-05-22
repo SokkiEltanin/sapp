@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder } from 'react-native';
 import { router } from 'expo-router';
 import { Timer } from 'lucide-react-native';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -16,6 +16,31 @@ export default function PomodoroIndicator() {
 
   const pulse = useRef(new Animated.Value(1)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const pan = useRef(new Animated.ValueXY()).current;
+  const didMove = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 4 || Math.abs(gs.dy) > 4,
+      onPanResponderGrant: () => {
+        didMove.current = false;
+        pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (_, gs) => {
+        didMove.current = true;
+        pan.setValue({ x: gs.dx, y: gs.dy });
+      },
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+        if (!didMove.current) {
+          router.push('/pomodoro' as any);
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     loopRef.current?.stop();
@@ -40,15 +65,24 @@ export default function PomodoroIndicator() {
     : mode === 'break' ? colors.accent.success : colors.accent.warning;
 
   return (
-    <View style={styles.wrap}>
-      <TouchableOpacity onPress={() => router.push('/pomodoro' as any)} activeOpacity={0.8} style={styles.pill}>
-        <Animated.View style={[styles.dot, { backgroundColor: modeColor, opacity: pulse }]} />
-        <Timer size={11} color={modeColor} />
-        <Text style={[styles.time, { color: modeColor }]}>{fmt(remaining)}</Text>
-        {taskTitle && (
-          <Text style={styles.task} numberOfLines={1}>{taskTitle}</Text>
-        )}
-      </TouchableOpacity>
+    <View style={styles.wrap} pointerEvents="box-none">
+      <Animated.View
+        style={[styles.draggable, { transform: pan.getTranslateTransform() }]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity
+          onPress={() => { if (!didMove.current) router.push('/pomodoro' as any); }}
+          activeOpacity={0.85}
+          style={styles.pill}
+        >
+          <Animated.View style={[styles.dot, { backgroundColor: modeColor, opacity: pulse }]} />
+          <Timer size={11} color={modeColor} />
+          <Text style={[styles.time, { color: modeColor }]}>{fmt(remaining)}</Text>
+          {taskTitle && (
+            <Text style={styles.task} numberOfLines={1}>{taskTitle}</Text>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -56,9 +90,13 @@ export default function PomodoroIndicator() {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
+    left: 0, right: 0,
     bottom: 88,
-    alignSelf: 'center',
+    alignItems: 'center',
     zIndex: 999,
+  },
+  draggable: {
+    alignItems: 'center',
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

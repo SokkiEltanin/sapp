@@ -16,9 +16,10 @@ interface Props {
   tasks: Task[];
   moodEntries?: MoodEntry[];
   onSelectDate: (date: string) => void;
+  detailed?: boolean;
 }
 
-export default function CalendarGrid({ year, month, selectedDate, events, tasks, moodEntries = [], onSelectDate }: Props) {
+export default function CalendarGrid({ year, month, selectedDate, events, tasks, moodEntries = [], onSelectDate, detailed = false }: Props) {
   const numDays = daysInMonth(year, month);
   const offset = startOffset(year, month);
   const today = new Date();
@@ -31,6 +32,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
   while (cells.length % 7 !== 0) cells.push(null);
 
   const ds = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
+  const eventsFor = (day: number) => events.filter(e => e.date.startsWith(ds(day)));
   const evColor = (day: number) => {
     const ev = events.find(e => e.date.startsWith(ds(day)));
     return ev ? (ev.color ?? 'rgba(255,255,255,0.4)') : null;
@@ -52,9 +54,9 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
       </View>
 
       {Array.from({ length: cells.length / 7 }, (_, w) => (
-        <View key={w} style={styles.row}>
+        <View key={w} style={[styles.row, detailed && styles.rowDetailed]}>
           {cells.slice(w * 7, w * 7 + 7).map((day, i) => {
-            if (!day) return <View key={i} style={styles.cellWrap} />;
+            if (!day) return <View key={i} style={[styles.cellWrap, detailed && styles.cellWrapDetailed]} />;
             const d = ds(day);
             const sel = d === selectedDate;
             const isTd = d === todayStr;
@@ -64,6 +66,41 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
             const tk = hasTk(day);
             const urgent = hasHighTk(day);
             const mood = moodFor(day);
+            const dayEvents = detailed ? eventsFor(day).slice(0, 2) : [];
+
+            if (detailed) {
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => onSelectDate(d)}
+                  style={[styles.detailedCell, sel && styles.detailedCellSel, isTd && !sel && styles.detailedCellToday]}
+                >
+                  <View style={styles.detailedTop}>
+                    <Text style={[
+                      styles.num,
+                      sel && styles.numSel,
+                      isTd && !sel && styles.numToday,
+                      isWeekend && !sel && styles.numWeekend,
+                    ]}>
+                      {day}
+                    </Text>
+                    {mood && (
+                      <View style={[styles.moodDotTiny, { backgroundColor: MOOD_COLORS[mood.mood] }]} />
+                    )}
+                  </View>
+                  {dayEvents.map((ev, ei) => (
+                    <View key={ei} style={[styles.eventPill, { borderLeftColor: ev.color ?? colors.accent.blue }]}>
+                      <Text style={styles.eventPillText} numberOfLines={1}>{ev.title}</Text>
+                    </View>
+                  ))}
+                  {tk && dayEvents.length < 2 && (
+                    <View style={[styles.eventPill, { borderLeftColor: urgent ? colors.accent.danger : 'rgba(255,255,255,0.3)' }]}>
+                      <Text style={styles.eventPillText} numberOfLines={1}>zadanie</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            }
 
             return (
               <View key={i} style={styles.cellWrap}>
@@ -146,4 +183,25 @@ const styles = StyleSheet.create({
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
   dotSel: { backgroundColor: colors.bg.primary + 'BB' },
   dotUrgent: { backgroundColor: colors.accent.danger },
+
+  // Detailed mode
+  rowDetailed: { alignItems: 'stretch' },
+  cellWrapDetailed: { flex: 1, minHeight: 68 },
+  detailedCell: {
+    flex: 1, minHeight: 68,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 3, paddingTop: 4, paddingBottom: 3,
+    gap: 2,
+  },
+  detailedCellSel: { backgroundColor: 'rgba(255,255,255,0.07)' },
+  detailedCellToday: { backgroundColor: 'rgba(255,255,255,0.04)' },
+  detailedTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  moodDotTiny: { width: 6, height: 6, borderRadius: 3 },
+  eventPill: {
+    borderLeftWidth: 2, borderLeftColor: colors.accent.blue,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 3, paddingVertical: 1,
+    borderRadius: 2,
+  },
+  eventPillText: { fontSize: 8, color: colors.text.secondary, fontWeight: '500' },
 });

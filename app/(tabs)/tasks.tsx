@@ -1,5 +1,4 @@
 ﻿import { useState, useMemo, useRef } from 'react';
-import CalendarView from '@/components/calendar/CalendarView';
 import {
   View, Text, StyleSheet, SectionList, RefreshControl,
   TouchableOpacity, Alert, Modal, Pressable, ScrollView, Animated, TextInput,
@@ -10,7 +9,7 @@ import { router } from 'expo-router';
 import {
   CheckCircle2, Circle, Clock, Flame, Timer,
   Search, RefreshCw, AlarmClock, BellOff, CheckSquare,
-  Trash2, CalendarClock, X as XIcon, CalendarDays, ListTodo, BarChart2, Lightbulb,
+  Trash2, CalendarClock, X as XIcon, BarChart2, Lightbulb,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -386,7 +385,6 @@ export default function TasksScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks, isLoading, reload, toggle, remove, update, snooze, unsnooze } = useTasks();
   const startPomodoro = usePomodoroStore(s => s.startFor);
-  const [viewMode, setViewMode]     = useState<'list' | 'calendar'>('list');
   const [filter, setFilter]         = useState<FilterKey>('all');
   const [moodModal, setMoodModal]   = useState(false);
   const [completedTask, setCompletedTask] = useState<Task | null>(null);
@@ -558,35 +556,10 @@ export default function TasksScreen() {
           >
             <Search size={16} color={showSearch ? colors.text.primary : colors.text.secondary} />
           </TouchableOpacity>
-          <View style={styles.viewToggle}>
-            <TouchableOpacity
-              onPress={() => setViewMode('list')}
-              style={[styles.toggleTab, viewMode === 'list' && styles.toggleTabActive]}
-              activeOpacity={0.7}
-            >
-              <ListTodo size={13} color={viewMode === 'list' ? colors.text.primary : colors.text.muted} />
-              <Text style={[styles.toggleTabText, viewMode === 'list' && styles.toggleTabTextActive]}>
-                Lista
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setViewMode('calendar')}
-              style={[styles.toggleTab, viewMode === 'calendar' && styles.toggleTabActive]}
-              activeOpacity={0.7}
-            >
-              <CalendarDays size={13} color={viewMode === 'calendar' ? colors.text.primary : colors.text.muted} />
-              <Text style={[styles.toggleTabText, viewMode === 'calendar' && styles.toggleTabTextActive]}>
-                Kalen.
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
 
-      {viewMode === 'calendar' ? (
-        <CalendarView tasks={tasks} onToggleTask={handleToggle} />
-      ) : (
-        <>
+      <>
           {/* Search bar */}
           {showSearch && (
             <View style={styles.searchBarWrap}>
@@ -718,8 +691,7 @@ export default function TasksScreen() {
               </View>
             }
           />
-        </>
-      )}
+      </>
 
       <CompletionMoodModal
         visible={moodModal}
@@ -848,20 +820,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderColor: 'rgba(255,255,255,0.22)',
   },
-  viewToggle: {
-    flexDirection: 'row',
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
-    overflow: 'hidden',
-  },
-  toggleTab: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-  },
-  toggleTabActive: { backgroundColor: colors.bg.elevated },
-  toggleTabText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  toggleTabTextActive: { color: colors.text.primary },
   searchBarWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginHorizontal: spacing[4], marginBottom: spacing[2],

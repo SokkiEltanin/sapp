@@ -1,10 +1,10 @@
-﻿import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Vibration,
+  View, Text, StyleSheet, TouchableOpacity, Vibration, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Play, Pause, SkipForward, RotateCcw, Timer, Volume2, VolumeX } from 'lucide-react-native';
+import { X, Play, Pause, SkipForward, RotateCcw, Timer, Volume2, VolumeX, CheckSquare, Square, Plus } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
@@ -12,6 +12,7 @@ import { usePomodoroStore, PomodoroMode } from '@/store/pomodoroStore';
 import { tasksService } from '@/services/calendarService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useFocusSound, FocusSound, FOCUS_SOUND_LABELS } from '@/hooks/useFocusSound';
+import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -23,9 +24,9 @@ function fmt(secs: number) {
 }
 
 const MODE_META: Record<PomodoroMode, { label: string; color: string; hint: string }> = {
-  work:       { label: 'PRACA',        color: colors.text.primary,  hint: 'Skupiony czas pracy' },
-  break:      { label: 'PRZERWA',      color: colors.accent.success, hint: 'Krótka przerwa' },
-  long_break: { label: 'DŁUGA PRZERWA', color: colors.accent.warning, hint: 'Czas odetchnąć' },
+  work:       { label: 'PRACA',         color: colors.text.primary,   hint: 'Skupiony czas pracy' },
+  break:      { label: 'PRZERWA',       color: colors.accent.success,  hint: 'Krótka przerwa' },
+  long_break: { label: 'DŁUGA PRZERWA', color: colors.accent.warning,  hint: 'Czas odetchnąć' },
 };
 
 // ─── Ring progress (two-half technique) ──────────────────────────────────────
@@ -48,10 +49,7 @@ function RingProgress({ pct, size = 200, stroke = 8, color = colors.text.primary
 
   return (
     <View style={{ width: size, height: size }}>
-      {/* Track */}
       <View style={[arcBase, { borderColor: 'rgba(255,255,255,0.07)' }]} />
-
-      {/* Right half clip — fills first 50% */}
       <View style={{ position: 'absolute', top: 0, right: 0, width: half, height: size, overflow: 'hidden' }}>
         <View style={[arcBase, {
           left: -half,
@@ -59,8 +57,6 @@ function RingProgress({ pct, size = 200, stroke = 8, color = colors.text.primary
           transform: [{ rotate: `${rightRotation}deg` }],
         }]} />
       </View>
-
-      {/* Left half clip — fills second 50% */}
       {prog >= 0.5 && (
         <View style={{ position: 'absolute', top: 0, left: 0, width: half, height: size, overflow: 'hidden' }}>
           <View style={[arcBase, {
@@ -80,10 +76,7 @@ function RoundDots({ completed }: { completed: number }) {
   return (
     <View style={dots.row}>
       {[0, 1, 2, 3].map((i) => (
-        <View
-          key={i}
-          style={[dots.dot, i < (completed % 4) && dots.dotFilled]}
-        />
+        <View key={i} style={[dots.dot, i < (completed % 4) && dots.dotFilled]} />
       ))}
     </View>
   );
@@ -101,9 +94,12 @@ export default function PomodoroScreen() {
     taskId, taskTitle, mode, remaining, isRunning,
     workMins, completedRounds,
     pause, resume, reset, nextRound,
+    milestones, addMilestone, toggleMilestone,
   } = usePomodoroStore();
   const updateTaskStore = useCalendarStore(s => s.updateTask);
   const { selected: focusSound, setSelected: setFocusSound } = useFocusSound(isRunning);
+
+  const [newMilestone, setNewMilestone] = useState('');
 
   const totalSecs = mode === 'work'
     ? workMins * 60
@@ -115,7 +111,9 @@ export default function PomodoroScreen() {
   const prevRemaining = useRef(remaining);
   useEffect(() => {
     if (prevRemaining.current > 0 && remaining === 0) {
-      Vibration.vibrate([0, 300, 100, 300]);
+      // Double pulse: pleasant completion pattern
+      Vibration.vibrate([0, 150, 80, 150, 80, 400]);
+      haptic.success();
     }
     prevRemaining.current = remaining;
   }, [remaining]);
@@ -132,6 +130,21 @@ export default function PomodoroScreen() {
 
   const done = remaining === 0;
 
+  const handleToggleMilestone = (id: string) => {
+    const m = milestones.find(x => x.id === id);
+    toggleMilestone(id);
+    if (m && !m.done) haptic.success();
+    else haptic.tap();
+  };
+
+  const handleAddMilestone = () => {
+    const t = newMilestone.trim();
+    if (!t) return;
+    addMilestone(t);
+    setNewMilestone('');
+    haptic.tap();
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
@@ -146,23 +159,21 @@ export default function PomodoroScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <View style={styles.body}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Ring + time */}
         <View style={styles.ringWrap}>
           <RingProgress pct={pct} size={220} stroke={10} color={color} />
-
           <View style={styles.ringCenter}>
-            {/* Mode badge */}
             <View style={[styles.modeBadge, { borderColor: color + '30', backgroundColor: color + '12' }]}>
               <Text style={[styles.modeText, { color }]}>{label}</Text>
             </View>
-
-            {/* Time */}
-            <Text style={[styles.timeText, done && { color: color }]}>
+            <Text style={[styles.timeText, done && { color }]}>
               {done ? 'KONIEC!' : fmt(remaining)}
             </Text>
-
-            {/* Task name */}
             {taskTitle && (
               <Text style={styles.taskName} numberOfLines={1}>{taskTitle}</Text>
             )}
@@ -177,19 +188,17 @@ export default function PomodoroScreen() {
 
         {/* Controls */}
         <View style={styles.controls}>
-          {/* Reset */}
-          <PressableScale onPress={reset} style={styles.iconBtn}>
+          <PressableScale onPress={() => { reset(); haptic.tap(); }} style={styles.iconBtn}>
             <RotateCcw size={18} color={colors.text.muted} />
           </PressableScale>
 
-          {/* Play/Pause — main */}
           {done ? (
-            <PressableScale onPress={nextRound} style={styles.mainBtn}>
+            <PressableScale onPress={() => { nextRound(); haptic.medium(); }} style={styles.mainBtn}>
               <SkipForward size={26} color={colors.bg.primary} />
             </PressableScale>
           ) : (
             <PressableScale
-              onPress={isRunning ? pause : resume}
+              onPress={() => { isRunning ? pause() : resume(); haptic.medium(); }}
               style={styles.mainBtn}
             >
               {isRunning
@@ -199,58 +208,93 @@ export default function PomodoroScreen() {
             </PressableScale>
           )}
 
-          {/* Skip */}
-          <PressableScale onPress={nextRound} style={styles.iconBtn}>
+          <PressableScale onPress={() => { nextRound(); haptic.tap(); }} style={styles.iconBtn}>
             <SkipForward size={18} color={colors.text.muted} />
           </PressableScale>
         </View>
 
-        {/* Settings strip */}
-        <View>
-          <GlassCard padding={spacing[4]} style={styles.settingsCard}>
-            <Text style={styles.settingsLabel}>Ustawienia sesji</Text>
-            <View style={styles.settingsRow}>
-              {[15, 20, 25, 30, 45].map((mins) => {
-                const active = workMins === mins;
-                return (
-                  <PressableScale
-                    key={mins}
-                    onPress={() => usePomodoroStore.getState().setWorkMins(mins)}
-                    style={[styles.minBtn, active && styles.minBtnActive]}
-                  >
-                    <Text style={[styles.minText, active && styles.minTextActive]}>{mins}</Text>
-                    <Text style={[styles.minUnit, active && { color: colors.bg.primary }]}>min</Text>
-                  </PressableScale>
-                );
-              })}
-            </View>
+        {/* Milestones — only in work mode */}
+        {mode === 'work' && (
+          <GlassCard padding={spacing[4]} style={styles.milestoneCard}>
+            <Text style={styles.settingsLabel}>Co robię w tej sesji</Text>
 
-            {/* Focus sounds */}
-            <View style={styles.soundRow}>
-              {focusSound === 'off'
-                ? <VolumeX size={12} color={colors.text.muted} />
-                : <Volume2 size={12} color={colors.accent.blue} />}
-              <Text style={styles.soundRowLabel}>Dźwięk tła</Text>
-            </View>
-            <View style={styles.soundBtns}>
-              {(['off', 'rain', 'noise', 'cafe'] as FocusSound[]).map(s => {
-                const active = focusSound === s;
-                return (
-                  <PressableScale
-                    key={s}
-                    onPress={() => setFocusSound(s)}
-                    style={[styles.soundBtn, active && styles.soundBtnActive]}
-                  >
-                    <Text style={[styles.soundBtnText, active && styles.soundBtnTextActive]}>
-                      {FOCUS_SOUND_LABELS[s]}
-                    </Text>
-                  </PressableScale>
-                );
-              })}
+            {milestones.map(m => (
+              <TouchableOpacity
+                key={m.id}
+                style={styles.milestoneRow}
+                onPress={() => handleToggleMilestone(m.id)}
+                activeOpacity={0.7}
+              >
+                {m.done
+                  ? <CheckSquare size={16} color={colors.accent.success} />
+                  : <Square size={16} color={colors.text.muted} />}
+                <Text style={[styles.milestoneText, m.done && styles.milestoneDone]}>
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.milestoneInput}>
+              <TextInput
+                style={styles.milestoneInputField}
+                value={newMilestone}
+                onChangeText={setNewMilestone}
+                placeholder="Dodaj krok..."
+                placeholderTextColor={colors.text.muted}
+                onSubmitEditing={handleAddMilestone}
+                returnKeyType="done"
+                maxLength={60}
+              />
+              <TouchableOpacity onPress={handleAddMilestone} hitSlop={8} activeOpacity={0.7}>
+                <Plus size={16} color={newMilestone.trim() ? colors.accent.blue : colors.text.muted} />
+              </TouchableOpacity>
             </View>
           </GlassCard>
-        </View>
-      </View>
+        )}
+
+        {/* Settings strip */}
+        <GlassCard padding={spacing[4]} style={styles.settingsCard}>
+          <Text style={styles.settingsLabel}>Ustawienia sesji</Text>
+          <View style={styles.settingsRow}>
+            {[15, 20, 25, 30, 45].map((mins) => {
+              const active = workMins === mins;
+              return (
+                <PressableScale
+                  key={mins}
+                  onPress={() => { usePomodoroStore.getState().setWorkMins(mins); haptic.tap(); }}
+                  style={[styles.minBtn, active && styles.minBtnActive]}
+                >
+                  <Text style={[styles.minText, active && styles.minTextActive]}>{mins}</Text>
+                  <Text style={[styles.minUnit, active && { color: colors.bg.primary }]}>min</Text>
+                </PressableScale>
+              );
+            })}
+          </View>
+
+          <View style={styles.soundRow}>
+            {focusSound === 'off'
+              ? <VolumeX size={12} color={colors.text.muted} />
+              : <Volume2 size={12} color={colors.accent.blue} />}
+            <Text style={styles.soundRowLabel}>Dźwięk tła</Text>
+          </View>
+          <View style={styles.soundBtns}>
+            {(['off', 'rain', 'noise', 'cafe'] as FocusSound[]).map(s => {
+              const active = focusSound === s;
+              return (
+                <PressableScale
+                  key={s}
+                  onPress={() => { setFocusSound(s); haptic.tap(); }}
+                  style={[styles.soundBtn, active && styles.soundBtnActive]}
+                >
+                  <Text style={[styles.soundBtnText, active && styles.soundBtnTextActive]}>
+                    {FOCUS_SOUND_LABELS[s]}
+                  </Text>
+                </PressableScale>
+              );
+            })}
+          </View>
+        </GlassCard>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -270,9 +314,9 @@ const styles = StyleSheet.create({
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   headerTitle: { ...typography.h4, color: colors.text.primary },
 
-  body: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: spacing[4], gap: spacing[6],
+  scroll: {
+    alignItems: 'center', paddingHorizontal: spacing[4],
+    paddingTop: spacing[6], paddingBottom: spacing[8], gap: spacing[5],
   },
 
   ringWrap: { alignItems: 'center', justifyContent: 'center' },
@@ -310,6 +354,19 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
+  milestoneCard: { width: '100%' },
+  milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[2] },
+  milestoneText: { flex: 1, fontSize: 14, color: colors.text.primary },
+  milestoneDone: { color: colors.text.muted, textDecorationLine: 'line-through' },
+  milestoneInput: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    marginTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: spacing[3],
+  },
+  milestoneInputField: {
+    flex: 1, fontSize: 13, color: colors.text.primary,
+    paddingVertical: spacing[1],
+  },
+
   settingsCard: { width: '100%' },
   settingsLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: spacing[3] },
   settingsRow: { flexDirection: 'row', gap: spacing[2] },
@@ -337,4 +394,3 @@ const styles = StyleSheet.create({
   soundBtnText: { fontSize: 11, fontWeight: '500', color: colors.text.muted },
   soundBtnTextActive: { color: colors.accent.blue, fontWeight: '700' },
 });
-
