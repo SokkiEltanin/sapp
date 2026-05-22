@@ -33,7 +33,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 GoogleSignin.configure({
   webClientId: '1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com',
   offlineAccess: true,
-  scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+  scopes: ['https://www.googleapis.com/auth/calendar.events'],
 });
 
 const APP_VERSION = '6.0.0';

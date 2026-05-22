@@ -131,13 +131,22 @@ export default function AddWorkShift() {
   const [salary, setSalary]     = useState(String(settings.monthlySalary));
   const [hours, setHours]       = useState(String(settings.hoursPerMonth));
   const [saving, setSaving]     = useState(false);
-  const [workColor, setWorkColor] = useState<string | undefined>(settings.workColor);
+  const [workColor, setWorkColor]   = useState<string | undefined>(settings.workColor);
+  const [workPrefix, setWorkPrefix] = useState(settings.workPrefix ?? '');
 
-  const saveWorkColor = async (color: string | undefined) => {
-    const newSettings = { ...settings, workColor: color };
-    setWorkColor(color);
+  const saveWorkSettings = async (patch: { workColor?: string | undefined; workPrefix?: string }) => {
+    const newSettings = { ...settings, ...patch };
     setSettings(newSettings);
     try { await workService.saveSettings(newSettings); } catch {}
+  };
+
+  const saveWorkColor = async (color: string | undefined) => {
+    setWorkColor(color);
+    await saveWorkSettings({ workColor: color, workPrefix });
+  };
+
+  const handlePrefixBlur = async () => {
+    await saveWorkSettings({ workColor, workPrefix: workPrefix.trim() });
   };
 
   // Duration preview
@@ -282,15 +291,42 @@ export default function AddWorkShift() {
             </View>
           </View>
 
+          {/* Work prefix */}
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>Prefix eventów pracy</Text>
+            <View style={s.card}>
+              <View style={s.inputRow}>
+                <Text style={[s.inputLabel, { flex: 1 }]}>Np. [JD], [PRACA] — eventy z tym prefixem = zmiana</Text>
+                <TextInput
+                  style={[s.numInput, { minWidth: 90, textAlign: 'right' }]}
+                  value={workPrefix}
+                  onChangeText={setWorkPrefix}
+                  onBlur={handlePrefixBlur}
+                  placeholder="[JD]"
+                  placeholderTextColor={colors.text.muted}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+            {workPrefix.trim() !== '' && (
+              <View style={[s.colorActive, { borderColor: colors.accent.blue + '60', backgroundColor: colors.accent.blue + '10' }]}>
+                <View style={[s.colorActiveDot, { backgroundColor: colors.accent.blue }]} />
+                <Text style={[s.colorActiveText, { color: colors.accent.blue }]}>
+                  Eventy zaczynające się od "{workPrefix.trim()}" = praca
+                </Text>
+              </View>
+            )}
+          </View>
+
           {/* Work color picker */}
           <View style={s.section}>
             <View style={s.colorHeader}>
               <Palette size={13} color={colors.accent.blue} />
-              <Text style={s.sectionLabel}>Kolor pracy w kalendarzu</Text>
+              <Text style={s.sectionLabel}>Lub kolor pracy w kalendarzu</Text>
             </View>
             <View style={s.colorHint}>
               <Text style={s.colorHintText}>
-                Zdarzenia kalendarza z tym kolorem będą traktowane jako zmiana pracy. Zarobki liczone automatycznie z sumy godzin w miesiącu.
+                Alternatywnie — zdarzenia z tym kolorem będą traktowane jako zmiana pracy. Możesz używać obu metod jednocześnie.
               </Text>
             </View>
             <View style={s.colorRow}>

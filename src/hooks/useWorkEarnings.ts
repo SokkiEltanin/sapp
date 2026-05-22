@@ -40,12 +40,20 @@ export function useWorkEarnings(
     return () => clearInterval(id);
   }, []);
 
-  // ── Color-mode: derive everything from calendar events ────────────────────
+  // ── Color-mode / prefix-mode: derive everything from calendar events ─────
   const colorMode = useMemo(() => {
-    if (!settings.workColor) return null;
+    if (!settings.workColor && !settings.workPrefix) return null;
     const wc = settings.workColor;
+    const wp = settings.workPrefix?.trim().toLowerCase();
 
-    const workEvents = events.filter(e => e.color === wc && e.startTime && e.endTime);
+    const isWorkEvent = (e: CalendarEvent) => {
+      if (!e.startTime || !e.endTime) return false;
+      if (wc && e.color === wc) return true;
+      if (wp && e.title.toLowerCase().startsWith(wp)) return true;
+      return false;
+    };
+
+    const workEvents = events.filter(isWorkEvent);
 
     // Total work hours this month
     const monthStart = monthStartStr();
@@ -66,20 +74,20 @@ export function useWorkEarnings(
     ) ?? null;
 
     return { workEvents, monthWorkHours, activeEvent };
-  }, [events, settings.workColor, tick]);
+  }, [events, settings.workColor, settings.workPrefix, tick]);
 
   // ── Per-second rate ───────────────────────────────────────────────────────
   const perSecond = useMemo(() => {
     if (colorMode) {
       const hours = colorMode.monthWorkHours > 0 ? colorMode.monthWorkHours : settings.hoursPerMonth;
-      return settings.monthlySalary / (hours * 3600);
+      return hours > 0 ? settings.monthlySalary / (hours * 3600) : 0;
     }
     return settings.monthlySalary / (settings.hoursPerMonth * 3600);
   }, [colorMode, settings]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {
-    if (settings.workColor) return null; // color-mode overrides manual shifts
+    if (settings.workColor || settings.workPrefix) return null; // color/prefix-mode overrides manual shifts
     const today = todayStr();
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
@@ -98,7 +106,7 @@ export function useWorkEarnings(
       isWorking: false, secondsWorked: 0,
       totalEarned: 0, perSecond, progressPct: 0,
       shiftDurationMin: 0, monthWorkHours: colorMode?.monthWorkHours ?? 0,
-      isColorMode: !!settings.workColor,
+      isColorMode: !!(settings.workColor || settings.workPrefix),
     };
 
     if (colorMode) {
@@ -121,7 +129,7 @@ export function useWorkEarnings(
         progressPct: Math.min(shiftDurMin > 0 ? workedMins / shiftDurMin : 0, 1),
         shiftDurationMin: shiftDurMin,
         monthWorkHours: colorMode.monthWorkHours,
-        isColorMode: true,
+        isColorMode: !!(settings.workColor || settings.workPrefix),
       };
     }
 

@@ -356,6 +356,66 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync(`event-${eventId}`).catch(() => {});
   },
 
+  // ─── Work shift notifications ─────────────────────────────────────────────
+  // Schedule start + end notifications for all upcoming work events (next 7 days).
+  // Called whenever calendar events or work settings change.
+
+  async scheduleWorkShiftNotifications(
+    workEvents: { id: string; title: string; date: string; startTime?: string; endTime?: string }[],
+    perSecond: number,
+  ): Promise<void> {
+    // Cancel all previously scheduled work notifications
+    const all = await Notifications.getAllScheduledNotificationsAsync().catch(() => []);
+    for (const n of all) {
+      if (n.identifier?.startsWith('work-start-') || n.identifier?.startsWith('work-end-')) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+      }
+    }
+
+    const now = new Date();
+    const in7Days = new Date(now);
+    in7Days.setDate(now.getDate() + 7);
+
+    for (const ev of workEvents) {
+      if (!ev.startTime) continue;
+      const dateBase = ev.date.slice(0, 10);
+      const [sh, sm] = ev.startTime.split(':').map(Number);
+
+      const fireStart = new Date(`${dateBase}T00:00:00`);
+      fireStart.setHours(sh, sm, 0, 0);
+      if (fireStart > now && fireStart <= in7Days) {
+        await Notifications.scheduleNotificationAsync({
+          identifier: `work-start-${ev.id}`,
+          content: {
+            title: 'Zmiana pracy',
+            body: `Zaczyna się: ${ev.title}. Do roboty!`,
+            data: { screen: 'index' },
+          },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireStart },
+        }).catch(() => {});
+      }
+
+      if (!ev.endTime) continue;
+      const [eh, em] = ev.endTime.split(':').map(Number);
+      const fireEnd = new Date(`${dateBase}T00:00:00`);
+      fireEnd.setHours(eh, em, 0, 0);
+
+      if (fireEnd > now && fireEnd <= in7Days) {
+        const durationSecs = Math.max(0, (eh * 60 + em - sh * 60 - sm) * 60);
+        const earned = (perSecond * durationSecs).toFixed(2);
+        await Notifications.scheduleNotificationAsync({
+          identifier: `work-end-${ev.id}`,
+          content: {
+            title: 'Koniec zmiany',
+            body: `${ev.title} — zarobiłeś ok. ${earned} zł. Dobra robota!`,
+            data: { screen: 'index' },
+          },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireEnd },
+        }).catch(() => {});
+      }
+    }
+  },
+
   async scheduleSnoozeReminder(taskId: string, title: string, until: Date): Promise<void> {
     if (until <= new Date()) return;
     await Notifications.scheduleNotificationAsync({

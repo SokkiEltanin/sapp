@@ -297,9 +297,35 @@ export default function DashboardScreen() {
     loadYearlyReports().then(setYearlyRep);
     weatherService.getWeather().then(setWeatherData).catch(() => {});
     googleCalendarService.getStoredToken().then(token => {
-      if (token) googleCalendarService.fetchEvents(1, 2).then(setGcalEvents).catch(() => {});
+      if (token) googleCalendarService.fetchEvents(1, 14).then(evs => {
+        setGcalEvents(evs);
+      }).catch(() => {});
     });
   }, []);
+
+  // Schedule work shift notifications when events or settings load
+  useEffect(() => {
+    if (!workSettings.workColor && !workSettings.workPrefix) return;
+    const wc = workSettings.workColor;
+    const wp = workSettings.workPrefix?.trim().toLowerCase();
+    const workEvs = allEvents.filter(e => {
+      if (!e.startTime || !e.endTime) return false;
+      if (wc && e.color === wc) return true;
+      if (wp && e.title.toLowerCase().startsWith(wp)) return true;
+      return false;
+    });
+    if (workEvs.length === 0) return;
+    const monthHours = workEvs.reduce((sum, e) => {
+      const [sh, sm] = e.startTime!.split(':').map(Number);
+      const [eh, em] = e.endTime!.split(':').map(Number);
+      return sum + Math.max(0, (eh * 60 + em - sh * 60 - sm)) / 60;
+    }, 0);
+    const hrs = monthHours > 0 ? monthHours : workSettings.hoursPerMonth;
+    const perSecond = hrs > 0 ? workSettings.monthlySalary / (hrs * 3600) : 0;
+    import('@/services/notificationsService').then(({ notificationsService }) => {
+      notificationsService.scheduleWorkShiftNotifications(workEvs, perSecond).catch(() => {});
+    });
+  }, [allEvents, workSettings]);
 
   // Auto-generate monthly report
   useEffect(() => {

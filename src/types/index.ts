@@ -219,6 +219,7 @@ export interface WorkSettings {
   currency: string;
   notifyEveryMinutes: number; // 0 = off
   workColor?: string;         // hex color — calendar events with this color count as work
+  workPrefix?: string;        // title prefix — events starting with this count as work (e.g. "[JD]")
 }
 
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {
