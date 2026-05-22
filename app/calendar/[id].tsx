@@ -10,6 +10,7 @@ import { ArrowLeft, Trash2, Edit3, Save, Calendar, Clock, Flag, Circle } from 'l
 import PressableScale from '@/components/ui/PressableScale';
 import { useCalendarStore } from '@/store/calendarStore';
 import { calendarService } from '@/services/calendarService';
+import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
 import { EventPriority } from '@/types';
@@ -76,28 +77,49 @@ export default function EventDetailScreen() {
     );
   }
 
+  const isGCal = id?.startsWith('gcal-') ?? false;
+
   const handleSave = async () => {
     if (!title.trim()) { toast.error('Tytuł nie może być pusty'); return; }
     setSaving(true);
     try {
+      const trimmedDate = date.trim();
+      const trimmedStart = startTime.trim();
+      const trimmedEnd = endTime.trim();
+
       const updates = {
         title: title.trim(),
         description: description.trim() || undefined,
-        date: date.trim() + 'T12:00:00.000Z',
-        startTime: startTime.trim() || undefined,
-        endTime: endTime.trim() || undefined,
-        allDay: !startTime.trim(),
+        date: trimmedDate + 'T12:00:00.000Z',
+        startTime: trimmedStart || undefined,
+        endTime: trimmedEnd || undefined,
+        allDay: !trimmedStart,
         priority,
         color,
       };
-      updateEvent(id!, updates);
-      await calendarService.updateEvent(id!, updates);
-      notificationsService.cancelEventReminder(id!).catch(() => {});
-      if (updates.startTime) {
-        notificationsService.scheduleEventReminder(id!, updates.title, updates.date, updates.startTime).catch(() => {});
+
+      if (isGCal) {
+        const ok = await googleCalendarService.updateEvent(id!, {
+          title: updates.title,
+          description: updates.description,
+          date: trimmedDate,
+          startTime: trimmedStart || undefined,
+          endTime: trimmedEnd || undefined,
+          allDay: !trimmedStart,
+        });
+        if (!ok) throw new Error('Nie udało się zapisać w Google Calendar');
+        updateEvent(id!, updates); // optymistyczna aktualizacja w store
+      } else {
+        updateEvent(id!, updates);
+        await calendarService.updateEvent(id!, updates);
+        notificationsService.cancelEventReminder(id!).catch(() => {});
+        if (updates.startTime) {
+          notificationsService.scheduleEventReminder(id!, updates.title, updates.date, updates.startTime).catch(() => {});
+        }
       }
+
       setEditing(false);
-      toast.success('Zapisano');
+      toast.success(isGCal ? 'Zapisano w Google Calendar' : 'Zapisano');
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -111,8 +133,12 @@ export default function EventDetailScreen() {
       {
         text: 'Usuń', style: 'destructive', onPress: async () => {
           deleteEvent(id!);
-          await calendarService.deleteEvent(id!).catch(() => {});
-          notificationsService.cancelEventReminder(id!).catch(() => {});
+          if (isGCal) {
+            await googleCalendarService.deleteEvent(id!).catch(() => {});
+          } else {
+            await calendarService.deleteEvent(id!).catch(() => {});
+            notificationsService.cancelEventReminder(id!).catch(() => {});
+          }
           toast.info('Usunięto');
           router.back();
         },
@@ -121,6 +147,7 @@ export default function EventDetailScreen() {
   };
 
   const evColor = editing ? color : (event.color ?? colors.accent.blue);
+  const gcalBlue = '#039BE5';
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -131,9 +158,14 @@ export default function EventDetailScreen() {
           <PressableScale onPress={() => router.back()} style={s.iconBtn}>
             <ArrowLeft size={20} color={colors.text.secondary} />
           </PressableScale>
-          <View style={[s.colorPill, { backgroundColor: evColor + '25', borderColor: evColor + '50' }]}>
-            <Circle size={7} color={evColor} fill={evColor} />
-            <Text style={[s.colorPillText, { color: evColor }]}>Wydarzenie</Text>
+          <View style={[s.colorPill, {
+            backgroundColor: isGCal ? gcalBlue + '20' : evColor + '25',
+            borderColor: isGCal ? gcalBlue + '60' : evColor + '50',
+          }]}>
+            <Circle size={7} color={isGCal ? gcalBlue : evColor} fill={isGCal ? gcalBlue : evColor} />
+            <Text style={[s.colorPillText, { color: isGCal ? gcalBlue : evColor }]}>
+              {isGCal ? 'Google Calendar' : 'Wydarzenie'}
+            </Text>
           </View>
           <View style={s.headerActions}>
             {editing ? (

@@ -39,11 +39,22 @@ function mapEvent(e: GCalEvent): CalendarEvent {
   };
 }
 
+const BASE = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+
+function realId(appId: string): string {
+  return appId.startsWith('gcal-') ? appId.slice(5) : appId;
+}
+
 async function doFetch(token: string, params: URLSearchParams): Promise<Response> {
-  return fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
+  return fetch(`${BASE}?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+async function apiFetch(token: string, path: string, method: string, body?: object): Promise<Response> {
+  return fetch(`${BASE}/${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
 }
 
 export const googleCalendarService = {
@@ -67,6 +78,66 @@ export const googleCalendarService = {
     } catch {
       return null;
     }
+  },
+
+  async getToken(): Promise<string | null> {
+    let token = await this.getStoredToken();
+    if (!token) token = await this.refreshToken();
+    return token;
+  },
+
+  async updateEvent(appId: string, updates: {
+    title?: string;
+    description?: string;
+    date?: string;       // YYYY-MM-DD
+    startTime?: string;  // HH:mm or ''
+    endTime?: string;    // HH:mm or ''
+    allDay?: boolean;
+  }): Promise<boolean> {
+    let token = await this.getToken();
+    if (!token) return false;
+
+    const id = realId(appId);
+    const isAllDay = updates.allDay || !updates.startTime;
+    const body: Record<string, any> = {};
+
+    if (updates.title !== undefined) body.summary = updates.title;
+    if (updates.description !== undefined) body.description = updates.description ?? '';
+
+    if (updates.date) {
+      if (isAllDay) {
+        const nextDay = new Date(updates.date + 'T00:00:00');
+        nextDay.setDate(nextDay.getDate() + 1);
+        body.start = { date: updates.date };
+        body.end   = { date: nextDay.toISOString().slice(0, 10) };
+      } else {
+        const tz = 'Europe/Warsaw';
+        body.start = { dateTime: `${updates.date}T${updates.startTime}:00`, timeZone: tz };
+        body.end   = { dateTime: `${updates.date}T${updates.endTime || updates.startTime}:00`, timeZone: tz };
+      }
+    }
+
+    let resp = await apiFetch(token, id, 'PATCH', body);
+    if (resp.status === 401) {
+      const fresh = await this.refreshToken();
+      if (!fresh) return false;
+      resp = await apiFetch(fresh, id, 'PATCH', body);
+    }
+    return resp.ok;
+  },
+
+  async deleteEvent(appId: string): Promise<boolean> {
+    let token = await this.getToken();
+    if (!token) return false;
+
+    const id = realId(appId);
+    let resp = await apiFetch(token, id, 'DELETE');
+    if (resp.status === 401) {
+      const fresh = await this.refreshToken();
+      if (!fresh) return false;
+      resp = await apiFetch(fresh, id, 'DELETE');
+    }
+    return resp.ok || resp.status === 204;
   },
 
   async fetchEvents(daysBack = 7, daysForward = 60): Promise<CalendarEvent[]> {
