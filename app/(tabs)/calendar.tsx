@@ -1,8 +1,12 @@
-﻿import { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, Animated } from 'react-native';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
+  Modal, TouchableOpacity, NativeScrollEvent, NativeSyntheticEvent,
+  Dimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Briefcase, X } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -12,10 +16,12 @@ import TaskItem from '@/components/calendar/TaskItem';
 import DayTimeline from '@/components/calendar/DayTimeline';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useMoodStore } from '@/store/moodStore';
+import { useWorkStore } from '@/store/workStore';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+import { CalendarEvent, Task, MoodEntry } from '@/types';
 
 const MONTH_NAMES = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -23,6 +29,7 @@ const MONTH_NAMES = [
 ];
 const MONTH_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
+const DAY_SHORT = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -33,31 +40,251 @@ function fmtDay(dateStr: string) {
   const d = new Date(dateStr);
   return `${DAY_FULL[d.getDay()]}, ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
 }
+function fmtDayShort(dateStr: string) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${DAY_SHORT[d.getDay()]} ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+// ─── Full-screen month modal ──────────────────────────────────────────────────
+
+interface MonthModalProps {
+  visible: boolean;
+  onClose: () => void;
+  viewYear: number;
+  viewMonth: number;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  selectedDate: string;
+  onSelectDate: (d: string) => void;
+  events: CalendarEvent[];
+  tasks: Task[];
+  moodEntries: MoodEntry[];
+  workColor?: string;
+  onEventPress: (id: string) => void;
+  onAddEvent: () => void;
+}
+
+function MonthModal({
+  visible, onClose,
+  viewYear, viewMonth, onPrevMonth, onNextMonth,
+  selectedDate, onSelectDate,
+  events, tasks, moodEntries,
+  workColor, onEventPress, onAddEvent,
+}: MonthModalProps) {
+  // All events for the viewed month, grouped by date
+  const monthEvents = useMemo(() => {
+    const prefix = `${viewYear}-${pad(viewMonth + 1)}`;
+    const filtered = events
+      .filter(e => e.date.startsWith(prefix))
+      .sort((a, b) => {
+        const dateCmp = a.date.localeCompare(b.date);
+        if (dateCmp !== 0) return dateCmp;
+        return (a.startTime ?? '').localeCompare(b.startTime ?? '');
+      });
+
+    const groups: { date: string; evs: CalendarEvent[] }[] = [];
+    for (const ev of filtered) {
+      const last = groups[groups.length - 1];
+      if (last && last.date === ev.date.slice(0, 10)) {
+        last.evs.push(ev);
+      } else {
+        groups.push({ date: ev.date.slice(0, 10), evs: [ev] });
+      }
+    }
+    return groups;
+  }, [events, viewYear, viewMonth]);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={m.safe} edges={['top', 'bottom']}>
+        {/* Header */}
+        <View style={m.header}>
+          <TouchableOpacity onPress={onPrevMonth} style={m.navBtn} activeOpacity={0.7}>
+            <ChevronLeft size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
+          <View style={m.titleWrap}>
+            <Text style={m.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
+            <Text style={m.yearLabel}>{viewYear}</Text>
+          </View>
+          <TouchableOpacity onPress={onNextMonth} style={m.navBtn} activeOpacity={0.7}>
+            <ChevronRight size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
+          <View style={m.headerRight}>
+            <TouchableOpacity onPress={onAddEvent} style={m.addBtn} activeOpacity={0.7}>
+              <Plus size={16} color={colors.text.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} style={m.closeBtn} activeOpacity={0.7}>
+              <ChevronDown size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={m.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Full calendar grid */}
+          <View style={m.gridWrap}>
+            <CalendarGrid
+              year={viewYear}
+              month={viewMonth}
+              selectedDate={selectedDate}
+              events={events}
+              tasks={tasks}
+              moodEntries={moodEntries}
+              onSelectDate={onSelectDate}
+            />
+          </View>
+
+          {/* Month event list */}
+          {monthEvents.length > 0 ? (
+            <View style={m.eventList}>
+              <Text style={m.listHeader}>Eventy w tym miesiącu</Text>
+              {monthEvents.map(({ date, evs }) => {
+                const isToday = date === todayStr();
+                const isSel = date === selectedDate;
+                return (
+                  <View key={date} style={m.dayGroup}>
+                    <TouchableOpacity
+                      onPress={() => onSelectDate(date)}
+                      activeOpacity={0.7}
+                      style={[m.dayLabel, isSel && m.dayLabelSel]}
+                    >
+                      <Text style={[m.dayLabelText, isToday && { color: colors.accent.blue }, isSel && { color: colors.text.primary, fontWeight: '700' }]}>
+                        {fmtDayShort(date)}
+                      </Text>
+                      {isToday && <View style={m.todayDot} />}
+                    </TouchableOpacity>
+                    {evs.map(ev => {
+                      const isWork = workColor != null && ev.color === workColor;
+                      return (
+                        <TouchableOpacity
+                          key={ev.id}
+                          onPress={() => { onClose(); onEventPress(ev.id); }}
+                          activeOpacity={0.75}
+                          style={m.eventRow}
+                        >
+                          <View style={[m.colorBar, { backgroundColor: ev.color ?? colors.accent.blue }]} />
+                          <View style={m.eventMeta}>
+                            {(ev.startTime || ev.endTime) ? (
+                              <Text style={m.eventTime}>
+                                {ev.startTime ?? ''}{ev.endTime ? ` – ${ev.endTime}` : ''}
+                              </Text>
+                            ) : (
+                              <Text style={m.eventTime}>cały dzień</Text>
+                            )}
+                            {ev.endTime && ev.startTime && (
+                              <Text style={m.eventDuration}>
+                                {(() => {
+                                  const [sh, sm] = ev.startTime.split(':').map(Number);
+                                  const [eh, em] = ev.endTime.split(':').map(Number);
+                                  const mins = (eh * 60 + em) - (sh * 60 + sm);
+                                  return mins > 0 ? `${Math.floor(mins / 60)}h${mins % 60 > 0 ? ` ${mins % 60}m` : ''}` : '';
+                                })()}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={m.eventBody}>
+                            <Text style={m.eventTitle} numberOfLines={1}>{ev.title}</Text>
+                            {ev.description ? (
+                              <Text style={m.eventDesc} numberOfLines={1}>{ev.description}</Text>
+                            ) : null}
+                          </View>
+                          {isWork && (
+                            <View style={[m.workBadge, { backgroundColor: workColor + '20', borderColor: workColor + '50' }]}>
+                              <Briefcase size={10} color={workColor} />
+                              <Text style={[m.workBadgeText, { color: workColor }]}>praca</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={m.emptyMonth}>
+              <CalendarDays size={28} color={colors.text.muted} />
+              <Text style={m.emptyMonthText}>Brak eventów w tym miesiącu</Text>
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+const m = StyleSheet.create({
+  safe:       { flex: 1, backgroundColor: colors.bg.primary },
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', gap: spacing[1] },
+  navBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  titleWrap:  { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], paddingHorizontal: spacing[2] },
+  monthLabel: { fontSize: 20, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
+  yearLabel:  { fontSize: 13, color: colors.text.muted, fontWeight: '500' },
+  headerRight:{ flexDirection: 'row', gap: spacing[2], marginLeft: spacing[1] },
+  addBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+
+  scroll:     { paddingBottom: 40 },
+  gridWrap:   { paddingHorizontal: spacing[2], paddingTop: spacing[3], paddingBottom: spacing[3] },
+
+  eventList:  { paddingHorizontal: spacing[4], gap: spacing[2] },
+  listHeader: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: spacing[1], marginTop: spacing[2] },
+
+  dayGroup:   { gap: spacing[1] },
+  dayLabel:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4, paddingHorizontal: spacing[2], borderRadius: radius.md },
+  dayLabelSel:{ backgroundColor: 'rgba(255,255,255,0.04)' },
+  dayLabelText:{ fontSize: 11, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  todayDot:   { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent.blue },
+
+  eventRow:   { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', minHeight: 52, gap: 0 },
+  colorBar:   { width: 3, alignSelf: 'stretch' },
+  eventMeta:  { width: 68, paddingVertical: spacing[3], paddingLeft: spacing[3], gap: 2 },
+  eventTime:  { fontSize: 10, fontWeight: '700', color: colors.text.secondary },
+  eventDuration:{ fontSize: 9, color: colors.text.muted },
+  eventBody:  { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3] },
+  eventTitle: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
+  eventDesc:  { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  workBadge:  { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, marginRight: spacing[3] },
+  workBadgeText:{ fontSize: 9, fontWeight: '700' },
+
+  emptyMonth: { alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] },
+  emptyMonthText:{ fontSize: 14, color: colors.text.muted, fontWeight: '500' },
+});
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
+  const { settings: workSettings } = useWorkStore();
 
   const now = new Date();
-  const [viewYear, setViewYear] = useState(now.getFullYear());
-  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const [viewYear, setViewYear]     = useState(now.getFullYear());
+  const [viewMonth, setViewMonth]   = useState(now.getMonth());
   const [refreshing, setRefreshing] = useState(false);
-  const [monthExpanded, setMonthExpanded] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
 
-  // Animate month grid
-  const gridHeight = useRef(new Animated.Value(0)).current;
-  const gridOpacity = useRef(new Animated.Value(0)).current;
-
-  const toggleMonth = () => {
-    const next = !monthExpanded;
-    setMonthExpanded(next);
-    Animated.parallel([
-      Animated.timing(gridHeight, { toValue: next ? 330 : 0, duration: 280, useNativeDriver: false }),
-      Animated.timing(gridOpacity, { toValue: next ? 1 : 0, duration: 240, useNativeDriver: false }),
-    ]).start();
+  // Pull-to-expand: detect overscroll on iOS
+  const pullActivated = useRef(false);
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    if (y < -65 && !pullActivated.current && !modalVisible) {
+      pullActivated.current = true;
+      setModalVisible(true);
+    }
+    if (y >= 0) pullActivated.current = false;
   };
 
   useEffect(() => { load(); }, []);
@@ -98,7 +325,6 @@ export default function CalendarScreen() {
 
   const handleSelectDate = (date: string) => {
     setSelectedDate(date);
-    // sync view month when selecting from grid
     const d = new Date(date);
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth());
@@ -139,7 +365,24 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
-      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+      {/* Full-screen month modal */}
+      <MonthModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        viewYear={viewYear}
+        viewMonth={viewMonth}
+        onPrevMonth={prevMonth}
+        onNextMonth={nextMonth}
+        selectedDate={selectedDate}
+        onSelectDate={(d) => { handleSelectDate(d); }}
+        events={events}
+        tasks={tasks}
+        moodEntries={moodEntries}
+        workColor={workSettings.workColor}
+        onEventPress={(id) => router.push(`/calendar/${id}` as any)}
+        onAddEvent={() => { setModalVisible(false); router.push('/calendar/add'); }}
+      />
+
       <ScreenHeader
         title="Kalendarz"
         subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
@@ -159,40 +402,28 @@ export default function CalendarScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
         contentContainerStyle={{ paddingBottom: 120 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
-        {/* Month nav + collapsible grid */}
-        <View>
-          <View style={styles.monthNav}>
-            <PressableScale onPress={prevMonth} style={styles.navBtn}>
-              <ChevronLeft size={18} color={colors.text.secondary} />
-            </PressableScale>
+        {/* Month nav — tap to expand full screen */}
+        <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
+          <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
+            <ChevronLeft size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
 
-            <Pressable onPress={toggleMonth} style={styles.monthTitleBtn}>
-              <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
-              <Text style={styles.yearLabel}>{viewYear}</Text>
-              <CalendarDays size={12} color={monthExpanded ? colors.text.secondary : colors.text.muted} style={{ marginLeft: 4 }} />
-            </Pressable>
-
-            <PressableScale onPress={nextMonth} style={styles.navBtn}>
-              <ChevronRight size={18} color={colors.text.secondary} />
-            </PressableScale>
+          <View style={styles.monthTitleBtn}>
+            <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
+            <Text style={styles.yearLabel}>{viewYear}</Text>
+            <CalendarDays size={12} color={colors.text.muted} style={{ marginLeft: 4 }} />
+            <View style={styles.expandHint}>
+              <ChevronDown size={10} color={colors.text.muted} />
+            </View>
           </View>
 
-          {/* Animated month grid */}
-          <Animated.View style={{ height: gridHeight, opacity: gridOpacity, overflow: 'hidden' }}>
-            <View style={styles.gridWrap}>
-              <CalendarGrid
-                year={viewYear}
-                month={viewMonth}
-                selectedDate={selectedDate}
-                events={events}
-                tasks={tasks}
-                moodEntries={moodEntries}
-                onSelectDate={handleSelectDate}
-              />
-            </View>
-          </Animated.View>
-        </View>
+          <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
+            <ChevronRight size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
+        </TouchableOpacity>
 
         {/* Week strip — always visible */}
         <View style={styles.weekCard}>
@@ -268,8 +499,6 @@ export default function CalendarScreen() {
           )}
         </View>
       </ScrollView>
-
-      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -302,37 +531,20 @@ const styles = StyleSheet.create({
   monthTitleBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md,
+    borderRadius: radius.md, backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
-  yearLabel: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
-
-  gridWrap: {
-    marginHorizontal: spacing[2],
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    paddingTop: spacing[3],
-  },
+  yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  expandHint: { marginLeft: 2, opacity: 0.5 },
 
   weekCard: {
-    marginHorizontal: spacing[2],
-    marginTop: spacing[2],
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
+    marginHorizontal: spacing[2], marginTop: spacing[2],
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
   },
-  weekNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing[1],
-  },
-  weekNavBtn: {
-    width: 28, height: 48,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  weekNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[1] },
+  weekNavBtn: { width: 28, height: 48, alignItems: 'center', justifyContent: 'center' },
 
   section: { paddingHorizontal: spacing[4], paddingTop: spacing[4], gap: spacing[2] },
   sectionLabel: {
@@ -344,20 +556,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.bg.card, borderRadius: radius.md,
     overflow: 'hidden', marginBottom: spacing[2],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    minHeight: 52,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', minHeight: 52,
   },
   evColorBar: { width: 3, alignSelf: 'stretch' },
-  evTime: { width: 48, alignItems: 'center', paddingVertical: spacing[3] },
+  evTime:     { width: 48, alignItems: 'center', paddingVertical: spacing[3] },
   evTimeText: { ...typography.caption, color: colors.text.secondary, fontWeight: '700', fontSize: 11 },
-  evTimeSub: { ...typography.caption, color: colors.text.muted, fontSize: 9, marginTop: 1 },
-  evInfo: { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3] },
-  evTitle: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '600' },
-  evDesc: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  evTimeSub:  { ...typography.caption, color: colors.text.muted, fontSize: 9, marginTop: 1 },
+  evInfo:     { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3] },
+  evTitle:    { ...typography.bodySmall, color: colors.text.primary, fontWeight: '600' },
+  evDesc:     { ...typography.caption, color: colors.text.muted, marginTop: 2 },
 
   empty: { alignItems: 'center', paddingVertical: spacing[8], gap: spacing[2] },
   emptyText: { ...typography.label, color: colors.text.secondary },
   emptyHint: { ...typography.caption, color: colors.text.muted },
-
 });
-
