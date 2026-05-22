@@ -58,39 +58,32 @@ jobs:
       - name: Inject signing config into build.gradle
         run: |
           python3 << 'PYEOF'
-          import re
-
+          import re, sys
           with open('android/app/build.gradle', 'r') as f:
               content = f.read()
-
-          signing_config = """
-              signingConfigs {
-                  release {
-                      storeFile file(MYAPP_UPLOAD_STORE_FILE)
-                      storePassword MYAPP_UPLOAD_STORE_PASSWORD
-                      keyAlias MYAPP_UPLOAD_KEY_ALIAS
-                      keyPassword MYAPP_UPLOAD_KEY_PASSWORD
-                  }
-              }
-          """
-
-          # Insert signingConfigs before buildTypes if not already present
+          signing_line = '\n            signingConfig signingConfigs.release'
+          if 'signingConfig signingConfigs.release' not in content:
+              content = re.sub(r'(buildTypes\s*\{.*?)(\brelease\s*\{)', r'\1\2' + signing_line, content, count=1, flags=re.DOTALL)
+              print('Inserted signingConfig reference in release buildType')
+          signing_cfgs = '\n    signingConfigs {\n        release {\n            storeFile file(MYAPP_UPLOAD_STORE_FILE)\n            storePassword MYAPP_UPLOAD_STORE_PASSWORD\n            keyAlias MYAPP_UPLOAD_KEY_ALIAS\n            keyPassword MYAPP_UPLOAD_KEY_PASSWORD\n        }\n    }\n'
           if 'signingConfigs' not in content:
-              content = content.replace('    buildTypes {', signing_config + '    buildTypes {')
-
-          # Set release buildType to use signingConfig
-          content = re.sub(
-              r'(buildTypes\s*\{[^}]*release\s*\{)',
-              r'\1\n            signingConfig signingConfigs.release',
-              content,
-              count=1
-          )
-
+              content = re.sub(r'(\n\s+buildTypes\s*\{)', signing_cfgs + r'\1', content, count=1)
+              print('Inserted signingConfigs block before buildTypes')
           with open('android/app/build.gradle', 'w') as f:
               f.write(content)
-
-          print("Signing config injected.")
+          if 'signingConfig signingConfigs.release' not in content:
+              print('ERROR: signingConfig not found in build.gradle after injection!')
+              sys.exit(1)
+          print('Signing config OK.')
           PYEOF
+
+      - name: Verify signing config in build.gradle
+        run: |
+          echo "=== signingConfig lines in build.gradle ==="
+          grep -n "signingConfig" android/app/build.gradle
+          grep -q "signingConfig signingConfigs.release" android/app/build.gradle \
+            && echo "OK: release buildType will use production keystore" \
+            || (echo "FAIL: signingConfig.release missing" && exit 1)
 
       - name: Verify google-services.json placement
         run: |
@@ -114,6 +107,13 @@ jobs:
           EXPO_PUBLIC_GOOGLE_VISION_API_KEY: AIzaSyAmP5HZ66UjcEK-cncMFyKZ0p4pNDCeUK4
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com
           EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: 1020705470960-h29iavvvn5e1iipg76kdbn8cih7vg5oo.apps.googleusercontent.com
+
+      - name: Verify APK certificate SHA-1
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          echo "=== APK certificate SHA-1 ==="
+          keytool -printcert -jarfile "$APK" 2>&1 | grep -i "sha1"
+          echo "Expected: A0:70:35:43:2F:E5:39:44:E2:1F:00:F6:73:8D:AD:A2:7E:EA:FC:88"
 
       - name: Rename APK
         run: |
