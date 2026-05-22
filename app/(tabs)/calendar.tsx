@@ -561,7 +561,8 @@ export default function CalendarScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
 
-          <View style={styles.gridCard}>
+          {/* Full-width grid — no card wrapper, flush to screen edges */}
+          <View style={styles.detailedGridWrap}>
             <CalendarGrid
               year={viewYear}
               month={viewMonth}
@@ -644,6 +645,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
     overflow: 'hidden',
+  },
+  detailedGridWrap: {
+    marginTop: spacing[1],
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255,255,255,0.07)',
   },
 
   // Week view
