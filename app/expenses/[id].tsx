@@ -3,9 +3,14 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { ArrowLeft, Trash2, Edit3, Save, TrendingDown, TrendingUp, Check, Tag, Calendar, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react-native';
+import {
+  ArrowLeft, Trash2, Edit3, Save, TrendingDown, TrendingUp,
+  Check, Tag, Calendar, ShoppingCart, ChevronDown, ChevronUp,
+  Pencil, X as XIcon,
+} from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -14,14 +19,191 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
-import { ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
+import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem } from '@/types';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
+import { saveCustomProductsToMemory, saveCustomTagsToMemory } from '@/utils/productMemory';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
 const INCOME_CATS  = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, typeof INCOME_CATEGORY_META[IncomeCategory]][];
 const EXPENSE_TAGS = ['słodycze', 'warzywa', 'mięso', 'napoje', 'fast food', 'apteka', 'paliwo', 'bilety'];
 const INCOME_TAGS  = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
+
+const ITEM_TAGS = [
+  'mięso', 'nabiał', 'ryby', 'warzywa', 'owoce',
+  'słodycze', 'pieczywo', 'napoje', 'przekąski',
+  'chemia', 'higiena', 'dania gotowe',
+];
+
+// ─── Inline item editor ───────────────────────────────────────────────────────
+
+interface ItemEditorProps {
+  item: ReceiptItem;
+  onSave: (updated: ReceiptItem) => void;
+  onCancel: () => void;
+}
+
+function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
+  const [name, setName]         = useState(item.name);
+  const [price, setPrice]       = useState(item.price.toFixed(2));
+  const [qty, setQty]           = useState(item.quantity.toString());
+  const [category, setCategory] = useState<ExpenseCategory>(item.category);
+  const [tags, setTags]         = useState<string[]>(item.tags ?? []);
+
+  const toggleTag = (t: string) =>
+    setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+
+  const handleSave = () => {
+    const p = parseFloat(price.replace(',', '.'));
+    const q = parseFloat(qty.replace(',', '.')) || 1;
+    if (!name.trim() || isNaN(p) || p <= 0) return;
+    onSave({ ...item, name: name.trim(), price: p, quantity: q, category, tags });
+  };
+
+  return (
+    <View style={ie.wrap}>
+      {/* Name */}
+      <TextInput
+        style={ie.nameInput}
+        value={name}
+        onChangeText={setName}
+        placeholder="Nazwa produktu"
+        placeholderTextColor={colors.text.muted}
+        returnKeyType="done"
+      />
+
+      {/* Price + Qty row */}
+      <View style={ie.row}>
+        <View style={ie.field}>
+          <Text style={ie.fieldLabel}>CENA zł</Text>
+          <TextInput
+            style={ie.fieldInput}
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="decimal-pad"
+            placeholder="0,00"
+            placeholderTextColor={colors.text.muted}
+          />
+        </View>
+        <View style={ie.field}>
+          <Text style={ie.fieldLabel}>ILOŚĆ / KG</Text>
+          <TextInput
+            style={ie.fieldInput}
+            value={qty}
+            onChangeText={setQty}
+            keyboardType="decimal-pad"
+            placeholder="1"
+            placeholderTextColor={colors.text.muted}
+          />
+        </View>
+      </View>
+
+      {/* Category mini-grid */}
+      <Text style={ie.sectionLabel}>Kategoria</Text>
+      <View style={ie.catRow}>
+        {EXPENSE_CATS.map(([key, meta]) => {
+          const Icon = (LucideIcons as any)[meta.icon];
+          const sel = category === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              onPress={() => setCategory(key as ExpenseCategory)}
+              style={[ie.catChip, sel && { backgroundColor: meta.color + '22', borderColor: meta.color + '60' }]}
+              activeOpacity={0.7}
+            >
+              {Icon && <Icon size={11} color={sel ? meta.color : colors.text.muted} />}
+              <Text style={[ie.catChipText, sel && { color: meta.color, fontWeight: '700' }]}>{meta.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Food sub-tags */}
+      <Text style={ie.sectionLabel}>Tagi</Text>
+      <View style={ie.tagsRow}>
+        {ITEM_TAGS.map(t => (
+          <TouchableOpacity
+            key={t}
+            onPress={() => toggleTag(t)}
+            style={[ie.tagChip, tags.includes(t) && ie.tagChipSel]}
+            activeOpacity={0.7}
+          >
+            <Text style={[ie.tagChipText, tags.includes(t) && ie.tagChipTextSel]}>{t}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Actions */}
+      <View style={ie.actions}>
+        <TouchableOpacity style={ie.cancelBtn} onPress={onCancel} activeOpacity={0.7}>
+          <XIcon size={14} color={colors.text.muted} />
+          <Text style={ie.cancelText}>Anuluj</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={ie.saveBtn} onPress={handleSave} activeOpacity={0.7}>
+          <Check size={14} color={colors.bg.primary} />
+          <Text style={ie.saveText}>Zapisz produkt</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const ie = StyleSheet.create({
+  wrap: {
+    marginTop: spacing[2], padding: spacing[3],
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.lg, gap: spacing[3],
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  nameInput: {
+    fontSize: 14, fontWeight: '600', color: colors.text.primary,
+    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  row: { flexDirection: 'row', gap: spacing[3] },
+  field: { flex: 1, gap: 4 },
+  fieldLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  fieldInput: {
+    fontSize: 15, fontWeight: '700', color: colors.text.primary,
+    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  sectionLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  catChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[2], paddingVertical: 5,
+    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border.default,
+  },
+  catChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1] },
+  tagChip: {
+    paddingHorizontal: spacing[2], paddingVertical: 4,
+    backgroundColor: colors.bg.card, borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.border.default,
+  },
+  tagChipSel: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue + '60' },
+  tagChipText: { fontSize: 10, color: colors.text.muted },
+  tagChipTextSel: { color: colors.accent.blue, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: spacing[2], justifyContent: 'flex-end' },
+  cancelBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+  },
+  cancelText: { fontSize: 12, color: colors.text.muted },
+  saveBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    backgroundColor: colors.text.primary, borderRadius: radius.md,
+  },
+  saveText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary },
+});
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function ExpenseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -46,6 +228,8 @@ export default function ExpenseDetailScreen() {
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving]     = useState(false);
   const [itemsExpanded, setItemsExpanded] = useState(true);
+  const [editedItems, setEditedItems] = useState<ReceiptItem[]>(expense?.receiptItems ?? []);
+  const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date(expense?.date ?? Date.now());
     const p = (n: number) => String(n).padStart(2, '0');
@@ -69,6 +253,12 @@ export default function ExpenseDetailScreen() {
   const quickTags = editIsIncome ? INCOME_TAGS : EXPENSE_TAGS;
   const accentColor = editIsIncome ? colors.accent.green : colors.accent.red;
 
+  // Gradient colors for amount hero
+  const heroGradient: [string, string] = editIsIncome
+    ? ['#1a3d2e', '#0f2a1e']   // deep green
+    : ['#3d1a1a', '#2a0f0f'];  // deep red
+  const heroAccent = editIsIncome ? '#34D399' : '#F87171';
+
   const toggleTag = (tag: string) =>
     setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
 
@@ -76,6 +266,21 @@ export default function ExpenseDetailScreen() {
     const t = customTag.trim().toLowerCase();
     if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
     setCustomTag('');
+  };
+
+  const handleItemSave = async (idx: number, updated: ReceiptItem) => {
+    const orig = editedItems[idx];
+    const next = editedItems.map((it, i) => i === idx ? updated : it);
+    setEditedItems(next);
+    setEditingItemIdx(null);
+    // Save to shared product memory so future receipt scans auto-apply corrections
+    const changed = orig.category !== updated.category || JSON.stringify(orig.tags) !== JSON.stringify(updated.tags) || orig.name !== updated.name;
+    if (changed) {
+      saveCustomProductsToMemory([{ name: updated.name, category: updated.category }]).catch(() => {});
+      if (updated.tags.length > 0) {
+        saveCustomTagsToMemory([{ name: updated.name, tags: updated.tags }]).catch(() => {});
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -86,21 +291,20 @@ export default function ExpenseDetailScreen() {
     }
     setSaving(true);
     try {
-      // Parse DD.MM.YYYY date input
-    let dateParsed = expense.date;
-    if (dateInput) {
-      const [y, m, d] = dateInput.split('-').map(Number);
-      const dt = new Date(y, m - 1, d, 12, 0, 0);
-      if (!isNaN(dt.getTime())) dateParsed = dt.toISOString();
-    }
-
-    const updates = {
+      let dateParsed = expense.date;
+      if (dateInput) {
+        const [y, m, d] = dateInput.split('-').map(Number);
+        const dt = new Date(y, m - 1, d, 12, 0, 0);
+        if (!isNaN(dt.getTime())) dateParsed = dt.toISOString();
+      }
+      const updates = {
         type: txType,
         amount: parsed,
         note: note.trim(),
         category: editIsIncome ? incCat : expCat,
         tags,
         date: dateParsed,
+        receiptItems: editedItems,
         updatedAt: new Date().toISOString(),
       };
       updateExpense(id!, updates);
@@ -127,6 +331,8 @@ export default function ExpenseDetailScreen() {
       },
     ]);
   };
+
+  const displayAmt = editing ? amount : expense.amount.toFixed(2);
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -166,29 +372,45 @@ export default function ExpenseDetailScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Amount hero */}
-          <View style={[s.amountCard, { borderLeftColor: accentColor }]}>
+          {/* ── Amount hero — gradient tile ─────────────────────────────────── */}
+          <LinearGradient colors={heroGradient} style={s.heroCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            {/* Store name if receipt */}
+            {expense.storeName ? (
+              <Text style={s.storeName}>{expense.storeName}</Text>
+            ) : null}
+
+            {/* Amount — number first, then zł */}
             {editing ? (
-              <View style={s.amountRow}>
-                <Text style={s.currency}>PLN</Text>
+              <View style={s.amountEditRow}>
                 <TextInput
                   value={amount}
                   onChangeText={setAmount}
-                  style={[s.amountInput, { color: accentColor }]}
+                  style={[s.amountInput, { color: heroAccent }]}
                   keyboardType="decimal-pad"
                   autoFocus
                   placeholder="0,00"
-                  placeholderTextColor={colors.text.muted}
+                  placeholderTextColor={heroAccent + '60'}
                 />
+                <Text style={[s.currencyLabel, { color: heroAccent + 'AA' }]}>zł</Text>
               </View>
             ) : (
               <View style={s.amountRow}>
-                <Text style={s.currency}>PLN</Text>
-                <Text style={[s.amountDisplay, { color: accentColor }]}>
-                  {isInc ? '+' : '-'}{expense.amount.toFixed(2)}
+                <Text style={[s.amountDisplay, { color: heroAccent }]}>
+                  {editIsIncome ? '+' : '-'}{expense.amount.toFixed(2)}
                 </Text>
+                <Text style={[s.currencyLabel, { color: heroAccent + 'AA' }]}>zł</Text>
               </View>
             )}
+
+            {/* Date chip */}
+            <View style={s.heroMeta}>
+              <View style={[s.dateBadge, { borderColor: heroAccent + '30' }]}>
+                <Calendar size={10} color={heroAccent + '90'} />
+                <Text style={[s.dateBadgeText, { color: heroAccent + '90' }]}>
+                  {new Date(expense.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+            </View>
 
             {/* Note */}
             {editing ? (
@@ -197,16 +419,24 @@ export default function ExpenseDetailScreen() {
                 onChangeText={setNote}
                 style={s.noteInput}
                 placeholder="Opis..."
-                placeholderTextColor={colors.text.muted}
+                placeholderTextColor={'rgba(255,255,255,0.25)'}
                 multiline
               />
             ) : (
               expense.note ? <Text style={s.noteText}>{expense.note}</Text> : null
             )}
-          </View>
+          </LinearGradient>
 
-          {/* Receipt breakdown */}
-          {expense.receiptItems && expense.receiptItems.length > 0 && (
+          {/* ── Date picker (editing) ────────────────────────────────────────── */}
+          {editing && (
+            <View style={s.card}>
+              <Text style={s.cardLabel}>Data</Text>
+              <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data transakcji" />
+            </View>
+          )}
+
+          {/* ── Receipt breakdown ────────────────────────────────────────────── */}
+          {editedItems.length > 0 && (
             <View style={s.card}>
               <TouchableOpacity
                 style={s.receiptHeader}
@@ -215,58 +445,62 @@ export default function ExpenseDetailScreen() {
               >
                 <ShoppingCart size={14} color={colors.accent.blue} />
                 <Text style={[s.cardLabel, { color: colors.accent.blue, flex: 1 }]}>
-                  PRODUKTY ({expense.receiptItems.length})
+                  PRODUKTY ({editedItems.length})
                 </Text>
                 {itemsExpanded
                   ? <ChevronUp size={14} color={colors.text.muted} />
                   : <ChevronDown size={14} color={colors.text.muted} />
                 }
               </TouchableOpacity>
-              {itemsExpanded && expense.receiptItems.map((it, idx) => {
+              {itemsExpanded && editedItems.map((it, idx) => {
                 const meta = getCategoryMeta(it.category);
+                const isEditing = editingItemIdx === idx;
                 return (
-                  <View key={idx} style={s.receiptItem}>
-                    <View style={s.receiptItemLeft}>
-                      <Text style={s.receiptItemName} numberOfLines={1}>{it.name}</Text>
-                      <Text style={s.receiptItemMeta}>
-                        {it.quantity > 1 ? `${it.quantity} szt. · ` : ''}{meta.label}
-                        {it.discount ? ` · -${it.discount.toFixed(2)} zł` : ''}
-                      </Text>
-                      {it.tags?.length > 0 && (
-                        <View style={s.itemTagsRow}>
-                          {it.tags.map(tag => (
-                            <View key={tag} style={s.itemTagBadge}>
-                              <Text style={s.itemTagText}>{tag}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                    <Text style={s.receiptItemPrice}>{it.price.toFixed(2)} zł</Text>
+                  <View key={idx}>
+                    <TouchableOpacity
+                      style={s.receiptItem}
+                      onPress={() => setEditingItemIdx(isEditing ? null : idx)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[s.itemCatDot, { backgroundColor: meta.color + '30', borderColor: meta.color + '60' }]}>
+                        {(() => { const Icon = (LucideIcons as any)[meta.icon]; return Icon ? <Icon size={9} color={meta.color} /> : null; })()}
+                      </View>
+                      <View style={s.receiptItemLeft}>
+                        <Text style={s.receiptItemName} numberOfLines={1}>{it.name}</Text>
+                        <Text style={s.receiptItemMeta}>
+                          {it.quantity !== 1 ? `${it.quantity} × ` : ''}{meta.label}
+                          {it.discount ? ` · -${it.discount.toFixed(2)} zł` : ''}
+                        </Text>
+                        {it.tags?.length > 0 && (
+                          <View style={s.itemTagsRow}>
+                            {it.tags.map(tag => (
+                              <View key={tag} style={s.itemTagBadge}>
+                                <Text style={s.itemTagText}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                      <View style={s.itemRight}>
+                        <Text style={s.receiptItemPrice}>{it.price.toFixed(2)} zł</Text>
+                        <Pencil size={11} color={isEditing ? colors.accent.blue : colors.text.muted} />
+                      </View>
+                    </TouchableOpacity>
+
+                    {isEditing && (
+                      <ItemEditor
+                        item={it}
+                        onSave={(updated) => handleItemSave(idx, updated)}
+                        onCancel={() => setEditingItemIdx(null)}
+                      />
+                    )}
                   </View>
                 );
               })}
             </View>
           )}
 
-          {/* Date row */}
-          <View style={s.card}>
-            <Text style={s.cardLabel}>Data</Text>
-            {editing ? (
-              <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data transakcji" />
-            ) : (
-              <View style={s.dateRow}>
-                <Calendar size={14} color={colors.text.muted} />
-                <Text style={s.dateTxt}>
-                  {new Date(expense.date).toLocaleDateString('pl-PL', {
-                    day: 'numeric', month: 'long', year: 'numeric',
-                  })}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Type toggle (editing only) */}
+          {/* ── Type toggle (editing only) ───────────────────────────────────── */}
           {editing && (
             <View style={s.typeToggle}>
               <TouchableOpacity
@@ -288,7 +522,7 @@ export default function ExpenseDetailScreen() {
             </View>
           )}
 
-          {/* Category */}
+          {/* ── Category ─────────────────────────────────────────────────────── */}
           <View style={s.card}>
             <Text style={s.cardLabel}>Kategoria</Text>
             <View style={s.catGrid}>
@@ -319,7 +553,7 @@ export default function ExpenseDetailScreen() {
             </View>
           </View>
 
-          {/* Tags */}
+          {/* ── Tags ─────────────────────────────────────────────────────────── */}
           <View style={s.card}>
             <Text style={s.cardLabel}>Tagi</Text>
             {editing ? (
@@ -413,17 +647,44 @@ const s = StyleSheet.create({
 
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
 
-  amountCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
-    borderLeftWidth: 3, padding: spacing[5], gap: spacing[2],
+  // ── Amount hero ────────────────────────────────────────────────────────────
+  heroCard: {
+    borderRadius: radius.xl, padding: spacing[5], gap: spacing[2],
+    overflow: 'hidden',
+  },
+  storeName: {
+    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.35)',
+    textTransform: 'uppercase', letterSpacing: 1,
   },
   amountRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] },
-  currency: { fontSize: 18, fontWeight: '300', color: colors.text.muted },
-  amountDisplay: { fontSize: 40, fontWeight: '800', letterSpacing: -1.5, lineHeight: 46 },
-  amountInput: { fontSize: 40, fontWeight: '800', letterSpacing: -1.5, flex: 1, padding: 0 },
-  noteText: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
-  noteInput: { fontSize: 14, color: colors.text.secondary, lineHeight: 20, padding: 0 },
+  amountEditRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] },
+  amountDisplay: { fontSize: 44, fontWeight: '800', letterSpacing: -2, lineHeight: 50 },
+  amountInput: {
+    fontSize: 44, fontWeight: '800', letterSpacing: -2,
+    flex: 1, padding: 0, lineHeight: 50,
+  },
+  currencyLabel: { fontSize: 20, fontWeight: '300', lineHeight: 50 },
+  heroMeta: { flexDirection: 'row', marginTop: 2 },
+  dateBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[2], paddingVertical: 3,
+    borderRadius: radius.full, borderWidth: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  dateBadgeText: { fontSize: 10, fontWeight: '500' },
+  noteText: { fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 20, marginTop: 4 },
+  noteInput: { fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 20, marginTop: 4, padding: 0 },
+
+  // ── Cards ──────────────────────────────────────────────────────────────────
+  card: {
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: colors.border.default,
+    padding: spacing[4], gap: spacing[3],
+  },
+  cardLabel: {
+    fontSize: 10, fontWeight: '600', color: colors.text.muted,
+    textTransform: 'uppercase', letterSpacing: 0.8,
+  },
 
   typeToggle: {
     flexDirection: 'row', gap: spacing[2],
@@ -437,16 +698,6 @@ const s = StyleSheet.create({
   typeBtnActive: { backgroundColor: colors.text.primary },
   typeBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
   typeBtnTextActive: { color: colors.bg.primary },
-
-  card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
-    padding: spacing[4], gap: spacing[3],
-  },
-  cardLabel: {
-    fontSize: 10, fontWeight: '600', color: colors.text.muted,
-    textTransform: 'uppercase', letterSpacing: 0.8,
-  },
 
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   catItem: {
@@ -467,9 +718,7 @@ const s = StyleSheet.create({
   },
 
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  customTagRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-  },
+  customTagRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   tagInput: {
     flex: 1, fontSize: 14, color: colors.text.primary,
     backgroundColor: colors.bg.elevated, borderRadius: radius.md,
@@ -490,27 +739,34 @@ const s = StyleSheet.create({
   emptyTags: { fontSize: 13, color: colors.text.muted },
 
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dateInput: {
-    flex: 1, fontSize: 15, color: colors.text.primary,
-    paddingVertical: 0, fontWeight: '600',
-  },
   dateTxt: { fontSize: 14, color: colors.text.secondary },
 
   meta: { fontSize: 11, color: colors.text.muted, paddingHorizontal: spacing[1], lineHeight: 18 },
 
+  // ── Receipt items ──────────────────────────────────────────────────────────
   receiptHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   receiptItem: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: spacing[2],
     borderTopWidth: 1, borderTopColor: colors.border.subtle,
+  },
+  itemCatDot: {
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
   },
   receiptItemLeft: { flex: 1, gap: 2 },
   receiptItemName: { fontSize: 13, fontWeight: '500', color: colors.text.primary },
   receiptItemMeta: { fontSize: 10, color: colors.text.muted },
+  itemRight: { alignItems: 'flex-end', gap: 3 },
   receiptItemPrice: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  itemTagsRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
-  itemTagBadge: { paddingHorizontal: 6, paddingVertical: 2, backgroundColor: colors.accent.blue + '18', borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '30' },
-  itemTagText:  { fontSize: 9, color: colors.accent.blue, fontWeight: '600' },
+  itemTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
+  itemTagBadge: {
+    paddingHorizontal: 6, paddingVertical: 2,
+    backgroundColor: colors.accent.blue + '18', borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.accent.blue + '30',
+  },
+  itemTagText: { fontSize: 9, color: colors.accent.blue, fontWeight: '600' },
 
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
