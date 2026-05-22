@@ -424,6 +424,23 @@ export default function DashboardScreen() {
   const habitsDoneCount = habits.filter(h => habitsDone.includes(h.id)).length;
   const onRefresh       = () => { reloadFin(); reloadTasks(); };
 
+  // Mood streak — consecutive days with at least one entry (going back from today or yesterday)
+  const moodStreak = useMemo(() => {
+    const dates = [...new Set(moodEntries.map(e => e.date))].sort().reverse();
+    if (!dates.length) return 0;
+    const todayD = todayStr();
+    const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return toStr(d); })();
+    // Start from today or yesterday
+    if (dates[0] !== todayD && dates[0] !== yest) return 0;
+    let streak = 0;
+    let cursor = new Date(dates[0]);
+    for (const d of dates) {
+      if (d === toStr(cursor)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+      else if (d < toStr(cursor)) break;
+    }
+    return streak;
+  }, [moodEntries]);
+
   const bestStreak = useMemo(() => {
     if (habits.length === 0) return null;
     let best = { streak: 0, habit: habits[0] };
@@ -725,6 +742,12 @@ export default function DashboardScreen() {
                   <View style={[s.moodPill, { backgroundColor: mc + '1A' }]}>
                     <Smile size={12} color={mc} />
                     <Text style={[s.moodPillLabel, { color: mc }]}>NASTRÓJ</Text>
+                    {moodStreak >= 2 && (
+                      <View style={[s.moodStreakBadge, { backgroundColor: mc + '25' }]}>
+                        <Flame size={8} color={mc} />
+                        <Text style={[s.moodStreakText, { color: mc }]}>{moodStreak}</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={s.moodDots}>
                     {last7Mood.map(e => (
@@ -743,7 +766,7 @@ export default function DashboardScreen() {
                     style={[s.checkInBtn, { borderColor: mc + '44', backgroundColor: mc + '18' }]}
                     hitSlop={8}
                   >
-                    <Text style={[s.checkInText, { color: mc }]}>+ check-in</Text>
+                    <Text style={[s.checkInText, { color: mc }]}>{todayEntry ? 'edytuj' : '+ check-in'}</Text>
                   </TouchableOpacity>
                 </View>
               </PressableScale>
@@ -820,33 +843,37 @@ export default function DashboardScreen() {
 
           {/* ── Work earnings widget ────────────────────────────────────── */}
           {workEarnings.isWorking && (() => {
-            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked, activeEventTitle, isColorMode } = workEarnings;
+            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked, activeEventTitle, isColorMode, monthWorkHours } = workEarnings;
             const h = Math.floor(secondsWorked / 3600);
             const m = Math.floor((secondsWorked % 3600) / 60);
             const timeLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;
             const durLabel = shiftDurationMin > 0
               ? `${Math.floor(shiftDurationMin / 60)}h${shiftDurationMin % 60 > 0 ? ` ${shiftDurationMin % 60}m` : ''}`
               : '';
+            const wc = workSettings.workColor;
             return (
               <TouchableOpacity onPress={() => router.push('/work/add' as any)} activeOpacity={0.85}>
-                <View style={s.workCard}>
+                <View style={[s.workCard, wc && { borderColor: wc + '40', backgroundColor: wc + '0A' }]}>
                   <View style={s.workHeader}>
-                    <View style={s.workIconWrap}>
-                      <Briefcase size={16} color="#60A5FA" />
+                    <View style={[s.workIconWrap, wc && { backgroundColor: wc + '20' }]}>
+                      <Briefcase size={16} color={wc ?? '#60A5FA'} />
                     </View>
                     <View style={s.workTitles}>
                       <Text style={s.workTitle} numberOfLines={1}>
                         {isColorMode && activeEventTitle ? activeEventTitle : 'W pracy'}
                       </Text>
-                      <Text style={s.workSub}>{timeLabel}{durLabel ? ` z ${durLabel}` : ''}</Text>
+                      <Text style={s.workSub}>
+                        {timeLabel}{durLabel ? ` z ${durLabel}` : ''}
+                        {isColorMode && monthWorkHours > 0 ? ` · ${monthWorkHours.toFixed(1)}h ten miesiąc` : ''}
+                      </Text>
                     </View>
                     <View style={s.workEarnCol}>
-                      <Text style={s.workEarned}>{totalEarned.toFixed(2)} zł</Text>
-                      <Text style={s.workRate}>+{perSecond.toFixed(4)} zł/s</Text>
+                      <Text style={[s.workEarned, wc && { color: wc }]}>{totalEarned.toFixed(2)} zł</Text>
+                      <Text style={[s.workRate, wc && { color: wc + 'AA' }]}>+{perSecond.toFixed(4)} zł/s</Text>
                     </View>
                   </View>
                   <View style={s.workProgressTrack}>
-                    <View style={[s.workProgressFill, { width: `${progressPct * 100}%` }]} />
+                    <View style={[s.workProgressFill, { width: `${progressPct * 100}%`, backgroundColor: wc ?? '#60A5FA' }]} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -1620,7 +1647,9 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderRadius: radius.full, paddingHorizontal: spacing[2], paddingVertical: 3,
   },
-  moodPillLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  moodPillLabel:  { fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
+  moodStreakBadge:{ flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2 },
+  moodStreakText: { fontSize: 9, fontWeight: '800' },
   moodDots:      { flexDirection: 'row', gap: 4, alignItems: 'center', marginLeft: spacing[1] },
   moodDotSm:     { width: 7, height: 7, borderRadius: 4 },
   moodEmpty:     { fontSize: 11, color: colors.text.muted },

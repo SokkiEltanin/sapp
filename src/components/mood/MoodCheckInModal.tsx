@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
@@ -23,6 +23,17 @@ const PRESET_TAGS = [
   'przygnębiony', 'towarzyski', 'twórczy', 'zaniepokojony', 'pewny siebie',
 ];
 
+const POSITIVE_TAGS = new Set([
+  'skupiony', 'radosny', 'produktywny', 'spokojny', 'motywowany',
+  'wdzięczny', 'szczęśliwy', 'zrelaksowany', 'podekscytowany',
+  'pełen energii', 'zadowolony', 'towarzyski', 'twórczy', 'pewny siebie',
+]);
+const NEGATIVE_TAGS = new Set([
+  'zmęczony', 'niespokojny', 'smutny', 'rozproszony', 'przytłoczony',
+  'zestresowany', 'sfrustrowany', 'samotny', 'bez motywacji', 'przygnębiony',
+  'zaniepokojony',
+]);
+
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -40,8 +51,48 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
-  const { addEntry, updateEntry } = useMoodStore();
+  const { addEntry, updateEntry, entries: allEntries } = useMoodStore();
   const chipColor = mood ? MOOD_COLORS[mood] : undefined;
+
+  // Tag usage frequency across all past entries
+  const tagFrequency = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of allEntries) {
+      for (const t of e.tags) map.set(t, (map.get(t) ?? 0) + 1);
+    }
+    return map;
+  }, [allEntries]);
+
+  // Sort tags: by sentiment (based on current mood) then by frequency
+  const sortedPresetTags = useMemo(() => {
+    const byFreq = (a: string, b: string) => (tagFrequency.get(b) ?? 0) - (tagFrequency.get(a) ?? 0);
+    const positive = PRESET_TAGS.filter(t => POSITIVE_TAGS.has(t));
+    const negative = PRESET_TAGS.filter(t => NEGATIVE_TAGS.has(t));
+    const neutral  = PRESET_TAGS.filter(t => !POSITIVE_TAGS.has(t) && !NEGATIVE_TAGS.has(t));
+
+    let ordered: string[];
+    if (!mood) {
+      ordered = [...PRESET_TAGS].sort(byFreq);
+    } else if (mood <= 2) {
+      // Bad mood → negative first
+      ordered = [
+        ...negative.sort(byFreq),
+        ...neutral.sort(byFreq),
+        ...positive.sort(byFreq),
+      ];
+    } else if (mood >= 4) {
+      // Good mood → positive first
+      ordered = [
+        ...positive.sort(byFreq),
+        ...neutral.sort(byFreq),
+        ...negative.sort(byFreq),
+      ];
+    } else {
+      // Neutral mood → pure frequency sort
+      ordered = [...PRESET_TAGS].sort(byFreq);
+    }
+    return ordered;
+  }, [mood, tagFrequency]);
 
   useEffect(() => {
     if (visible) {
@@ -114,9 +165,9 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     }
   };
 
-  // All tags to show: preset + any custom tags already selected not in preset
+  // All tags to show: sorted presets + any custom tags already selected not in preset
   const allDisplayTags = [
-    ...PRESET_TAGS,
+    ...sortedPresetTags,
     ...tags.filter(t => !PRESET_TAGS.includes(t)),
   ];
 
@@ -164,6 +215,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                     selected={tags.includes(tag)}
                     onPress={() => toggleTag(tag)}
                     color={chipColor}
+                    count={tagFrequency.get(tag)}
                   />
                 ))}
                 {/* Inline custom tag input at end of scroll */}
