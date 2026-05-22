@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TextInput,
@@ -8,12 +8,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   X, Check, Clock, AlignLeft, DollarSign, Calendar,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, Palette,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { workService } from '@/services/workService';
 import { useWorkStore } from '@/store/workStore';
 import { toast } from '@/store/toastStore';
+
+const WORK_COLORS = ['#60A5FA', '#34D399', '#F87171', '#FBBF24', '#C084FC', '#F472B6', '#FFFFFF'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -120,7 +122,7 @@ const dp = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AddWorkShift() {
-  const { settings, addShift: storeAdd } = useWorkStore();
+  const { settings, addShift: storeAdd, setSettings } = useWorkStore();
 
   const [date, setDate]         = useState(todayStr());
   const [startTime, setStart]   = useState('08:00');
@@ -129,6 +131,14 @@ export default function AddWorkShift() {
   const [salary, setSalary]     = useState(String(settings.monthlySalary));
   const [hours, setHours]       = useState(String(settings.hoursPerMonth));
   const [saving, setSaving]     = useState(false);
+  const [workColor, setWorkColor] = useState<string | undefined>(settings.workColor);
+
+  const saveWorkColor = async (color: string | undefined) => {
+    const newSettings = { ...settings, workColor: color };
+    setWorkColor(color);
+    setSettings(newSettings);
+    try { await workService.saveSettings(newSettings); } catch {}
+  };
 
   // Duration preview
   const durationMin = (() => {
@@ -272,6 +282,51 @@ export default function AddWorkShift() {
             </View>
           </View>
 
+          {/* Work color picker */}
+          <View style={s.section}>
+            <View style={s.colorHeader}>
+              <Palette size={13} color={colors.accent.blue} />
+              <Text style={s.sectionLabel}>Kolor pracy w kalendarzu</Text>
+            </View>
+            <View style={s.colorHint}>
+              <Text style={s.colorHintText}>
+                Zdarzenia kalendarza z tym kolorem będą traktowane jako zmiana pracy. Zarobki liczone automatycznie z sumy godzin w miesiącu.
+              </Text>
+            </View>
+            <View style={s.colorRow}>
+              <TouchableOpacity
+                style={[s.colorSwatch, !workColor && s.colorSwatchSelected, { backgroundColor: colors.bg.elevated }]}
+                onPress={() => saveWorkColor(undefined)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.colorSwatchOff, !workColor && { color: colors.text.primary }]}>brak</Text>
+              </TouchableOpacity>
+              {WORK_COLORS.map(c => (
+                <TouchableOpacity
+                  key={c}
+                  style={[
+                    s.colorSwatch,
+                    { backgroundColor: c },
+                    workColor === c && s.colorSwatchSelected,
+                    c === '#FFFFFF' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+                  ]}
+                  onPress={() => saveWorkColor(c)}
+                  activeOpacity={0.7}
+                >
+                  {workColor === c && <Check size={12} color={c === '#FFFFFF' ? '#000' : '#fff'} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+            {workColor && (
+              <View style={[s.colorActive, { borderColor: workColor + '60', backgroundColor: workColor + '10' }]}>
+                <View style={[s.colorActiveDot, { backgroundColor: workColor }]} />
+                <Text style={[s.colorActiveText, { color: workColor }]}>
+                  Kolor aktywny — zdarzenia kalendarza w tym kolorze = praca
+                </Text>
+              </View>
+            )}
+          </View>
+
           {/* Save button */}
           <TouchableOpacity style={[s.saveFullBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving} activeOpacity={0.8}>
             <Check size={16} color="#000" />
@@ -338,4 +393,23 @@ const s = StyleSheet.create({
     backgroundColor: colors.accent.green, borderRadius: radius.xl, paddingVertical: spacing[4],
   },
   saveBtnText: { fontSize: 16, fontWeight: '800', color: '#000' },
+
+  // Work color picker
+  colorHeader:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  colorHint:      { backgroundColor: colors.bg.elevated, borderRadius: radius.md, padding: spacing[3] },
+  colorHintText:  { fontSize: 12, color: colors.text.muted, lineHeight: 18 },
+  colorRow:       { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' },
+  colorSwatch: {
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'transparent',
+  },
+  colorSwatchSelected: { borderColor: colors.text.primary },
+  colorSwatchOff:      { fontSize: 9, fontWeight: '700', color: colors.text.muted, textAlign: 'center' },
+  colorActive: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    borderRadius: radius.md, borderWidth: 1, padding: spacing[3],
+  },
+  colorActiveDot:  { width: 8, height: 8, borderRadius: 4 },
+  colorActiveText: { fontSize: 12, fontWeight: '600', flex: 1 },
 });

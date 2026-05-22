@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   RefreshControl, TouchableOpacity, Animated as RNAnimated,
 } from 'react-native';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -197,6 +198,50 @@ function WeatherIco({ icon, size, color }: { icon: WeatherIcon; size: number; co
   }
 }
 
+// ─── Wave chart ───────────────────────────────────────────────────────────────
+
+const WAVE_W = 320;
+const WAVE_H = 72;
+
+function WaveChart({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * WAVE_W,
+    y: WAVE_H - 8 - ((v / max) * (WAVE_H - 20)),
+  }));
+
+  let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const px = pts[i - 1].x, py = pts[i - 1].y;
+    const cx = pts[i].x,     cy = pts[i].y;
+    const cpx = (px + cx) / 2;
+    line += ` C ${cpx.toFixed(1)} ${py.toFixed(1)}, ${cpx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
+  }
+  const fill = `${line} L ${pts[pts.length - 1].x.toFixed(1)} ${WAVE_H} L ${pts[0].x.toFixed(1)} ${WAVE_H} Z`;
+
+  return (
+    <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
+      <Defs>
+        <SvgLinearGradient id={`wg_${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity="0.35" />
+          <Stop offset="1" stopColor={color} stopOpacity="0" />
+        </SvgLinearGradient>
+      </Defs>
+      <Path d={fill} fill={`url(#wg_${color.replace('#', '')})`} />
+      <Path d={line} stroke={color} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map((p, i) => (
+        <Path
+          key={i}
+          d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0`}
+          fill={color}
+          opacity={data[i] > 0 ? '1' : '0.2'}
+        />
+      ))}
+    </Svg>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -210,7 +255,6 @@ export default function DashboardScreen() {
   const { habits, todayDone: habitsDone, toggle: toggleHabit, getStreak } = useHabits();
   const pomodoro    = usePomodoroToday();
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
-  const workEarnings = useWorkEarnings(workShifts, workSettings);
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood } = useMoodStore();
   const { events, tasks: calTasks, setEvents } = useCalendarStore();
@@ -227,6 +271,12 @@ export default function DashboardScreen() {
   const [expandedReport, setExpanded]   = useState<string | null>(null);
   const [generating, setGenerating]     = useState(false);
   const [gcalEvents, setGcalEvents]     = useState<CalendarEvent[]>([]);
+  const [waveTab, setWaveTab]           = useState<'food' | 'sweets'>('food');
+  const [weekFinExpanded, setWeekFinExpanded] = useState(false);
+  const [weekFinFoodOnly, setWeekFinFoodOnly] = useState(false);
+
+  const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
+  const workEarnings = useWorkEarnings(workShifts, allEvents, workSettings);
 
   useEffect(() => {
     if (events.length === 0) {
@@ -499,6 +549,18 @@ export default function DashboardScreen() {
     [expenses, statWeekSet],
   );
 
+  const weekAllExpenses = useMemo(() =>
+    expenses
+      .filter(e => (!e.type || e.type === 'expense') && statWeekSet.has(e.date.slice(0, 10)))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount),
+    [expenses, statWeekSet],
+  );
+
+  const weekFoodExpenses = useMemo(() =>
+    weekAllExpenses.filter(e => e.category === 'groceries'),
+    [weekAllExpenses],
+  );
+
   const statWeekEvents = useMemo(() =>
     events.filter(e => statWeekSet.has(e.date)).sort((a, b) => a.date.localeCompare(b.date)),
     [events, statWeekSet],
@@ -518,9 +580,6 @@ export default function DashboardScreen() {
       return { offset, dates, avgMood, sweets: sw, food, income: inc, label, isCurrent: offset === statsWeekOffset, weather };
     });
   }, [statsWeekOffset, moodByDay, expenses, weatherData]);
-
-  const maxSweets = Math.max(...weekOverview.map(w => w.sweets), 1);
-  const maxFood   = Math.max(...weekOverview.map(w => w.food), 1);
 
   const moodFoodCorr = useMemo(() => {
     const withMood = weekOverview.filter(w => w.avgMood !== null);
@@ -760,11 +819,14 @@ export default function DashboardScreen() {
           )}
 
           {/* ── Work earnings widget ────────────────────────────────────── */}
-          {workEarnings.isWorking && workEarnings.activeShift && (() => {
-            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked } = workEarnings;
+          {workEarnings.isWorking && (() => {
+            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked, activeEventTitle, isColorMode } = workEarnings;
             const h = Math.floor(secondsWorked / 3600);
             const m = Math.floor((secondsWorked % 3600) / 60);
             const timeLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;
+            const durLabel = shiftDurationMin > 0
+              ? `${Math.floor(shiftDurationMin / 60)}h${shiftDurationMin % 60 > 0 ? ` ${shiftDurationMin % 60}m` : ''}`
+              : '';
             return (
               <TouchableOpacity onPress={() => router.push('/work/add' as any)} activeOpacity={0.85}>
                 <View style={s.workCard}>
@@ -773,8 +835,10 @@ export default function DashboardScreen() {
                       <Briefcase size={16} color="#60A5FA" />
                     </View>
                     <View style={s.workTitles}>
-                      <Text style={s.workTitle}>W pracy</Text>
-                      <Text style={s.workSub}>{timeLabel} z {Math.floor(shiftDurationMin / 60)}h {shiftDurationMin % 60 > 0 ? `${shiftDurationMin % 60}m` : ''}</Text>
+                      <Text style={s.workTitle} numberOfLines={1}>
+                        {isColorMode && activeEventTitle ? activeEventTitle : 'W pracy'}
+                      </Text>
+                      <Text style={s.workSub}>{timeLabel}{durLabel ? ` z ${durLabel}` : ''}</Text>
                     </View>
                     <View style={s.workEarnCol}>
                       <Text style={s.workEarned}>{totalEarned.toFixed(2)} zł</Text>
@@ -967,65 +1031,102 @@ export default function DashboardScreen() {
           </View>
 
           {/* ── Finances week ───────────────────────────────────────────────── */}
-          {(weekTotal > 0 || weekInc > 0) && (
-            <View style={s.statCard}>
-              <View style={s.statCardRow}>
-                <Wallet size={13} color={colors.accent.blue} />
-                <Text style={[s.statCardLabel, { color: colors.accent.blue }]}>Tydzień finansowo</Text>
-              </View>
-              <View style={s.finRow}>
-                <View style={s.finStat}>
-                  <Text style={s.finVal}>{weekTotal.toFixed(0)}</Text>
-                  <Text style={s.finLabel}>wydatki zł</Text>
+          {(weekTotal > 0 || weekInc > 0) && (() => {
+            const displayList = weekFinExpanded
+              ? (weekFinFoodOnly ? weekFoodExpenses : weekAllExpenses)
+              : bigExpenses;
+            return (
+              <View style={s.statCard}>
+                <TouchableOpacity
+                  style={s.statCardRow}
+                  onPress={() => { setWeekFinExpanded(e => !e); if (!weekFinExpanded) setWeekFinFoodOnly(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Wallet size={13} color={colors.accent.blue} />
+                  <Text style={[s.statCardLabel, { color: colors.accent.blue }]}>Tydzień finansowo</Text>
+                  {weekFinExpanded
+                    ? <ChevronRight size={13} color={colors.text.muted} style={{ transform: [{ rotate: '90deg' }] }} />
+                    : <ChevronRight size={13} color={colors.text.muted} />
+                  }
+                </TouchableOpacity>
+                <View style={s.finRow}>
+                  <View style={s.finStat}>
+                    <Text style={s.finVal}>{weekTotal.toFixed(0)}</Text>
+                    <Text style={s.finLabel}>wydatki zł</Text>
+                  </View>
+                  {weekInc > 0 && (
+                    <>
+                      <View style={s.finSep} />
+                      <View style={s.finStat}>
+                        <View style={s.finIconRow}>
+                          <TrendingUp size={10} color={colors.accent.green} />
+                          <Text style={[s.finVal, { color: colors.accent.green }]}>{weekInc.toFixed(0)}</Text>
+                        </View>
+                        <Text style={s.finLabel}>przychody zł</Text>
+                      </View>
+                    </>
+                  )}
+                  {weekFood > 0 && (
+                    <>
+                      <View style={s.finSep} />
+                      <View style={s.finStat}>
+                        <View style={s.finIconRow}>
+                          <ShoppingCart size={10} color={colors.accent.green} />
+                          <Text style={[s.finVal, { color: colors.accent.green }]}>{weekFood.toFixed(0)}</Text>
+                        </View>
+                        <Text style={s.finLabel}>jedzenie zł</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
-                {weekInc > 0 && (
-                  <>
-                    <View style={s.finSep} />
-                    <View style={s.finStat}>
-                      <View style={s.finIconRow}>
-                        <TrendingUp size={10} color={colors.accent.green} />
-                        <Text style={[s.finVal, { color: colors.accent.green }]}>{weekInc.toFixed(0)}</Text>
-                      </View>
-                      <Text style={s.finLabel}>przychody zł</Text>
-                    </View>
-                  </>
+                {weekFinExpanded && (
+                  <View style={s.finFilterRow}>
+                    <TouchableOpacity
+                      style={[s.finFilterBtn, !weekFinFoodOnly && s.finFilterBtnActive]}
+                      onPress={() => setWeekFinFoodOnly(false)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.finFilterText, !weekFinFoodOnly && s.finFilterTextActive]}>Wszystkie</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[s.finFilterBtn, weekFinFoodOnly && s.finFilterBtnActive]}
+                      onPress={() => setWeekFinFoodOnly(true)}
+                      activeOpacity={0.7}
+                    >
+                      <ShoppingCart size={10} color={weekFinFoodOnly ? colors.accent.green : colors.text.muted} />
+                      <Text style={[s.finFilterText, weekFinFoodOnly && { color: colors.accent.green, fontWeight: '700' }]}>Jedzenie</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
-                {weekFood > 0 && (
-                  <>
-                    <View style={s.finSep} />
-                    <View style={s.finStat}>
-                      <View style={s.finIconRow}>
-                        <ShoppingCart size={10} color={colors.accent.green} />
-                        <Text style={[s.finVal, { color: colors.accent.green }]}>{weekFood.toFixed(0)}</Text>
-                      </View>
-                      <Text style={s.finLabel}>jedzenie zł</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-              {bigExpenses.length > 0 && (
-                <View style={s.bigExpSection}>
-                  {bigExpenses.map(e => {
-                    const isInc = e.type === 'income';
-                    return (
+                {displayList.length > 0 && (
+                  <View style={s.bigExpSection}>
+                    {displayList.map(e => (
                       <View key={e.id} style={s.bigExpRow}>
                         <Text style={s.bigExpDate}>{e.date.slice(5, 10).replace('-', '.')}</Text>
-                        <Text style={s.bigExpNote} numberOfLines={1}>{e.storeName || e.note || '—'}</Text>
-                        <Text style={[s.bigExpAmt, { color: isInc ? colors.accent.green : colors.text.primary }]}>
-                          {isInc ? '+' : '-'}{e.amount.toFixed(0)} zł
+                        <Text style={s.bigExpNote} numberOfLines={1}>{e.storeName || e.note || e.category}</Text>
+                        <Text style={[s.bigExpAmt, { color: colors.text.primary }]}>
+                          -{e.amount.toFixed(0)} zł
                         </Text>
                       </View>
-                    );
-                  })}
-                </View>
-              )}
-              {weekSweets > 0 && weekFood > 0 && (
-                <Text style={s.finNote}>
-                  Słodycze: {weekSweets.toFixed(0)} zł ({Math.round(weekSweets / weekFood * 100)}% jedzenia tego tygodnia)
-                </Text>
-              )}
-            </View>
-          )}
+                    ))}
+                    {!weekFinExpanded && weekAllExpenses.length > bigExpenses.length && (
+                      <TouchableOpacity onPress={() => setWeekFinExpanded(true)} style={s.showMoreBtn}>
+                        <Text style={s.showMoreText}>+ {weekAllExpenses.length - bigExpenses.length} więcej</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+                {weekFinExpanded && displayList.length === 0 && (
+                  <Text style={s.emptyMood}>Brak wydatków{weekFinFoodOnly ? ' na jedzenie' : ''} w tym tygodniu</Text>
+                )}
+                {weekSweets > 0 && weekFood > 0 && (
+                  <Text style={s.finNote}>
+                    Słodycze: {weekSweets.toFixed(0)} zł ({Math.round(weekSweets / weekFood * 100)}% jedzenia tego tygodnia)
+                  </Text>
+                )}
+              </View>
+            );
+          })()}
 
           {/* ── Google Calendar: dziś + jutro ──────────────────────────────── */}
           {(gcalToday.length > 0 || gcalTomorrow.length > 0) && (
@@ -1082,12 +1183,54 @@ export default function DashboardScreen() {
           <View style={s.statCard}>
             <View style={s.statCardRow}>
               <Text style={s.statCardLabel}>Ostatnie {WEEKS_BACK} tygodni</Text>
-              <Text style={s.statCardMeta}>nastrój · jedzenie · słodycze</Text>
+              <View style={s.waveToggleRow}>
+                <TouchableOpacity
+                  style={[s.waveToggleBtn, waveTab === 'food' && s.waveToggleBtnActive]}
+                  onPress={() => setWaveTab('food')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.waveToggleText, waveTab === 'food' && { color: colors.accent.green, fontWeight: '700' }]}>Jedzenie</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.waveToggleBtn, waveTab === 'sweets' && s.waveToggleBtnActive]}
+                  onPress={() => setWaveTab('sweets')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.waveToggleText, waveTab === 'sweets' && { color: colors.accent.amber, fontWeight: '700' }]}>Słodycze</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {/* Wave chart */}
+            <View style={s.waveChartWrap}>
+              <WaveChart
+                data={weekOverview.map(w => waveTab === 'food' ? w.food : w.sweets)}
+                color={waveTab === 'food' ? colors.accent.green : colors.accent.amber}
+              />
+              {/* week labels below chart */}
+              <View style={s.waveLabels}>
+                {weekOverview.map((w, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => setStatsWeekOffset(w.offset)}
+                    style={s.waveLabelBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.waveLabel, w.isCurrent && { color: colors.text.primary, fontWeight: '700' }]} numberOfLines={1}>
+                      {w.label.slice(0, 5)}
+                    </Text>
+                    <Text style={[s.waveAmt, { color: waveTab === 'food' ? colors.accent.green : colors.accent.amber }]}>
+                      {(waveTab === 'food' ? w.food : w.sweets) > 0
+                        ? `${(waveTab === 'food' ? w.food : w.sweets).toFixed(0)}`
+                        : '—'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {weekOverview.map((w, i) => {
-              const col      = w.avgMood ? moodColor(w.avgMood) : 'rgba(255,255,255,0.08)';
-              const sweetsH  = maxSweets > 0 ? (w.sweets / maxSweets) * 32 : 0;
-              const foodH    = maxFood   > 0 ? (w.food   / maxFood)   * 32 : 0;
+              const col = w.avgMood ? moodColor(w.avgMood) : 'rgba(255,255,255,0.08)';
               const sweetsPct = w.food > 0 ? Math.round(w.sweets / w.food * 100) : 0;
               return (
                 <TouchableOpacity
@@ -1111,12 +1254,8 @@ export default function DashboardScreen() {
                       : <Text style={s.overviewTemp}>—</Text>
                     }
                   </View>
-                  <View style={s.overviewBarsWrap}>
-                    <View style={[s.overviewBar, { height: Math.max(foodH, 2), backgroundColor: colors.accent.green + (w.food > 0 ? 'AA' : '20') }]} />
-                    <View style={[s.overviewBar, { height: Math.max(sweetsH, 2), backgroundColor: colors.accent.amber + (w.sweets > 0 ? 'CC' : '20') }]} />
-                  </View>
                   <View style={s.overviewAmtCol}>
-                    {w.food > 0 && <Text style={[s.overviewAmt, { color: colors.accent.green }]}>{w.food.toFixed(0)}</Text>}
+                    {w.food > 0 && <Text style={[s.overviewAmt, { color: colors.accent.green }]}>{w.food.toFixed(0)} zł</Text>}
                     {w.sweets > 0 && <Text style={[s.overviewAmt, { color: colors.accent.amber }]}>{sweetsPct}%</Text>}
                   </View>
                 </TouchableOpacity>
@@ -1612,8 +1751,6 @@ const s = StyleSheet.create({
   overviewLabel:      { width: 80, fontSize: 11, color: colors.text.muted },
   overviewDot:        { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   overviewDotVal:     { fontSize: 10, fontWeight: '800', color: '#fff' },
-  overviewBarsWrap:   { flex: 1, height: 36, flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', gap: 3 },
-  overviewBar:        { width: 7, borderRadius: 3, minHeight: 2 },
   overviewAmtCol:     { width: 42, alignItems: 'flex-end', gap: 1 },
   overviewAmt:        { fontSize: 9, fontWeight: '600' },
   overviewWeather:    { flexDirection: 'row', alignItems: 'center', gap: 2, width: 34 },
@@ -1693,4 +1830,24 @@ const s = StyleSheet.create({
   workRate:         { fontSize: 10, color: 'rgba(96,165,250,0.7)' },
   workProgressTrack:{ height: 3, backgroundColor: 'rgba(96,165,250,0.15)', borderRadius: 2, overflow: 'hidden' },
   workProgressFill: { height: 3, backgroundColor: '#60A5FA', borderRadius: 2 },
+
+  // Wave chart
+  waveToggleRow:      { flexDirection: 'row', gap: spacing[1] },
+  waveToggleBtn:      { paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  waveToggleBtnActive:{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.14)' },
+  waveToggleText:     { fontSize: 10, fontWeight: '500', color: colors.text.muted },
+  waveChartWrap:      { gap: spacing[1] },
+  waveLabels:         { flexDirection: 'row' },
+  waveLabelBtn:       { flex: 1, alignItems: 'center', gap: 1 },
+  waveLabel:          { fontSize: 8, color: colors.text.muted },
+  waveAmt:            { fontSize: 9, fontWeight: '700' },
+
+  // Finances expanded
+  finFilterRow:       { flexDirection: 'row', gap: spacing[2] },
+  finFilterBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing[3], paddingVertical: 4, borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  finFilterBtnActive: { borderColor: colors.accent.blue + '50', backgroundColor: colors.accent.blue + '10' },
+  finFilterText:      { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
+  finFilterTextActive:{ color: colors.accent.blue, fontWeight: '700' },
+  showMoreBtn:        { paddingVertical: 6, alignItems: 'center' },
+  showMoreText:       { fontSize: 11, color: colors.text.muted },
 });

@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
   Animated, Pressable, TouchableOpacity, TextInput,
 } from 'react-native';
-import { X, Check, Plus } from 'lucide-react-native';
+import { X, Check } from 'lucide-react-native';
 
 import MoodPicker from './MoodPicker';
 import InputField from '@/components/ui/InputField';
@@ -85,6 +85,10 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
       Alert.alert('Uzupełnij', 'Wybierz nastrój i poziom energii');
       return;
     }
+    if (!note.trim()) {
+      Alert.alert('Uzupełnij', 'Wpisz notatkę dnia — to pomaga budować statystyki słów kluczowych');
+      return;
+    }
     setSaving(true);
     try {
       if (existingEntry) {
@@ -148,7 +152,12 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
             {/* Tags */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Co czujesz?</Text>
-              <View style={styles.tagsWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tagsScroll}
+                keyboardShouldPersistTaps="handled"
+              >
                 {allDisplayTags.map(tag => (
                   <Chip
                     key={tag} label={tag}
@@ -157,39 +166,31 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                     color={chipColor}
                   />
                 ))}
-              </View>
-
-              {/* Custom tag input */}
-              <View style={styles.customTagRow}>
-                <TextInput
-                  style={styles.customTagInput}
-                  value={customTag}
-                  onChangeText={setCustomTag}
-                  placeholder="Własny tag..."
-                  placeholderTextColor={colors.text.muted}
-                  onSubmitEditing={addCustomTag}
-                  returnKeyType="done"
-                  maxLength={30}
-                />
-                <TouchableOpacity
-                  onPress={addCustomTag}
-                  style={[styles.customTagBtn, { opacity: customTag.trim() ? 1 : 0.4 }]}
-                  activeOpacity={0.7}
-                >
-                  <Plus size={14} color={colors.accent.purple} />
-                </TouchableOpacity>
-              </View>
+                {/* Inline custom tag input at end of scroll */}
+                <View style={styles.customTagInline}>
+                  <TextInput
+                    style={styles.customTagInputInline}
+                    value={customTag}
+                    onChangeText={setCustomTag}
+                    placeholder="+ własny"
+                    placeholderTextColor={colors.text.muted}
+                    onSubmitEditing={addCustomTag}
+                    returnKeyType="done"
+                    maxLength={30}
+                  />
+                </View>
+              </ScrollView>
             </View>
 
             <InputField
-              label="Notatka (opcjonalnie)"
+              label="Notatka dnia"
               value={note}
               onChangeText={setNote}
-              placeholder="Co słychać? Jak minął dzień..."
+              placeholder="Co słychać? Opisz dzień — dobra lub zła, każda notatka buduje Twoje statystyki."
               multiline
-              numberOfLines={3}
+              numberOfLines={4}
               textAlignVertical="top"
-              containerStyle={{ minHeight: 90 }}
+              containerStyle={{ minHeight: 100 }}
             />
           </ScrollView>
 
@@ -200,7 +201,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               icon={<Check size={18} color={colors.bg.primary} />}
               size="lg"
               fullWidth
-              disabled={saving || !mood || !energy}
+              disabled={saving || !mood || !energy || !note.trim()}
             />
           </View>
         </Animated.View>
@@ -243,25 +244,18 @@ const styles = StyleSheet.create({
     ...typography.label, color: colors.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
   },
-  tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  tagsScroll: { flexDirection: 'row', gap: spacing[2], paddingRight: spacing[2] },
 
-  customTagRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    marginTop: spacing[1],
+  customTagInline: {
+    height: 30, justifyContent: 'center',
   },
-  customTagInput: {
-    flex: 1, height: 36,
+  customTagInputInline: {
+    height: 30, minWidth: 80,
     backgroundColor: colors.bg.elevated,
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     borderWidth: 1, borderColor: colors.border.default,
     paddingHorizontal: spacing[3],
-    fontSize: 13, color: colors.text.primary,
-  },
-  customTagBtn: {
-    width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.accent.purple + '18',
-    borderWidth: 1, borderColor: colors.accent.purple + '44',
-    alignItems: 'center', justifyContent: 'center',
+    fontSize: 12, color: colors.text.primary,
   },
 
   footer: {

@@ -218,6 +218,7 @@ export interface WorkSettings {
   hoursPerMonth: number;
   currency: string;
   notifyEveryMinutes: number; // 0 = off
+  workColor?: string;         // hex color — calendar events with this color count as work
 }
 
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {
@@ -225,6 +226,7 @@ export const DEFAULT_WORK_SETTINGS: WorkSettings = {
   hoursPerMonth: 168,
   currency: 'PLN',
   notifyEveryMinutes: 0,
+  workColor: undefined,
 };
 
 // ─── Habits ───────────────────────────────────────────────────────────────────

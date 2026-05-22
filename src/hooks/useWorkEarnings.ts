@@ -1,10 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { WorkShift, WorkSettings } from '@/types';
+import { WorkShift, WorkSettings, CalendarEvent } from '@/types';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function monthStartStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`;
 }
 function timeToMins(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
@@ -13,26 +17,71 @@ function timeToMins(hhmm: string): number {
 
 export interface WorkEarningsResult {
   activeShift:      WorkShift | null;
+  activeEventTitle: string | null; // event title when color-mode is active
   isWorking:        boolean;
-  secondsWorked:    number;   // seconds from shift start to now
-  totalEarned:      number;   // PLN
-  perSecond:        number;   // PLN/s
-  progressPct:      number;   // 0..1 through the shift
+  secondsWorked:    number;
+  totalEarned:      number;
+  perSecond:        number;
+  progressPct:      number;
   shiftDurationMin: number;
+  monthWorkHours:   number; // total hours from work-colored events this month
+  isColorMode:      boolean; // true when tracking via calendar event color
 }
 
-export function useWorkEarnings(shifts: WorkShift[], settings: WorkSettings): WorkEarningsResult {
+export function useWorkEarnings(
+  shifts: WorkShift[],
+  events: CalendarEvent[],
+  settings: WorkSettings,
+): WorkEarningsResult {
   const [tick, setTick] = useState(0);
 
-  const perSecond = useMemo(
-    () => settings.monthlySalary / (settings.hoursPerMonth * 3600),
-    [settings.monthlySalary, settings.hoursPerMonth],
-  );
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
-  // Find today's active shift (current time is within start..end)
-  const activeShift = useMemo(() => {
+  // ── Color-mode: derive everything from calendar events ────────────────────
+  const colorMode = useMemo(() => {
+    if (!settings.workColor) return null;
+    const wc = settings.workColor;
+
+    const workEvents = events.filter(e => e.color === wc && e.startTime && e.endTime);
+
+    // Total work hours this month
+    const monthStart = monthStartStr();
+    const monthEvents = workEvents.filter(e => e.date.slice(0, 10) >= monthStart);
+    const totalMonthMins = monthEvents.reduce((sum, e) => {
+      return sum + Math.max(0, timeToMins(e.endTime!) - timeToMins(e.startTime!));
+    }, 0);
+    const monthWorkHours = totalMonthMins / 60;
+
+    // Active event right now (today, current time within event)
     const today = todayStr();
-    const now   = new Date();
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const activeEvent = workEvents.find(e =>
+      e.date.startsWith(today) &&
+      timeToMins(e.startTime!) <= nowMins &&
+      nowMins <= timeToMins(e.endTime!)
+    ) ?? null;
+
+    return { workEvents, monthWorkHours, activeEvent };
+  }, [events, settings.workColor, tick]);
+
+  // ── Per-second rate ───────────────────────────────────────────────────────
+  const perSecond = useMemo(() => {
+    if (colorMode) {
+      const hours = colorMode.monthWorkHours > 0 ? colorMode.monthWorkHours : settings.hoursPerMonth;
+      return settings.monthlySalary / (hours * 3600);
+    }
+    return settings.monthlySalary / (settings.hoursPerMonth * 3600);
+  }, [colorMode, settings]);
+
+  // ── Manual-shift active detection (fallback when no workColor) ────────────
+  const activeShift = useMemo(() => {
+    if (settings.workColor) return null; // color-mode overrides manual shifts
+    const today = todayStr();
+    const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
     return shifts.find(s => {
       if (s.date !== today) return false;
@@ -40,19 +89,43 @@ export function useWorkEarnings(shifts: WorkShift[], settings: WorkSettings): Wo
       const end   = timeToMins(s.endTime);
       return nowMins >= start && nowMins <= end;
     }) ?? null;
-  }, [shifts, tick]);
+  }, [shifts, settings.workColor, tick]);
 
-  // Tick every second when working
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
+  // ── Compose result ────────────────────────────────────────────────────────
   return useMemo(() => {
-    if (!activeShift) {
-      return { activeShift: null, isWorking: false, secondsWorked: 0, totalEarned: 0, perSecond, progressPct: 0, shiftDurationMin: 0 };
+    const empty: WorkEarningsResult = {
+      activeShift: null, activeEventTitle: null,
+      isWorking: false, secondsWorked: 0,
+      totalEarned: 0, perSecond, progressPct: 0,
+      shiftDurationMin: 0, monthWorkHours: colorMode?.monthWorkHours ?? 0,
+      isColorMode: !!settings.workColor,
+    };
+
+    if (colorMode) {
+      const ae = colorMode.activeEvent;
+      if (!ae) return empty;
+      const now = new Date();
+      const startMins   = timeToMins(ae.startTime!);
+      const endMins     = timeToMins(ae.endTime!);
+      const nowMins     = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+      const shiftDurMin = endMins - startMins;
+      const workedMins  = Math.max(0, Math.min(nowMins - startMins, shiftDurMin));
+      const secondsWorked = workedMins * 60;
+      return {
+        activeShift: null,
+        activeEventTitle: ae.title,
+        isWorking: true,
+        secondsWorked,
+        totalEarned: secondsWorked * perSecond,
+        perSecond,
+        progressPct: Math.min(shiftDurMin > 0 ? workedMins / shiftDurMin : 0, 1),
+        shiftDurationMin: shiftDurMin,
+        monthWorkHours: colorMode.monthWorkHours,
+        isColorMode: true,
+      };
     }
 
+    if (!activeShift) return empty;
     const now          = new Date();
     const startMins    = timeToMins(activeShift.startTime);
     const endMins      = timeToMins(activeShift.endTime);
@@ -60,17 +133,17 @@ export function useWorkEarnings(shifts: WorkShift[], settings: WorkSettings): Wo
     const shiftDurMin  = endMins - startMins;
     const workedMins   = Math.max(0, Math.min(nowMins - startMins, shiftDurMin));
     const secondsWorked = workedMins * 60;
-    const earned        = secondsWorked * perSecond;
-    const progressPct   = shiftDurMin > 0 ? workedMins / shiftDurMin : 0;
-
     return {
       activeShift,
+      activeEventTitle: null,
       isWorking: true,
       secondsWorked,
-      totalEarned: earned,
+      totalEarned: secondsWorked * perSecond,
       perSecond,
-      progressPct: Math.min(progressPct, 1),
+      progressPct: Math.min(shiftDurMin > 0 ? workedMins / shiftDurMin : 0, 1),
       shiftDurationMin: shiftDurMin,
+      monthWorkHours: 0,
+      isColorMode: false,
     };
-  }, [activeShift, tick, perSecond]);
+  }, [colorMode, activeShift, tick, perSecond, settings.workColor]);
 }

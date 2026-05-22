@@ -489,56 +489,6 @@ export default function FinancesScreen() {
               </View>
             </View>
 
-            {/* Salary vs expenses card */}
-            {lastIncome && thisMonthExp > 0 && (() => {
-              const ratio    = thisMonthExp / lastIncome.amount;
-              const leftover = lastIncome.amount - thisMonthExp;
-              const over     = leftover < 0;
-              const barColor = ratio >= 1 ? colors.accent.red : ratio >= 0.75 ? colors.accent.amber : colors.accent.green;
-              const incDate  = lastIncome.date.slice(0, 7);
-              const incLabel = format(parseISO(lastIncome.date.slice(0, 10) + 'T12:00:00'), 'LLLL', { locale: pl });
-              return (
-                <View style={[styles.card, styles.salaryCard]}>
-                  <View style={styles.cardRow}>
-                    <TrendingUp size={13} color={colors.accent.green} />
-                    <Text style={[styles.cardLabel, { color: colors.accent.green }]}>Ostatni przychód ({incLabel})</Text>
-                    <Text style={[styles.cardMeta, { color: colors.accent.green }]}>+{lastIncome.amount.toFixed(0)} zł</Text>
-                  </View>
-
-                  {/* Big ratio */}
-                  <View style={styles.salaryRatioRow}>
-                    <Text style={[styles.salaryBigPct, { color: barColor }]}>
-                      {Math.round(ratio * 100)}%
-                    </Text>
-                    <Text style={styles.salaryRatioLabel}>wypłaty{'\n'}wydane</Text>
-                    <View style={{ flex: 1 }} />
-                    <View style={styles.salarySideStats}>
-                      <View style={styles.salarySideStat}>
-                        <Text style={[styles.salarySideVal, { color: colors.accent.red }]}>-{thisMonthExp.toFixed(0)} zł</Text>
-                        <Text style={styles.salarySideLabel}>wydatki</Text>
-                      </View>
-                      <View style={[styles.salarySideStat, { alignItems: 'flex-end' }]}>
-                        <Text style={[styles.salarySideVal, { color: over ? colors.accent.red : colors.accent.green }]}>
-                          {over ? '-' : '+'}{Math.abs(leftover).toFixed(0)} zł
-                        </Text>
-                        <Text style={styles.salarySideLabel}>{over ? 'brakuje' : 'zostaje'}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Progress bar */}
-                  <View style={styles.salaryBarTrack}>
-                    <View style={[styles.salaryBarFill, {
-                      width: `${Math.min(100, ratio * 100)}%`,
-                      backgroundColor: barColor,
-                    }]} />
-                  </View>
-                  <Text style={styles.salaryHint}>
-                    {ratio < 0.5 ? 'Oszczędzasz solidnie.' : ratio < 0.75 ? 'Całkiem dobrze, ale można lepiej.' : ratio < 1 ? 'Uwaga — zostało mało.' : 'Wydatki przekroczyły przychód!'}
-                  </Text>
-                </View>
-              );
-            })()}
 
             {/* Spending alerts */}
             {spendingAlerts.length > 0 && (
