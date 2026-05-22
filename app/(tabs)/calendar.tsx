@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
-  Modal, TouchableOpacity, NativeScrollEvent, NativeSyntheticEvent,
+  Modal, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -265,19 +265,14 @@ export default function CalendarScreen() {
   const [calMode, setCalMode]       = useState<CalMode>('month');
   const [viewYear, setViewYear]     = useState(now.getFullYear());
   const [viewMonth, setViewMonth]   = useState(now.getMonth());
-  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
 
-  // Pull-to-expand: detect overscroll on iOS
-  const pullActivated = useRef(false);
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    if (y < -65 && !pullActivated.current && !modalVisible) {
-      pullActivated.current = true;
-      setModalVisible(true);
-    }
-    if (y >= 0) pullActivated.current = false;
+  // Pull-down opens the full-screen month modal on all platforms
+  // (on Android RefreshControl fires onRefresh instead of negative scroll Y)
+  const openModal = () => {
+    if (!modalVisible) setModalVisible(true);
+    load(); // silent background refresh
   };
 
   useEffect(() => { load(); }, []);
@@ -297,7 +292,6 @@ export default function CalendarScreen() {
     }
   };
 
-  const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -479,10 +473,8 @@ export default function CalendarScreen() {
       {calMode === 'week' && (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={openModal} tintColor={colors.text.muted} />}
           contentContainerStyle={{ paddingBottom: 120 }}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
         >
           <View style={styles.weekCard}>
             <View style={styles.weekNavRow}>
@@ -510,10 +502,8 @@ export default function CalendarScreen() {
       {calMode === 'month' && (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={openModal} tintColor={colors.text.muted} />}
           contentContainerStyle={{ paddingBottom: 120 }}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
         >
           {/* Month nav — tap to expand full screen */}
           <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
@@ -552,10 +542,8 @@ export default function CalendarScreen() {
       {calMode === 'detailed' && (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={openModal} tintColor={colors.text.muted} />}
           contentContainerStyle={{ paddingBottom: 120 }}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
         >
           <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
             <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
