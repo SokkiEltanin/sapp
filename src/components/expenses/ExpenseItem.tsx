@@ -1,9 +1,14 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { TrendingUp, TrendingDown, ShoppingCart } from 'lucide-react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 
 function timeStr(iso: string): string {
   try {
@@ -20,6 +25,8 @@ interface Props {
 }
 
 export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
   const isIncome  = expense.type === 'income';
   const isReceipt = !isIncome && (expense.receiptItems?.length ?? 0) > 0;
   const meta      = getCategoryMeta(expense.category);
@@ -30,57 +37,110 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
     ? `${expense.receiptItems!.length} produktów · ${timeStr(expense.date)}`
     : `${timeStr(expense.date)}${expense.tags.length > 0 ? ` · ${expense.tags.slice(0, 2).join(', ')}` : ''}${!isIncome ? ` · ${meta.label}` : ''}`;
 
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded(v => !v);
+  };
+
   return (
-    <PressableScale
-      onPress={() => onPress?.(expense)}
-      onLongPress={() => onLongPress?.(expense)}
-      style={[styles.row, isReceipt && styles.rowReceipt]}
-    >
-      <View style={[styles.bar, { backgroundColor: accentColor }]} />
+    <View style={[styles.wrap, isReceipt && styles.wrapReceipt]}>
+      {/* Main row */}
+      <PressableScale
+        onPress={() => onPress?.(expense)}
+        onLongPress={() => onLongPress?.(expense)}
+        style={styles.row}
+      >
+        <View style={[styles.bar, { backgroundColor: accentColor }]} />
 
-      <View style={[styles.iconWrap, isReceipt && { backgroundColor: colors.accent.blue + '15' }]}>
-        {isIncome
-          ? <TrendingUp size={16} color={colors.accent.green} />
-          : isReceipt
-            ? <ShoppingCart size={16} color={colors.accent.blue} />
-            : <TrendingDown size={16} color={colors.text.muted} />
-        }
-      </View>
+        <View style={[styles.iconWrap, isReceipt && { backgroundColor: colors.accent.blue + '15' }]}>
+          {isIncome
+            ? <TrendingUp size={16} color={colors.accent.green} />
+            : isReceipt
+              ? <ShoppingCart size={16} color={colors.accent.blue} />
+              : <TrendingDown size={16} color={colors.text.muted} />
+          }
+        </View>
 
-      <View style={styles.info}>
-        <Text style={styles.note} numberOfLines={1}>{title}</Text>
-        <Text style={styles.meta}>{subtitle}</Text>
-        {isReceipt && expense.receiptItems!.length > 0 && (
-          <View style={styles.itemPreview}>
-            {expense.receiptItems!.slice(0, 3).map((it, i) => (
-              <Text key={i} style={styles.itemChip} numberOfLines={1}>{it.name}</Text>
-            ))}
-            {expense.receiptItems!.length > 3 && (
-              <Text style={styles.itemMore}>+{expense.receiptItems!.length - 3}</Text>
-            )}
-          </View>
+        <View style={styles.info}>
+          <Text style={styles.note} numberOfLines={1}>{title}</Text>
+          <Text style={styles.meta}>{subtitle}</Text>
+        </View>
+
+        <Text style={[styles.amount, { color: isIncome ? colors.accent.green : colors.text.primary }]}>
+          {isIncome ? '+' : '-'}{expense.amount.toFixed(2)} zł
+        </Text>
+
+        {/* Expand toggle for receipts */}
+        {isReceipt && (
+          <TouchableOpacity
+            onPress={toggle}
+            hitSlop={12}
+            style={styles.chevronBtn}
+            activeOpacity={0.6}
+          >
+            {expanded
+              ? <ChevronUp size={15} color={colors.accent.blue} />
+              : <ChevronDown size={15} color={colors.text.muted} />
+            }
+          </TouchableOpacity>
         )}
-      </View>
+      </PressableScale>
 
-      <Text style={[styles.amount, { color: isIncome ? colors.accent.green : colors.text.primary }]}>
-        {isIncome ? '+' : '-'}{expense.amount.toFixed(2)} zł
-      </Text>
-    </PressableScale>
+      {/* Expanded receipt items */}
+      {isReceipt && expanded && (
+        <View style={styles.itemList}>
+          {expense.receiptItems!.map((it, i) => {
+            const itMeta = getCategoryMeta(it.category);
+            return (
+              <View key={i} style={[styles.itemRow, i === 0 && styles.itemRowFirst]}>
+                <View style={[styles.itemDot, { backgroundColor: itMeta.color + '30', borderColor: itMeta.color + '50' }]} />
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName} numberOfLines={1}>{it.name}</Text>
+                  {it.tags?.length > 0 && (
+                    <View style={styles.itemTagsRow}>
+                      {it.tags.slice(0, 3).map(tag => (
+                        <View key={tag} style={styles.itemTag}>
+                          <Text style={styles.itemTagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={styles.itemAmtCol}>
+                  {it.quantity !== 1 && (
+                    <Text style={styles.itemQty}>{it.quantity}×</Text>
+                  )}
+                  <Text style={styles.itemPrice}>{it.price.toFixed(2)} zł</Text>
+                </View>
+              </View>
+            );
+          })}
+          <TouchableOpacity
+            style={styles.detailBtn}
+            onPress={() => onPress?.(expense)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.detailBtnText}>Edytuj / szczegóły →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    paddingRight: spacing[4], paddingVertical: spacing[3],
+  wrap: {
     backgroundColor: colors.bg.card,
     borderRadius: radius.md, marginBottom: spacing[2],
     borderWidth: 1, borderColor: colors.border.default,
     overflow: 'hidden',
   },
-  rowReceipt: {
-    borderColor: colors.accent.blue + '20',
-    paddingVertical: spacing[3],
+  wrapReceipt: {
+    borderColor: colors.accent.blue + '25',
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingRight: spacing[2], paddingVertical: spacing[3],
   },
   bar: { width: 2, alignSelf: 'stretch' },
   iconWrap: {
@@ -91,13 +151,50 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 2 },
   note: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '500' },
   meta: { ...typography.caption, color: colors.text.muted },
-  itemPreview: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  itemChip: {
-    fontSize: 10, color: colors.text.secondary,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: 4, overflow: 'hidden',
-  },
-  itemMore: { fontSize: 10, color: colors.text.muted, alignSelf: 'center' },
   amount: { ...typography.label, fontWeight: '700', fontSize: 14 },
+  chevronBtn: {
+    width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Expanded items list
+  itemList: {
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+    paddingBottom: spacing[1],
+  },
+  itemRowFirst: {
+    borderTopWidth: 0,
+  },
+  itemRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[4], paddingVertical: spacing[2],
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)',
+  },
+  itemDot: {
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
+  },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
+  itemTagsRow: { flexDirection: 'row', gap: 4, marginTop: 2 },
+  itemTag: {
+    paddingHorizontal: 5, paddingVertical: 1,
+    backgroundColor: colors.accent.blue + '15',
+    borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.accent.blue + '25',
+  },
+  itemTagText: { fontSize: 8, color: colors.accent.blue, fontWeight: '600' },
+  itemAmtCol: { alignItems: 'flex-end', gap: 1 },
+  itemQty: { fontSize: 9, color: colors.text.muted },
+  itemPrice: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+
+  detailBtn: {
+    marginHorizontal: spacing[4], marginTop: spacing[1], marginBottom: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.accent.blue + '12',
+    borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.accent.blue + '30',
+    alignItems: 'center',
+  },
+  detailBtnText: { fontSize: 11, fontWeight: '600', color: colors.accent.blue },
 });
