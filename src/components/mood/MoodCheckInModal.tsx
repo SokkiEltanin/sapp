@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
-  Animated, Pressable, TouchableOpacity, TextInput,
+  Animated, Pressable, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 
@@ -50,6 +50,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
 
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
 
   const { addEntry, updateEntry, entries: allEntries } = useMoodStore();
   const chipColor = mood ? MOOD_COLORS[mood] : undefined;
@@ -193,6 +194,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
           </View>
 
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -238,6 +240,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                 label="Notatka dnia"
                 value={note}
                 onChangeText={setNote}
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)}
                 placeholder="Co słychać? Opisz dzień — dobra lub zła, każda notatka buduje Twoje statystyki."
                 multiline
                 numberOfLines={4}

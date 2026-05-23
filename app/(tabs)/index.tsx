@@ -1,6 +1,6 @@
-import { useMemo, useEffect, useState, useRef } from 'react';
+import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, ScrollView, Modal,
   RefreshControl, TouchableOpacity, Animated as RNAnimated,
 } from 'react-native';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -15,7 +15,7 @@ import {
   BrainCircuit, Plus, ShoppingCart,
   Wallet, FileText, RefreshCw, Calendar,
   Cloud, CloudDrizzle, CloudRain, Snowflake, CloudLightning,
-  Briefcase,
+  Briefcase, CreditCard, Check,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -28,7 +28,8 @@ import { useHabits } from '@/hooks/useHabits';
 import { usePomodoroToday } from '@/hooks/usePomodoroToday';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
-import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, MoodLevel, Expense } from '@/types';
+import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, MoodLevel, Expense, Subscription, BillingCycle } from '@/types';
+import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
@@ -172,6 +173,25 @@ function humorLine(mood?: number, pending = 0, done = 0): string {
   return opts[(new Date().getDate()) % opts.length];
 }
 
+function isDurationExpired(sub: Subscription): boolean {
+  if (!sub.durationMonths || sub.durationMonths === 0 || !sub.startDate) return false;
+  const end = new Date(sub.startDate + 'T00:00:00');
+  end.setMonth(end.getMonth() + sub.durationMonths);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return end <= today;
+}
+
+function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
+  const d = new Date(current + 'T00:00:00');
+  switch (cycle) {
+    case 'weekly':    d.setDate(d.getDate() + 7); break;
+    case 'monthly':   d.setMonth(d.getMonth() + 1); break;
+    case 'quarterly': d.setMonth(d.getMonth() + 3); break;
+    case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d.toISOString().split('T')[0];
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -260,7 +280,13 @@ export default function DashboardScreen() {
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood } = useMoodStore();
   const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
+  const { subscriptions, update: updateSub } = useSubscriptions();
   const [budgets, setBudgets] = useState<MonthlyBudgets>({});
+
+  // ── Subscription payment queue ─────────────────────────────────────────────
+  const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
+  const [paymentConfirming, setPaymentConfirming] = useState(false);
+  const checkedSubs = useRef(false);
 
   // ── Stats data ─────────────────────────────────────────────────────────────
   const [weatherData, setWeatherData]   = useState<DayWeather[]>([]);
@@ -271,6 +297,7 @@ export default function DashboardScreen() {
   const [monthlyReports, setMonthlyRep] = useState<MonthlyReport[]>([]);
   const [yearlyReports, setYearlyRep]   = useState<YearlyReport[]>([]);
   const [expandedReport, setExpanded]   = useState<string | null>(null);
+  const [reportsOpen, setReportsOpen]   = useState(false);
   const [generating, setGenerating]     = useState(false);
   const [waveTab, setWaveTab]           = useState<'food' | 'sweets'>('food');
   const [weekFinExpanded, setWeekFinExpanded] = useState(false);
@@ -299,6 +326,44 @@ export default function DashboardScreen() {
         setGcalEvents(evs);
       }).catch(() => {});
     });
+  }, []);
+
+  // Subscription payment queue check
+  useEffect(() => {
+    if (checkedSubs.current || subscriptions.length === 0) return;
+    checkedSubs.current = true;
+    const todayS = new Date().toISOString().split('T')[0];
+    const due = subscriptions.filter(s => s.active && !isDurationExpired(s) && s.nextBillingDate <= todayS);
+    if (due.length > 0) setPaymentQueue(due);
+  }, [subscriptions]);
+
+  const currentPayment = paymentQueue[0] ?? null;
+
+  const handlePaymentYes = useCallback(async () => {
+    if (!currentPayment) return;
+    setPaymentConfirming(true);
+    try {
+      const todayS = new Date().toISOString().split('T')[0];
+      await expensesService.add({
+        type: 'expense',
+        amount: currentPayment.amount,
+        currency: currentPayment.currency,
+        category: currentPayment.category,
+        tags: [],
+        note: `Subskrypcja: ${currentPayment.name}`,
+        date: todayS,
+      });
+      const next = advanceNextBillingDate(currentPayment.nextBillingDate, currentPayment.billingCycle);
+      await updateSub(currentPayment.id, { nextBillingDate: next });
+    } catch { }
+    finally {
+      setPaymentConfirming(false);
+      setPaymentQueue(q => q.slice(1));
+    }
+  }, [currentPayment, updateSub]);
+
+  const handlePaymentNo = useCallback(() => {
+    setPaymentQueue(q => q.slice(1));
   }, []);
 
   // Schedule work shift notifications when events or settings load
@@ -1035,60 +1100,6 @@ export default function DashboardScreen() {
             )}
           </View>
 
-          {/* ── Mood heatmap ────────────────────────────────────────────────── */}
-          <View style={s.statCard}>
-            <View style={s.statCardRow}>
-              <Calendar size={13} color={colors.accent.pink} />
-              <Text style={[s.statCardLabel, { color: colors.accent.pink }]}>Kalendarz nastrojów</Text>
-            </View>
-            <View style={s.heatNavRow}>
-              <TouchableOpacity onPress={() => setHeatOffset(o => o - 1)} style={s.heatNavBtn}>
-                <ChevronLeft size={14} color={colors.text.secondary} />
-              </TouchableOpacity>
-              <Text style={s.heatMonthLabel}>{heatMonthLabel}</Text>
-              <TouchableOpacity
-                onPress={() => setHeatOffset(o => Math.min(o + 1, 0))}
-                style={[s.heatNavBtn, heatOffset >= 0 && s.navBtnDisabled]}
-                disabled={heatOffset >= 0}
-              >
-                <ChevronRight size={14} color={heatOffset >= 0 ? colors.text.muted : colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            <View style={s.heatHeaderRow}>
-              {DAY_SHORT.map(d => (
-                <Text key={d} style={s.heatHeaderCell}>{d}</Text>
-              ))}
-            </View>
-            <View style={s.heatGridWrap}>
-              {heatGrid.map((week, ri) => (
-                <View key={ri} style={s.heatWeekRow}>
-                  {week.map((cell, ci) => {
-                    if (!cell) return <View key={ci} style={s.heatCellEmpty} />;
-                    const bg = cell.avgMood
-                      ? moodColor(cell.avgMood)
-                      : cell.isToday
-                      ? 'rgba(255,255,255,0.10)'
-                      : 'rgba(255,255,255,0.04)';
-                    return (
-                      <View key={ci} style={[
-                        s.heatCell,
-                        { backgroundColor: bg },
-                        cell.isToday && s.heatCellToday,
-                      ]}>
-                        <Text style={[
-                          s.heatCellDay,
-                          cell.avgMood ? s.heatCellDayFilled : cell.isToday ? { color: colors.accent.blue } : null,
-                        ]}>
-                          {cell.day}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-          </View>
-
           {/* ── Finances week ───────────────────────────────────────────────── */}
           {(weekTotal > 0 || weekInc > 0) && (() => {
             const displayList = weekFinExpanded
@@ -1221,135 +1232,30 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {/* ── Calendar events this week ────────────────────────────────────── */}
-          {statWeekEvents.length > 0 && (
-            <View style={s.statCard}>
-              <View style={s.statCardRow}>
-                <Calendar size={13} color={colors.accent.purple} />
-                <Text style={[s.statCardLabel, { color: colors.accent.purple }]}>Eventy w tym tygodniu</Text>
-              </View>
-              {statWeekEvents.map(e => (
-                <View key={e.id} style={s.eventRow}>
-                  <View style={[s.eventDot, { backgroundColor: e.color ?? colors.accent.purple }]} />
-                  <Text style={s.eventDate}>{e.date.slice(5).replace('-', '.')}</Text>
-                  <Text style={s.eventTitle} numberOfLines={1}>{e.title}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* ── 8-week overview ─────────────────────────────────────────────── */}
-          <View style={s.statCard}>
-            <View style={s.statCardRow}>
-              <Text style={s.statCardLabel}>Ostatnie {WEEKS_BACK} tygodni</Text>
-              <View style={s.waveToggleRow}>
-                <TouchableOpacity
-                  style={[s.waveToggleBtn, waveTab === 'food' && s.waveToggleBtnActive]}
-                  onPress={() => setWaveTab('food')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.waveToggleText, waveTab === 'food' && { color: colors.accent.green, fontWeight: '700' }]}>Jedzenie</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.waveToggleBtn, waveTab === 'sweets' && s.waveToggleBtnActive]}
-                  onPress={() => setWaveTab('sweets')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[s.waveToggleText, waveTab === 'sweets' && { color: colors.accent.amber, fontWeight: '700' }]}>Słodycze</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Wave chart */}
-            <View style={s.waveChartWrap}>
-              <WaveChart
-                data={weekOverview.map(w => waveTab === 'food' ? w.food : w.sweets)}
-                color={waveTab === 'food' ? colors.accent.green : colors.accent.amber}
-                dotColors={weekOverview.map(w => w.avgMood ? moodColor(w.avgMood) : null)}
-              />
-              {/* week labels below chart */}
-              <View style={s.waveLabels}>
-                {weekOverview.map((w, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() => setStatsWeekOffset(w.offset)}
-                    style={s.waveLabelBtn}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.waveLabel, w.isCurrent && { color: colors.text.primary, fontWeight: '700' }]} numberOfLines={1}>
-                      {w.label.slice(0, 5)}
-                    </Text>
-                    <Text style={[s.waveAmt, { color: waveTab === 'food' ? colors.accent.green : colors.accent.amber }]}>
-                      {(waveTab === 'food' ? w.food : w.sweets) > 0
-                        ? `${(waveTab === 'food' ? w.food : w.sweets).toFixed(0)}`
-                        : '—'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            {moodFoodCorr && (moodFoodCorr.goodCount > 0 || moodFoodCorr.badCount > 0) && (
-              <View style={s.corrBox}>
-                <Text style={s.corrTitle}>Korelacja nastrój ↔ jedzenie</Text>
-                <View style={s.corrRow}>
-                  <View style={s.corrStat}>
-                    <View style={[s.corrDot, { backgroundColor: MOOD_COLORS[4] }]} />
-                    <Text style={s.corrLabel}>Dobry nastrój ({moodFoodCorr.goodCount} tydz.)</Text>
-                    <Text style={s.corrVal}>{moodFoodCorr.goodFood.toFixed(0)} zł jedzenie</Text>
-                    {moodFoodCorr.goodSweets > 0 && (
-                      <Text style={[s.corrSub, { color: colors.accent.amber }]}>{moodFoodCorr.goodSweets.toFixed(0)} zł słodycze</Text>
-                    )}
-                  </View>
-                  <View style={s.corrDivider} />
-                  <View style={s.corrStat}>
-                    <View style={[s.corrDot, { backgroundColor: MOOD_COLORS[2] }]} />
-                    <Text style={s.corrLabel}>Słaby nastrój ({moodFoodCorr.badCount} tydz.)</Text>
-                    <Text style={s.corrVal}>{moodFoodCorr.badFood.toFixed(0)} zł jedzenie</Text>
-                    {moodFoodCorr.badSweets > 0 && (
-                      <Text style={[s.corrSub, { color: colors.accent.amber }]}>{moodFoodCorr.badSweets.toFixed(0)} zł słodycze</Text>
-                    )}
-                  </View>
-                </View>
-                {moodFoodCorr.badSweets > 0 && moodFoodCorr.goodSweets > 0 && (
-                  <Text style={s.corrInsight}>
-                    {moodFoodCorr.badSweets > moodFoodCorr.goodSweets * 1.2
-                      ? `Przy słabym nastroju jesz ${Math.round((moodFoodCorr.badSweets / moodFoodCorr.goodSweets - 1) * 100)}% więcej słodyczy.`
-                      : moodFoodCorr.goodSweets > moodFoodCorr.badSweets * 1.2
-                      ? `Przy dobrym nastroju wydajesz ${Math.round((moodFoodCorr.goodSweets / moodFoodCorr.badSweets - 1) * 100)}% więcej na słodycze.`
-                      : 'Nastrój nie ma dużego wpływu na słodycze w twoim przypadku.'}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
-
           {/* ── Reports ─────────────────────────────────────────────────────── */}
           <View style={s.statCard}>
-            <View style={s.statCardRow}>
+            <TouchableOpacity
+              style={s.statCardRow}
+              onPress={() => setReportsOpen(o => !o)}
+              activeOpacity={0.7}
+            >
               <FileText size={13} color={colors.accent.purple} />
               <Text style={[s.statCardLabel, { color: colors.accent.purple }]}>Raporty</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (reportTab === 'weekly') generateManual(getWeekBounds(statWeekDates[0]).start);
-                  else if (reportTab === 'monthly') generateManualMonthly(getPrevMonth());
-                  else generateManualYearly(new Date().getFullYear());
-                }}
-                style={s.genBtn}
-                disabled={generating}
-              >
-                <RefreshCw size={11} color={generating ? colors.text.muted : colors.accent.purple} />
-                <Text style={[s.genBtnText, generating && { color: colors.text.muted }]}>
-                  {generating ? '...' : 'Generuj'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              <View style={{ flex: 1 }} />
+              <ChevronRight
+                size={13} color={colors.text.muted}
+                style={reportsOpen ? { transform: [{ rotate: '90deg' }] } : undefined}
+              />
+            </TouchableOpacity>
 
+            {reportsOpen && (
+              <>
             <View style={s.reportTabRow}>
               {(['weekly', 'monthly', 'yearly'] as const).map(tab => (
                 <TouchableOpacity
                   key={tab}
                   style={[s.reportTabBtn, reportTab === tab && s.reportTabBtnActive]}
-                  onPress={() => { setReportTab(tab); setExpanded(null); }}
+                  onPress={() => setReportTab(tab)}
                   activeOpacity={0.7}
                 >
                   <Text style={[s.reportTabText, reportTab === tab && s.reportTabTextActive]}>
@@ -1533,11 +1439,46 @@ export default function DashboardScreen() {
                   );
                 })
             )}
+              </>
+            )}
           </View>
 
         </ScrollView>
 
         <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={null} />
+
+        {/* ── Subscription payment confirmation ─────────────────────────── */}
+        {currentPayment && (
+          <Modal visible transparent animationType="fade" onRequestClose={handlePaymentNo}>
+            <View style={s.payOverlay}>
+              <View style={s.payCard}>
+                <View style={s.payIconWrap}>
+                  <CreditCard size={24} color={colors.accent.blue} />
+                </View>
+                <Text style={s.payTitle}>Płatność należna</Text>
+                <Text style={s.payName}>{currentPayment.name}</Text>
+                <Text style={s.payAmount}>{currentPayment.amount.toFixed(2)} zł</Text>
+                <Text style={s.payHint}>Czy opłaciłeś tę subskrypcję?</Text>
+                {paymentQueue.length > 1 && (
+                  <Text style={s.payQueue}>+{paymentQueue.length - 1} kolejnych</Text>
+                )}
+                <View style={s.payBtns}>
+                  <PressableScale onPress={handlePaymentNo} style={s.payBtnNo}>
+                    <Text style={s.payBtnNoText}>Nie teraz</Text>
+                  </PressableScale>
+                  <PressableScale
+                    onPress={handlePaymentYes}
+                    style={[s.payBtnYes, paymentConfirming && { opacity: 0.6 }]}
+                    disabled={paymentConfirming}
+                  >
+                    <Check size={16} color={colors.bg.primary} />
+                    <Text style={s.payBtnYesText}>{paymentConfirming ? 'Zapisuję...' : 'Tak, opłaciłem'}</Text>
+                  </PressableScale>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
       </Animated.View>
     </SafeAreaView>
   );
@@ -1858,4 +1799,39 @@ const s = StyleSheet.create({
   finFilterTextActive:{ color: colors.accent.blue, fontWeight: '700' },
   showMoreBtn:        { paddingVertical: 6, alignItems: 'center' },
   showMoreText:       { fontSize: 11, color: colors.text.muted },
+
+  // Payment modal
+  payOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: spacing[6],
+  },
+  payCard: {
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: colors.border.default,
+    padding: spacing[6], alignItems: 'center', gap: spacing[2], width: '100%',
+  },
+  payIconWrap: {
+    width: 52, height: 52, borderRadius: radius.full,
+    backgroundColor: colors.accent.blue + '18',
+    alignItems: 'center', justifyContent: 'center', marginBottom: spacing[1],
+  },
+  payTitle:   { fontSize: 10, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  payName:    { fontSize: 20, fontWeight: '800', color: colors.text.primary, textAlign: 'center' },
+  payAmount:  { fontSize: 28, fontWeight: '800', color: colors.accent.blue },
+  payHint:    { fontSize: 14, color: colors.text.secondary, textAlign: 'center', marginTop: spacing[1] },
+  payQueue:   { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  payBtns: { flexDirection: 'row', gap: spacing[3], marginTop: spacing[3], width: '100%' },
+  payBtnNo: {
+    flex: 1, paddingVertical: spacing[3], borderRadius: radius.md,
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    alignItems: 'center',
+  },
+  payBtnNoText: { fontSize: 13, color: colors.text.secondary, fontWeight: '600' },
+  payBtnYes: {
+    flex: 2, paddingVertical: spacing[3], borderRadius: radius.md,
+    backgroundColor: colors.accent.blue, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+  },
+  payBtnYesText: { fontSize: 13, color: colors.bg.primary, fontWeight: '700' },
 });
