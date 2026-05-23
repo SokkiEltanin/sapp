@@ -2,7 +2,7 @@ export const colors = {
   bg: {
     primary:   '#000000',
     secondary: '#080808',
-    card:      '#0E0E0E',
+    card:      '#141414',
     elevated:  '#181818',
     overlay:   'rgba(0,0,0,0.92)',
   },

@@ -162,10 +162,10 @@ export const MOOD_LABELS: Record<MoodLevel, string> = {
 
 export const MOOD_COLORS: Record<MoodLevel, string> = {
   1: '#6B7280', // szary
-  2: '#EF4444', // czerwony
-  3: '#F97316', // pomarańczowy
-  4: '#EAB308', // żółty
-  5: '#22C55E', // zielony
+  2: '#F87171', // czerwony (theme red)
+  3: '#FBBF24', // bursztynowy (theme amber)
+  4: '#34D399', // miętowy (theme green)
+  5: '#60A5FA', // niebieski (theme blue - wyróżnia "świetnie")
 };
 
 export const ENERGY_LABELS: Record<MoodLevel, string> = {

@@ -1003,8 +1003,8 @@ export default function DashboardScreen() {
           {/* ── Mood timeline ───────────────────────────────────────────────── */}
           <View style={s.statCard}>
             <View style={s.statCardRow}>
-              <Smile size={13} color={colors.accent.pink} />
-              <Text style={[s.statCardLabel, { color: colors.accent.pink }]}>Nastrój tygodnia</Text>
+              <Smile size={13} color={colors.text.muted} />
+              <Text style={s.statCardLabel}>Nastrój tygodnia</Text>
               {moodTrend && (
                 <View style={[s.trendBadge, {
                   backgroundColor: moodTrend === 'up' ? colors.accent.green + '1A' : moodTrend === 'down' ? colors.accent.red + '1A' : 'rgba(255,255,255,0.06)',
@@ -1103,8 +1103,8 @@ export default function DashboardScreen() {
           {/* ── Mood heatmap ────────────────────────────────────────────────── */}
           <View style={s.statCard}>
             <View style={s.statCardRow}>
-              <Calendar size={13} color={colors.accent.pink} />
-              <Text style={[s.statCardLabel, { color: colors.accent.pink }]}>Kalendarz nastrojów</Text>
+              <Calendar size={13} color={colors.text.muted} />
+              <Text style={s.statCardLabel}>Kalendarz nastrojów</Text>
             </View>
             <View style={s.heatNavRow}>
               <TouchableOpacity onPress={() => setHeatOffset(o => o - 1)} style={s.heatNavBtn}>
@@ -1166,8 +1166,8 @@ export default function DashboardScreen() {
                   onPress={() => { setWeekFinExpanded(e => !e); if (!weekFinExpanded) setWeekFinFoodOnly(false); }}
                   activeOpacity={0.7}
                 >
-                  <Wallet size={13} color={colors.accent.blue} />
-                  <Text style={[s.statCardLabel, { color: colors.accent.blue }]}>Tydzień finansowo</Text>
+                  <Wallet size={13} color={colors.text.muted} />
+                  <Text style={s.statCardLabel}>Tydzień finansowo</Text>
                   {weekFinExpanded
                     ? <ChevronRight size={13} color={colors.text.muted} style={{ transform: [{ rotate: '90deg' }] }} />
                     : <ChevronRight size={13} color={colors.text.muted} />
@@ -1256,8 +1256,8 @@ export default function DashboardScreen() {
           {(gcalToday.length > 0 || gcalTomorrow.length > 0) && (
             <View style={s.statCard}>
               <View style={s.statCardRow}>
-                <CalendarDays size={13} color={'#039BE5'} />
-                <Text style={[s.statCardLabel, { color: '#039BE5' }]}>Google Kalendarz</Text>
+                <CalendarDays size={13} color={colors.text.muted} />
+                <Text style={s.statCardLabel}>Google Kalendarz</Text>
               </View>
               {gcalToday.length > 0 && (
                 <>
@@ -1342,8 +1342,8 @@ export default function DashboardScreen() {
               onPress={() => setReportsOpen(o => !o)}
               activeOpacity={0.7}
             >
-              <FileText size={13} color={colors.accent.purple} />
-              <Text style={[s.statCardLabel, { color: colors.accent.purple }]}>Raporty</Text>
+              <FileText size={13} color={colors.text.muted} />
+              <Text style={s.statCardLabel}>Raporty</Text>
               <View style={{ flex: 1 }} />
               <ChevronRight
                 size={13} color={colors.text.muted}
@@ -1791,7 +1791,7 @@ const s = StyleSheet.create({
   eventDate:  { fontSize: 10, color: colors.text.muted, width: 32 },
   eventTitle: { flex: 1, fontSize: 13, color: colors.text.secondary },
 
-  gcalDayLabel: { fontSize: 9, fontWeight: '700', color: '#039BE5', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  gcalDayLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
   gcalRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
   gcalDot:      { width: 6, height: 6, borderRadius: 3 },
   gcalTime:     { fontSize: 10, color: colors.text.muted, width: 36, fontWeight: '600' },
