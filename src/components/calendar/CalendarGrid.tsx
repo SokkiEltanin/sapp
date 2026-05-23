@@ -98,16 +98,22 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                   onPress={() => onSelectDate(d)}
                   style={[styles.detailedCell, sel && styles.detailedCellSel]}
                 >
-                  {/* Day number */}
+                  {/* Day number — View wrapper required for borderRadius on Android */}
                   <View style={styles.detailedNumRow}>
-                    <Text style={[
-                      styles.detailedNum,
-                      isTd && styles.detailedNumToday,
-                      sel && !isTd && styles.detailedNumSel,
-                      isWeekend && !sel && !isTd && styles.detailedNumWeekend,
+                    <View style={[
+                      styles.detailedNumCircle,
+                      isTd && styles.detailedNumCircleToday,
+                      sel && !isTd && styles.detailedNumCircleSel,
                     ]}>
-                      {day}
-                    </Text>
+                      <Text style={[
+                        styles.detailedNum,
+                        isTd && styles.detailedNumTextToday,
+                        sel && !isTd && styles.detailedNumTextSel,
+                        !isTd && !sel && isWeekend && styles.detailedNumWeekend,
+                      ]}>
+                        {day}
+                      </Text>
+                    </View>
                     {mood && (
                       <View style={[styles.moodDotTiny, { backgroundColor: MOOD_COLORS[mood.mood] }]} />
                     )}
@@ -256,21 +262,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 2,
   },
+  detailedNumCircle: {
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  detailedNumCircleToday: { backgroundColor: colors.accent.blue },
+  detailedNumCircleSel:   { backgroundColor: colors.text.primary },
   detailedNum: {
     fontSize: 11, fontWeight: '500', color: colors.text.muted,
-    width: 20, height: 20, textAlign: 'center', lineHeight: 20,
+    lineHeight: 14, textAlign: 'center',
   },
-  detailedNumToday: {
-    color: '#fff', fontWeight: '800',
-    backgroundColor: colors.accent.blue,
-    borderRadius: 10, overflow: 'hidden',
-  },
-  detailedNumSel: {
-    color: colors.bg.primary, fontWeight: '800',
-    backgroundColor: colors.text.primary,
-    borderRadius: 10, overflow: 'hidden',
-  },
-  detailedNumWeekend: { color: '#f87171', opacity: 0.8 },
+  detailedNumTextToday: { color: '#fff', fontWeight: '800' },
+  detailedNumTextSel:   { color: colors.bg.primary, fontWeight: '800' },
+  detailedNumWeekend:   { color: '#f87171', opacity: 0.8 },
 
   moodDotTiny: { width: 5, height: 5, borderRadius: 3 },
 

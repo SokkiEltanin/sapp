@@ -21,11 +21,11 @@ const ENERGY_EMOJIS: Record<MoodLevel, string> = {
 };
 
 const ENERGY_COLORS: Record<MoodLevel, string> = {
-  1: '#6B7280',
-  2: '#55B4FF',
-  3: '#43D98F',
-  4: '#FFBE55',
-  5: '#FF6584',
+  1: '#374151', // ciemnoszary
+  2: '#6B7280', // szary
+  3: '#8BA9C3', // szarawo-niebieski
+  4: '#4B9FE5', // jasnoniebieski
+  5: '#1D4ED8', // niebieski
 };
 
 interface Props {

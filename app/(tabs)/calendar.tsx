@@ -423,7 +423,7 @@ export default function CalendarScreen() {
         moodEntries={moodEntries}
         workColor={workSettings.workColor}
         onEventPress={(id) => router.push(`/calendar/${id}` as any)}
-        onAddEvent={() => { setModalVisible(false); router.push('/calendar/add'); }}
+        onAddEvent={() => { setModalVisible(false); router.push('/calendar/add?type=event' as any); }}
       />
 
       <ScreenHeader
@@ -434,7 +434,7 @@ export default function CalendarScreen() {
             <PressableScale onPress={goToday} style={styles.todayBtn}>
               <Text style={styles.todayBtnText}>Dziś</Text>
             </PressableScale>
-            <PressableScale onPress={() => router.push('/calendar/add')} style={styles.addBtn}>
+            <PressableScale onPress={() => router.push('/calendar/add?type=event' as any)} style={styles.addBtn}>
               <Plus size={16} color={colors.text.primary} />
             </PressableScale>
           </View>

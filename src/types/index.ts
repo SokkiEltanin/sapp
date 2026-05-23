@@ -161,11 +161,11 @@ export const MOOD_LABELS: Record<MoodLevel, string> = {
 };
 
 export const MOOD_COLORS: Record<MoodLevel, string> = {
-  1: '#FF5A5F',
-  2: '#FF9F43',
-  3: '#FFBE55',
-  4: '#43D98F',
-  5: '#6C63FF',
+  1: '#6B7280', // szary
+  2: '#EF4444', // czerwony
+  3: '#F97316', // pomarańczowy
+  4: '#EAB308', // żółty
+  5: '#22C55E', // zielony
 };
 
 export const ENERGY_LABELS: Record<MoodLevel, string> = {

@@ -3,6 +3,7 @@ import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
   Animated, Pressable, TouchableOpacity, TextInput,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 
@@ -192,70 +193,75 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
           >
-            <MoodPicker value={mood} onChange={setMood} label="Nastrój" />
-            <MoodPicker value={energy} onChange={setEnergy} label="Energia" mode="energy" />
+            <ScrollView
+              contentContainerStyle={styles.scroll}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <MoodPicker value={mood} onChange={setMood} label="Nastrój" />
+              <MoodPicker value={energy} onChange={setEnergy} label="Energia" mode="energy" />
 
-            {/* Tags */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Co czujesz?</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.tagsScroll}
-                keyboardShouldPersistTaps="handled"
-              >
-                {allDisplayTags.map(tag => (
-                  <Chip
-                    key={tag} label={tag}
-                    selected={tags.includes(tag)}
-                    onPress={() => toggleTag(tag)}
-                    color={chipColor}
-                    count={tagFrequency.get(tag)}
-                  />
-                ))}
-                {/* Inline custom tag input at end of scroll */}
-                <View style={styles.customTagInline}>
-                  <TextInput
-                    style={styles.customTagInputInline}
-                    value={customTag}
-                    onChangeText={setCustomTag}
-                    placeholder="+ własny"
-                    placeholderTextColor={colors.text.muted}
-                    onSubmitEditing={addCustomTag}
-                    returnKeyType="done"
-                    maxLength={30}
-                  />
-                </View>
-              </ScrollView>
-            </View>
+              {/* Tags */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Co czujesz?</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.tagsScroll}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {allDisplayTags.map(tag => (
+                    <Chip
+                      key={tag} label={tag}
+                      selected={tags.includes(tag)}
+                      onPress={() => toggleTag(tag)}
+                      color={chipColor}
+                      count={tagFrequency.get(tag)}
+                    />
+                  ))}
+                  {/* Inline custom tag input at end of scroll */}
+                  <View style={styles.customTagInline}>
+                    <TextInput
+                      style={styles.customTagInputInline}
+                      value={customTag}
+                      onChangeText={setCustomTag}
+                      placeholder="+ własny"
+                      placeholderTextColor={colors.text.muted}
+                      onSubmitEditing={addCustomTag}
+                      returnKeyType="done"
+                      maxLength={30}
+                    />
+                  </View>
+                </ScrollView>
+              </View>
 
-            <InputField
-              label="Notatka dnia"
-              value={note}
-              onChangeText={setNote}
-              placeholder="Co słychać? Opisz dzień — dobra lub zła, każda notatka buduje Twoje statystyki."
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              containerStyle={{ minHeight: 100 }}
-            />
-          </ScrollView>
+              <InputField
+                label="Notatka dnia"
+                value={note}
+                onChangeText={setNote}
+                placeholder="Co słychać? Opisz dzień — dobra lub zła, każda notatka buduje Twoje statystyki."
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                containerStyle={{ minHeight: 100 }}
+              />
 
-          <View style={styles.footer}>
-            <AnimatedButton
-              onPress={handleSave}
-              label={saving ? 'Zapisuję...' : (existingEntry ? 'Zaktualizuj' : 'Zapisz')}
-              icon={<Check size={18} color={colors.bg.primary} />}
-              size="lg"
-              fullWidth
-              disabled={saving || !mood || !energy || !note.trim()}
-            />
-          </View>
+              <View style={styles.footer}>
+                <AnimatedButton
+                  onPress={handleSave}
+                  label={saving ? 'Zapisuję...' : (existingEntry ? 'Zaktualizuj' : 'Zapisz')}
+                  icon={<Check size={18} color={colors.bg.primary} />}
+                  size="lg"
+                  fullWidth
+                  disabled={saving || !mood || !energy || !note.trim()}
+                />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Animated.View>
       </Animated.View>
     </Modal>
