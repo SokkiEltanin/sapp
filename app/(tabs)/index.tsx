@@ -1100,6 +1100,60 @@ export default function DashboardScreen() {
             )}
           </View>
 
+          {/* ── Mood heatmap ────────────────────────────────────────────────── */}
+          <View style={s.statCard}>
+            <View style={s.statCardRow}>
+              <Calendar size={13} color={colors.accent.pink} />
+              <Text style={[s.statCardLabel, { color: colors.accent.pink }]}>Kalendarz nastrojów</Text>
+            </View>
+            <View style={s.heatNavRow}>
+              <TouchableOpacity onPress={() => setHeatOffset(o => o - 1)} style={s.heatNavBtn}>
+                <ChevronLeft size={14} color={colors.text.secondary} />
+              </TouchableOpacity>
+              <Text style={s.heatMonthLabel}>{heatMonthLabel}</Text>
+              <TouchableOpacity
+                onPress={() => setHeatOffset(o => Math.min(o + 1, 0))}
+                style={[s.heatNavBtn, heatOffset >= 0 && s.navBtnDisabled]}
+                disabled={heatOffset >= 0}
+              >
+                <ChevronRight size={14} color={heatOffset >= 0 ? colors.text.muted : colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={s.heatHeaderRow}>
+              {DAY_SHORT.map(d => (
+                <Text key={d} style={s.heatHeaderCell}>{d}</Text>
+              ))}
+            </View>
+            <View style={s.heatGridWrap}>
+              {heatGrid.map((week, ri) => (
+                <View key={ri} style={s.heatWeekRow}>
+                  {week.map((cell, ci) => {
+                    if (!cell) return <View key={ci} style={s.heatCellEmpty} />;
+                    const bg = cell.avgMood
+                      ? moodColor(cell.avgMood) + '55'
+                      : cell.isToday
+                      ? 'rgba(255,255,255,0.10)'
+                      : 'rgba(255,255,255,0.04)';
+                    return (
+                      <View key={ci} style={[
+                        s.heatCell,
+                        { backgroundColor: bg },
+                        cell.isToday && s.heatCellToday,
+                      ]}>
+                        <Text style={[
+                          s.heatCellDay,
+                          cell.avgMood ? { color: moodColor(cell.avgMood), fontWeight: '700' } : cell.isToday ? { color: colors.accent.blue } : null,
+                        ]}>
+                          {cell.day}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </View>
+
           {/* ── Finances week ───────────────────────────────────────────────── */}
           {(weekTotal > 0 || weekInc > 0) && (() => {
             const displayList = weekFinExpanded
@@ -1231,6 +1285,55 @@ export default function DashboardScreen() {
               )}
             </View>
           )}
+
+          {/* ── 8-week overview ─────────────────────────────────────────────── */}
+          <View style={s.statCard}>
+            <View style={s.statCardRow}>
+              <Text style={s.statCardLabel}>Ostatnie {WEEKS_BACK} tygodni</Text>
+              <View style={s.waveToggleRow}>
+                <TouchableOpacity
+                  style={[s.waveToggleBtn, waveTab === 'food' && s.waveToggleBtnActive]}
+                  onPress={() => setWaveTab('food')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.waveToggleText, waveTab === 'food' && { color: colors.accent.green, fontWeight: '700' }]}>Jedzenie</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.waveToggleBtn, waveTab === 'sweets' && s.waveToggleBtnActive]}
+                  onPress={() => setWaveTab('sweets')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.waveToggleText, waveTab === 'sweets' && { color: colors.accent.amber, fontWeight: '700' }]}>Słodycze</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={s.waveChartWrap}>
+              <WaveChart
+                data={weekOverview.map(w => waveTab === 'food' ? w.food : w.sweets)}
+                color={waveTab === 'food' ? colors.accent.green : colors.accent.amber}
+                dotColors={weekOverview.map(w => w.avgMood ? moodColor(w.avgMood) : null)}
+              />
+              <View style={s.waveLabels}>
+                {weekOverview.map((w, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => setStatsWeekOffset(w.offset)}
+                    style={s.waveLabelBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.waveLabel, w.isCurrent && { color: colors.text.primary, fontWeight: '700' }]} numberOfLines={1}>
+                      {w.label.slice(0, 5)}
+                    </Text>
+                    <Text style={[s.waveAmt, { color: waveTab === 'food' ? colors.accent.green : colors.accent.amber }]}>
+                      {(waveTab === 'food' ? w.food : w.sweets) > 0
+                        ? `${(waveTab === 'food' ? w.food : w.sweets).toFixed(0)}`
+                        : '—'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
 
           {/* ── Reports ─────────────────────────────────────────────────────── */}
           <View style={s.statCard}>
