@@ -5,11 +5,13 @@ import { CalendarEvent, Task } from '@/types';
 
 interface CalendarState {
   events: CalendarEvent[];
+  gcalEvents: CalendarEvent[]; // Google Calendar events (gcal- prefix)
   tasks: Task[];
   selectedDate: string; // YYYY-MM-DD
   isLoading: boolean;
 
   setEvents: (events: CalendarEvent[]) => void;
+  setGcalEvents: (events: CalendarEvent[]) => void;
   addEvent: (event: CalendarEvent) => void;
   updateEvent: (id: string, updates: Partial<CalendarEvent>) => void;
   deleteEvent: (id: string) => void;
@@ -27,11 +29,13 @@ export const useCalendarStore = create<CalendarState>()(
   persist(
     (set) => ({
       events: [],
+      gcalEvents: [],
       tasks: [],
       selectedDate: new Date().toISOString().split('T')[0],
       isLoading: false,
 
       setEvents: (events) => set({ events }),
+      setGcalEvents: (gcalEvents) => set({ gcalEvents }),
       addEvent: (event) => set((state) => ({ events: [...state.events, event] })),
       updateEvent: (id, updates) =>
         set((state) => ({

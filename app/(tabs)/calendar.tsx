@@ -257,7 +257,7 @@ const m = StyleSheet.create({
 
 export default function CalendarScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
-  const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
+  const { events, gcalEvents, tasks, selectedDate, setEvents, setGcalEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
   const { settings: workSettings } = useWorkStore();
@@ -269,7 +269,6 @@ export default function CalendarScreen() {
   const [viewMonth, setViewMonth]   = useState(now.getMonth());
   const [modalVisible, setModalVisible] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [gcalEvents, setGcalEvents] = useState<CalendarEvent[]>([]);
 
   // Pull-down opens the full-screen month modal on all platforms
   // (on Android RefreshControl fires onRefresh instead of negative scroll Y)
@@ -524,12 +523,13 @@ export default function CalendarScreen() {
             <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.monthTitleBtn} activeOpacity={0.7}>
               <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
               <Text style={styles.yearLabel}>{viewYear}</Text>
-              <View style={styles.expandHint}>
-                <ChevronDown size={10} color={colors.text.muted} />
-              </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
               <ChevronRight size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+            {/* Explicit expand button */}
+            <TouchableOpacity onPress={() => setMonthExpanded(true)} style={styles.expandBtn} activeOpacity={0.7}>
+              <LayoutGrid size={15} color={colors.accent.blue} />
             </TouchableOpacity>
           </View>
 
@@ -653,10 +653,16 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   monthTitleBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.md, backgroundColor: colors.bg.card,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  expandBtn: {
+    width: 34, height: 34, borderRadius: radius.md,
+    backgroundColor: colors.accent.blue + '18',
+    borderWidth: 1, borderColor: colors.accent.blue + '40',
+    alignItems: 'center', justifyContent: 'center',
   },
   monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
   yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },

@@ -260,7 +260,7 @@ export default function DashboardScreen() {
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood } = useMoodStore();
-  const { events, tasks: calTasks, setEvents } = useCalendarStore();
+  const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
   const [budgets, setBudgets] = useState<MonthlyBudgets>({});
 
   // ── Stats data ─────────────────────────────────────────────────────────────
@@ -273,7 +273,6 @@ export default function DashboardScreen() {
   const [yearlyReports, setYearlyRep]   = useState<YearlyReport[]>([]);
   const [expandedReport, setExpanded]   = useState<string | null>(null);
   const [generating, setGenerating]     = useState(false);
-  const [gcalEvents, setGcalEvents]     = useState<CalendarEvent[]>([]);
   const [waveTab, setWaveTab]           = useState<'food' | 'sweets'>('food');
   const [weekFinExpanded, setWeekFinExpanded] = useState(false);
   const [weekFinFoodOnly, setWeekFinFoodOnly] = useState(false);

@@ -45,8 +45,8 @@ const rw = StyleSheet.create({
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { events, updateEvent, deleteEvent, setEvents } = useCalendarStore();
-  const event = events.find(e => e.id === id);
+  const { events, gcalEvents, updateEvent, deleteEvent, setEvents } = useCalendarStore();
+  const event = [...events, ...gcalEvents].find(e => e.id === id);
 
   useEffect(() => {
     if (events.length === 0) {
