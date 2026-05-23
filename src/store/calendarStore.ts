@@ -40,9 +40,13 @@ export const useCalendarStore = create<CalendarState>()(
       updateEvent: (id, updates) =>
         set((state) => ({
           events: state.events.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+          gcalEvents: state.gcalEvents.map((e) => (e.id === id ? { ...e, ...updates } : e)),
         })),
       deleteEvent: (id) =>
-        set((state) => ({ events: state.events.filter((e) => e.id !== id) })),
+        set((state) => ({
+          events: state.events.filter((e) => e.id !== id),
+          gcalEvents: state.gcalEvents.filter((e) => e.id !== id),
+        })),
 
       setTasks: (tasks) => set({ tasks }),
       addTask: (task) => set((state) => ({ tasks: [...state.tasks, task] })),

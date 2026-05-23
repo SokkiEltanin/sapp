@@ -39,7 +39,6 @@ import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { Animated } from 'react-native';
 import { weatherService, DayWeather, WeatherIcon } from '@/services/weatherService';
 import { googleCalendarService } from '@/services/googleCalendarService';
-import { CalendarEvent } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import {
