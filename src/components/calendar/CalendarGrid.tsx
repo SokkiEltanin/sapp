@@ -79,18 +79,12 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
             const urgent = hasHighTk(day);
             const mood = moodFor(day);
 
-            // ── Detailed (Google Calendar style) ─────────────────────────────
+            // ── Detailed (Samsung/Google Calendar style) ──────────────────────
             if (detailed) {
               const dayEvs = eventsFor(day);
               const dayTks = tasks.filter(t =>
                 (t.deadline?.startsWith(d) || t.scheduledDate === d) && t.status !== 'done'
               );
-              const hasUrgent = dayTks.some(t => t.priority === 'high');
-
-              // Show up to 3 event pills; tasks get 1 pill if any
-              const maxEvPills = dayTks.length > 0 ? 2 : 3;
-              const visibleEvs = dayEvs.slice(0, maxEvPills);
-              const overflow = dayEvs.length - visibleEvs.length + (dayTks.length > 1 ? dayTks.length - 1 : 0);
 
               return (
                 <Pressable
@@ -119,38 +113,42 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                     )}
                   </View>
 
-                  {/* Event pills */}
-                  {visibleEvs.map((ev, ei) => (
+                  {/* All event pills */}
+                  {dayEvs.map((ev, ei) => (
                     <View
-                      key={ei}
+                      key={`ev-${ei}`}
                       style={[styles.eventPill, {
-                        backgroundColor: (ev.color ?? colors.accent.blue) + '28',
+                        backgroundColor: (ev.color ?? colors.accent.blue) + '40',
                         borderLeftColor: ev.color ?? colors.accent.blue,
                       }]}
                     >
                       <Text style={styles.eventPillText} numberOfLines={1}>
-                        {ev.startTime ? `${ev.startTime.slice(0, 5)} ` : ''}{ev.title}
+                        {ev.startTime
+                          ? `${ev.startTime.slice(0, 5)}${ev.endTime ? `-${ev.endTime.slice(0, 5)}` : ''} `
+                          : ''}
+                        {ev.title}
                       </Text>
                     </View>
                   ))}
 
-                  {/* Task pill */}
-                  {dayTks.length > 0 && (
-                    <View style={[styles.eventPill, {
-                      backgroundColor: hasUrgent
-                        ? colors.accent.danger + '22'
-                        : 'rgba(255,255,255,0.06)',
-                      borderLeftColor: hasUrgent ? colors.accent.danger : 'rgba(255,255,255,0.25)',
-                    }]}>
+                  {/* All task pills */}
+                  {dayTks.map((tk, ti) => (
+                    <View
+                      key={`tk-${ti}`}
+                      style={[styles.eventPill, {
+                        backgroundColor: tk.priority === 'high'
+                          ? colors.accent.danger + '25'
+                          : 'rgba(255,255,255,0.07)',
+                        borderLeftColor: tk.priority === 'high'
+                          ? colors.accent.danger
+                          : 'rgba(255,255,255,0.3)',
+                      }]}
+                    >
                       <Text style={styles.eventPillText} numberOfLines={1}>
-                        {dayTks.length === 1 ? dayTks[0].title : `${dayTks.length} zadań`}
+                        {tk.title}
                       </Text>
                     </View>
-                  )}
-
-                  {overflow > 0 && (
-                    <Text style={styles.overflowText}>+{overflow}</Text>
-                  )}
+                  ))}
                 </Pressable>
               );
             }
@@ -247,13 +245,13 @@ const styles = StyleSheet.create({
 
   // ── Detailed cells ──────────────────────────────────────────────────────────
   detailedEmpty: {
-    flex: 1, minHeight: 90,
+    flex: 1, minHeight: 80,
     borderRightWidth: 0.5, borderRightColor: 'rgba(255,255,255,0.05)',
   },
   detailedCell: {
-    flex: 1, minHeight: 90,
+    flex: 1, minHeight: 80,
     borderRightWidth: 0.5, borderRightColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 3, paddingTop: 5, paddingBottom: 4,
+    paddingHorizontal: 2, paddingTop: 4, paddingBottom: 5,
     gap: 2,
   },
   detailedCellSel: { backgroundColor: 'rgba(255,255,255,0.05)' },
@@ -280,12 +278,8 @@ const styles = StyleSheet.create({
 
   eventPill: {
     borderLeftWidth: 2,
-    paddingHorizontal: 3, paddingVertical: 2,
-    borderRadius: 2,
+    paddingHorizontal: 4, paddingVertical: 3,
+    borderRadius: 3,
   },
-  eventPillText: { fontSize: 8, color: colors.text.primary, fontWeight: '500' },
-  overflowText: {
-    fontSize: 8, color: colors.text.muted,
-    paddingHorizontal: 3, fontWeight: '600',
-  },
+  eventPillText: { fontSize: 10, color: colors.text.primary, fontWeight: '500', lineHeight: 13 },
 });
