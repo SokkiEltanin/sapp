@@ -541,6 +541,8 @@ export default function CalendarScreen() {
               tasks={tasks}
               moodEntries={moodEntries}
               onSelectDate={handleSelectDate}
+              onEventPress={(id) => router.push(`/calendar/${id}` as any)}
+              onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
             />
           </View>
 
@@ -581,6 +583,8 @@ export default function CalendarScreen() {
               tasks={tasks}
               moodEntries={moodEntries}
               onSelectDate={handleSelectDate}
+              onEventPress={(id) => router.push(`/calendar/${id}` as any)}
+              onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
               detailed
             />
           </View>

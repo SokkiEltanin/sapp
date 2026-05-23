@@ -3,7 +3,6 @@ import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
   Animated, Pressable, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 
@@ -193,15 +192,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
             </TouchableOpacity>
           </View>
 
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <ScrollView
-              contentContainerStyle={styles.scroll}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
               <MoodPicker value={mood} onChange={setMood} label="Nastrój" />
               <MoodPicker value={energy} onChange={setEnergy} label="Energia" mode="energy" />
 
@@ -260,8 +255,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                   disabled={saving || !mood || !energy || !note.trim()}
                 />
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
+          </ScrollView>
         </Animated.View>
       </Animated.View>
     </Modal>

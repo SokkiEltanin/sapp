@@ -16,10 +16,12 @@ interface Props {
   tasks: Task[];
   moodEntries?: MoodEntry[];
   onSelectDate: (date: string) => void;
+  onEventPress?: (id: string) => void;
+  onTaskPress?: (id: string) => void;
   detailed?: boolean;
 }
 
-export default function CalendarGrid({ year, month, selectedDate, events, tasks, moodEntries = [], onSelectDate, detailed = false }: Props) {
+export default function CalendarGrid({ year, month, selectedDate, events, tasks, moodEntries = [], onSelectDate, onEventPress, onTaskPress, detailed = false }: Props) {
   const numDays = daysInMonth(year, month);
   const offset = startOffset(year, month);
   const today = new Date();
@@ -113,10 +115,11 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                     )}
                   </View>
 
-                  {/* All event pills */}
+                  {/* All event pills — tappable */}
                   {dayEvs.map((ev, ei) => (
-                    <View
+                    <Pressable
                       key={`ev-${ei}`}
+                      onPress={(e) => { e.stopPropagation(); onEventPress?.(ev.id); }}
                       style={[styles.eventPill, {
                         backgroundColor: (ev.color ?? colors.accent.blue) + '40',
                         borderLeftColor: ev.color ?? colors.accent.blue,
@@ -128,13 +131,14 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                           : ''}
                         {ev.title}
                       </Text>
-                    </View>
+                    </Pressable>
                   ))}
 
-                  {/* All task pills */}
+                  {/* All task pills — tappable */}
                   {dayTks.map((tk, ti) => (
-                    <View
+                    <Pressable
                       key={`tk-${ti}`}
+                      onPress={(e) => { e.stopPropagation(); onTaskPress?.(tk.id); }}
                       style={[styles.eventPill, {
                         backgroundColor: tk.priority === 'high'
                           ? colors.accent.danger + '25'
@@ -147,7 +151,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                       <Text style={styles.eventPillText} numberOfLines={1}>
                         {tk.title}
                       </Text>
-                    </View>
+                    </Pressable>
                   ))}
                 </Pressable>
               );
