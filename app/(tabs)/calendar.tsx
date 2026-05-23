@@ -17,6 +17,7 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useWorkStore } from '@/store/workStore';
 import { calendarService, tasksService } from '@/services/calendarService';
+import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
@@ -267,6 +268,7 @@ export default function CalendarScreen() {
   const [viewMonth, setViewMonth]   = useState(now.getMonth());
   const [modalVisible, setModalVisible] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [gcalEvents, setGcalEvents] = useState<CalendarEvent[]>([]);
 
   // Pull-down opens the full-screen month modal on all platforms
   // (on Android RefreshControl fires onRefresh instead of negative scroll Y)
@@ -290,6 +292,12 @@ export default function CalendarScreen() {
     } finally {
       setLoading(false);
     }
+    // Also load Google Calendar events (non-blocking)
+    googleCalendarService.getStoredToken().then(token => {
+      if (token) {
+        googleCalendarService.fetchEvents(0, 60).then(setGcalEvents).catch(() => {});
+      }
+    });
   };
 
 
@@ -318,9 +326,11 @@ export default function CalendarScreen() {
     setWeekOffset(0);
   };
 
+  const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
+
   const selectedEvents = useMemo(
-    () => events.filter(e => e.date.startsWith(selectedDate)),
-    [events, selectedDate],
+    () => allEvents.filter(e => e.date.startsWith(selectedDate)),
+    [allEvents, selectedDate],
   );
   const selectedTasks = useMemo(
     () => tasks.filter(t =>
@@ -418,7 +428,7 @@ export default function CalendarScreen() {
         onNextMonth={nextMonth}
         selectedDate={selectedDate}
         onSelectDate={(d) => { handleSelectDate(d); }}
-        events={events}
+        events={allEvents}
         tasks={tasks}
         moodEntries={moodEntries}
         workColor={workSettings.workColor}
@@ -527,7 +537,7 @@ export default function CalendarScreen() {
               year={viewYear}
               month={viewMonth}
               selectedDate={selectedDate}
-              events={events}
+              events={allEvents}
               tasks={tasks}
               moodEntries={moodEntries}
               onSelectDate={handleSelectDate}
@@ -567,7 +577,7 @@ export default function CalendarScreen() {
               year={viewYear}
               month={viewMonth}
               selectedDate={selectedDate}
-              events={events}
+              events={allEvents}
               tasks={tasks}
               moodEntries={moodEntries}
               onSelectDate={handleSelectDate}
