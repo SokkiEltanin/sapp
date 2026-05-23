@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import {
   ChevronLeft, Bell, BellOff, Moon, Sun,
   Smile, ListTodo, CalendarDays, Database, Check,
-  Zap, ClipboardList, LogIn, User,
+  Zap, ClipboardList, LogIn, User, Briefcase,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -29,6 +29,8 @@ import { colors, spacing, radius, typography } from '@/theme';
 import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
 import { appSettings } from '@/utils/appSettings';
 import { googleCalendarService } from '@/services/googleCalendarService';
+import { useWorkStore } from '@/store/workStore';
+import { workService } from '@/services/workService';
 
 GoogleSignin.configure({
   webClientId: '1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com',
@@ -42,6 +44,23 @@ export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
   const { tasks, events } = useCalendarStore();
+  const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
+
+  const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
+
+  useEffect(() => {
+    workService.getSettings().then(s => {
+      setWorkSettings(s);
+      setWorkPrefix(s.workPrefix ?? '');
+    }).catch(() => {});
+  }, []);
+
+  const saveWorkPrefix = async (prefix: string) => {
+    const trimmed = prefix.trim();
+    const newS = { ...workSettings, workPrefix: trimmed || undefined };
+    setWorkSettings(newS);
+    try { await workService.saveSettings(newS); } catch {}
+  };
 
   const [googleUser, setGoogleUser]   = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
@@ -252,6 +271,41 @@ export default function SettingsScreen() {
                 onValueChange={(v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); }}
                 trackColor={{ false: colors.bg.elevated, true: colors.accent.purple + '80' }}
                 thumbColor={hapticsOn ? colors.accent.purple : colors.text.muted}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Work prefix */}
+        <View>
+          <Text style={styles.sectionTitle}>Praca</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={[styles.iconWrap, { backgroundColor: '#60A5FA18' }]}>
+                <Briefcase size={16} color="#60A5FA" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Prefix eventów pracy</Text>
+                <Text style={styles.rowSub}>
+                  {workPrefix.trim()
+                    ? `Eventy zaczynające się od "${workPrefix.trim()}" = zmiana`
+                    : 'Np. [JD], [PRACA] — eventy z tym prefixem = zmiana'}
+                </Text>
+              </View>
+              <TextInput
+                value={workPrefix}
+                onChangeText={setWorkPrefix}
+                onBlur={() => saveWorkPrefix(workPrefix)}
+                placeholder="[JD]"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="none"
+                style={{
+                  fontSize: 14, fontWeight: '700', color: '#60A5FA',
+                  minWidth: 72, textAlign: 'right',
+                  paddingVertical: 4, paddingHorizontal: spacing[2],
+                  backgroundColor: '#60A5FA12', borderRadius: radius.md,
+                  borderWidth: 1, borderColor: '#60A5FA30',
+                }}
               />
             </View>
           </View>

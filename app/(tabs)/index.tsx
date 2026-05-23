@@ -279,7 +279,7 @@ export default function DashboardScreen() {
   const [weekFinFoodOnly, setWeekFinFoodOnly] = useState(false);
 
   const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
-  const workEarnings = useWorkEarnings(workShifts, allEvents, workSettings);
+  const workEarnings = useWorkEarnings(workShifts, allEvents, workSettings, expenses);
 
   useEffect(() => {
     if (events.length === 0) {
@@ -321,7 +321,12 @@ export default function DashboardScreen() {
       return sum + Math.max(0, (eh * 60 + em - sh * 60 - sm)) / 60;
     }, 0);
     const hrs = monthHours > 0 ? monthHours : workSettings.hoursPerMonth;
-    const perSecond = hrs > 0 ? workSettings.monthlySalary / (hrs * 3600) : 0;
+    const wp2 = wp;
+    const salaryIncome = wp2 ? expenses.find(e =>
+      e.type === 'income' && e.tags.some(t => t.toLowerCase() === wp2)
+    ) : null;
+    const effectiveSalary = salaryIncome?.amount ?? workSettings.monthlySalary;
+    const perSecond = hrs > 0 ? effectiveSalary / (hrs * 3600) : 0;
     import('@/services/notificationsService').then(({ notificationsService }) => {
       notificationsService.scheduleWorkShiftNotifications(workEvs, perSecond).catch(() => {});
     });
@@ -872,7 +877,7 @@ export default function DashboardScreen() {
 
           {/* ── Work earnings widget ────────────────────────────────────── */}
           {workEarnings.isWorking && (() => {
-            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked, activeEventTitle, isColorMode, monthWorkHours } = workEarnings;
+            const { totalEarned, perSecond, progressPct, shiftDurationMin, secondsWorked, activeEventTitle, isColorMode, monthWorkHours, salaryUsed } = workEarnings;
             const h = Math.floor(secondsWorked / 3600);
             const m = Math.floor((secondsWorked % 3600) / 60);
             const timeLabel = h > 0 ? `${h}h ${m}m` : `${m}m`;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { WorkShift, WorkSettings, CalendarEvent } from '@/types';
+import { WorkShift, WorkSettings, CalendarEvent, Expense } from '@/types';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -17,21 +17,23 @@ function timeToMins(hhmm: string): number {
 
 export interface WorkEarningsResult {
   activeShift:      WorkShift | null;
-  activeEventTitle: string | null; // event title when color-mode is active
+  activeEventTitle: string | null;
   isWorking:        boolean;
   secondsWorked:    number;
   totalEarned:      number;
   perSecond:        number;
   progressPct:      number;
   shiftDurationMin: number;
-  monthWorkHours:   number; // total hours from work-colored events this month
-  isColorMode:      boolean; // true when tracking via calendar event color
+  monthWorkHours:   number;
+  isColorMode:      boolean;
+  salaryUsed:       number; // actual salary (from income entry if tagged, else settings)
 }
 
 export function useWorkEarnings(
   shifts: WorkShift[],
   events: CalendarEvent[],
   settings: WorkSettings,
+  expenses?: Expense[],
 ): WorkEarningsResult {
   const [tick, setTick] = useState(0);
 
@@ -39,6 +41,19 @@ export function useWorkEarnings(
     const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // ── Salary from income entries tagged with work prefix ───────────────────
+  const salaryUsed = useMemo(() => {
+    if (!expenses?.length || !settings.workPrefix?.trim()) return settings.monthlySalary;
+    const wp = settings.workPrefix.trim().toLowerCase();
+    const candidates = expenses.filter(e =>
+      e.type === 'income' &&
+      e.tags.some(t => t.toLowerCase() === wp)
+    );
+    if (!candidates.length) return settings.monthlySalary;
+    candidates.sort((a, b) => b.date.localeCompare(a.date));
+    return candidates[0].amount;
+  }, [expenses, settings.workPrefix, settings.monthlySalary]);
 
   // ── Color-mode / prefix-mode: derive everything from calendar events ─────
   const colorMode = useMemo(() => {
@@ -80,10 +95,10 @@ export function useWorkEarnings(
   const perSecond = useMemo(() => {
     if (colorMode) {
       const hours = colorMode.monthWorkHours > 0 ? colorMode.monthWorkHours : settings.hoursPerMonth;
-      return hours > 0 ? settings.monthlySalary / (hours * 3600) : 0;
+      return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
-    return settings.monthlySalary / (settings.hoursPerMonth * 3600);
-  }, [colorMode, settings]);
+    return salaryUsed / (settings.hoursPerMonth * 3600);
+  }, [colorMode, settings, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {
@@ -107,6 +122,7 @@ export function useWorkEarnings(
       totalEarned: 0, perSecond, progressPct: 0,
       shiftDurationMin: 0, monthWorkHours: colorMode?.monthWorkHours ?? 0,
       isColorMode: !!(settings.workColor || settings.workPrefix),
+      salaryUsed,
     };
 
     if (colorMode) {
@@ -130,6 +146,7 @@ export function useWorkEarnings(
         shiftDurationMin: shiftDurMin,
         monthWorkHours: colorMode.monthWorkHours,
         isColorMode: !!(settings.workColor || settings.workPrefix),
+        salaryUsed,
       };
     }
 
@@ -152,6 +169,7 @@ export function useWorkEarnings(
       shiftDurationMin: shiftDurMin,
       monthWorkHours: 0,
       isColorMode: false,
+      salaryUsed,
     };
   }, [colorMode, activeShift, tick, perSecond, settings.workColor]);
 }
