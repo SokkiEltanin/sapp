@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, ChevronLeft, ChevronRight, ChevronDown, CalendarDays, Briefcase, List, LayoutGrid } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, CalendarDays, Briefcase, LayoutGrid, RefreshCw } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -31,7 +31,7 @@ const MONTH_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wr
 const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 const DAY_SHORT = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
 
-type CalMode = 'week' | 'month' | 'detailed';
+type CalMode = 'week' | 'month';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -264,6 +264,7 @@ export default function CalendarScreen() {
 
   const now = new Date();
   const [calMode, setCalMode]       = useState<CalMode>('month');
+  const [monthExpanded, setMonthExpanded] = useState(false);
   const [viewYear, setViewYear]     = useState(now.getFullYear());
   const [viewMonth, setViewMonth]   = useState(now.getMonth());
   const [modalVisible, setModalVisible] = useState(false);
@@ -324,6 +325,7 @@ export default function CalendarScreen() {
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth());
     setWeekOffset(0);
+    setMonthExpanded(false); // tapping a day in expanded view collapses to compact
   };
 
   const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
@@ -418,7 +420,7 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
-      {/* Full-screen month modal */}
+      {/* Full-screen month modal (event list) */}
       <MonthModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -427,7 +429,7 @@ export default function CalendarScreen() {
         onPrevMonth={prevMonth}
         onNextMonth={nextMonth}
         selectedDate={selectedDate}
-        onSelectDate={(d) => { handleSelectDate(d); }}
+        onSelectDate={(d) => { handleSelectDate(d); setModalVisible(false); }}
         events={allEvents}
         tasks={tasks}
         moodEntries={moodEntries}
@@ -441,6 +443,9 @@ export default function CalendarScreen() {
         subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
         rightSlot={
           <View style={styles.headerRight}>
+            <PressableScale onPress={load} style={styles.addBtn}>
+              <RefreshCw size={14} color={colors.text.muted} />
+            </PressableScale>
             <PressableScale onPress={goToday} style={styles.todayBtn}>
               <Text style={styles.todayBtnText}>Dziś</Text>
             </PressableScale>
@@ -451,11 +456,11 @@ export default function CalendarScreen() {
         }
       />
 
-      {/* Mode toggle bar */}
+      {/* Mode toggle bar — 2 modes only */}
       <View style={styles.modeBar}>
         <TouchableOpacity
           style={[styles.modeTab, calMode === 'week' && styles.modeTabActive]}
-          onPress={() => setCalMode('week')}
+          onPress={() => { setCalMode('week'); setMonthExpanded(false); }}
           activeOpacity={0.7}
         >
           <CalendarDays size={13} color={calMode === 'week' ? colors.text.primary : colors.text.muted} />
@@ -463,19 +468,11 @@ export default function CalendarScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.modeTab, calMode === 'month' && styles.modeTabActive]}
-          onPress={() => setCalMode('month')}
+          onPress={() => { setCalMode('month'); setMonthExpanded(false); }}
           activeOpacity={0.7}
         >
           <LayoutGrid size={13} color={calMode === 'month' ? colors.text.primary : colors.text.muted} />
           <Text style={[styles.modeTabText, calMode === 'month' && styles.modeTabTextActive]}>Miesiąc</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeTab, calMode === 'detailed' && styles.modeTabActive]}
-          onPress={() => setCalMode('detailed')}
-          activeOpacity={0.7}
-        >
-          <List size={13} color={calMode === 'detailed' ? colors.text.primary : colors.text.muted} />
-          <Text style={[styles.modeTabText, calMode === 'detailed' && styles.modeTabTextActive]}>Szczegółowy</Text>
         </TouchableOpacity>
       </View>
 
@@ -483,7 +480,6 @@ export default function CalendarScreen() {
       {calMode === 'week' && (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={openModal} tintColor={colors.text.muted} />}
           contentContainerStyle={{ paddingBottom: 120 }}
         >
           <View style={styles.weekCard}>
@@ -493,7 +489,7 @@ export default function CalendarScreen() {
               </PressableScale>
               <WeekStrip
                 selectedDate={selectedDate}
-                events={events}
+                events={allEvents}
                 tasks={tasks}
                 moodEntries={moodEntries}
                 weekOffset={weekOffset}
@@ -508,29 +504,34 @@ export default function CalendarScreen() {
         </ScrollView>
       )}
 
-      {/* ── Month compact view ─────────────────────────────────────────────── */}
-      {calMode === 'month' && (
+      {/* ── Month compact (pills + dots) — pull-down expands ───────────────── */}
+      {calMode === 'month' && !monthExpanded && (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={openModal} tintColor={colors.text.muted} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={false}
+              onRefresh={() => setMonthExpanded(true)}
+              tintColor={colors.text.muted}
+            />
+          }
           contentContainerStyle={{ paddingBottom: 120 }}
         >
-          {/* Month nav — tap to expand full screen */}
-          <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
+          <View style={styles.monthNav}>
             <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
               <ChevronLeft size={18} color={colors.text.secondary} />
             </TouchableOpacity>
-            <View style={styles.monthTitleBtn}>
+            <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.monthTitleBtn} activeOpacity={0.7}>
               <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
               <Text style={styles.yearLabel}>{viewYear}</Text>
               <View style={styles.expandHint}>
                 <ChevronDown size={10} color={colors.text.muted} />
               </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
               <ChevronRight size={18} color={colors.text.secondary} />
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
 
           <View style={styles.gridCard}>
             <CalendarGrid
@@ -550,30 +551,39 @@ export default function CalendarScreen() {
         </ScrollView>
       )}
 
-      {/* ── Monthly detailed view ──────────────────────────────────────────── */}
-      {calMode === 'detailed' && (
+      {/* ── Month expanded / detailed — full screen, pull-down collapses ────── */}
+      {calMode === 'month' && monthExpanded && (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={openModal} tintColor={colors.text.muted} />}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={false}
+              onRefresh={() => setMonthExpanded(false)}
+              tintColor={colors.text.muted}
+            />
+          }
+          contentContainerStyle={{ paddingBottom: 40 }}
         >
-          <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8} style={styles.monthNav}>
+          {/* Nav row with collapse button */}
+          <View style={styles.monthNav}>
             <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
               <ChevronLeft size={18} color={colors.text.secondary} />
             </TouchableOpacity>
-            <View style={styles.monthTitleBtn}>
+            <TouchableOpacity
+              onPress={() => setMonthExpanded(false)}
+              style={[styles.monthTitleBtn, { gap: spacing[3] }]}
+              activeOpacity={0.7}
+            >
+              <ChevronUp size={12} color={colors.text.muted} />
               <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
               <Text style={styles.yearLabel}>{viewYear}</Text>
-              <View style={styles.expandHint}>
-                <ChevronDown size={10} color={colors.text.muted} />
-              </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity onPress={nextMonth} style={styles.navBtn} activeOpacity={0.7}>
               <ChevronRight size={18} color={colors.text.secondary} />
             </TouchableOpacity>
-          </TouchableOpacity>
+          </View>
 
-          {/* Full-width grid — no card wrapper, flush to screen edges */}
+          {/* Full-width detailed grid — no card wrapper */}
           <View style={styles.detailedGridWrap}>
             <CalendarGrid
               year={viewYear}
@@ -588,8 +598,6 @@ export default function CalendarScreen() {
               detailed
             />
           </View>
-
-          <DayDetail />
         </ScrollView>
       )}
     </SafeAreaView>
