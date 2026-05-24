@@ -263,6 +263,8 @@ export default function FinancesScreen() {
       const b = budgets[c.cat];
       if (b != null && c.amount > b) {
         msgs.push({ text: `${c.meta.label} przekracza budżet o ${(c.amount - b).toFixed(0)} zł.`, bad: true });
+      } else if (b != null && c.amount >= b * 0.75) {
+        msgs.push({ text: `${c.meta.label} zużyło ${Math.round(c.amount / b * 100)}% budżetu.` });
       }
     });
     if (balance > 0 && thisMonthInc > 0) {
@@ -626,16 +628,18 @@ export default function FinancesScreen() {
                 </View>
                 {catBreakdown.map(({ cat, amount, pct, meta, change, prevAmount }) => {
                   const IconComp  = (LucideIcons as any)[meta.icon];
-                  const budget    = budgets[cat];
+                  const budget     = budgets[cat];
                   const overBudget = budget != null && amount > budget;
+                  const nearBudget = budget != null && !overBudget && amount >= budget * 0.75;
                   const budgetPct  = budget != null ? Math.min(1, amount / budget) : null;
+                  const budgetBarColor = overBudget ? colors.accent.red : nearBudget ? colors.accent.amber : colors.accent.green;
                   const isExpanded = expandedCat === cat;
                   return (
                     <View key={cat}>
                       <TouchableOpacity onPress={() => setExpandedCat(isExpanded ? null : cat)} activeOpacity={0.7}>
                         <View style={[styles.catRow, isExpanded && styles.catRowExpanded]}>
-                          <View style={[styles.catIcon, overBudget && { backgroundColor: colors.accent.red + '20' }]}>
-                            {IconComp && <IconComp size={14} color={overBudget ? colors.accent.red : colors.text.muted} />}
+                          <View style={[styles.catIcon, overBudget && { backgroundColor: colors.accent.red + '20' }, nearBudget && !overBudget && { backgroundColor: colors.accent.amber + '18' }]}>
+                            {IconComp && <IconComp size={14} color={overBudget ? colors.accent.red : nearBudget ? colors.accent.amber : colors.text.muted} />}
                           </View>
                           <View style={styles.catInfo}>
                             <View style={styles.catTopRow}>
@@ -646,7 +650,7 @@ export default function FinancesScreen() {
                                     <Text style={[styles.changeBadgeText, { color: change.color }]}>{change.text}</Text>
                                   </View>
                                 )}
-                                <Text style={[styles.catAmount, overBudget && { color: colors.accent.red }]}>
+                                <Text style={[styles.catAmount, overBudget && { color: colors.accent.red }, nearBudget && !overBudget && { color: colors.accent.amber }]}>
                                   {amount.toFixed(2)} zł
                                 </Text>
                               </View>
@@ -659,11 +663,15 @@ export default function FinancesScreen() {
                                 <View style={styles.budgetBarTrack}>
                                   <View style={[styles.budgetBarFill, {
                                     width: `${(budgetPct ?? 0) * 100}%`,
-                                    backgroundColor: overBudget ? colors.accent.red : colors.accent.green,
+                                    backgroundColor: budgetBarColor,
                                   }]} />
                                 </View>
-                                <Text style={[styles.catPct, overBudget && { color: colors.accent.red }]}>
-                                  {overBudget ? `przekroczono o ${(amount - budget).toFixed(0)} zł` : `${(budget - amount).toFixed(0)} zł z ${budget.toFixed(0)} zł`}
+                                <Text style={[styles.catPct, overBudget && { color: colors.accent.red }, nearBudget && !overBudget && { color: colors.accent.amber }]}>
+                                  {overBudget
+                                    ? `przekroczono o ${(amount - budget).toFixed(0)} zł`
+                                    : nearBudget
+                                    ? `${Math.round((budgetPct ?? 0) * 100)}% budżetu — zostało ${(budget - amount).toFixed(0)} zł`
+                                    : `${(budget - amount).toFixed(0)} zł z ${budget.toFixed(0)} zł`}
                                 </Text>
                               </>
                             ) : (
