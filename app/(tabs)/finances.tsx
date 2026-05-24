@@ -9,6 +9,7 @@ import {
   ScanLine, BarChart2, RefreshCcw,
   ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
   Settings2, Lightbulb, AlertTriangle, Wallet, Tag,
+  Plus, Receipt, ArrowDownLeft,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
@@ -312,7 +313,7 @@ export default function FinancesScreen() {
               ? format(monthBase, 'LLLL yyyy', { locale: pl })
               : new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })
           }
-          accentColor={colors.expenses}
+          accentColor={colors.tabs.finances}
           rightSlot={
             <View style={{ flexDirection: 'row', gap: spacing[2] }}>
               <PressableScale onPress={() => router.push('/expenses/scan' as any)} style={styles.headerBtn}>
@@ -332,7 +333,7 @@ export default function FinancesScreen() {
             style={[styles.segBtn, viewMode === 'list' && styles.segBtnActive]}
             activeOpacity={0.7}
           >
-            <Wallet size={13} color={viewMode === 'list' ? colors.text.primary : colors.text.muted} />
+            <Wallet size={13} color={viewMode === 'list' ? colors.tabs.finances : colors.text.muted} />
             <Text style={[styles.segText, viewMode === 'list' && styles.segTextActive]}>Transakcje</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -340,7 +341,7 @@ export default function FinancesScreen() {
             style={[styles.segBtn, viewMode === 'stats' && styles.segBtnActive]}
             activeOpacity={0.7}
           >
-            <BarChart2 size={13} color={viewMode === 'stats' ? colors.text.primary : colors.text.muted} />
+            <BarChart2 size={13} color={viewMode === 'stats' ? colors.tabs.finances : colors.text.muted} />
             <Text style={[styles.segText, viewMode === 'stats' && styles.segTextActive]}>Statystyki</Text>
           </TouchableOpacity>
         </View>
@@ -375,7 +376,7 @@ export default function FinancesScreen() {
                       style={[styles.tagChip, !activeTagFilter && styles.tagChipActive]}
                       activeOpacity={0.7}
                     >
-                      <Tag size={10} color={!activeTagFilter ? colors.accent.blue : colors.text.muted} />
+                      <Tag size={10} color={!activeTagFilter ? colors.tabs.finances : colors.text.muted} />
                       <Text style={[styles.tagChipText, !activeTagFilter && styles.tagChipTextActive]}>Wszystkie</Text>
                     </TouchableOpacity>
                     {availableTags.map((tag) => (
@@ -821,6 +822,34 @@ export default function FinancesScreen() {
           </ScrollView>
         )}
 
+        {/* Bottom quick-add bar */}
+        <View style={styles.quickBar}>
+          <TouchableOpacity
+            style={[styles.quickBtn, { borderColor: colors.accent.red + '50', backgroundColor: colors.accent.red + '10' }]}
+            onPress={() => router.push('/expenses/add' as any)}
+            activeOpacity={0.75}
+          >
+            <TrendingDown size={15} color={colors.accent.red} />
+            <Text style={[styles.quickBtnText, { color: colors.accent.red }]}>Wydatek</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickBtn, { borderColor: colors.accent.green + '50', backgroundColor: colors.accent.green + '10' }]}
+            onPress={() => router.push('/expenses/add?type=income' as any)}
+            activeOpacity={0.75}
+          >
+            <TrendingUp size={15} color={colors.accent.green} />
+            <Text style={[styles.quickBtnText, { color: colors.accent.green }]}>Przychód</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickBtn, { borderColor: colors.tabs.finances + '50', backgroundColor: colors.tabs.finances + '10' }]}
+            onPress={() => router.push('/expenses/scan' as any)}
+            activeOpacity={0.75}
+          >
+            <ScanLine size={15} color={colors.tabs.finances} />
+            <Text style={[styles.quickBtnText, { color: colors.tabs.finances }]}>Skan</Text>
+          </TouchableOpacity>
+        </View>
+
       </Animated.View>
     </SafeAreaView>
   );
@@ -836,9 +865,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.full, borderWidth: 1,
     borderColor: colors.border.default, backgroundColor: colors.bg.card,
   },
-  tagChipActive: { backgroundColor: colors.accent.blue + '18', borderColor: colors.accent.blue },
+  tagChipActive: { backgroundColor: colors.tabs.finances + '18', borderColor: colors.tabs.finances },
   tagChipText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  tagChipTextActive: { color: colors.accent.blue },
+  tagChipTextActive: { color: colors.tabs.finances },
 
   segWrap: {
     flexDirection: 'row',
@@ -853,9 +882,9 @@ const styles = StyleSheet.create({
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 5, paddingVertical: spacing[2],
   },
-  segBtnActive: { backgroundColor: colors.bg.elevated },
+  segBtnActive: { backgroundColor: colors.tabs.finances + '1A' },
   segText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
-  segTextActive: { color: colors.text.primary },
+  segTextActive: { color: colors.tabs.finances, fontWeight: '700' },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -991,6 +1020,24 @@ const styles = StyleSheet.create({
   tagSortBtnTextActive: { color: colors.accent.blue },
   tagNoProducts:     { fontSize: 12, color: colors.text.muted, fontStyle: 'italic', paddingVertical: spacing[2] },
   cardMeta2:         { fontSize: 9, color: colors.text.muted, fontStyle: 'italic' },
+
+  // ── Bottom quick-add bar ─────────────────────────────────────────────────────
+  quickBar: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    gap: spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
+    backgroundColor: colors.bg.primary,
+  },
+  quickBtn: {
+    flex: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10,
+    borderRadius: radius.lg, borderWidth: 1,
+  },
+  quickBtnText: { fontSize: 12, fontWeight: '700' },
 
   // ── Salary card ──────────────────────────────────────────────────────────────
   salaryCard:      { borderColor: colors.accent.green + '22' },
