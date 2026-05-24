@@ -117,7 +117,7 @@ function buildSections(tasks: Task[]): Section[] {
   const pending  = tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed');
   const groups: [string, string, Task[]][] = [
     ['Przeterminowane', colors.accent.red,    pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d < today; })],
-    ['Dzisiaj',         colors.accent.purple, pending.filter(t => t.deadline?.startsWith(today))],
+    ['Dzisiaj',         colors.tabs.tasks,    pending.filter(t => t.deadline?.startsWith(today))],
     ['Jutro',           colors.accent.blue,   pending.filter(t => t.deadline?.startsWith(tomorrow))],
     ['Ten tydzień',     colors.text.secondary, pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d > tomorrow && d <= weekEnd; })],
     ['Późniejsze',      colors.text.muted,    pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d > weekEnd; })],
@@ -157,7 +157,21 @@ function TaskCard({ task, index, onToggle, onLongPress, onPomodoro, onSnooze }: 
   const snoozed  = task.status === 'snoozed';
   const urgent   = task.priority === 'high' && !done && !snoozed;
   const overdue  = !done && !snoozed && (task.deadline?.split('T')[0] ?? '') < todayStr();
-  const accentColor = snoozed ? colors.accent.amber : urgent ? colors.accent.red : overdue ? colors.accent.red : colors.accent.purple;
+
+  function urgencyBarColor(): string {
+    if (done) return 'rgba(255,255,255,0.06)';
+    if (snoozed) return colors.accent.amber;
+    if (task.priority === 'high') return colors.accent.red;
+    const d = task.deadline?.split('T')[0];
+    if (!d) return 'rgba(255,255,255,0.1)';
+    const today = todayStr();
+    const msPerDay = 86_400_000;
+    const daysUntil = Math.ceil((new Date(d).getTime() - new Date(today).getTime()) / msPerDay);
+    if (daysUntil <= 0) return colors.accent.red;
+    if (daysUntil <= 3) return colors.accent.amber;
+    return colors.tabs.tasks;
+  }
+  const accentColor = urgencyBarColor();
 
   return (
     <View style={styles.cardWrap}>
@@ -202,9 +216,9 @@ function TaskCard({ task, index, onToggle, onLongPress, onPomodoro, onSnooze }: 
               </View>
             )}
             {task.estimatedPomodoros != null && task.estimatedPomodoros > 0 && (
-              <View style={[styles.chip, { backgroundColor: colors.accent.purple + '18', borderColor: colors.accent.purple + '30' }]}>
-                <Timer size={9} color={colors.accent.purple} />
-                <Text style={[styles.chipText, { color: colors.accent.purple }]}>
+              <View style={[styles.chip, { backgroundColor: colors.tabs.tasks + '18', borderColor: colors.tabs.tasks + '30' }]}>
+                <Timer size={9} color={colors.tabs.tasks} />
+                <Text style={[styles.chipText, { color: colors.tabs.tasks }]}>
                   {task.estimatedPomodoros}×25m
                 </Text>
               </View>
@@ -428,13 +442,6 @@ export default function TasksScreen() {
     }
   }, [tasks, filter, today, weekEnd, snoozedTasks]);
 
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const allTags = useMemo(() => {
-    const set = new Set<string>();
-    tasks.forEach(t => t.tags?.forEach(tag => set.add(tag)));
-    return Array.from(set).sort();
-  }, [tasks]);
-
   const handleToggle = (id: string) => {
     const t = tasks.find(x => x.id === id);
     toggle(id);
@@ -499,9 +506,6 @@ export default function TasksScreen() {
     />
   );
 
-  const applyTagFilter = (list: Task[]) =>
-    selectedTag ? list.filter(t => t.tags?.includes(selectedTag)) : list;
-
   const applySearch = (list: Task[]) => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return list;
@@ -512,14 +516,13 @@ export default function TasksScreen() {
     );
   };
 
-  const tagFilteredSections: Section[] = sections.map(s => ({
-    ...s, data: applySearch(applyTagFilter(s.data)),
+  const filteredSections: Section[] = sections.map(s => ({
+    ...s, data: applySearch(s.data),
   })).filter(s => s.data.length > 0);
 
-  // For non-'all' filters, flat list wrapped in one section
   const displaySections: Section[] = filter === 'all'
-    ? tagFilteredSections
-    : [{ title: '', accent: '', data: applySearch(applyTagFilter(filtered)) }];
+    ? filteredSections
+    : [{ title: '', accent: '', data: applySearch(filtered) }];
 
   const handleMoodSelect = async (mood: MoodLevel) => {
     setMoodModal(false);
@@ -631,33 +634,6 @@ export default function TasksScreen() {
                 {overdueTasks.length} przeterminowanych — naciśnij aby wyczyścić
               </Text>
             </TouchableOpacity>
-          )}
-
-          {/* Tag filter strip */}
-          {allTags.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tagStrip}
-            >
-              {selectedTag && (
-                <PressableScale onPress={() => setSelectedTag(null)}>
-                  <View style={[styles.tagPill, styles.tagPillClear]}>
-                    <Text style={styles.tagPillClearText}>wyczysc</Text>
-                  </View>
-                </PressableScale>
-              )}
-              {allTags.map(tag => {
-                const active = selectedTag === tag;
-                return (
-                  <PressableScale key={tag} onPress={() => setSelectedTag(active ? null : tag)}>
-                    <View style={[styles.tagPill, active && styles.tagPillActive]}>
-                      <Text style={[styles.tagPillText, active && styles.tagPillTextActive]}>#{tag}</Text>
-                    </View>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
           )}
 
           <SectionList
@@ -824,7 +800,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginHorizontal: spacing[4], marginBottom: spacing[2],
     backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.accent.purple + '40',
+    borderWidth: 1, borderColor: colors.tabs.tasks + '40',
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   searchInput: {
@@ -844,11 +820,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.card,
   },
   filterPillActive: {
-    backgroundColor: colors.text.primary,
-    borderColor: colors.text.primary,
+    backgroundColor: colors.tabs.tasks + '22',
+    borderColor: colors.tabs.tasks + '60',
   },
   filterText: { fontSize: 12, fontWeight: '500', color: colors.text.secondary },
-  filterTextActive: { color: colors.text.inverse },
+  filterTextActive: { color: colors.tabs.tasks, fontWeight: '700' },
 
   list: { paddingHorizontal: spacing[4], paddingBottom: 130 },
 
@@ -861,7 +837,7 @@ const styles = StyleSheet.create({
     minHeight: 60, overflow: 'hidden',
   },
   taskCardDone: { opacity: 0.35 },
-  accentBar: { width: 3, alignSelf: 'stretch', marginRight: spacing[3] },
+  accentBar: { width: 4, alignSelf: 'stretch', marginRight: spacing[3], borderRadius: 2 },
   checkWrap: { marginRight: spacing[2] },
   taskContent: { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3], gap: 6 },
   taskTitle: { fontSize: 14, fontWeight: '500', color: colors.text.primary, lineHeight: 19 },
@@ -879,22 +855,6 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   snoozeBtn: { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
   pomBtn: { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
-
-  tagStrip: { paddingHorizontal: spacing[4], paddingBottom: spacing[2], gap: spacing[2], flexDirection: 'row' },
-  tagPill: {
-    paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  tagPillActive: {
-    backgroundColor: colors.accent.blue + '25',
-    borderColor: colors.accent.blue + '60',
-  },
-  tagPillText: { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
-  tagPillTextActive: { color: colors.accent.blue, fontWeight: '700' },
-  tagPillClear: { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.15)' },
-  tagPillClearText: { fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
 
   overdueBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
