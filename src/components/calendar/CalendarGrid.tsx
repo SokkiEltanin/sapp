@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, gap: 3,
   },
   cellSel: { backgroundColor: colors.text.primary },
-  cellToday: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' },
+  cellToday: { borderWidth: 1.5, borderColor: colors.tabs.calendar + '60' },
   num: { fontSize: 14, fontWeight: '400', color: colors.text.secondary, lineHeight: 18 },
   numSel: { color: colors.bg.primary, fontWeight: '800' },
   numToday: { color: colors.text.primary, fontWeight: '700' },
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     width: 20, height: 20, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
-  detailedNumCircleToday: { backgroundColor: colors.accent.blue },
+  detailedNumCircleToday: { backgroundColor: colors.tabs.calendar },
   detailedNumCircleSel:   { backgroundColor: colors.text.primary },
   detailedNum: {
     fontSize: 11, fontWeight: '500', color: colors.text.muted,

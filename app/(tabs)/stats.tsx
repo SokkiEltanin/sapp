@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, PanResponder, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, ChevronLeft, ChevronRight, CalendarDays, RefreshCw, CheckSquare, Wallet } from 'lucide-react-native';
+import { Plus, ChevronLeft, ChevronRight, CalendarDays, RefreshCw, CheckSquare, Wallet, LayoutGrid, AlignJustify } from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -53,7 +53,8 @@ export default function CalendarTabScreen() {
   const [viewYear, setViewYear]         = useState(now.getFullYear());
   const [viewMonth, setViewMonth]       = useState(now.getMonth());
   const [refreshing, setRefreshing]     = useState(false);
-  const [monthExpanded, setMonthExpanded] = useState(true);
+  type CalMode = 'month-detailed' | 'month-mini' | 'week';
+  const [calMode, setCalMode] = useState<CalMode>('month-detailed');
   const [weekOffset, setWeekOffset]     = useState(0);
   const [gcalEvents, setGcalEvents]     = useState<CalendarEvent[]>([]);
   const [gcalSyncing, setGcalSyncing]   = useState(false);
@@ -196,27 +197,66 @@ export default function CalendarTabScreen() {
           {/* ── Month nav + calendar ── */}
           <View {...monthSwipePR.panHandlers}>
             <View style={styles.monthNav}>
-              <PressableScale onPress={prevMonth} style={styles.navBtn}>
-                <ChevronLeft size={18} color={colors.text.secondary} />
-              </PressableScale>
+              {calMode !== 'week' ? (
+                <PressableScale onPress={prevMonth} style={styles.navBtn}>
+                  <ChevronLeft size={18} color={colors.text.secondary} />
+                </PressableScale>
+              ) : (
+                <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.navBtn}>
+                  <ChevronLeft size={18} color={colors.text.secondary} />
+                </PressableScale>
+              )}
 
-              <Pressable onPress={() => setMonthExpanded(v => !v)} style={styles.monthTitleBtn}>
+              <View style={styles.monthTitleBtn}>
                 <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
                 <Text style={styles.yearLabel}>{viewYear}</Text>
-                <CalendarDays
-                  size={12}
-                  color={monthExpanded ? colors.text.secondary : colors.text.muted}
-                  style={{ marginLeft: 4 }}
-                />
-              </Pressable>
+              </View>
 
-              <PressableScale onPress={nextMonth} style={styles.navBtn}>
-                <ChevronRight size={18} color={colors.text.secondary} />
-              </PressableScale>
+              {/* 3-mode toggle */}
+              <View style={styles.modeToggle}>
+                {([
+                  ['month-detailed', LayoutGrid,   ] as const,
+                  ['month-mini',     CalendarDays, ] as const,
+                  ['week',           AlignJustify, ] as const,
+                ]).map(([mode, Icon]) => (
+                  <Pressable
+                    key={mode}
+                    onPress={() => setCalMode(mode as CalMode)}
+                    style={[styles.modeBtn, calMode === mode && styles.modeBtnActive]}
+                  >
+                    <Icon size={14} color={calMode === mode ? colors.tabs.calendar : colors.text.muted} />
+                  </Pressable>
+                ))}
+              </View>
+
+              {calMode !== 'week' ? (
+                <PressableScale onPress={nextMonth} style={styles.navBtn}>
+                  <ChevronRight size={18} color={colors.text.secondary} />
+                </PressableScale>
+              ) : (
+                <PressableScale onPress={() => setWeekOffset(w => w + 1)} style={styles.navBtn}>
+                  <ChevronRight size={18} color={colors.text.secondary} />
+                </PressableScale>
+              )}
             </View>
 
-            {/* Monthly grid OR week strip — never both simultaneously */}
-            {monthExpanded ? (
+            {/* Calendar content — 3 modes */}
+            {calMode === 'month-detailed' && (
+              <CalendarGrid
+                year={viewYear}
+                month={viewMonth}
+                selectedDate={selectedDate}
+                events={allEvents}
+                tasks={tasks}
+                moodEntries={moodEntries}
+                onSelectDate={handleSelectDate}
+                onEventPress={(id) => { if (!id.startsWith('gcal-')) router.push(`/calendar/${id}` as any); }}
+                onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
+                detailed
+              />
+            )}
+
+            {calMode === 'month-mini' && (
               <View style={styles.gridWrap}>
                 <CalendarGrid
                   year={viewYear}
@@ -228,24 +268,18 @@ export default function CalendarTabScreen() {
                   onSelectDate={handleSelectDate}
                 />
               </View>
-            ) : (
+            )}
+
+            {calMode === 'week' && (
               <View style={styles.weekCard}>
-                <View style={styles.weekNavRow}>
-                  <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.weekNavBtn}>
-                    <ChevronLeft size={15} color={colors.text.muted} />
-                  </PressableScale>
-                  <WeekStrip
-                    selectedDate={selectedDate}
-                    events={allEvents}
-                    tasks={tasks}
-                    moodEntries={moodEntries}
-                    weekOffset={weekOffset}
-                    onSelectDate={(d) => { setSelectedDate(d); setWeekOffset(0); }}
-                  />
-                  <PressableScale onPress={() => setWeekOffset(w => w + 1)} style={styles.weekNavBtn}>
-                    <ChevronRight size={15} color={colors.text.muted} />
-                  </PressableScale>
-                </View>
+                <WeekStrip
+                  selectedDate={selectedDate}
+                  events={allEvents}
+                  tasks={tasks}
+                  moodEntries={moodEntries}
+                  weekOffset={weekOffset}
+                  onSelectDate={(d) => { setSelectedDate(d); }}
+                />
               </View>
             )}
           </View>
@@ -350,8 +384,9 @@ const styles = StyleSheet.create({
   },
 
   monthNav: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2],
+    gap: spacing[2],
   },
   navBtn: {
     width: 34, height: 34, borderRadius: radius.md,
@@ -359,8 +394,21 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   monthTitleBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[2],
+  },
+  modeToggle: {
+    flexDirection: 'row', gap: 2,
+    backgroundColor: colors.bg.card,
+    borderRadius: radius.md, padding: 2,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  modeBtn: {
+    width: 28, height: 26, borderRadius: radius.sm,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modeBtnActive: {
+    backgroundColor: colors.tabs.calendar + '20',
   },
   monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
   yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },
