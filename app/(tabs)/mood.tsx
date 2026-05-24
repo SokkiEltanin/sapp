@@ -100,13 +100,13 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
 
       {positive.length > 0 && (
         <View style={kw.section}>
-          <Text style={[kw.sectionLabel, { color: '#4CAF50' }]}>Co Cię uszczęśliwia</Text>
+          <Text style={[kw.sectionLabel, { color: colors.accent.green }]}>Co Cię uszczęśliwia</Text>
           <View style={kw.chips}>
             {positive.map(k => (
-              <View key={k.word} style={[kw.chip, { backgroundColor: '#4CAF5018', borderColor: '#4CAF5040' }]}>
-                <Text style={[kw.chipWord, { color: '#4CAF50' }]}>{k.word}</Text>
+              <View key={k.word} style={[kw.chip, { backgroundColor: colors.accent.green + '18', borderColor: colors.accent.green + '40' }]}>
+                <Text style={[kw.chipWord, { color: colors.accent.green }]}>{k.word}</Text>
                 {k.totalCount > 2 && (
-                  <Text style={[kw.chipCount, { color: '#4CAF5099' }]}>{k.totalCount}×</Text>
+                  <Text style={[kw.chipCount, { color: colors.accent.green + '99' }]}>{k.totalCount}×</Text>
                 )}
               </View>
             ))}

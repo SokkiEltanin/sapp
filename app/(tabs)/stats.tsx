@@ -17,6 +17,7 @@ import { calendarService, tasksService } from '@/services/calendarService';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { CalendarEvent } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
+import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
 
@@ -27,20 +28,6 @@ const MONTH_NAMES = [
 const MONTH_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  groceries: '#4CAF50', transport: '#2196F3', entertainment: '#9C27B0',
-  health: '#F44336', clothing: '#FF9800', housing: '#795548',
-  subscriptions: '#00BCD4', salary: '#4CAF50', freelance: '#8BC34A',
-  gift: '#E91E63', transfer: '#607D8B', investment: '#FF5722',
-  other: '#9E9E9E', other_income: '#9E9E9E',
-};
-const CATEGORY_LABELS: Record<string, string> = {
-  groceries: 'Zakupy', transport: 'Transport', entertainment: 'Rozrywka',
-  health: 'Zdrowie', clothing: 'Ubrania', housing: 'Dom',
-  subscriptions: 'Subskrypcje', salary: 'Wynagrodzenie', freelance: 'Freelance',
-  gift: 'Prezent', transfer: 'Przelew', investment: 'Inwestycje',
-  other: 'Inne', other_income: 'Inne przychody',
-};
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -316,10 +303,10 @@ export default function CalendarTabScreen() {
                     onPress={() => router.push(`/finances/${exp.id}` as any)}
                     style={styles.expenseRow}
                   >
-                    <View style={[styles.expenseDot, { backgroundColor: CATEGORY_COLORS[exp.category] ?? '#9E9E9E' }]} />
+                    <View style={[styles.expenseDot, { backgroundColor: getCategoryMeta(exp.category as any).color }]} />
                     <View style={styles.expenseInfo}>
                       <Text style={styles.expenseNote} numberOfLines={1}>
-                        {exp.note || CATEGORY_LABELS[exp.category] || exp.category}
+                        {exp.note || getCategoryMeta(exp.category as any).label || exp.category}
                       </Text>
                       {exp.storeName ? (
                         <Text style={styles.expenseStore} numberOfLines={1}>{exp.storeName}</Text>

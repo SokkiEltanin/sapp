@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
+import { colors } from '@/theme';
 
-export type TimeOfDay = 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+export type TimeOfDay = 'night' | 'dawn' | 'morning' | 'afternoon' | 'evening';
 
-const ACCENTS: Record<TimeOfDay, { color: string; greeting: string }> = {
-  dawn:      { color: '#F59E0B', greeting: 'Świt' },
-  morning:   { color: '#38BDF8', greeting: 'Dzień dobry' },
-  afternoon: { color: '#818CF8', greeting: 'Cześć' },
-  evening:   { color: '#FB923C', greeting: 'Dobry wieczór' },
-  night:     { color: '#A78BFA', greeting: 'Dobranoc' },
+const ACCENTS: Record<TimeOfDay, { color: string; greeting: string; gradientTop: string }> = {
+  night:     { color: colors.tabs.calendar,  greeting: 'Dobranoc',     gradientTop: colors.timeGradient.night },
+  dawn:      { color: colors.accent.amber,   greeting: 'Świt',         gradientTop: colors.timeGradient.dawn },
+  morning:   { color: colors.tabs.tasks,     greeting: 'Dzień dobry',  gradientTop: colors.timeGradient.morning },
+  afternoon: { color: colors.tabs.calendar,  greeting: 'Cześć',        gradientTop: colors.timeGradient.afternoon },
+  evening:   { color: colors.accent.orange,  greeting: 'Dobry wieczór', gradientTop: colors.timeGradient.evening },
 };
 
 function timeOfDay(h: number): TimeOfDay {

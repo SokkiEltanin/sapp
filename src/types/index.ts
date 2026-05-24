@@ -161,11 +161,11 @@ export const MOOD_LABELS: Record<MoodLevel, string> = {
 };
 
 export const MOOD_COLORS: Record<MoodLevel, string> = {
-  1: '#6B7280', // szary
-  2: '#F87171', // czerwony (theme red)
-  3: '#FBBF24', // bursztynowy (theme amber)
-  4: '#34D399', // miętowy (theme green)
-  5: '#60A5FA', // niebieski (theme blue - wyróżnia "świetnie")
+  1: '#6B7280', // szary    — fatalnie
+  2: '#FF6B6B', // czerwony — słabo
+  3: '#FBBF24', // bursztyn — tak sobie
+  4: '#4ECBA8', // teal     — dobrze
+  5: '#6C9EFF', // cobalt   — świetnie
 };
 
 export const ENERGY_LABELS: Record<MoodLevel, string> = {
@@ -174,6 +174,14 @@ export const ENERGY_LABELS: Record<MoodLevel, string> = {
   3: 'Średnia',
   4: 'Dobra',
   5: 'Pełna energia',
+};
+
+export const ENERGY_COLORS: Record<MoodLevel, string> = {
+  1: '#374151', // bardzo ciemny — bez energii
+  2: '#6B7280', // szary        — niska
+  3: '#6C9EFF', // cobalt       — średnia
+  4: '#4ECBA8', // teal         — dobra
+  5: '#FBBF24', // bursztyn     — pełna energia (złoto = buzzy)
 };
 
 // ─── Health ───────────────────────────────────────────────────────────────────

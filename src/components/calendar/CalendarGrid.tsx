@@ -274,9 +274,9 @@ const styles = StyleSheet.create({
     fontSize: 11, fontWeight: '500', color: colors.text.muted,
     lineHeight: 14, textAlign: 'center',
   },
-  detailedNumTextToday: { color: '#fff', fontWeight: '800' },
+  detailedNumTextToday: { color: colors.white, fontWeight: '800' },
   detailedNumTextSel:   { color: colors.bg.primary, fontWeight: '800' },
-  detailedNumWeekend:   { color: '#f87171', opacity: 0.8 },
+  detailedNumWeekend:   { color: colors.accent.red, opacity: 0.8 },
 
   moodDotTiny: { width: 5, height: 5, borderRadius: 3 },
 

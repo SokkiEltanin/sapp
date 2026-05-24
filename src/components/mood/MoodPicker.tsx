@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
-import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS } from '@/types';
+import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -20,13 +20,6 @@ const ENERGY_EMOJIS: Record<MoodLevel, string> = {
   5: '🚀',
 };
 
-const ENERGY_COLORS: Record<MoodLevel, string> = {
-  1: '#374151', // ciemnoszary
-  2: '#6B7280', // szary
-  3: '#8BA9C3', // szarawo-niebieski
-  4: '#4B9FE5', // jasnoniebieski
-  5: '#1D4ED8', // niebieski
-};
 
 interface Props {
   value?: MoodLevel;
@@ -58,7 +51,7 @@ function MoodOption({ level, selected, onSelect, color, emoji }: {
         ]}>
           <Text style={styles.emoji}>{emoji}</Text>
           {selected && (
-            <View style={[styles.selDot, { backgroundColor: '#fff' }]} />
+            <View style={[styles.selDot, { backgroundColor: colors.white }]} />
           )}
         </View>
       </Pressable>
