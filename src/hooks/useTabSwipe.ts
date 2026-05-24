@@ -2,27 +2,32 @@ import { useRef, useEffect, useCallback } from 'react';
 import { PanResponder, Animated, Dimensions } from 'react-native';
 import { router, usePathname, useFocusEffect } from 'expo-router';
 
-const TABS = ['/', '/tasks', '/finances', '/stats'] as const;
+const TABS = ['/', '/tasks', '/finances', '/stats', '/analytics'] as const;
 const { width: W } = Dimensions.get('window');
 
-// Set before navigate() so the incoming screen reads it in useFocusEffect
+// Set before navigate() so the incoming screen reads it on mount / focus
 let pendingDirection: -1 | 0 | 1 = 0;
 
 export function useTabSwipe() {
-  const pathname   = usePathname();
-  const pathRef    = useRef(pathname);
-  const translateX = useRef(new Animated.Value(0)).current;
+  const pathname = usePathname();
+  const pathRef  = useRef(pathname);
 
-  // Keep pathRef current so PanResponder closures get the live pathname
+  // Initialize off-screen when arriving via swipe (pendingDirection is set
+  // before router.navigate, so useRef picks it up on first mount)
+  const translateX = useRef(
+    new Animated.Value(pendingDirection !== 0 ? -pendingDirection * W : 0)
+  ).current;
+
   useEffect(() => { pathRef.current = pathname; }, [pathname]);
 
-  // Fires ONLY on the screen that just gained focus — no cross-screen conflicts
   useFocusEffect(
     useCallback(() => {
       const dir = pendingDirection;
+      pendingDirection = 0; // consume immediately so re-renders don't re-read it
+
       if (dir !== 0) {
-        // Arrived here via swipe — slide in from the correct off-screen edge
-        pendingDirection = 0;
+        // Might already be off-screen from useRef init (first mount) — setValue
+        // is a no-op if value is already correct, so safe to call either way
         translateX.setValue(-dir * W);
         Animated.spring(translateX, {
           toValue: 0,
@@ -31,7 +36,6 @@ export function useTabSwipe() {
           friction: 26,
         }).start();
       } else {
-        // Normal focus (tab press, back nav, app resume) — snap to center
         translateX.setValue(0);
       }
     }, []),
@@ -40,7 +44,6 @@ export function useTabSwipe() {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, { dx, dy }) => {
-        // Block gesture capture when a modal / non-tab screen is on top
         if (!TABS.includes(pathRef.current as any)) return false;
         return Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 2.5;
       },
@@ -62,7 +65,6 @@ export function useTabSwipe() {
         const canPrev = dx > 0 && idx > 0;
 
         if (!isSwipe || !(canNext || canPrev)) {
-          // Not enough — spring back
           Animated.spring(translateX, {
             toValue: 0, useNativeDriver: true,
             tension: 260, friction: 28,
@@ -71,9 +73,8 @@ export function useTabSwipe() {
         }
 
         const dir: -1 | 1 = dx < 0 ? -1 : 1;
-        pendingDirection = dir; // incoming screen reads this in useFocusEffect
+        pendingDirection = dir;
 
-        // Slide current screen off-screen, THEN navigate
         Animated.timing(translateX, {
           toValue: dir * W,
           duration: 180,
@@ -82,7 +83,6 @@ export function useTabSwipe() {
           if (!finished) return;
           if (canNext) router.navigate(TABS[idx + 1] as any);
           if (canPrev) router.navigate(TABS[idx - 1] as any);
-          // translateX for this (now hidden) screen is reset by useFocusEffect on next visit
         });
       },
 

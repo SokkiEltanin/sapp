@@ -21,30 +21,31 @@ type BottomTabBarProps = {
 };
 
 const TABS = [
-  { name: 'index',    label: 'Dziś',       Icon: LayoutDashboard },
-  { name: 'tasks',    label: 'Zadania',    Icon: ListTodo },
-  { name: 'finances', label: 'Finanse',    Icon: Wallet },
-  { name: 'stats',    label: 'Kalendarz',  Icon: CalendarDays },
+  { name: 'index',     Icon: LayoutDashboard },
+  { name: 'tasks',     Icon: ListTodo },
+  { name: 'finances',  Icon: Wallet },
+  { name: 'stats',     Icon: CalendarDays },
+  { name: 'analytics', Icon: BarChart2 },
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Nastrój',         Icon: Smile,        color: colors.accent.pink,   route: '/(tabs)/mood' },
-  { label: 'Praca',           Icon: Briefcase,    color: '#60A5FA',            route: '/work/add' },
-  { label: 'Nawyki',          Icon: Flame,        color: colors.accent.amber,  route: '/habits' },
-  { label: 'Focus',           Icon: Target,       color: colors.accent.purple, route: '/focus' },
-  { label: 'Event',           Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },
-  { label: 'Przychód',        Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
-  { label: 'Wydatek',         Icon: Receipt,      color: colors.accent.red,    route: '/expenses/add' },
-  { label: 'Skan paragonu',   Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
-  { label: 'Nowe zadanie',    Icon: CheckSquare,  color: colors.accent.purple, route: '/tasks/add' },
+  { label: 'Nastrój',       Icon: Smile,        color: colors.accent.pink,   route: '/(tabs)/mood' },
+  { label: 'Praca',         Icon: Briefcase,    color: colors.accent.blue,   route: '/work/add' },
+  { label: 'Nawyki',        Icon: Flame,        color: colors.accent.amber,  route: '/habits' },
+  { label: 'Focus',         Icon: Target,       color: colors.accent.purple, route: '/focus' },
+  { label: 'Event',         Icon: CalendarPlus, color: colors.accent.blue,   route: '/calendar/add' },
+  { label: 'Przychód',      Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
+  { label: 'Wydatek',       Icon: Receipt,      color: colors.accent.red,    route: '/expenses/add' },
+  { label: 'Skan paragonu', Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
+  { label: 'Nowe zadanie',  Icon: CheckSquare,  color: colors.accent.purple, route: '/tasks/add' },
 ];
 
-const FAB_SIZE = 52;
-const FAB_OVERLAP = 20;
+const FAB_SIZE = 48;
+const PILL_H   = 50; // approximate pill height for menu offset
 
 export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const [open, setOpen] = useState(false);
-  const insets = useSafeAreaInsets();
+  const insets       = useSafeAreaInsets();
   const pendingCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending').length);
   const { color: accentColor } = useTimeAccent();
 
@@ -52,8 +53,8 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const itemAnims    = useRef(QUICK_ACTIONS.map(() => new Animated.Value(0))).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  const pillH    = 64;
-  const menuBase = FAB_SIZE - FAB_OVERLAP + pillH + (insets.bottom || 16) + 16;
+  // quick-actions menu sits above the FAB
+  const menuBase = (insets.bottom || 16) + 8 + PILL_H + 12 + FAB_SIZE + 12;
 
   const openMenu = () => {
     setOpen(true);
@@ -127,11 +128,11 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         </View>
       </Modal>
 
-      {/* ── Bar container ──────────────────────────────────────────── */}
+      {/* ── Bar ────────────────────────────────────────────────────── */}
       <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]}>
 
-        {/* FAB — floats above pill center */}
-        <View style={s.fabRow} pointerEvents="box-none">
+        {/* FAB — floats above pill, right-aligned */}
+        <View style={s.fabRow}>
           <TouchableOpacity
             style={[s.fab, { shadowColor: accentColor }]}
             onPress={open ? () => closeMenu() : openMenu}
@@ -145,23 +146,23 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
           </TouchableOpacity>
         </View>
 
-        {/* Pill */}
+        {/* Pill — 5 icons, no labels */}
         <View style={s.pill}>
           {TABS.map((tab, i) => {
-            const focused = state.index === i;
-            const showBadge = tab.name === 'tasks' && pendingCount > 0;
+            const focused    = state.index === i;
+            const showBadge  = tab.name === 'tasks' && pendingCount > 0;
             return (
               <TouchableOpacity
                 key={tab.name}
                 style={s.tabItem}
                 onPress={() => navigation.navigate(tab.name)}
-                activeOpacity={0.75}
+                activeOpacity={0.7}
               >
                 <View style={s.iconWrap}>
                   <tab.Icon
-                    size={21}
-                    color={focused ? '#FFFFFF' : colors.text.secondary}
-                    strokeWidth={focused ? 2 : 1.5}
+                    size={20}
+                    color={focused ? colors.white : colors.text.secondary}
+                    strokeWidth={focused ? 2.2 : 1.5}
                   />
                   {showBadge && (
                     <View style={s.badge}>
@@ -169,11 +170,8 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                     </View>
                   )}
                 </View>
-                <Text style={[s.tabLabel, focused && s.tabLabelActive]}>
-                  {tab.label}
-                </Text>
                 {focused && (
-                  <View style={[s.activeLine, { backgroundColor: accentColor }]} />
+                  <View style={[s.activeDot, { backgroundColor: accentColor }]} />
                 )}
               </TouchableOpacity>
             );
@@ -186,24 +184,22 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
 
 const s = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 0,
     backgroundColor: 'transparent',
   },
 
   // ── FAB row ─────────────────────────────────────────────────────
   fabRow: {
-    alignItems: 'center',
-    marginBottom: -FAB_OVERLAP,
-    zIndex: 10,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingRight: 4,
+    marginBottom: 8,
   },
   fab: {
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
     elevation: 12,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
@@ -223,56 +219,45 @@ const s = StyleSheet.create({
   // ── Pill ────────────────────────────────────────────────────────
   pill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(14,14,14,0.98)',
+    backgroundColor: 'rgba(20,20,20,0.98)',
     borderRadius: 28,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 8,
-    paddingTop: FAB_OVERLAP + 4,
-    paddingBottom: 10,
-    elevation: 12,
-    shadowColor: '#000',
+    paddingVertical: 6,
+    elevation: 8,
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.4,
-    shadowRadius: 16,
+    shadowRadius: 12,
   },
 
   // ── Tab items ────────────────────────────────────────────────────
   tabItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
     gap: 4,
-    paddingTop: 2,
   },
   iconWrap: { position: 'relative' },
-  tabLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    color: colors.text.secondary,
-    letterSpacing: 0.3,
-  },
-  tabLabelActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  activeLine: {
-    width: 16,
-    height: 2,
-    borderRadius: 1,
-    marginTop: 2,
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 
   // ── Badge ────────────────────────────────────────────────────────
   badge: {
     position: 'absolute', top: -5, right: -8,
-    minWidth: 15, height: 15, borderRadius: 8,
+    minWidth: 14, height: 14, borderRadius: 7,
     backgroundColor: colors.accent.red,
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: colors.black,
   },
-  badgeText: { fontSize: 8, fontWeight: '700', color: '#fff', lineHeight: 11 },
+  badgeText: { fontSize: 8, fontWeight: '700', color: colors.white, lineHeight: 11 },
 
   // ── Quick actions menu ───────────────────────────────────────────
   backdrop: {
@@ -291,7 +276,7 @@ const s = StyleSheet.create({
     gap: spacing[3],
   },
   quickIcon: {
-    width: 46, height: 46, borderRadius: 23,
+    width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1,
   },
