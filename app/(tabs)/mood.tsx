@@ -350,8 +350,10 @@ export default function MoodScreen() {
 
   const { openCheckIn } = useLocalSearchParams<{ openCheckIn?: string }>();
 
+  const today = todayStr();
+  const todayEntry = useMemo(() => entries.find(e => e.date === today) ?? null, [entries, today]);
+
   // Auto-open check-in modal when navigated from notification.
-  // If there's already a today entry, open it in edit mode; otherwise new.
   useFocusEffect(
     useCallback(() => {
       if (openCheckIn === 'true') {
@@ -367,9 +369,6 @@ export default function MoodScreen() {
     catch (_) {} finally { setLoading(false); }
   };
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
-
-  const today = todayStr();
-  const todayEntry = useMemo(() => entries.find(e => e.date === today) ?? null, [entries, today]);
   const last30 = useMemo(() => entries.filter(e => e.date >= dateMinusDays(30)), [entries]);
   const avgMood = avg(last30.map(e => e.mood));
   const avgEnergy = avg(last30.map(e => e.energy));
