@@ -69,8 +69,9 @@ function taskSubtitle(task: Task, pomodoroTaskId?: string): string {
     return 'ODŁOŻONE';
   }
   if (task.id === pomodoroTaskId) return 'AKTUALNIE W TOKU';
-  if (!task.deadline) return 'BEZ TERMINU';
-  return `ZAPLANOWANE ${deadlineLabel(task.deadline)}`;
+  if (task.deadline) return `ZAPLANOWANE ${deadlineLabel(task.deadline)}`;
+  if (task.scheduledDate) return `ZAPLANOWANE ${deadlineLabel(task.scheduledDate)}`;
+  return 'BEZ TERMINU';
 }
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
@@ -128,12 +129,18 @@ const SECTION_DEFS = [
 
 function taskSection(task: Task, today: string, tomorrow: string, weekEnd: string): typeof SECTION_DEFS[number]['key'] {
   const d = task.deadline?.split('T')[0];
-  if (!d) return 'none';
-  if (d < today) return 'overdue';
-  if (d === today) return 'today';
-  if (d === tomorrow) return 'tomorrow';
-  if (d <= weekEnd) return 'week';
-  return 'later';
+  const s = task.scheduledDate;
+  // Overdue deadline
+  if (d && d < today) return 'overdue';
+  // Today by deadline or scheduledDate
+  if (d === today || s === today) return 'today';
+  // Tomorrow by deadline or scheduledDate
+  if (d === tomorrow || (!d && s === tomorrow)) return 'tomorrow';
+  // This week
+  if ((d && d <= weekEnd) || (!d && s && s <= weekEnd)) return 'week';
+  // Later
+  if (d || s) return 'later';
+  return 'none';
 }
 
 function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem[] {
