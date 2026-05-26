@@ -384,6 +384,7 @@ export default function DashboardScreen() {
   const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
   const overdueTasks   = useMemo(() => pendingTasks.filter(t => t.deadline && t.deadline.split('T')[0] < today).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? '')), [pendingTasks, today]);
   const todayTasks     = useMemo(() => pendingTasks.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today), [pendingTasks, today]);
+  const doneToday      = useMemo(() => tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(today)).length, [tasks, today]);
 
   const tomorrow = useMemo(() => {
     const t = new Date(); t.setDate(t.getDate() + 1);
@@ -658,6 +659,9 @@ export default function DashboardScreen() {
                 )}
                 {nextDeadline && (
                   <Text style={s.miniCardSub} numberOfLines={1}>→ {nextDeadline.label}</Text>
+                )}
+                {doneToday > 0 && (
+                  <Text style={[s.miniCardSub, { color: colors.accent.green }]}>✓ {doneToday} dziś</Text>
                 )}
               </TouchableOpacity>
 
