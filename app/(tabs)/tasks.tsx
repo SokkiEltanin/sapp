@@ -1,54 +1,37 @@
-﻿import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, SectionList, RefreshControl,
-  TouchableOpacity, Alert, Modal, Pressable, ScrollView, Animated, TextInput,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  Modal, Pressable, TextInput, KeyboardAvoidingView,
+  Platform, ScrollView, Animated, RefreshControl,
 } from 'react-native';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  CheckCircle2, Circle, Clock, Flame, Timer,
-  Search, RefreshCw, AlarmClock, BellOff, CheckSquare,
-  Trash2, CalendarClock, X as XIcon, BarChart2, Lightbulb,
+  Check, Pencil, Plus, SlidersHorizontal,
+  AlarmClock, ChevronRight, Trash2, X,
+  Square, CheckSquare2,
 } from 'lucide-react-native';
 
-import PressableScale from '@/components/ui/PressableScale';
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
-import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
-import { Task, TaskDifficulty, MoodLevel } from '@/types';
-import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
+import { Task, Subtask } from '@/types';
+import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+import { notificationsService } from '@/services/notificationsService';
 
-// ─── Snooze options ───────────────────────────────────────────────────────────
+// ─── Colors ───────────────────────────────────────────────────────────────────
 
-function buildSnoozeOptions() {
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(8, 0, 0, 0);
-  const in3 = new Date(now); in3.setDate(in3.getDate() + 3); in3.setHours(8, 0, 0, 0);
-  const in7 = new Date(now); in7.setDate(in7.getDate() + 7); in7.setHours(8, 0, 0, 0);
-  return [
-    { label: '1 godzinę',          date: new Date(now.getTime() + 60 * 60_000) },
-    { label: '2 godziny',          date: new Date(now.getTime() + 2 * 60 * 60_000) },
-    { label: 'Jutro rano (8:00)',  date: tomorrow },
-    { label: 'Za 3 dni',           date: in3 },
-    { label: 'Za tydzień',         date: in7 },
-  ];
-}
-
-function fmtSnooze(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = d.getTime() - now.getTime();
-  const diffH = diffMs / 3_600_000;
-  if (diffH < 1) return `${Math.ceil(diffMs / 60_000)} min`;
-  if (diffH < 24) return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
-  const [, m, day] = d.toISOString().split('T')[0].split('-');
-  return `${parseInt(day)}.${parseInt(m)}`;
-}
+const G = {
+  card:       '#0D2318',
+  cardBorder: 'rgba(61,190,117,0.18)',
+  accent:     '#3DBE75',
+  accentDim:  'rgba(61,190,117,0.22)',
+  accentText: '#3DBE75',
+  overdueCard:'#1A0A0A',
+  overdueBorder:'rgba(255,107,107,0.25)',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,891 +40,638 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-function tomorrowStr() {
-  const d = new Date(); d.setDate(d.getDate() + 1);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function daysUntil(iso: string): number {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(iso.split('T')[0] + 'T00:00:00');
+  return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
 }
-function weekEndStr() {
-  const d = new Date();
-  const diff = d.getDay() === 0 ? 6 : 7 - d.getDay();
-  d.setDate(d.getDate() + diff);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function fmtDl(iso: string) {
-  const d = iso.split('T')[0];
-  const today = todayStr();
-  if (d === today) return 'dziś';
-  if (d === tomorrowStr()) return 'jutro';
-  const [, m, day] = d.split('-');
+const DAY_PL = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+
+function deadlineLabel(iso: string): string {
+  const d = daysUntil(iso);
+  if (d < 0)  return 'PRZETERMINOWANE';
+  if (d === 0) return 'NA DZIŚ';
+  if (d === 1) return 'NA JUTRO';
+  if (d <= 6) {
+    const wd = new Date(iso.split('T')[0] + 'T12:00:00').getDay();
+    return `NA ${DAY_PL[wd].toUpperCase()}`;
+  }
+  const [, m, day] = iso.split('T')[0].split('-');
   return `${parseInt(day)}.${parseInt(m)}`;
 }
 
-type FilterKey = 'all' | 'today' | 'week' | 'done' | 'snoozed' | 'parking';
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all',     label: 'Wszystkie' },
-  { key: 'today',   label: 'Dziś' },
-  { key: 'week',    label: 'Tydzień' },
-  { key: 'parking', label: 'Parking' },
-  { key: 'done',    label: 'Ukończone' },
-  { key: 'snoozed', label: 'Odłożone' },
-];
+function taskSubtitle(task: Task, pomodoroTaskId?: string): string {
+  if (task.status === 'snoozed') {
+    if (task.snoozedUntil) {
+      const d = new Date(task.snoozedUntil);
+      return `ODŁOŻONE DO ${d.getHours()}:${pad(d.getMinutes())}`;
+    }
+    return 'ODŁOŻONE';
+  }
+  if (task.id === pomodoroTaskId) return 'AKTUALNIE W TOKU';
+  if (!task.deadline) return 'BEZ TERMINU';
+  return `ZAPLANOWANE ${deadlineLabel(task.deadline)}`;
+}
 
-interface Section { title: string; accent: string; data: Task[] }
+// ─── Sort ─────────────────────────────────────────────────────────────────────
+
+type SortKey = 'deadline' | 'priority' | 'created' | 'alpha';
+
+const SORT_OPTIONS: { key: SortKey; label: string; sub: string }[] = [
+  { key: 'deadline',  label: 'Termin',     sub: 'Najpilniejsze pierwsze' },
+  { key: 'priority',  label: 'Priorytet',  sub: 'Wysokie → niskie' },
+  { key: 'created',   label: 'Dodane',     sub: 'Najnowsze pierwsze' },
+  { key: 'alpha',     label: 'Alfabet',    sub: 'A → Z' },
+];
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
 
-function smartSort(a: Task, b: Task): number {
-  // 1. Priority
-  const pDiff = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
-  if (pDiff !== 0) return pDiff;
-  // 2. Deadline proximity (earlier = more urgent)
-  if (a.deadline && b.deadline) {
-    const dDiff = a.deadline.localeCompare(b.deadline);
-    if (dDiff !== 0) return dDiff;
-  } else if (a.deadline) {
-    return -1;
-  } else if (b.deadline) {
-    return 1;
-  }
-  // 3. More estimated work surfaces earlier (so you plan it first)
-  const pomoDiff = (b.estimatedPomodoros ?? 0) - (a.estimatedPomodoros ?? 0);
-  if (pomoDiff !== 0) return pomoDiff;
-  // 4. Difficulty tiebreak
-  return (b.difficulty ?? 0) - (a.difficulty ?? 0);
+function sortTasks(tasks: Task[], sort: SortKey): Task[] {
+  const today = todayStr();
+  return [...tasks].sort((a, b) => {
+    if (sort === 'deadline') {
+      // Overdue first, then by nearest deadline, no deadline last
+      const aD = a.deadline?.split('T')[0];
+      const bD = b.deadline?.split('T')[0];
+      const aOver = aD && aD < today ? -1 : 0;
+      const bOver = bD && bD < today ? -1 : 0;
+      if (aOver !== bOver) return aOver - bOver;
+      if (!aD && !bD) return 0;
+      if (!aD) return 1;
+      if (!bD) return -1;
+      return aD.localeCompare(bD);
+    }
+    if (sort === 'priority') {
+      const pDiff = (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
+      if (pDiff !== 0) return pDiff;
+      return (a.deadline ?? 'z').localeCompare(b.deadline ?? 'z');
+    }
+    if (sort === 'created') return b.createdAt.localeCompare(a.createdAt);
+    return a.title.localeCompare(b.title);
+  });
 }
-
-function buildSections(tasks: Task[]): Section[] {
-  const today    = todayStr();
-  const tomorrow = tomorrowStr();
-  const weekEnd  = weekEndStr();
-  const pending  = tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed');
-  const groups: [string, string, Task[]][] = [
-    ['Przeterminowane', colors.accent.red,    pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d < today; })],
-    ['Dzisiaj',         colors.tabs.tasks,    pending.filter(t => t.deadline?.startsWith(today))],
-    ['Jutro',           colors.accent.blue,   pending.filter(t => t.deadline?.startsWith(tomorrow))],
-    ['Ten tydzień',     colors.text.secondary, pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d > tomorrow && d <= weekEnd; })],
-    ['Późniejsze',      colors.text.muted,    pending.filter(t => { const d = t.deadline?.split('T')[0]; return d && d > weekEnd; })],
-    ['Bez terminu',     colors.text.muted,    pending.filter(t => !t.deadline)],
-  ];
-  return groups.filter(([,, data]) => data.length > 0).map(([title, accent, data]) => ({ title, accent, data: [...data].sort(smartSort) }));
-}
-
-// ─── Difficulty indicator ──────────────────────────────────────────────────────
-
-function DiffBar({ level }: { level?: TaskDifficulty }) {
-  if (!level) return null;
-  const col = level <= 2 ? colors.accent.green : level === 3 ? colors.accent.amber : colors.accent.red;
-  return (
-    <View style={db.wrap}>
-      {[1,2,3,4,5].map(i => (
-        <View key={i} style={[db.seg, { backgroundColor: i <= level ? col : 'rgba(255,255,255,0.08)' }]} />
-      ))}
-    </View>
-  );
-}
-const db = StyleSheet.create({
-  wrap: { flexDirection: 'row', gap: 2, alignItems: 'center' },
-  seg: { width: 8, height: 3, borderRadius: 2 },
-});
 
 // ─── Task card ────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, index, onToggle, onLongPress, onPomodoro, onSnooze }: {
-  task: Task; index: number;
-  onToggle: (id: string) => void;
-  onLongPress: (id: string) => void;
-  onPomodoro: (task: Task) => void;
-  onSnooze: (task: Task) => void;
+function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
+  task: Task;
+  pomodoroTaskId?: string;
+  onComplete: (task: Task) => void;
+  onEdit: (task: Task) => void;
 }) {
-  const done     = task.status === 'done';
+  const overdue  = task.status !== 'done' && task.status !== 'snoozed' &&
+    !!task.deadline && task.deadline.split('T')[0] < todayStr();
+  const urgent   = task.priority === 'high';
   const snoozed  = task.status === 'snoozed';
-  const urgent   = task.priority === 'high' && !done && !snoozed;
-  const overdue  = !done && !snoozed && (task.deadline?.split('T')[0] ?? '') < todayStr();
+  const isDone   = task.status === 'done';
+  const subtitle = taskSubtitle(task, pomodoroTaskId);
 
-  function urgencyBarColor(): string {
-    if (done) return 'rgba(255,255,255,0.06)';
-    if (snoozed) return colors.accent.amber;
-    if (task.priority === 'high') return colors.accent.red;
-    const d = task.deadline?.split('T')[0];
-    if (!d) return 'rgba(255,255,255,0.1)';
-    const today = todayStr();
-    const msPerDay = 86_400_000;
-    const daysUntil = Math.ceil((new Date(d).getTime() - new Date(today).getTime()) / msPerDay);
-    if (daysUntil <= 0) return colors.accent.red;
-    if (daysUntil <= 3) return colors.accent.amber;
-    return colors.tabs.tasks;
-  }
-  const accentColor = urgencyBarColor();
+  const cardBg     = overdue ? G.overdueCard : G.card;
+  const cardBorder = overdue ? G.overdueBorder : G.cardBorder;
+  const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.accent
+    : overdue ? colors.accent.red
+    : snoozed ? colors.accent.amber
+    : colors.text.muted;
 
   return (
-    <View style={styles.cardWrap}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => router.push(`/tasks/${task.id}` as any)}
-        onLongPress={() => onLongPress(task.id)}
-        style={[styles.taskCard, done && styles.taskCardDone]}
-      >
-        {/* Left accent bar */}
-        <View style={[styles.accentBar, { backgroundColor: done ? colors.text.muted : accentColor }]} />
-
-        {/* Checkbox */}
-        <TouchableOpacity onPress={() => onToggle(task.id)} style={styles.checkWrap} hitSlop={8}>
-          {done
-            ? <CheckCircle2 size={20} color={colors.accent.green} />
-            : <Circle size={20} color={urgent ? colors.accent.red : 'rgba(255,255,255,0.18)'} strokeWidth={1.5} />
-          }
+    <TouchableOpacity
+      style={[s.card, { backgroundColor: cardBg, borderColor: cardBorder }, isDone && s.cardDone]}
+      onPress={() => onEdit(task)}
+      activeOpacity={0.75}
+    >
+      {/* Action pill */}
+      <View style={[s.actionPill, overdue && { borderColor: colors.accent.red + '40' }]}>
+        <TouchableOpacity
+          style={s.actionHalf}
+          onPress={() => onComplete(task)}
+          hitSlop={6}
+          activeOpacity={0.7}
+        >
+          <Check size={14} color={isDone ? G.accent : colors.text.secondary} strokeWidth={2.5} />
         </TouchableOpacity>
+        <View style={s.actionDivider} />
+        <TouchableOpacity
+          style={s.actionHalf}
+          onPress={() => onEdit(task)}
+          hitSlop={6}
+          activeOpacity={0.7}
+        >
+          <Pencil size={13} color={colors.text.secondary} strokeWidth={2} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Content */}
-        <View style={styles.taskContent}>
-          <Text style={[styles.taskTitle, done && styles.taskTitleDone]} numberOfLines={2}>
-            {task.title}
-          </Text>
+      {/* Content */}
+      <View style={s.cardContent}>
+        <Text
+          style={[s.cardTitle, isDone && s.cardTitleDone, urgent && !isDone && { color: colors.accent.red }]}
+          numberOfLines={2}
+        >
+          {task.title.toUpperCase()}
+        </Text>
+        <Text style={[s.cardSub, { color: subColor }]}>{subtitle}</Text>
+        {task.subtasks && task.subtasks.length > 0 && (() => {
+          const done = task.subtasks.filter(s => s.done).length;
+          return (
+            <Text style={s.cardMilestones}>{done}/{task.subtasks.length} kamieni</Text>
+          );
+        })()}
+      </View>
 
-          <View style={styles.taskMeta}>
-            {task.deadline && (
-              <View style={[styles.chip,
-                overdue && { backgroundColor: colors.accent.red + '18', borderColor: colors.accent.red + '40' }
-              ]}>
-                <Clock size={9} color={overdue ? colors.accent.red : colors.text.muted} />
-                <Text style={[styles.chipText, overdue && { color: colors.accent.red }]}>
-                  {fmtDl(task.deadline)}
-                </Text>
-              </View>
-            )}
-            {urgent && (
-              <View style={[styles.chip, { backgroundColor: colors.accent.red + '18', borderColor: colors.accent.red + '30' }]}>
-                <Flame size={9} color={colors.accent.red} />
-                <Text style={[styles.chipText, { color: colors.accent.red }]}>pilne</Text>
-              </View>
-            )}
-            {task.estimatedPomodoros != null && task.estimatedPomodoros > 0 && (
-              <View style={[styles.chip, { backgroundColor: colors.tabs.tasks + '18', borderColor: colors.tabs.tasks + '30' }]}>
-                <Timer size={9} color={colors.tabs.tasks} />
-                <Text style={[styles.chipText, { color: colors.tabs.tasks }]}>
-                  {task.estimatedPomodoros}×25m
-                </Text>
-              </View>
-            )}
-            {snoozed && task.snoozedUntil && (
-              <View style={[styles.chip, { backgroundColor: colors.accent.amber + '18', borderColor: colors.accent.amber + '30' }]}>
-                <BellOff size={9} color={colors.accent.amber} />
-                <Text style={[styles.chipText, { color: colors.accent.amber }]}>
-                  {fmtSnooze(task.snoozedUntil)}
-                </Text>
-              </View>
-            )}
-            {task.recurring && task.recurring !== 'none' && (
-              <View style={[styles.chip, { backgroundColor: colors.accent.blue + '18', borderColor: colors.accent.blue + '30' }]}>
-                <RefreshCw size={9} color={colors.accent.blue} />
-                <Text style={[styles.chipText, { color: colors.accent.blue }]}>
-                  {{ daily: 'codziennie', weekly: 'tyg.', monthly: 'mies.' }[task.recurring]}
-                </Text>
-              </View>
-            )}
-            {task.subtasks && task.subtasks.length > 0 && (() => {
-              const total = task.subtasks.length;
-              const doneCount = task.subtasks.filter(s => s.done).length;
-              const allDone = doneCount === total;
-              const col = allDone ? colors.accent.green : colors.accent.blue;
-              return (
-                <View style={[styles.chip, { backgroundColor: col + '18', borderColor: col + '30' }]}>
-                  <CheckSquare size={9} color={col} />
-                  <Text style={[styles.chipText, { color: col }]}>{doneCount}/{total}</Text>
-                </View>
-              );
-            })()}
-            {task.tags?.slice(0, 2).map(t => (
-              <Text key={t} style={styles.tagText}>#{t}</Text>
-            ))}
-            <DiffBar level={task.difficulty} />
-          </View>
-        </View>
-
-        {/* Action buttons */}
-        <View style={styles.cardActions}>
-          {!done && !snoozed && (
-            <TouchableOpacity onPress={() => onSnooze(task)} style={styles.snoozeBtn} hitSlop={8}>
-              <AlarmClock size={15} color={colors.accent.amber} />
-            </TouchableOpacity>
-          )}
-          {!done && !snoozed && task.estimatedPomodoros! > 0 && (
-            <TouchableOpacity onPress={() => onPomodoro(task)} style={styles.pomBtn} hitSlop={8}>
-              <Timer size={16} color={colors.accent.purple} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </TouchableOpacity>
-    </View>
+      <ChevronRight size={14} color='rgba(255,255,255,0.15)' />
+    </TouchableOpacity>
   );
 }
 
-// ─── Swipeable wrapper ────────────────────────────────────────────────────────
+// ─── Task detail modal ────────────────────────────────────────────────────────
 
-function SwipeableTaskCard(props: {
-  task: Task; index: number;
-  onToggle: (id: string) => void;
-  onLongPress: (id: string) => void;
-  onPomodoro: (task: Task) => void;
-  onSnooze: (task: Task) => void;
+function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubtask, onToggleSubtask }: {
+  task: Task | null;
+  visible: boolean;
+  onClose: () => void;
+  onUpdate: (id: string, data: Partial<Task>) => void;
   onDelete: (id: string) => void;
+  onAddSubtask: (taskId: string, title: string) => void;
+  onToggleSubtask: (taskId: string, subtaskId: string) => void;
 }) {
-  const { task, onToggle, onSnooze, onDelete } = props;
-  const swipeRef = useRef<Swipeable>(null);
+  const [newMilestone, setNewMilestone] = useState('');
+  const inputRef = useRef<TextInput>(null);
 
-  const isDone    = task.status === 'done';
-  const isSnoozed = task.status === 'snoozed';
+  if (!task) return null;
 
-  if (isDone || isSnoozed) {
-    return <TaskCard {...props} />;
-  }
-
-  const LeftAction = (_: any, dragX: Animated.AnimatedInterpolation<number>) => {
-    const scale = dragX.interpolate({ inputRange: [0, 80], outputRange: [0.6, 1], extrapolate: 'clamp' });
-    return (
-      <View style={sw.leftWrap}>
-        <Animated.View style={[sw.leftInner, { transform: [{ scale }] }]}>
-          <CheckCircle2 size={22} color={colors.bg.primary} strokeWidth={2.5} />
-          <Text style={sw.leftLabel}>Gotowe</Text>
-        </Animated.View>
-      </View>
-    );
+  const handleAddMilestone = () => {
+    const title = newMilestone.trim();
+    if (!title) return;
+    onAddSubtask(task.id, title);
+    setNewMilestone('');
   };
 
-  const RightActions = () => (
-    <View style={sw.rightWrap}>
-      <TouchableOpacity
-        style={sw.snoozeAction}
-        activeOpacity={0.8}
-        onPress={() => { swipeRef.current?.close(); onSnooze(task); }}
-      >
-        <AlarmClock size={18} color={colors.bg.primary} />
-        <Text style={sw.rightLabel}>Odłóż</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={sw.deleteAction}
-        activeOpacity={0.8}
-        onPress={() => { swipeRef.current?.close(); onDelete(task.id); }}
-      >
-        <Trash2 size={18} color={colors.bg.primary} />
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
-    <Swipeable
-      ref={swipeRef}
-      friction={2}
-      leftThreshold={72}
-      rightThreshold={40}
-      overshootLeft={false}
-      renderLeftActions={LeftAction}
-      renderRightActions={RightActions}
-      onSwipeableLeftOpen={() => {
-        onToggle(task.id);
-        setTimeout(() => swipeRef.current?.close(), 300);
-      }}
-    >
-      <TaskCard {...props} />
-    </Swipeable>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={dm.overlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={dm.kav}
+        >
+          <View style={dm.sheet}>
+            {/* Header */}
+            <View style={dm.header}>
+              <View style={dm.headerLeft}>
+                {task.deadline && (
+                  <Text style={dm.dateLabel}>
+                    {deadlineLabel(task.deadline)}
+                  </Text>
+                )}
+                <Text style={dm.titleText}>{task.title.toUpperCase()}</Text>
+                {task.description ? (
+                  <Text style={dm.descText}>{task.description}</Text>
+                ) : null}
+              </View>
+              <TouchableOpacity onPress={onClose} style={dm.closeBtn} hitSlop={8}>
+                <X size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={dm.body}>
+              {/* Milestones */}
+              {(task.subtasks ?? []).map((sub) => (
+                <TouchableOpacity
+                  key={sub.id}
+                  style={dm.milestoneRow}
+                  onPress={() => onToggleSubtask(task.id, sub.id)}
+                  activeOpacity={0.7}
+                >
+                  {sub.done
+                    ? <CheckSquare2 size={16} color={G.accent} strokeWidth={2} />
+                    : <Square size={16} color={colors.text.muted} strokeWidth={1.5} />
+                  }
+                  <Text style={[dm.milestoneText, sub.done && dm.milestoneDone]}>
+                    {sub.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              {/* Add milestone row */}
+              <View style={dm.addMilestoneRow}>
+                <Plus size={14} color={G.accent} />
+                <TextInput
+                  ref={inputRef}
+                  value={newMilestone}
+                  onChangeText={setNewMilestone}
+                  placeholder="DODAJ KAMIEŃ MILOWY"
+                  placeholderTextColor={colors.text.muted}
+                  style={dm.milestoneInput}
+                  returnKeyType="done"
+                  onSubmitEditing={handleAddMilestone}
+                />
+              </View>
+            </ScrollView>
+
+            {/* Footer actions */}
+            <View style={dm.footer}>
+              <TouchableOpacity
+                style={dm.footerBtn}
+                onPress={() => { onClose(); router.push(`/tasks/${task.id}` as any); }}
+                activeOpacity={0.8}
+              >
+                <Pencil size={15} color={G.accent} />
+                <Text style={dm.footerBtnText}>Edytuj</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dm.footerBtn, dm.footerBtnDanger]}
+                onPress={() => { onDelete(task.id); onClose(); }}
+                activeOpacity={0.8}
+              >
+                <Trash2 size={15} color={colors.accent.red} />
+                <Text style={[dm.footerBtnText, { color: colors.accent.red }]}>Usuń</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 }
 
-const sw = StyleSheet.create({
-  leftWrap: {
-    width: 88, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: colors.accent.green,
-    borderRadius: radius.lg,
+const dm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  kav: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#0D2318',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderWidth: 1, borderBottomWidth: 0,
+    borderColor: G.cardBorder,
+    maxHeight: '85%',
+    paddingBottom: 32,
   },
-  leftInner: { alignItems: 'center', gap: 4 },
-  leftLabel: { fontSize: 10, fontWeight: '700', color: colors.bg.primary },
-
-  rightWrap: {
-    flexDirection: 'row',
+  header: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    padding: spacing[5], gap: spacing[3],
+    borderBottomWidth: 1, borderBottomColor: G.cardBorder,
   },
-  snoozeAction: {
-    width: 68, justifyContent: 'center', alignItems: 'center', gap: 4,
-    backgroundColor: colors.accent.amber,
-    borderTopLeftRadius: radius.lg, borderBottomLeftRadius: radius.lg,
+  headerLeft: { flex: 1, gap: 4 },
+  dateLabel: { fontSize: 10, color: G.accent, fontWeight: '700', letterSpacing: 1.5 },
+  titleText: { fontSize: 20, fontWeight: '800', color: colors.white, letterSpacing: 0.5, lineHeight: 26 },
+  descText:  { fontSize: 13, color: colors.text.secondary, lineHeight: 19, marginTop: 4 },
+  closeBtn:  { padding: 4 },
+  body: { paddingHorizontal: spacing[5], paddingTop: spacing[4] },
+  milestoneRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1, borderBottomColor: 'rgba(61,190,117,0.08)',
   },
-  deleteAction: {
-    width: 56, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: colors.accent.red,
-    borderTopRightRadius: radius.lg, borderBottomRightRadius: radius.lg,
+  milestoneText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
+  milestoneDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  addMilestoneRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: spacing[3],
   },
-  rightLabel: { fontSize: 10, fontWeight: '700', color: colors.bg.primary },
+  milestoneInput: {
+    flex: 1, fontSize: 12, color: colors.text.primary,
+    fontWeight: '700', letterSpacing: 1,
+  },
+  footer: {
+    flexDirection: 'row', gap: spacing[3],
+    paddingHorizontal: spacing[5], paddingTop: spacing[4],
+    borderTopWidth: 1, borderTopColor: G.cardBorder,
+  },
+  footerBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: spacing[3],
+    backgroundColor: G.accentDim, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: G.cardBorder,
+  },
+  footerBtnDanger: {
+    backgroundColor: colors.accent.red + '15',
+    borderColor: colors.accent.red + '30',
+  },
+  footerBtnText: { fontSize: 13, fontWeight: '700', color: G.accent },
 });
 
-// ─── Section header ───────────────────────────────────────────────────────────
+// ─── Completion confirm modal ──────────────────────────────────────────────────
 
-function SectionHeader({ title, count, accent }: { title: string; count: number; accent: string }) {
+function ConfirmModal({ task, onConfirm, onCancel }: {
+  task: Task | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!task) return null;
   return (
-    <View style={sh.row}>
-      <View style={[sh.pill, { backgroundColor: accent + '18', borderColor: accent + '35' }]}>
-        <Text style={[sh.title, { color: accent }]}>{title}</Text>
+    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+      <Pressable style={cm.overlay} onPress={onCancel} />
+      <View style={cm.box}>
+        <Text style={cm.title}>Ukończyłeś zadanie?</Text>
+        <Text style={cm.sub} numberOfLines={2}>{task.title}</Text>
+        <View style={cm.btns}>
+          <TouchableOpacity style={cm.btnNo} onPress={onCancel} activeOpacity={0.8}>
+            <Text style={cm.btnNoText}>Nie</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={cm.btnYes} onPress={onConfirm} activeOpacity={0.8}>
+            <Check size={16} color={G.card} strokeWidth={3} />
+            <Text style={cm.btnYesText}>Tak, gotowe</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={sh.line} />
-      <Text style={sh.count}>{count}</Text>
-    </View>
+    </Modal>
   );
 }
-const sh = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3] },
-  pill: { paddingHorizontal: spacing[3], paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
-  title: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
-  line: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
-  count: { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
+
+const cm = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)' },
+  box: {
+    position: 'absolute', bottom: 120, left: 24, right: 24,
+    backgroundColor: '#0D2318',
+    borderRadius: 20, padding: spacing[5], gap: spacing[4],
+    borderWidth: 1, borderColor: G.cardBorder,
+  },
+  title: { fontSize: 17, fontWeight: '800', color: colors.white, textAlign: 'center' },
+  sub:   { fontSize: 13, color: colors.text.muted, textAlign: 'center' },
+  btns:  { flexDirection: 'row', gap: spacing[3] },
+  btnNo: {
+    flex: 1, paddingVertical: spacing[3], borderRadius: radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  btnNoText:  { fontSize: 14, fontWeight: '600', color: colors.text.secondary },
+  btnYes: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: spacing[3], borderRadius: radius.lg,
+    backgroundColor: G.accent,
+  },
+  btnYesText: { fontSize: 14, fontWeight: '800', color: G.card },
+});
+
+// ─── Sort sheet ───────────────────────────────────────────────────────────────
+
+function SortSheet({ sort, onSelect, onClose }: {
+  sort: SortKey;
+  onSelect: (k: SortKey) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={ss.overlay} onPress={onClose} />
+      <View style={ss.sheet}>
+        <View style={ss.handle} />
+        <Text style={ss.heading}>Sortowanie</Text>
+        {SORT_OPTIONS.map(opt => (
+          <TouchableOpacity
+            key={opt.key}
+            style={[ss.row, sort === opt.key && ss.rowActive]}
+            onPress={() => { onSelect(opt.key); onClose(); }}
+            activeOpacity={0.75}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[ss.label, sort === opt.key && ss.labelActive]}>{opt.label}</Text>
+              <Text style={ss.sub}>{opt.sub}</Text>
+            </View>
+            {sort === opt.key && <Check size={16} color={G.accent} strokeWidth={2.5} />}
+          </TouchableOpacity>
+        ))}
+      </View>
+    </Modal>
+  );
+}
+
+const ss = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#0A1A10',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: spacing[5], paddingBottom: 40,
+    borderWidth: 1, borderBottomWidth: 0, borderColor: G.cardBorder,
+    gap: spacing[1],
+  },
+  handle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: G.accentDim, alignSelf: 'center', marginBottom: spacing[3],
+  },
+  heading: { fontSize: 13, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.2, marginBottom: spacing[2] },
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: spacing[3], paddingHorizontal: spacing[3],
+    borderRadius: radius.lg, gap: spacing[3],
+  },
+  rowActive: { backgroundColor: G.accentDim },
+  label: { fontSize: 15, fontWeight: '600', color: colors.text.secondary },
+  labelActive: { color: G.accent },
+  sub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
-  const { tasks, isLoading, reload, toggle, remove, update, snooze, unsnooze } = useTasks();
-  const startPomodoro = usePomodoroStore(s => s.startFor);
-  const [filter, setFilter]         = useState<FilterKey>('all');
-  const [moodModal, setMoodModal]   = useState(false);
-  const [completedTask, setCompletedTask] = useState<Task | null>(null);
-  const [snoozeTask, setSnoozeTask] = useState<Task | null>(null);
-  const [rescueOpen, setRescueOpen] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { tasks, isLoading, reload, toggle, remove, update, addSubtask, toggleSubtask } = useTasks();
+  const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
 
-  const today   = todayStr();
-  const weekEnd = weekEndStr();
+  const [sort, setSort]           = useState<SortKey>('deadline');
+  const [sortOpen, setSortOpen]   = useState(false);
+  const [confirmTask, setConfirmTask] = useState<Task | null>(null);
+  const [detailTask, setDetailTask]   = useState<Task | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
 
-  const sections     = useMemo(() => buildSections(tasks), [tasks]);
-  const snoozedTasks = useMemo(() => tasks.filter(t => t.status === 'snoozed'), [tasks]);
-  const pending      = tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed').length;
-  const overdueTasks = useMemo(() =>
-    tasks.filter(t => {
-      const d = t.deadline?.split('T')[0];
-      return t.status !== 'done' && t.status !== 'snoozed' && d && d < today;
-    }),
-    [tasks, today]);
+  const today = todayStr();
 
-  const filtered = useMemo(() => {
-    switch (filter) {
-      case 'today':
-        return tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed' &&
-          (t.deadline?.startsWith(today) || t.scheduledDate === today));
-      case 'week':
-        return tasks.filter(t => t.status !== 'done' && t.status !== 'snoozed' && t.deadline != null &&
-          t.deadline.split('T')[0] >= today && t.deadline.split('T')[0] <= weekEnd);
-      case 'done':
-        return tasks.filter(t => t.status === 'done').slice(0, 50);
-      case 'snoozed':
-        return [...snoozedTasks].sort((a, b) =>
-          (a.snoozedUntil ?? '').localeCompare(b.snoozedUntil ?? ''));
-      case 'parking':
-        return tasks
-          .filter(t => t.status !== 'done' && t.status !== 'snoozed' && !t.deadline)
-          .sort(smartSort);
-      default:
-        return [];
-    }
-  }, [tasks, filter, today, weekEnd, snoozedTasks]);
+  const active    = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
+  const done      = useMemo(() => tasks.filter(t => t.status === 'done').slice(0, 30), [tasks]);
+  const sorted    = useMemo(() => sortTasks(active, sort), [active, sort]);
 
-  const handleToggle = (id: string) => {
-    const t = tasks.find(x => x.id === id);
-    toggle(id);
-    if (t && t.status !== 'done') {
-      setCompletedTask(t);
-      setMoodModal(true);
-    }
-  };
-
-  const handleLongPress = (id: string) => {
-    const t = tasks.find(x => x.id === id);
-    const isSnoozed = t?.status === 'snoozed';
-    const btns: any[] = [
-      { text: 'Anuluj', style: 'cancel' },
-    ];
-    if (!isSnoozed) {
-      btns.push({ text: 'Odłóż', onPress: () => { const found = tasks.find(x => x.id === id); if (found) setSnoozeTask(found); } });
+  const handleCompletePress = useCallback((task: Task) => {
+    if (task.status === 'done') {
+      toggle(task.id); // untoggle
     } else {
-      btns.push({ text: 'Wznów teraz', onPress: () => { unsnooze(id); toast.success('Zadanie wznowione'); } });
+      haptic.tap();
+      setConfirmTask(task);
     }
-    btns.push({ text: 'Usuń', style: 'destructive', onPress: () => { remove(id); toast.info('Usunięto'); } });
-    Alert.alert(t?.title ?? 'Zadanie', undefined, btns);
-  };
+  }, [toggle]);
 
-  const handleSnooze = (task: Task) => setSnoozeTask(task);
+  const handleConfirm = useCallback(() => {
+    if (!confirmTask) return;
+    toggle(confirmTask.id);
+    toast.success('Zadanie ukończone');
+    setConfirmTask(null);
+  }, [confirmTask, toggle]);
 
-  const handleSnoozeSelect = (until: Date) => {
-    if (!snoozeTask) return;
-    snooze(snoozeTask.id, until);
-    setSnoozeTask(null);
-    toast.info(`Odłożono do ${fmtSnooze(until.toISOString())}`);
-  };
+  const handleEditPress = useCallback((task: Task) => {
+    setDetailTask(task);
+    setDetailVisible(true);
+  }, []);
 
-  const handlePomodoro = (task: Task) => {
-    startPomodoro(task.id, task.title);
-    router.push('/pomodoro' as any);
-    toast.info(`Timer: ${task.title}`);
-  };
-
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     remove(id);
     toast.info('Usunięto');
-  };
+  }, [remove]);
 
-  const rescheduleOverdue = (id: string, daysAhead: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + daysAhead);
-    const pad2 = (n: number) => String(n).padStart(2, '0');
-    const newDeadline = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T23:59:00.000Z`;
-    update(id, { deadline: newDeadline });
-  };
+  const pending  = active.filter(t => t.status === 'pending' && !t.snoozedUntil).length;
+  const overdue  = active.filter(t => t.deadline?.split('T')[0] < today).length;
 
-  const renderItem = ({ item, index }: { item: Task; index: number }) => (
-    <SwipeableTaskCard
-      task={item}
-      index={index}
-      onToggle={handleToggle}
-      onLongPress={handleLongPress}
-      onPomodoro={handlePomodoro}
-      onSnooze={handleSnooze}
-      onDelete={handleDelete}
-    />
-  );
-
-  const applySearch = (list: Task[]) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(t =>
-      t.title.toLowerCase().includes(q) ||
-      t.description?.toLowerCase().includes(q) ||
-      t.tags?.some(tag => tag.toLowerCase().includes(q))
-    );
-  };
-
-  const filteredSections: Section[] = sections.map(s => ({
-    ...s, data: applySearch(s.data),
-  })).filter(s => s.data.length > 0);
-
-  const displaySections: Section[] = filter === 'all'
-    ? filteredSections
-    : [{ title: '', accent: '', data: applySearch(filtered) }];
-
-  const handleMoodSelect = async (mood: MoodLevel) => {
-    setMoodModal(false);
-    if (completedTask) {
-      await update(completedTask.id, { postCompletionMood: mood });
-      toast.success('Nastrój zapisany');
-    }
-  };
+  const listData: (Task | 'done-header' | Task)[] = [
+    ...sorted,
+    ...(done.length > 0 ? (['done-header' as const, ...done]) : []),
+  ];
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']} {...panHandlers}>
+    <SafeAreaView style={s.root} edges={['top']} {...panHandlers}>
       <Animated.View style={[{ flex: 1 }, animatedStyle]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Zadania</Text>
-          <Text style={styles.subtitle}>
-            {pending > 0 ? `${pending} aktywnych` : 'Wszystko ukończone'}
-            {snoozedTasks.length > 0 ? ` · ${snoozedTasks.length} odłożonych` : ''}
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            onPress={() => router.push('/weekly' as any)}
-            style={styles.headerBtn}
-            activeOpacity={0.75}
-          >
-            <BarChart2 size={16} color={colors.accent.blue} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => { setShowSearch(v => !v); if (showSearch) setSearchQuery(''); }}
-            style={[styles.headerBtn, showSearch && styles.headerBtnActive]}
-            activeOpacity={0.75}
-          >
-            <Search size={16} color={showSearch ? colors.text.primary : colors.text.secondary} />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <>
-          {/* Search bar */}
-          {showSearch && (
-            <View style={styles.searchBarWrap}>
-              <Search size={14} color={colors.text.muted} />
-              <TextInput
-                autoFocus
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Szukaj zadań, tagów..."
-                placeholderTextColor={colors.text.muted}
-                style={styles.searchInput}
-                returnKeyType="search"
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
-                  <XIcon size={14} color={colors.text.muted} />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+        {/* Header */}
+        <View style={s.header}>
+          <View>
+            <Text style={s.title}>Zadania</Text>
+            <Text style={s.subtitle}>
+              {pending > 0 ? `${pending} aktywnych` : 'Wszystko ogarnięte'}
+              {overdue > 0 ? ` · ${overdue} po terminie` : ''}
+            </Text>
+          </View>
+          <View style={s.headerRight}>
+            <TouchableOpacity
+              style={s.headerBtn}
+              onPress={() => setSortOpen(true)}
+              activeOpacity={0.75}
+            >
+              <SlidersHorizontal size={16} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.headerBtn, s.addBtn]}
+              onPress={() => router.push('/tasks/add' as any)}
+              activeOpacity={0.75}
+            >
+              <Plus size={18} color={G.accent} strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-          {/* Filter bar */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterWrap}
-            style={{ flexGrow: 0, flexShrink: 0 }}
-          >
-            {FILTERS.map(({ key, label }) => {
-              const active = filter === key;
-              const isParking = key === 'parking';
+        {/* List */}
+        <FlatList
+          data={listData as any[]}
+          keyExtractor={(item, i) => typeof item === 'string' ? item : item.id}
+          renderItem={({ item }) => {
+            if (item === 'done-header') {
               return (
-                <PressableScale key={key} onPress={() => setFilter(key)}>
-                  <View style={[
-                    styles.filterPill,
-                    active && (isParking ? styles.filterPillParking : styles.filterPillActive),
-                    isParking && !active && styles.filterPillParkingIdle,
-                  ]}>
-                    {isParking && <Lightbulb size={10} color={active ? colors.accent.amber : colors.text.muted} />}
-                    <Text style={[
-                      styles.filterText,
-                      active && (isParking ? styles.filterTextParking : styles.filterTextActive),
-                    ]}>{label}</Text>
-                  </View>
-                </PressableScale>
-              );
-            })}
-          </ScrollView>
-
-          {/* Parking lot info banner */}
-          {filter === 'parking' && (
-            <View style={styles.parkingBanner}>
-              <Lightbulb size={14} color={colors.accent.amber} />
-              <Text style={styles.parkingBannerText}>
-                Pomysły bez terminu — dodaj deadline gdy będziesz gotowy
-              </Text>
-            </View>
-          )}
-
-          {/* Overdue rescue banner */}
-          {overdueTasks.length > 0 && filter === 'all' && (
-            <TouchableOpacity
-              style={styles.overdueBanner}
-              onPress={() => setRescueOpen(true)}
-              activeOpacity={0.8}
-            >
-              <CalendarClock size={14} color={colors.bg.primary} />
-              <Text style={styles.overdueBannerText}>
-                {overdueTasks.length} przeterminowanych — naciśnij aby wyczyścić
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          <SectionList
-            sections={displaySections}
-            keyExtractor={item => item.id}
-            renderItem={renderItem}
-            renderSectionHeader={({ section }) =>
-              section.title ? (
-                <SectionHeader title={section.title} count={section.data.length} accent={section.accent} />
-              ) : null
-            }
-            refreshControl={
-              <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} />
-            }
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <Text style={styles.emptyTitle}>
-                  {filter === 'done' ? 'Brak ukończonych' : filter === 'snoozed' ? 'Brak odłożonych' : filter === 'parking' ? 'Parking pusty' : 'Brak zadań'}
-                </Text>
-                <Text style={styles.emptySub}>
-                  {filter === 'done'
-                    ? 'Zaznacz zadania jako ukończone'
-                    : filter === 'snoozed'
-                    ? 'Odłóż zadanie, żeby schować je tymczasowo'
-                    : filter === 'parking'
-                    ? 'Dodaj zadanie bez terminu — trafi tu automatycznie'
-                    : 'Naciśnij + żeby dodać pierwsze zadanie'}
-                </Text>
-              </View>
-            }
-          />
-      </>
-
-      <CompletionMoodModal
-        visible={moodModal}
-        taskTitle={completedTask?.title ?? ''}
-        onSelect={handleMoodSelect}
-        onDismiss={() => setMoodModal(false)}
-      />
-
-      {/* Snooze picker */}
-      {snoozeTask && (
-        <Modal visible transparent animationType="slide" onRequestClose={() => setSnoozeTask(null)}>
-          <Pressable style={sn.overlay} onPress={() => setSnoozeTask(null)} />
-          <View style={sn.sheet}>
-            <View style={sn.handle} />
-            <Text style={sn.heading}>Odłóż zadanie</Text>
-            <Text style={sn.sub} numberOfLines={1}>{snoozeTask.title}</Text>
-            {buildSnoozeOptions().map(opt => (
-              <TouchableOpacity
-                key={opt.label}
-                style={sn.optionRow}
-                onPress={() => handleSnoozeSelect(opt.date)}
-                activeOpacity={0.75}
-              >
-                <AlarmClock size={16} color={colors.accent.amber} />
-                <Text style={sn.optionLabel}>{opt.label}</Text>
-                <Text style={sn.optionTime}>
-                  {opt.date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Modal>
-      )}
-      {/* Overdue rescue modal */}
-      {rescueOpen && (
-        <Modal visible transparent animationType="slide" onRequestClose={() => setRescueOpen(false)}>
-          <Pressable style={sn.overlay} onPress={() => setRescueOpen(false)} />
-          <View style={sn.sheet}>
-            <View style={sn.handle} />
-            <View style={rs.header}>
-              <CalendarClock size={16} color={colors.accent.red} />
-              <Text style={rs.heading}>Przeterminowane</Text>
-              <Text style={rs.count}>{overdueTasks.length}</Text>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              {overdueTasks.map(task => (
-                <View key={task.id} style={rs.row}>
-                  <Text style={rs.taskTitle} numberOfLines={1}>{task.title}</Text>
-                  {task.deadline && (
-                    <Text style={rs.taskDate}>{task.deadline.split('T')[0]}</Text>
-                  )}
-                  <View style={rs.actions}>
-                    <TouchableOpacity
-                      style={[rs.btn, { backgroundColor: colors.accent.purple + '20', borderColor: colors.accent.purple + '40' }]}
-                      onPress={() => rescheduleOverdue(task.id, 0)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[rs.btnText, { color: colors.accent.purple }]}>Dziś</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[rs.btn, { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue + '40' }]}
-                      onPress={() => rescheduleOverdue(task.id, 1)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[rs.btnText, { color: colors.accent.blue }]}>Jutro</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[rs.btn, { backgroundColor: colors.accent.amber + '20', borderColor: colors.accent.amber + '40' }]}
-                      onPress={() => rescheduleOverdue(task.id, 7)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[rs.btnText, { color: colors.accent.amber }]}>+7 dni</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[rs.btn, { backgroundColor: colors.accent.red + '18', borderColor: colors.accent.red + '30' }]}
-                      onPress={() => { remove(task.id); toast.info('Usunięto'); }}
-                      activeOpacity={0.75}
-                    >
-                      <Trash2 size={12} color={colors.accent.red} />
-                    </TouchableOpacity>
-                  </View>
+                <View style={s.sectionHeader}>
+                  <View style={s.sectionLine} />
+                  <Text style={s.sectionLabel}>UKOŃCZONE</Text>
+                  <View style={s.sectionLine} />
                 </View>
-              ))}
-            </ScrollView>
-            {overdueTasks.length === 0 && (
-              <View style={rs.done}>
-                <CheckCircle2 size={28} color={colors.accent.green} />
-                <Text style={rs.doneText}>Wszystko ogarnięte!</Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={rs.closeBtn}
-              onPress={() => setRescueOpen(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={rs.closeBtnText}>Zamknij</Text>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-      )}
+              );
+            }
+            return (
+              <TaskCard
+                task={item}
+                pomodoroTaskId={pomodoroTaskId}
+                onComplete={handleCompletePress}
+                onEdit={handleEditPress}
+              />
+            );
+          }}
+          contentContainerStyle={s.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={G.accent} />
+          }
+          ListEmptyComponent={
+            <View style={s.empty}>
+              <Text style={s.emptyTitle}>Brak zadań</Text>
+              <Text style={s.emptySub}>Naciśnij + żeby dodać pierwsze</Text>
+            </View>
+          }
+        />
       </Animated.View>
+
+      {/* Modals */}
+      <ConfirmModal
+        task={confirmTask}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmTask(null)}
+      />
+      <TaskDetailModal
+        task={detailTask}
+        visible={detailVisible}
+        onClose={() => setDetailVisible(false)}
+        onUpdate={update}
+        onDelete={handleDelete}
+        onAddSubtask={addSubtask}
+        onToggleSubtask={toggleSubtask}
+      />
+      <SortSheet
+        sort={sort}
+        onSelect={setSort}
+        onClose={() => setSortOpen(false)}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg.primary },
 
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[4],
-    paddingTop: spacing[4],
-    paddingBottom: spacing[2],
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[3],
   },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, color: colors.text.muted, marginTop: 3 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title:    { fontSize: 28, fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  headerRight: { flexDirection: 'row', gap: spacing[2] },
   headerBtn: {
-    width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1,
-    borderColor: colors.border.default,
+    width: 38, height: 38, borderRadius: radius.lg,
+    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerBtnActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
-  searchBarWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    marginHorizontal: spacing[4], marginBottom: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.tabs.tasks + '40',
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-  },
-  searchInput: {
-    flex: 1, fontSize: 14, color: colors.text.primary,
-    paddingVertical: 4,
+  addBtn: {
+    backgroundColor: G.accentDim,
+    borderColor: G.cardBorder,
   },
 
-  filterWrap: {
-    flexDirection: 'row', gap: spacing[2],
-    paddingHorizontal: spacing[4], paddingBottom: spacing[3],
-  },
-  filterPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: spacing[4], paddingVertical: 8,
-    borderRadius: radius.full, borderWidth: 1,
-    borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
-  },
-  filterPillActive: {
-    backgroundColor: colors.tabs.tasks + '22',
-    borderColor: colors.tabs.tasks + '60',
-  },
-  filterText: { fontSize: 12, fontWeight: '500', color: colors.text.secondary },
-  filterTextActive: { color: colors.tabs.tasks, fontWeight: '700' },
+  list: { paddingHorizontal: spacing[4], paddingBottom: 140, gap: spacing[2] },
 
-  list: { paddingHorizontal: spacing[4], paddingBottom: 130 },
-
-  cardWrap: { marginBottom: spacing[2] }, // used by done/snoozed cards (no Swipeable wrapper)
-  taskCard: {
+  card: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
-    minHeight: 60, overflow: 'hidden',
+    borderRadius: 18, borderWidth: 1,
+    paddingVertical: spacing[3], paddingRight: spacing[3],
+    gap: spacing[3],
   },
-  taskCardDone: { opacity: 0.35 },
-  accentBar: { width: 4, alignSelf: 'stretch', marginRight: spacing[3], borderRadius: 2 },
-  checkWrap: { marginRight: spacing[2] },
-  taskContent: { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3], gap: 6 },
-  taskTitle: { fontSize: 14, fontWeight: '500', color: colors.text.primary, lineHeight: 19 },
-  taskTitleDone: { textDecorationLine: 'line-through', color: colors.text.secondary },
-  taskMeta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing[2] },
+  cardDone: { opacity: 0.45 },
 
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5,
+  actionPill: {
+    flexDirection: 'row', alignItems: 'center',
+    marginLeft: spacing[3],
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(61,190,117,0.2)',
+    overflow: 'hidden',
+    height: 44,
   },
-  chipText: { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
-  tagText: { fontSize: 10, color: colors.text.muted },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  snoozeBtn: { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
-  pomBtn: { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
+  actionHalf: {
+    width: 36, height: 44,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  actionDivider: {
+    width: 1, height: 22, backgroundColor: 'rgba(61,190,117,0.2)',
+  },
 
-  overdueBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.accent.red,
-    marginHorizontal: spacing[4], marginBottom: spacing[2],
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  cardContent: { flex: 1, gap: 3 },
+  cardTitle: {
+    fontSize: 13, fontWeight: '800', color: colors.white,
+    letterSpacing: 0.3, lineHeight: 18,
   },
-  overdueBannerText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary, flex: 1 },
+  cardTitleDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  cardSub: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
+  cardMilestones: { fontSize: 9, color: colors.text.muted, marginTop: 2 },
 
-  parkingBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.accent.amber + '15',
-    borderWidth: 1, borderColor: colors.accent.amber + '35',
-    marginHorizontal: spacing[4], marginBottom: spacing[2],
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: spacing[3], marginVertical: spacing[3],
   },
-  parkingBannerText: { fontSize: 12, color: colors.accent.amber, flex: 1 },
-  filterPillParking: { backgroundColor: colors.accent.amber + '20', borderColor: colors.accent.amber + '60' },
-  filterPillParkingIdle: { borderColor: colors.accent.amber + '35' },
-  filterTextParking: { color: colors.accent.amber, fontWeight: '700' },
+  sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
+  sectionLabel: {
+    fontSize: 9, fontWeight: '700', color: colors.text.muted,
+    letterSpacing: 1.5,
+  },
 
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text.secondary },
-  emptySub: { fontSize: 13, color: colors.text.muted, textAlign: 'center', lineHeight: 20 },
+  emptySub:   { fontSize: 13, color: colors.text.muted },
 });
-
-const sn = StyleSheet.create({
-  overlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: colors.bg.secondary,
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: spacing[5], paddingBottom: spacing[8], gap: spacing[1],
-    borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border.default,
-  },
-  handle: {
-    width: 36, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignSelf: 'center', marginBottom: spacing[3],
-  },
-  heading: { fontSize: 17, fontWeight: '800', color: colors.text.primary, marginBottom: 2 },
-  sub: { fontSize: 12, color: colors.text.muted, marginBottom: spacing[3] },
-  optionRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
-  },
-  optionLabel: { flex: 1, fontSize: 15, color: colors.text.primary, fontWeight: '500' },
-  optionTime: { fontSize: 12, color: colors.text.muted },
-});
-
-const rs = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
-  heading: { fontSize: 17, fontWeight: '800', color: colors.text.primary, flex: 1 },
-  count: {
-    fontSize: 13, fontWeight: '700', color: colors.accent.red,
-    backgroundColor: colors.accent.red + '18',
-    paddingHorizontal: 8, paddingVertical: 2, borderRadius: radius.full,
-  },
-  row: {
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
-    gap: spacing[2],
-  },
-  taskTitle: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
-  taskDate: { fontSize: 11, color: colors.accent.red, fontWeight: '500' },
-  actions: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
-  btn: {
-    paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.md, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
-    minWidth: 52,
-  },
-  btnText: { fontSize: 12, fontWeight: '700' },
-  done: { alignItems: 'center', paddingVertical: spacing[6], gap: spacing[2] },
-  doneText: { fontSize: 16, fontWeight: '700', color: colors.accent.green },
-  closeBtn: {
-    marginTop: spacing[3],
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: radius.full, paddingVertical: spacing[3],
-    alignItems: 'center',
-  },
-  closeBtnText: { fontSize: 14, fontWeight: '600', color: colors.text.secondary },
-});
-
