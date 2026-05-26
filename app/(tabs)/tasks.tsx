@@ -75,7 +75,8 @@ function taskSubtitle(task: Task, pomodoroTaskId?: string): string {
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 
-type SortKey = 'deadline' | 'priority' | 'created' | 'alpha';
+type SortKey   = 'deadline' | 'priority' | 'created' | 'alpha';
+type FilterKey = 'all' | 'urgent' | 'today' | 'snoozed';
 
 const SORT_OPTIONS: { key: SortKey; label: string; sub: string }[] = [
   { key: 'deadline',  label: 'Termin',     sub: 'Najpilniejsze pierwsze' },
@@ -640,6 +641,90 @@ const qc = StyleSheet.create({
   },
 });
 
+// ─── Filter pills ─────────────────────────────────────────────────────────────
+
+const FILTER_PILLS: { key: FilterKey; label: string }[] = [
+  { key: 'all',     label: 'Wszystkie' },
+  { key: 'urgent',  label: 'Pilne'     },
+  { key: 'today',   label: 'Dziś'      },
+  { key: 'snoozed', label: 'Odłożone'  },
+];
+
+function FilterPills({ filter, onSelect, counts }: {
+  filter: FilterKey;
+  onSelect: (f: FilterKey) => void;
+  counts: Record<FilterKey, number>;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={fp.wrap}
+      contentContainerStyle={fp.row}
+    >
+      {FILTER_PILLS.map(p => {
+        const isActive = filter === p.key;
+        const count = counts[p.key];
+        return (
+          <TouchableOpacity
+            key={p.key}
+            style={[fp.pill, isActive && fp.pillActive]}
+            onPress={() => { haptic.tap(); onSelect(p.key); }}
+            activeOpacity={0.75}
+          >
+            <Text style={[fp.pillText, isActive && fp.pillTextActive]}>{p.label}</Text>
+            {count > 0 && (
+              <View style={[fp.badge, isActive && fp.badgeActive]}>
+                <Text style={[fp.badgeText, isActive && fp.badgeTextActive]}>{count}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const fp = StyleSheet.create({
+  wrap: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: G.cardBorder },
+  row: {
+    paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[3],
+    flexDirection: 'row', gap: spacing[2],
+  },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: G.accentDim,
+    borderWidth: 1, borderColor: G.cardBorder,
+  },
+  pillActive: {
+    backgroundColor: G.accent,
+    borderColor: G.accent,
+  },
+  pillText: {
+    fontSize: 12, fontWeight: '700', color: G.accent, letterSpacing: 0.3,
+  },
+  pillTextActive: {
+    color: G.card,
+  },
+  badge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(61,190,117,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeActive: {
+    backgroundColor: 'rgba(13,35,24,0.35)',
+  },
+  badgeText: {
+    fontSize: 10, fontWeight: '800', color: G.accent,
+  },
+  badgeTextActive: {
+    color: G.card,
+  },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
@@ -649,6 +734,7 @@ export default function TasksScreen() {
 
   const [sort, setSort]           = useState<SortKey>('deadline');
   const [sortOpen, setSortOpen]   = useState(false);
+  const [filter, setFilter]       = useState<FilterKey>('all');
   const [confirmTask, setConfirmTask] = useState<Task | null>(null);
   const [detailTask, setDetailTask]   = useState<Task | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -657,7 +743,22 @@ export default function TasksScreen() {
 
   const active    = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
   const done      = useMemo(() => tasks.filter(t => t.status === 'done').slice(0, 30), [tasks]);
-  const sorted    = useMemo(() => sortTasks(active, sort), [active, sort]);
+
+  const filtered  = useMemo(() => {
+    if (filter === 'urgent')  return active.filter(t => t.priority === 'high');
+    if (filter === 'today')   return active.filter(t => t.deadline?.startsWith(today));
+    if (filter === 'snoozed') return active.filter(t => t.status === 'snoozed');
+    return active;
+  }, [active, filter, today]);
+
+  const filterCounts = useMemo<Record<FilterKey, number>>(() => ({
+    all:     active.length,
+    urgent:  active.filter(t => t.priority === 'high').length,
+    today:   active.filter(t => t.deadline?.startsWith(today)).length,
+    snoozed: active.filter(t => t.status === 'snoozed').length,
+  }), [active, today]);
+
+  const sorted    = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
 
   const handleCompletePress = useCallback((task: Task) => {
     if (task.status === 'done') {
@@ -729,6 +830,9 @@ export default function TasksScreen() {
           </View>
         </View>
 
+        {/* Filter pills */}
+        <FilterPills filter={filter} onSelect={setFilter} counts={filterCounts} />
+
         {/* List */}
         <FlatList
           data={listData as any[]}
@@ -773,8 +877,15 @@ export default function TasksScreen() {
           }
           ListEmptyComponent={
             <View style={s.empty}>
-              <Text style={s.emptyTitle}>Brak zadań</Text>
-              <Text style={s.emptySub}>Naciśnij + żeby dodać pierwsze</Text>
+              <Text style={s.emptyTitle}>
+                {filter === 'all' ? 'Brak zadań' : 'Brak wyników'}
+              </Text>
+              <Text style={s.emptySub}>
+                {filter === 'all'     ? 'Naciśnij + żeby dodać pierwsze' :
+                 filter === 'urgent'  ? 'Brak zadań o wysokim priorytecie' :
+                 filter === 'today'   ? 'Brak zadań na dziś' :
+                                        'Brak odłożonych zadań'}
+              </Text>
             </View>
           }
         />
