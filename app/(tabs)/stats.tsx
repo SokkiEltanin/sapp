@@ -27,7 +27,14 @@ import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
 
-const V = colors.tabs.calendar; // violet #BF80FF
+const VP = {
+  card:       '#100A18',
+  cardBorder: 'rgba(191,128,255,0.18)',
+  accent:     '#BF80FF',
+  accentDim:  'rgba(191,128,255,0.12)',
+  muted:      'rgba(191,128,255,0.45)',
+};
+const V = VP.accent; // kept for existing inline expressions
 
 const MONTH_NAMES = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -402,6 +409,7 @@ export default function CalendarTabScreen() {
         <ScreenHeader
           title="Kalendarz"
           subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
+          style={{ borderBottomColor: VP.cardBorder }}
           rightSlot={
             <View style={styles.headerRight}>
               <PressableScale onPress={goToday} style={styles.todayBtn}>
@@ -612,12 +620,13 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   todayBtn: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: VP.cardBorder,
+    backgroundColor: VP.accentDim,
   },
-  todayBtnText: { ...typography.caption, color: colors.text.secondary, fontWeight: '600', fontSize: 11 },
+  todayBtnText: { ...typography.caption, color: VP.accent, fontWeight: '700', fontSize: 11 },
   iconBtn: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: VP.card, borderWidth: 1, borderColor: VP.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -628,8 +637,8 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: VP.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: VP.cardBorder,
   },
   monthTitleBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -637,9 +646,9 @@ const styles = StyleSheet.create({
   },
   modeToggle: {
     flexDirection: 'row', gap: 2,
-    backgroundColor: colors.bg.card,
+    backgroundColor: VP.card,
     borderRadius: radius.md, padding: 2,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: VP.cardBorder,
   },
   modeBtn: {
     width: 28, height: 26, borderRadius: radius.sm,
@@ -649,7 +658,7 @@ const styles = StyleSheet.create({
     backgroundColor: V + '20',
   },
   monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
-  yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  yearLabel:  { ...typography.caption, color: VP.muted, marginTop: 2 },
 
   swipeHint: {
     fontSize: 9, color: colors.text.muted, textAlign: 'center',
@@ -659,32 +668,32 @@ const styles = StyleSheet.create({
 
   gridWrap: {
     marginHorizontal: spacing[2],
-    backgroundColor: colors.bg.card,
+    backgroundColor: VP.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
+    borderColor: VP.cardBorder,
     paddingTop: spacing[3],
   },
 
   weekCard: {
     marginHorizontal: spacing[2],
-    backgroundColor: colors.bg.card,
+    backgroundColor: VP.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
+    borderColor: VP.cardBorder,
   },
 
   daySection: { paddingHorizontal: spacing[3], paddingTop: spacing[3], gap: spacing[3] },
   daySectionLabel: {
-    fontSize: 10, fontWeight: '700', color: colors.text.muted,
+    fontSize: 10, fontWeight: '700', color: VP.muted,
     letterSpacing: 1.4, textTransform: 'uppercase',
   },
 
   timelineWrap: {
-    backgroundColor: colors.bg.card,
+    backgroundColor: VP.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
+    borderColor: VP.cardBorder,
     padding: spacing[3],
     overflow: 'hidden',
   },
@@ -692,7 +701,7 @@ const styles = StyleSheet.create({
   subSection: { gap: spacing[2] },
   subHeader:  { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginBottom: spacing[1] },
   subLabel: {
-    fontSize: 9, fontWeight: '700', color: colors.text.muted,
+    fontSize: 9, fontWeight: '700', color: VP.muted,
     letterSpacing: 1.2, textTransform: 'uppercase',
   },
 
@@ -701,9 +710,9 @@ const styles = StyleSheet.create({
 
   expenseRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    backgroundColor: VP.card, borderRadius: radius.md,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: VP.cardBorder,
   },
   expenseDot:   { width: 8, height: 8, borderRadius: 4 },
   expenseInfo:  { flex: 1 },
