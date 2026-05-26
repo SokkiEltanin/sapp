@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Modal,
   RefreshControl, TouchableOpacity, Animated,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -13,9 +14,11 @@ import {
   TrendingUp, TrendingDown, Flame, Smile, Zap,
   CalendarDays, Settings, Wallet,
   Briefcase, CreditCard, Check, Plus,
+  Timer, CloudSun, Thermometer,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -57,6 +60,35 @@ const HUMOR: Record<number, string[]> = {
   4: ['Dobry nastrój? Wykorzystaj go.', 'Całkiem nieźle! Nie psuj tego.', 'Rzadki widok. Doceniam.'],
   5: ['5/5 — dziś możesz wszystko.', 'Energia max. To wykorzystaj.', 'SZCZYT MOŻLIWOŚCI.'],
 };
+
+// ─── Weather ──────────────────────────────────────────────────────────────────
+
+const WMO_DESC: Record<number, string> = {
+  0: 'Bezchmurnie', 1: 'Głównie jasno', 2: 'Częściowe zachmurzenie', 3: 'Pochmurno',
+  45: 'Mgła', 48: 'Mgła z szronem',
+  51: 'Mżawka', 53: 'Mżawka', 55: 'Gęsta mżawka',
+  61: 'Lekki deszcz', 63: 'Deszcz', 65: 'Ulewny deszcz',
+  71: 'Lekki śnieg', 73: 'Śnieg', 75: 'Gęsty śnieg',
+  80: 'Przelotny deszcz', 81: 'Deszcz przelotny', 82: 'Gwałtowny deszcz',
+  95: 'Burza',
+};
+
+interface WeatherData { temp: number; desc: string; wmo: number; }
+
+async function fetchWeather(): Promise<WeatherData | null> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return null;
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+    const { latitude, longitude } = loc.coords;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current_weather=true&temperature_unit=celsius`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const cw = data.current_weather;
+    return { temp: Math.round(cw.temperature), desc: WMO_DESC[cw.weathercode] ?? 'Nieznana pogoda', wmo: cw.weathercode };
+  } catch { return null; }
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -204,6 +236,7 @@ export default function DashboardScreen() {
   const { color: accentColor, greeting, gradientTop } = useTimeAccent();
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
+  const pomodoro = usePomodoroStore();
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const { tasks, isLoading: tasksLoading, reload: reloadTasks } = useTasks();
@@ -212,8 +245,9 @@ export default function DashboardScreen() {
   const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
   const { subscriptions, update: updateSub } = useSubscriptions();
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
-  const [budgets, setBudgets] = useState<MonthlyBudgets>({});
-  const [finPeriod, setFinPeriod] = useState<'week' | 'month'>('week');
+  const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
+  const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
+  const [weather, setWeather]       = useState<WeatherData | null>(null);
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -252,6 +286,7 @@ export default function DashboardScreen() {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
     if (moodEntries.length === 0) moodService.getAll().then(setMood).catch(() => {});
     getBudgets().then(setBudgets);
+    fetchWeather().then(w => { if (w) setWeather(w); });
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     googleCalendarService.getStoredToken().then(token => {
@@ -420,6 +455,52 @@ export default function DashboardScreen() {
     return { remaining, totalBudget, pct: Math.min(1, stats.monthExpenses / totalBudget) };
   }, [budgets, stats.monthExpenses]);
 
+  // ── Floating Lifebar ──────────────────────────────────────────────────────
+  const lifebarState = useMemo(() => {
+    // Priority 1: Pomodoro running
+    if (pomodoro.isRunning && pomodoro.mode === 'work') {
+      const m = Math.floor(pomodoro.remaining / 60);
+      const sec = pomodoro.remaining % 60;
+      return {
+        label: pomodoro.taskTitle ?? 'Focus',
+        value: `${m}:${String(sec).padStart(2, '0')}`,
+        color: colors.accent.red,
+        icon: 'timer' as const,
+      };
+    }
+    // Priority 2: Current calendar event (started ≤ now, ends > now)
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const currentEvent = gcalToday.find(e => {
+      if (!e.startTime || !e.endTime) return false;
+      const [sh, sm] = e.startTime.split(':').map(Number);
+      const [eh, em] = e.endTime.split(':').map(Number);
+      const startMins = sh * 60 + sm, endMins = eh * 60 + em;
+      return nowMins >= startMins && nowMins < endMins;
+    });
+    if (currentEvent) {
+      const [eh, em] = currentEvent.endTime!.split(':').map(Number);
+      const endMins = eh * 60 + em;
+      const left = endMins - nowMins;
+      return {
+        label: currentEvent.title,
+        value: `kończy się za ${left} min`,
+        color: currentEvent.color ?? colors.accent.blue,
+        icon: 'calendar' as const,
+      };
+    }
+    // Priority 3: Budget near limit (≥ 85%)
+    if (budgetRemaining && budgetRemaining.pct >= 0.85) {
+      const pct = Math.round(budgetRemaining.pct * 100);
+      return {
+        label: 'Budżet',
+        value: `${pct}% wydane`,
+        color: pct >= 100 ? colors.accent.red : colors.accent.amber,
+        icon: 'wallet' as const,
+      };
+    }
+    return null;
+  }, [pomodoro.isRunning, pomodoro.remaining, pomodoro.mode, pomodoro.taskTitle, gcalToday, budgetRemaining]);
+
   // ─── Render ───────────────────────────────────────────────────────────────
   const moodBlobColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : accentColor;
 
@@ -446,6 +527,16 @@ export default function DashboardScreen() {
               <Settings size={17} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
+
+          {/* ── Floating Lifebar ──────────────────────────────────── */}
+          {lifebarState && (
+            <View style={s.lifebar}>
+              <View style={[s.lifebarDot, { backgroundColor: lifebarState.color }]} />
+              <Text style={s.lifebarLabel} numberOfLines={1}>{lifebarState.label}</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={[s.lifebarValue, { color: lifebarState.color }]}>{lifebarState.value}</Text>
+            </View>
+          )}
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -524,6 +615,15 @@ export default function DashboardScreen() {
                 )}
               </BlurView>
             </TouchableOpacity>
+
+            {/* ══ WEATHER TILE ════════════════════════════════════════════ */}
+            {weather && (
+              <View style={s.weatherRow}>
+                <CloudSun size={14} color={accentColor} />
+                <Text style={s.weatherTemp}>{weather.temp}°C</Text>
+                <Text style={s.weatherDesc}>{weather.desc}</Text>
+              </View>
+            )}
 
             {/* ══ TASKS + WORK ROW ═════════════════════════════════════════ */}
             <View style={s.miniRow}>
@@ -682,6 +782,14 @@ export default function DashboardScreen() {
                     </Text>
                   ))}
                 </View>
+              </View>
+            )}
+
+            {/* ══ HUMOR TILE ══════════════════════════════════════════════ */}
+            {todayEntry && (
+              <View style={s.humorTile}>
+                <Text style={s.humorTileEmoji}>{MOOD_EMOJIS[todayEntry.mood]}</Text>
+                <Text style={s.humorTileText}>{humor}</Text>
               </View>
             )}
 
@@ -897,6 +1005,37 @@ const s = StyleSheet.create({
     borderRadius: 1, overflow: 'hidden', marginTop: spacing[1],
   },
   miniWorkFill: { height: '100%', borderRadius: 1 },
+
+  // ── Floating Lifebar ──────────────────────────────────────────────────────
+  lifebar: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    marginHorizontal: spacing[4], marginBottom: spacing[2],
+    paddingHorizontal: spacing[4], paddingVertical: 10,
+    backgroundColor: 'rgba(18,18,18,0.92)',
+    borderRadius: radius.full,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
+  lifebarDot: { width: 6, height: 6, borderRadius: 3 },
+  lifebarLabel: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, flex: 1 },
+  lifebarValue: { fontSize: 12, fontWeight: '700' },
+
+  // ── Weather ────────────────────────────────────────────────────────────────
+  weatherRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[2],
+  },
+  weatherTemp: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  weatherDesc: { fontSize: 12, color: colors.text.muted },
+
+  // ── Humor tile ─────────────────────────────────────────────────────────────
+  humorTile: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    paddingHorizontal: spacing[4], paddingVertical: spacing[4],
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  humorTileEmoji: { fontSize: 20 },
+  humorTileText: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.text.secondary, lineHeight: 18, fontStyle: 'italic' },
 
   // ── Standard card ──────────────────────────────────────────────────────────
   card: {
