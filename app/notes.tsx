@@ -24,6 +24,14 @@ import {
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
 
+const V = {
+  card:       '#1A1226',
+  cardBorder: 'rgba(167,139,250,0.20)',
+  accent:     '#A78BFA',
+  accentDim:  'rgba(167,139,250,0.14)',
+  muted:      'rgba(167,139,250,0.45)',
+};
+
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -164,8 +172,8 @@ function FolderPicker({ folders, value, onChange }: {
         onPress={() => setOpen(o => !o)}
         activeOpacity={0.75}
       >
-        <Folder size={13} color={value ? colors.accent.blue : colors.text.muted} />
-        <Text style={[fp.triggerText, value && { color: colors.accent.blue }]}>
+        <Folder size={13} color={value ? V.accent : colors.text.muted} />
+        <Text style={[fp.triggerText, value && { color: V.accent }]}>
           {value ?? 'Bez katalogu'}
         </Text>
         <ChevronDown size={12} color={colors.text.muted} />
@@ -187,7 +195,7 @@ function FolderPicker({ folders, value, onChange }: {
               onPress={() => { onChange(f); setOpen(false); }}
               activeOpacity={0.75}
             >
-              <Folder size={11} color={value === f ? colors.accent.blue : colors.text.muted} />
+              <Folder size={11} color={value === f ? V.accent : colors.text.muted} />
               <Text style={[fp.optionText, value === f && fp.optionTextActive]}>{f}</Text>
             </TouchableOpacity>
           ))}
@@ -217,9 +225,9 @@ const fp = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
-  optionActive: { backgroundColor: colors.accent.blue + '15' },
+  optionActive: { backgroundColor: V.accentDim },
   optionText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
-  optionTextActive: { color: colors.accent.blue, fontWeight: '700' },
+  optionTextActive: { color: V.accent, fontWeight: '700' },
 });
 
 // ─── Note editor modal ────────────────────────────────────────────────────────
@@ -417,7 +425,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
                   {tags.map(t => (
                     <TouchableOpacity key={t} onPress={() => removeTag(t)} style={em.tagChip} activeOpacity={0.7}>
                       <Text style={em.tagChipText}>#{t}</Text>
-                      <X size={9} color={colors.accent.blue + 'BB'} />
+                      <X size={9} color={V.accent + 'BB'} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -452,7 +460,7 @@ const em = StyleSheet.create({
   },
   headerTitle: { ...typography.h4, color: colors.text.primary, flex: 1 },
   saveBtn: {
-    backgroundColor: colors.text.primary, borderRadius: radius.md,
+    backgroundColor: V.accent, borderRadius: radius.md,
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
   },
   saveBtnText: { fontSize: 13, fontWeight: '700', color: colors.bg.primary },
@@ -474,15 +482,15 @@ const em = StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   tagInput: { flex: 1, fontSize: 13, color: colors.text.primary, paddingVertical: 0 },
-  tagAddText: { fontSize: 12, fontWeight: '700', color: colors.accent.blue },
+  tagAddText: { fontSize: 12, fontWeight: '700', color: V.accent },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   tagChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.accent.blue + '18',
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '30',
+    backgroundColor: V.accentDim,
+    borderRadius: radius.full, borderWidth: 1, borderColor: V.cardBorder,
     paddingHorizontal: spacing[2], paddingVertical: 4,
   },
-  tagChipText: { fontSize: 11, fontWeight: '600', color: colors.accent.blue },
+  tagChipText: { fontSize: 11, fontWeight: '600', color: V.accent },
 });
 
 // ─── Note card ────────────────────────────────────────────────────────────────
@@ -509,7 +517,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
         )}
         <View style={nc.actions}>
           <TouchableOpacity onPress={onConvert} hitSlop={8} style={nc.actionBtn}>
-            <ClipboardList size={13} color={colors.accent.purple + 'BB'} />
+            <ClipboardList size={13} color={V.accent + 'BB'} />
           </TouchableOpacity>
           <TouchableOpacity onPress={onPin} hitSlop={8} style={nc.actionBtn}>
             {note.pinned
@@ -529,7 +537,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
 
       {note.bodyRich && (
         <View style={nc.richBadge}>
-          <Type size={8} color={colors.accent.blue + 'AA'} />
+          <Type size={8} color={V.accent + 'AA'} />
         </View>
       )}
 
@@ -563,8 +571,8 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
 
 const nc = StyleSheet.create({
   wrap: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: V.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: V.cardBorder,
     padding: spacing[4], gap: spacing[2],
   },
   pinned: { borderColor: colors.accent.amber + '40', backgroundColor: colors.accent.amber + '08' },
@@ -577,13 +585,13 @@ const nc = StyleSheet.create({
   time: { fontSize: 11, color: colors.text.muted },
   folderBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: colors.accent.purple + '15',
-    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.accent.purple + '25',
+    backgroundColor: V.accentDim,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: V.cardBorder,
     paddingHorizontal: 5, paddingVertical: 2,
   },
-  folderText: { fontSize: 9, color: colors.accent.purple + 'CC', fontWeight: '600' },
+  folderText: { fontSize: 9, color: V.muted, fontWeight: '600' },
   tagRow: { flexDirection: 'row', gap: spacing[1] },
-  tag: { fontSize: 10, color: colors.accent.blue + 'AA' },
+  tag: { fontSize: 10, color: V.muted },
   pinnedBadge: { marginLeft: 'auto' },
   actions: { flexDirection: 'row', gap: spacing[1] },
   actionBtn: { padding: 3 },
@@ -752,7 +760,7 @@ export default function NotesScreen() {
           )}
         </View>
         <PressableScale onPress={() => setSearching(s => !s)} style={styles.iconBtn}>
-          <Search size={18} color={searching ? colors.accent.blue : colors.text.muted} />
+          <Search size={18} color={searching ? V.accent : colors.text.muted} />
         </PressableScale>
         <PressableScale onPress={openNew} style={[styles.iconBtn, styles.addBtn]}>
           <Plus size={20} color={colors.bg.primary} />
@@ -787,7 +795,7 @@ export default function NotesScreen() {
             onLongPress={() => handleDeleteFolder(f)}
             activeOpacity={0.75}
           >
-            <Folder size={10} color={activeFolder === f ? colors.bg.primary : colors.accent.purple + 'CC'} />
+            <Folder size={10} color={activeFolder === f ? colors.bg.primary : V.muted} />
             <Text style={[styles.folderChipText, activeFolder === f && styles.folderChipTextActive]}>
               {f} ({folderCount(f)})
             </Text>
@@ -850,7 +858,7 @@ export default function NotesScreen() {
       {notes.length === 0 ? (
         <View style={styles.empty}>
           <View style={styles.emptyIcon}>
-            <FileText size={32} color={colors.accent.blue} />
+            <FileText size={32} color={V.accent} />
           </View>
           <Text style={styles.emptyTitle}>Brak notatek</Text>
           <Text style={styles.emptySub}>
@@ -934,7 +942,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  addBtn: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  addBtn: { backgroundColor: V.accent, borderColor: V.accent },
 
   // ── Folder tabs ─────────────────────────────────────────────────────────────
   folderScroll: {
@@ -952,7 +960,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.card,
   },
   folderChipActive: {
-    backgroundColor: colors.text.primary, borderColor: colors.text.primary,
+    backgroundColor: V.accent, borderColor: V.accent,
   },
   folderChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
   folderChipTextActive: { color: colors.bg.primary },
@@ -965,13 +973,13 @@ const styles = StyleSheet.create({
   folderChipNewText: { fontSize: 11, color: colors.text.muted },
   newFolderInput: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '50',
+    backgroundColor: V.card,
+    borderRadius: radius.full, borderWidth: 1, borderColor: V.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: 5,
     minWidth: 140,
   },
   newFolderText: { flex: 1, fontSize: 12, color: colors.text.primary, paddingVertical: 0 },
-  newFolderConfirm: { fontSize: 12, fontWeight: '700', color: colors.accent.blue },
+  newFolderConfirm: { fontSize: 12, fontWeight: '700', color: V.accent },
 
   // ── Search ──────────────────────────────────────────────────────────────────
   searchBar: {
@@ -993,15 +1001,15 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4], padding: spacing[8] },
   emptyIcon: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.accent.blue + '15',
-    borderWidth: 1, borderColor: colors.accent.blue + '30',
+    backgroundColor: V.accentDim,
+    borderWidth: 1, borderColor: V.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
   emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 21 },
   emptyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.text.primary, borderRadius: radius.full,
+    backgroundColor: V.accent, borderRadius: radius.full,
     paddingHorizontal: spacing[5], paddingVertical: spacing[3],
   },
   emptyBtnText: { fontSize: 14, fontWeight: '700', color: colors.bg.primary },

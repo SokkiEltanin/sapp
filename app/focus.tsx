@@ -13,6 +13,14 @@ import { toast } from '@/store/toastStore';
 import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 
+const G = {
+  card:       '#0D2318',
+  cardBorder: 'rgba(61,190,117,0.18)',
+  accent:     '#3DBE75',
+  accentDim:  'rgba(61,190,117,0.14)',
+  muted:      'rgba(61,190,117,0.45)',
+};
+
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
   const d = new Date();
@@ -124,7 +132,7 @@ export default function FocusScreen() {
               <View style={styles.subtasksProgressTrack}>
                 <View style={[styles.subtasksProgressFill, {
                   width: `${subtasksPct * 100}%`,
-                  backgroundColor: subtasksPct === 1 ? colors.accent.green : colors.accent.blue,
+                  backgroundColor: subtasksPct === 1 ? G.accent : colors.accent.blue,
                 }]} />
               </View>
               <View style={styles.subtasksList}>
@@ -136,7 +144,7 @@ export default function FocusScreen() {
                     activeOpacity={0.75}
                   >
                     {sub.done
-                      ? <CheckSquare size={18} color={colors.accent.green} />
+                      ? <CheckSquare size={18} color={G.accent} />
                       : <Square size={18} color='rgba(255,255,255,0.2)' strokeWidth={1.5} />
                     }
                     <Text style={[styles.subtaskText, sub.done && styles.subtaskTextDone]}>
@@ -180,7 +188,7 @@ export default function FocusScreen() {
         </View>
       ) : (
         <View style={styles.emptyBody}>
-          <CheckCircle2 size={64} color={colors.accent.green} strokeWidth={1.5} />
+          <CheckCircle2 size={64} color={G.accent} strokeWidth={1.5} />
           <Text style={styles.emptyTitle}>Wszystko zrobione!</Text>
           <Text style={styles.emptySub}>
             {skipSet.size > 0
@@ -205,16 +213,16 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.card, borderWidth: 1, borderColor: G.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 14, fontWeight: '700', color: colors.text.secondary },
   queueBadge: {
     paddingHorizontal: spacing[3], paddingVertical: 5,
-    borderRadius: radius.full, backgroundColor: colors.bg.card,
-    borderWidth: 1, borderColor: colors.border.default,
+    borderRadius: radius.full, backgroundColor: G.accentDim,
+    borderWidth: 1, borderColor: G.cardBorder,
   },
-  queueText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  queueText: { fontSize: 11, fontWeight: '600', color: G.muted },
 
   body: {
     flex: 1, paddingHorizontal: spacing[5], paddingTop: spacing[6],
@@ -238,8 +246,8 @@ const styles = StyleSheet.create({
   deadline: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
 
   subtasksCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder,
     padding: spacing[4], gap: spacing[3],
   },
   subtasksHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -264,14 +272,14 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: spacing[3], marginTop: 'auto' },
   skipBtn: {
     flex: 1, paddingVertical: spacing[4], borderRadius: radius.xl,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.card, borderWidth: 1, borderColor: G.cardBorder,
     alignItems: 'center',
   },
-  skipText: { fontSize: 15, fontWeight: '600', color: colors.text.secondary },
+  skipText: { fontSize: 15, fontWeight: '600', color: G.muted },
   doneBtn: {
     flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing[2], paddingVertical: spacing[4], borderRadius: radius.xl,
-    backgroundColor: colors.accent.green,
+    backgroundColor: G.accent,
   },
   doneBtnText: { fontSize: 17, fontWeight: '800', color: colors.bg.primary },
 
@@ -288,8 +296,8 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 22 },
   backHome: {
     marginTop: spacing[4], paddingHorizontal: spacing[6], paddingVertical: spacing[4],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.accentDim, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder,
   },
-  backHomeText: { fontSize: 15, fontWeight: '700', color: colors.text.primary },
+  backHomeText: { fontSize: 15, fontWeight: '700', color: G.accent },
 });
