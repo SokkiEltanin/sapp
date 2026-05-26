@@ -1,43 +1,447 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Animated } from 'react-native';
-import { BarChart2 } from 'lucide-react-native';
-import { colors, spacing, typography } from '@/theme';
+import { useFocusEffect } from 'expo-router';
+import {
+  CheckCircle2, Flame, Smile, Timer, TrendingUp, TrendingDown, Target,
+} from 'lucide-react-native';
+
+import { useCalendarStore } from '@/store/calendarStore';
+import { useHabits } from '@/hooks/useHabits';
+import { useMoodStore } from '@/store/moodStore';
+import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
+import { MoodLevel, MOOD_COLORS } from '@/types';
+import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+
+// ─── Orange palette ───────────────────────────────────────────────────────────
+
+const O = {
+  card:       '#160D04',
+  cardBorder: 'rgba(255,159,107,0.18)',
+  accent:     '#FF9F6B',
+  accentDim:  'rgba(255,159,107,0.12)',
+  muted:      'rgba(255,159,107,0.50)',
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const WEEK_DAYS_SHORT = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+
+function pad(n: number) { return String(n).padStart(2, '0'); }
+function dateStr(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function last7Dates(): string[] {
+  const today = new Date();
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (6 - i));
+    return dateStr(d);
+  });
+}
+function todayDow(): number {
+  const d = new Date().getDay();
+  return d === 0 ? 6 : d - 1;
+}
+function dowLabel(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  return WEEK_DAYS_SHORT[(d.getDay() + 6) % 7];
+}
+
+// ─── Stat card ────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, icon, accent }: {
+  label: string; value: string; sub?: string;
+  icon: React.ReactNode; accent: string;
+}) {
+  return (
+    <View style={[sc.card, { borderColor: accent + '30' }]}>
+      <View style={[sc.iconWrap, { backgroundColor: accent + '18' }]}>
+        {icon}
+      </View>
+      <Text style={sc.value}>{value}</Text>
+      <Text style={[sc.label, { color: accent + 'AA' }]}>{label}</Text>
+      {sub ? <Text style={sc.sub}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+const sc = StyleSheet.create({
+  card: {
+    flex: 1, backgroundColor: O.card, borderRadius: radius.xl,
+    borderWidth: 1, padding: spacing[3], gap: 4,
+  },
+  iconWrap: {
+    width: 28, height: 28, borderRadius: radius.md,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 2,
+  },
+  value: { fontSize: 28, fontWeight: '900', color: colors.text.primary, letterSpacing: -1.2 },
+  label: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.9 },
+  sub:   { fontSize: 10, color: colors.text.muted, marginTop: 1 },
+});
+
+// ─── Mini bar chart ───────────────────────────────────────────────────────────
+
+function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
+  values: number[]; barColors: string[]; labels: string[]; maxH?: number;
+}) {
+  const max = Math.max(...values, 1);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5 }}>
+      {values.map((v, i) => (
+        <View key={i} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+          <View style={{ height: maxH, justifyContent: 'flex-end', alignItems: 'center' }}>
+            <View style={{
+              width: '75%', borderRadius: 3,
+              height: v > 0 ? Math.max(4, (v / max) * maxH) : 3,
+              backgroundColor: v > 0 ? barColors[i] : 'rgba(255,255,255,0.07)',
+            }} />
+          </View>
+          <Text style={{ fontSize: 8, color: colors.text.muted, fontWeight: '600' }}>{labels[i]}</Text>
+          {v > 0 && <Text style={{ fontSize: 7, fontWeight: '700', color: barColors[i] }}>{v}</Text>}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
+  const { tasks }    = useCalendarStore();
+  const { habits, getLast7, getStreak, todayDone } = useHabits();
+  const { entries: moodEntries }                   = useMoodStore();
+  const [pomSessions, setPomSessions] = useState<Record<string, PomodoroSession[]>>({});
+
+  const dates    = useMemo(() => last7Dates(), []);
+  const todayIdx = todayDow();
+
+  useFocusEffect(useCallback(() => {
+    getSessionsForDates(dates).then(setPomSessions).catch(() => {});
+  }, [dates.join(',')]));
+
+  // ── Task completions per day ────────────────────────────────────────────────
+  const weekDoneByDay = useMemo(() =>
+    dates.map(d =>
+      tasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(d)).length
+    ),
+  [tasks, dates]);
+
+  const totalDoneThisWeek = weekDoneByDay.reduce((a, b) => a + b, 0);
+  const totalPending      = tasks.filter(t => t.status === 'pending').length;
+
+  // ── Habit avg completion rate per day ───────────────────────────────────────
+  const habitRateByDay = useMemo(() => {
+    if (habits.length === 0) return dates.map(() => 0);
+    return dates.map((_, di) => {
+      const done = habits.filter(h => getLast7(h.id)[di]).length;
+      return Math.round((done / habits.length) * 100);
+    });
+  }, [habits, dates, getLast7]);
+
+  const avgHabitRate = habitRateByDay.length > 0
+    ? Math.round(
+        habitRateByDay.slice(0, todayIdx + 1).reduce((a, b) => a + b, 0) / (todayIdx + 1)
+      )
+    : 0;
+
+  // ── Top habits by streak ────────────────────────────────────────────────────
+  const topHabits = useMemo(() =>
+    habits
+      .map(h => ({ habit: h, streak: getStreak(h.id), last7: getLast7(h.id) }))
+      .sort((a, b) => b.streak - a.streak)
+      .slice(0, 4),
+  [habits, getStreak, getLast7]);
+
+  // ── Mood this week ──────────────────────────────────────────────────────────
+  const weekMood = useMemo(() =>
+    dates.map(d => moodEntries.find(m => m.date === d)?.mood ?? 0),
+  [moodEntries, dates]);
+
+  const moodThisWeek = weekMood.filter(m => m > 0);
+  const avgMood = moodThisWeek.length
+    ? moodThisWeek.reduce((a, b) => a + b, 0) / moodThisWeek.length
+    : 0;
+
+  const prevWeekMoods = moodEntries.filter(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    const start = new Date(); start.setDate(start.getDate() - 14);
+    const end   = new Date(); end.setDate(end.getDate() - 7);
+    return d >= start && d < end;
+  });
+  const prevAvgMood = prevWeekMoods.length
+    ? prevWeekMoods.reduce((a, e) => a + e.mood, 0) / prevWeekMoods.length
+    : 0;
+
+  const moodTrend: 'up' | 'down' | 'flat' =
+    avgMood > 0 && prevAvgMood > 0
+      ? avgMood > prevAvgMood + 0.3 ? 'up'
+      : avgMood < prevAvgMood - 0.3 ? 'down'
+      : 'flat'
+    : 'flat';
+
+  const moodColor = avgMood > 0
+    ? MOOD_COLORS[Math.round(avgMood) as MoodLevel]
+    : colors.text.muted;
+
+  // ── Pomodoro per day ────────────────────────────────────────────────────────
+  const pomByDay         = dates.map(d => pomSessions[d]?.length ?? 0);
+  const totalPomThisWeek = pomByDay.reduce((a, b) => a + b, 0);
+  const totalPomMins     = dates
+    .flatMap(d => pomSessions[d] ?? [])
+    .reduce((a, s) => a + s.durationMins, 0);
+
+  const noData = totalDoneThisWeek === 0 && habits.length === 0
+    && moodThisWeek.length === 0 && totalPomThisWeek === 0;
+
+  const weekStart = dates[0].slice(5).replace('-', '/');
+  const weekEnd   = dates[6].slice(5).replace('-', '/');
+
   return (
-    <SafeAreaView style={s.root} edges={['top']} {...panHandlers}>
+    <SafeAreaView style={styles.root} edges={['top']} {...panHandlers}>
       <Animated.View style={[{ flex: 1 }, animatedStyle]}>
-        <View style={s.header}>
-          <Text style={s.headerTitle}>Statystyki</Text>
-        </View>
-        <View style={s.center}>
-          <View style={s.iconWrap}>
-            <BarChart2 size={32} color={colors.tabs.analytics} strokeWidth={1.5} />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Analityka</Text>
+            <Text style={styles.weekLabel}>{weekStart} – {weekEnd}</Text>
           </View>
-          <Text style={s.title}>W budowie</Text>
-          <Text style={s.sub}>Tu pojawią się wykresy i analizy ze wszystkich zakładek — nastrój, finanse, zadania, nawyki</Text>
-        </View>
+
+          {/* 2×2 stat grid */}
+          <View style={styles.statRow}>
+            <StatCard
+              label="Ukończone zadania"
+              value={String(totalDoneThisWeek)}
+              sub={totalPending > 0 ? `${totalPending} oczekuje` : 'Wszystko gotowe!'}
+              icon={<CheckCircle2 size={15} color={O.accent} />}
+              accent={O.accent}
+            />
+            <StatCard
+              label="Skuteczność nawyków"
+              value={habits.length > 0 ? `${avgHabitRate}%` : '—'}
+              sub={`${todayDone.length}/${habits.length} dziś`}
+              icon={<Flame size={15} color={colors.accent.amber} />}
+              accent={colors.accent.amber}
+            />
+          </View>
+          <View style={styles.statRow}>
+            <StatCard
+              label="Nastrój (śr.)"
+              value={avgMood > 0 ? avgMood.toFixed(1) : '—'}
+              sub={moodThisWeek.length > 0 ? `${moodThisWeek.length} check-inów` : 'brak danych'}
+              icon={<Smile size={15} color={moodColor} />}
+              accent={moodColor}
+            />
+            <StatCard
+              label="Sesje Pomodoro"
+              value={String(totalPomThisWeek)}
+              sub={totalPomMins > 0
+                ? `${Math.floor(totalPomMins / 60)}h ${totalPomMins % 60}m skupienia`
+                : 'w tym tygodniu'}
+              icon={<Timer size={15} color={colors.accent.blue} />}
+              accent={colors.accent.blue}
+            />
+          </View>
+
+          {/* Task completions chart */}
+          {totalDoneThisWeek > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>ZADANIA UKOŃCZONE — 7 DNI</Text>
+              <MiniBarChart
+                values={weekDoneByDay}
+                barColors={dates.map((_, i) => i === todayIdx ? O.accent : O.accent + '90')}
+                labels={dates.map(dowLabel)}
+                maxH={60}
+              />
+            </View>
+          )}
+
+          {/* Mood chart */}
+          {moodThisWeek.length > 0 && (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>NASTRÓJ — 7 DNI</Text>
+                {moodTrend !== 'flat' && (
+                  <View style={[styles.trendBadge, {
+                    backgroundColor: moodTrend === 'up'
+                      ? colors.accent.success + '20'
+                      : colors.accent.red + '20',
+                  }]}>
+                    {moodTrend === 'up'
+                      ? <TrendingUp size={10} color={colors.accent.success} />
+                      : <TrendingDown size={10} color={colors.accent.red} />
+                    }
+                    <Text style={[styles.trendText, {
+                      color: moodTrend === 'up' ? colors.accent.success : colors.accent.red,
+                    }]}>
+                      {moodTrend === 'up' ? 'Lepiej niż tydzień temu' : 'Gorzej niż tydzień temu'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <MiniBarChart
+                values={weekMood}
+                barColors={weekMood.map(m =>
+                  m > 0 ? MOOD_COLORS[m as MoodLevel] : 'transparent'
+                )}
+                labels={dates.map(dowLabel)}
+                maxH={56}
+              />
+            </View>
+          )}
+
+          {/* Habit streaks */}
+          {topHabits.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>NAWYKI — SERIA DNI</Text>
+              <View style={styles.habitsList}>
+                {topHabits.map(({ habit, streak, last7 }) => (
+                  <View key={habit.id} style={styles.habitRow}>
+                    <View style={[styles.habitIconWrap, {
+                      backgroundColor: habit.color + '22',
+                      borderColor:     habit.color + '44',
+                    }]}>
+                      <View style={[styles.habitInnerDot, { backgroundColor: habit.color }]} />
+                    </View>
+                    <Text style={styles.habitName} numberOfLines={1}>{habit.title}</Text>
+                    <View style={styles.habitDots}>
+                      {last7.map((done, i) => (
+                        <View key={i} style={[
+                          styles.habitMiniDot,
+                          done && { backgroundColor: habit.color },
+                        ]} />
+                      ))}
+                    </View>
+                    {streak > 0 ? (
+                      <View style={styles.streakBadge}>
+                        <Flame size={9} color={colors.accent.amber} />
+                        <Text style={styles.streakText}>{streak}d</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.streakBadge, { backgroundColor: 'transparent' }]}>
+                        <Text style={[styles.streakText, { color: colors.text.muted }]}>—</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Pomodoro chart */}
+          {totalPomThisWeek > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>POMODORO — 7 DNI</Text>
+              <MiniBarChart
+                values={pomByDay}
+                barColors={dates.map((_, i) =>
+                  i === todayIdx ? colors.accent.blue : colors.accent.blue + '90'
+                )}
+                labels={dates.map(dowLabel)}
+                maxH={48}
+              />
+            </View>
+          )}
+
+          {/* Habit rate chart */}
+          {habits.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>NAWYKI — SKUTECZNOŚĆ DZIENNA</Text>
+              <MiniBarChart
+                values={habitRateByDay.map((v, i) => i > todayIdx ? 0 : v)}
+                barColors={habitRateByDay.map(v =>
+                  v >= 80 ? colors.accent.success
+                  : v >= 50 ? colors.accent.amber
+                  : colors.accent.red
+                )}
+                labels={dates.map(dowLabel)}
+                maxH={52}
+              />
+            </View>
+          )}
+
+          {/* Empty state */}
+          {noData && (
+            <View style={styles.empty}>
+              <View style={styles.emptyIcon}>
+                <Target size={32} color={O.accent} strokeWidth={1.5} />
+              </View>
+              <Text style={styles.emptyTitle}>Zacznij zbierać dane</Text>
+              <Text style={styles.emptySub}>
+                Uzupełniaj zadania, nawyki i nastrój — tutaj zobaczysz swoje tygodniowe wzorce
+              </Text>
+            </View>
+          )}
+
+        </ScrollView>
       </Animated.View>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: colors.bg.primary },
+  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 100 },
+
   header: {
-    paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[2],
+    paddingTop: spacing[2], paddingBottom: spacing[1],
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
   },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4], padding: spacing[6] },
-  iconWrap: {
+  title:     { fontSize: 28, fontWeight: '900', color: colors.text.primary, letterSpacing: -0.5 },
+  weekLabel: { fontSize: 11, color: O.muted, fontWeight: '700' },
+
+  statRow: { flexDirection: 'row', gap: spacing[3] },
+
+  card: {
+    backgroundColor: O.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: O.cardBorder,
+    padding: spacing[4], gap: spacing[3],
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardTitle: {
+    fontSize: 10, fontWeight: '700', color: O.muted,
+    textTransform: 'uppercase', letterSpacing: 0.9,
+  },
+
+  trendBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full,
+  },
+  trendText: { fontSize: 9, fontWeight: '700' },
+
+  habitsList: { gap: spacing[2] },
+  habitRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  habitIconWrap: {
+    width: 22, height: 22, borderRadius: 11, flexShrink: 0,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  habitInnerDot: { width: 8, height: 8, borderRadius: 4 },
+  habitName:     { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
+  habitDots:     { flexDirection: 'row', gap: 3 },
+  habitMiniDot: {
+    width: 7, height: 7, borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  streakBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    backgroundColor: colors.accent.amber + '18',
+    borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
+    minWidth: 32, justifyContent: 'center',
+  },
+  streakText: { fontSize: 10, fontWeight: '700', color: colors.accent.amber },
+
+  empty: { alignItems: 'center', paddingTop: 80, gap: spacing[4] },
+  emptyIcon: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.tabs.analytics + '15',
-    borderWidth: 1, borderColor: colors.tabs.analytics + '30',
+    backgroundColor: O.accentDim, borderWidth: 1, borderColor: O.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
-  sub:   { ...typography.body, color: colors.text.muted, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
+  emptySub: {
+    fontSize: 14, color: colors.text.muted, textAlign: 'center',
+    lineHeight: 22, paddingHorizontal: spacing[4],
+  },
 });
