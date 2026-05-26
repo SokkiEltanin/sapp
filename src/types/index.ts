@@ -260,9 +260,10 @@ export interface Habit {
   title: string;
   color: string;
   icon: HabitIcon | string;
-  type?: HabitType;      // default 'check'
-  dailyGoal?: number;    // for count type (e.g. 8 glasses)
-  unit?: string;         // e.g. 'szkl.', 'ml', 'min'
-  reminderTime?: string; // HH:mm or undefined = no reminder
+  type?: HabitType;        // default 'check'
+  dailyGoal?: number;      // for count type (e.g. 8 glasses)
+  unit?: string;           // e.g. 'szkl.', 'ml', 'min'
+  weeklyTarget?: number;   // 1-7, default 7 = every day
+  reminderTime?: string;   // HH:mm or undefined = no reminder
   createdAt: string;
 }

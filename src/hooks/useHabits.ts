@@ -123,13 +123,30 @@ export function useHabits() {
   const getStreak = useCallback((habitId: string): number => {
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return 0;
-    const todayCount = completions[today]?.[habitId] ?? 0;
+    const target = habit.weeklyTarget && habit.weeklyTarget < 7 ? habit.weeklyTarget : null;
+
+    if (!target) {
+      // Daily streak: consecutive days done
+      const todayCount = completions[today]?.[habitId] ?? 0;
+      let streak = 0;
+      const start = isDone(habit, todayCount) ? 0 : -1;
+      for (let i = start; i >= -29; i--) {
+        const d = offsetDate(today, i);
+        const c = completions[d]?.[habitId] ?? 0;
+        if (isDone(habit, c)) streak++; else break;
+      }
+      return streak;
+    }
+
+    // Weekly streak: consecutive 7-day windows meeting the target
     let streak = 0;
-    const start = isDone(habit, todayCount) ? 0 : -1;
-    for (let i = start; i >= -29; i--) {
-      const d = offsetDate(today, i);
-      const c = completions[d]?.[habitId] ?? 0;
-      if (isDone(habit, c)) streak++; else break;
+    for (let w = 0; w <= 3; w++) {
+      const windowDone = Array.from({ length: 7 }, (_, i) => {
+        const d = offsetDate(today, -(w * 7) - i);
+        return isDone(habit, completions[d]?.[habitId] ?? 0);
+      }).filter(Boolean).length;
+      if (windowDone >= target) streak++;
+      else break;
     }
     return streak;
   }, [completions, today, habits]);
@@ -159,7 +176,17 @@ export function useHabits() {
   const todayDone = useMemo(() => {
     const counts = completions[today] ?? {};
     return habits
-      .filter((h) => isDone(h, counts[h.id] ?? 0))
+      .filter((h) => {
+        // For weekly-target habits, done if target met in rolling 7-day window
+        if (h.weeklyTarget && h.weeklyTarget < 7) {
+          const weekDone = Array.from({ length: 7 }, (_, i) => {
+            const d = offsetDate(today, -i);
+            return isDone(h, completions[d]?.[h.id] ?? 0);
+          }).filter(Boolean).length;
+          return weekDone >= h.weeklyTarget;
+        }
+        return isDone(h, counts[h.id] ?? 0);
+      })
       .map((h) => h.id);
   }, [habits, completions, today]);
 

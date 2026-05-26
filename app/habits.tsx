@@ -101,6 +101,11 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
               <Text style={hr.streakText}>{streak}d</Text>
             </View>
           )}
+          {habit.weeklyTarget && habit.weeklyTarget < 7 && (
+            <View style={hr.freqBadge}>
+              <Text style={hr.freqText}>{habit.weeklyTarget}×/tydz.</Text>
+            </View>
+          )}
           {habit.reminderTime && (
             <View style={hr.reminderBadge}>
               <Bell size={9} color={colors.accent.purple} />
@@ -173,6 +178,12 @@ const hr = StyleSheet.create({
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
   },
   streakText: { fontSize: 10, fontWeight: '700', color: colors.accent.amber },
+  freqBadge: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
+  },
+  freqText: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+
   reminderBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
     backgroundColor: colors.accent.purple + '18',
@@ -282,9 +293,16 @@ function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 const UNIT_PRESETS = ['szkl.', 'ml', 'min', 'km', 'powt.'];
 
+const FREQ_OPTIONS: { label: string; value: number }[] = [
+  { label: 'Codziennie', value: 7 },
+  { label: '5×/tydzień', value: 5 },
+  { label: '3×/tydzień', value: 3 },
+  { label: '2×/tydzień', value: 2 },
+];
+
 interface HabitFormData {
   title: string; color: string; icon: string; reminderTime?: string;
-  type: HabitType; dailyGoal?: number; unit?: string;
+  type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number;
 }
 
 function HabitFormModal({ visible, onClose, onSave, editing }: {
@@ -304,6 +322,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   const [reminderOn, setReminderOn]   = useState(false);
   const [reminderHour, setRemH]       = useState(20);
   const [reminderMin, setRemM]        = useState(0);
+  const [weeklyTarget, setWeeklyTarget] = useState(7);
 
   useEffect(() => {
     if (!visible) return;
@@ -320,6 +339,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     } else {
       setGoal('8'); setUnit('szkl.'); setUnitCustom(false);
     }
+    setWeeklyTarget(editing?.weeklyTarget ?? 7);
     const rt = editing?.reminderTime;
     if (rt) {
       const [h, m] = rt.split(':').map(Number);
@@ -334,7 +354,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     const rt = reminderOn ? `${pad2(reminderHour)}:${pad2(reminderMin)}` : undefined;
     const goalN = type === 'count' ? (parseInt(goal) || 1) : undefined;
     const unitVal = type === 'count' ? (unitCustom ? customUnit.trim() : unit) : undefined;
-    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type, dailyGoal: goalN, unit: unitVal || undefined });
+    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined });
     onClose();
   };
 
@@ -432,6 +452,20 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
           ))}
         </View>
 
+        {/* Frequency */}
+        <Text style={am.sectionLabel}>Częstotliwość</Text>
+        <View style={am.freqRow}>
+          {FREQ_OPTIONS.map(opt => (
+            <PressableScale
+              key={opt.value}
+              onPress={() => setWeeklyTarget(opt.value)}
+              style={[am.freqChip, weeklyTarget === opt.value && { backgroundColor: selColor + '30', borderColor: selColor }]}
+            >
+              <Text style={[am.freqChipText, weeklyTarget === opt.value && { color: selColor }]}>{opt.label}</Text>
+            </PressableScale>
+          ))}
+        </View>
+
         {/* Reminder */}
         <Text style={am.sectionLabel}>Przypomnienie</Text>
         <View style={am.reminderWrap}>
@@ -482,6 +516,14 @@ const am = StyleSheet.create({
     backgroundColor: colors.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
     paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontSize: 15, color: colors.text.primary,
   },
+
+  freqRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  freqChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full,
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+  },
+  freqChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
 
   typeRow: { flexDirection: 'row', gap: spacing[3] },
   typePill: {
