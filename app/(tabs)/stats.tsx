@@ -1,8 +1,14 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, PanResponder, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
+  PanResponder, Animated, Modal, TouchableOpacity,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Plus, ChevronLeft, ChevronRight, CalendarDays, RefreshCw, CheckSquare, Wallet, LayoutGrid, AlignJustify } from 'lucide-react-native';
+import {
+  Plus, ChevronLeft, ChevronRight, CalendarDays, RefreshCw,
+  CheckSquare, Wallet, LayoutGrid, AlignJustify, Edit3, X, Clock,
+} from 'lucide-react-native';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -15,11 +21,13 @@ import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { googleCalendarService } from '@/services/googleCalendarService';
-import { CalendarEvent } from '@/types';
+import { CalendarEvent, Task } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+
+const V = colors.tabs.calendar; // violet #BF80FF
 
 const MONTH_NAMES = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -28,6 +36,8 @@ const MONTH_NAMES = [
 const MONTH_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 
+type CalMode = 'month-detailed' | 'month-mini' | 'week';
+const MODE_ORDER: CalMode[] = ['month-detailed', 'month-mini', 'week'];
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -42,6 +52,191 @@ function fmtAmount(amount: number, currency: string) {
   return `${amount % 1 === 0 ? amount : amount.toFixed(2)} ${currency}`;
 }
 
+// ─── Day events modal ─────────────────────────────────────────────────────────
+
+interface DayModalProps {
+  date: string;
+  events: CalendarEvent[];
+  tasks: Task[];
+  onClose: () => void;
+  onToggleTask: (id: string) => void;
+}
+
+function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps) {
+  const insets = useSafeAreaInsets();
+  const isToday = date === todayStr();
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable style={dm.backdrop} onPress={onClose} />
+      <View style={[dm.sheet, { paddingBottom: insets.bottom + 16 }]}>
+
+        <View style={dm.handle} />
+
+        <View style={dm.header}>
+          <View>
+            <Text style={dm.dayLabel}>
+              {isToday ? 'Dzisiaj' : fmtDay(date)}
+            </Text>
+            <Text style={dm.monthLabel}>
+              {new Date(date + 'T12:00:00').getDate()} {MONTH_SHORT[new Date(date + 'T12:00:00').getMonth()]}
+            </Text>
+          </View>
+          <View style={dm.headerRight}>
+            <TouchableOpacity
+              style={[dm.addBtn, { backgroundColor: V + '22', borderColor: V + '55' }]}
+              onPress={() => { onClose(); router.push(`/calendar/add?date=${date}` as any); }}
+              activeOpacity={0.8}
+            >
+              <Plus size={15} color={V} strokeWidth={2.5} />
+              <Text style={[dm.addBtnText, { color: V }]}>Dodaj</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={dm.closeBtn} onPress={onClose} activeOpacity={0.7}>
+              <X size={16} color={colors.text.muted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={dm.scrollContent}
+        >
+          {events.length === 0 && tasks.length === 0 && (
+            <View style={dm.empty}>
+              <Text style={dm.emptyText}>Brak wydarzeń</Text>
+              <Text style={dm.emptyHint}>Dotknij + żeby dodać</Text>
+            </View>
+          )}
+
+          {events.length > 0 && (
+            <View style={dm.section}>
+              <Text style={dm.sectionLabel}>WYDARZENIA</Text>
+              {events.map(ev => {
+                const isGCal = ev.id.startsWith('gcal-');
+                const evColor = ev.color ?? (isGCal ? '#039BE5' : V);
+                return (
+                  <TouchableOpacity
+                    key={ev.id}
+                    style={[dm.eventRow, { borderLeftColor: evColor }]}
+                    onPress={() => { onClose(); router.push(`/calendar/${ev.id}` as any); }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={dm.eventInfo}>
+                      <Text style={dm.eventTitle} numberOfLines={1}>{ev.title}</Text>
+                      {ev.startTime ? (
+                        <View style={dm.eventTime}>
+                          <Clock size={10} color={colors.text.muted} />
+                          <Text style={dm.eventTimeText}>
+                            {ev.startTime}{ev.endTime ? ` → ${ev.endTime}` : ''}
+                          </Text>
+                          {isGCal && <Text style={dm.gcalBadge}>GCal</Text>}
+                        </View>
+                      ) : (
+                        <View style={dm.eventTime}>
+                          <Text style={dm.eventTimeText}>Cały dzień</Text>
+                          {isGCal && <Text style={dm.gcalBadge}>GCal</Text>}
+                        </View>
+                      )}
+                    </View>
+                    <View style={[dm.editBtn, { backgroundColor: evColor + '18', borderColor: evColor + '44' }]}>
+                      <Edit3 size={13} color={evColor} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {tasks.length > 0 && (
+            <View style={dm.section}>
+              <Text style={dm.sectionLabel}>ZADANIA</Text>
+              {tasks.map((t, i) => (
+                <TaskItem
+                  key={t.id} task={t} index={i}
+                  onToggle={onToggleTask}
+                  onPress={(id) => { onClose(); router.push(`/tasks/${id}` as any); }}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const dm = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#131016',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderWidth: 1, borderBottomWidth: 0,
+    borderColor: V + '30',
+    paddingTop: 12,
+    maxHeight: '80%',
+  },
+  handle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center', marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    paddingHorizontal: spacing[4], marginBottom: spacing[4],
+  },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dayLabel: { fontSize: 18, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
+  monthLabel: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: spacing[3], paddingVertical: 7,
+    borderRadius: radius.full, borderWidth: 1,
+  },
+  addBtnText: { fontSize: 12, fontWeight: '700' },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.bg.card,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  scrollContent: { paddingHorizontal: spacing[4], paddingBottom: spacing[4], gap: spacing[3] },
+  section: { gap: spacing[2] },
+  sectionLabel: {
+    fontSize: 9, fontWeight: '700', color: colors.text.muted,
+    letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 2,
+  },
+  eventRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.bg.card, borderRadius: radius.lg,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderLeftWidth: 3,
+  },
+  eventInfo: { flex: 1, gap: 3 },
+  eventTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
+  eventTime: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  eventTimeText: { fontSize: 11, color: colors.text.muted },
+  gcalBadge: {
+    fontSize: 9, fontWeight: '700', color: '#039BE5',
+    backgroundColor: '#039BE520', borderRadius: 4,
+    paddingHorizontal: 4, paddingVertical: 1, marginLeft: 4,
+  },
+  editBtn: {
+    width: 34, height: 34, borderRadius: radius.md,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
+  },
+  empty: { alignItems: 'center', paddingVertical: spacing[8], gap: spacing[2] },
+  emptyText: { fontSize: 15, fontWeight: '600', color: colors.text.secondary },
+  emptyHint: { fontSize: 12, color: colors.text.muted },
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export default function CalendarTabScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
@@ -53,21 +248,37 @@ export default function CalendarTabScreen() {
   const [viewYear, setViewYear]         = useState(now.getFullYear());
   const [viewMonth, setViewMonth]       = useState(now.getMonth());
   const [refreshing, setRefreshing]     = useState(false);
-  type CalMode = 'month-detailed' | 'month-mini' | 'week';
-  const [calMode, setCalMode] = useState<CalMode>('month-detailed');
+  const [calMode, setCalMode]           = useState<CalMode>('month-detailed');
+  const calModeRef                      = useRef<CalMode>('month-detailed');
   const [weekOffset, setWeekOffset]     = useState(0);
   const [gcalEvents, setGcalEvents]     = useState<CalendarEvent[]>([]);
   const [gcalSyncing, setGcalSyncing]   = useState(false);
   const [gcalAvailable, setGcalAvailable] = useState(false);
+  const [dayModalDate, setDayModalDate] = useState<string | null>(null);
 
-  const monthSwipePR = useRef(
+  const setMode = useCallback((m: CalMode) => {
+    setCalMode(m);
+    calModeRef.current = m;
+  }, []);
+
+  // Combined gesture: horizontal → month nav, vertical → mode collapse/expand
+  const calGesturePR = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, { dx, dy }) =>
-        Math.abs(dx) > 18 && Math.abs(dx) > Math.abs(dy) * 2,
-      onPanResponderRelease: (_, { dx, vx }) => {
-        if (Math.abs(dx) > 50 || Math.abs(vx) > 0.4) {
+        Math.abs(dx) > 12 || Math.abs(dy) > 12,
+
+      onPanResponderRelease: (_, { dx, dy, vx, vy }) => {
+        const absX = Math.abs(dx), absY = Math.abs(dy);
+        const isHoriz = absX > absY * 1.4;
+        const isVert  = absY > absX * 1.4;
+
+        if (isHoriz && (absX > 45 || Math.abs(vx) > 0.35)) {
           if (dx < 0) setViewMonth(m => { if (m === 11) { setViewYear(y => y + 1); return 0; } return m + 1; });
           else        setViewMonth(m => { if (m === 0)  { setViewYear(y => y - 1); return 11; } return m - 1; });
+        } else if (isVert && (absY > 50 || Math.abs(vy) > 0.35)) {
+          const idx = MODE_ORDER.indexOf(calModeRef.current);
+          if (dy < 0 && idx < MODE_ORDER.length - 1) setMode(MODE_ORDER[idx + 1]); // swipe up → collapse
+          else if (dy > 0 && idx > 0) setMode(MODE_ORDER[idx - 1]);                 // swipe down → expand
         }
       },
     }),
@@ -122,6 +333,7 @@ export default function CalendarTabScreen() {
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth());
     setWeekOffset(0);
+    setDayModalDate(date);
   };
 
   const allEvents = useMemo(
@@ -146,6 +358,18 @@ export default function CalendarTabScreen() {
     [expenses, selectedDate],
   );
 
+  const modalEvents = useMemo(
+    () => dayModalDate ? allEvents.filter(e => e.date.startsWith(dayModalDate)) : [],
+    [allEvents, dayModalDate],
+  );
+
+  const modalTasks = useMemo(
+    () => dayModalDate ? tasks.filter(t =>
+      t.deadline?.startsWith(dayModalDate) || t.scheduledDate === dayModalDate,
+    ) : [],
+    [tasks, dayModalDate],
+  );
+
   const toggleTask = async (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
@@ -165,6 +389,12 @@ export default function CalendarTabScreen() {
     .filter(e => e.type === 'income')
     .reduce((s, e) => s + e.amount, 0);
   const expCurrency = selectedExpenses[0]?.currency ?? 'PLN';
+
+  const modeIcon = (mode: CalMode) => {
+    if (mode === 'month-detailed') return LayoutGrid;
+    if (mode === 'month-mini')     return CalendarDays;
+    return AlignJustify;
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
@@ -194,53 +424,45 @@ export default function CalendarTabScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
           contentContainerStyle={{ paddingBottom: 140 }}
         >
-          {/* ── Month nav + calendar ── */}
-          <View {...monthSwipePR.panHandlers}>
+          {/* ── Calendar area with gesture ── */}
+          <View {...calGesturePR.panHandlers}>
             <View style={styles.monthNav}>
-              {calMode !== 'week' ? (
-                <PressableScale onPress={prevMonth} style={styles.navBtn}>
-                  <ChevronLeft size={18} color={colors.text.secondary} />
-                </PressableScale>
-              ) : (
-                <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.navBtn}>
-                  <ChevronLeft size={18} color={colors.text.secondary} />
-                </PressableScale>
-              )}
+              <PressableScale
+                onPress={calMode !== 'week' ? prevMonth : () => setWeekOffset(w => w - 1)}
+                style={styles.navBtn}
+              >
+                <ChevronLeft size={18} color={colors.text.secondary} />
+              </PressableScale>
 
               <View style={styles.monthTitleBtn}>
                 <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
                 <Text style={styles.yearLabel}>{viewYear}</Text>
               </View>
 
-              {/* 3-mode toggle */}
+              {/* Mode indicator — swipe hint */}
               <View style={styles.modeToggle}>
-                {([
-                  ['month-detailed', LayoutGrid,   ] as const,
-                  ['month-mini',     CalendarDays, ] as const,
-                  ['week',           AlignJustify, ] as const,
-                ]).map(([mode, Icon]) => (
-                  <Pressable
-                    key={mode}
-                    onPress={() => setCalMode(mode as CalMode)}
-                    style={[styles.modeBtn, calMode === mode && styles.modeBtnActive]}
-                  >
-                    <Icon size={14} color={calMode === mode ? colors.tabs.calendar : colors.text.muted} />
-                  </Pressable>
-                ))}
+                {MODE_ORDER.map(mode => {
+                  const Icon = modeIcon(mode);
+                  return (
+                    <Pressable
+                      key={mode}
+                      onPress={() => setMode(mode)}
+                      style={[styles.modeBtn, calMode === mode && styles.modeBtnActive]}
+                    >
+                      <Icon size={14} color={calMode === mode ? V : colors.text.muted} />
+                    </Pressable>
+                  );
+                })}
               </View>
 
-              {calMode !== 'week' ? (
-                <PressableScale onPress={nextMonth} style={styles.navBtn}>
-                  <ChevronRight size={18} color={colors.text.secondary} />
-                </PressableScale>
-              ) : (
-                <PressableScale onPress={() => setWeekOffset(w => w + 1)} style={styles.navBtn}>
-                  <ChevronRight size={18} color={colors.text.secondary} />
-                </PressableScale>
-              )}
+              <PressableScale
+                onPress={calMode !== 'week' ? nextMonth : () => setWeekOffset(w => w + 1)}
+                style={styles.navBtn}
+              >
+                <ChevronRight size={18} color={colors.text.secondary} />
+              </PressableScale>
             </View>
 
-            {/* Calendar content — 3 modes */}
             {calMode === 'month-detailed' && (
               <CalendarGrid
                 year={viewYear}
@@ -250,7 +472,7 @@ export default function CalendarTabScreen() {
                 tasks={tasks}
                 moodEntries={moodEntries}
                 onSelectDate={handleSelectDate}
-                onEventPress={(id) => { if (!id.startsWith('gcal-')) router.push(`/calendar/${id}` as any); }}
+                onEventPress={(id) => router.push(`/calendar/${id}` as any)}
                 onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
                 detailed
               />
@@ -278,29 +500,36 @@ export default function CalendarTabScreen() {
                   tasks={tasks}
                   moodEntries={moodEntries}
                   weekOffset={weekOffset}
-                  onSelectDate={(d) => { setSelectedDate(d); }}
+                  onSelectDate={(d) => { setSelectedDate(d); setDayModalDate(d); }}
                 />
               </View>
             )}
           </View>
 
-          {/* ── Day detail ── */}
+          {/* Swipe hint label */}
+          <Text style={styles.swipeHint}>
+            {calMode === 'month-detailed'
+              ? 'Przesuń w górę → widok mini'
+              : calMode === 'month-mini'
+              ? 'Przesuń w górę → tydzień  ·  w dół → szczegóły'
+              : 'Przesuń w dół → widok miesięczny'}
+          </Text>
+
+          {/* ── Day detail (inline, below calendar) ── */}
           <View style={styles.daySection}>
             <Text style={styles.daySectionLabel}>
               {isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
             </Text>
 
-            {/* Time-block timeline */}
             <View style={styles.timelineWrap}>
               <DayTimeline
                 events={selectedEvents}
                 date={selectedDate}
-                onPress={(id) => { if (!id.startsWith('gcal-')) router.push(`/calendar/${id}` as any); }}
+                onPress={(id) => router.push(`/calendar/${id}` as any)}
                 onAddAtTime={(time) => router.push(`/calendar/add?startTime=${time}&type=event` as any)}
               />
             </View>
 
-            {/* Tasks for the selected day */}
             {selectedTasks.length > 0 && (
               <View style={styles.subSection}>
                 <View style={styles.subHeader}>
@@ -317,7 +546,6 @@ export default function CalendarTabScreen() {
               </View>
             )}
 
-            {/* Expenses / income for the selected day */}
             {selectedExpenses.length > 0 && (
               <View style={styles.subSection}>
                 <View style={styles.subHeader}>
@@ -354,7 +582,6 @@ export default function CalendarTabScreen() {
               </View>
             )}
 
-            {/* Empty state — timeline still shown above for tap-to-add */}
             {selectedEvents.length === 0 && selectedTasks.length === 0 && selectedExpenses.length === 0 && (
               <View style={styles.emptyDay}>
                 <Text style={styles.emptyText}>Pusty dzień</Text>
@@ -364,6 +591,17 @@ export default function CalendarTabScreen() {
           </View>
         </ScrollView>
       </Animated.View>
+
+      {/* ── Day modal ── */}
+      {dayModalDate && (
+        <DayModal
+          date={dayModalDate}
+          events={modalEvents}
+          tasks={modalTasks}
+          onClose={() => setDayModalDate(null)}
+          onToggleTask={toggleTask}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -408,10 +646,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   modeBtnActive: {
-    backgroundColor: colors.tabs.calendar + '20',
+    backgroundColor: V + '20',
   },
   monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
   yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+
+  swipeHint: {
+    fontSize: 9, color: colors.text.muted, textAlign: 'center',
+    letterSpacing: 0.5, marginTop: spacing[1], marginBottom: spacing[2],
+    opacity: 0.6,
+  },
 
   gridWrap: {
     marginHorizontal: spacing[2],
@@ -429,10 +673,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.04)',
   },
-  weekNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[1] },
-  weekNavBtn: { width: 28, height: 48, alignItems: 'center', justifyContent: 'center' },
 
-  daySection: { paddingHorizontal: spacing[3], paddingTop: spacing[4], gap: spacing[3] },
+  daySection: { paddingHorizontal: spacing[3], paddingTop: spacing[3], gap: spacing[3] },
   daySectionLabel: {
     fontSize: 10, fontWeight: '700', color: colors.text.muted,
     letterSpacing: 1.4, textTransform: 'uppercase',
