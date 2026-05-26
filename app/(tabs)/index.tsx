@@ -355,7 +355,7 @@ export default function DashboardScreen() {
   // ── Quick mood handler ────────────────────────────────────────────────────
   const handleQuickMood = useCallback(async (level: MoodLevel) => {
     haptic.tap();
-    if (todayEntry) { openCheckIn(todayEntry); return; }
+    if (todayEntry) { openCheckIn(); return; }
     try {
       const entry = await moodService.add({ date: todayStr(), mood: level, energy: 3, tags: [] });
       addEntry(entry);
@@ -546,7 +546,7 @@ export default function DashboardScreen() {
 
             {/* ══ GLASSMORPHISM MOOD CARD ══════════════════════════════════ */}
             <TouchableOpacity
-              onPress={() => openCheckIn(todayEntry ?? undefined)}
+              onPress={() => openCheckIn()}
               activeOpacity={0.92}
               style={s.moodWrap}
             >

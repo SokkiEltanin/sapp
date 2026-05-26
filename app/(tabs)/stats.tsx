@@ -562,7 +562,7 @@ export default function CalendarTabScreen() {
                 {selectedExpenses.map(exp => (
                   <Pressable
                     key={exp.id}
-                    onPress={() => router.push(`/finances/${exp.id}` as any)}
+                    onPress={() => router.push(`/expenses/${exp.id}` as any)}
                     style={styles.expenseRow}
                   >
                     <View style={[styles.expenseDot, { backgroundColor: getCategoryMeta(exp.category as any).color }]} />

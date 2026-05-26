@@ -505,7 +505,7 @@ export default function TasksScreen() {
   }, [remove]);
 
   const pending  = active.filter(t => t.status === 'pending' && !t.snoozedUntil).length;
-  const overdue  = active.filter(t => t.deadline?.split('T')[0] < today).length;
+  const overdue  = active.filter(t => (t.deadline?.split('T')[0] ?? '') < today).length;
 
   const listData: (Task | 'done-header' | Task)[] = [
     ...sorted,
