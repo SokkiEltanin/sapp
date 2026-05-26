@@ -241,7 +241,7 @@ export default function DashboardScreen() {
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const { tasks, isLoading: tasksLoading, reload: reloadTasks, toggle: toggleTask } = useTasks();
-  const { habits, todayDone: habitsDoneIds, toggle: toggleHabit } = useHabits();
+  const { habits, todayDone: habitsDoneIds, toggle: toggleHabit, getStreak } = useHabits();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood, addEntry } = useMoodStore();
   const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
@@ -779,6 +779,33 @@ export default function DashboardScreen() {
               ))}
             </View>
 
+            {/* ══ EVENING HABITS NUDGE ════════════════════════════════════ */}
+            {habits.length > 0 && new Date().getHours() >= 17 && (() => {
+              const notDone = habits.filter(h => !habitsDoneIds.includes(h.id));
+              if (notDone.length === 0) return null;
+              const maxStreak = Math.max(...notDone.map(h => getStreak(h.id)));
+              return (
+                <TouchableOpacity
+                  style={s.habitsNudge}
+                  onPress={() => router.push('/habits' as any)}
+                  activeOpacity={0.8}
+                >
+                  <Flame size={14} color={colors.accent.amber} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.habitsNudgeTitle}>
+                      {notDone.length === 1 ? 'Jeszcze 1 nawyk dziś'
+                        : `Jeszcze ${notDone.length} nawyki dziś`}
+                      {maxStreak >= 2 ? ` · ${maxStreak}d seria!` : ''}
+                    </Text>
+                    <Text style={s.habitsNudgeSub} numberOfLines={1}>
+                      {notDone.slice(0, 3).map(h => h.title).join(' · ')}{notDone.length > 3 ? ` +${notDone.length - 3}` : ''}
+                    </Text>
+                  </View>
+                  <ChevronRight size={13} color={colors.accent.amber + '80'} />
+                </TouchableOpacity>
+              );
+            })()}
+
             {/* ══ HABITS TODAY ════════════════════════════════════════════ */}
             {habits.length > 0 && (() => {
               const doneCount = habitsDoneIds.length;
@@ -1143,6 +1170,16 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   toolLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
+
+  // ── Evening habits nudge ──────────────────────────────────────────────────
+  habitsNudge: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.accent.amber + '0E',
+    borderRadius: radius.xl, padding: spacing[4],
+    borderWidth: 1, borderColor: colors.accent.amber + '35',
+  },
+  habitsNudgeTitle: { fontSize: 13, fontWeight: '700', color: colors.accent.amber, marginBottom: 2 },
+  habitsNudgeSub: { fontSize: 11, color: colors.accent.amber + '80' },
 
   // ── Habits today card ─────────────────────────────────────────────────────
   habitsCard: {
