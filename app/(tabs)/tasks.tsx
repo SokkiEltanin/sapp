@@ -660,10 +660,13 @@ const FILTER_PILLS: { key: FilterKey; label: string }[] = [
   { key: 'snoozed', label: 'Odłożone'  },
 ];
 
-function FilterPills({ filter, onSelect, counts }: {
+function FilterPills({ filter, onSelect, counts, tags, tagFilter, onTagSelect }: {
   filter: FilterKey;
   onSelect: (f: FilterKey) => void;
   counts: Record<FilterKey, number>;
+  tags: string[];
+  tagFilter: string | null;
+  onTagSelect: (t: string | null) => void;
 }) {
   return (
     <ScrollView
@@ -673,13 +676,13 @@ function FilterPills({ filter, onSelect, counts }: {
       contentContainerStyle={fp.row}
     >
       {FILTER_PILLS.map(p => {
-        const isActive = filter === p.key;
+        const isActive = filter === p.key && !tagFilter;
         const count = counts[p.key];
         return (
           <TouchableOpacity
             key={p.key}
             style={[fp.pill, isActive && fp.pillActive]}
-            onPress={() => { haptic.tap(); onSelect(p.key); }}
+            onPress={() => { haptic.tap(); onSelect(p.key); onTagSelect(null); }}
             activeOpacity={0.75}
           >
             <Text style={[fp.pillText, isActive && fp.pillTextActive]}>{p.label}</Text>
@@ -688,6 +691,20 @@ function FilterPills({ filter, onSelect, counts }: {
                 <Text style={[fp.badgeText, isActive && fp.badgeTextActive]}>{count}</Text>
               </View>
             )}
+          </TouchableOpacity>
+        );
+      })}
+      {tags.length > 0 && <View style={fp.divider} />}
+      {tags.map(tag => {
+        const isActive = tagFilter === tag;
+        return (
+          <TouchableOpacity
+            key={`tag-${tag}`}
+            style={[fp.tagChip, isActive && fp.tagChipActive]}
+            onPress={() => { haptic.tap(); onTagSelect(isActive ? null : tag); }}
+            activeOpacity={0.75}
+          >
+            <Text style={[fp.tagText, isActive && fp.tagTextActive]}>#{tag}</Text>
           </TouchableOpacity>
         );
       })}
@@ -733,6 +750,21 @@ const fp = StyleSheet.create({
   badgeTextActive: {
     color: G.card,
   },
+  divider: {
+    width: 1, height: 20, backgroundColor: G.cardBorder, alignSelf: 'center', marginHorizontal: 4,
+  },
+  tagChip: {
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+  },
+  tagChipActive: {
+    backgroundColor: 'rgba(108,158,255,0.18)',
+    borderColor: colors.accent.blue + '60',
+  },
+  tagText: { fontSize: 12, fontWeight: '600', color: colors.text.muted, letterSpacing: 0.2 },
+  tagTextActive: { color: colors.accent.blue },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -745,6 +777,7 @@ export default function TasksScreen() {
   const [sort, setSort]           = useState<SortKey>('deadline');
   const [sortOpen, setSortOpen]   = useState(false);
   const [filter, setFilter]       = useState<FilterKey>('all');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [confirmTask, setConfirmTask] = useState<Task | null>(null);
   const [detailTask, setDetailTask]   = useState<Task | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -754,12 +787,24 @@ export default function TasksScreen() {
   const active    = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
   const done      = useMemo(() => tasks.filter(t => t.status === 'done').slice(0, 30), [tasks]);
 
+  const availableTags = useMemo(() => {
+    const freq: Record<string, number> = {};
+    for (const t of active) {
+      for (const tag of t.tags ?? []) {
+        if (tag) freq[tag] = (freq[tag] ?? 0) + 1;
+      }
+    }
+    return Object.entries(freq).sort(([,a],[,b]) => b - a).slice(0, 8).map(([tag]) => tag);
+  }, [active]);
+
   const filtered  = useMemo(() => {
-    if (filter === 'urgent')  return active.filter(t => t.priority === 'high');
-    if (filter === 'today')   return active.filter(t => t.deadline?.startsWith(today));
-    if (filter === 'snoozed') return active.filter(t => t.status === 'snoozed');
-    return active;
-  }, [active, filter, today]);
+    let base = active;
+    if (filter === 'urgent')  base = base.filter(t => t.priority === 'high');
+    else if (filter === 'today')   base = base.filter(t => t.deadline?.startsWith(today));
+    else if (filter === 'snoozed') base = base.filter(t => t.status === 'snoozed');
+    if (tagFilter) base = base.filter(t => (t.tags ?? []).includes(tagFilter));
+    return base;
+  }, [active, filter, tagFilter, today]);
 
   const filterCounts = useMemo<Record<FilterKey, number>>(() => ({
     all:     active.length,
@@ -841,7 +886,14 @@ export default function TasksScreen() {
         </View>
 
         {/* Filter pills */}
-        <FilterPills filter={filter} onSelect={setFilter} counts={filterCounts} />
+        <FilterPills
+          filter={filter}
+          onSelect={setFilter}
+          counts={filterCounts}
+          tags={availableTags}
+          tagFilter={tagFilter}
+          onTagSelect={setTagFilter}
+        />
 
         {/* List */}
         <FlatList
@@ -888,10 +940,11 @@ export default function TasksScreen() {
           ListEmptyComponent={
             <View style={s.empty}>
               <Text style={s.emptyTitle}>
-                {filter === 'all' ? 'Brak zadań' : 'Brak wyników'}
+                {filter === 'all' && !tagFilter ? 'Brak zadań' : 'Brak wyników'}
               </Text>
               <Text style={s.emptySub}>
-                {filter === 'all'     ? 'Naciśnij + żeby dodać pierwsze' :
+                {tagFilter ? `Brak zadań z tagiem #${tagFilter}` :
+                 filter === 'all'     ? 'Naciśnij + żeby dodać pierwsze' :
                  filter === 'urgent'  ? 'Brak zadań o wysokim priorytecie' :
                  filter === 'today'   ? 'Brak zadań na dziś' :
                                         'Brak odłożonych zadań'}
