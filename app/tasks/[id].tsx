@@ -29,6 +29,14 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
 
+const G = {
+  card:       '#0D2318',
+  cardBorder: 'rgba(61,190,117,0.18)',
+  accent:     '#3DBE75',
+  accentDim:  'rgba(61,190,117,0.14)',
+  muted:      'rgba(61,190,117,0.45)',
+};
+
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
   const d = new Date();
@@ -42,7 +50,7 @@ function fmtDate(iso?: string) {
 // ─── Difficulty bar ───────────────────────────────────────────────────────────
 
 function DiffPicker({ value, onChange }: { value?: TaskDifficulty; onChange: (v: TaskDifficulty) => void }) {
-  const col = (v?: TaskDifficulty) => !v ? colors.text.muted : v <= 2 ? colors.accent.green : v === 3 ? colors.accent.amber : colors.accent.red;
+  const col = (v?: TaskDifficulty) => !v ? colors.text.muted : v <= 2 ? G.accent : v === 3 ? colors.accent.amber : colors.accent.red;
   const labels = ['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'] as const;
   return (
     <View style={dp.row}>
@@ -113,10 +121,10 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
 const rw = StyleSheet.create({
   wrap: {
     gap: spacing[2], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: G.cardBorder,
   },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  label: { fontSize: 10, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  label: { fontSize: 10, fontWeight: '700', color: G.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -187,9 +195,9 @@ export default function TaskDetailScreen() {
 
       // Reschedule or cancel reminder
       notificationsService.cancelTaskReminder(id!).catch(() => {});
-      if (reminderTime && deadline.trim()) {
+      if (reminderTime) {
         notificationsService.scheduleCustomTaskReminder(
-          id!, title.trim(), deadline.trim(), reminderTime, reminderMessage,
+          id!, title.trim(), deadline.trim() || todayStr(), reminderTime, reminderMessage,
         ).catch(() => {});
       }
 
@@ -383,7 +391,7 @@ export default function TaskDetailScreen() {
                   activeOpacity={0.75}
                 >
                   {sub.done
-                    ? <CheckSquare size={16} color={colors.accent.green} />
+                    ? <CheckSquare size={16} color={G.accent} />
                     : <Square size={16} color='rgba(255,255,255,0.25)' />
                   }
                   <Text style={[styles.subTitle, sub.done && styles.subTitleDone]} numberOfLines={2}>
@@ -426,7 +434,7 @@ export default function TaskDetailScreen() {
                       }}
                       style={styles.subAddBtn}
                     >
-                      <Check size={13} color={colors.accent.green} strokeWidth={3} />
+                      <Check size={13} color={G.accent} strokeWidth={3} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -480,10 +488,10 @@ export default function TaskDetailScreen() {
                     activeOpacity={0.8}
                   >
                     {reminderOn
-                      ? <Bell size={13} color={colors.accent.green} />
+                      ? <Bell size={13} color={G.accent} />
                       : <BellOff size={13} color={colors.text.muted} />
                     }
-                    <Text style={[styles.reminderBtnText, reminderOn && { color: colors.accent.green }]}>
+                    <Text style={[styles.reminderBtnText, reminderOn && { color: G.accent }]}>
                       {reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : 'Dodaj przypomnienie'}
                     </Text>
                   </TouchableOpacity>
@@ -491,19 +499,19 @@ export default function TaskDetailScreen() {
                     <>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
                         <TouchableOpacity onPress={() => setReminderHour(h => (h + 23) % 24)} style={styles.stepBtn}>
-                          <ChevronUp size={12} color={colors.text.secondary} />
+                          <ChevronUp size={12} color={G.accent} />
                         </TouchableOpacity>
                         <Text style={styles.stepVal}>{pad(reminderHour)}</Text>
                         <TouchableOpacity onPress={() => setReminderHour(h => (h + 1) % 24)} style={styles.stepBtn}>
-                          <ChevronDown size={12} color={colors.text.secondary} />
+                          <ChevronDown size={12} color={G.accent} />
                         </TouchableOpacity>
-                        <Text style={{ color: colors.text.muted, fontSize: 18, fontWeight: '700' }}>:</Text>
+                        <Text style={{ color: G.muted, fontSize: 18, fontWeight: '700' }}>:</Text>
                         <TouchableOpacity onPress={() => setReminderMin(m => (m + 55) % 60)} style={styles.stepBtn}>
-                          <ChevronUp size={12} color={colors.text.secondary} />
+                          <ChevronUp size={12} color={G.accent} />
                         </TouchableOpacity>
                         <Text style={styles.stepVal}>{pad(reminderMin)}</Text>
                         <TouchableOpacity onPress={() => setReminderMin(m => (m + 5) % 60)} style={styles.stepBtn}>
-                          <ChevronDown size={12} color={colors.text.secondary} />
+                          <ChevronDown size={12} color={G.accent} />
                         </TouchableOpacity>
                       </View>
                       <TextInput
@@ -638,10 +646,10 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.card, borderWidth: 1, borderColor: G.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  saveBtn: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  saveBtn: { backgroundColor: G.accent, borderColor: G.accent },
   headerActions: { flexDirection: 'row', gap: spacing[2] },
 
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: spacing[10] },
@@ -656,13 +664,13 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', gap: spacing[2] },
   statusBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.card, borderRadius: radius.full,
+    borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
   },
   statusBtnDone: {
-    backgroundColor: colors.accent.green,
-    borderColor: colors.accent.green,
+    backgroundColor: G.accent,
+    borderColor: G.accent,
   },
   statusText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
   pomStartBtn: {
@@ -674,51 +682,52 @@ const styles = StyleSheet.create({
   pomStartText: { fontSize: 13, fontWeight: '600', color: colors.accent.purple },
 
   sectionCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.card,
+    borderRadius: radius.xl, borderWidth: 1, borderColor: G.cardBorder,
     padding: spacing[4], gap: spacing[1],
   },
   sectionCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
-  sectionCardLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  sectionCardLabel: { fontSize: 10, fontWeight: '700', color: G.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   pomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[2] },
   fieldLabel: { fontSize: 12, color: colors.text.secondary },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   stepBtn: {
     width: 28, height: 28, borderRadius: radius.sm,
-    backgroundColor: colors.bg.elevated, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: G.accentDim, borderWidth: 1, borderColor: G.cardBorder,
+    alignItems: 'center', justifyContent: 'center',
   },
-  stepBtnText: { fontSize: 16, color: colors.text.primary, lineHeight: 18 },
-  stepVal: { fontSize: 18, fontWeight: '700', color: colors.text.primary, minWidth: 24, textAlign: 'center' },
+  stepBtnText: { fontSize: 16, color: G.accent, lineHeight: 18 },
+  stepVal: { fontSize: 18, fontWeight: '700', color: G.accent, minWidth: 24, textAlign: 'center' },
 
   fieldValue: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
   fieldInput: {
     fontSize: 14, color: colors.text.primary, lineHeight: 20,
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
 
   priorityRow: { flexDirection: 'row', gap: spacing[2] },
   priorityPill: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   priorityText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
 
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   tagChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.bg.elevated, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: G.accentDim, borderRadius: radius.full,
+    borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: 5,
   },
-  tagText: { fontSize: 12, color: colors.text.secondary },
-  tagX: { fontSize: 14, color: colors.text.muted, lineHeight: 16 },
+  tagText: { fontSize: 12, color: G.accent, fontWeight: '600' },
+  tagX: { fontSize: 14, color: G.muted, lineHeight: 16 },
   tagInputRow: {
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   tagInput: { fontSize: 13, color: colors.text.primary },
@@ -729,13 +738,13 @@ const styles = StyleSheet.create({
   },
   metaText: { fontSize: 11, color: colors.text.muted },
 
-  subtaskProgress: { fontSize: 11, fontWeight: '700', color: colors.accent.blue, marginLeft: 'auto' },
+  subtaskProgress: { fontSize: 11, fontWeight: '700', color: G.accent, marginLeft: 'auto' },
   subProgressTrack: { height: 2, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 1, overflow: 'hidden' },
   subProgressFill: { height: 2, borderRadius: 1 },
   subRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: spacing[2],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: G.cardBorder,
   },
   subTitle: { flex: 1, fontSize: 14, color: colors.text.primary, lineHeight: 19 },
   subTitleDone: { textDecorationLine: 'line-through', color: colors.text.muted },
@@ -743,7 +752,7 @@ const styles = StyleSheet.create({
   subInputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginTop: spacing[1], paddingTop: spacing[2],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
+    borderTopWidth: 1, borderTopColor: G.cardBorder,
   },
   subInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: spacing[1] },
   subAddBtn: { padding: 4 },
@@ -752,21 +761,21 @@ const styles = StyleSheet.create({
   recurPill: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+    borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  recurPillActive: { borderColor: colors.accent.primary, backgroundColor: colors.accent.primary + '20' },
+  recurPillActive: { borderColor: G.accent, backgroundColor: G.accentDim },
   recurText: { fontSize: 12, fontWeight: '500', color: colors.text.muted },
-  recurTextActive: { color: colors.accent.primary, fontWeight: '700' },
+  recurTextActive: { color: G.accent, fontWeight: '700' },
 
   reminderBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+    borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)',
   },
   reminderBtnOn: {
-    borderColor: colors.accent.green + '50',
-    backgroundColor: colors.accent.green + '10',
+    borderColor: G.accent + '55',
+    backgroundColor: G.accentDim,
   },
   reminderBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
 
