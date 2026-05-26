@@ -27,11 +27,11 @@ const PRIORITY_OPTIONS: { value: EventPriority; label: string; color: string }[]
 const EVENT_COLORS = ['#6C63FF', '#43D98F', '#FF6584', '#FFBE55', '#55B4FF', '#A78BFA'];
 
 export default function AddCalendarModal() {
-  const params = useLocalSearchParams<{ startTime?: string; type?: string }>();
+  const params = useLocalSearchParams<{ startTime?: string; type?: string; date?: string }>();
   const [type, setType] = useState<FormType>(params.type === 'event' ? 'event' : 'task');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState(params.date ?? '');
   const [startTime, setStartTime] = useState(params.startTime ?? '');
   const [endTime, setEndTime] = useState('');
   const [priority, setPriority] = useState<EventPriority>('normal');
