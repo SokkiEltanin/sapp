@@ -15,6 +15,7 @@ import {
   CalendarDays, Settings, Wallet,
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
+  Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -47,6 +48,17 @@ import { haptic } from '@/utils/haptics';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SWEETS_TAGS = ['słodycze'];
+
+const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
+  droplets:    Droplets,
+  dumbbell:    Dumbbell,
+  'book-open': BookOpen,
+  moon:        Moon,
+  zap:         Zap,
+  heart:       Heart,
+  sun:         Sun,
+  bike:        Bike,
+};
 const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
 const WEEKS_BACK  = 8;
 
@@ -241,7 +253,7 @@ export default function DashboardScreen() {
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const { tasks, isLoading: tasksLoading, reload: reloadTasks, toggle: toggleTask } = useTasks();
-  const { habits, todayDone: habitsDoneIds, toggle: toggleHabit, getStreak } = useHabits();
+  const { habits, todayDone: habitsDoneIds, toggle: toggleHabit, increment: incrementHabit, getTodayCount, getStreak } = useHabits();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood, addEntry } = useMoodStore();
   const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
@@ -839,22 +851,42 @@ export default function DashboardScreen() {
 
                   {/* Per-habit quick dots */}
                   <View style={s.habitsDotsRow}>
-                    {habits.slice(0, 8).map(h => {
+                    {habits.slice(0, 7).map(h => {
                       const done = habitsDoneIds.includes(h.id);
+                      const isCount = h.type === 'count';
+                      const count = isCount ? getTodayCount(h.id) : 0;
+                      const goal = h.dailyGoal ?? 1;
+                      const HIcon = HABIT_ICON_MAP[h.icon] ?? Zap;
                       return (
                         <TouchableOpacity
                           key={h.id}
-                          onPress={(e) => { (e as any).stopPropagation?.(); haptic.tap(); toggleHabit(h.id); }}
+                          onPress={(e) => {
+                            (e as any).stopPropagation?.();
+                            if (isCount && !done) {
+                              haptic.tap();
+                              incrementHabit(h.id);
+                            } else if (!isCount) {
+                              haptic.tap();
+                              toggleHabit(h.id);
+                            }
+                          }}
                           style={[
                             s.habitsDot,
-                            { backgroundColor: done ? h.color + 'CC' : h.color + '20', borderColor: h.color + (done ? 'CC' : '50') },
+                            { backgroundColor: done ? h.color + 'CC' : h.color + '20', borderColor: h.color + (done ? 'CC' : '40') },
                           ]}
                           activeOpacity={0.7}
-                        />
+                        >
+                          <HIcon size={12} color={done ? colors.bg.primary : h.color} strokeWidth={2} />
+                          {isCount && !done && count > 0 && (
+                            <View style={[s.habitCountBadge, { backgroundColor: h.color }]}>
+                              <Text style={s.habitCountText}>{count}</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
                       );
                     })}
-                    {habits.length > 8 && (
-                      <Text style={s.habitsMore}>+{habits.length - 8}</Text>
+                    {habits.length > 7 && (
+                      <Text style={s.habitsMore}>+{habits.length - 7}</Text>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -1196,11 +1228,19 @@ const s = StyleSheet.create({
     borderRadius: 2, overflow: 'hidden',
   },
   habitsFill: { height: 3, borderRadius: 2 },
-  habitsDotsRow: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
+  habitsDotsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   habitsDot: {
-    width: 22, height: 22, borderRadius: 11,
+    width: 32, height: 32, borderRadius: 16,
     borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
   },
+  habitCountBadge: {
+    position: 'absolute', bottom: -3, right: -3,
+    minWidth: 14, height: 14, borderRadius: 7,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  habitCountText: { fontSize: 8, fontWeight: '800', color: colors.bg.primary },
   habitsMore: { fontSize: 11, color: colors.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
