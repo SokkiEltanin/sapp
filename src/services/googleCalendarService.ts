@@ -86,6 +86,55 @@ export const googleCalendarService = {
     return token;
   },
 
+  async createEvent(opts: {
+    title: string;
+    description?: string;
+    date: string;       // YYYY-MM-DD
+    startTime?: string; // HH:mm
+    endTime?: string;   // HH:mm
+    allDay?: boolean;
+  }): Promise<string | null> {
+    let token = await this.getToken();
+    if (!token) return null;
+
+    const isAllDay = opts.allDay || !opts.startTime;
+    const tz = 'Europe/Warsaw';
+    const body: Record<string, any> = {
+      summary: opts.title,
+      description: opts.description ?? '',
+    };
+
+    if (isAllDay) {
+      const nextDay = new Date(opts.date + 'T00:00:00');
+      nextDay.setDate(nextDay.getDate() + 1);
+      body.start = { date: opts.date };
+      body.end   = { date: nextDay.toISOString().slice(0, 10) };
+    } else {
+      body.start = { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz };
+      body.end   = { dateTime: `${opts.date}T${opts.endTime || opts.startTime}:00`, timeZone: tz };
+    }
+
+    let resp = await fetch(BASE, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (resp.status === 401) {
+      const fresh = await this.refreshToken();
+      if (!fresh) return null;
+      resp = await fetch(BASE, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${fresh}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.id ?? null;
+  },
+
   async updateEvent(appId: string, updates: {
     title?: string;
     description?: string;

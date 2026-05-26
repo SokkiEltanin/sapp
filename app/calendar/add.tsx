@@ -12,6 +12,7 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import PressableScale from '@/components/ui/PressableScale';
 import { EventPriority, TaskStatus } from '@/types';
 import { calendarService, tasksService } from '@/services/calendarService';
+import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -64,16 +65,32 @@ export default function AddCalendarModal() {
           addTask(task);
         });
       } else {
+        const dateStr = deadline.trim() || selectedDate;
+        const st = startTime.trim() || undefined;
+        const et = endTime.trim() || undefined;
+        const isAllDay = !st;
+
         const event = await calendarService.addEvent({
           title: title.trim(),
           description: description.trim() || undefined,
-          date: (deadline.trim() || selectedDate) + 'T12:00:00.000Z',
-          startTime: startTime.trim() || undefined,
-          endTime: endTime.trim() || undefined,
-          allDay: !startTime.trim(),
+          date: dateStr + 'T12:00:00.000Z',
+          startTime: st,
+          endTime: et,
+          allDay: isAllDay,
           priority,
           color: eventColor,
         });
+
+        // Also push to Google Calendar if connected (fire-and-forget)
+        googleCalendarService.createEvent({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          date: dateStr,
+          startTime: st,
+          endTime: et,
+          allDay: isAllDay,
+        }).catch(() => {});
+
         router.back();
         InteractionManager.runAfterInteractions(() => {
           addEvent(event);
