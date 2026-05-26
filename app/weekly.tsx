@@ -171,7 +171,7 @@ export default function WeeklyScreen() {
   const weekTasks = useMemo(() => {
     const [from, to] = [dates[0], dates[6]];
     return tasks.filter(t => {
-      const d = (t.deadline ?? t.updatedAt ?? '').split('T')[0];
+      const d = (t.deadline ?? t.scheduledDate ?? t.updatedAt ?? '').split('T')[0];
       return d >= from && d <= to;
     });
   }, [tasks, dates]);
