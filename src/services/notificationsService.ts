@@ -306,8 +306,30 @@ export const notificationsService = {
     }).catch(() => {});
   },
 
+  async scheduleCustomTaskReminder(
+    taskId: string,
+    title: string,
+    date: string,       // YYYY-MM-DD
+    time: string,       // HH:mm
+    customMessage?: string,
+  ): Promise<void> {
+    const [h, m] = time.split(':').map(Number);
+    const fire = new Date(`${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+    if (fire <= new Date()) return;
+    await Notifications.scheduleNotificationAsync({
+      identifier: `task-reminder-${taskId}`,
+      content: {
+        title: title,
+        body: customMessage || `Przypomnienie: ${title}`,
+        data: { screen: 'tasks', taskId },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+    }).catch(() => {});
+  },
+
   async cancelTaskReminder(taskId: string): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(`task-${taskId}`).catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync(`task-reminder-${taskId}`).catch(() => {});
     await Notifications.cancelScheduledNotificationAsync(`task-humor-${taskId}`).catch(() => {});
   },
 

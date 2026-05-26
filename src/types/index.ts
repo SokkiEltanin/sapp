@@ -133,6 +133,8 @@ export interface Task {
   recurring?: TaskRecurring;
   postCompletionMood?: MoodLevel;
   subtasks?: Subtask[];
+  reminderTime?: string;    // HH:mm — custom reminder time
+  reminderMessage?: string; // custom notification text
   createdAt: string;
   updatedAt: string;
 }

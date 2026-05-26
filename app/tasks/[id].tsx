@@ -8,7 +8,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import {
   ArrowLeft, Trash2, Check, Timer, Edit3, Save,
   Calendar, Flag, AlignLeft, Tag, Clock, RefreshCw, BellOff, Bell,
-  Plus, CheckSquare, Square, X as XIcon,
+  Plus, CheckSquare, Square, X as XIcon, ChevronUp, ChevronDown,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -24,6 +24,7 @@ const RECURRING_OPTIONS: { value: TaskRecurring; label: string }[] = [
   { value: 'monthly', label: 'Co miesiąc' },
 ];
 import { tasksService } from '@/services/calendarService';
+import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
@@ -140,6 +141,11 @@ export default function TaskDetailScreen() {
   const [recurring, setRecurring]       = useState<TaskRecurring>(task?.recurring ?? 'none');
   const [subtaskInput, setSubtaskInput] = useState('');
   const [saving, setSaving]             = useState(false);
+  const [reminderOn, setReminderOn]     = useState(!!task?.reminderTime);
+  const reminderParts = task?.reminderTime?.split(':').map(Number) ?? [9, 0];
+  const [reminderHour, setReminderHour] = useState(reminderParts[0]);
+  const [reminderMin, setReminderMin]   = useState(reminderParts[1]);
+  const [reminderMsg, setReminderMsg]   = useState(task?.reminderMessage ?? '');
   const [moodModal, setMoodModal]       = useState(false);
   const [moodTaskTitle, setMoodTaskTitle] = useState('');
 
@@ -163,6 +169,9 @@ export default function TaskDetailScreen() {
     setSaving(true);
     try {
       const deadlineIso = deadline.trim() ? deadline.trim() + 'T23:59:00.000Z' : undefined;
+      const reminderTime = reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : undefined;
+      const reminderMessage = reminderOn && reminderMsg.trim() ? reminderMsg.trim() : undefined;
+
       await update(id!, {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -172,7 +181,18 @@ export default function TaskDetailScreen() {
         estimatedPomodoros: pomodoros > 0 ? pomodoros : undefined,
         tags,
         recurring,
+        reminderTime,
+        reminderMessage,
       });
+
+      // Reschedule or cancel reminder
+      notificationsService.cancelTaskReminder(id!).catch(() => {});
+      if (reminderTime && deadline.trim()) {
+        notificationsService.scheduleCustomTaskReminder(
+          id!, title.trim(), deadline.trim(), reminderTime, reminderMessage,
+        ).catch(() => {});
+      }
+
       setEditing(false);
       toast.success('Zapisano');
     } catch (e: any) {
@@ -451,6 +471,61 @@ export default function TaskDetailScreen() {
               )}
             </Row>
 
+            <Row icon={<Bell size={12} color={colors.text.muted} />} label="Przypomnienie">
+              {editing ? (
+                <View style={{ gap: spacing[2] }}>
+                  <TouchableOpacity
+                    style={[styles.reminderBtn, reminderOn && styles.reminderBtnOn]}
+                    onPress={() => setReminderOn(v => !v)}
+                    activeOpacity={0.8}
+                  >
+                    {reminderOn
+                      ? <Bell size={13} color={colors.accent.green} />
+                      : <BellOff size={13} color={colors.text.muted} />
+                    }
+                    <Text style={[styles.reminderBtnText, reminderOn && { color: colors.accent.green }]}>
+                      {reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : 'Dodaj przypomnienie'}
+                    </Text>
+                  </TouchableOpacity>
+                  {reminderOn && (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                        <TouchableOpacity onPress={() => setReminderHour(h => (h + 23) % 24)} style={styles.stepBtn}>
+                          <ChevronUp size={12} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                        <Text style={styles.stepVal}>{pad(reminderHour)}</Text>
+                        <TouchableOpacity onPress={() => setReminderHour(h => (h + 1) % 24)} style={styles.stepBtn}>
+                          <ChevronDown size={12} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                        <Text style={{ color: colors.text.muted, fontSize: 18, fontWeight: '700' }}>:</Text>
+                        <TouchableOpacity onPress={() => setReminderMin(m => (m + 55) % 60)} style={styles.stepBtn}>
+                          <ChevronUp size={12} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                        <Text style={styles.stepVal}>{pad(reminderMin)}</Text>
+                        <TouchableOpacity onPress={() => setReminderMin(m => (m + 5) % 60)} style={styles.stepBtn}>
+                          <ChevronDown size={12} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                      </View>
+                      <TextInput
+                        value={reminderMsg}
+                        onChangeText={setReminderMsg}
+                        placeholder="Treść powiadomienia..."
+                        placeholderTextColor={colors.text.muted}
+                        style={[styles.fieldInput, { minHeight: 56, textAlignVertical: 'top' }]}
+                        multiline
+                      />
+                    </>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.fieldValue}>
+                  {task.reminderTime
+                    ? `${task.reminderTime}${task.reminderMessage ? ` — "${task.reminderMessage}"` : ''}`
+                    : 'Brak'}
+                </Text>
+              )}
+            </Row>
+
             <Row icon={<RefreshCw size={12} color={colors.text.muted} />} label="Powtarzanie">
               <View style={styles.recurRow}>
                 {RECURRING_OPTIONS.map(opt => {
@@ -682,6 +757,18 @@ const styles = StyleSheet.create({
   recurPillActive: { borderColor: colors.accent.primary, backgroundColor: colors.accent.primary + '20' },
   recurText: { fontSize: 12, fontWeight: '500', color: colors.text.muted },
   recurTextActive: { color: colors.accent.primary, fontWeight: '700' },
+
+  reminderBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+  },
+  reminderBtnOn: {
+    borderColor: colors.accent.green + '50',
+    backgroundColor: colors.accent.green + '10',
+  },
+  reminderBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
 
   snoozedBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],

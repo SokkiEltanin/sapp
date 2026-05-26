@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TextInput,
@@ -6,239 +6,82 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Check, CalendarDays, Flag, AlignLeft, Timer, Tag, Clock, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react-native';
+import {
+  X, Check, CalendarDays, Flag, AlignLeft, Timer,
+  Bell, BellOff, ChevronUp, ChevronDown,
+} from 'lucide-react-native';
 
-import AnimatedButton from '@/components/ui/AnimatedButton';
-import PressableScale from '@/components/ui/PressableScale';
-import InputField from '@/components/ui/InputField';
-import GlassCard from '@/components/ui/GlassCard';
-import DatePickerField from '@/components/ui/DatePickerField';
 import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring } from '@/types';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { toast } from '@/store/toastStore';
-import { colors, spacing, radius, typography } from '@/theme';
+import { colors, spacing, radius } from '@/theme';
+import { haptic } from '@/utils/haptics';
+
+// ─── Green palette ────────────────────────────────────────────────────────────
+
+const G = {
+  card:       '#0D2318',
+  cardBorder: 'rgba(61,190,117,0.18)',
+  accent:     '#3DBE75',
+  accentDim:  'rgba(61,190,117,0.14)',
+  muted:      'rgba(61,190,117,0.45)',
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────���───────────
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+function offsetDate(days: number): string {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
-// ─── Priority ─────────────────────────────────────────────────────────────────
+// ─── Quick deadline chips ──────────────────��──────────────────────────────────
 
-const PRIORITIES: { value: EventPriority; label: string; sub: string; color: string }[] = [
-  { value: 'low',    label: 'Niskie',   sub: 'kiedyś', color: colors.text.muted },
-  { value: 'normal', label: 'Normalne', sub: 'wkrótce', color: colors.text.secondary },
-  { value: 'high',   label: 'Pilne',    sub: 'asap',   color: colors.accent.danger },
+const DEADLINE_CHIPS = [
+  { label: 'Bez terminu', value: null },
+  { label: 'Dziś',        value: 0 },
+  { label: 'Jutro',       value: 1 },
+  { label: 'Ten tydz.',   value: 7 },
+] as const;
+
+// ─── Priority chips ───────────────────────────────────────────────────��───────
+
+const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
+  { value: 'low',    label: 'Niskie',   color: colors.text.muted },
+  { value: 'normal', label: 'Normalne', color: G.accent },
+  { value: 'high',   label: 'Pilne',    color: colors.accent.red },
 ];
 
-// ─── Difficulty ───────────────────────────────────────────────────────────────
+// ─── Time picker ──────────────────────���───────────────────────────��───────────
 
-function diffColor(level: TaskDifficulty): string {
-  if (level <= 2) return colors.accent.success;
-  if (level === 3) return colors.accent.warning;
-  return colors.accent.danger;
-}
-
-function DifficultyPicker({
-  value, onChange,
-}: { value: TaskDifficulty | undefined; onChange: (v: TaskDifficulty) => void }) {
-  return (
-    <View style={diff.row}>
-      {([1, 2, 3, 4, 5] as TaskDifficulty[]).map((d) => {
-        const active = value !== undefined && d <= value;
-        const color  = value ? diffColor(value) : 'rgba(255,255,255,0.15)';
-        return (
-          <PressableScale key={d} onPress={() => onChange(d)} style={diff.dotWrap}>
-            <View style={[
-              diff.dot,
-              { backgroundColor: active ? color : 'rgba(255,255,255,0.08)' },
-              active && { width: 18, height: 18 },
-            ]} />
-          </PressableScale>
-        );
-      })}
-      {value !== undefined && (
-        <Text style={[diff.label, { color: diffColor(value) }]}>
-          {['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'][value]}
-        </Text>
-      )}
-    </View>
-  );
-}
-
-const diff = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dotWrap: { padding: 4 },
-  dot: { width: 14, height: 14, borderRadius: 7 },
-  label: { fontSize: 12, fontWeight: '600', marginLeft: spacing[1] },
-});
-
-// ─── Pomodoro stepper ─────────────────────────────────────────────────────────
-
-function PomodoroStepper({
-  value, onChange,
-}: { value: number; onChange: (v: number) => void }) {
-  return (
-    <View style={pom.row}>
-      <PressableScale
-        onPress={() => onChange(Math.max(0, value - 1))}
-        style={[pom.btn, value === 0 && pom.btnDisabled]}
-      >
-        <Text style={pom.btnText}>−</Text>
-      </PressableScale>
-      <View style={pom.display}>
-        <Text style={pom.count}>{value}</Text>
-        <Text style={pom.unit}>× 25 min</Text>
-      </View>
-      <PressableScale
-        onPress={() => onChange(Math.min(12, value + 1))}
-        style={pom.btn}
-      >
-        <Text style={pom.btnText}>+</Text>
-      </PressableScale>
-      {value > 0 && (
-        <Text style={pom.total}>{value * 25} min łącznie</Text>
-      )}
-    </View>
-  );
-}
-
-const pom = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  btn: {
-    width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  btnDisabled: { opacity: 0.35 },
-  btnText: { color: colors.text.primary, fontSize: 18, lineHeight: 20 },
-  display: { alignItems: 'center', minWidth: 50 },
-  count: { fontSize: 22, fontWeight: '700', color: colors.text.primary, lineHeight: 26 },
-  unit: { fontSize: 9, color: colors.text.muted },
-  total: { fontSize: 11, color: colors.text.secondary, marginLeft: spacing[1] },
-});
-
-// ─── Tag input ────────────────────────────────────────────────────────────────
-
-function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
-  const [input, setInput] = useState('');
-
-  const add = () => {
-    const t = input.trim().toLowerCase().replace(/\s+/g, '_');
-    if (t && !tags.includes(t)) onChange([...tags, t]);
-    setInput('');
-  };
-
-  return (
-    <View style={tag.wrap}>
-      <View style={tag.row}>
-        {tags.map((t) => (
-          <PressableScale key={t} onPress={() => onChange(tags.filter((x) => x !== t))}>
-            <View style={tag.chip}>
-              <Text style={tag.chipText}>#{t}</Text>
-              <X size={9} color={colors.text.muted} />
-            </View>
-          </PressableScale>
-        ))}
-      </View>
-      <View style={tag.inputRow}>
-        <TextInput
-          value={input}
-          onChangeText={setInput}
-          onSubmitEditing={add}
-          placeholder="Dodaj tag..."
-          placeholderTextColor={colors.text.muted}
-          style={tag.input}
-          returnKeyType="done"
-          blurOnSubmit={false}
-        />
-        {input.trim().length > 0 && (
-          <PressableScale onPress={add} style={tag.addBtn}>
-            <Check size={13} color={colors.accent.success} strokeWidth={3} />
-          </PressableScale>
-        )}
-      </View>
-    </View>
-  );
-}
-
-const tag = StyleSheet.create({
-  wrap: { gap: spacing[2] },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: spacing[3], paddingVertical: 5,
-  },
-  chipText: { fontSize: 11, color: colors.text.secondary, fontWeight: '500' },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: spacing[3], minHeight: 40,
-  },
-  input: { flex: 1, ...typography.body, color: colors.text.primary, fontSize: 13 },
-  addBtn: { padding: 4 },
-});
-
-// ─── Recurring options ────────────────────────────────────────────────────────
-
-const RECURRING_OPTIONS: { value: TaskRecurring; label: string }[] = [
-  { value: 'none',    label: 'Brak' },
-  { value: 'daily',   label: 'Codziennie' },
-  { value: 'weekly',  label: 'Co tydzień' },
-  { value: 'monthly', label: 'Co miesiąc' },
-];
-
-// ─── Section label ────────────────────────────────────────────────────────────
-
-function SectionLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <View style={sec.row}>
-      {icon}
-      <Text style={sec.text}>{label}</Text>
-    </View>
-  );
-}
-
-const sec = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
-  text: { fontSize: 11, fontWeight: '600', color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
-});
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-function pad2(n: number) { return String(n).padStart(2, '0'); }
-
-// ─── Time slot picker ─────────────────────────────────────────────────────────
-
-function TimeSlotPicker({ hour, minute, onChange }: {
+function TimePicker({ hour, minute, onChange }: {
   hour: number; minute: number; onChange: (h: number, m: number) => void;
 }) {
   return (
     <View style={tp.row}>
       <View style={tp.unit}>
-        <TouchableOpacity onPress={() => onChange((hour + 23) % 24, minute)} style={tp.arrow}>
-          <ChevronUp size={14} color={colors.text.secondary} />
+        <TouchableOpacity onPress={() => onChange((hour + 23) % 24, minute)} style={tp.arrow} activeOpacity={0.7}>
+          <ChevronUp size={14} color={G.accent} />
         </TouchableOpacity>
-        <Text style={tp.digit}>{pad2(hour)}</Text>
-        <TouchableOpacity onPress={() => onChange((hour + 1) % 24, minute)} style={tp.arrow}>
-          <ChevronDown size={14} color={colors.text.secondary} />
+        <Text style={tp.digit}>{pad(hour)}</Text>
+        <TouchableOpacity onPress={() => onChange((hour + 1) % 24, minute)} style={tp.arrow} activeOpacity={0.7}>
+          <ChevronDown size={14} color={G.accent} />
         </TouchableOpacity>
       </View>
       <Text style={tp.sep}>:</Text>
       <View style={tp.unit}>
-        <TouchableOpacity onPress={() => onChange(hour, (minute + 55) % 60)} style={tp.arrow}>
-          <ChevronUp size={14} color={colors.text.secondary} />
+        <TouchableOpacity onPress={() => onChange(hour, (minute + 55) % 60)} style={tp.arrow} activeOpacity={0.7}>
+          <ChevronUp size={14} color={G.accent} />
         </TouchableOpacity>
-        <Text style={tp.digit}>{pad2(minute)}</Text>
-        <TouchableOpacity onPress={() => onChange(hour, (minute + 5) % 60)} style={tp.arrow}>
-          <ChevronDown size={14} color={colors.text.secondary} />
+        <Text style={tp.digit}>{pad(minute)}</Text>
+        <TouchableOpacity onPress={() => onChange(hour, (minute + 5) % 60)} style={tp.arrow} activeOpacity={0.7}>
+          <ChevronDown size={14} color={G.accent} />
         </TouchableOpacity>
       </View>
     </View>
@@ -246,356 +89,591 @@ function TimeSlotPicker({ hour, minute, onChange }: {
 }
 
 const tp = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   unit: { alignItems: 'center', gap: 2 },
   arrow: {
-    width: 32, height: 26, borderRadius: radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 28, borderRadius: radius.sm,
+    backgroundColor: G.accentDim, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: G.cardBorder,
   },
-  digit: { fontSize: 22, fontWeight: '800', color: colors.text.primary, minWidth: 38, textAlign: 'center' },
-  sep: { fontSize: 22, fontWeight: '800', color: colors.text.muted, marginBottom: 2 },
+  digit: { fontSize: 24, fontWeight: '800', color: G.accent, minWidth: 40, textAlign: 'center' },
+  sep: { fontSize: 24, fontWeight: '800', color: G.muted, marginBottom: 2 },
 });
 
+// ─── Section card ────────────────────��───────────────────────────────────���────
+
+function SectionCard({ label, icon, children }: {
+  label: string; icon: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <View style={sc.card}>
+      <View style={sc.header}>
+        {icon}
+        <Text style={sc.label}>{label}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+const sc = StyleSheet.create({
+  card: {
+    backgroundColor: G.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder, padding: spacing[4], gap: spacing[3],
+  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  label: { fontSize: 10, fontWeight: '700', color: G.muted, textTransform: 'uppercase', letterSpacing: 1.1 },
+});
+
+// ─── Screen ───────────────────────────��──────────────────────────────��────────
+
 export default function AddTaskScreen() {
-  const [title, setTitle]           = useState('');
+  const [title, setTitle]             = useState('');
   const [description, setDescription] = useState('');
-  const [deadline, setDeadline]     = useState('');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [priority, setPriority]     = useState<EventPriority>('normal');
-  const [difficulty, setDifficulty] = useState<TaskDifficulty | undefined>(undefined);
-  const [pomodoros, setPomodoros]   = useState(0);
-  const [tags, setTags]             = useState<string[]>([]);
-  const [recurring, setRecurring]   = useState<TaskRecurring>('none');
-  const [saving, setSaving]         = useState(false);
-  const [timeEnabled, setTimeEnabled] = useState(false);
-  const [timeHour, setTimeHour]     = useState(9);
-  const [timeMin, setTimeMin]       = useState(0);
+  const [deadline, setDeadline]       = useState('');
+  const [priority, setPriority]       = useState<EventPriority>('normal');
+  const [saving, setSaving]           = useState(false);
+
+  // Reminder
+  const [reminderOn, setReminderOn]       = useState(false);
+  const [reminderHour, setReminderHour]   = useState(9);
+  const [reminderMin, setReminderMin]     = useState(0);
+  const [reminderMsg, setReminderMsg]     = useState('');
+
+  // Advanced (collapsed by default)
+  const [showAdvanced, setShowAdvanced]   = useState(false);
+  const [difficulty, setDifficulty]       = useState<TaskDifficulty | undefined>(undefined);
+  const [pomodoros, setPomodoros]         = useState(0);
+  const [recurring, setRecurring]         = useState<TaskRecurring>('none');
+  const [tags, setTags]                   = useState<string[]>([]);
+  const [tagInput, setTagInput]           = useState('');
 
   const { selectedDate, addTask } = useCalendarStore();
+  const titleRef = useRef<TextInput>(null);
 
+  // ── Deadline chips logic ─────────────────────────────────────────────────
+  const selectDeadlineChip = (offset: number | null) => {
+    haptic.tap();
+    setDeadline(offset === null ? '' : offsetDate(offset));
+  };
+  const activeChip = (offset: number | null): boolean => {
+    if (offset === null) return !deadline;
+    return deadline === offsetDate(offset);
+  };
+
+  // ── Tags ──────��──────────────────────────────────────────────────────────
+  const addTag = () => {
+    const t = tagInput.trim().toLowerCase().replace(/\s+/g, '_');
+    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
+    setTagInput('');
+  };
+
+  // ── Save ──────────────────���──────────────────────────────────────────────
   const handleSave = async () => {
-    if (!title.trim()) {
-      toast.error('Wpisz tytuł zadania');
-      return;
-    }
+    if (!title.trim()) { toast.error('Wpisz tytuł zadania'); return; }
     setSaving(true);
     try {
-      const deadlineIso   = deadline ? deadline + 'T23:59:00.000Z' : undefined;
-      const scheduledTime = timeEnabled ? `${pad2(timeHour)}:${pad2(timeMin)}` : undefined;
+      const deadlineIso = deadline ? deadline + 'T23:59:00.000Z' : undefined;
+      const reminderTime = reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : undefined;
+      const reminderMessage = reminderOn && reminderMsg.trim() ? reminderMsg.trim() : undefined;
+
       const task = await tasksService.addTask({
         title: title.trim(),
         description: description.trim() || undefined,
         deadline: deadlineIso,
-        scheduledDate: scheduledDate || selectedDate || undefined,
-        scheduledTime,
+        scheduledDate: deadline || selectedDate || undefined,
         status: 'pending' as TaskStatus,
         priority,
-        difficulty: difficulty ?? undefined,
+        difficulty,
         estimatedPomodoros: pomodoros > 0 ? pomodoros : undefined,
         completedPomodoros: 0,
         tags,
         recurring,
+        reminderTime,
+        reminderMessage,
       });
+
+      // Schedule reminder
+      if (reminderTime && deadlineIso) {
+        notificationsService.scheduleCustomTaskReminder(
+          task.id, task.title,
+          deadline,
+          reminderTime,
+          reminderMessage,
+        ).catch(() => {});
+      }
+
       toast.success('Zadanie dodane');
       router.back();
-      InteractionManager.runAfterInteractions(() => {
-        addTask(task);
-      });
+      InteractionManager.runAfterInteractions(() => addTask(task));
     } catch (e: any) {
       setSaving(false);
       toast.error(e.message ?? 'Błąd zapisu');
     }
   };
 
+  const canSave = !!title.trim() && !saving;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={20}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
-            <X size={20} color={colors.text.secondary} />
-          </PressableScale>
-          <Text style={styles.headerTitle}>Nowe zadanie</Text>
-          <View style={{ width: 36 }} />
+
+        {/* ── Header ── */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => router.back()} style={s.closeBtn} activeOpacity={0.7}>
+            <X size={18} color={colors.text.muted} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Nowe zadanie</Text>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={!canSave}
+            style={[s.saveBtn, !canSave && s.saveBtnDisabled]}
+            activeOpacity={0.8}
+          >
+            <Check size={15} color={canSave ? colors.bg.primary : colors.text.muted} strokeWidth={2.5} />
+            <Text style={[s.saveBtnText, !canSave && { color: colors.text.muted }]}>
+              {saving ? 'Zapis...' : 'Zapisz'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={s.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Title */}
-          <View>
-            <GlassCard style={styles.titleCard}>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Co trzeba zrobić?"
-                placeholderTextColor={colors.text.muted}
-                style={styles.titleInput}
-                multiline
-                autoFocus
-              />
-            </GlassCard>
+
+          {/* ── Title card ── */}
+          <View style={s.titleCard}>
+            <TextInput
+              ref={titleRef}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Co trzeba zrobić?"
+              placeholderTextColor={G.muted}
+              style={s.titleInput}
+              multiline
+              autoFocus
+            />
           </View>
 
-          {/* Priority */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<Flag size={12} color={colors.text.muted} />} label="Priorytet" />
-              <View style={styles.priorityRow}>
-                {PRIORITIES.map((opt) => {
-                  const active = priority === opt.value;
-                  return (
-                    <PressableScale
-                      key={opt.value}
-                      onPress={() => setPriority(opt.value)}
-                      style={[
-                        styles.priorityBtn,
-                        active && { borderColor: opt.color, backgroundColor: opt.color + '12' },
-                      ]}
-                    >
-                      <Text style={[styles.priorityLabel, active && { color: opt.color, fontWeight: '700' }]}>
-                        {opt.label}
-                      </Text>
-                      <Text style={styles.prioritySub}>{opt.sub}</Text>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-            </GlassCard>
-          </View>
-
-          {/* Difficulty */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<Flag size={12} color={colors.text.muted} />} label="Trudność" />
-              <DifficultyPicker value={difficulty} onChange={setDifficulty} />
-            </GlassCard>
-          </View>
-
-          {/* Pomodoros */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<Timer size={12} color={colors.text.muted} />} label="Szacowany czas" />
-              <PomodoroStepper value={pomodoros} onChange={setPomodoros} />
-            </GlassCard>
-          </View>
-
-          {/* Recurring */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<RefreshCw size={12} color={colors.text.muted} />} label="Powtarzanie" />
-              <View style={rec.row}>
-                {RECURRING_OPTIONS.map((opt) => {
-                  const active = recurring === opt.value;
-                  return (
-                    <PressableScale
-                      key={opt.value}
-                      onPress={() => setRecurring(opt.value)}
-                      style={[rec.pill, active && rec.pillActive]}
-                    >
-                      <Text style={[rec.pillText, active && rec.pillTextActive]}>
-                        {opt.label}
-                      </Text>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-            </GlassCard>
-          </View>
-
-          {/* Deadline + scheduling */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<CalendarDays size={12} color={colors.text.muted} />} label="Termin / Zaplanuj" />
-              <View style={{ gap: spacing[3] }}>
-                {/* Quick date chips */}
-                <View style={styles.chipRow}>
+          {/* ── Deadline ── */}
+          <SectionCard
+            label="Termin"
+            icon={<CalendarDays size={12} color={G.muted} />}
+          >
+            <View style={s.chipRow}>
+              {DEADLINE_CHIPS.map(chip => {
+                const active = activeChip(chip.value);
+                return (
                   <TouchableOpacity
-                    style={[styles.chip, !deadline && styles.chipNone]}
-                    onPress={() => { setDeadline(''); setScheduledDate(''); }}
+                    key={chip.label}
+                    style={[s.deadlineChip, active && s.deadlineChipActive]}
+                    onPress={() => selectDeadlineChip(chip.value)}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.chipText, !deadline && styles.chipNoneText]}>Bez terminu</Text>
+                    <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>
+                      {chip.label}
+                    </Text>
                   </TouchableOpacity>
-                  {[
-                    { label: 'Dziś',   offset: 0 },
-                    { label: 'Jutro',  offset: 1 },
-                    { label: '+7 dni', offset: 7 },
-                  ].map(({ label, offset }) => {
-                    const d = new Date(); d.setDate(d.getDate() + offset);
-                    const iso = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-                    const active = deadline === iso;
+                );
+              })}
+            </View>
+            {deadline ? (
+              <Text style={s.deadlineDate}>{deadline}</Text>
+            ) : null}
+          </SectionCard>
+
+          {/* ── Priority ── */}
+          <SectionCard
+            label="Priorytet"
+            icon={<Flag size={12} color={G.muted} />}
+          >
+            <View style={s.priorityRow}>
+              {PRIORITIES.map(p => {
+                const active = priority === p.value;
+                return (
+                  <TouchableOpacity
+                    key={p.value}
+                    style={[s.priorityChip, active && { borderColor: p.color, backgroundColor: p.color + '18' }]}
+                    onPress={() => { haptic.tap(); setPriority(p.value); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.priorityChipText, active && { color: p.color, fontWeight: '700' }]}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </SectionCard>
+
+          {/* ── Reminder ── */}
+          <SectionCard
+            label="Powiadomienie"
+            icon={<Bell size={12} color={reminderOn ? G.accent : G.muted} />}
+          >
+            {/* Toggle */}
+            <TouchableOpacity
+              style={[s.reminderToggle, reminderOn && s.reminderToggleOn]}
+              onPress={() => { haptic.tap(); setReminderOn(v => !v); }}
+              activeOpacity={0.8}
+            >
+              {reminderOn
+                ? <Bell size={14} color={G.accent} />
+                : <BellOff size={14} color={colors.text.muted} />
+              }
+              <Text style={[s.reminderToggleText, reminderOn && { color: G.accent }]}>
+                {reminderOn
+                  ? `Przypomnienie o ${pad(reminderHour)}:${pad(reminderMin)}`
+                  : 'Dodaj przypomnienie'}
+              </Text>
+              {reminderOn && (
+                <TouchableOpacity
+                  style={s.reminderClear}
+                  onPress={() => { haptic.tap(); setReminderOn(false); }}
+                  hitSlop={8}
+                >
+                  <X size={12} color={colors.text.muted} />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+
+            {reminderOn && (
+              <>
+                <TimePicker
+                  hour={reminderHour}
+                  minute={reminderMin}
+                  onChange={(h, m) => { setReminderHour(h); setReminderMin(m); }}
+                />
+                <TextInput
+                  value={reminderMsg}
+                  onChangeText={setReminderMsg}
+                  placeholder="Treść powiadomienia (opcjonalnie)..."
+                  placeholderTextColor={G.muted}
+                  style={s.reminderMsgInput}
+                  multiline
+                  returnKeyType="done"
+                />
+              </>
+            )}
+          </SectionCard>
+
+          {/* ── Description ── */}
+          <SectionCard
+            label="Opis"
+            icon={<AlignLeft size={12} color={G.muted} />}
+          >
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Szczegóły, notatki..."
+              placeholderTextColor={G.muted}
+              style={s.descInput}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </SectionCard>
+
+          {/* ── Advanced options (collapsed) ── */}
+          <TouchableOpacity
+            style={s.advancedToggle}
+            onPress={() => setShowAdvanced(v => !v)}
+            activeOpacity={0.75}
+          >
+            <Timer size={12} color={G.muted} />
+            <Text style={s.advancedToggleText}>
+              {showAdvanced ? 'Ukryj opcje zaawansowane' : 'Więcej opcji'}
+            </Text>
+            {showAdvanced
+              ? <ChevronUp size={13} color={G.muted} />
+              : <ChevronDown size={13} color={G.muted} />
+            }
+          </TouchableOpacity>
+
+          {showAdvanced && (
+            <>
+              {/* Difficulty */}
+              <View style={s.advCard}>
+                <Text style={s.advLabel}>TRUDNOŚĆ</Text>
+                <View style={s.diffRow}>
+                  {([1, 2, 3, 4, 5] as TaskDifficulty[]).map(d => {
+                    const active = difficulty !== undefined && d <= difficulty;
+                    const col = difficulty ? (difficulty <= 2 ? G.accent : difficulty === 3 ? colors.accent.amber : colors.accent.red) : G.accent;
+                    return (
+                      <TouchableOpacity key={d} onPress={() => setDifficulty(d)} style={s.diffDotWrap} activeOpacity={0.7}>
+                        <View style={[
+                          s.diffDot,
+                          active && { backgroundColor: col, width: 18, height: 18 },
+                          !active && { backgroundColor: 'rgba(255,255,255,0.07)' },
+                        ]} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {difficulty !== undefined && (
+                    <Text style={[s.diffLabel, { color: difficulty <= 2 ? G.accent : difficulty === 3 ? colors.accent.amber : colors.accent.red }]}>
+                      {['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'][difficulty]}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Pomodoros */}
+              <View style={s.advCard}>
+                <Text style={s.advLabel}>SZAC. CZAS (× 25 MIN)</Text>
+                <View style={s.stepperRow}>
+                  <TouchableOpacity
+                    style={[s.stepBtn, pomodoros === 0 && { opacity: 0.35 }]}
+                    onPress={() => setPomodoros(p => Math.max(0, p - 1))}
+                    disabled={pomodoros === 0}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.stepBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={s.stepVal}>{pomodoros}</Text>
+                  <TouchableOpacity
+                    style={s.stepBtn}
+                    onPress={() => setPomodoros(p => Math.min(12, p + 1))}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.stepBtnText}>+</Text>
+                  </TouchableOpacity>
+                  {pomodoros > 0 && (
+                    <Text style={s.stepHint}>{pomodoros * 25} min łącznie</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Recurring */}
+              <View style={s.advCard}>
+                <Text style={s.advLabel}>POWTARZANIE</Text>
+                <View style={s.chipRow}>
+                  {(['none', 'daily', 'weekly', 'monthly'] as TaskRecurring[]).map(r => {
+                    const label = { none: 'Brak', daily: 'Dziennie', weekly: 'Tygodniowo', monthly: 'Miesięcznie' }[r];
+                    const active = recurring === r;
                     return (
                       <TouchableOpacity
-                        key={label}
-                        style={[styles.chip, active && styles.chipActive]}
-                        onPress={() => { setDeadline(iso); if (!scheduledDate) setScheduledDate(iso); }}
+                        key={r}
+                        style={[s.deadlineChip, active && s.deadlineChipActive]}
+                        onPress={() => setRecurring(r)}
                         activeOpacity={0.75}
                       >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+                        <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>{label}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-
-                <DatePickerField
-                  value={deadline}
-                  onChange={(d) => { setDeadline(d); if (!scheduledDate) setScheduledDate(d); }}
-                  placeholder="Termin (opcjonalnie)"
-                />
-                <DatePickerField
-                  value={scheduledDate}
-                  onChange={setScheduledDate}
-                  placeholder="Zaplanuj na dzień (opcjonalnie)"
-                />
-
-                {/* Optional time slot */}
-                <TouchableOpacity
-                  style={[styles.timeToggle, timeEnabled && styles.timeToggleActive]}
-                  onPress={() => setTimeEnabled(v => !v)}
-                  activeOpacity={0.75}
-                >
-                  <Clock size={13} color={timeEnabled ? colors.accent.blue : colors.text.muted} />
-                  <Text style={[styles.timeToggleText, timeEnabled && { color: colors.accent.blue }]}>
-                    {timeEnabled ? `Godzina: ${pad2(timeHour)}:${pad2(timeMin)}` : 'Dodaj godzinę (opcjonalnie)'}
-                  </Text>
-                </TouchableOpacity>
-
-                {timeEnabled && (
-                  <TimeSlotPicker
-                    hour={timeHour} minute={timeMin}
-                    onChange={(h, m) => { setTimeHour(h); setTimeMin(m); }}
-                  />
-                )}
               </View>
-            </GlassCard>
-          </View>
 
-          {/* Tags */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<Tag size={12} color={colors.text.muted} />} label="Tagi" />
-              <TagInput tags={tags} onChange={setTags} />
-            </GlassCard>
-          </View>
+              {/* Tags */}
+              <View style={s.advCard}>
+                <Text style={s.advLabel}>TAGI</Text>
+                {tags.length > 0 && (
+                  <View style={s.tagsRow}>
+                    {tags.map(t => (
+                      <TouchableOpacity
+                        key={t} onPress={() => setTags(prev => prev.filter(x => x !== t))}
+                        style={s.tagChip} activeOpacity={0.8}
+                      >
+                        <Text style={s.tagText}>#{t}</Text>
+                        <X size={9} color={G.muted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+                <View style={s.tagInputRow}>
+                  <TextInput
+                    value={tagInput}
+                    onChangeText={setTagInput}
+                    onSubmitEditing={addTag}
+                    placeholder="Dodaj tag..."
+                    placeholderTextColor={G.muted}
+                    style={s.tagInput}
+                    returnKeyType="done"
+                    blurOnSubmit={false}
+                  />
+                  {tagInput.trim().length > 0 && (
+                    <TouchableOpacity onPress={addTag} style={s.tagAddBtn} activeOpacity={0.8}>
+                      <Check size={13} color={G.accent} strokeWidth={3} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </>
+          )}
 
-          {/* Description */}
-          <View>
-            <GlassCard padding={spacing[4]}>
-              <SectionLabel icon={<AlignLeft size={12} color={colors.text.muted} />} label="Opis (opcjonalnie)" />
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Szczegóły, notatki..."
-                placeholderTextColor={colors.text.muted}
-                style={styles.descInput}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </GlassCard>
-          </View>
+          <View style={{ height: 20 }} />
         </ScrollView>
 
-        <View style={styles.footer}>
-          <AnimatedButton
+        {/* ── Footer CTA ── */}
+        <View style={s.footer}>
+          <TouchableOpacity
+            style={[s.cta, !canSave && s.ctaDisabled]}
             onPress={handleSave}
-            label={saving ? 'Zapisuję...' : 'Dodaj zadanie'}
-            icon={<Check size={18} color={colors.bg.primary} />}
-            size="lg"
-            fullWidth
-            disabled={saving || !title.trim()}
-          />
+            disabled={!canSave}
+            activeOpacity={0.85}
+          >
+            <Check size={18} color={colors.bg.primary} strokeWidth={2.5} />
+            <Text style={s.ctaText}>{saving ? 'Zapisuję...' : 'Dodaj zadanie'}</Text>
+          </TouchableOpacity>
         </View>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   closeBtn: {
-    width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    width: 34, height: 34, borderRadius: radius.md,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
   },
-  headerTitle: { ...typography.h4, color: colors.text.primary },
-  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[8] },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary, letterSpacing: -0.2 },
+  saveBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: G.accent, borderRadius: radius.full,
+    paddingHorizontal: spacing[3], paddingVertical: 7,
+  },
+  saveBtnDisabled: { backgroundColor: 'rgba(61,190,117,0.15)', borderWidth: 1, borderColor: G.cardBorder },
+  saveBtnText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary },
 
-  titleCard: { padding: spacing[4], minHeight: 80 },
-  titleInput: {
-    fontSize: 20, fontWeight: '600', color: colors.text.primary,
-    lineHeight: 28, letterSpacing: -0.3,
+  scroll: { paddingHorizontal: spacing[4], paddingTop: spacing[3], gap: spacing[3] },
+
+  titleCard: {
+    backgroundColor: G.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder,
+    padding: spacing[4], minHeight: 96,
   },
+  titleInput: {
+    fontSize: 20, fontWeight: '700', color: colors.text.primary,
+    lineHeight: 28, letterSpacing: -0.3, padding: 0,
+  },
+
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  deadlineChip: {
+    paddingHorizontal: spacing[3], paddingVertical: 7,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  deadlineChipActive: {
+    borderColor: G.accent,
+    backgroundColor: G.accentDim,
+  },
+  deadlineChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  deadlineChipTextActive: { color: G.accent, fontWeight: '700' },
+  deadlineDate: { fontSize: 11, color: G.muted, marginTop: -spacing[1] },
 
   priorityRow: { flexDirection: 'row', gap: spacing[2] },
-  priorityBtn: {
+  priorityChip: {
     flex: 1, alignItems: 'center', paddingVertical: spacing[3],
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)', gap: 3,
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  priorityLabel: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
-  prioritySub: { fontSize: 10, color: colors.text.muted },
+  priorityChipText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
 
-  inputInCard: { backgroundColor: 'rgba(255,255,255,0.04)' },
-
-  chipRow: { flexDirection: 'row', gap: spacing[2] },
-  chip: {
-    paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  chipActive:    { borderColor: colors.accent.blue,  backgroundColor: colors.accent.blue  + '20' },
-  chipNone:      { borderColor: colors.accent.green, backgroundColor: colors.accent.green + '15' },
-  chipText:      { fontSize: 12, fontWeight: '600', color: colors.text.muted },
-  chipTextActive:{ color: colors.accent.blue },
-  chipNoneText:  { color: colors.accent.green, fontWeight: '700' },
-
-  timeToggle: {
+  reminderToggle: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  timeToggleActive: { borderColor: colors.accent.blue + '40', backgroundColor: colors.accent.blue + '10' },
-  timeToggleText: { fontSize: 13, fontWeight: '500', color: colors.text.muted },
+  reminderToggleOn: {
+    borderColor: G.accent + '55',
+    backgroundColor: G.accentDim,
+  },
+  reminderToggleText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  reminderClear: { padding: 4 },
+  reminderMsgInput: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: G.cardBorder,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    fontSize: 13, color: colors.text.primary, lineHeight: 18,
+    minHeight: 60, textAlignVertical: 'top',
+  },
 
   descInput: {
-    ...typography.body, color: colors.text.primary,
-    fontSize: 14, minHeight: 72, lineHeight: 22,
+    fontSize: 14, color: colors.text.secondary, lineHeight: 21,
+    minHeight: 72, padding: 0, textAlignVertical: 'top',
   },
+
+  advancedToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: spacing[2], paddingHorizontal: spacing[1],
+  },
+  advancedToggleText: { flex: 1, fontSize: 12, color: G.muted, fontWeight: '600' },
+
+  advCard: {
+    backgroundColor: G.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder,
+    padding: spacing[4], gap: spacing[3],
+  },
+  advLabel: {
+    fontSize: 9, fontWeight: '700', color: G.muted,
+    letterSpacing: 1.1, textTransform: 'uppercase',
+  },
+
+  diffRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  diffDotWrap: { padding: 4 },
+  diffDot: { width: 14, height: 14, borderRadius: 7 },
+  diffLabel: { fontSize: 12, fontWeight: '600', marginLeft: spacing[1] },
+
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  stepBtn: {
+    width: 32, height: 32, borderRadius: radius.md,
+    backgroundColor: G.accentDim, borderWidth: 1, borderColor: G.cardBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepBtnText: { color: G.accent, fontSize: 18, lineHeight: 20, fontWeight: '700' },
+  stepVal: { fontSize: 22, fontWeight: '800', color: G.accent, minWidth: 30, textAlign: 'center' },
+  stepHint: { fontSize: 11, color: G.muted },
+
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  tagChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: 5,
+    backgroundColor: G.accentDim, borderRadius: radius.full,
+    borderWidth: 1, borderColor: G.cardBorder,
+  },
+  tagText: { fontSize: 11, color: G.accent, fontWeight: '600' },
+  tagInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
+    paddingHorizontal: spacing[3], minHeight: 40,
+  },
+  tagInput: { flex: 1, fontSize: 13, color: colors.text.primary },
+  tagAddBtn: { padding: 4 },
 
   footer: {
     padding: spacing[4],
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)',
   },
-});
-
-const rec = StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  pill: {
-    paddingHorizontal: spacing[3], paddingVertical: 7,
-    borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+  cta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    backgroundColor: G.accent, borderRadius: radius.xl,
+    paddingVertical: 15, width: '100%',
   },
-  pillActive: {
-    borderColor: colors.accent.primary,
-    backgroundColor: colors.accent.primary + '20',
-  },
-  pillText: { fontSize: 13, color: colors.text.muted, fontWeight: '500' },
-  pillTextActive: { color: colors.accent.primary, fontWeight: '700' },
+  ctaDisabled: { backgroundColor: 'rgba(61,190,117,0.18)' },
+  ctaText: { fontSize: 15, fontWeight: '800', color: colors.bg.primary, letterSpacing: -0.2 },
 });
-
