@@ -8,15 +8,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
-  AlarmClock, ChevronRight, Trash2, X,
-  Square, CheckSquare2, Clock,
+  ChevronRight, Trash2, X,
+  Square, CheckSquare2, Clock, ArrowRight,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
-import { Task, Subtask } from '@/types';
+import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { notificationsService } from '@/services/notificationsService';
@@ -109,6 +109,53 @@ function sortTasks(tasks: Task[], sort: SortKey): Task[] {
     if (sort === 'created') return b.createdAt.localeCompare(a.createdAt);
     return a.title.localeCompare(b.title);
   });
+}
+
+// ─── Deadline grouping ────────────────────────────────────────────────────────
+
+type SectionHeader = { type: 'section'; key: string; label: string; color: string; count: number };
+type ListItem = Task | SectionHeader | 'done-header';
+
+const SECTION_DEFS = [
+  { key: 'overdue',  label: 'PRZETERMINOWANE', color: '#FF6B6B' },
+  { key: 'today',    label: 'DZIŚ',             color: '#FBBF24' },
+  { key: 'tomorrow', label: 'JUTRO',            color: '#F97316' },
+  { key: 'week',     label: 'W TYM TYGODNIU',   color: G.accent  },
+  { key: 'later',    label: 'PÓŹNIEJ',           color: colors.text.muted },
+  { key: 'none',     label: 'BEZ TERMINU',       color: colors.text.muted },
+] as const;
+
+function taskSection(task: Task, today: string, tomorrow: string, weekEnd: string): typeof SECTION_DEFS[number]['key'] {
+  const d = task.deadline?.split('T')[0];
+  if (!d) return 'none';
+  if (d < today) return 'overdue';
+  if (d === today) return 'today';
+  if (d === tomorrow) return 'tomorrow';
+  if (d <= weekEnd) return 'week';
+  return 'later';
+}
+
+function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem[] {
+  const tomorrow = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();
+  const weekEnd  = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; })();
+
+  const buckets: Record<string, Task[]> = { overdue: [], today: [], tomorrow: [], week: [], later: [], none: [] };
+  for (const t of sorted) {
+    buckets[taskSection(t, today, tomorrow, weekEnd)].push(t);
+  }
+
+  const result: ListItem[] = [];
+  for (const def of SECTION_DEFS) {
+    const tasks = buckets[def.key];
+    if (tasks.length === 0) continue;
+    result.push({ type: 'section', key: def.key, label: def.label, color: def.color, count: tasks.length });
+    result.push(...tasks);
+  }
+  if (done.length > 0) {
+    result.push('done-header');
+    result.push(...done);
+  }
+  return result;
 }
 
 // ─── Task card ────────────────────────────────────────────────────────────────
@@ -526,11 +573,78 @@ const ss = StyleSheet.create({
   sub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
 });
 
+// ─── Quick capture bar ────────────────────────────────────────────────────────
+
+function QuickCapture({ onCreate }: { onCreate: (title: string) => void }) {
+  const [text, setText] = useState('');
+  const inputRef = useRef<TextInput>(null);
+
+  const submit = () => {
+    const t = text.trim();
+    if (!t) return;
+    onCreate(t);
+    setText('');
+    haptic.tap();
+  };
+
+  return (
+    <View style={qc.wrap}>
+      <View style={qc.row}>
+        <TextInput
+          ref={inputRef}
+          value={text}
+          onChangeText={setText}
+          placeholder="Szybkie zadanie..."
+          placeholderTextColor={colors.text.muted}
+          style={qc.input}
+          returnKeyType="done"
+          onSubmitEditing={submit}
+          blurOnSubmit={false}
+        />
+        <TouchableOpacity
+          style={[qc.btn, text.trim().length > 0 && qc.btnActive]}
+          onPress={submit}
+          activeOpacity={0.75}
+          hitSlop={8}
+        >
+          <ArrowRight size={16} color={text.trim().length > 0 ? G.card : colors.text.muted} strokeWidth={2.5} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const qc = StyleSheet.create({
+  wrap: {
+    paddingHorizontal: spacing[4], paddingBottom: spacing[3], paddingTop: spacing[2],
+    borderTopWidth: 1, borderTopColor: G.cardBorder,
+    backgroundColor: colors.bg.primary,
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: G.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: G.cardBorder,
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+  },
+  input: {
+    flex: 1, fontSize: 14, fontWeight: '600', color: colors.white, letterSpacing: 0.2,
+  },
+  btn: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  btnActive: {
+    backgroundColor: G.accent, borderColor: G.accent,
+  },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
-  const { tasks, isLoading, reload, toggle, remove, update, snooze, addSubtask, toggleSubtask } = useTasks();
+  const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
 
   const [sort, setSort]           = useState<SortKey>('deadline');
@@ -574,10 +688,15 @@ export default function TasksScreen() {
   const pending  = active.filter(t => t.status === 'pending' && !t.snoozedUntil).length;
   const overdue  = active.filter(t => (t.deadline?.split('T')[0] ?? '') < today).length;
 
-  const listData: (Task | 'done-header' | Task)[] = [
-    ...sorted,
-    ...(done.length > 0 ? (['done-header' as const, ...done]) : []),
-  ];
+  const listData: ListItem[] = useMemo(() => {
+    if (sort === 'deadline') return buildGroupedList(sorted, done, today);
+    return [...sorted, ...(done.length > 0 ? (['done-header' as const, ...done]) : [])];
+  }, [sorted, done, today, sort]);
+
+  const handleQuickCreate = useCallback(async (title: string) => {
+    await create({ title, status: 'pending', priority: 'normal', tags: [] });
+    toast.success('Dodano zadanie');
+  }, [create]);
 
   return (
     <SafeAreaView style={s.root} edges={['top']} {...panHandlers}>
@@ -613,8 +732,12 @@ export default function TasksScreen() {
         {/* List */}
         <FlatList
           data={listData as any[]}
-          keyExtractor={(item, i) => typeof item === 'string' ? item : item.id}
-          renderItem={({ item }) => {
+          keyExtractor={(item: ListItem) => {
+            if (item === 'done-header') return 'done-header';
+            if ((item as SectionHeader).type === 'section') return `sec-${(item as SectionHeader).key}`;
+            return (item as Task).id;
+          }}
+          renderItem={({ item }: { item: ListItem }) => {
             if (item === 'done-header') {
               return (
                 <View style={s.sectionHeader}>
@@ -624,9 +747,19 @@ export default function TasksScreen() {
                 </View>
               );
             }
+            if ((item as SectionHeader).type === 'section') {
+              const sec = item as SectionHeader;
+              return (
+                <View style={s.groupHeader}>
+                  <View style={[s.groupDot, { backgroundColor: sec.color }]} />
+                  <Text style={[s.groupLabel, { color: sec.color }]}>{sec.label}</Text>
+                  <Text style={s.groupCount}>{sec.count}</Text>
+                </View>
+              );
+            }
             return (
               <TaskCard
-                task={item}
+                task={item as Task}
                 pomodoroTaskId={pomodoroTaskId}
                 onComplete={handleCompletePress}
                 onEdit={handleEditPress}
@@ -645,6 +778,9 @@ export default function TasksScreen() {
             </View>
           }
         />
+
+        {/* Quick capture */}
+        <QuickCapture onCreate={handleQuickCreate} />
       </Animated.View>
 
       {/* Modals */}
@@ -737,6 +873,22 @@ const s = StyleSheet.create({
   sectionLabel: {
     fontSize: 9, fontWeight: '700', color: colors.text.muted,
     letterSpacing: 1.5,
+  },
+
+  groupHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    marginTop: spacing[4], marginBottom: spacing[1],
+    paddingHorizontal: spacing[1],
+  },
+  groupDot: { width: 6, height: 6, borderRadius: 3 },
+  groupLabel: {
+    flex: 1, fontSize: 9, fontWeight: '800', letterSpacing: 1.6,
+  },
+  groupCount: {
+    fontSize: 9, fontWeight: '700', color: colors.text.muted,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 8,
   },
 
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },
