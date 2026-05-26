@@ -15,7 +15,7 @@ export const colors = {
   // Per-tab identity colors — one per section
   tabs: {
     dashboard: '#E5E5EA',  // neutral/white — no strong accent
-    tasks:     '#6C9EFF',  // cobalt blue — focus, clarity
+    tasks:     '#3DBE75',  // emerald green — action, energy
     finances:  '#4ECBA8',  // teal — money, growth
     calendar:  '#BF80FF',  // soft violet — time, planning
     analytics: '#FF9F6B',  // warm orange — data, insights
@@ -69,7 +69,7 @@ export const colors = {
   calendar: '#BF80FF',
   health:   '#4ECBA8',
   mood:     '#F472B6',
-  tasks:    '#6C9EFF',
+  tasks:    '#3DBE75',
 } as const;
 
 export type Colors = typeof colors;

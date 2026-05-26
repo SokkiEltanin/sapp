@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import {
-  LayoutDashboard, ListTodo, Wallet,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet,
   Plus, Receipt, TrendingUp, CalendarPlus, CheckSquare,
-  Smile, ScanLine, Target, Flame, CalendarDays, BarChart2, Briefcase,
+  Smile, ScanLine, Target, Flame, Briefcase,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,12 +20,19 @@ type BottomTabBarProps = {
   descriptors: Record<string, any>;
 };
 
+// Dashboard → Zadania → Kalendarz → Finanse
 const TABS = [
-  { name: 'index',     Icon: LayoutDashboard },
-  { name: 'tasks',     Icon: ListTodo },
-  { name: 'finances',  Icon: Wallet },
-  { name: 'stats',     Icon: CalendarDays },
-  { name: 'analytics', Icon: BarChart2 },
+  { name: 'index',    Icon: LayoutDashboard },
+  { name: 'tasks',    Icon: ListTodo        },
+  { name: 'stats',    Icon: CalendarDays    },
+  { name: 'finances', Icon: Wallet          },
+];
+
+const TAB_ACCENT = [
+  null,              // dashboard — uses time accent
+  colors.tabs.tasks,    // tasks — emerald green
+  colors.tabs.calendar, // calendar — violet
+  colors.tabs.finances, // finances — teal
 ];
 
 const QUICK_ACTIONS = [
@@ -37,23 +44,22 @@ const QUICK_ACTIONS = [
   { label: 'Przychód',      Icon: TrendingUp,   color: colors.accent.green,  route: '/expenses/add?type=income' },
   { label: 'Wydatek',       Icon: Receipt,      color: colors.accent.red,    route: '/expenses/add' },
   { label: 'Skan paragonu', Icon: ScanLine,     color: colors.accent.blue,   route: '/expenses/scan' },
-  { label: 'Nowe zadanie',  Icon: CheckSquare,  color: colors.accent.purple, route: '/tasks/add' },
+  { label: 'Nowe zadanie',  Icon: CheckSquare,  color: colors.tabs.tasks,    route: '/tasks/add' },
 ];
 
 const FAB_SIZE = 48;
-const PILL_H   = 50; // approximate pill height for menu offset
+const PILL_H   = 52;
 
 export default function TabBar({ state, navigation }: BottomTabBarProps) {
-  const [open, setOpen] = useState(false);
-  const insets       = useSafeAreaInsets();
-  const pendingCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending').length);
-  const { color: accentColor } = useTimeAccent();
+  const [open, setOpen]   = useState(false);
+  const insets            = useSafeAreaInsets();
+  const pendingCount      = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending').length);
+  const { color: timeAccent } = useTimeAccent();
 
   const fabProgress  = useRef(new Animated.Value(0)).current;
   const itemAnims    = useRef(QUICK_ACTIONS.map(() => new Animated.Value(0))).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  // quick-actions menu sits above the FAB
   const menuBase = (insets.bottom || 16) + 8 + PILL_H + 12 + FAB_SIZE + 12;
 
   const openMenu = () => {
@@ -95,10 +101,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
         animationType="none"
         onRequestClose={() => closeMenu()}
       >
-        <Animated.View
-          style={[s.backdrop, { opacity: backdropAnim }]}
-          pointerEvents="box-none"
-        >
+        <Animated.View style={[s.backdrop, { opacity: backdropAnim }]} pointerEvents="box-none">
           <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
         </Animated.View>
 
@@ -108,10 +111,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
               inputRange: [0, 1], outputRange: [16, 0], extrapolate: 'clamp',
             });
             return (
-              <Animated.View
-                key={action.label}
-                style={{ opacity: itemAnims[i], transform: [{ translateY }] }}
-              >
+              <Animated.View key={action.label} style={{ opacity: itemAnims[i], transform: [{ translateY }] }}>
                 <TouchableOpacity
                   style={s.quickItem}
                   onPress={() => closeMenu(() => router.push(action.route as any))}
@@ -131,26 +131,27 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
       {/* ── Bar ────────────────────────────────────────────────────── */}
       <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]}>
 
-        {/* FAB — floats above pill, right-aligned */}
+        {/* FAB */}
         <View style={s.fabRow}>
           <TouchableOpacity
-            style={[s.fab, { shadowColor: accentColor }]}
+            style={[s.fab, { shadowColor: timeAccent }]}
             onPress={open ? () => closeMenu() : openMenu}
             activeOpacity={0.85}
           >
-            <View style={[s.fabInner, { borderColor: accentColor + '60' }]}>
+            <View style={[s.fabInner, { borderColor: timeAccent + '60' }]}>
               <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-                <Plus size={20} color={accentColor} strokeWidth={2.5} />
+                <Plus size={20} color={timeAccent} strokeWidth={2.5} />
               </Animated.View>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Pill — 5 icons, no labels */}
+        {/* Pill — 4 tabs with per-tab active highlight */}
         <View style={s.pill}>
           {TABS.map((tab, i) => {
-            const focused    = state.index === i;
-            const showBadge  = tab.name === 'tasks' && pendingCount > 0;
+            const focused   = state.index === i;
+            const accent    = TAB_ACCENT[i] ?? timeAccent;
+            const showBadge = tab.name === 'tasks' && pendingCount > 0;
             return (
               <TouchableOpacity
                 key={tab.name}
@@ -158,10 +159,13 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                 onPress={() => navigation.navigate(tab.name)}
                 activeOpacity={0.7}
               >
+                {focused && (
+                  <View style={[s.activePill, { backgroundColor: accent + '28' }]} />
+                )}
                 <View style={s.iconWrap}>
                   <tab.Icon
                     size={20}
-                    color={focused ? colors.white : colors.text.secondary}
+                    color={focused ? accent : colors.text.muted}
                     strokeWidth={focused ? 2.2 : 1.5}
                   />
                   {showBadge && (
@@ -170,9 +174,6 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                     </View>
                   )}
                 </View>
-                {focused && (
-                  <View style={[s.activeDot, { backgroundColor: accentColor }]} />
-                )}
               </TouchableOpacity>
             );
           })}
@@ -189,7 +190,6 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  // ── FAB row ─────────────────────────────────────────────────────
   fabRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -197,97 +197,77 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   fab: {
-    width: FAB_SIZE,
-    height: FAB_SIZE,
+    width: FAB_SIZE, height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
     elevation: 12,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
+    shadowOpacity: 0.45, shadowRadius: 18,
   },
   fabInner: {
-    width: FAB_SIZE,
-    height: FAB_SIZE,
+    width: FAB_SIZE, height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
     backgroundColor: colors.bg.elevated,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.18)',
   },
 
-  // ── Pill ────────────────────────────────────────────────────────
   pill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(20,20,20,0.98)',
+    backgroundColor: 'rgba(18,18,18,0.97)',
     borderRadius: 28,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 6,
     elevation: 8,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOpacity: 0.4, shadowRadius: 12,
   },
 
-  // ── Tab items ────────────────────────────────────────────────────
   tabItem: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 5,
-    gap: 4,
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 8,
+    position: 'relative',
   },
-  iconWrap: { position: 'relative' },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  activePill: {
+    position: 'absolute',
+    width: '80%', height: '100%',
+    borderRadius: 16,
   },
+  iconWrap: { position: 'relative', zIndex: 1 },
 
-  // ── Badge ────────────────────────────────────────────────────────
   badge: {
     position: 'absolute', top: -5, right: -8,
     minWidth: 14, height: 14, borderRadius: 7,
     backgroundColor: colors.accent.red,
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 2,
-    borderWidth: 1.5,
-    borderColor: colors.black,
+    paddingHorizontal: 2, borderWidth: 1.5, borderColor: colors.black,
   },
   badgeText: { fontSize: 8, fontWeight: '700', color: colors.white, lineHeight: 11 },
 
-  // ── Quick actions menu ───────────────────────────────────────────
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.72)',
   },
   quickMenu: {
-    position: 'absolute',
-    right: 24,
-    gap: spacing[3],
-    alignItems: 'flex-end',
+    position: 'absolute', right: 24,
+    gap: spacing[3], alignItems: 'flex-end',
   },
   quickItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
   },
   quickIcon: {
     width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1,
   },
   quickLabel: {
-    fontSize: 13, fontWeight: '600',
-    color: colors.text.primary,
+    fontSize: 13, fontWeight: '600', color: colors.text.primary,
     backgroundColor: 'rgba(18,18,18,0.96)',
     paddingHorizontal: spacing[3], paddingVertical: 7,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: radius.md, overflow: 'hidden',
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
 });
