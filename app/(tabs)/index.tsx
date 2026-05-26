@@ -240,7 +240,7 @@ export default function DashboardScreen() {
   const pomodoro = usePomodoroStore();
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
-  const { tasks, isLoading: tasksLoading, reload: reloadTasks } = useTasks();
+  const { tasks, isLoading: tasksLoading, reload: reloadTasks, toggle: toggleTask } = useTasks();
   const { habits, todayDone: habitsDoneIds, toggle: toggleHabit } = useHabits();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood, addEntry } = useMoodStore();
@@ -692,6 +692,59 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* ══ TODAY'S TASKS ════════════════════════════════════════════ */}
+            {todayTasks.length > 0 && (() => {
+              const PORD: Record<string, number> = { high: 0, normal: 1, low: 2 };
+              const sorted = [...todayTasks].sort((a, b) => (PORD[a.priority] ?? 1) - (PORD[b.priority] ?? 1));
+              const shown = sorted.slice(0, 3);
+              return (
+                <View style={s.todayCard}>
+                  <View style={s.todayHeader}>
+                    <Check size={12} color={colors.tabs.tasks} strokeWidth={3} />
+                    <Text style={s.todayTitle}>DZIŚ</Text>
+                    <View style={s.todayBadge}>
+                      <Text style={s.todayBadgeText}>{todayTasks.length}</Text>
+                    </View>
+                    {todayTasks.length > 3 && (
+                      <TouchableOpacity onPress={() => router.push('/(tabs)/tasks' as any)} style={s.todayMore}>
+                        <Text style={s.todayMoreText}>+{todayTasks.length - 3} więcej</Text>
+                        <ChevronRight size={11} color={colors.tabs.tasks} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {shown.map(task => (
+                    <TouchableOpacity
+                      key={task.id}
+                      style={s.todayRow}
+                      onPress={() => router.push('/(tabs)/tasks' as any)}
+                      activeOpacity={0.7}
+                    >
+                      <TouchableOpacity
+                        style={[s.todayCheck, task.priority === 'high' && s.todayCheckUrgent]}
+                        onPress={() => { haptic.tap(); toggleTask(task.id); }}
+                        hitSlop={8}
+                        activeOpacity={0.7}
+                      >
+                        <Check
+                          size={11}
+                          color={task.priority === 'high' ? colors.accent.red : colors.tabs.tasks}
+                          strokeWidth={3}
+                        />
+                      </TouchableOpacity>
+                      <Text style={[s.todayRowTitle, task.priority === 'high' && { color: colors.accent.red }]} numberOfLines={1}>
+                        {task.title}
+                      </Text>
+                      {task.priority === 'high' && (
+                        <View style={s.urgentPill}>
+                          <Text style={s.urgentPillText}>PILNE</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            })()}
 
             {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
             <View style={s.toolsRow}>
@@ -1197,6 +1250,52 @@ const s = StyleSheet.create({
   gcalDot:      { width: 6, height: 6, borderRadius: 3 },
   gcalTime:     { fontSize: 10, color: colors.text.muted, width: 36, fontWeight: '600' },
   gcalTitle:    { flex: 1, fontSize: 13, color: colors.text.secondary },
+
+  // ── Today tasks strip ─────────────────────────────────────────────────────
+  todayCard: {
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    padding: spacing[4], borderWidth: 1,
+    borderColor: colors.tabs.tasks + '28',
+    gap: 0,
+  },
+  todayHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingBottom: spacing[2],
+  },
+  todayTitle: {
+    fontSize: 10, fontWeight: '800', color: colors.tabs.tasks, letterSpacing: 1.5,
+  },
+  todayBadge: {
+    backgroundColor: colors.tabs.tasks + '20', borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 2,
+  },
+  todayBadgeText: { fontSize: 11, fontWeight: '800', color: colors.tabs.tasks },
+  todayMore: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 2 },
+  todayMoreText: { fontSize: 11, fontWeight: '600', color: colors.tabs.tasks },
+  todayRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: 7,
+    borderTopWidth: 1, borderTopColor: colors.tabs.tasks + '12',
+  },
+  todayCheck: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: colors.tabs.tasks + '15',
+    borderWidth: 1.5, borderColor: colors.tabs.tasks + '45',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  todayCheckUrgent: {
+    backgroundColor: colors.accent.red + '15',
+    borderColor: colors.accent.red + '45',
+  },
+  todayRowTitle: {
+    flex: 1, fontSize: 13, fontWeight: '700', color: colors.text.primary, letterSpacing: 0.1,
+  },
+  urgentPill: {
+    backgroundColor: colors.accent.red + '15', borderRadius: radius.sm,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderWidth: 1, borderColor: colors.accent.red + '30',
+  },
+  urgentPillText: { fontSize: 9, fontWeight: '800', color: colors.accent.red, letterSpacing: 0.8 },
 
   // ── Subscription payment modal ─────────────────────────────────────────────
   payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
