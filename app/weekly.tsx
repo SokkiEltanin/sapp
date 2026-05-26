@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
   diffRow: { flexDirection: 'row', gap: spacing[2] },
   diffTile: {
     flex: 1, alignItems: 'center', gap: 1, paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.bg.elevated,
+    borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.bg.secondary,
   },
   diffLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
   diffDays: { fontSize: 16, fontWeight: '900', color: colors.text.primary, letterSpacing: -0.5 },

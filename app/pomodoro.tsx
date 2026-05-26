@@ -15,6 +15,13 @@ import { useFocusSound, FocusSound, FOCUS_SOUND_LABELS } from '@/hooks/useFocusS
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
 
+const C = {
+  accent: '#22D3EE',
+  dim:    'rgba(34,211,238,0.14)',
+  border: 'rgba(34,211,238,0.22)',
+  muted:  'rgba(34,211,238,0.45)',
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(secs: number) {
@@ -24,7 +31,7 @@ function fmt(secs: number) {
 }
 
 const MODE_META: Record<PomodoroMode, { label: string; color: string; hint: string }> = {
-  work:       { label: 'PRACA',         color: colors.text.primary,   hint: 'Skupiony czas pracy' },
+  work:       { label: 'PRACA',         color: C.accent,              hint: 'Skupiony czas pracy' },
   break:      { label: 'PRZERWA',       color: colors.accent.success,  hint: 'Krótka przerwa' },
   long_break: { label: 'DŁUGA PRZERWA', color: colors.accent.warning,  hint: 'Czas odetchnąć' },
 };
@@ -84,7 +91,7 @@ function RoundDots({ completed }: { completed: number }) {
 const dots = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.12)' },
-  dotFilled: { backgroundColor: colors.text.primary },
+  dotFilled: { backgroundColor: C.accent },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -226,7 +233,7 @@ export default function PomodoroScreen() {
                 activeOpacity={0.7}
               >
                 {m.done
-                  ? <CheckSquare size={16} color={colors.accent.success} />
+                  ? <CheckSquare size={16} color={C.accent} />
                   : <Square size={16} color={colors.text.muted} />}
                 <Text style={[styles.milestoneText, m.done && styles.milestoneDone]}>
                   {m.label}
@@ -246,7 +253,7 @@ export default function PomodoroScreen() {
                 maxLength={60}
               />
               <TouchableOpacity onPress={handleAddMilestone} hitSlop={8} activeOpacity={0.7}>
-                <Plus size={16} color={newMilestone.trim() ? colors.accent.blue : colors.text.muted} />
+                <Plus size={16} color={newMilestone.trim() ? C.accent : colors.text.muted} />
               </TouchableOpacity>
             </View>
           </GlassCard>
@@ -274,7 +281,7 @@ export default function PomodoroScreen() {
           <View style={styles.soundRow}>
             {focusSound === 'off'
               ? <VolumeX size={12} color={colors.text.muted} />
-              : <Volume2 size={12} color={colors.accent.blue} />}
+              : <Volume2 size={12} color={C.accent} />}
             <Text style={styles.soundRowLabel}>Dźwięk tła</Text>
           </View>
           <View style={styles.soundBtns}>
@@ -350,7 +357,7 @@ const styles = StyleSheet.create({
   },
   mainBtn: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.text.primary,
+    backgroundColor: C.accent,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -376,9 +383,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  minBtnActive: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  minBtnActive: { backgroundColor: C.dim, borderColor: C.border },
   minText: { fontSize: 16, fontWeight: '700', color: colors.text.secondary },
-  minTextActive: { color: colors.bg.primary },
+  minTextActive: { color: C.accent },
   minUnit: { fontSize: 8, color: colors.text.muted, marginTop: 1 },
 
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4], marginBottom: spacing[2] },
@@ -390,7 +397,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  soundBtnActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue + '50' },
+  soundBtnActive: { backgroundColor: C.dim, borderColor: C.border },
   soundBtnText: { fontSize: 11, fontWeight: '500', color: colors.text.muted },
-  soundBtnTextActive: { color: colors.accent.blue, fontWeight: '700' },
+  soundBtnTextActive: { color: C.accent, fontWeight: '700' },
 });
