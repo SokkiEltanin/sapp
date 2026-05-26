@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, Flame, Smile, Timer, TrendingUp, TrendingDown, Target,
+  Droplets, Dumbbell, BookOpen, Moon, Zap, Heart, Sun, Bike,
 } from 'lucide-react-native';
 
 import { useCalendarStore } from '@/store/calendarStore';
@@ -13,6 +14,19 @@ import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MoodLevel, MOOD_COLORS } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+
+// ─── Habit icon map ───────────────────────────────────────────────────────────
+
+const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
+  droplets:    Droplets,
+  dumbbell:    Dumbbell,
+  'book-open': BookOpen,
+  moon:        Moon,
+  zap:         Zap,
+  heart:       Heart,
+  sun:         Sun,
+  bike:        Bike,
+};
 
 // ─── Orange palette ───────────────────────────────────────────────────────────
 
@@ -111,7 +125,7 @@ function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
 export default function AnalyticsScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks }    = useCalendarStore();
-  const { habits, getLast7, getStreak, todayDone } = useHabits();
+  const { habits, getLast7, getLast30, getStreak, todayDone } = useHabits();
   const { entries: moodEntries }                   = useMoodStore();
   const [pomSessions, setPomSessions] = useState<Record<string, PomodoroSession[]>>({});
 
@@ -147,13 +161,14 @@ export default function AnalyticsScreen() {
       )
     : 0;
 
-  // ── Top habits by streak ────────────────────────────────────────────────────
-  const topHabits = useMemo(() =>
+  // ── Habits with stats (all, sorted by streak) ─────────────────────────────
+  const habitStats = useMemo(() =>
     habits
-      .map(h => ({ habit: h, streak: getStreak(h.id), last7: getLast7(h.id) }))
-      .sort((a, b) => b.streak - a.streak)
-      .slice(0, 4),
-  [habits, getStreak, getLast7]);
+      .map(h => ({ habit: h, streak: getStreak(h.id), last7: getLast7(h.id), last30: getLast30(h.id) }))
+      .sort((a, b) => b.streak - a.streak),
+  [habits, getStreak, getLast7, getLast30]);
+
+  const topHabits = habitStats.slice(0, 4);
 
   // ── Mood this week ──────────────────────────────────────────────────────────
   const weekMood = useMemo(() =>
@@ -298,35 +313,70 @@ export default function AnalyticsScreen() {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>NAWYKI — SERIA DNI</Text>
               <View style={styles.habitsList}>
-                {topHabits.map(({ habit, streak, last7 }) => (
-                  <View key={habit.id} style={styles.habitRow}>
-                    <View style={[styles.habitIconWrap, {
-                      backgroundColor: habit.color + '22',
-                      borderColor:     habit.color + '44',
-                    }]}>
-                      <View style={[styles.habitInnerDot, { backgroundColor: habit.color }]} />
-                    </View>
-                    <Text style={styles.habitName} numberOfLines={1}>{habit.title}</Text>
-                    <View style={styles.habitDots}>
-                      {last7.map((done, i) => (
-                        <View key={i} style={[
-                          styles.habitMiniDot,
-                          done && { backgroundColor: habit.color },
-                        ]} />
-                      ))}
-                    </View>
-                    {streak > 0 ? (
-                      <View style={styles.streakBadge}>
-                        <Flame size={9} color={colors.accent.amber} />
-                        <Text style={styles.streakText}>{streak}d</Text>
+                {topHabits.map(({ habit, streak, last7 }) => {
+                  const HIcon = HABIT_ICON_MAP[habit.icon] ?? Zap;
+                  return (
+                    <View key={habit.id} style={styles.habitRow}>
+                      <View style={[styles.habitIconWrap, {
+                        backgroundColor: habit.color + '22',
+                        borderColor:     habit.color + '44',
+                      }]}>
+                        <HIcon size={11} color={habit.color} />
                       </View>
-                    ) : (
-                      <View style={[styles.streakBadge, { backgroundColor: 'transparent' }]}>
-                        <Text style={[styles.streakText, { color: colors.text.muted }]}>—</Text>
+                      <Text style={styles.habitName} numberOfLines={1}>{habit.title}</Text>
+                      <View style={styles.habitDots}>
+                        {last7.map((done, i) => (
+                          <View key={i} style={[
+                            styles.habitMiniDot,
+                            done && { backgroundColor: habit.color },
+                          ]} />
+                        ))}
                       </View>
-                    )}
-                  </View>
-                ))}
+                      {streak > 0 ? (
+                        <View style={styles.streakBadge}>
+                          <Flame size={9} color={colors.accent.amber} />
+                          <Text style={styles.streakText}>{streak}d</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.streakBadge, { backgroundColor: 'transparent' }]}>
+                          <Text style={[styles.streakText, { color: colors.text.muted }]}>—</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* 30-day habit heatmap */}
+          {habitStats.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>NAWYKI — OSTATNIE 30 DNI</Text>
+              <View style={styles.heatmapList}>
+                {habitStats.map(({ habit, last30 }) => {
+                  const HIcon = HABIT_ICON_MAP[habit.icon] ?? Zap;
+                  const doneCount = last30.filter(Boolean).length;
+                  return (
+                    <View key={habit.id} style={styles.heatmapRow}>
+                      <View style={[styles.heatmapIcon, { backgroundColor: habit.color + '22', borderColor: habit.color + '44' }]}>
+                        <HIcon size={10} color={habit.color} />
+                      </View>
+                      <View style={styles.heatmapGrid}>
+                        {last30.map((done, i) => (
+                          <View
+                            key={i}
+                            style={[
+                              styles.heatmapCell,
+                              { backgroundColor: done ? habit.color + 'DD' : 'rgba(255,255,255,0.05)' },
+                            ]}
+                          />
+                        ))}
+                      </View>
+                      <Text style={[styles.heatmapCount, { color: habit.color + 'AA' }]}>{doneCount}</Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -419,6 +469,16 @@ const styles = StyleSheet.create({
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
   habitInnerDot: { width: 8, height: 8, borderRadius: 4 },
+
+  heatmapList: { gap: 8 },
+  heatmapRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heatmapIcon: {
+    width: 20, height: 20, borderRadius: 10, flexShrink: 0,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  heatmapGrid: { flex: 1, flexDirection: 'row', flexWrap: 'nowrap', gap: 2 },
+  heatmapCell: { width: 7, height: 7, borderRadius: 1.5 },
+  heatmapCount: { fontSize: 10, fontWeight: '700', minWidth: 20, textAlign: 'right' },
   habitName:     { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
   habitDots:     { flexDirection: 'row', gap: 3 },
   habitMiniDot: {
