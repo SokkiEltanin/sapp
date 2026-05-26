@@ -34,6 +34,13 @@ export function useTasks() {
         }
       }
       setTasks(data);
+      // Reschedule deadline reminders for all pending tasks with future deadlines
+      const nowStr = new Date().toISOString();
+      for (const task of data) {
+        if (task.status === 'pending' && task.deadline && task.deadline > nowStr) {
+          notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, task.deadline).catch(() => {});
+        }
+      }
       // Reschedule daily todo list with fresh task data
       AsyncStorage.getItem('notif_todo_enabled').then(enabled => {
         if (enabled !== 'true') return;
@@ -55,15 +62,24 @@ export function useTasks() {
   const create = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> => {
     const task = await tasksService.addTask(data);
     addTask(task);
+    if (task.deadline) {
+      notificationsService.scheduleTaskDeadlineReminder(task.id, task.title, task.deadline).catch(() => {});
+    }
     return task;
   };
 
   const update = async (id: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => {
     updateTask(id, updates);
+    if ('deadline' in updates) {
+      notificationsService.cancelTaskReminder(id).catch(() => {});
+      if (updates.deadline) {
+        const task = tasks.find(t => t.id === id);
+        notificationsService.scheduleTaskDeadlineReminder(id, task?.title ?? '', updates.deadline).catch(() => {});
+      }
+    }
     try {
       await tasksService.updateTask(id, updates);
     } catch {
-      // revert on fail — reload from server
       load();
     }
   };
