@@ -7,6 +7,14 @@ import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
+
+const P = {
+  card:       '#170810',
+  cardBorder: 'rgba(244,114,182,0.18)',
+  accent:     '#F472B6',
+  accentDim:  'rgba(244,114,182,0.12)',
+  muted:      'rgba(244,114,182,0.45)',
+};
 import { useMoodStore } from '@/store/moodStore';
 import { moodService } from '@/services/moodService';
 import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel } from '@/types';
@@ -135,8 +143,8 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
 
 const kw = StyleSheet.create({
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder,
   },
   header:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: {
@@ -286,8 +294,8 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
 
 const ins = StyleSheet.create({
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder,
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: {
@@ -409,10 +417,10 @@ export default function MoodScreen() {
       <ScreenHeader
         title="Nastrój"
         subtitle="Twoje samopoczucie"
-        accentColor={colors.text.primary}
+        accentColor={P.accent}
         rightSlot={
           <PressableScale onPress={() => setModalOpen(true)} style={styles.addBtn}>
-            <Plus size={17} color={colors.text.secondary} />
+            <Plus size={17} color={colors.bg.primary} />
           </PressableScale>
         }
       />
@@ -565,12 +573,12 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
   addBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: P.accent, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: P.accent,
   },
   heroCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder,
   },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   moodBubble: {
@@ -594,19 +602,19 @@ const styles = StyleSheet.create({
 
   statsRow: { flexDirection: 'row', gap: spacing[2] },
   statCard: {
-    flex: 1, backgroundColor: colors.bg.card, borderRadius: radius.lg,
+    flex: 1, backgroundColor: P.card, borderRadius: radius.lg,
     padding: spacing[3], gap: 4, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: P.cardBorder,
   },
   statVal: { fontSize: 18, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
   statLabel: { ...typography.caption, color: colors.text.muted, fontSize: 9, textAlign: 'center' },
 
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3],
+    borderWidth: 1, borderColor: P.cardBorder,
   },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { ...typography.label, color: colors.text.secondary, fontWeight: '600' },
+  cardLabel: { ...typography.label, color: P.muted, fontWeight: '600' },
 
   chartWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
   chartCol: { flex: 1, alignItems: 'center', gap: 3 },
