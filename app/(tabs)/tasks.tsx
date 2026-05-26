@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
   ChevronRight, Trash2, X,
-  Square, CheckSquare2, Clock, ArrowRight,
+  Square, CheckSquare2, Clock, ArrowRight, Timer,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
@@ -217,12 +217,22 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
           {task.title.toUpperCase()}
         </Text>
         <Text style={[s.cardSub, { color: subColor }]}>{subtitle}</Text>
-        {task.subtasks && task.subtasks.length > 0 && (() => {
-          const done = task.subtasks.filter(s => s.done).length;
-          return (
-            <Text style={s.cardMilestones}>{done}/{task.subtasks.length} kamieni</Text>
-          );
-        })()}
+        <View style={s.cardMeta}>
+          {task.subtasks && task.subtasks.length > 0 && (() => {
+            const done = task.subtasks.filter(st => st.done).length;
+            return (
+              <Text style={s.cardMilestones}>{done}/{task.subtasks.length} kamieni</Text>
+            );
+          })()}
+          {!!task.estimatedPomodoros && task.estimatedPomodoros > 0 && (
+            <View style={s.pomoPill}>
+              <Timer size={9} color={isDone ? colors.text.muted : '#4DD9F5'} strokeWidth={2.5} />
+              <Text style={[s.pomoPillText, isDone && { color: colors.text.muted }]}>
+                {task.estimatedPomodoros}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <ChevronRight size={14} color='rgba(255,255,255,0.15)' />
@@ -974,7 +984,14 @@ const s = StyleSheet.create({
   },
   cardTitleDone: { textDecorationLine: 'line-through', color: colors.text.muted },
   cardSub: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
-  cardMilestones: { fontSize: 9, color: colors.text.muted, marginTop: 2 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
+  cardMilestones: { fontSize: 9, color: colors.text.muted },
+  pomoPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(77,217,245,0.10)',
+    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2,
+  },
+  pomoPillText: { fontSize: 9, fontWeight: '700', color: '#4DD9F5' },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center',
