@@ -31,6 +31,14 @@ import { useTabSwipe } from '@/hooks/useTabSwipe';
 
 const MONTHS_BACK = 6;
 
+const F = {
+  card:       '#041412',
+  cardBorder: 'rgba(78,203,168,0.18)',
+  accent:     '#4ECBA8',
+  accentDim:  'rgba(78,203,168,0.12)',
+  muted:      'rgba(78,203,168,0.45)',
+};
+
 function isExp(e: Expense)  { return !e.type || e.type === 'expense'; }
 function isInc(e: Expense)  { return e.type === 'income'; }
 function inMonth(e: Expense, start: Date, end: Date) {
@@ -316,6 +324,7 @@ export default function FinancesScreen() {
               : new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })
           }
           accentColor={colors.tabs.finances}
+          style={{ borderBottomColor: F.cardBorder }}
           rightSlot={
             <View style={{ flexDirection: 'row', gap: spacing[2] }}>
               <PressableScale onPress={() => router.push('/expenses/scan' as any)} style={styles.headerBtn}>
@@ -871,7 +880,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: colors.border.default, backgroundColor: colors.bg.card,
+    borderColor: F.cardBorder, backgroundColor: F.card,
   },
   tagChipActive: { backgroundColor: colors.tabs.finances + '18', borderColor: colors.tabs.finances },
   tagChipText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
@@ -881,9 +890,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: spacing[4],
     marginBottom: spacing[2],
-    backgroundColor: colors.bg.card,
+    backgroundColor: F.card,
     borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
+    borderWidth: 1, borderColor: F.cardBorder,
     overflow: 'hidden',
   },
   segBtn: {
@@ -911,7 +920,7 @@ const styles = StyleSheet.create({
 
   headerBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: F.card, borderWidth: 1, borderColor: F.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -925,7 +934,7 @@ const styles = StyleSheet.create({
   },
   monthArrow: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: F.card, borderWidth: 1, borderColor: F.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   monthLabelWrap: { alignItems: 'center', flex: 1 },
@@ -933,13 +942,13 @@ const styles = StyleSheet.create({
   monthYear:  { fontSize: 11, color: colors.text.muted },
   settingsBtn: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: F.card, borderWidth: 1, borderColor: F.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
 
   heroCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[5],
-    gap: spacing[3], borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: F.card, borderRadius: radius.xl, padding: spacing[5],
+    gap: spacing[3], borderWidth: 1, borderColor: F.cardBorder,
   },
   heroHeader:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   heroLabel:     { fontSize: 10, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '600' },
@@ -952,13 +961,13 @@ const styles = StyleSheet.create({
   heroSep:       { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.08)' },
 
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    backgroundColor: F.card, borderRadius: radius.xl,
     padding: spacing[4], gap: spacing[3],
-    borderWidth: 1, borderColor: colors.border.default,
+    borderWidth: 1, borderColor: F.cardBorder,
   },
   alertCard: { borderColor: colors.accent.amber + '30', backgroundColor: colors.accent.amber + '08' },
   cardRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { fontSize: 12, color: colors.text.secondary, flex: 1, fontWeight: '600' },
+  cardLabel: { fontSize: 12, color: F.muted, flex: 1, fontWeight: '600' },
   cardMeta:  { fontSize: 13, fontWeight: '700' },
 
   alertRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },

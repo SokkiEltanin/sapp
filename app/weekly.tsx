@@ -352,26 +352,26 @@ export default function WeeklyScreen() {
       >
         {/* ── Tasks ── */}
         <SCard
-          icon={<CheckCircle2 size={13} color={colors.accent.purple} />}
+          icon={<CheckCircle2 size={13} color={colors.tabs.tasks} />}
           label="Zadania"
-          accent={colors.accent.purple}
+          accent={colors.tabs.tasks}
         >
           <View style={styles.statRow}>
             <View style={styles.statBox}>
-              <Text style={[styles.statBig, { color: colors.accent.green }]}>
+              <Text style={[styles.statBig, { color: colors.tabs.tasks }]}>
                 {completedThisWeek.length}
               </Text>
               <Text style={styles.statSub}>ukończono</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statBox}>
-              <Text style={[styles.statBig, { color: colors.accent.purple }]}>
+              <Text style={[styles.statBig, { color: colors.tabs.tasks }]}>
                 {weekTasks.filter(t => t.status !== 'done').length}
               </Text>
               <Text style={styles.statSub}>aktywnych</Text>
             </View>
           </View>
-          <WeekBars values={taskDailyDone} max={maxTaskDay} color={colors.accent.purple} dates={dates} />
+          <WeekBars values={taskDailyDone} max={maxTaskDay} color={colors.tabs.tasks} dates={dates} />
 
           {taskStats.total >= 3 && (
             <>
@@ -638,20 +638,20 @@ export default function WeeklyScreen() {
         {/* ── Pomodoro ── */}
         {pomoTotalRounds > 0 && (
           <SCard
-            icon={<Timer size={13} color={colors.accent.purple} />}
+            icon={<Timer size={13} color="#4DD9F5" />}
             label="Skupienie (Pomodoro)"
-            accent={colors.accent.purple}
+            accent="#4DD9F5"
           >
             <View style={styles.statRow}>
               <View style={styles.statBox}>
-                <Text style={[styles.statBig, { color: colors.accent.purple }]}>
+                <Text style={[styles.statBig, { color: '#4DD9F5' }]}>
                   {pomoTotalRounds}
                 </Text>
                 <Text style={styles.statSub}>sesji</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statBox}>
-                <Text style={[styles.statBig, { color: colors.accent.purple }]}>
+                <Text style={[styles.statBig, { color: '#4DD9F5' }]}>
                   {pomoTotalMins >= 60
                     ? `${Math.floor(pomoTotalMins / 60)}h${pomoTotalMins % 60 > 0 ? `${pomoTotalMins % 60}m` : ''}`
                     : `${pomoTotalMins}m`}
@@ -666,7 +666,7 @@ export default function WeeklyScreen() {
                 <Text style={styles.statSub}>aktywnych dni</Text>
               </View>
             </View>
-            <WeekBars values={pomoDailyMins} max={pomoMaxDay} color={colors.accent.purple} dates={dates} />
+            <WeekBars values={pomoDailyMins} max={pomoMaxDay} color="#4DD9F5" dates={dates} />
           </SCard>
         )}
 
