@@ -578,7 +578,7 @@ export default function HabitsScreen() {
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, {
             width: `${(doneCount / habits.length) * 100}%` as any,
-            backgroundColor: allDone ? colors.accent.green : colors.accent.purple,
+            backgroundColor: allDone ? colors.accent.green : colors.accent.amber,
           }]} />
         </View>
       )}
@@ -655,8 +655,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   iconBtnActive: { backgroundColor: colors.accent.purple + '18', borderColor: colors.accent.purple + '40' },
-  addBtn: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
-  progressTrack: { height: 2, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
+  addBtn: { backgroundColor: colors.accent.amber, borderColor: colors.accent.amber },
+  progressTrack: { height: 2, backgroundColor: 'rgba(251,191,36,0.12)', overflow: 'hidden' },
   progressFill: { height: 2, borderRadius: 1 },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 60 },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[4] },
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 21, paddingHorizontal: spacing[6] },
   emptyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.text.primary, borderRadius: radius.full,
+    backgroundColor: colors.accent.amber, borderRadius: radius.full,
     paddingHorizontal: spacing[5], paddingVertical: spacing[3], marginTop: spacing[2],
   },
   emptyBtnText: { fontSize: 14, fontWeight: '700', color: colors.bg.primary },

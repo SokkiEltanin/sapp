@@ -72,8 +72,8 @@ function SCard({ icon, label, children, accent }: {
 
 const sc = StyleSheet.create({
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: colors.bg.secondary, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
     padding: spacing[4], gap: spacing[3],
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
@@ -732,13 +732,13 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center', justifyContent: 'center',
   },
   weekNav: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginHorizontal: spacing[2] },
   navBtn: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center', justifyContent: 'center',
   },
   navBtnDisabled: { opacity: 0.3 },

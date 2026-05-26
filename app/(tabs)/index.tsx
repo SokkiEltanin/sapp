@@ -696,10 +696,10 @@ export default function DashboardScreen() {
             {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
             <View style={s.toolsRow}>
               {[
-                { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',   accent: '#F97316' },
-                { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',    accent: '#A78BFA' },
-                { label: 'Tydzień',  icon: <BarChart2 size={18} color='#22D3EE' />, route: '/weekly',   accent: '#22D3EE' },
-                { label: 'Focus',    icon: <Timer     size={18} color='#F43F5E' />, route: '/pomodoro', accent: '#F43F5E' },
+                { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',  accent: '#F97316' },
+                { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',   accent: '#A78BFA' },
+                { label: 'Skupienie',icon: <Activity  size={18} color='#F43F5E' />, route: '/focus',   accent: '#F43F5E' },
+                { label: 'Pomodoro', icon: <Timer     size={18} color='#22D3EE' />, route: '/pomodoro',accent: '#22D3EE' },
               ].map(tool => (
                 <TouchableOpacity
                   key={tool.route}
