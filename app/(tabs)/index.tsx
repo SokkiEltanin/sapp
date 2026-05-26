@@ -369,8 +369,9 @@ export default function DashboardScreen() {
   const isLoading = finLoading || tasksLoading;
   const onRefresh = () => { reloadFin(); reloadTasks(); };
 
-  const pendingTasks = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
-  const todayTasks   = useMemo(() => pendingTasks.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today), [pendingTasks, today]);
+  const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
+  const overdueTasks   = useMemo(() => pendingTasks.filter(t => t.deadline && t.deadline.split('T')[0] < today).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? '')), [pendingTasks, today]);
+  const todayTasks     = useMemo(() => pendingTasks.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today), [pendingTasks, today]);
 
   const tomorrow = useMemo(() => {
     const t = new Date(); t.setDate(t.getDate() + 1);
@@ -693,55 +694,65 @@ export default function DashboardScreen() {
               )}
             </View>
 
-            {/* ══ TODAY'S TASKS ════════════════════════════════════════════ */}
-            {todayTasks.length > 0 && (() => {
+            {/* ══ TODAY'S + OVERDUE TASKS ══════════════════════════════════ */}
+            {(todayTasks.length > 0 || overdueTasks.length > 0) && (() => {
               const PORD: Record<string, number> = { high: 0, normal: 1, low: 2 };
-              const sorted = [...todayTasks].sort((a, b) => (PORD[a.priority] ?? 1) - (PORD[b.priority] ?? 1));
-              const shown = sorted.slice(0, 3);
+              const todaySorted    = [...todayTasks].sort((a, b) => (PORD[a.priority] ?? 1) - (PORD[b.priority] ?? 1));
+              const combined       = [...overdueTasks, ...todaySorted];
+              const shown          = combined.slice(0, 4);
+              const totalCount     = combined.length;
+              const hasOverdue     = overdueTasks.length > 0;
               return (
-                <View style={s.todayCard}>
+                <View style={[s.todayCard, hasOverdue && { borderColor: colors.accent.red + '30' }]}>
                   <View style={s.todayHeader}>
-                    <Check size={12} color={colors.tabs.tasks} strokeWidth={3} />
-                    <Text style={s.todayTitle}>DZIŚ</Text>
-                    <View style={s.todayBadge}>
-                      <Text style={s.todayBadgeText}>{todayTasks.length}</Text>
+                    <Check size={12} color={hasOverdue ? colors.accent.red : colors.tabs.tasks} strokeWidth={3} />
+                    <Text style={[s.todayTitle, hasOverdue && { color: colors.accent.red }]}>
+                      {hasOverdue ? 'ZALEGŁE & DZIŚ' : 'DZIŚ'}
+                    </Text>
+                    <View style={[s.todayBadge, hasOverdue && { backgroundColor: colors.accent.red + '20' }]}>
+                      <Text style={[s.todayBadgeText, hasOverdue && { color: colors.accent.red }]}>{totalCount}</Text>
                     </View>
-                    {todayTasks.length > 3 && (
+                    {totalCount > 4 && (
                       <TouchableOpacity onPress={() => router.push('/(tabs)/tasks' as any)} style={s.todayMore}>
-                        <Text style={s.todayMoreText}>+{todayTasks.length - 3} więcej</Text>
-                        <ChevronRight size={11} color={colors.tabs.tasks} />
+                        <Text style={[s.todayMoreText, hasOverdue && { color: colors.accent.red }]}>+{totalCount - 4} więcej</Text>
+                        <ChevronRight size={11} color={hasOverdue ? colors.accent.red : colors.tabs.tasks} />
                       </TouchableOpacity>
                     )}
                   </View>
-                  {shown.map(task => (
-                    <TouchableOpacity
-                      key={task.id}
-                      style={s.todayRow}
-                      onPress={() => router.push('/(tabs)/tasks' as any)}
-                      activeOpacity={0.7}
-                    >
+                  {shown.map(task => {
+                    const isOverdue = task.deadline && task.deadline.split('T')[0] < today;
+                    const checkColor = isOverdue ? colors.accent.red : task.priority === 'high' ? colors.accent.red : colors.tabs.tasks;
+                    return (
                       <TouchableOpacity
-                        style={[s.todayCheck, task.priority === 'high' && s.todayCheckUrgent]}
-                        onPress={() => { haptic.tap(); toggleTask(task.id); }}
-                        hitSlop={8}
+                        key={task.id}
+                        style={s.todayRow}
+                        onPress={() => router.push('/(tabs)/tasks' as any)}
                         activeOpacity={0.7}
                       >
-                        <Check
-                          size={11}
-                          color={task.priority === 'high' ? colors.accent.red : colors.tabs.tasks}
-                          strokeWidth={3}
-                        />
+                        <TouchableOpacity
+                          style={[s.todayCheck, (isOverdue || task.priority === 'high') && s.todayCheckUrgent]}
+                          onPress={() => { haptic.tap(); toggleTask(task.id); }}
+                          hitSlop={8}
+                          activeOpacity={0.7}
+                        >
+                          <Check size={11} color={checkColor} strokeWidth={3} />
+                        </TouchableOpacity>
+                        <Text style={[s.todayRowTitle, (isOverdue || task.priority === 'high') && { color: colors.accent.red }]} numberOfLines={1}>
+                          {task.title}
+                        </Text>
+                        {isOverdue && (
+                          <View style={s.overduePill}>
+                            <Text style={s.overduePillText}>ZALEGŁE</Text>
+                          </View>
+                        )}
+                        {!isOverdue && task.priority === 'high' && (
+                          <View style={s.urgentPill}>
+                            <Text style={s.urgentPillText}>PILNE</Text>
+                          </View>
+                        )}
                       </TouchableOpacity>
-                      <Text style={[s.todayRowTitle, task.priority === 'high' && { color: colors.accent.red }]} numberOfLines={1}>
-                        {task.title}
-                      </Text>
-                      {task.priority === 'high' && (
-                        <View style={s.urgentPill}>
-                          <Text style={s.urgentPillText}>PILNE</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  ))}
+                    );
+                  })}
                 </View>
               );
             })()}
@@ -1296,6 +1307,12 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.accent.red + '30',
   },
   urgentPillText: { fontSize: 9, fontWeight: '800', color: colors.accent.red, letterSpacing: 0.8 },
+  overduePill: {
+    backgroundColor: colors.accent.red + '20', borderRadius: radius.sm,
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderWidth: 1, borderColor: colors.accent.red + '45',
+  },
+  overduePillText: { fontSize: 9, fontWeight: '800', color: colors.accent.red, letterSpacing: 0.8 },
 
   // ── Subscription payment modal ─────────────────────────────────────────────
   payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
