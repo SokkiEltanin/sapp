@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { X, Play, Pause, SkipForward, RotateCcw, Timer, Volume2, VolumeX, CheckSquare, Square, Plus } from 'lucide-react-native';
+import { X, Play, Pause, SkipForward, RotateCcw, Timer, Volume2, VolumeX, CheckSquare, Square, Plus, Check, CheckCircle2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
@@ -107,6 +107,13 @@ export default function PomodoroScreen() {
   const { selected: focusSound, setSelected: setFocusSound } = useFocusSound(isRunning);
 
   const [newMilestone, setNewMilestone] = useState('');
+  const [taskDismissed, setTaskDismissed] = useState(false);
+
+  const prevTaskId = useRef(taskId);
+  useEffect(() => {
+    if (taskId !== prevTaskId.current) setTaskDismissed(false);
+    prevTaskId.current = taskId;
+  }, [taskId]);
 
   const totalSecs = mode === 'work'
     ? workMins * 60
@@ -150,6 +157,17 @@ export default function PomodoroScreen() {
     addMilestone(t);
     setNewMilestone('');
     haptic.tap();
+  };
+
+  const handleMarkTaskDone = async () => {
+    if (!taskId) return;
+    setTaskDismissed(true);
+    haptic.success();
+    const now = new Date().toISOString();
+    try {
+      await tasksService.updateTask(taskId, { status: 'done', updatedAt: now });
+      updateTaskStore(taskId, { status: 'done', updatedAt: now });
+    } catch {}
   };
 
   return (
@@ -219,6 +237,26 @@ export default function PomodoroScreen() {
             <SkipForward size={18} color={colors.text.muted} />
           </PressableScale>
         </View>
+
+        {/* Task-done prompt — appears when work round ends with a linked task */}
+        {done && mode === 'work' && !!taskId && !taskDismissed && (
+          <View style={styles.taskDoneCard}>
+            <View style={styles.taskDoneHeader}>
+              <CheckCircle2 size={16} color={C.accent} />
+              <Text style={styles.taskDoneTitle} numberOfLines={2}>{taskTitle}</Text>
+            </View>
+            <Text style={styles.taskDoneQuestion}>Zadanie ukończone?</Text>
+            <View style={styles.taskDoneBtns}>
+              <PressableScale onPress={handleMarkTaskDone} style={styles.taskDoneYes}>
+                <Check size={14} color={colors.bg.primary} />
+                <Text style={styles.taskDoneYesText}>Tak!</Text>
+              </PressableScale>
+              <PressableScale onPress={() => { setTaskDismissed(true); haptic.tap(); }} style={styles.taskDoneNo}>
+                <Text style={styles.taskDoneNoText}>Jeszcze nie</Text>
+              </PressableScale>
+            </View>
+          </View>
+        )}
 
         {/* Milestones — only in work mode */}
         {mode === 'work' && (
@@ -400,4 +438,28 @@ const styles = StyleSheet.create({
   soundBtnActive: { backgroundColor: C.dim, borderColor: C.border },
   soundBtnText: { fontSize: 11, fontWeight: '500', color: colors.text.muted },
   soundBtnTextActive: { color: C.accent, fontWeight: '700' },
+
+  taskDoneCard: {
+    width: '100%',
+    backgroundColor: C.dim, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: C.border,
+    padding: spacing[4], gap: spacing[3],
+  },
+  taskDoneHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  taskDoneTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  taskDoneQuestion: { fontSize: 12, color: C.muted, fontWeight: '600', letterSpacing: 0.5 },
+  taskDoneBtns: { flexDirection: 'row', gap: spacing[2] },
+  taskDoneYes: {
+    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing[1], backgroundColor: C.accent,
+    borderRadius: radius.lg, paddingVertical: spacing[3],
+  },
+  taskDoneYesText: { fontSize: 14, fontWeight: '800', color: colors.bg.primary },
+  taskDoneNo: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    borderRadius: radius.lg, paddingVertical: spacing[3],
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  taskDoneNoText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
 });
