@@ -77,7 +77,7 @@ const dp = StyleSheet.create({
 
 const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
   { value: 'low',    label: 'Niskie',   color: colors.text.secondary },
-  { value: 'normal', label: 'Normalne', color: colors.text.primary },
+  { value: 'normal', label: 'Normalne', color: G.accent },
   { value: 'high',   label: 'Pilne',    color: colors.accent.red },
 ];
 

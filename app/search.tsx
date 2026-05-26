@@ -365,8 +365,8 @@ export default function SearchScreen() {
           {matchedNotes.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionRow}>
-                <FileText size={12} color={colors.accent.blue} />
-                <Text style={[styles.sectionTitle, { color: colors.accent.blue }]}>Notatki</Text>
+                <FileText size={12} color={colors.accent.purple} />
+                <Text style={[styles.sectionTitle, { color: colors.accent.purple }]}>Notatki</Text>
                 <Text style={styles.sectionCount}>{matchedNotes.length}</Text>
               </View>
               {matchedNotes.map(note => (
@@ -376,8 +376,8 @@ export default function SearchScreen() {
                   onPress={() => router.push({ pathname: '/notes', params: { noteId: note.id } } as any)}
                   activeOpacity={0.75}
                 >
-                  <View style={[styles.rowIcon, { backgroundColor: colors.accent.blue + '18' }]}>
-                    <FileText size={14} color={colors.accent.blue} />
+                  <View style={[styles.rowIcon, { backgroundColor: colors.accent.purple + '18' }]}>
+                    <FileText size={14} color={colors.accent.purple} />
                   </View>
                   <View style={styles.rowInfo}>
                     <Highlighted text={note.title || note.body.slice(0, 40) || 'Notatka'} query={q} />

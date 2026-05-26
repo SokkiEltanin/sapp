@@ -87,7 +87,7 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   const pct     = isCount ? Math.min(count / goal, 1) : (done ? 1 : 0);
 
   return (
-    <TouchableOpacity onLongPress={onEdit} activeOpacity={0.85} delayLongPress={400} style={hr.wrap}>
+    <TouchableOpacity onLongPress={onEdit} activeOpacity={0.85} delayLongPress={400} style={[hr.wrap, done && { backgroundColor: habit.color + '0D', borderColor: habit.color + '35' }]}>
       <View style={[hr.iconCircle, { backgroundColor: habit.color + '22', borderColor: habit.color + '44' }]}>
         <HabitIcon name={habit.icon} size={18} color={habit.color} />
       </View>
@@ -499,9 +499,9 @@ const am = StyleSheet.create({
     paddingHorizontal: spacing[2], paddingVertical: 4, borderRadius: radius.sm,
     backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
   },
-  unitChipActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue },
+  unitChipActive: { backgroundColor: colors.accent.amber + '20', borderColor: colors.accent.amber },
   unitChipText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  unitChipTextActive: { color: colors.accent.blue },
+  unitChipTextActive: { color: colors.accent.amber },
 
   iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   iconBtn: {
@@ -512,7 +512,7 @@ const am = StyleSheet.create({
   colorRow: { flexDirection: 'row', gap: spacing[2] },
   colorBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   colorBtnActive: { borderWidth: 2, borderColor: colors.text.primary, transform: [{ scale: 1.15 }] },
-  addBtn: { backgroundColor: colors.text.primary, borderRadius: radius.full, paddingVertical: spacing[4], alignItems: 'center', marginTop: spacing[2] },
+  addBtn: { backgroundColor: colors.accent.amber, borderRadius: radius.full, paddingVertical: spacing[4], alignItems: 'center', marginTop: spacing[2] },
   addBtnDisabled: { opacity: 0.35 },
   addBtnText: { fontSize: 15, fontWeight: '700', color: colors.bg.primary },
 
