@@ -86,6 +86,14 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   const goal    = habit.dailyGoal ?? 1;
   const pct     = isCount ? Math.min(count / goal, 1) : (done ? 1 : 0);
 
+  // Weekly progress for habits with weeklyTarget < 7
+  const weeklyTarget = habit.weeklyTarget && habit.weeklyTarget < 7 ? habit.weeklyTarget : null;
+  const thisWeekDone = weeklyTarget != null ? (() => {
+    const dow = (() => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; })();
+    return last7.slice(6 - dow).filter(Boolean).length;
+  })() : null;
+  const weeklyMet = weeklyTarget != null && thisWeekDone != null && thisWeekDone >= weeklyTarget;
+
   return (
     <TouchableOpacity onLongPress={onEdit} activeOpacity={0.85} delayLongPress={400} style={[hr.wrap, done && { backgroundColor: habit.color + '0D', borderColor: habit.color + '35' }]}>
       <View style={[hr.iconCircle, { backgroundColor: habit.color + '22', borderColor: habit.color + '44' }]}>
@@ -101,9 +109,11 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
               <Text style={hr.streakText}>{streak}d</Text>
             </View>
           )}
-          {habit.weeklyTarget && habit.weeklyTarget < 7 && (
-            <View style={hr.freqBadge}>
-              <Text style={hr.freqText}>{habit.weeklyTarget}×/tydz.</Text>
+          {weeklyTarget != null && thisWeekDone != null && (
+            <View style={[hr.freqBadge, weeklyMet && { backgroundColor: colors.accent.green + '20', borderColor: colors.accent.green + '40' }]}>
+              <Text style={[hr.freqText, weeklyMet && { color: colors.accent.green }]}>
+                {thisWeekDone}/{weeklyTarget} tydz.
+              </Text>
             </View>
           )}
           {habit.reminderTime && (
@@ -181,6 +191,7 @@ const hr = StyleSheet.create({
   freqBadge: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
+    borderWidth: 1, borderColor: 'transparent',
   },
   freqText: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
 
