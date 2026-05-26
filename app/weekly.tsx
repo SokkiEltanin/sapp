@@ -60,10 +60,14 @@ function SCard({ icon, label, children, accent }: {
   icon: React.ReactNode; label: string; children: React.ReactNode; accent?: string;
 }) {
   return (
-    <View style={[sc.card, accent && { borderLeftWidth: 3, borderLeftColor: accent }]}>
+    <View style={[sc.card, accent && {
+      borderLeftWidth: 3, borderLeftColor: accent,
+      backgroundColor: accent + '09',
+      borderColor: accent + '20',
+    }]}>
       <View style={sc.header}>
         {icon}
-        <Text style={sc.label}>{label}</Text>
+        <Text style={[sc.label, accent && { color: accent + 'AA' }]}>{label}</Text>
       </View>
       {children}
     </View>
