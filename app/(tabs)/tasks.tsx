@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
   AlarmClock, ChevronRight, Trash2, X,
-  Square, CheckSquare2,
+  Square, CheckSquare2, Clock,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
@@ -184,7 +184,14 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
 
 // ─── Task detail modal ────────────────────────────────────────────────────────
 
-function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubtask, onToggleSubtask }: {
+const SNOOZE_OPTIONS = [
+  { label: 'Za 1 godzinę',     getDate: () => { const d = new Date(); d.setHours(d.getHours() + 1); return d; } },
+  { label: 'Dziś wieczór 20:00', getDate: () => { const d = new Date(); d.setHours(20, 0, 0, 0); return d; } },
+  { label: 'Jutro rano 9:00',   getDate: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; } },
+  { label: 'Za tydzień',        getDate: () => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d; } },
+] as const;
+
+function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubtask, onToggleSubtask, onSnooze }: {
   task: Task | null;
   visible: boolean;
   onClose: () => void;
@@ -192,8 +199,10 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   onDelete: (id: string) => void;
   onAddSubtask: (taskId: string, title: string) => void;
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
+  onSnooze: (id: string, until: Date) => void;
 }) {
   const [newMilestone, setNewMilestone] = useState('');
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   if (!task) return null;
@@ -277,6 +286,14 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 <Text style={dm.footerBtnText}>Edytuj</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={[dm.footerBtn, dm.footerBtnSnooze]}
+                onPress={() => { haptic.tap(); setSnoozeOpen(true); }}
+                activeOpacity={0.8}
+              >
+                <Clock size={15} color={colors.accent.amber} />
+                <Text style={[dm.footerBtnText, { color: colors.accent.amber }]}>Odłóż</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[dm.footerBtn, dm.footerBtnDanger]}
                 onPress={() => { onDelete(task.id); onClose(); }}
                 activeOpacity={0.8}
@@ -285,6 +302,36 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 <Text style={[dm.footerBtnText, { color: colors.accent.red }]}>Usuń</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Snooze sheet */}
+            {snoozeOpen && (
+              <View style={dm.snoozeSheet}>
+                <View style={dm.snoozeHeader}>
+                  <Clock size={13} color={colors.accent.amber} />
+                  <Text style={dm.snoozeTitle}>Odłóż zadanie</Text>
+                  <TouchableOpacity onPress={() => setSnoozeOpen(false)} hitSlop={8}>
+                    <X size={15} color={colors.text.muted} />
+                  </TouchableOpacity>
+                </View>
+                {SNOOZE_OPTIONS.map(opt => (
+                  <TouchableOpacity
+                    key={opt.label}
+                    style={dm.snoozeRow}
+                    onPress={() => {
+                      haptic.tap();
+                      onSnooze(task.id, opt.getDate());
+                      setSnoozeOpen(false);
+                      onClose();
+                      toast.info('Odłożono zadanie');
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={dm.snoozeRowText}>{opt.label}</Text>
+                    <ChevronRight size={13} color={colors.text.muted} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -344,7 +391,27 @@ const dm = StyleSheet.create({
     backgroundColor: colors.accent.red + '15',
     borderColor: colors.accent.red + '30',
   },
+  footerBtnSnooze: {
+    backgroundColor: colors.accent.amber + '15',
+    borderColor: colors.accent.amber + '30',
+  },
   footerBtnText: { fontSize: 13, fontWeight: '700', color: G.accent },
+  snoozeSheet: {
+    borderTopWidth: 1, borderTopColor: G.cardBorder,
+    paddingHorizontal: spacing[5], paddingTop: spacing[3], paddingBottom: spacing[2],
+    gap: 0,
+  },
+  snoozeHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingBottom: spacing[3],
+  },
+  snoozeTitle: { flex: 1, fontSize: 11, fontWeight: '700', color: colors.accent.amber, letterSpacing: 1.2, textTransform: 'uppercase' },
+  snoozeRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: spacing[3],
+    borderTopWidth: 1, borderTopColor: 'rgba(61,190,117,0.06)',
+  },
+  snoozeRowText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text.secondary },
 });
 
 // ─── Completion confirm modal ──────────────────────────────────────────────────
@@ -463,7 +530,7 @@ const ss = StyleSheet.create({
 
 export default function TasksScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
-  const { tasks, isLoading, reload, toggle, remove, update, addSubtask, toggleSubtask } = useTasks();
+  const { tasks, isLoading, reload, toggle, remove, update, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
 
   const [sort, setSort]           = useState<SortKey>('deadline');
@@ -594,6 +661,7 @@ export default function TasksScreen() {
         onDelete={handleDelete}
         onAddSubtask={addSubtask}
         onToggleSubtask={toggleSubtask}
+        onSnooze={snooze}
       />
       <SortSheet
         sort={sort}

@@ -193,11 +193,11 @@ export default function AddTaskScreen() {
         reminderMessage,
       });
 
-      // Schedule reminder
-      if (reminderTime && deadlineIso) {
+      // Schedule reminder — use deadline date or today if no deadline
+      if (reminderTime) {
         notificationsService.scheduleCustomTaskReminder(
           task.id, task.title,
-          deadline,
+          deadline || todayStr(),
           reminderTime,
           reminderMessage,
         ).catch(() => {});
