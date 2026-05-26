@@ -51,7 +51,8 @@ export default function FocusScreen() {
           t.deadline?.split('T')[0] === today ||
           t.scheduledDate === today ||
           t.priority === 'high' ||
-          !t.deadline
+          (!t.deadline && !t.scheduledDate) ||
+          (t.deadline?.split('T')[0] && t.deadline.split('T')[0] < today) // overdue
         )
       )
       .sort((a, b) => {
