@@ -15,6 +15,16 @@ import { MOOD_COLORS } from '@/types';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { colors, spacing, radius, typography } from '@/theme';
 
+// ─── Teal palette ─────────────────────────────────────────────────────────────
+
+const T = {
+  card:       '#041412',
+  cardBorder: 'rgba(78,203,168,0.18)',
+  accent:     '#4ECBA8',
+  accentDim:  'rgba(78,203,168,0.12)',
+  muted:      'rgba(78,203,168,0.45)',
+};
+
 const WEEK_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
 
 type SleepQuality = 'poor' | 'fair' | 'good' | 'excellent';
@@ -136,12 +146,12 @@ export default function HealthScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" />
+      <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* Steps hero */}
-        <GlassCard padding={spacing[4]} style={styles.card}>
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
             <Footprints size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>KROKI DZISIAJ</Text>
@@ -156,7 +166,7 @@ export default function HealthScreen() {
             </View>
           </View>
           <Text style={[styles.heroNum, {
-            color: steps >= stepGoal ? colors.accent.success : colors.text.primary,
+            color: steps >= stepGoal ? T.accent : colors.text.primary,
           }]}>
             {steps.toLocaleString()}
           </Text>
@@ -166,13 +176,13 @@ export default function HealthScreen() {
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, {
               width: `${stepPct * 100}%`,
-              backgroundColor: steps >= stepGoal ? colors.accent.success : colors.text.primary,
+              backgroundColor: steps >= stepGoal ? T.accent : T.muted,
             }]} />
           </View>
         </GlassCard>
 
         {/* Sleep card */}
-        <GlassCard padding={spacing[4]} style={styles.card}>
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
             <Moon size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>SEN</Text>
@@ -274,7 +284,7 @@ export default function HealthScreen() {
         </GlassCard>
 
         {/* Pomodoro */}
-        <GlassCard padding={spacing[4]} style={styles.pomRow}>
+        <GlassCard padding={spacing[4]} style={styles.tealPomRow}>
           <View style={styles.pomLeft}>
             <Timer size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>POMODORO DZISIAJ</Text>
@@ -283,13 +293,13 @@ export default function HealthScreen() {
             {pomodoroStore.completedRounds}
             <Text style={styles.pomUnit}> sesji</Text>
           </Text>
-          <PressableScale onPress={() => router.push('/pomodoro' as any)} style={styles.pomCta}>
-            <Text style={styles.pomCtaText}>{pomodoroStore.isRunning ? 'Trwa...' : 'Start'}</Text>
+          <PressableScale onPress={() => router.push('/pomodoro' as any)} style={[styles.pomCta, { backgroundColor: T.accentDim, borderColor: T.cardBorder }]}>
+            <Text style={[styles.pomCtaText, { color: T.accent }]}>{pomodoroStore.isRunning ? 'Trwa...' : 'Start'}</Text>
           </PressableScale>
         </GlassCard>
 
         {/* Weekly steps chart */}
-        <GlassCard padding={spacing[4]} style={styles.card}>
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
             <Activity size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>TEN TYDZIEŃ — KROKI</Text>
@@ -306,7 +316,7 @@ export default function HealthScreen() {
                       height: barH,
                       backgroundColor: s === 0
                         ? 'rgba(255,255,255,0.07)'
-                        : goalMet ? colors.accent.success : colors.text.primary,
+                        : goalMet ? T.accent : T.muted,
                       width: isToday ? 14 : 9,
                       opacity: s === 0 ? 0.4 : 1,
                     }]} />
@@ -320,7 +330,7 @@ export default function HealthScreen() {
         </GlassCard>
 
         {/* Water */}
-        <GlassCard padding={spacing[4]} style={styles.card}>
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
             <Droplets size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>NAWODNIENIE</Text>
@@ -335,7 +345,7 @@ export default function HealthScreen() {
               >
                 <Droplets
                   size={14}
-                  color={i < water ? colors.accent.success : colors.text.muted}
+                  color={i < water ? T.accent : colors.text.muted}
                   strokeWidth={i < water ? 2.5 : 1.5}
                 />
               </TouchableOpacity>
@@ -344,7 +354,7 @@ export default function HealthScreen() {
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, {
               width: `${(water / waterGoal) * 100}%`,
-              backgroundColor: water >= waterGoal ? colors.accent.success : colors.text.primary,
+              backgroundColor: water >= waterGoal ? T.accent : T.muted,
             }]} />
           </View>
           <View style={styles.waterCtrl}>
@@ -361,7 +371,7 @@ export default function HealthScreen() {
         </GlassCard>
 
         {/* Weight */}
-        <GlassCard padding={spacing[4]} style={styles.card}>
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
             <Activity size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>MASA CIAŁA</Text>
@@ -410,7 +420,7 @@ export default function HealthScreen() {
                     <View style={styles.weightBarWrap}>
                       <View style={[styles.weightBar, {
                         height: h,
-                        backgroundColor: w > 0 ? colors.text.primary : 'rgba(255,255,255,0.07)',
+                        backgroundColor: w > 0 ? T.accent : 'rgba(255,255,255,0.07)',
                         width: isToday ? 12 : 8,
                         opacity: w === 0 ? 0.3 : 1,
                       }]} />
@@ -426,7 +436,7 @@ export default function HealthScreen() {
 
         {/* Mood trend */}
         {recentMood.length > 0 && (
-          <GlassCard padding={spacing[4]} style={styles.card}>
+          <GlassCard padding={spacing[4]} style={styles.tealCard}>
             <View style={styles.cardRow}>
               <Activity size={13} color={colors.text.muted} />
               <Text style={styles.cardLabel}>NASTRÓJ — 7 DNI</Text>
@@ -494,8 +504,10 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
 
   card: { gap: spacing[3] },
+  tealCard: { gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },
+  tealPomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, letterSpacing: 1.2 },
+  cardLabel: { fontSize: 10, fontWeight: '600', color: T.muted, letterSpacing: 1.2 },
 
   heroNum: { fontSize: 44, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
   heroSub: { ...typography.caption, color: colors.text.muted },
@@ -532,11 +544,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   minutePillActive: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: T.accentDim,
+    borderColor: T.cardBorder,
   },
   minuteText: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
-  minuteTextActive: { color: colors.text.primary, fontWeight: '700' },
+  minuteTextActive: { color: T.accent, fontWeight: '700' },
 
   microBar: { height: 2, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
   microFill: { height: 2, borderRadius: radius.full },
@@ -562,7 +574,7 @@ const styles = StyleSheet.create({
   sleepBar: { borderRadius: 3, minHeight: 3 },
   sleepBarLabel: { fontSize: 8, color: colors.text.muted },
 
-  // Pomodoro row
+  // Pomodoro row (base — overridden by tealPomRow inline)
   pomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   pomLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flex: 1 },
   pomNum: { fontSize: 22, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
@@ -590,7 +602,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center',
   },
-  glassFilled: { backgroundColor: colors.accent.success + '15', borderColor: colors.accent.success + '40' },
+  glassFilled: { backgroundColor: T.accentDim, borderColor: T.cardBorder },
   waterCtrl: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[1] },
   ctrlBtn: {
     width: 42, height: 42, borderRadius: radius.md,
@@ -654,14 +666,14 @@ const wm = StyleSheet.create({
     width: '100%', fontSize: 42, fontWeight: '900', color: colors.text.primary,
     textAlign: 'center', letterSpacing: -1,
     paddingVertical: spacing[3],
-    borderBottomWidth: 2, borderBottomColor: colors.accent.purple + '60',
+    borderBottomWidth: 2, borderBottomColor: T.accent + '60',
   },
   unit: { fontSize: 13, color: colors.text.muted, fontWeight: '600', alignSelf: 'flex-end', marginTop: -spacing[2] },
   saveBtn: {
     width: '100%', paddingVertical: spacing[4],
-    backgroundColor: colors.accent.purple + '25',
-    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.accent.purple + '50',
+    backgroundColor: T.accentDim,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: T.cardBorder,
     alignItems: 'center',
   },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.accent.purple },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: T.accent },
 });
