@@ -586,14 +586,15 @@ const ss = StyleSheet.create({
 
 // ─── Quick capture bar ────────────────────────────────────────────────────────
 
-function QuickCapture({ onCreate }: { onCreate: (title: string) => void }) {
+function QuickCapture({ onCreate }: { onCreate: (title: string, scheduleToday: boolean) => void }) {
   const [text, setText] = useState('');
+  const [todayMode, setTodayMode] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   const submit = () => {
     const t = text.trim();
     if (!t) return;
-    onCreate(t);
+    onCreate(t, todayMode);
     setText('');
     haptic.tap();
   };
@@ -612,6 +613,14 @@ function QuickCapture({ onCreate }: { onCreate: (title: string) => void }) {
           onSubmitEditing={submit}
           blurOnSubmit={false}
         />
+        <TouchableOpacity
+          onPress={() => { setTodayMode(v => !v); haptic.tap(); }}
+          style={[qc.todayChip, todayMode && qc.todayChipActive]}
+          activeOpacity={0.75}
+          hitSlop={6}
+        >
+          <Text style={[qc.todayChipText, todayMode && qc.todayChipTextActive]}>Dziś</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[qc.btn, text.trim().length > 0 && qc.btnActive]}
           onPress={submit}
@@ -649,6 +658,17 @@ const qc = StyleSheet.create({
   btnActive: {
     backgroundColor: G.accent, borderColor: G.accent,
   },
+  todayChip: {
+    paddingHorizontal: spacing[3], paddingVertical: 5,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  todayChipActive: {
+    backgroundColor: G.accentDim, borderColor: G.accent + '80',
+  },
+  todayChipText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  todayChipTextActive: { color: G.accent },
 });
 
 // ─── Filter pills ─────────────────────────────────────────────────────────────
@@ -849,9 +869,12 @@ export default function TasksScreen() {
     return [...sorted, ...(done.length > 0 ? (['done-header' as const, ...done]) : [])];
   }, [sorted, done, today, sort]);
 
-  const handleQuickCreate = useCallback(async (title: string) => {
-    await create({ title, status: 'pending', priority: 'normal', tags: [] });
-    toast.success('Dodano zadanie');
+  const handleQuickCreate = useCallback(async (title: string, scheduleToday: boolean) => {
+    await create({
+      title, status: 'pending', priority: 'normal', tags: [],
+      ...(scheduleToday ? { scheduledDate: todayStr() } : {}),
+    });
+    toast.success(scheduleToday ? 'Dodano na dziś' : 'Dodano zadanie');
   }, [create]);
 
   return (
