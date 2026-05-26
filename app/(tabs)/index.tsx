@@ -23,6 +23,7 @@ import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useTasks } from '@/hooks/useTasks';
+import { useHabits } from '@/hooks/useHabits';
 import { useMoodCheckIn } from '@/hooks/useMoodCheckIn';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -240,6 +241,7 @@ export default function DashboardScreen() {
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const { tasks, isLoading: tasksLoading, reload: reloadTasks } = useTasks();
+  const { habits, todayDone: habitsDoneIds, toggle: toggleHabit } = useHabits();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood, addEntry } = useMoodStore();
   const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
@@ -713,6 +715,61 @@ export default function DashboardScreen() {
               ))}
             </View>
 
+            {/* ══ HABITS TODAY ════════════════════════════════════════════ */}
+            {habits.length > 0 && (() => {
+              const doneCount = habitsDoneIds.length;
+              const allDone   = doneCount === habits.length;
+              const pct       = habits.length > 0 ? doneCount / habits.length : 0;
+              return (
+                <TouchableOpacity
+                  style={s.habitsCard}
+                  onPress={() => router.push('/habits' as any)}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.habitsHeader}>
+                    <View style={s.habitsHeaderLeft}>
+                      <Flame size={13} color={allDone ? colors.accent.green : '#F97316'} />
+                      <Text style={[s.habitsTitle, allDone && { color: colors.accent.green }]}>
+                        {allDone ? 'Nawyki na dziś gotowe!' : 'Nawyki — dziś'}
+                      </Text>
+                    </View>
+                    <Text style={[s.habitsBadge, allDone && { color: colors.accent.green }]}>
+                      {doneCount}/{habits.length}
+                    </Text>
+                  </View>
+
+                  {/* Progress bar */}
+                  <View style={s.habitsTrack}>
+                    <View style={[s.habitsFill, {
+                      width: `${pct * 100}%` as any,
+                      backgroundColor: allDone ? colors.accent.green : '#F97316',
+                    }]} />
+                  </View>
+
+                  {/* Per-habit quick dots */}
+                  <View style={s.habitsDotsRow}>
+                    {habits.slice(0, 8).map(h => {
+                      const done = habitsDoneIds.includes(h.id);
+                      return (
+                        <TouchableOpacity
+                          key={h.id}
+                          onPress={(e) => { (e as any).stopPropagation?.(); haptic.tap(); toggleHabit(h.id); }}
+                          style={[
+                            s.habitsDot,
+                            { backgroundColor: done ? h.color + 'CC' : h.color + '20', borderColor: h.color + (done ? 'CC' : '50') },
+                          ]}
+                          activeOpacity={0.7}
+                        />
+                      );
+                    })}
+                    {habits.length > 8 && (
+                      <Text style={s.habitsMore}>+{habits.length - 8}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })()}
+
             {/* ══ WEEKLY / MONTHLY FINANCES ════════════════════════════════ */}
             <View style={s.card}>
               <View style={s.cardHeader}>
@@ -1022,6 +1079,28 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   toolLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
+
+  // ── Habits today card ─────────────────────────────────────────────────────
+  habitsCard: {
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(249,115,22,0.20)',
+    padding: spacing[4], gap: spacing[3],
+  },
+  habitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  habitsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  habitsTitle: { fontSize: 13, fontWeight: '700', color: '#F97316' },
+  habitsBadge: { fontSize: 14, fontWeight: '800', color: '#F97316' },
+  habitsTrack: {
+    height: 3, backgroundColor: 'rgba(249,115,22,0.12)',
+    borderRadius: 2, overflow: 'hidden',
+  },
+  habitsFill: { height: 3, borderRadius: 2 },
+  habitsDotsRow: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
+  habitsDot: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 1.5,
+  },
+  habitsMore: { fontSize: 11, color: colors.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
   miniRow: { flexDirection: 'row', gap: spacing[3] },
