@@ -14,7 +14,7 @@ import {
   TrendingUp, TrendingDown, Flame, Smile, Zap,
   CalendarDays, Settings, Wallet,
   Briefcase, CreditCard, Check, Plus,
-  Timer, CloudSun, Thermometer,
+  Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -691,6 +691,28 @@ export default function DashboardScreen() {
               )}
             </View>
 
+            {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
+            <View style={s.toolsRow}>
+              {[
+                { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',   accent: '#F97316' },
+                { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',    accent: '#A78BFA' },
+                { label: 'Tydzień',  icon: <BarChart2 size={18} color='#22D3EE' />, route: '/weekly',   accent: '#22D3EE' },
+                { label: 'Focus',    icon: <Timer     size={18} color='#F43F5E' />, route: '/pomodoro', accent: '#F43F5E' },
+              ].map(tool => (
+                <TouchableOpacity
+                  key={tool.route}
+                  style={[s.toolTile, { borderColor: tool.accent + '30' }]}
+                  onPress={() => router.push(tool.route as any)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[s.toolIcon, { backgroundColor: tool.accent + '15' }]}>
+                    {tool.icon}
+                  </View>
+                  <Text style={s.toolLabel}>{tool.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             {/* ══ WEEKLY / MONTHLY FINANCES ════════════════════════════════ */}
             <View style={s.card}>
               <View style={s.cardHeader}>
@@ -987,6 +1009,19 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   quickMoodEmoji: { fontSize: 22 },
+
+  // ── Tools row ─────────────────────────────────────────────────────────────
+  toolsRow: { flexDirection: 'row', gap: spacing[2] },
+  toolTile: {
+    flex: 1, alignItems: 'center', gap: spacing[2],
+    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, paddingVertical: spacing[3],
+  },
+  toolIcon: {
+    width: 38, height: 38, borderRadius: radius.lg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  toolLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
   miniRow: { flexDirection: 'row', gap: spacing[3] },
