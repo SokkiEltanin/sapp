@@ -116,7 +116,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
               <Animated.View key={action.label} style={{ opacity: itemAnims[i], transform: [{ translateY }] }}>
                 <TouchableOpacity
                   style={s.quickItem}
-                  onPress={() => closeMenu(() => router.push(action.route as any))}
+                  onPress={() => { haptic.tap(); closeMenu(() => router.push(action.route as any)); }}
                   activeOpacity={0.8}
                 >
                   <Text style={s.quickLabel}>{action.label}</Text>

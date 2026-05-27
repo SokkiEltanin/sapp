@@ -349,6 +349,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   const [weeklyTarget, setWeeklyTarget] = useState(7);
 
   const applyPreset = (p: typeof HABIT_PRESETS[number]) => {
+    haptic.tap();
     setTitle(p.title);
     setType(p.type);
     setSelIcon(p.icon);
@@ -392,6 +393,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
 
   const handleSave = () => {
     if (!title.trim()) return;
+    haptic.success();
     const rt = reminderOn ? `${pad2(reminderHour)}:${pad2(reminderMin)}` : undefined;
     const goalN = type === 'count' ? (parseInt(goal) || 1) : undefined;
     const unitVal = type === 'count' ? (unitCustom ? customUnit.trim() : unit) : undefined;
