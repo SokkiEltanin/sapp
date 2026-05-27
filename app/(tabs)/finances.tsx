@@ -28,6 +28,7 @@ import { formatDate } from '@/utils/date';
 import { Expense, ExpenseCategory } from '@/types';
 import { colors, spacing, typography, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+import { haptic } from '@/utils/haptics';
 
 const MONTHS_BACK = 6;
 
@@ -340,7 +341,7 @@ export default function FinancesScreen() {
         {/* Segment toggle */}
         <View style={styles.segWrap}>
           <TouchableOpacity
-            onPress={() => setViewMode('list')}
+            onPress={() => { haptic.tap(); setViewMode('list'); }}
             style={[styles.segBtn, viewMode === 'list' && styles.segBtnActive]}
             activeOpacity={0.7}
           >
@@ -348,7 +349,7 @@ export default function FinancesScreen() {
             <Text style={[styles.segText, viewMode === 'list' && styles.segTextActive]}>Transakcje</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => setViewMode('stats')}
+            onPress={() => { haptic.tap(); setViewMode('stats'); }}
             style={[styles.segBtn, viewMode === 'stats' && styles.segBtnActive]}
             activeOpacity={0.7}
           >
@@ -441,7 +442,7 @@ export default function FinancesScreen() {
             {/* Month picker */}
             <View style={styles.monthPicker}>
               <PressableScale
-                onPress={() => setMonthOffset(o => Math.min(o + 1, MONTHS_BACK - 1))}
+                onPress={() => { haptic.tap(); setMonthOffset(o => Math.min(o + 1, MONTHS_BACK - 1)); }}
                 style={styles.monthArrow}
               >
                 <ChevronLeft size={16} color={monthOffset < MONTHS_BACK - 1 ? colors.text.secondary : colors.text.muted} />
@@ -451,7 +452,7 @@ export default function FinancesScreen() {
                 <Text style={styles.monthYear}>{format(monthBase, 'yyyy')}</Text>
               </View>
               <PressableScale
-                onPress={() => setMonthOffset(o => Math.max(o - 1, 0))}
+                onPress={() => { haptic.tap(); setMonthOffset(o => Math.max(o - 1, 0)); }}
                 style={styles.monthArrow}
               >
                 <ChevronRight size={16} color={monthOffset > 0 ? colors.text.secondary : colors.text.muted} />
