@@ -13,6 +13,7 @@ import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
+import { haptic } from '@/utils/haptics';
 
 type BottomTabBarProps = {
   state: { index: number; routes: { name: string }[] };
@@ -63,6 +64,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const menuBase = (insets.bottom || 16) + 8 + PILL_H + 12 + FAB_SIZE + 12;
 
   const openMenu = () => {
+    haptic.tap();
     setOpen(true);
     Animated.parallel([
       Animated.timing(backdropAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
@@ -156,7 +158,7 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
               <TouchableOpacity
                 key={tab.name}
                 style={s.tabItem}
-                onPress={() => navigation.navigate(tab.name)}
+                onPress={() => { haptic.tap(); navigation.navigate(tab.name); }}
                 activeOpacity={0.7}
               >
                 {focused && (
