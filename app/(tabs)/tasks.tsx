@@ -11,6 +11,7 @@ import {
   ChevronRight, Trash2, X,
   Square, CheckSquare2, Clock, ArrowRight, Timer, RefreshCw,
 } from 'lucide-react-native';
+import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -782,6 +783,69 @@ const fp = StyleSheet.create({
   tagTextActive: { color: colors.accent.blue },
 });
 
+// ─── Swipe row ────────────────────────────────────────────────────────────────
+
+function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onQuickSnooze }: {
+  task: Task;
+  pomodoroTaskId?: string;
+  onComplete: (task: Task) => void;
+  onEdit: (task: Task) => void;
+  onQuickSnooze: (id: string) => void;
+}) {
+  const swRef = useRef<SwipeableMethods>(null);
+  const isDone = task.status === 'done';
+
+  return (
+    <ReanimatedSwipeable
+      ref={swRef}
+      friction={2}
+      overshootFriction={8}
+      leftThreshold={72}
+      rightThreshold={72}
+      renderLeftActions={() => (
+        <View style={[sw.leftReveal, isDone && sw.leftRevealDone]}>
+          <Check size={18} color={isDone ? G.accent : G.card} strokeWidth={3} />
+          <Text style={[sw.revealText, isDone && sw.revealTextDone]}>
+            {isDone ? 'COFNIJ' : 'GOTOWE'}
+          </Text>
+        </View>
+      )}
+      renderRightActions={() => isDone ? null : (
+        <View style={sw.rightReveal}>
+          <Text style={sw.revealText}>ZA GODZ.</Text>
+          <Clock size={18} color={G.card} strokeWidth={2.5} />
+        </View>
+      )}
+      onSwipeableOpen={(dir) => {
+        swRef.current?.close();
+        if (dir === 'right') {
+          onComplete(task);
+        } else if (!isDone) {
+          onQuickSnooze(task.id);
+        }
+      }}
+    >
+      <TaskCard task={task} pomodoroTaskId={pomodoroTaskId} onComplete={onComplete} onEdit={onEdit} />
+    </ReanimatedSwipeable>
+  );
+}
+
+const sw = StyleSheet.create({
+  leftReveal: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, gap: 8,
+    backgroundColor: G.accent, borderRadius: 18,
+  },
+  leftRevealDone: { backgroundColor: G.accentDim },
+  rightReveal: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
+    paddingHorizontal: 20, gap: 8,
+    backgroundColor: colors.accent.amber, borderRadius: 18,
+  },
+  revealText: { fontSize: 10, fontWeight: '800', color: G.card, letterSpacing: 0.8 },
+  revealTextDone: { color: G.accent },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
@@ -862,6 +926,13 @@ export default function TasksScreen() {
     startPomodoro(task.id, task.title);
     router.push('/pomodoro' as any);
   }, [startPomodoro]);
+
+  const handleQuickSnooze = useCallback((id: string) => {
+    const d = new Date(); d.setHours(d.getHours() + 1);
+    snooze(id, d);
+    haptic.tap();
+    toast.info('Odłożono na godzinę');
+  }, [snooze]);
 
   const pending  = active.filter(t => t.status === 'pending' && !t.snoozedUntil).length;
   const overdue  = active.filter(t => { const d = t.deadline?.split('T')[0]; return !!d && d < today; }).length;
@@ -970,11 +1041,12 @@ export default function TasksScreen() {
               );
             }
             return (
-              <TaskCard
+              <SwipeRow
                 task={item as Task}
                 pomodoroTaskId={pomodoroTaskId}
                 onComplete={handleCompletePress}
                 onEdit={handleEditPress}
+                onQuickSnooze={handleQuickSnooze}
               />
             );
           }}
