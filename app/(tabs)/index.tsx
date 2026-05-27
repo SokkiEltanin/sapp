@@ -777,6 +777,19 @@ export default function DashboardScreen() {
                             <Text style={s.urgentPillText}>PILNE</Text>
                           </View>
                         )}
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            (e as any).stopPropagation?.();
+                            haptic.tap();
+                            pomodoro.startFor(task.id, task.title);
+                            router.push('/pomodoro' as any);
+                          }}
+                          hitSlop={8}
+                          activeOpacity={0.7}
+                          style={s.todayPomBtn}
+                        >
+                          <Timer size={12} color='rgba(34,211,238,0.7)' />
+                        </TouchableOpacity>
                       </TouchableOpacity>
                     );
                   })}
@@ -1409,6 +1422,11 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.accent.red + '45',
   },
   overduePillText: { fontSize: 9, fontWeight: '800', color: colors.accent.red, letterSpacing: 0.8 },
+  todayPomBtn: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(34,211,238,0.08)',
+  },
 
   // ── Subscription payment modal ─────────────────────────────────────────────
   payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
