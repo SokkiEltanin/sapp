@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { CalendarEvent, MoodEntry, MOOD_COLORS, Task } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const DAY_NAMES = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
 
@@ -61,7 +62,7 @@ export default function WeekStrip({ selectedDate, events, tasks, moodEntries = [
         const moodBg = mood && !sel ? MOOD_COLORS[mood.mood] + '20' : undefined;
 
         return (
-          <Pressable key={date} onPress={() => onSelectDate(date)} style={styles.cell}>
+          <Pressable key={date} onPress={() => { haptic.tap(); onSelectDate(date); }} style={styles.cell}>
             <Text style={[styles.dayName, isWeekend && styles.dayNameWeekend, sel && styles.dayNameSel]}>
               {DAY_NAMES[dow]}
             </Text>

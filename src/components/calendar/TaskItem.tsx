@@ -3,6 +3,7 @@ import { Check, Clock, Flame } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Task } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 function fmtDeadline(iso: string): string {
   const [, m, day] = iso.split('T')[0].split('-');
@@ -25,12 +26,12 @@ export default function TaskItem({ task, index, onToggle, onPress }: Props) {
       <View style={[styles.row, done && styles.rowDone]}>
         <View style={[styles.bar, { backgroundColor: high && !done ? colors.accent.danger : 'rgba(255,255,255,0.06)' }]} />
         <PressableScale
-          onPress={() => onToggle(task.id)}
+          onPress={() => { done ? haptic.tap() : haptic.success(); onToggle(task.id); }}
           style={[styles.checkbox, done && styles.checkboxDone]}
         >
           {done && <Check size={11} color={colors.white} strokeWidth={3} />}
         </PressableScale>
-        <PressableScale style={styles.info} onPress={onPress ? () => onPress(task.id) : undefined}>
+        <PressableScale style={styles.info} onPress={onPress ? () => { haptic.tap(); onPress(task.id); } : undefined}>
           <Text style={[styles.title, done && styles.titleDone]} numberOfLines={1}>
             {task.title}
           </Text>

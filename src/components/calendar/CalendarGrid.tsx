@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { CalendarEvent, MoodEntry, MOOD_COLORS, Task } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const HEADERS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
 
@@ -91,7 +92,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
               return (
                 <Pressable
                   key={i}
-                  onPress={() => onSelectDate(d)}
+                  onPress={() => { haptic.tap(); onSelectDate(d); }}
                   style={[styles.detailedCell, sel && styles.detailedCellSel]}
                 >
                   {/* Day number — View wrapper required for borderRadius on Android */}
@@ -119,7 +120,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                   {dayEvs.map((ev, ei) => (
                     <Pressable
                       key={`ev-${ei}`}
-                      onPress={(e) => { e.stopPropagation(); onEventPress?.(ev.id); }}
+                      onPress={(e) => { e.stopPropagation(); haptic.tap(); onEventPress?.(ev.id); }}
                       style={[styles.eventPill, {
                         backgroundColor: (ev.color ?? colors.accent.blue) + '40',
                         borderLeftColor: ev.color ?? colors.accent.blue,
@@ -138,7 +139,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                   {dayTks.map((tk, ti) => (
                     <Pressable
                       key={`tk-${ti}`}
-                      onPress={(e) => { e.stopPropagation(); onTaskPress?.(tk.id); }}
+                      onPress={(e) => { e.stopPropagation(); haptic.tap(); onTaskPress?.(tk.id); }}
                       style={[styles.eventPill, {
                         backgroundColor: tk.priority === 'high'
                           ? colors.accent.danger + '25'
@@ -161,7 +162,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
             return (
               <View key={i} style={styles.cellWrap}>
                 <Pressable
-                  onPress={() => onSelectDate(d)}
+                  onPress={() => { haptic.tap(); onSelectDate(d); }}
                   style={[styles.cell, sel && styles.cellSel, isTd && !sel && styles.cellToday]}
                 >
                   <Text style={[

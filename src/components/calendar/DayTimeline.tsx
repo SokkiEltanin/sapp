@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { CalendarEvent } from '@/types';
 import { colors, spacing, radius } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const HOUR_HEIGHT  = 58;
 const START_HOUR   = 6;
@@ -86,7 +87,7 @@ export default function DayTimeline({ events, date, onPress, onAddAtTime }: Prop
           <Text style={styles.allDayLabel}>całodz.</Text>
           <View style={styles.allDayList}>
             {allDayEvents.map(ev => (
-              <Pressable key={ev.id} onPress={() => onPress?.(ev.id)}
+              <Pressable key={ev.id} onPress={() => { haptic.tap(); onPress?.(ev.id); }}
                 style={[styles.allDayPill, { backgroundColor: (ev.color ?? colors.accent.purple) + '28', borderColor: (ev.color ?? colors.accent.purple) + '55' }]}>
                 <Text style={[styles.allDayText, { color: ev.color ?? colors.accent.purple }]} numberOfLines={1}>
                   {ev.title}
@@ -118,6 +119,7 @@ export default function DayTimeline({ events, date, onPress, onAddAtTime }: Prop
           onLayout={e => setContainerW(e.nativeEvent.layout.width)}
           onPress={e => {
             if (!onAddAtTime) return;
+            haptic.tap();
             const y = e.nativeEvent.locationY;
             const totalH = y / HOUR_HEIGHT;
             const h = Math.floor(totalH) + START_HOUR;
@@ -159,7 +161,7 @@ export default function DayTimeline({ events, date, onPress, onAddAtTime }: Prop
             return (
               <Pressable
                 key={ev.id}
-                onPress={() => onPress?.(ev.id)}
+                onPress={() => { haptic.tap(); onPress?.(ev.id); }}
                 style={[styles.eventBlock, {
                   top: clamped,
                   height,
