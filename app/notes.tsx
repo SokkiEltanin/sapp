@@ -506,6 +506,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
     ? blocksToPlainText(deserializeBlocks(note.bodyRich))
     : note.body;
   const preview = plainBody.trim().replace(/\n+/g, ' ');
+  const wordCount = plainBody.trim() ? plainBody.trim().split(/\s+/).length : 0;
 
   return (
     <PressableScale onPress={onPress} style={[nc.wrap, note.pinned && nc.pinned]}>
@@ -543,6 +544,9 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
 
       <View style={nc.footer}>
         <Text style={nc.time}>{fmtDate(note.updatedAt)}</Text>
+        {wordCount > 0 && (
+          <Text style={nc.wordCount}>{wordCount}sl</Text>
+        )}
         {note.folder && (
           <View style={nc.folderBadge}>
             <Folder size={8} color={colors.accent.purple + 'CC'} />
@@ -583,6 +587,7 @@ const nc = StyleSheet.create({
   richBadge: { position: 'absolute', top: spacing[3], right: 80 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1], flexWrap: 'wrap' },
   time: { fontSize: 11, color: colors.text.muted },
+  wordCount: { fontSize: 10, color: V.muted, fontWeight: '500' },
   folderBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: V.accentDim,
