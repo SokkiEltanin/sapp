@@ -9,6 +9,7 @@ import { getTodaySessions } from '@/utils/pomodoroHistory';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
+import { haptic } from '@/utils/haptics';
 import { useMoodStore } from '@/store/moodStore';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
@@ -150,10 +151,16 @@ export default function HealthScreen() {
   const updateWater = (v: number) => {
     const next = Math.max(0, Math.min(waterGoal, v));
     setWater(next);
-    if (next === waterGoal) toast.success('Cel nawodnienia osiągnięty!');
+    if (next === waterGoal) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
+    else haptic.tap();
   };
 
-  const updateSteps = (delta: number) => setSteps(s => Math.max(0, s + delta));
+  const updateSteps = (delta: number) => setSteps(s => {
+    const next = Math.max(0, s + delta);
+    if (next >= stepGoal && s < stepGoal) haptic.success();
+    else haptic.tap();
+    return next;
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -208,7 +215,7 @@ export default function HealthScreen() {
 
           {/* Duration row */}
           <View style={styles.sleepDurRow}>
-            <PressableScale onPress={() => setSleepH(h => Math.max(0, h - 1))} style={styles.sleepBtn}>
+            <PressableScale onPress={() => { haptic.tap(); setSleepH(h => Math.max(0, h - 1)); }} style={styles.sleepBtn}>
               <Minus size={13} color={colors.text.muted} />
             </PressableScale>
             <View style={styles.sleepDurCenter}>
@@ -220,7 +227,7 @@ export default function HealthScreen() {
                 {sleepH < 6 ? 'za mało' : sleepH >= 7 && sleepH <= 9 ? 'optymalny' : sleepH > 9 ? 'dużo' : 'minimalny'}
               </Text>
             </View>
-            <PressableScale onPress={() => setSleepH(h => Math.min(14, h + 1))} style={styles.sleepBtn}>
+            <PressableScale onPress={() => { haptic.tap(); setSleepH(h => Math.min(14, h + 1)); }} style={styles.sleepBtn}>
               <Plus size={13} color={colors.text.muted} />
             </PressableScale>
           </View>
@@ -228,7 +235,7 @@ export default function HealthScreen() {
           {/* Minutes fine-tune */}
           <View style={styles.minuteRow}>
             {[0, 15, 30, 45].map(m => (
-              <PressableScale key={m} onPress={() => setSleepM(m)} style={[
+              <PressableScale key={m} onPress={() => { haptic.tap(); setSleepM(m); }} style={[
                 styles.minutePill,
                 sleepM === m && styles.minutePillActive,
               ]}>
@@ -252,7 +259,7 @@ export default function HealthScreen() {
               const active = sleepQuality === q;
               const col = QUALITY_COLORS[q];
               return (
-                <PressableScale key={q} onPress={() => setSleepQuality(active ? undefined : q)} style={[
+                <PressableScale key={q} onPress={() => { haptic.tap(); setSleepQuality(active ? undefined : q); }} style={[
                   styles.qualityPill,
                   active && { backgroundColor: col + '20', borderColor: col + '60' },
                 ]}>
@@ -422,10 +429,10 @@ export default function HealthScreen() {
           </View>
 
           <View style={styles.weightRow}>
-            <PressableScale onPress={() => setWeight(w => Math.max(0, parseFloat((w - 1).toFixed(1))))} style={styles.weightBtn}>
+            <PressableScale onPress={() => { haptic.tap(); setWeight(w => Math.max(0, parseFloat((w - 1).toFixed(1)))); }} style={styles.weightBtn}>
               <Minus size={13} color={colors.text.muted} />
             </PressableScale>
-            <PressableScale onPress={() => setWeight(w => Math.max(0, parseFloat((w - 0.1).toFixed(1))))} style={styles.weightBtnSm}>
+            <PressableScale onPress={() => { haptic.tap(); setWeight(w => Math.max(0, parseFloat((w - 0.1).toFixed(1)))); }} style={styles.weightBtnSm}>
               <Text style={styles.weightBtnSmText}>-0.1</Text>
             </PressableScale>
             <TouchableOpacity
@@ -438,10 +445,10 @@ export default function HealthScreen() {
               </Text>
               <Text style={styles.weightUnit}>{weight > 0 ? 'kg · dotknij' : 'kg · ustaw'}</Text>
             </TouchableOpacity>
-            <PressableScale onPress={() => setWeight(w => parseFloat((w + 0.1).toFixed(1)))} style={styles.weightBtnSm}>
+            <PressableScale onPress={() => { haptic.tap(); setWeight(w => parseFloat((w + 0.1).toFixed(1))); }} style={styles.weightBtnSm}>
               <Text style={styles.weightBtnSmText}>+0.1</Text>
             </PressableScale>
-            <PressableScale onPress={() => setWeight(w => parseFloat((w + 1).toFixed(1)))} style={styles.weightBtn}>
+            <PressableScale onPress={() => { haptic.tap(); setWeight(w => parseFloat((w + 1).toFixed(1))); }} style={styles.weightBtn}>
               <Plus size={13} color={colors.text.muted} />
             </PressableScale>
           </View>
