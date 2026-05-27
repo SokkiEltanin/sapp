@@ -16,6 +16,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 type FormType = 'task' | 'event';
 
@@ -60,6 +61,7 @@ export default function AddCalendarModal() {
           priority,
           tags: [],
         });
+        haptic.success();
         router.back();
         InteractionManager.runAfterInteractions(() => {
           addTask(task);
@@ -91,6 +93,7 @@ export default function AddCalendarModal() {
           allDay: isAllDay,
         }).catch(() => {});
 
+        haptic.success();
         router.back();
         InteractionManager.runAfterInteractions(() => {
           addEvent(event);

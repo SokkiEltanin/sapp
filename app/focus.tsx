@@ -188,7 +188,7 @@ export default function FocusScreen() {
                   <TouchableOpacity
                     key={sub.id}
                     style={styles.subtaskRow}
-                    onPress={() => toggleSubtask(task.id, sub.id)}
+                    onPress={() => { haptic.tap(); toggleSubtask(task.id, sub.id); }}
                     activeOpacity={0.75}
                   >
                     {sub.done
