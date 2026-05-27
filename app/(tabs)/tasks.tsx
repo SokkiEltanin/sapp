@@ -180,12 +180,17 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
   const snoozed  = task.status === 'snoozed';
   const isDone   = task.status === 'done';
   const subtitle = taskSubtitle(task, pomodoroTaskId);
+  const dueDays  = (!overdue && !snoozed && !isDone && task.deadline) ? daysUntil(task.deadline) : null;
+  const isToday    = dueDays === 0;
+  const isTomorrow = dueDays === 1;
 
   const cardBg     = overdue ? G.overdueCard : G.card;
-  const cardBorder = overdue ? G.overdueBorder : G.cardBorder;
+  const cardBorder = overdue ? G.overdueBorder : isToday ? 'rgba(251,191,36,0.25)' : G.cardBorder;
   const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.accent
-    : overdue ? colors.accent.red
-    : snoozed ? colors.accent.amber
+    : overdue   ? colors.accent.red
+    : snoozed   ? colors.accent.amber
+    : isToday   ? colors.accent.amber
+    : isTomorrow ? '#F97316'
     : colors.text.muted;
 
   return (

@@ -21,6 +21,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+import { haptic } from '@/utils/haptics';
 import { CalendarEvent, Task, MoodEntry } from '@/types';
 
 const MONTH_NAMES = [
@@ -302,15 +303,18 @@ export default function CalendarScreen() {
 
 
   const prevMonth = () => {
+    haptic.tap();
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
     else setViewMonth(m => m - 1);
   };
   const nextMonth = () => {
+    haptic.tap();
     if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
     else setViewMonth(m => m + 1);
   };
 
   const goToday = () => {
+    haptic.tap();
     const t = todayStr();
     setSelectedDate(t);
     setViewYear(now.getFullYear());
@@ -319,6 +323,7 @@ export default function CalendarScreen() {
   };
 
   const handleSelectDate = (date: string) => {
+    haptic.tap();
     setSelectedDate(date);
     const d = new Date(date);
     setViewYear(d.getFullYear());
@@ -351,6 +356,7 @@ export default function CalendarScreen() {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     const next = task.status === 'done' ? 'pending' : 'done';
+    if (next === 'done') haptic.success(); else haptic.tap();
     updateTask(id, { status: next });
     try {
       await tasksService.updateTask(id, { status: next });
@@ -459,7 +465,7 @@ export default function CalendarScreen() {
       <View style={styles.modeBar}>
         <TouchableOpacity
           style={[styles.modeTab, calMode === 'week' && styles.modeTabActive]}
-          onPress={() => { setCalMode('week'); setMonthExpanded(false); }}
+          onPress={() => { haptic.tap(); setCalMode('week'); setMonthExpanded(false); }}
           activeOpacity={0.7}
         >
           <CalendarDays size={13} color={calMode === 'week' ? colors.text.primary : colors.text.muted} />
@@ -467,7 +473,7 @@ export default function CalendarScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.modeTab, calMode === 'month' && styles.modeTabActive]}
-          onPress={() => { setCalMode('month'); setMonthExpanded(false); }}
+          onPress={() => { haptic.tap(); setCalMode('month'); setMonthExpanded(false); }}
           activeOpacity={0.7}
         >
           <LayoutGrid size={13} color={calMode === 'month' ? colors.text.primary : colors.text.muted} />
@@ -483,7 +489,7 @@ export default function CalendarScreen() {
         >
           <View style={styles.weekCard}>
             <View style={styles.weekNavRow}>
-              <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.weekNavBtn}>
+              <PressableScale onPress={() => { haptic.tap(); setWeekOffset(w => w - 1); }} style={styles.weekNavBtn}>
                 <ChevronLeft size={15} color={colors.text.muted} />
               </PressableScale>
               <WeekStrip
@@ -494,7 +500,7 @@ export default function CalendarScreen() {
                 weekOffset={weekOffset}
                 onSelectDate={(d) => { setSelectedDate(d); setWeekOffset(0); }}
               />
-              <PressableScale onPress={() => setWeekOffset(w => w + 1)} style={styles.weekNavBtn}>
+              <PressableScale onPress={() => { haptic.tap(); setWeekOffset(w => w + 1); }} style={styles.weekNavBtn}>
                 <ChevronRight size={15} color={colors.text.muted} />
               </PressableScale>
             </View>
@@ -520,7 +526,7 @@ export default function CalendarScreen() {
             <TouchableOpacity onPress={prevMonth} style={styles.navBtn} activeOpacity={0.7}>
               <ChevronLeft size={18} color={colors.text.secondary} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.monthTitleBtn} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { haptic.tap(); setModalVisible(true); }} style={styles.monthTitleBtn} activeOpacity={0.7}>
               <Text style={styles.monthLabel}>{MONTH_NAMES[viewMonth]}</Text>
               <Text style={styles.yearLabel}>{viewYear}</Text>
             </TouchableOpacity>
@@ -528,7 +534,7 @@ export default function CalendarScreen() {
               <ChevronRight size={18} color={colors.text.secondary} />
             </TouchableOpacity>
             {/* Explicit expand button */}
-            <TouchableOpacity onPress={() => setMonthExpanded(true)} style={styles.expandBtn} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { haptic.tap(); setMonthExpanded(true); }} style={styles.expandBtn} activeOpacity={0.7}>
               <LayoutGrid size={15} color={colors.accent.blue} />
             </TouchableOpacity>
           </View>

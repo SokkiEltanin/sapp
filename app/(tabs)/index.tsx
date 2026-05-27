@@ -550,7 +550,7 @@ export default function DashboardScreen() {
               <Text style={s.greetingText}>{greeting}</Text>
               <Text style={s.dateText}>{dateLabel}</Text>
             </View>
-            <TouchableOpacity onPress={() => router.push('/settings' as any)} style={s.settingsBtn} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { haptic.tap(); router.push('/settings' as any); }} style={s.settingsBtn} activeOpacity={0.7}>
               <Settings size={17} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
@@ -573,7 +573,7 @@ export default function DashboardScreen() {
 
             {/* ══ GLASSMORPHISM MOOD CARD ══════════════════════════════════ */}
             <TouchableOpacity
-              onPress={() => openCheckIn()}
+              onPress={() => { haptic.tap(); openCheckIn(); }}
               activeOpacity={0.92}
               style={s.moodWrap}
             >
@@ -870,7 +870,7 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity
                   style={s.habitsNudge}
-                  onPress={() => router.push('/habits' as any)}
+                  onPress={() => { haptic.tap(); router.push('/habits' as any); }}
                   activeOpacity={0.8}
                 >
                   <Flame size={14} color={colors.accent.amber} />
@@ -976,13 +976,13 @@ export default function DashboardScreen() {
                 <View style={s.periodToggle}>
                   <TouchableOpacity
                     style={[s.periodBtn, finPeriod === 'week' && s.periodBtnActive]}
-                    onPress={() => setFinPeriod('week')}
+                    onPress={() => { haptic.tap(); setFinPeriod('week'); }}
                   >
                     <Text style={[s.periodBtnText, finPeriod === 'week' && { color: colors.tabs.finances }]}>7 dni</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[s.periodBtn, finPeriod === 'month' && s.periodBtnActive]}
-                    onPress={() => setFinPeriod('month')}
+                    onPress={() => { haptic.tap(); setFinPeriod('month'); }}
                   >
                     <Text style={[s.periodBtnText, finPeriod === 'month' && { color: colors.tabs.finances }]}>Mies.</Text>
                   </TouchableOpacity>
@@ -990,12 +990,12 @@ export default function DashboardScreen() {
 
                 {finPeriod === 'week' && (
                   <>
-                    <TouchableOpacity onPress={() => setWeekOffset(o => o - 1)} style={s.navArrow}>
+                    <TouchableOpacity onPress={() => { haptic.tap(); setWeekOffset(o => o - 1); }} style={s.navArrow}>
                       <ChevronLeft size={14} color={colors.text.muted} />
                     </TouchableOpacity>
                     <Text style={s.weekLabelText}>{weekLabel(weekDates)}</Text>
                     <TouchableOpacity
-                      onPress={() => setWeekOffset(o => Math.min(o + 1, 0))}
+                      onPress={() => { haptic.tap(); setWeekOffset(o => Math.min(o + 1, 0)); }}
                       disabled={weekOffset >= 0}
                       style={s.navArrow}
                     >
