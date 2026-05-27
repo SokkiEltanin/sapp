@@ -667,7 +667,7 @@ export default function HabitsScreen() {
   const handleDelete = (habit: Habit) => {
     Alert.alert('Usuń nawyk', `Usunąć "${habit.title}"?`, [
       { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { remove(habit.id); toast.info('Usunięto'); } },
+      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); remove(habit.id); toast.info('Usunięto'); } },
     ]);
   };
 

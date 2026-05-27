@@ -26,6 +26,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+import { haptic } from '@/utils/haptics';
 
 const VP = {
   card:       '#100A18',
@@ -335,6 +336,7 @@ export default function CalendarTabScreen() {
   };
 
   const handleSelectDate = (date: string) => {
+    haptic.tap();
     setSelectedDate(date);
     const d = new Date(date + 'T12:00:00');
     setViewYear(d.getFullYear());
@@ -381,6 +383,7 @@ export default function CalendarTabScreen() {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     const next = task.status === 'done' ? 'pending' : 'done';
+    if (next === 'done') haptic.success(); else haptic.tap();
     updateTask(id, { status: next });
     try {
       await tasksService.updateTask(id, { status: next });
@@ -454,7 +457,7 @@ export default function CalendarTabScreen() {
                   return (
                     <Pressable
                       key={mode}
-                      onPress={() => setMode(mode)}
+                      onPress={() => { haptic.tap(); setMode(mode); }}
                       style={[styles.modeBtn, calMode === mode && styles.modeBtnActive]}
                     >
                       <Icon size={14} color={calMode === mode ? V : colors.text.muted} />
