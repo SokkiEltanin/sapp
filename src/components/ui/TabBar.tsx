@@ -54,7 +54,10 @@ const PILL_H   = 52;
 export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const [open, setOpen]   = useState(false);
   const insets            = useSafeAreaInsets();
+  const todayStr = (() => { const d = new Date(); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; })();
   const pendingCount      = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending').length);
+  const overdueCount      = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && t.deadline && t.deadline.split('T')[0] < todayStr).length);
+  const todayDueCount     = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && (t.deadline?.split('T')[0] === todayStr || t.scheduledDate === todayStr)).length);
   const { color: timeAccent } = useTimeAccent();
 
   const fabProgress  = useRef(new Animated.Value(0)).current;
@@ -154,6 +157,8 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
             const focused   = state.index === i;
             const accent    = TAB_ACCENT[i] ?? timeAccent;
             const showBadge = tab.name === 'tasks' && pendingCount > 0;
+            const badgeColor = overdueCount > 0 ? colors.accent.red : todayDueCount > 0 ? colors.accent.amber : colors.accent.green;
+            const badgeCount = overdueCount > 0 ? overdueCount : todayDueCount > 0 ? todayDueCount : pendingCount;
             return (
               <TouchableOpacity
                 key={tab.name}
@@ -171,8 +176,8 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
                     strokeWidth={focused ? 2.2 : 1.5}
                   />
                   {showBadge && (
-                    <View style={s.badge}>
-                      <Text style={s.badgeText}>{pendingCount > 99 ? '99' : pendingCount}</Text>
+                    <View style={[s.badge, { backgroundColor: badgeColor }]}>
+                      <Text style={s.badgeText}>{badgeCount > 99 ? '99' : badgeCount}</Text>
                     </View>
                   )}
                 </View>

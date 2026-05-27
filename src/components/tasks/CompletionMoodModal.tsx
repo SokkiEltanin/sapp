@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'reac
 import { CheckCircle2 } from 'lucide-react-native';
 import { MoodLevel, MOOD_COLORS, MOOD_LABELS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 interface Props {
   visible: boolean;
@@ -42,7 +43,7 @@ export default function CompletionMoodModal({ visible, taskTitle, onSelect, onDi
                 <TouchableOpacity
                   key={level}
                   style={[styles.optBtn, { borderColor: col + '50', backgroundColor: col + '15' }]}
-                  onPress={() => onSelect(level)}
+                  onPress={() => { haptic.success(); onSelect(level); }}
                   activeOpacity={0.75}
                 >
                   <Text style={[styles.optNum, { color: col }]}>{level}</Text>
@@ -52,7 +53,7 @@ export default function CompletionMoodModal({ visible, taskTitle, onSelect, onDi
             })}
           </View>
 
-          <TouchableOpacity onPress={onDismiss} style={styles.skipBtn}>
+          <TouchableOpacity onPress={() => { haptic.tap(); onDismiss(); }} style={styles.skipBtn}>
             <Text style={styles.skipText}>Pomiń</Text>
           </TouchableOpacity>
         </View>
