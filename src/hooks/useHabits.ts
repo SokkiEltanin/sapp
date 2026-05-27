@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Habit } from '@/types';
 import { getHabits, saveHabits, getCounts, setCounts } from '@/utils/habits';
 import { notificationsService } from '@/services/notificationsService';
-import { haptic } from '@/utils/haptics';
 
 function applyReminder(habit: Habit) {
   if (habit.reminderTime) {
@@ -62,7 +61,6 @@ export function useHabits() {
     const counts = completions[today] ?? {};
     const current = counts[habitId] ?? 0;
     const next = current >= 1 ? 0 : 1;
-    if (next === 1) haptic.success(); else haptic.tap();
     const nextCounts = { ...counts, [habitId]: next };
     setComp((prev) => ({ ...prev, [today]: nextCounts }));
     await setCounts(today, nextCounts);
@@ -75,7 +73,6 @@ export function useHabits() {
     const habit   = habits.find((h) => h.id === habitId);
     const goal    = goalFor(habit!);
     const next    = current + 1;
-    if (next === goal) haptic.success(); else haptic.tap();
     const nextCounts = { ...counts, [habitId]: next };
     setComp((prev) => ({ ...prev, [today]: nextCounts }));
     await setCounts(today, nextCounts);
@@ -86,7 +83,6 @@ export function useHabits() {
     const counts  = completions[today] ?? {};
     const current = counts[habitId] ?? 0;
     if (current <= 0) return;
-    haptic.tap();
     const nextCounts = { ...counts, [habitId]: current - 1 };
     setComp((prev) => ({ ...prev, [today]: nextCounts }));
     await setCounts(today, nextCounts);
