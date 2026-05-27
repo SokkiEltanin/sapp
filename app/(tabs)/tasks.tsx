@@ -520,60 +520,6 @@ const dm = StyleSheet.create({
   snoozeRowText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text.secondary },
 });
 
-// ─── Completion confirm modal ──────────────────────────────────────────────────
-
-function ConfirmModal({ task, onConfirm, onCancel }: {
-  task: Task | null;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  if (!task) return null;
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={cm.overlay} onPress={onCancel} />
-      <View style={cm.box}>
-        <Text style={cm.title}>Ukończyłeś zadanie?</Text>
-        <Text style={cm.sub} numberOfLines={2}>{task.title}</Text>
-        <View style={cm.btns}>
-          <TouchableOpacity style={cm.btnNo} onPress={() => { haptic.tap(); onCancel(); }} activeOpacity={0.8}>
-            <Text style={cm.btnNoText}>Nie</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={cm.btnYes} onPress={onConfirm} activeOpacity={0.8}>
-            <Check size={16} color={G.card} strokeWidth={3} />
-            <Text style={cm.btnYesText}>Tak, gotowe</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const cm = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)' },
-  box: {
-    position: 'absolute', bottom: 120, left: 24, right: 24,
-    backgroundColor: '#0D2318',
-    borderRadius: 20, padding: spacing[5], gap: spacing[4],
-    borderWidth: 1, borderColor: G.cardBorder,
-  },
-  title: { fontSize: 17, fontWeight: '800', color: colors.white, textAlign: 'center' },
-  sub:   { fontSize: 13, color: colors.text.muted, textAlign: 'center' },
-  btns:  { flexDirection: 'row', gap: spacing[3] },
-  btnNo: {
-    flex: 1, paddingVertical: spacing[3], borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-  },
-  btnNoText:  { fontSize: 14, fontWeight: '600', color: colors.text.secondary },
-  btnYes: {
-    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: spacing[3], borderRadius: radius.lg,
-    backgroundColor: G.accent,
-  },
-  btnYesText: { fontSize: 14, fontWeight: '800', color: G.card },
-});
-
 // ─── Sort sheet ───────────────────────────────────────────────────────────────
 
 function SortSheet({ sort, onSelect, onClose }: {
@@ -848,7 +794,6 @@ export default function TasksScreen() {
   const [sortOpen, setSortOpen]   = useState(false);
   const [filter, setFilter]       = useState<FilterKey>('all');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [confirmTask, setConfirmTask] = useState<Task | null>(null);
   const [detailTask, setDetailTask]   = useState<Task | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [doneCollapsed, setDoneCollapsed] = useState(true);
@@ -894,20 +839,14 @@ export default function TasksScreen() {
 
   const handleCompletePress = useCallback((task: Task) => {
     if (task.status === 'done') {
-      toggle(task.id); // untoggle
-    } else {
       haptic.tap();
-      setConfirmTask(task);
+      toggle(task.id);
+    } else {
+      haptic.success();
+      toggle(task.id);
+      toast.success('Ukończono!');
     }
   }, [toggle]);
-
-  const handleConfirm = useCallback(() => {
-    if (!confirmTask) return;
-    haptic.success();
-    toggle(confirmTask.id);
-    toast.success('Zadanie ukończone');
-    setConfirmTask(null);
-  }, [confirmTask, toggle]);
 
   const handleEditPress = useCallback((task: Task) => {
     setDetailTask(task);
@@ -1066,11 +1005,6 @@ export default function TasksScreen() {
       </Animated.View>
 
       {/* Modals */}
-      <ConfirmModal
-        task={confirmTask}
-        onConfirm={handleConfirm}
-        onCancel={() => setConfirmTask(null)}
-      />
       <TaskDetailModal
         task={detailTask}
         visible={detailVisible}
