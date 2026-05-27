@@ -68,6 +68,11 @@ export default function FocusScreen() {
   const task = queue[0] ?? null;
   const remaining = queue.length;
 
+  const estimatedMins = useMemo(() => {
+    const total = queue.reduce((sum, t) => sum + (t.estimatedPomodoros ?? 0), 0);
+    return total > 0 ? total * 25 : null;
+  }, [queue]);
+
   const handleDone = () => {
     if (!task) return;
     toggle(task.id);
@@ -111,6 +116,13 @@ export default function FocusScreen() {
         <Text style={styles.headerTitle}>Tryb skupienia</Text>
         <View style={styles.queueBadge}>
           <Text style={styles.queueText}>{remaining} zad.</Text>
+          {estimatedMins !== null && (
+            <Text style={styles.queueEstimate}>
+              {'~' + (estimatedMins >= 60
+                ? `${Math.floor(estimatedMins / 60)}h${estimatedMins % 60 > 0 ? `${estimatedMins % 60}m` : ''}`
+                : `${estimatedMins}m`)}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -295,8 +307,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: 5,
     borderRadius: radius.full, backgroundColor: G.accentDim,
     borderWidth: 1, borderColor: G.cardBorder,
+    alignItems: 'center',
   },
   queueText: { fontSize: 11, fontWeight: '600', color: G.muted },
+  queueEstimate: { fontSize: 9, fontWeight: '500', color: G.muted, marginTop: 1 },
 
   body: {
     flex: 1, paddingHorizontal: spacing[5], paddingTop: spacing[6],
