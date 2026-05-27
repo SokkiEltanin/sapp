@@ -60,6 +60,7 @@ export default function HealthScreen() {
   const [weekSteps, setWeekSteps]       = useState<number[]>(Array(7).fill(0));
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
+  const [weekWater, setWeekWater]       = useState<number[]>(Array(7).fill(0));
 
   const { entries } = useMoodStore();
   const pomodoroStore = usePomodoroStore();
@@ -97,6 +98,7 @@ export default function HealthScreen() {
         const todayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
         const wSteps  = Array(7).fill(0);
         const wWeight = Array(7).fill(0);
+        const wWater  = Array(7).fill(0);
         const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
 
         for (let i = 0; i <= todayIdx; i++) {
@@ -107,6 +109,7 @@ export default function HealthScreen() {
             const parsed = JSON.parse(dayRaw);
             if (parsed.steps != null)  wSteps[i] = parsed.steps;
             if (parsed.weight != null) wWeight[i] = parsed.weight;
+            if (parsed.water != null)  wWater[i]  = parsed.water;
             wSleep[i] = {
               h: parsed.sleepH ?? 0,
               m: parsed.sleepM ?? 0,
@@ -117,6 +120,7 @@ export default function HealthScreen() {
         setWeekSteps(wSteps);
         setWeekSleep(wSleep);
         setWeekWeight(wWeight);
+        setWeekWater(wWater);
       } catch {}
       setLoaded(true);
     };
@@ -129,6 +133,7 @@ export default function HealthScreen() {
     const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     setWeekSteps(prev => { const n = [...prev]; n[todayIdx] = steps; return n; });
     setWeekWeight(prev => { const n = [...prev]; n[todayIdx] = weight; return n; });
+    setWeekWater(prev => { const n = [...prev]; n[todayIdx] = water; return n; });
     setWeekSleep(prev => {
       const n = [...prev];
       n[todayIdx] = { h: sleepH, m: sleepM, quality: sleepQuality };
@@ -367,6 +372,32 @@ export default function HealthScreen() {
             <PressableScale onPress={() => updateWater(water + 1)} style={styles.ctrlBtn}>
               <Plus size={15} color={colors.text.secondary} />
             </PressableScale>
+          </View>
+
+          {/* 7-day water chart */}
+          <View style={[styles.cardRow, { marginTop: spacing[2] }]}>
+            <Text style={[styles.cardLabel, { color: 'rgba(255,255,255,0.25)' }]}>TYDZIEŃ</Text>
+          </View>
+          <View style={styles.sleepChartRow}>
+            {weekWater.map((w, i) => {
+              const barH = w > 0 ? Math.max(5, Math.min(48, (w / waterGoal) * 48)) : 3;
+              const isToday = i === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
+              const goalMet = w >= waterGoal;
+              return (
+                <View key={i} style={styles.sleepChartCol}>
+                  <View style={styles.sleepBarWrap}>
+                    <View style={[styles.sleepBar, {
+                      height: barH,
+                      backgroundColor: w === 0 ? 'rgba(255,255,255,0.08)' : goalMet ? T.accent : T.muted,
+                      opacity: w === 0 ? 0.35 : 1,
+                      width: isToday ? 12 : 8,
+                    }]} />
+                  </View>
+                  <Text style={[styles.chartDay, isToday && styles.chartDayToday]}>{WEEK_DAYS[i]}</Text>
+                  {w > 0 && <Text style={styles.sleepBarLabel}>{w}</Text>}
+                </View>
+              );
+            })}
           </View>
         </GlassCard>
 
