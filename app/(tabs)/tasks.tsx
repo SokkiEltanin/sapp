@@ -851,6 +851,7 @@ export default function TasksScreen() {
   const [confirmTask, setConfirmTask] = useState<Task | null>(null);
   const [detailTask, setDetailTask]   = useState<Task | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [doneCollapsed, setDoneCollapsed] = useState(true);
 
   const today = todayStr();
 
@@ -927,9 +928,17 @@ export default function TasksScreen() {
   const overdue  = active.filter(t => { const d = t.deadline?.split('T')[0]; return !!d && d < today; }).length;
 
   const listData: ListItem[] = useMemo(() => {
-    if (sort === 'deadline') return buildGroupedList(sorted, done, today);
-    return [...sorted, ...(done.length > 0 ? (['done-header' as const, ...done]) : [])];
-  }, [sorted, done, today, sort]);
+    const shownDone = doneCollapsed ? [] : done;
+    // Always show done-header when there are done tasks so toggle is visible
+    const doneBlock: ListItem[] = done.length > 0
+      ? ['done-header' as const, ...shownDone]
+      : [];
+    if (sort === 'deadline') {
+      const grouped = buildGroupedList(sorted, [], today);
+      return [...grouped, ...doneBlock];
+    }
+    return [...sorted, ...doneBlock];
+  }, [sorted, done, today, sort, doneCollapsed]);
 
   const handleQuickCreate = useCallback(async (title: string, scheduleToday: boolean) => {
     await create({
@@ -991,11 +1000,24 @@ export default function TasksScreen() {
           renderItem={({ item }: { item: ListItem }) => {
             if (item === 'done-header') {
               return (
-                <View style={s.sectionHeader}>
+                <TouchableOpacity
+                  style={s.sectionHeader}
+                  onPress={() => { haptic.tap(); setDoneCollapsed(v => !v); }}
+                  activeOpacity={0.7}
+                >
                   <View style={s.sectionLine} />
-                  <Text style={s.sectionLabel}>UKOŃCZONE</Text>
+                  <View style={s.sectionLabelRow}>
+                    <Text style={s.sectionLabel}>UKOŃCZONE</Text>
+                    <View style={s.sectionBadge}>
+                      <Text style={s.sectionBadgeText}>{done.length}</Text>
+                    </View>
+                    {doneCollapsed
+                      ? <ChevronRight size={11} color={colors.text.muted} />
+                      : <Square size={11} color={colors.text.muted} strokeWidth={1.5} />
+                    }
+                  </View>
                   <View style={s.sectionLine} />
-                </View>
+                </TouchableOpacity>
               );
             }
             if ((item as SectionHeader).type === 'section') {
@@ -1150,10 +1172,16 @@ const s = StyleSheet.create({
     gap: spacing[3], marginVertical: spacing[3],
   },
   sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   sectionLabel: {
     fontSize: 9, fontWeight: '700', color: colors.text.muted,
     letterSpacing: 1.5,
   },
+  sectionBadge: {
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 6,
+    paddingHorizontal: 5, paddingVertical: 1,
+  },
+  sectionBadgeText: { fontSize: 9, fontWeight: '700', color: colors.text.muted },
 
   groupHeader: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
