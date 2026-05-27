@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { X, Check, Tag, TrendingDown, TrendingUp, ClipboardList } from 'lucide-react-native';
+import { haptic } from '@/utils/haptics';
 import * as LucideIcons from 'lucide-react-native';
 
 import InputField from '@/components/ui/InputField';
@@ -73,6 +74,7 @@ export default function AddExpenseModal() {
   };
 
   const handleTypeSwitch = (type: TransactionType) => {
+    haptic.tap();
     setTxType(type);
     setTags([]);
   };
@@ -103,6 +105,7 @@ export default function AddExpenseModal() {
         note,
         date: dateParsed,
       });
+      haptic.success();
       router.back();
       InteractionManager.runAfterInteractions(async () => {
         addExpense(expense);

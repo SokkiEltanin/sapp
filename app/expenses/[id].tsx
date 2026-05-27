@@ -12,6 +12,7 @@ import {
   Pencil, X as XIcon,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
+import { haptic } from '@/utils/haptics';
 
 import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
@@ -309,6 +310,7 @@ export default function ExpenseDetailScreen() {
       };
       updateExpense(id!, updates);
       await expensesService.update(id!, updates);
+      haptic.success();
       setEditing(false);
       toast.success('Zapisano');
     } catch (e: any) {
@@ -323,6 +325,7 @@ export default function ExpenseDetailScreen() {
       { text: 'Anuluj', style: 'cancel' },
       {
         text: 'Usuń', style: 'destructive', onPress: async () => {
+          haptic.medium();
           deleteExpense(id!);
           await expensesService.remove(id!).catch(() => {});
           toast.info('Usunięto');
