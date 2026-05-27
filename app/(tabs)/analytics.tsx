@@ -126,7 +126,7 @@ function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
 export default function AnalyticsScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks }    = useCalendarStore();
-  const { habits, getLast7, getLast30, getStreak, todayDone } = useHabits();
+  const { habits, completions, getLast30, getStreak, todayDone } = useHabits();
   const { entries: moodEntries }                   = useMoodStore();
   const [pomSessions, setPomSessions] = useState<Record<string, PomodoroSession[]>>({});
   const [weekOffset, setWeekOffset] = useState(0);
@@ -138,6 +138,14 @@ export default function AnalyticsScreen() {
   useFocusEffect(useCallback(() => {
     getSessionsForDates(dates).then(setPomSessions).catch(() => {});
   }, [dates.join(',')]));
+
+  const habitDone = useCallback((habitId: string, date: string, goal: number): boolean => {
+    return (completions[date]?.[habitId] ?? 0) >= goal;
+  }, [completions]);
+
+  const habitGoal = useCallback((h: { type?: string; dailyGoal?: number }): number => {
+    return h.type === 'count' ? (h.dailyGoal ?? 1) : 1;
+  }, []);
 
   // ── Task completions per day ────────────────────────────────────────────────
   const weekDoneByDay = useMemo(() =>
@@ -152,11 +160,11 @@ export default function AnalyticsScreen() {
   // ── Habit avg completion rate per day ───────────────────────────────────────
   const habitRateByDay = useMemo(() => {
     if (habits.length === 0) return dates.map(() => 0);
-    return dates.map((_, di) => {
-      const done = habits.filter(h => getLast7(h.id)[di]).length;
+    return dates.map(d => {
+      const done = habits.filter(h => habitDone(h.id, d, habitGoal(h))).length;
       return Math.round((done / habits.length) * 100);
     });
-  }, [habits, dates, getLast7]);
+  }, [habits, dates, habitDone, habitGoal]);
 
   const avgHabitRate = habitRateByDay.length > 0
     ? Math.round(
@@ -167,9 +175,14 @@ export default function AnalyticsScreen() {
   // ── Habits with stats (all, sorted by streak) ─────────────────────────────
   const habitStats = useMemo(() =>
     habits
-      .map(h => ({ habit: h, streak: getStreak(h.id), last7: getLast7(h.id), last30: getLast30(h.id) }))
+      .map(h => ({
+        habit: h,
+        streak: getStreak(h.id),
+        last7: dates.map(d => habitDone(h.id, d, habitGoal(h))),
+        last30: getLast30(h.id),
+      }))
       .sort((a, b) => b.streak - a.streak),
-  [habits, getStreak, getLast7, getLast30]);
+  [habits, dates, getStreak, getLast30, habitDone, habitGoal]);
 
   const topHabits = habitStats.slice(0, 4);
 
@@ -338,7 +351,7 @@ export default function AnalyticsScreen() {
                       </View>
                       <Text style={styles.habitName} numberOfLines={1}>{habit.title}</Text>
                       <View style={styles.habitDots}>
-                        {last7.map((done, i) => (
+                        {last7.map((done: boolean, i: number) => (
                           <View key={i} style={[
                             styles.habitMiniDot,
                             done && { backgroundColor: habit.color },
