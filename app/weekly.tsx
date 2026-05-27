@@ -261,9 +261,10 @@ export default function WeeklyScreen() {
   // ── Habits ─────────────────────────────────────────────────────────────────
 
   const habitWeekData = useMemo(() =>
-    habits.map(h => ({
-      days: dates.filter(d => (completions[d]?.[h.id] ?? 0) >= 1).length,
-    })),
+    habits.map(h => {
+      const goal = h.type === 'count' ? (h.dailyGoal ?? 1) : 1;
+      return { days: dates.filter(d => (completions[d]?.[h.id] ?? 0) >= goal).length };
+    }),
     [habits, completions, dates],
   );
 
@@ -330,7 +331,8 @@ export default function WeeklyScreen() {
           </PressableScale>
           <View style={styles.weekLabelWrap}>
             <Text style={styles.weekTitle}>
-              {isCurrentWeek ? 'Ten tydzień' : isFutureWeek ? 'Przyszły tydzień' : 'Poprzedni tydzień'}
+              {isCurrentWeek ? 'Ten tydzień' : isFutureWeek ? 'Przyszły tydzień'
+                : weekOffset === -1 ? 'Poprzedni tydzień' : `${Math.abs(weekOffset)} tyg. temu`}
             </Text>
             <Text style={styles.weekDates}>{weekLabel(dates)}</Text>
           </View>
