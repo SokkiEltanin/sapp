@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
   TrendingUp, TrendingDown, Flame, Smile, Zap,
@@ -44,6 +44,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
+import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -262,6 +263,7 @@ export default function DashboardScreen() {
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [weather, setWeather]       = useState<WeatherData | null>(null);
+  const [todayPomCount, setTodayPomCount] = useState(0);
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -376,10 +378,19 @@ export default function DashboardScreen() {
     } catch {}
   }, [todayEntry, openCheckIn, addEntry]);
 
+  // ── Pomodoro history ──────────────────────────────────────────────────────
+  const loadPomSessions = useCallback(async () => {
+    const sessions = await getTodaySessions();
+    setTodayPomCount(sessions.length);
+  }, []);
+
+  useEffect(() => { loadPomSessions(); }, []);
+  useFocusEffect(useCallback(() => { loadPomSessions(); }, [loadPomSessions]));
+
   // ── Derived data ──────────────────────────────────────────────────────────
   const today     = todayStr();
   const isLoading = finLoading || tasksLoading;
-  const onRefresh = () => { reloadFin(); reloadTasks(); };
+  const onRefresh = () => { reloadFin(); reloadTasks(); loadPomSessions(); };
 
   const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
   const overdueTasks   = useMemo(() => pendingTasks.filter(t => t.deadline && t.deadline.split('T')[0] < today).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? '')), [pendingTasks, today]);
@@ -775,12 +786,12 @@ export default function DashboardScreen() {
 
             {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
             <View style={s.toolsRow}>
-              {[
-                { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',  accent: '#F97316' },
-                { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',   accent: '#A78BFA' },
-                { label: 'Skupienie',icon: <Activity  size={18} color='#F43F5E' />, route: '/focus',   accent: '#F43F5E' },
-                { label: 'Pomodoro', icon: <Timer     size={18} color='#22D3EE' />, route: '/pomodoro',accent: '#22D3EE' },
-              ].map(tool => (
+              {([
+                { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',  accent: '#F97316', sub: null },
+                { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',   accent: '#A78BFA', sub: null },
+                { label: 'Skupienie',icon: <Activity  size={18} color='#F43F5E' />, route: '/focus',   accent: '#F43F5E', sub: null },
+                { label: 'Pomodoro', icon: <Timer     size={18} color='#22D3EE' />, route: '/pomodoro',accent: '#22D3EE', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
+              ] as const).map(tool => (
                 <TouchableOpacity
                   key={tool.route}
                   style={[s.toolTile, { borderColor: tool.accent + '30' }]}
@@ -791,6 +802,9 @@ export default function DashboardScreen() {
                     {tool.icon}
                   </View>
                   <Text style={s.toolLabel}>{tool.label}</Text>
+                  {tool.sub && (
+                    <Text style={[s.toolSub, { color: tool.accent }]}>{tool.sub}</Text>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -1206,6 +1220,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   toolLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
+  toolSub: { fontSize: 11, fontWeight: '800', letterSpacing: -0.3 },
 
   // ── Evening habits nudge ──────────────────────────────────────────────────
   habitsNudge: {
