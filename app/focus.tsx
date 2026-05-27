@@ -28,6 +28,20 @@ function todayStr() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+const DOW_PL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
+
+function deadlineInfo(iso: string): { label: string; color: string } {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(iso.split('T')[0] + 'T00:00:00');
+  const days = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0)  return { label: 'PRZETERMINOWANE', color: colors.accent.red };
+  if (days === 0) return { label: 'TERMIN DZIŚ',     color: colors.accent.amber };
+  if (days === 1) return { label: 'Jutro',           color: colors.accent.amber };
+  if (days <= 6) return { label: `W ${DOW_PL[target.getDay()].toUpperCase()}`, color: colors.text.secondary };
+  const [, m, d] = iso.split('T')[0].split('-');
+  return { label: `${parseInt(d)}.${parseInt(m)}`, color: colors.text.muted };
+}
+
 const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
 
 function priorityColor(p: string) {
@@ -147,11 +161,14 @@ export default function FocusScreen() {
           ) : null}
 
           {/* Deadline */}
-          {task.deadline && (
-            <Text style={styles.deadline}>
-              Termin: {task.deadline.split('T')[0]}
-            </Text>
-          )}
+          {task.deadline && (() => {
+            const { label, color } = deadlineInfo(task.deadline);
+            return (
+              <View style={[styles.deadlinePill, { backgroundColor: color + '18', borderColor: color + '40' }]}>
+                <Text style={[styles.deadlineText, { color }]}>{label}</Text>
+              </View>
+            );
+          })()}
 
           {/* Subtasks */}
           {subtasksTotal > 0 && (
@@ -334,7 +351,12 @@ const styles = StyleSheet.create({
     lineHeight: 40, letterSpacing: -0.5,
   },
   taskDesc: { fontSize: 14, color: colors.text.secondary, lineHeight: 22 },
-  deadline: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
+  deadlinePill: {
+    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
+    borderRadius: 8, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  deadlineText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
 
   subtasksCard: {
     backgroundColor: G.card, borderRadius: radius.xl,
