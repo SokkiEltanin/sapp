@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -63,8 +64,13 @@ export default function HealthScreen() {
   const [weekWater, setWeekWater]       = useState<number[]>(Array(7).fill(0));
 
   const { entries } = useMoodStore();
-  const pomodoroStore = usePomodoroStore();
+  const pomodoroIsRunning = usePomodoroStore(s => s.isRunning);
+  const [todayPomCount, setTodayPomCount] = useState(0);
   const recentMood = entries.slice(0, 7).reverse();
+
+  useFocusEffect(useCallback(() => {
+    getTodaySessions().then(s => setTodayPomCount(s.length)).catch(() => {});
+  }, []));
 
   const maxBar = Math.max(...weekSteps, 1);
   const stepPct = Math.min(1, steps / stepGoal);
@@ -295,11 +301,11 @@ export default function HealthScreen() {
             <Text style={styles.cardLabel}>POMODORO DZISIAJ</Text>
           </View>
           <Text style={styles.pomNum}>
-            {pomodoroStore.completedRounds}
+            {todayPomCount}
             <Text style={styles.pomUnit}> sesji</Text>
           </Text>
           <PressableScale onPress={() => router.push('/pomodoro' as any)} style={[styles.pomCta, { backgroundColor: T.accentDim, borderColor: T.cardBorder }]}>
-            <Text style={[styles.pomCtaText, { color: T.accent }]}>{pomodoroStore.isRunning ? 'Trwa...' : 'Start'}</Text>
+            <Text style={[styles.pomCtaText, { color: T.accent }]}>{pomodoroIsRunning ? 'Trwa...' : 'Start'}</Text>
           </PressableScale>
         </GlassCard>
 
