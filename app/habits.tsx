@@ -693,6 +693,23 @@ export default function HabitsScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {allDone && (() => {
+          const bestStreak = Math.max(...habits.map(h => getStreak(h.id)), 0);
+          return (
+            <View style={styles.allDoneCard}>
+              <View style={styles.allDoneIconWrap}>
+                <CalendarDays size={22} color={colors.accent.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.allDoneTitle}>Wszystkie nawyki ukończone!</Text>
+                <Text style={styles.allDoneSub}>
+                  {bestStreak >= 2 ? `Najlepsza seria: ${bestStreak} dni` : 'Doskonała robota na dziś!'}
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
+
         {habits.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
@@ -768,6 +785,21 @@ const styles = StyleSheet.create({
   progressTrack: { height: 2, backgroundColor: 'rgba(251,191,36,0.12)', overflow: 'hidden' },
   progressFill: { height: 2, borderRadius: 1 },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 60 },
+
+  allDoneCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.accent.green + '12',
+    borderRadius: radius.xl, borderWidth: 1, borderColor: colors.accent.green + '35',
+    padding: spacing[4],
+  },
+  allDoneIconWrap: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: colors.accent.green + '20',
+    borderWidth: 1, borderColor: colors.accent.green + '40',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  allDoneTitle: { fontSize: 14, fontWeight: '800', color: colors.accent.green, lineHeight: 20 },
+  allDoneSub: { fontSize: 12, color: colors.text.secondary, marginTop: 2 },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[4] },
   emptyIcon: {
     width: 72, height: 72, borderRadius: 36,
