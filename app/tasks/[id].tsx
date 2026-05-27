@@ -28,6 +28,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
+import { haptic } from '@/utils/haptics';
 
 const G = {
   card:       '#0D2318',
@@ -206,6 +207,7 @@ export default function TaskDetailScreen() {
         ).catch(() => {});
       }
 
+      haptic.success();
       setEditing(false);
       toast.success('Zapisano');
     } catch (e: any) {
@@ -229,6 +231,7 @@ export default function TaskDetailScreen() {
       { text: 'Anuluj', style: 'cancel' },
       {
         text: 'Usuń', style: 'destructive', onPress: async () => {
+          haptic.medium();
           await remove(id!);
           toast.info('Usunięto');
           router.back();

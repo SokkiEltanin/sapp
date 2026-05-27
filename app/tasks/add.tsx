@@ -203,6 +203,7 @@ export default function AddTaskScreen() {
         ).catch(() => {});
       }
 
+      haptic.success();
       toast.success('Zadanie dodane');
       router.back();
       InteractionManager.runAfterInteractions(() => addTask(task));
