@@ -4,6 +4,7 @@ import { useState } from 'react';
 import PressableScale from '@/components/ui/PressableScale';
 import { MoodEntry, MOOD_COLORS, MOOD_LABELS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 interface Props {
   todayEntry?: MoodEntry | null;
@@ -18,7 +19,7 @@ export default function MoodNudge({ todayEntry, onOpen }: Props) {
     const mc = MOOD_COLORS[todayEntry.mood];
     return (
       <View style={styles.wrapper}>
-        <PressableScale onPress={onOpen}>
+        <PressableScale onPress={() => { haptic.tap(); onOpen(); }}>
           <View style={styles.doneRow}>
             <View style={[styles.dot, { backgroundColor: mc }]} />
             <Text style={styles.doneLabel}>{MOOD_LABELS[todayEntry.mood]}</Text>
@@ -38,13 +39,13 @@ export default function MoodNudge({ todayEntry, onOpen }: Props) {
   return (
     <View style={styles.wrapper}>
       <View style={styles.nudgeRow}>
-        <PressableScale onPress={onOpen} style={{ flex: 1 }}>
+        <PressableScale onPress={() => { haptic.tap(); onOpen(); }} style={{ flex: 1 }}>
           <View style={styles.nudgeInner}>
             <Text style={styles.nudgeText}>Jak się dziś czujesz?</Text>
             <Text style={styles.nudgeSub}>Zaloguj nastrój — 10 sekund</Text>
           </View>
         </PressableScale>
-        <PressableScale onPress={() => setDismissed(true)} style={styles.dismissBtn}>
+        <PressableScale onPress={() => { haptic.tap(); setDismissed(true); }} style={styles.dismissBtn}>
           <X size={12} color={colors.text.muted} />
         </PressableScale>
       </View>

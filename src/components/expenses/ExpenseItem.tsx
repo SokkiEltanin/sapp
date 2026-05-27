@@ -5,6 +5,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -38,6 +39,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
     : `${timeStr(expense.date)}${expense.tags.length > 0 ? ` · ${expense.tags.slice(0, 2).join(', ')}` : ''}${!isIncome ? ` · ${meta.label}` : ''}`;
 
   const toggle = () => {
+    haptic.tap();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpanded(v => !v);
   };
@@ -46,8 +48,8 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
     <View style={[styles.wrap, isReceipt && styles.wrapReceipt]}>
       {/* Main row */}
       <PressableScale
-        onPress={() => onPress?.(expense)}
-        onLongPress={() => onLongPress?.(expense)}
+        onPress={() => { haptic.tap(); onPress?.(expense); }}
+        onLongPress={() => { haptic.medium(); onLongPress?.(expense); }}
         style={styles.row}
       >
         <View style={[styles.bar, { backgroundColor: accentColor }]} />
@@ -117,7 +119,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
           })}
           <TouchableOpacity
             style={styles.detailBtn}
-            onPress={() => onPress?.(expense)}
+            onPress={() => { haptic.tap(); onPress?.(expense); }}
             activeOpacity={0.75}
           >
             <Text style={styles.detailBtnText}>Edytuj / szczegóły →</Text>
