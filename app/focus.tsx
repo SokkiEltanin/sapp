@@ -127,7 +127,7 @@ export default function FocusScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <Text style={styles.headerTitle}>Tryb skupienia</Text>
@@ -188,7 +188,11 @@ export default function FocusScreen() {
                   <TouchableOpacity
                     key={sub.id}
                     style={styles.subtaskRow}
-                    onPress={() => { haptic.tap(); toggleSubtask(task.id, sub.id); }}
+                    onPress={() => {
+                      const willFinishAll = !sub.done && subtasksDone + 1 === subtasksTotal;
+                      willFinishAll ? haptic.success() : haptic.tap();
+                      toggleSubtask(task.id, sub.id);
+                    }}
                     activeOpacity={0.75}
                   >
                     {sub.done
@@ -250,7 +254,7 @@ export default function FocusScreen() {
                 <TouchableOpacity onPress={handleCapture} hitSlop={8} activeOpacity={0.7}>
                   <Check size={16} color={captureText.trim() ? G.accent : G.muted} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => { haptic.tap(); setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
                   <X size={14} color={G.muted} />
                 </TouchableOpacity>
               </View>
@@ -271,7 +275,7 @@ export default function FocusScreen() {
               ? `Pominięto ${skipSet.size} zadań`
               : 'Nie ma aktywnych zadań na dziś'}
           </Text>
-          <PressableScale onPress={() => router.back()} style={styles.backHome}>
+          <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.backHome}>
             <Text style={styles.backHomeText}>Wróć</Text>
           </PressableScale>
 
@@ -293,7 +297,7 @@ export default function FocusScreen() {
                 <TouchableOpacity onPress={handleCapture} hitSlop={8} activeOpacity={0.7}>
                   <Check size={16} color={captureText.trim() ? G.accent : G.muted} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => { haptic.tap(); setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
                   <X size={14} color={G.muted} />
                 </TouchableOpacity>
               </View>

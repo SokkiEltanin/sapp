@@ -416,7 +416,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
                   onSubmitEditing={addTag}
                 />
                 {tagInput.length > 0 && (
-                  <TouchableOpacity onPress={addTag} activeOpacity={0.7}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); addTag(); }} activeOpacity={0.7}>
                     <Text style={em.tagAddText}>Dodaj</Text>
                   </TouchableOpacity>
                 )}
@@ -424,7 +424,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
               {tags.length > 0 && (
                 <View style={em.tagRow}>
                   {tags.map(t => (
-                    <TouchableOpacity key={t} onPress={() => removeTag(t)} style={em.tagChip} activeOpacity={0.7}>
+                    <TouchableOpacity key={t} onPress={() => { haptic.tap(); removeTag(t); }} style={em.tagChip} activeOpacity={0.7}>
                       <Text style={em.tagChipText}>#{t}</Text>
                       <X size={9} color={V.accent + 'BB'} />
                     </TouchableOpacity>
@@ -518,16 +518,16 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
           <Text style={nc.titleEmpty} numberOfLines={1}>{preview || 'Pusta notatka'}</Text>
         )}
         <View style={nc.actions}>
-          <TouchableOpacity onPress={onConvert} hitSlop={8} style={nc.actionBtn}>
+          <TouchableOpacity onPress={() => { haptic.tap(); onConvert(); }} hitSlop={8} style={nc.actionBtn}>
             <ClipboardList size={13} color={V.accent + 'BB'} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={onPin} hitSlop={8} style={nc.actionBtn}>
+          <TouchableOpacity onPress={() => { haptic.tap(); onPin(); }} hitSlop={8} style={nc.actionBtn}>
             {note.pinned
               ? <PinOff size={13} color={colors.accent.amber} />
               : <Pin size={13} color={colors.text.muted} />
             }
           </TouchableOpacity>
-          <TouchableOpacity onPress={onDelete} hitSlop={8} style={nc.actionBtn}>
+          <TouchableOpacity onPress={() => { haptic.medium(); onDelete(); }} hitSlop={8} style={nc.actionBtn}>
             <Trash2 size={13} color='rgba(255,255,255,0.18)' />
           </TouchableOpacity>
         </View>
@@ -762,7 +762,7 @@ export default function NotesScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.iconBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.iconBtn}>
           <ArrowLeft size={20} color={colors.text.secondary} />
         </PressableScale>
         <View style={styles.headerCenter}>
@@ -771,7 +771,7 @@ export default function NotesScreen() {
             <Text style={styles.subtitle}>{notes.length} notatek</Text>
           )}
         </View>
-        <PressableScale onPress={() => setSearching(s => !s)} style={styles.iconBtn}>
+        <PressableScale onPress={() => { haptic.tap(); setSearching(s => !s); }} style={styles.iconBtn}>
           <Search size={18} color={searching ? V.accent : colors.text.muted} />
         </PressableScale>
         <PressableScale onPress={openNew} style={[styles.iconBtn, styles.addBtn]}>
@@ -790,7 +790,7 @@ export default function NotesScreen() {
         {/* All */}
         <TouchableOpacity
           style={[styles.folderChip, activeFolder === null && styles.folderChipActive]}
-          onPress={() => setActiveFolder(null)}
+          onPress={() => { haptic.tap(); setActiveFolder(null); }}
           activeOpacity={0.75}
         >
           <Text style={[styles.folderChipText, activeFolder === null && styles.folderChipTextActive]}>
@@ -803,8 +803,8 @@ export default function NotesScreen() {
           <TouchableOpacity
             key={f}
             style={[styles.folderChip, activeFolder === f && styles.folderChipActive]}
-            onPress={() => setActiveFolder(f)}
-            onLongPress={() => handleDeleteFolder(f)}
+            onPress={() => { haptic.tap(); setActiveFolder(f); }}
+            onLongPress={() => { haptic.medium(); handleDeleteFolder(f); }}
             activeOpacity={0.75}
           >
             <Folder size={10} color={activeFolder === f ? colors.bg.primary : V.muted} />
@@ -828,17 +828,17 @@ export default function NotesScreen() {
               onSubmitEditing={handleCreateFolder}
               onBlur={() => { if (!newFolderName.trim()) setNewFolderMode(false); }}
             />
-            <TouchableOpacity onPress={handleCreateFolder} hitSlop={8}>
+            <TouchableOpacity onPress={() => { haptic.tap(); handleCreateFolder(); }} hitSlop={8}>
               <Text style={styles.newFolderConfirm}>OK</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setNewFolderMode(false); setNewFolderName(''); }} hitSlop={8}>
+            <TouchableOpacity onPress={() => { haptic.tap(); setNewFolderMode(false); setNewFolderName(''); }} hitSlop={8}>
               <X size={12} color={colors.text.muted} />
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity
             style={styles.folderChipNew}
-            onPress={() => setNewFolderMode(true)}
+            onPress={() => { haptic.tap(); setNewFolderMode(true); }}
             activeOpacity={0.75}
           >
             <FolderPlus size={11} color={colors.text.muted} />
@@ -860,7 +860,7 @@ export default function NotesScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+            <TouchableOpacity onPress={() => { haptic.tap(); setQuery(''); }} hitSlop={8}>
               <X size={14} color={colors.text.muted} />
             </TouchableOpacity>
           )}

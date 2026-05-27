@@ -781,7 +781,7 @@ export default function DashboardScreen() {
                       <Text style={[s.todayBadgeText, hasOverdue && { color: colors.accent.red }]}>{totalCount}</Text>
                     </View>
                     {totalCount > 4 && (
-                      <TouchableOpacity onPress={() => router.push('/(tabs)/tasks' as any)} style={s.todayMore}>
+                      <TouchableOpacity onPress={() => { haptic.tap(); router.push('/(tabs)/tasks' as any); }} style={s.todayMore}>
                         <Text style={[s.todayMoreText, hasOverdue && { color: colors.accent.red }]}>+{totalCount - 4} więcej</Text>
                         <ChevronRight size={11} color={hasOverdue ? colors.accent.red : colors.tabs.tasks} />
                       </TouchableOpacity>
@@ -794,12 +794,12 @@ export default function DashboardScreen() {
                       <TouchableOpacity
                         key={task.id}
                         style={s.todayRow}
-                        onPress={() => router.push('/(tabs)/tasks' as any)}
+                        onPress={() => { haptic.tap(); router.push('/(tabs)/tasks' as any); }}
                         activeOpacity={0.7}
                       >
                         <TouchableOpacity
                           style={[s.todayCheck, (isOverdue || task.priority === 'high') && s.todayCheckUrgent]}
-                          onPress={() => { haptic.tap(); toggleTask(task.id); }}
+                          onPress={() => { haptic.success(); toggleTask(task.id); }}
                           hitSlop={8}
                           activeOpacity={0.7}
                         >

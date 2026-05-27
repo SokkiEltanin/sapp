@@ -185,7 +185,7 @@ export default function PomodoroScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <View style={styles.headerCenter}>
