@@ -328,10 +328,10 @@ export default function FinancesScreen() {
           style={{ borderBottomColor: F.cardBorder }}
           rightSlot={
             <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-              <PressableScale onPress={() => router.push('/expenses/scan' as any)} style={styles.headerBtn}>
+              <PressableScale onPress={() => { haptic.tap(); router.push('/expenses/scan' as any); }} style={styles.headerBtn}>
                 <ScanLine size={17} color={colors.accent.blue} />
               </PressableScale>
-              <PressableScale onPress={() => router.push('/expenses/subscriptions' as any)} style={styles.headerBtn}>
+              <PressableScale onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }} style={styles.headerBtn}>
                 <RefreshCcw size={17} color={colors.text.secondary} />
               </PressableScale>
             </View>
@@ -384,7 +384,7 @@ export default function FinancesScreen() {
                     style={{ marginBottom: 8 }}
                   >
                     <TouchableOpacity
-                      onPress={() => setActiveTagFilter(null)}
+                      onPress={() => { haptic.tap(); setActiveTagFilter(null); }}
                       style={[styles.tagChip, !activeTagFilter && styles.tagChipActive]}
                       activeOpacity={0.7}
                     >
@@ -394,7 +394,7 @@ export default function FinancesScreen() {
                     {availableTags.map((tag) => (
                       <TouchableOpacity
                         key={tag}
-                        onPress={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                        onPress={() => { haptic.tap(); setActiveTagFilter(activeTagFilter === tag ? null : tag); }}
                         style={[styles.tagChip, activeTagFilter === tag && styles.tagChipActive]}
                         activeOpacity={0.7}
                       >
@@ -418,7 +418,7 @@ export default function FinancesScreen() {
                 <ExpenseItem
                   expense={item}
                   index={index}
-                  onPress={(e) => router.push(`/expenses/${e.id}` as any)}
+                  onPress={(e) => { haptic.tap(); router.push(`/expenses/${e.id}` as any); }}
                 />
               </View>
             )}
@@ -457,7 +457,7 @@ export default function FinancesScreen() {
               >
                 <ChevronRight size={16} color={monthOffset > 0 ? colors.text.secondary : colors.text.muted} />
               </PressableScale>
-              <PressableScale onPress={() => router.push('/settings' as any)} style={styles.settingsBtn}>
+              <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }} style={styles.settingsBtn}>
                 <Settings2 size={16} color={colors.text.muted} />
               </PressableScale>
             </View>
@@ -538,7 +538,7 @@ export default function FinancesScreen() {
               </View>
               <View style={styles.chartArea}>
                 {monthlyData.map((m, i) => (
-                  <TouchableOpacity key={i} style={styles.monthCol} onPress={() => setMonthOffset(MONTHS_BACK - 1 - i)}>
+                  <TouchableOpacity key={i} style={styles.monthCol} onPress={() => { haptic.tap(); setMonthOffset(MONTHS_BACK - 1 - i); }}>
                     <View style={styles.barsWrap}>
                       <View style={[styles.bar, {
                         height: Math.max(3, (m.income / maxMonthly) * 100),
@@ -646,7 +646,7 @@ export default function FinancesScreen() {
                   const isExpanded = expandedCat === cat;
                   return (
                     <View key={cat}>
-                      <TouchableOpacity onPress={() => setExpandedCat(isExpanded ? null : cat)} activeOpacity={0.7}>
+                      <TouchableOpacity onPress={() => { haptic.tap(); setExpandedCat(isExpanded ? null : cat); }} activeOpacity={0.7}>
                         <View style={[styles.catRow, isExpanded && styles.catRowExpanded]}>
                           <View style={[styles.catIcon, overBudget && { backgroundColor: colors.accent.red + '20' }, nearBudget && !overBudget && { backgroundColor: colors.accent.amber + '18' }]}>
                             {IconComp && <IconComp size={14} color={overBudget ? colors.accent.red : nearBudget ? colors.accent.amber : colors.text.muted} />}
@@ -733,7 +733,7 @@ export default function FinancesScreen() {
                   return (
                     <View key={tag}>
                       <TouchableOpacity
-                        onPress={() => setExpandedTag(isTagExpanded ? null : tag)}
+                        onPress={() => { haptic.tap(); setExpandedTag(isTagExpanded ? null : tag); }}
                         activeOpacity={0.7}
                       >
                         <View style={[styles.tagRow, isTagExpanded && styles.tagRowExpanded]}>
@@ -748,13 +748,13 @@ export default function FinancesScreen() {
                         <View style={styles.tagProductList}>
                           <View style={styles.tagSortRow}>
                             <TouchableOpacity
-                              onPress={() => setTagProductSort('price')}
+                              onPress={() => { haptic.tap(); setTagProductSort('price'); }}
                               style={[styles.tagSortBtn, tagProductSort === 'price' && styles.tagSortBtnActive]}
                             >
                               <Text style={[styles.tagSortBtnText, tagProductSort === 'price' && styles.tagSortBtnTextActive]}>Cena</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              onPress={() => setTagProductSort('date')}
+                              onPress={() => { haptic.tap(); setTagProductSort('date'); }}
                               style={[styles.tagSortBtn, tagProductSort === 'date' && styles.tagSortBtnActive]}
                             >
                               <Text style={[styles.tagSortBtnText, tagProductSort === 'date' && styles.tagSortBtnTextActive]}>Data</Text>
@@ -844,7 +844,7 @@ export default function FinancesScreen() {
         <View style={styles.quickBar}>
           <TouchableOpacity
             style={[styles.quickBtn, { borderColor: colors.accent.red + '50', backgroundColor: colors.accent.red + '10' }]}
-            onPress={() => router.push('/expenses/add' as any)}
+            onPress={() => { haptic.tap(); router.push('/expenses/add' as any); }}
             activeOpacity={0.75}
           >
             <TrendingDown size={15} color={colors.accent.red} />
@@ -852,7 +852,7 @@ export default function FinancesScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickBtn, { borderColor: colors.accent.green + '50', backgroundColor: colors.accent.green + '10' }]}
-            onPress={() => router.push('/expenses/add?type=income' as any)}
+            onPress={() => { haptic.tap(); router.push('/expenses/add?type=income' as any); }}
             activeOpacity={0.75}
           >
             <TrendingUp size={15} color={colors.accent.green} />
@@ -860,7 +860,7 @@ export default function FinancesScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickBtn, { borderColor: colors.tabs.finances + '50', backgroundColor: colors.tabs.finances + '10' }]}
-            onPress={() => router.push('/expenses/scan' as any)}
+            onPress={() => { haptic.tap(); router.push('/expenses/scan' as any); }}
             activeOpacity={0.75}
           >
             <ScanLine size={15} color={colors.tabs.finances} />

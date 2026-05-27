@@ -327,7 +327,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                   </View>
                 )}
               </View>
-              <TouchableOpacity onPress={onClose} style={dm.closeBtn} hitSlop={8}>
+              <TouchableOpacity onPress={() => { haptic.tap(); onClose(); }} style={dm.closeBtn} hitSlop={8}>
                 <X size={18} color={colors.text.muted} />
               </TouchableOpacity>
             </View>
@@ -395,7 +395,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
               </TouchableOpacity>
               <TouchableOpacity
                 style={[dm.footerBtn, dm.footerBtnDanger]}
-                onPress={() => { onDelete(task.id); onClose(); }}
+                onPress={() => { haptic.medium(); onDelete(task.id); onClose(); }}
                 activeOpacity={0.8}
               >
                 <Trash2 size={15} color={colors.accent.red} />
@@ -409,7 +409,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 <View style={dm.snoozeHeader}>
                   <Clock size={13} color={colors.accent.amber} />
                   <Text style={dm.snoozeTitle}>Odłóż zadanie</Text>
-                  <TouchableOpacity onPress={() => setSnoozeOpen(false)} hitSlop={8}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); setSnoozeOpen(false); }} hitSlop={8}>
                     <X size={15} color={colors.text.muted} />
                   </TouchableOpacity>
                 </View>
@@ -535,7 +535,7 @@ function ConfirmModal({ task, onConfirm, onCancel }: {
         <Text style={cm.title}>Ukończyłeś zadanie?</Text>
         <Text style={cm.sub} numberOfLines={2}>{task.title}</Text>
         <View style={cm.btns}>
-          <TouchableOpacity style={cm.btnNo} onPress={onCancel} activeOpacity={0.8}>
+          <TouchableOpacity style={cm.btnNo} onPress={() => { haptic.tap(); onCancel(); }} activeOpacity={0.8}>
             <Text style={cm.btnNoText}>Nie</Text>
           </TouchableOpacity>
           <TouchableOpacity style={cm.btnYes} onPress={onConfirm} activeOpacity={0.8}>
@@ -591,7 +591,7 @@ function SortSheet({ sort, onSelect, onClose }: {
           <TouchableOpacity
             key={opt.key}
             style={[ss.row, sort === opt.key && ss.rowActive]}
-            onPress={() => { onSelect(opt.key); onClose(); }}
+            onPress={() => { haptic.tap(); onSelect(opt.key); onClose(); }}
             activeOpacity={0.75}
           >
             <View style={{ flex: 1 }}>
@@ -955,14 +955,14 @@ export default function TasksScreen() {
           <View style={s.headerRight}>
             <TouchableOpacity
               style={s.headerBtn}
-              onPress={() => setSortOpen(true)}
+              onPress={() => { haptic.tap(); setSortOpen(true); }}
               activeOpacity={0.75}
             >
               <SlidersHorizontal size={16} color={colors.text.secondary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.headerBtn, s.addBtn]}
-              onPress={() => router.push('/tasks/add' as any)}
+              onPress={() => { haptic.tap(); router.push('/tasks/add' as any); }}
               activeOpacity={0.75}
             >
               <Plus size={18} color={G.accent} strokeWidth={2.5} />
