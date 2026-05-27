@@ -652,6 +652,46 @@ export default function DashboardScreen() {
               </View>
             )}
 
+            {/* ══ TODAY ACTIVITY STRIP ════════════════════════════════════ */}
+            {(doneToday > 0 || habitsDoneIds.length > 0 || !!todayEntry || todayPomCount > 0) && (() => {
+              const items = [
+                {
+                  icon: <CheckCircle2 size={11} color={doneToday > 0 ? colors.accent.green : colors.text.muted} strokeWidth={2} />,
+                  label: `${doneToday} zad.`,
+                  active: doneToday > 0,
+                  color: colors.accent.green,
+                },
+                {
+                  icon: <Flame size={11} color={habitsDoneIds.length > 0 ? colors.accent.amber : colors.text.muted} />,
+                  label: habits.length > 0 ? `${habitsDoneIds.length}/${habits.length}` : `${habitsDoneIds.length}`,
+                  active: habitsDoneIds.length > 0,
+                  color: colors.accent.amber,
+                },
+                {
+                  icon: <Smile size={11} color={todayEntry ? accentColor : colors.text.muted} />,
+                  label: todayEntry ? 'nastrój' : 'brak',
+                  active: !!todayEntry,
+                  color: accentColor,
+                },
+                {
+                  icon: <Timer size={11} color={todayPomCount > 0 ? '#22D3EE' : colors.text.muted} />,
+                  label: `${todayPomCount}×`,
+                  active: todayPomCount > 0,
+                  color: '#22D3EE',
+                },
+              ];
+              return (
+                <View style={s.activityStrip}>
+                  {items.map((item, i) => (
+                    <View key={i} style={[s.activityBadge, item.active && { backgroundColor: item.color + '15', borderColor: item.color + '35' }]}>
+                      {item.icon}
+                      <Text style={[s.activityLabel, item.active && { color: item.color }]}>{item.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+
             {/* ══ TASKS + WORK ROW ═════════════════════════════════════════ */}
             <View style={s.miniRow}>
               {/* Tasks tile */}
@@ -1313,6 +1353,17 @@ const s = StyleSheet.create({
   },
   weatherTemp: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   weatherDesc: { fontSize: 12, color: colors.text.muted },
+
+  activityStrip: {
+    flexDirection: 'row', gap: spacing[2],
+  },
+  activityBadge: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    paddingVertical: spacing[2], paddingHorizontal: spacing[2],
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  activityLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
 
   // ── Humor tile ─────────────────────────────────────────────────────────────
   humorTile: {
