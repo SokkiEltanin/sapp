@@ -104,9 +104,9 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
         <View style={hr.titleRow}>
           <Text style={hr.title}>{habit.title}</Text>
           {streak > 0 && (
-            <View style={hr.streak}>
-              <Flame size={9} color={colors.accent.amber} />
-              <Text style={hr.streakText}>{streak}d</Text>
+            <View style={[hr.streak, !done && { backgroundColor: colors.accent.red + '15', borderColor: colors.accent.red + '35' }]}>
+              <Flame size={9} color={!done ? colors.accent.red : colors.accent.amber} />
+              <Text style={[hr.streakText, !done && { color: colors.accent.red }]}>{streak}d</Text>
             </View>
           )}
           {weeklyTarget != null && thisWeekDone != null && (
@@ -186,6 +186,7 @@ const hr = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 2,
     backgroundColor: colors.accent.amber + '18',
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
+    borderWidth: 1, borderColor: colors.accent.amber + '30',
   },
   streakText: { fontSize: 10, fontWeight: '700', color: colors.accent.amber },
   freqBadge: {
