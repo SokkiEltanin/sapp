@@ -289,6 +289,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   const handleAddMilestone = () => {
     const title = newMilestone.trim();
     if (!title) return;
+    haptic.tap();
     onAddSubtask(task.id, title);
     setNewMilestone('');
   };
@@ -332,7 +333,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 <TouchableOpacity
                   key={sub.id}
                   style={dm.milestoneRow}
-                  onPress={() => onToggleSubtask(task.id, sub.id)}
+                  onPress={() => { haptic.tap(); onToggleSubtask(task.id, sub.id); }}
                   activeOpacity={0.7}
                 >
                   {sub.done
@@ -373,7 +374,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
               </TouchableOpacity>
               <TouchableOpacity
                 style={dm.footerBtn}
-                onPress={() => { onClose(); router.push(`/tasks/${task.id}` as any); }}
+                onPress={() => { haptic.tap(); onClose(); router.push(`/tasks/${task.id}` as any); }}
                 activeOpacity={0.8}
               >
                 <Pencil size={15} color={G.accent} />
