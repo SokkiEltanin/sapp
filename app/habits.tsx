@@ -96,7 +96,7 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   const weeklyMet = weeklyTarget != null && thisWeekDone != null && thisWeekDone >= weeklyTarget;
 
   return (
-    <TouchableOpacity onLongPress={onEdit} activeOpacity={0.85} delayLongPress={400} style={[hr.wrap, done && { backgroundColor: habit.color + '0D', borderColor: habit.color + '35' }]}>
+    <TouchableOpacity onLongPress={() => { haptic.medium(); onEdit(); }} activeOpacity={0.85} delayLongPress={400} style={[hr.wrap, done && { backgroundColor: habit.color + '0D', borderColor: habit.color + '35' }]}>
       <View style={[hr.iconCircle, { backgroundColor: habit.color + '22', borderColor: habit.color + '44' }]}>
         <HabitIcon name={habit.icon} size={18} color={habit.color} />
       </View>

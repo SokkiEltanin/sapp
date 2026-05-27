@@ -896,6 +896,7 @@ export default function TasksScreen() {
 
   const handleConfirm = useCallback(() => {
     if (!confirmTask) return;
+    haptic.success();
     toggle(confirmTask.id);
     toast.success('Zadanie ukończone');
     setConfirmTask(null);

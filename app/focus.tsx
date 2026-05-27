@@ -75,17 +75,20 @@ export default function FocusScreen() {
 
   const handleDone = () => {
     if (!task) return;
+    haptic.success();
     toggle(task.id);
     toast.success('Ukończono!');
   };
 
   const handleSkip = () => {
     if (!task) return;
+    haptic.tap();
     setSkipSet(prev => new Set([...prev, task.id]));
   };
 
   const handlePomodoro = () => {
     if (!task) return;
+    haptic.tap();
     startPomodoro(task.id, task.title);
     router.push('/pomodoro' as any);
   };
