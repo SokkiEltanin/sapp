@@ -543,6 +543,15 @@ export default function MoodScreen() {
                         <Text style={styles.entryDate}>{fmtShort(entry.date)}</Text>
                       </View>
                       {entry.note ? <Text style={styles.entryNote} numberOfLines={1}>{entry.note}</Text> : null}
+                      {(entry.tags ?? []).length > 0 && (
+                        <View style={styles.entryTagRow}>
+                          {(entry.tags ?? []).map(tag => (
+                            <View key={tag} style={styles.entryTagChip}>
+                              <Text style={styles.entryTagText}>#{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -636,6 +645,15 @@ const styles = StyleSheet.create({
   entryEnergyEmoji: { fontSize: 12 },
   entryDate: { ...typography.caption, color: colors.text.muted, marginLeft: 'auto' },
   entryNote: { ...typography.caption, color: colors.text.secondary, lineHeight: 16 },
+
+  entryTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 2 },
+  entryTagChip: {
+    paddingHorizontal: 5, paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(244,114,182,0.08)',
+    borderWidth: 1, borderColor: 'rgba(244,114,182,0.22)',
+  },
+  entryTagText: { fontSize: 9, fontWeight: '600', color: P.muted },
 
   empty: { alignItems: 'center', paddingVertical: spacing[12], gap: spacing[2] },
   emptyTitle: { ...typography.h3, color: colors.text.secondary },

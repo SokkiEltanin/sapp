@@ -177,7 +177,7 @@ export default function AnalyticsScreen() {
 
   const moodThisWeek = weekMood.filter(m => m > 0);
   const avgMood = moodThisWeek.length
-    ? moodThisWeek.reduce((a, b) => a + b, 0) / moodThisWeek.length
+    ? moodThisWeek.reduce((a: number, b) => a + b, 0) / moodThisWeek.length
     : 0;
 
   const prevWeekMoods = moodEntries.filter(e => {
