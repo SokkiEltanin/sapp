@@ -261,7 +261,7 @@ const SNOOZE_OPTIONS = [
   { label: 'Za tydzień',        getDate: () => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d; } },
 ] as const;
 
-function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubtask, onToggleSubtask, onSnooze }: {
+function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubtask, onToggleSubtask, onSnooze, onPomodoro }: {
   task: Task | null;
   visible: boolean;
   onClose: () => void;
@@ -270,6 +270,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   onAddSubtask: (taskId: string, title: string) => void;
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onSnooze: (id: string, until: Date) => void;
+  onPomodoro: (task: Task) => void;
 }) {
   const [newMilestone, setNewMilestone] = useState('');
   const [snoozeOpen, setSnoozeOpen] = useState(false);
@@ -354,6 +355,14 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
 
             {/* Footer actions */}
             <View style={dm.footer}>
+              <TouchableOpacity
+                style={[dm.footerBtn, dm.footerBtnPom]}
+                onPress={() => { haptic.tap(); onPomodoro(task); onClose(); }}
+                activeOpacity={0.8}
+              >
+                <Timer size={15} color='#22D3EE' />
+                <Text style={[dm.footerBtnText, { color: '#22D3EE' }]}>Pomodoro</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={dm.footerBtn}
                 onPress={() => { onClose(); router.push(`/tasks/${task.id}` as any); }}
@@ -473,6 +482,10 @@ const dm = StyleSheet.create({
   footerBtnSnooze: {
     backgroundColor: colors.accent.amber + '15',
     borderColor: colors.accent.amber + '30',
+  },
+  footerBtnPom: {
+    backgroundColor: 'rgba(34,211,238,0.12)',
+    borderColor: 'rgba(34,211,238,0.30)',
   },
   footerBtnText: { fontSize: 13, fontWeight: '700', color: G.accent },
   snoozeSheet: {
@@ -815,6 +828,7 @@ export default function TasksScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
+  const startPomodoro  = usePomodoroStore(s => s.startFor);
 
   const [sort, setSort]           = useState<SortKey>('deadline');
   const [sortOpen, setSortOpen]   = useState(false);
@@ -846,7 +860,7 @@ export default function TasksScreen() {
   const filtered  = useMemo(() => {
     let base = active;
     if (filter === 'urgent')  base = base.filter(t => t.priority === 'high');
-    else if (filter === 'today')   base = base.filter(t => t.deadline?.startsWith(today));
+    else if (filter === 'today')   base = base.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today);
     else if (filter === 'snoozed') base = base.filter(t => t.status === 'snoozed');
     else if (filter === 'quick')   base = base.filter(isQuick);
     if (tagFilter) base = base.filter(t => (t.tags ?? []).includes(tagFilter));
@@ -888,6 +902,11 @@ export default function TasksScreen() {
     remove(id);
     toast.info('Usunięto');
   }, [remove]);
+
+  const handlePomodoro = useCallback((task: Task) => {
+    startPomodoro(task.id, task.title);
+    router.push('/pomodoro' as any);
+  }, [startPomodoro]);
 
   const pending  = active.filter(t => t.status === 'pending' && !t.snoozedUntil).length;
   const overdue  = active.filter(t => (t.deadline?.split('T')[0] ?? '') < today).length;
@@ -998,6 +1017,7 @@ export default function TasksScreen() {
                  filter === 'all'     ? 'Naciśnij + żeby dodać pierwsze' :
                  filter === 'urgent'  ? 'Brak zadań o wysokim priorytecie' :
                  filter === 'today'   ? 'Brak zadań na dziś' :
+                 filter === 'quick'   ? 'Brak szybkich zadań' :
                                         'Brak odłożonych zadań'}
               </Text>
             </View>
@@ -1023,6 +1043,7 @@ export default function TasksScreen() {
         onAddSubtask={addSubtask}
         onToggleSubtask={toggleSubtask}
         onSnooze={snooze}
+        onPomodoro={handlePomodoro}
       />
       <SortSheet
         sort={sort}
