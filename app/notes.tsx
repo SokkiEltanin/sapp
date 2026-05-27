@@ -23,6 +23,7 @@ import {
 } from '@/utils/richText';
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
+import { haptic } from '@/utils/haptics';
 
 const V = {
   card:       '#1A1226',
@@ -669,6 +670,7 @@ export default function NotesScreen() {
 
   const handleSave = async (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => {
     setEditorOpen(false);
+    haptic.success();
     const body = blocksToPlainText(blocks);
     const hasFormatting = blocks.some(b => b.bold || b.italic || b.underline || b.color || b.size);
     const bodyRich = hasFormatting ? serializeBlocks(blocks) : undefined;
@@ -684,6 +686,7 @@ export default function NotesScreen() {
   };
 
   const handlePin = async (note: Note) => {
+    haptic.tap();
     await updateNote(note.id, { pinned: !note.pinned });
     loadAll();
   };
@@ -697,6 +700,7 @@ export default function NotesScreen() {
         {
           text: 'Dodaj zadanie',
           onPress: async () => {
+            haptic.success();
             const title = note.title.trim() || note.body.split('\n')[0].trim().slice(0, 80) || 'Zadanie z notatki';
             await createTask({ title, status: 'pending', priority: 'normal', tags: note.tags }).catch(() => {});
             toast.success('Zadanie dodane');
@@ -712,6 +716,7 @@ export default function NotesScreen() {
       {
         text: 'Usuń', style: 'destructive',
         onPress: async () => {
+          haptic.medium();
           await deleteNote(note.id);
           toast.info('Usunięto');
           loadAll();
@@ -723,6 +728,7 @@ export default function NotesScreen() {
   const handleCreateFolder = async () => {
     const name = newFolderName.trim();
     if (!name) { setNewFolderMode(false); return; }
+    haptic.tap();
     await createFolder(name);
     setNewFolderName('');
     setNewFolderMode(false);
@@ -742,6 +748,7 @@ export default function NotesScreen() {
         {
           text: 'Usuń', style: 'destructive',
           onPress: async () => {
+            haptic.medium();
             await deleteFolder(name);
             if (activeFolder === name) setActiveFolder(null);
             loadAll();
