@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
   ChevronRight, Trash2, X,
-  Square, CheckSquare2, Clock, ArrowRight, Timer,
+  Square, CheckSquare2, Clock, ArrowRight, Timer, RefreshCw,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
@@ -237,6 +237,11 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
               <Text style={[s.pomoPillText, isDone && { color: colors.text.muted }]}>
                 {task.estimatedPomodoros}
               </Text>
+            </View>
+          )}
+          {task.recurring && task.recurring !== 'none' && (
+            <View style={s.recurPill}>
+              <RefreshCw size={8} color={colors.text.muted} strokeWidth={2.5} />
             </View>
           )}
         </View>
@@ -1091,6 +1096,11 @@ const s = StyleSheet.create({
     borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2,
   },
   pomoPillText: { fontSize: 9, fontWeight: '700', color: '#4DD9F5' },
+  recurPill: {
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center',
