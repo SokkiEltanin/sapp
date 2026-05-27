@@ -143,7 +143,7 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
         <HistoryDots days={last7} color={habit.color} />
       </View>
 
-      <TouchableOpacity onPress={onDelete} style={hr.deleteBtn} hitSlop={8}>
+      <TouchableOpacity onPress={() => { haptic.tap(); onDelete(); }} style={hr.deleteBtn} hitSlop={8}>
         <Trash2 size={13} color="rgba(255,255,255,0.15)" />
       </TouchableOpacity>
 
@@ -529,7 +529,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
         {/* Reminder */}
         <Text style={am.sectionLabel}>Przypomnienie</Text>
         <View style={am.reminderWrap}>
-          <TouchableOpacity style={am.reminderToggleRow} onPress={() => setReminderOn((v) => !v)} activeOpacity={0.8}>
+          <TouchableOpacity style={am.reminderToggleRow} onPress={() => { haptic.tap(); setReminderOn((v) => !v); }} activeOpacity={0.8}>
             <Bell size={14} color={reminderOn ? colors.accent.purple : colors.text.muted} />
             <Text style={[am.reminderLabel, reminderOn && { color: colors.text.primary }]}>Codzienne przypomnienie</Text>
             <View style={[am.toggleTrack, reminderOn && am.toggleTrackOn]}>
@@ -539,15 +539,15 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
           {reminderOn && (
             <View style={am.timePickerRow}>
               <View style={am.timeUnit}>
-                <TouchableOpacity onPress={() => setRemH((h) => (h + 23) % 24)} style={am.timeArrow}><ChevronUp size={16} color={colors.text.secondary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.tap(); setRemH((h) => (h + 23) % 24); }} style={am.timeArrow}><ChevronUp size={16} color={colors.text.secondary} /></TouchableOpacity>
                 <Text style={am.timeDigit}>{pad2(reminderHour)}</Text>
-                <TouchableOpacity onPress={() => setRemH((h) => (h + 1) % 24)} style={am.timeArrow}><ChevronDown size={16} color={colors.text.secondary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.tap(); setRemH((h) => (h + 1) % 24); }} style={am.timeArrow}><ChevronDown size={16} color={colors.text.secondary} /></TouchableOpacity>
               </View>
               <Text style={am.timeSep}>:</Text>
               <View style={am.timeUnit}>
-                <TouchableOpacity onPress={() => setRemM((m) => (m + 55) % 60)} style={am.timeArrow}><ChevronUp size={16} color={colors.text.secondary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.tap(); setRemM((m) => (m + 55) % 60); }} style={am.timeArrow}><ChevronUp size={16} color={colors.text.secondary} /></TouchableOpacity>
                 <Text style={am.timeDigit}>{pad2(reminderMin)}</Text>
-                <TouchableOpacity onPress={() => setRemM((m) => (m + 5) % 60)} style={am.timeArrow}><ChevronDown size={16} color={colors.text.secondary} /></TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.tap(); setRemM((m) => (m + 5) % 60); }} style={am.timeArrow}><ChevronDown size={16} color={colors.text.secondary} /></TouchableOpacity>
               </View>
             </View>
           )}
