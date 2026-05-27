@@ -46,6 +46,11 @@ function fmtDate(iso?: string) {
   if (!iso) return '';
   return iso.split('T')[0];
 }
+function addDays(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 // ─── Difficulty bar ───────────────────────────────────────────────────────────
 
@@ -464,14 +469,35 @@ export default function TaskDetailScreen() {
 
             <Row icon={<Calendar size={12} color={colors.text.muted} />} label="Termin">
               {editing ? (
-                <TextInput
-                  value={deadline}
-                  onChangeText={setDeadline}
-                  placeholder={todayStr()}
-                  placeholderTextColor={colors.text.muted}
-                  style={styles.fieldInput}
-                  keyboardType="numbers-and-punctuation"
-                />
+                <View style={{ gap: spacing[2] }}>
+                  <TextInput
+                    value={deadline}
+                    onChangeText={setDeadline}
+                    placeholder={todayStr()}
+                    placeholderTextColor={colors.text.muted}
+                    style={styles.fieldInput}
+                    keyboardType="numbers-and-punctuation"
+                  />
+                  <View style={styles.quickDateRow}>
+                    {([
+                      { label: 'Dzisiaj', value: addDays(0) },
+                      { label: 'Jutro',   value: addDays(1) },
+                      { label: '+7 dni',  value: addDays(7) },
+                      { label: 'Wyczyść', value: '' },
+                    ] as { label: string; value: string }[]).map(btn => (
+                      <TouchableOpacity
+                        key={btn.label}
+                        style={[styles.quickDateBtn, deadline === btn.value && styles.quickDateBtnActive]}
+                        onPress={() => setDeadline(btn.value)}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={[styles.quickDateText, deadline === btn.value && styles.quickDateTextActive]}>
+                          {btn.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
               ) : (
                 <Text style={styles.fieldValue}>
                   {task.deadline ? task.deadline.split('T')[0] : 'Brak terminu'}
@@ -766,6 +792,16 @@ const styles = StyleSheet.create({
   recurPillActive: { borderColor: G.accent, backgroundColor: G.accentDim },
   recurText: { fontSize: 12, fontWeight: '500', color: colors.text.muted },
   recurTextActive: { color: G.accent, fontWeight: '700' },
+
+  quickDateRow: { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' },
+  quickDateBtn: {
+    paddingHorizontal: spacing[3], paddingVertical: 5,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  quickDateBtnActive: { borderColor: G.accent, backgroundColor: G.accentDim },
+  quickDateText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  quickDateTextActive: { color: G.accent },
 
   reminderBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],

@@ -16,6 +16,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { HABIT_COLORS, HABIT_ICONS, Habit, HabitType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
+import { haptic } from '@/utils/haptics';
 
 // ─── Icon renderer ────────────────────────────────────────────────────────────
 
@@ -651,6 +652,16 @@ export default function HabitsScreen() {
   const doneCount = todayDone.length;
   const allDone   = habits.length > 0 && doneCount === habits.length;
 
+  // Done habits sink to bottom so remaining ones are always at top
+  const sortedHabits = useMemo(
+    () => [...habits].sort((a, b) => {
+      const aDone = todayDone.includes(a.id) ? 1 : 0;
+      const bDone = todayDone.includes(b.id) ? 1 : 0;
+      return aDone - bDone;
+    }),
+    [habits, todayDone],
+  );
+
   const handleDelete = (habit: Habit) => {
     Alert.alert('Usuń nawyk', `Usunąć "${habit.title}"?`, [
       { text: 'Anuluj', style: 'cancel' },
@@ -725,21 +736,32 @@ export default function HabitsScreen() {
           </View>
         ) : (
           <>
-            {habits.map((habit) => (
-              <HabitRow
-                key={habit.id}
-                habit={habit}
-                done={todayDone.includes(habit.id)}
-                count={getTodayCount(habit.id)}
-                streak={getStreak(habit.id)}
-                last7={getLast7(habit.id)}
-                onToggle={() => toggle(habit.id)}
-                onIncrement={() => increment(habit.id)}
-                onDecrement={() => decrement(habit.id)}
-                onDelete={() => handleDelete(habit)}
-                onEdit={() => setEditing(habit)}
-              />
-            ))}
+            {sortedHabits.map((habit) => {
+              const isDone = todayDone.includes(habit.id);
+              const count  = getTodayCount(habit.id);
+              const goal   = habit.type === 'count' ? (habit.dailyGoal ?? 1) : 1;
+              return (
+                <HabitRow
+                  key={habit.id}
+                  habit={habit}
+                  done={isDone}
+                  count={count}
+                  streak={getStreak(habit.id)}
+                  last7={getLast7(habit.id)}
+                  onToggle={() => {
+                    haptic[isDone ? 'tap' : 'success']();
+                    toggle(habit.id);
+                  }}
+                  onIncrement={() => {
+                    haptic[count + 1 >= goal ? 'success' : 'tap']();
+                    increment(habit.id);
+                  }}
+                  onDecrement={() => { haptic.tap(); decrement(habit.id); }}
+                  onDelete={() => handleDelete(habit)}
+                  onEdit={() => setEditing(habit)}
+                />
+              );
+            })}
             {showMonth && <MonthGrid habits={habits} getLast30={getLast30} />}
           </>
         )}
