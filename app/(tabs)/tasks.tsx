@@ -77,7 +77,7 @@ function taskSubtitle(task: Task, pomodoroTaskId?: string): string {
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 
 type SortKey   = 'deadline' | 'priority' | 'created' | 'alpha';
-type FilterKey = 'all' | 'urgent' | 'today' | 'snoozed';
+type FilterKey = 'all' | 'urgent' | 'today' | 'snoozed' | 'quick';
 
 const SORT_OPTIONS: { key: SortKey; label: string; sub: string }[] = [
   { key: 'deadline',  label: 'Termin',     sub: 'Najpilniejsze pierwsze' },
@@ -693,6 +693,7 @@ const FILTER_PILLS: { key: FilterKey; label: string }[] = [
   { key: 'all',     label: 'Wszystkie' },
   { key: 'urgent',  label: 'Pilne'     },
   { key: 'today',   label: 'Dziś'      },
+  { key: 'quick',   label: 'Szybkie'   },
   { key: 'snoozed', label: 'Odłożone'  },
 ];
 
@@ -833,11 +834,16 @@ export default function TasksScreen() {
     return Object.entries(freq).sort(([,a],[,b]) => b - a).slice(0, 8).map(([tag]) => tag);
   }, [active]);
 
+  const isQuick = (t: Task) =>
+    (t.estimatedPomodoros != null && t.estimatedPomodoros <= 1) ||
+    (t.difficulty != null && t.difficulty <= 2);
+
   const filtered  = useMemo(() => {
     let base = active;
     if (filter === 'urgent')  base = base.filter(t => t.priority === 'high');
     else if (filter === 'today')   base = base.filter(t => t.deadline?.startsWith(today));
     else if (filter === 'snoozed') base = base.filter(t => t.status === 'snoozed');
+    else if (filter === 'quick')   base = base.filter(isQuick);
     if (tagFilter) base = base.filter(t => (t.tags ?? []).includes(tagFilter));
     return base;
   }, [active, filter, tagFilter, today]);
@@ -847,6 +853,7 @@ export default function TasksScreen() {
     urgent:  active.filter(t => t.priority === 'high').length,
     today:   active.filter(t => t.deadline?.startsWith(today)).length,
     snoozed: active.filter(t => t.status === 'snoozed').length,
+    quick:   active.filter(isQuick).length,
   }), [active, today]);
 
   const sorted    = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
