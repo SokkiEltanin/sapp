@@ -244,6 +244,14 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
               <RefreshCw size={8} color={colors.text.muted} strokeWidth={2.5} />
             </View>
           )}
+          {(task.tags ?? []).slice(0, 2).map(tag => (
+            <View key={tag} style={s.tagPill}>
+              <Text style={s.tagPillText}>#{tag}</Text>
+            </View>
+          ))}
+          {(task.tags ?? []).length > 2 && (
+            <Text style={s.tagMore}>+{(task.tags ?? []).length - 2}</Text>
+          )}
         </View>
       </View>
 
@@ -1122,6 +1130,13 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
+  tagPill: {
+    backgroundColor: 'rgba(108,158,255,0.10)',
+    borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1,
+    borderWidth: 1, borderColor: 'rgba(108,158,255,0.20)',
+  },
+  tagPillText: { fontSize: 8, fontWeight: '600', color: colors.accent.blue + 'CC' },
+  tagMore: { fontSize: 8, fontWeight: '600', color: colors.text.muted },
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center',
