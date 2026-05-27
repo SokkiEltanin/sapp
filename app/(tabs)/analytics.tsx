@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, Flame, Smile, Timer, TrendingUp, TrendingDown, Target,
   Droplets, Dumbbell, BookOpen, Moon, Zap, Heart, Sun, Bike,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react-native';
 
 import { useCalendarStore } from '@/store/calendarStore';
@@ -46,11 +47,11 @@ function pad(n: number) { return String(n).padStart(2, '0'); }
 function dateStr(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-function last7Dates(): string[] {
+function last7Dates(weekOffset = 0): string[] {
   const today = new Date();
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
-    d.setDate(today.getDate() - (6 - i));
+    d.setDate(today.getDate() - (6 - i) + weekOffset * 7);
     return dateStr(d);
   });
 }
@@ -128,9 +129,11 @@ export default function AnalyticsScreen() {
   const { habits, getLast7, getLast30, getStreak, todayDone } = useHabits();
   const { entries: moodEntries }                   = useMoodStore();
   const [pomSessions, setPomSessions] = useState<Record<string, PomodoroSession[]>>({});
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  const dates    = useMemo(() => last7Dates(), []);
-  const todayIdx = todayDow();
+  const dates    = useMemo(() => last7Dates(weekOffset), [weekOffset]);
+  const isCurrentWeek = weekOffset === 0;
+  const todayIdx = isCurrentWeek ? todayDow() : 6;
 
   useFocusEffect(useCallback(() => {
     getSessionsForDates(dates).then(setPomSessions).catch(() => {});
@@ -180,12 +183,10 @@ export default function AnalyticsScreen() {
     ? moodThisWeek.reduce((a: number, b) => a + b, 0) / moodThisWeek.length
     : 0;
 
-  const prevWeekMoods = moodEntries.filter(e => {
-    const d = new Date(e.date + 'T00:00:00');
-    const start = new Date(); start.setDate(start.getDate() - 14);
-    const end   = new Date(); end.setDate(end.getDate() - 7);
-    return d >= start && d < end;
-  });
+  const prevWeekMoods = useMemo(() => {
+    const prevDates = new Set(last7Dates(weekOffset - 1));
+    return moodEntries.filter(e => prevDates.has(e.date));
+  }, [moodEntries, weekOffset]);
   const prevAvgMood = prevWeekMoods.length
     ? prevWeekMoods.reduce((a, e) => a + e.mood, 0) / prevWeekMoods.length
     : 0;
@@ -222,7 +223,19 @@ export default function AnalyticsScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Analityka</Text>
-            <Text style={styles.weekLabel}>{weekStart} – {weekEnd}</Text>
+            <View style={styles.weekNav}>
+              <TouchableOpacity onPress={() => setWeekOffset(o => o - 1)} style={styles.navArrow}>
+                <ChevronLeft size={15} color={colors.text.muted} />
+              </TouchableOpacity>
+              <Text style={styles.weekLabel}>{weekStart} – {weekEnd}</Text>
+              <TouchableOpacity
+                onPress={() => setWeekOffset(o => Math.min(o + 1, 0))}
+                disabled={isCurrentWeek}
+                style={styles.navArrow}
+              >
+                <ChevronRight size={15} color={isCurrentWeek ? colors.text.muted + '30' : colors.text.muted} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* 2×2 stat grid */}
@@ -438,10 +451,12 @@ const styles = StyleSheet.create({
 
   header: {
     paddingTop: spacing[2], paddingBottom: spacing[1],
-    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   title:     { fontSize: 28, fontWeight: '900', color: colors.text.primary, letterSpacing: -0.5 },
+  weekNav:   { flexDirection: 'row', alignItems: 'center', gap: 2 },
   weekLabel: { fontSize: 11, color: O.muted, fontWeight: '700' },
+  navArrow:  { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
 
   statRow: { flexDirection: 'row', gap: spacing[3] },
 
