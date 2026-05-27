@@ -311,6 +311,17 @@ const FREQ_OPTIONS: { label: string; value: number }[] = [
   { label: '2×/tydzień', value: 2 },
 ];
 
+const HABIT_PRESETS: Array<{
+  title: string; type: HabitType; icon: string; color: string;
+  dailyGoal?: number; unit?: string; reminderHour?: number; reminderMin?: number;
+}> = [
+  { title: 'Woda',       type: 'count', icon: 'droplets',  color: '#60A5FA', dailyGoal: 8, unit: 'szkl.' },
+  { title: 'Ruch',       type: 'check', icon: 'dumbbell',  color: '#34D399' },
+  { title: 'Czytanie',   type: 'check', icon: 'book-open', color: '#FBBF24' },
+  { title: 'Sen',        type: 'check', icon: 'moon',      color: '#C084FC', reminderHour: 22, reminderMin: 0 },
+  { title: 'Medytacja',  type: 'check', icon: 'heart',     color: '#F472B6' },
+];
+
 interface HabitFormData {
   title: string; color: string; icon: string; reminderTime?: string;
   type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number;
@@ -334,6 +345,23 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   const [reminderHour, setRemH]       = useState(20);
   const [reminderMin, setRemM]        = useState(0);
   const [weeklyTarget, setWeeklyTarget] = useState(7);
+
+  const applyPreset = (p: typeof HABIT_PRESETS[number]) => {
+    setTitle(p.title);
+    setType(p.type);
+    setSelIcon(p.icon);
+    setSelColor(p.color);
+    if (p.type === 'count') {
+      setGoal(String(p.dailyGoal ?? 8));
+      setUnit(p.unit ?? 'szkl.');
+      setUnitCustom(false);
+    }
+    if (p.reminderHour != null) {
+      setRemH(p.reminderHour);
+      setRemM(p.reminderMin ?? 0);
+      setReminderOn(true);
+    }
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -375,6 +403,23 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
       <ScrollView style={am.sheetScroll} contentContainerStyle={am.sheet} keyboardShouldPersistTaps="handled">
         <View style={am.handle} />
         <Text style={am.heading}>{editing ? 'Edytuj nawyk' : 'Nowy nawyk'}</Text>
+
+        {/* Presets — only when creating */}
+        {!editing && (
+          <View style={am.presetsSection}>
+            <Text style={am.sectionLabel}>Szybki start</Text>
+            <View style={am.presetsRow}>
+              {HABIT_PRESETS.map(p => (
+                <PressableScale key={p.title} onPress={() => applyPreset(p)} style={[am.presetChip, { borderColor: p.color + '60' }]}>
+                  <View style={[am.presetIconWrap, { backgroundColor: p.color + '22' }]}>
+                    <HabitIcon name={p.icon} size={13} color={p.color} />
+                  </View>
+                  <Text style={[am.presetLabel, { color: p.color }]}>{p.title}</Text>
+                </PressableScale>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Name */}
         <TextInput
@@ -527,6 +572,17 @@ const am = StyleSheet.create({
     backgroundColor: colors.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
     paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontSize: 15, color: colors.text.primary,
   },
+
+  presetsSection: { gap: spacing[2] },
+  presetsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  presetChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  presetIconWrap: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  presetLabel: { fontSize: 12, fontWeight: '700' },
 
   freqRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   freqChip: {
