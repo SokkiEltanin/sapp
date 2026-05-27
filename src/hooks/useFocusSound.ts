@@ -3,7 +3,7 @@ import { Audio, AVPlaybackStatus } from 'expo-av';
 
 // Publicly available loopable ambient sounds (public domain / Creative Commons)
 // Replace with local assets (assets/sounds/*.mp3) for offline support
-const SOUND_URLS: Record<FocusSound, string> = {
+const SOUND_URLS: Record<Exclude<FocusSound, 'off'>, string> = {
   rain:  'https://cdn.freesound.org/previews/346/346642_5858296-lq.mp3',
   noise: 'https://cdn.freesound.org/previews/361/361300_6681381-lq.mp3',
   cafe:  'https://cdn.freesound.org/previews/462/462550_7349983-lq.mp3',
@@ -53,7 +53,7 @@ export function useFocusSound(isRunning: boolean) {
       try {
         await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
         const { sound } = await Audio.Sound.createAsync(
-          { uri: SOUND_URLS[selected] },
+          { uri: SOUND_URLS[selected as Exclude<FocusSound, 'off'>] },
           { shouldPlay: true, isLooping: true, volume: 0.35 },
         );
         if (!cancelled) {
