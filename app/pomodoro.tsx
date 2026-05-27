@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Vibration, ScrollView, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { X, Play, Pause, SkipForward, RotateCcw, Timer, Volume2, VolumeX, CheckSquare, Square, Plus, Check, CheckCircle2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -11,6 +11,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { usePomodoroStore, PomodoroMode } from '@/store/pomodoroStore';
 import { tasksService } from '@/services/calendarService';
 import { useCalendarStore } from '@/store/calendarStore';
+import { getTodaySessions, PomodoroSession } from '@/utils/pomodoroHistory';
 import { useFocusSound, FocusSound, FOCUS_SOUND_LABELS } from '@/hooks/useFocusSound';
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -108,6 +109,13 @@ export default function PomodoroScreen() {
 
   const [newMilestone, setNewMilestone] = useState('');
   const [taskDismissed, setTaskDismissed] = useState(false);
+  const [todaySessions, setTodaySessions] = useState<PomodoroSession[]>([]);
+
+  const loadTodaySessions = useCallback(() => {
+    getTodaySessions().then(setTodaySessions).catch(() => {});
+  }, []);
+
+  useFocusEffect(useCallback(() => { loadTodaySessions(); }, [loadTodaySessions]));
 
   const prevTaskId = useRef(taskId);
   useEffect(() => {
@@ -134,10 +142,13 @@ export default function PomodoroScreen() {
 
   const prevRounds = useRef(completedRounds);
   useEffect(() => {
-    if (completedRounds > prevRounds.current && taskId) {
-      tasksService.updateTask(taskId, { completedPomodoros: completedRounds })
-        .then(() => updateTaskStore(taskId, { completedPomodoros: completedRounds }))
-        .catch(() => {});
+    if (completedRounds > prevRounds.current) {
+      if (taskId) {
+        tasksService.updateTask(taskId, { completedPomodoros: completedRounds })
+          .then(() => updateTaskStore(taskId, { completedPomodoros: completedRounds }))
+          .catch(() => {});
+      }
+      loadTodaySessions();
     }
     prevRounds.current = completedRounds;
   }, [completedRounds]);
@@ -339,6 +350,25 @@ export default function PomodoroScreen() {
             })}
           </View>
         </GlassCard>
+        {/* Today's sessions history */}
+        {todaySessions.length > 0 && (
+          <GlassCard padding={spacing[4]} style={styles.historyCard}>
+            <Text style={styles.settingsLabel}>
+              {'Sesje dzisiaj — ' + todaySessions.reduce((s, r) => s + r.durationMins, 0) + 'm'}
+            </Text>
+            {todaySessions.map((session, i) => (
+              <View key={session.id} style={styles.historyRow}>
+                <View style={styles.historyIndex}>
+                  <Text style={styles.historyIndexText}>{i + 1}</Text>
+                </View>
+                <Text style={styles.historyTask} numberOfLines={1}>
+                  {session.taskTitle ?? 'Wolna sesja'}
+                </Text>
+                <Text style={styles.historyDur}>{session.durationMins}m</Text>
+              </View>
+            ))}
+          </GlassCard>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -438,6 +468,21 @@ const styles = StyleSheet.create({
   soundBtnActive: { backgroundColor: C.dim, borderColor: C.border },
   soundBtnText: { fontSize: 11, fontWeight: '500', color: colors.text.muted },
   soundBtnTextActive: { color: C.accent, fontWeight: '700' },
+
+  historyCard: { width: '100%' },
+  historyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: spacing[2],
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  historyIndex: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: C.dim, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  historyIndexText: { fontSize: 9, fontWeight: '800', color: C.accent },
+  historyTask: { flex: 1, fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
+  historyDur: { fontSize: 11, fontWeight: '700', color: C.muted },
 
   taskDoneCard: {
     width: '100%',
