@@ -5,11 +5,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Search, X, CheckSquare, CalendarDays, Receipt, CheckCircle2, FileText, Clock } from 'lucide-react-native';
+import { Search, X, CheckSquare, CalendarDays, Receipt, CheckCircle2, FileText, Clock, Flame } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useHabits } from '@/hooks/useHabits';
 import { getCategoryMeta } from '@/utils/categories';
 import { Note, getAllNotes } from '@/utils/notesStorage';
 import { blocksToPlainText, deserializeBlocks } from '@/utils/richText';
@@ -50,6 +51,7 @@ export default function SearchScreen() {
 
   const { tasks, events, setTasks, setEvents } = useCalendarStore();
   const { expenses, setExpenses } = useExpensesStore();
+  const { habits } = useHabits();
 
   // Load data into stores if not already loaded
   useEffect(() => {
@@ -112,6 +114,14 @@ export default function SearchScreen() {
       .slice(0, 6);
   }, [expenses, q]);
 
+  const matchedHabits = useMemo(() => {
+    if (!q) return [];
+    const lower = q.toLowerCase();
+    return habits
+      .filter(h => h.title.toLowerCase().includes(lower))
+      .slice(0, 5);
+  }, [habits, q]);
+
   const matchedNotes = useMemo(() => {
     if (!q) return [];
     const lower = q.toLowerCase();
@@ -137,8 +147,8 @@ export default function SearchScreen() {
     tasks.filter(t => t.status === 'pending').slice(0, 4),
   [tasks]);
 
-  const hasResults = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length > 0;
-  const total = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length;
+  const hasResults = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length + matchedHabits.length > 0;
+  const total = matchedTasks.length + matchedEvents.length + matchedExpenses.length + matchedNotes.length + matchedHabits.length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -383,6 +393,35 @@ export default function SearchScreen() {
                     <Highlighted text={note.title || note.body.slice(0, 40) || 'Notatka'} query={q} />
                     {note.title && note.body.length > 0 && (
                       <Text style={styles.rowMeta} numberOfLines={1}>{note.body.slice(0, 60)}</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Habits */}
+          {matchedHabits.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionRow}>
+                <Flame size={12} color={colors.accent.amber} />
+                <Text style={[styles.sectionTitle, { color: colors.accent.amber }]}>Nawyki</Text>
+                <Text style={styles.sectionCount}>{matchedHabits.length}</Text>
+              </View>
+              {matchedHabits.map(habit => (
+                <TouchableOpacity
+                  key={habit.id}
+                  style={styles.row}
+                  onPress={() => router.push('/habits' as any)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.rowIcon, { backgroundColor: habit.color + '22' }]}>
+                    <Flame size={14} color={habit.color} />
+                  </View>
+                  <View style={styles.rowInfo}>
+                    <Highlighted text={habit.title} query={q} />
+                    {habit.weeklyTarget != null && habit.weeklyTarget < 7 && (
+                      <Text style={styles.rowMeta}>{habit.weeklyTarget}× tygodniowo</Text>
                     )}
                   </View>
                 </TouchableOpacity>

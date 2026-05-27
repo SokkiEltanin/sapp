@@ -579,8 +579,9 @@ export default function WeeklyScreen() {
             <View style={styles.habitsGrid}>
               {habits.map((h, i) => {
                 const { days } = habitWeekData[i] ?? { days: 0 };
-                const pct = days / 7;
-                const col = pct >= 0.85 ? colors.accent.green : pct >= 0.5 ? colors.accent.amber : colors.text.muted;
+                const target = h.weeklyTarget ?? 7;
+                const pct = Math.min(1, days / target);
+                const col = days >= target ? colors.accent.green : pct >= 0.5 ? colors.accent.amber : colors.text.muted;
                 return (
                   <View key={h.id} style={styles.habitRow}>
                     <View style={[styles.habitDot, { backgroundColor: h.color + '30', borderColor: h.color + '50' }]}>
@@ -590,7 +591,7 @@ export default function WeeklyScreen() {
                     <View style={styles.habitBarTrack}>
                       <View style={[styles.habitBarFill, { width: `${pct * 100}%`, backgroundColor: col }]} />
                     </View>
-                    <Text style={[styles.habitPct, { color: col }]}>{days}/7</Text>
+                    <Text style={[styles.habitPct, { color: col }]}>{days}/{target}</Text>
                   </View>
                 );
               })}
