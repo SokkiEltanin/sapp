@@ -323,6 +323,7 @@ export default function DashboardScreen() {
 
   const handlePaymentYes = useCallback(async () => {
     if (!currentPayment) return;
+    haptic.success();
     setPaymentConfirming(true);
     try {
       const todayS = new Date().toISOString().split('T')[0];
@@ -336,7 +337,7 @@ export default function DashboardScreen() {
     finally { setPaymentConfirming(false); setPaymentQueue(q => q.slice(1)); }
   }, [currentPayment, updateSub]);
 
-  const handlePaymentNo = useCallback(() => setPaymentQueue(q => q.slice(1)), []);
+  const handlePaymentNo = useCallback(() => { haptic.tap(); setPaymentQueue(q => q.slice(1)); }, []);
 
   // ── Work tracking ─────────────────────────────────────────────────────────
   const allEvents  = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
