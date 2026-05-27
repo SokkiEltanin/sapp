@@ -15,6 +15,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
 import { EventPriority } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const EVENT_COLORS = [
   '#60A5FA', '#34D399', '#F87171', '#FBBF24', '#C084FC', '#F472B6', '#FFFFFF',
@@ -118,6 +119,7 @@ export default function EventDetailScreen() {
         }
       }
 
+      haptic.success();
       setEditing(false);
       toast.success(isGCal ? 'Zapisano w Google Calendar' : 'Zapisano');
     } catch (e: any) {
@@ -132,6 +134,7 @@ export default function EventDetailScreen() {
       { text: 'Anuluj', style: 'cancel' },
       {
         text: 'Usuń', style: 'destructive', onPress: async () => {
+          haptic.medium();
           deleteEvent(id!);
           if (isGCal) {
             await googleCalendarService.deleteEvent(id!).catch(() => {});
@@ -155,7 +158,7 @@ export default function EventDetailScreen() {
 
         {/* Header */}
         <View style={s.header}>
-          <PressableScale onPress={() => router.back()} style={s.iconBtn}>
+          <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.iconBtn}>
             <ArrowLeft size={20} color={colors.text.secondary} />
           </PressableScale>
           <View style={[s.colorPill, {
@@ -173,7 +176,7 @@ export default function EventDetailScreen() {
                 <Save size={18} color={colors.bg.primary} />
               </PressableScale>
             ) : (
-              <PressableScale onPress={() => setEditing(true)} style={s.iconBtn}>
+              <PressableScale onPress={() => { haptic.tap(); setEditing(true); }} style={s.iconBtn}>
                 <Edit3 size={18} color={colors.text.secondary} />
               </PressableScale>
             )}
@@ -274,7 +277,7 @@ export default function EventDetailScreen() {
                   return (
                     <PressableScale
                       key={p.value}
-                      onPress={() => editing && setPriority(p.value)}
+                      onPress={() => { if (editing) { haptic.tap(); setPriority(p.value); } }}
                       style={[s.pill, active && { borderColor: p.color, backgroundColor: p.color + '18' }]}
                     >
                       <Text style={[s.pillText, active && { color: p.color }]}>{p.label}</Text>
@@ -288,7 +291,7 @@ export default function EventDetailScreen() {
               <Row icon={<Circle size={12} color={colors.text.muted} />} label="Kolor">
                 <View style={s.colorRow}>
                   {EVENT_COLORS.map(c => (
-                    <PressableScale key={c} onPress={() => setColor(c)}>
+                    <PressableScale key={c} onPress={() => { haptic.tap(); setColor(c); }}>
                       <View style={[
                         s.colorDot,
                         { backgroundColor: c },

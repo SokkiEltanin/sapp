@@ -16,6 +16,7 @@ import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { ExpenseTemplate, ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, any][];
 const INCOME_CATS  = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, any][];
@@ -83,6 +84,7 @@ export default function TemplatesScreen() {
       {
         text: 'Usuń', style: 'destructive',
         onPress: async () => {
+          haptic.medium();
           await templatesService.remove(id).catch(() => {});
           setTemplates(prev => prev.filter(t => t.id !== id));
           toast.success('Szablon usunięty');
@@ -92,6 +94,7 @@ export default function TemplatesScreen() {
   };
 
   const useTemplate = (tmpl: ExpenseTemplate) => {
+    haptic.tap();
     router.back();
     setTimeout(() => {
       router.push({
@@ -113,7 +116,7 @@ export default function TemplatesScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <Text style={s.title}>Szablony wydatków</Text>

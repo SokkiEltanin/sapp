@@ -11,6 +11,7 @@ import {
   ChevronUp, ChevronDown, Palette,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
+import { haptic } from '@/utils/haptics';
 import { workService } from '@/services/workService';
 import { useWorkStore } from '@/store/workStore';
 import { toast } from '@/store/toastStore';
@@ -37,6 +38,7 @@ function TimePicker({
 }: { label: string; value: string; onChange: (v: string) => void }) {
   const [h, m] = value.split(':').map(Number);
   const inc = (delta: number, part: 'h' | 'm') => {
+    haptic.tap();
     if (part === 'h') {
       const nh = (h + delta + 24) % 24;
       onChange(`${pad(nh)}:${pad(m)}`);
@@ -87,6 +89,7 @@ const tp = StyleSheet.create({
 
 function DatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const shift = (delta: number) => {
+    haptic.tap();
     const d = new Date(value);
     d.setDate(d.getDate() + delta);
     onChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
@@ -141,6 +144,7 @@ export default function AddWorkShift() {
   };
 
   const saveWorkColor = async (color: string | undefined) => {
+    haptic.tap();
     setWorkColor(color);
     await saveWorkSettings({ workColor: color, workPrefix });
   };
@@ -186,6 +190,7 @@ export default function AddWorkShift() {
         currency: settings.currency,
       });
       storeAdd(shift);
+      haptic.success();
       toast.success('Zmiana pracy dodana');
       router.back();
     } catch (e: any) {
@@ -200,7 +205,7 @@ export default function AddWorkShift() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.closeBtn} hitSlop={10}>
+          <TouchableOpacity onPress={() => { haptic.tap(); router.back(); }} style={s.closeBtn} hitSlop={10}>
             <X size={18} color={colors.text.secondary} />
           </TouchableOpacity>
           <Text style={s.title}>Zmiana pracy</Text>

@@ -15,6 +15,7 @@ import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MoodLevel, MOOD_COLORS } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useTabSwipe } from '@/hooks/useTabSwipe';
+import { haptic } from '@/utils/haptics';
 
 // ─── Habit icon map ───────────────────────────────────────────────────────────
 
@@ -237,12 +238,12 @@ export default function AnalyticsScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Analityka</Text>
             <View style={styles.weekNav}>
-              <TouchableOpacity onPress={() => setWeekOffset(o => o - 1)} style={styles.navArrow}>
+              <TouchableOpacity onPress={() => { haptic.tap(); setWeekOffset(o => o - 1); }} style={styles.navArrow}>
                 <ChevronLeft size={15} color={colors.text.muted} />
               </TouchableOpacity>
               <Text style={styles.weekLabel}>{weekStart} – {weekEnd}</Text>
               <TouchableOpacity
-                onPress={() => setWeekOffset(o => Math.min(o + 1, 0))}
+                onPress={() => { haptic.tap(); setWeekOffset(o => Math.min(o + 1, 0)); }}
                 disabled={isCurrentWeek}
                 style={styles.navArrow}
               >

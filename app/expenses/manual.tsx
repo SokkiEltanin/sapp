@@ -19,6 +19,7 @@ import { getFoodTags, categorize } from '@/utils/receiptParser';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 interface Item {
   id: string;
@@ -328,6 +329,7 @@ export default function ManualReceiptScreen() {
         }
       }
 
+      haptic.success();
       router.back();
     } catch (e: any) {
       setSaving(false);
@@ -338,7 +340,7 @@ export default function ManualReceiptScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <View style={styles.headerCenter}>

@@ -17,6 +17,7 @@ import { blocksToPlainText, deserializeBlocks } from '@/utils/richText';
 import { expensesService } from '@/services/expensesService';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 function highlight(text: string, query: string): { part: string; match: boolean }[] {
   if (!query) return [{ part: text, match: false }];
@@ -169,12 +170,12 @@ export default function SearchScreen() {
             />
             {loading && <ActivityIndicator size="small" color={colors.text.muted} style={{ marginLeft: 4 }} />}
             {q.length > 0 && !loading && (
-              <PressableScale onPress={() => setQuery('')} style={styles.clearBtn}>
+              <PressableScale onPress={() => { haptic.tap(); setQuery(''); }} style={styles.clearBtn}>
                 <X size={14} color={colors.text.muted} />
               </PressableScale>
             )}
           </View>
-          <TouchableOpacity onPress={() => router.back()} style={styles.cancelBtn}>
+          <TouchableOpacity onPress={() => { haptic.tap(); router.back(); }} style={styles.cancelBtn}>
             <Text style={styles.cancelText}>Anuluj</Text>
           </TouchableOpacity>
         </View>

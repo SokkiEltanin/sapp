@@ -20,6 +20,7 @@ import { moodService } from '@/services/moodService';
 import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
+import { haptic } from '@/utils/haptics';
 
 // ─── Keyword analysis from free-text notes ────────────────────────────────────
 
@@ -404,6 +405,7 @@ export default function MoodScreen() {
       { text: 'Anuluj', style: 'cancel' },
       {
         text: 'Usuń', style: 'destructive', onPress: async () => {
+          haptic.medium();
           deleteEntry(entry.id);
           await moodService.remove(entry.id).catch(() => {});
           toast.info('Usunięto');
@@ -419,7 +421,7 @@ export default function MoodScreen() {
         subtitle="Twoje samopoczucie"
         accentColor={P.accent}
         rightSlot={
-          <PressableScale onPress={() => setModalOpen(true)} style={styles.addBtn}>
+          <PressableScale onPress={() => { haptic.tap(); setModalOpen(true); }} style={styles.addBtn}>
             <Plus size={17} color={colors.bg.primary} />
           </PressableScale>
         }
@@ -432,7 +434,7 @@ export default function MoodScreen() {
       >
         {/* Today hero */}
         <View>
-          <PressableScale onPress={() => openCheckin(todayEntry)}>
+          <PressableScale onPress={() => { haptic.tap(); openCheckin(todayEntry); }}>
             <View style={styles.heroCard}>
               <View style={styles.heroRow}>
                 <View style={[styles.moodBubble, { borderColor: todayColor + '44' }]}>
@@ -528,8 +530,8 @@ export default function MoodScreen() {
               return (
                 <TouchableOpacity
                   key={entry.id}
-                  onPress={() => openCheckin(entry)}
-                  onLongPress={() => handleDeleteEntry(entry)}
+                  onPress={() => { haptic.tap(); openCheckin(entry); }}
+                  onLongPress={() => { haptic.medium(); handleDeleteEntry(entry); }}
                   activeOpacity={0.75}
                 >
                   <View style={styles.entryRow}>

@@ -22,6 +22,7 @@ import { moodService } from '@/services/moodService';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, Habit, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -321,12 +322,12 @@ export default function WeeklyScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.iconBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.iconBtn}>
           <ArrowLeft size={20} color={colors.text.secondary} />
         </PressableScale>
 
         <View style={styles.weekNav}>
-          <PressableScale onPress={() => setWeekOffset(w => w - 1)} style={styles.navBtn}>
+          <PressableScale onPress={() => { haptic.tap(); setWeekOffset(w => w - 1); }} style={styles.navBtn}>
             <ChevronLeft size={16} color={colors.text.secondary} />
           </PressableScale>
           <View style={styles.weekLabelWrap}>
@@ -337,7 +338,7 @@ export default function WeeklyScreen() {
             <Text style={styles.weekDates}>{weekLabel(dates)}</Text>
           </View>
           <PressableScale
-            onPress={() => setWeekOffset(w => w + 1)}
+            onPress={() => { haptic.tap(); setWeekOffset(w => w + 1); }}
             style={[styles.navBtn, weekOffset >= 0 && styles.navBtnDisabled]}
             disabled={weekOffset >= 0}
           >

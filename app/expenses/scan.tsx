@@ -17,6 +17,7 @@ import {
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 import * as LucideIcons from 'lucide-react-native';
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
@@ -252,6 +253,7 @@ export default function ScanReceiptModal() {
         const taggedCustom = validCustom.filter(p => p.tags.length > 0).map(p => ({ name: p.name.trim(), tags: p.tags }));
         if (taggedCustom.length > 0) saveCustomTagsToMemory(taggedCustom).catch(() => {});
       }
+      haptic.success();
       router.back();
     } catch (e: any) {
       setSaving(false);
@@ -281,7 +283,7 @@ export default function ScanReceiptModal() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <Text style={styles.title}>Wklej paragon</Text>

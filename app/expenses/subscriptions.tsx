@@ -18,6 +18,7 @@ import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ export default function SubscriptionsScreen() {
 
   const handlePaymentYes = useCallback(async () => {
     if (!currentPayment) return;
+    haptic.success();
     setPaymentConfirming(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -188,6 +190,7 @@ export default function SubscriptionsScreen() {
   }, [currentPayment, update]);
 
   const handlePaymentNo = useCallback(() => {
+    haptic.tap();
     setPaymentQueue((q) => q.slice(1));
   }, []);
 
@@ -227,7 +230,7 @@ export default function SubscriptionsScreen() {
   const confirmDelete = (s: Subscription) =>
     Alert.alert('Usuń subskrypcję', `Usunąć "${s.name}"?`, [
       { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => remove(s.id) },
+      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); remove(s.id); } },
     ]);
 
   const active   = subscriptions.filter((s) => s.active);
@@ -237,7 +240,7 @@ export default function SubscriptionsScreen() {
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.closeBtn}>
           <ChevronLeft size={20} color={colors.text.secondary} />
         </PressableScale>
         <Text style={s.title}>Subskrypcje</Text>

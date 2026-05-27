@@ -16,6 +16,7 @@ import { getCategoryMeta } from '@/utils/categories';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { detectFixedCosts } from '@/utils/fixedCosts';
 import { colors, spacing, radius, typography } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const MONTHS_BACK = 6;
 
@@ -340,22 +341,22 @@ export default function StatsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} style={styles.backBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.backBtn}>
           <ChevronLeft size={22} color={colors.text.secondary} />
         </PressableScale>
         <View style={styles.monthPicker}>
-          <PressableScale onPress={() => setMonthOffset(o => Math.min(o + 1, MONTHS_BACK - 1))} style={styles.monthArrow}>
+          <PressableScale onPress={() => { haptic.tap(); setMonthOffset(o => Math.min(o + 1, MONTHS_BACK - 1)); }} style={styles.monthArrow}>
             <ChevronLeft size={16} color={monthOffset < MONTHS_BACK - 1 ? colors.text.secondary : colors.text.muted} />
           </PressableScale>
           <View style={styles.monthLabel}>
             <Text style={styles.headerTitle}>{format(monthBase, 'LLLL', { locale: pl })}</Text>
             <Text style={styles.headerSub}>{format(monthBase, 'yyyy')}</Text>
           </View>
-          <PressableScale onPress={() => setMonthOffset(o => Math.max(o - 1, 0))} style={styles.monthArrow}>
+          <PressableScale onPress={() => { haptic.tap(); setMonthOffset(o => Math.max(o - 1, 0)); }} style={styles.monthArrow}>
             <ChevronRight size={16} color={monthOffset > 0 ? colors.text.secondary : colors.text.muted} />
           </PressableScale>
         </View>
-        <PressableScale onPress={() => router.push('/settings' as any)} style={styles.settingsBtn}>
+        <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }} style={styles.settingsBtn}>
           <Settings2 size={18} color={colors.text.muted} />
         </PressableScale>
       </View>
