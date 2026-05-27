@@ -878,7 +878,7 @@ export default function TasksScreen() {
   const filterCounts = useMemo<Record<FilterKey, number>>(() => ({
     all:     active.length,
     urgent:  active.filter(t => t.priority === 'high').length,
-    today:   active.filter(t => t.deadline?.startsWith(today)).length,
+    today:   active.filter(t => t.deadline?.startsWith(today) || t.scheduledDate === today).length,
     snoozed: active.filter(t => t.status === 'snoozed').length,
     quick:   active.filter(isQuick).length,
   }), [active, today]);
@@ -917,7 +917,7 @@ export default function TasksScreen() {
   }, [startPomodoro]);
 
   const pending  = active.filter(t => t.status === 'pending' && !t.snoozedUntil).length;
-  const overdue  = active.filter(t => (t.deadline?.split('T')[0] ?? '') < today).length;
+  const overdue  = active.filter(t => { const d = t.deadline?.split('T')[0]; return !!d && d < today; }).length;
 
   const listData: ListItem[] = useMemo(() => {
     if (sort === 'deadline') return buildGroupedList(sorted, done, today);
