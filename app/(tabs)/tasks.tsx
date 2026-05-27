@@ -290,15 +290,22 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
             {/* Header */}
             <View style={dm.header}>
               <View style={dm.headerLeft}>
-                {task.deadline && (
+                {(task.deadline || task.scheduledDate) && (
                   <Text style={dm.dateLabel}>
-                    {deadlineLabel(task.deadline)}
+                    {task.deadline ? deadlineLabel(task.deadline) : `ZAPLANOWANE ${task.scheduledDate}`}
                   </Text>
                 )}
                 <Text style={dm.titleText}>{task.title.toUpperCase()}</Text>
                 {task.description ? (
                   <Text style={dm.descText}>{task.description}</Text>
                 ) : null}
+                {(task.tags ?? []).length > 0 && (
+                  <View style={dm.tagRow}>
+                    {(task.tags ?? []).map(t => (
+                      <Text key={t} style={dm.tagChip}>#{t}</Text>
+                    ))}
+                  </View>
+                )}
               </View>
               <TouchableOpacity onPress={onClose} style={dm.closeBtn} hitSlop={8}>
                 <X size={18} color={colors.text.muted} />
@@ -425,6 +432,8 @@ const dm = StyleSheet.create({
   titleText: { fontSize: 20, fontWeight: '800', color: colors.white, letterSpacing: 0.5, lineHeight: 26 },
   descText:  { fontSize: 13, color: colors.text.secondary, lineHeight: 19, marginTop: 4 },
   closeBtn:  { padding: 4 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  tagChip: { fontSize: 10, fontWeight: '600', color: 'rgba(61,190,117,0.50)' },
   body: { paddingHorizontal: spacing[5], paddingTop: spacing[4] },
   milestoneRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
