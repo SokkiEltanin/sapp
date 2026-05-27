@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  X, CheckCircle2, ChevronRight, Timer, CheckSquare, Square,
+  X, CheckCircle2, ChevronRight, Timer, CheckSquare, Square, Plus, Check,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
+import { haptic } from '@/utils/haptics';
 import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 
@@ -36,9 +37,11 @@ function priorityColor(p: string) {
 }
 
 export default function FocusScreen() {
-  const { tasks, toggle, toggleSubtask } = useTasks();
+  const { tasks, toggle, toggleSubtask, create } = useTasks();
   const startPomodoro = usePomodoroStore(s => s.startFor);
   const [skipSet, setSkipSet] = useState<Set<string>>(new Set());
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureText, setCaptureText] = useState('');
 
   const today = todayStr();
 
@@ -80,6 +83,18 @@ export default function FocusScreen() {
     if (!task) return;
     startPomodoro(task.id, task.title);
     router.push('/pomodoro' as any);
+  };
+
+  const handleCapture = async () => {
+    const t = captureText.trim();
+    if (!t) { setCaptureOpen(false); return; }
+    try {
+      await create({ title: t, status: 'pending', priority: 'normal', tags: [] });
+      toast.success('Dodano!');
+      haptic.success();
+    } catch {}
+    setCaptureText('');
+    setCaptureOpen(false);
   };
 
   const subtasksDone   = task?.subtasks?.filter(s => s.done).length ?? 0;
@@ -158,15 +173,13 @@ export default function FocusScreen() {
           )}
 
           {/* Pomodoro CTA */}
-          {task.estimatedPomodoros != null && task.estimatedPomodoros > 0 && (
-            <PressableScale onPress={handlePomodoro} style={styles.pomCta}>
-              <Timer size={16} color={colors.accent.purple} />
-              <Text style={styles.pomCtaText}>
-                Zacznij Pomodoro · {task.estimatedPomodoros}×25 min
-              </Text>
-              <ChevronRight size={14} color={colors.accent.purple} />
-            </PressableScale>
-          )}
+          <PressableScale onPress={handlePomodoro} style={styles.pomCta}>
+            <Timer size={16} color={colors.accent.purple} />
+            <Text style={styles.pomCtaText}>
+              {'Zacznij Pomodoro' + (task.estimatedPomodoros ? ` · ${task.estimatedPomodoros}×25 min` : '')}
+            </Text>
+            <ChevronRight size={14} color={colors.accent.purple} />
+          </PressableScale>
 
           {/* Actions */}
           <View style={styles.actions}>
@@ -186,6 +199,36 @@ export default function FocusScreen() {
               <Text style={styles.nextTitle} numberOfLines={1}>{queue[1].title}</Text>
             </View>
           )}
+
+          {/* Quick capture */}
+          <View style={styles.captureWrap}>
+            {captureOpen ? (
+              <View style={styles.captureInputRow}>
+                <TextInput
+                  autoFocus
+                  style={styles.captureInput}
+                  value={captureText}
+                  onChangeText={setCaptureText}
+                  placeholder="Nowe zadanie..."
+                  placeholderTextColor={G.muted}
+                  onSubmitEditing={handleCapture}
+                  returnKeyType="done"
+                  maxLength={80}
+                />
+                <TouchableOpacity onPress={handleCapture} hitSlop={8} activeOpacity={0.7}>
+                  <Check size={16} color={captureText.trim() ? G.accent : G.muted} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
+                  <X size={14} color={G.muted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => { setCaptureOpen(true); haptic.tap(); }} style={styles.captureBtn} activeOpacity={0.7}>
+                <Plus size={11} color={G.muted} />
+                <Text style={styles.captureBtnText}>Przechwyt</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       ) : (
         <View style={styles.emptyBody}>
@@ -199,6 +242,36 @@ export default function FocusScreen() {
           <PressableScale onPress={() => router.back()} style={styles.backHome}>
             <Text style={styles.backHomeText}>Wróć</Text>
           </PressableScale>
+
+          {/* Quick capture in empty state */}
+          <View style={[styles.captureWrap, { marginTop: spacing[2] }]}>
+            {captureOpen ? (
+              <View style={styles.captureInputRow}>
+                <TextInput
+                  autoFocus
+                  style={styles.captureInput}
+                  value={captureText}
+                  onChangeText={setCaptureText}
+                  placeholder="Nowe zadanie..."
+                  placeholderTextColor={G.muted}
+                  onSubmitEditing={handleCapture}
+                  returnKeyType="done"
+                  maxLength={80}
+                />
+                <TouchableOpacity onPress={handleCapture} hitSlop={8} activeOpacity={0.7}>
+                  <Check size={16} color={captureText.trim() ? G.accent : G.muted} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
+                  <X size={14} color={G.muted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => { setCaptureOpen(true); haptic.tap(); }} style={styles.captureBtn} activeOpacity={0.7}>
+                <Plus size={11} color={G.muted} />
+                <Text style={styles.captureBtnText}>Przechwyt</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -291,6 +364,20 @@ const styles = StyleSheet.create({
   },
   nextLabel: { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
   nextTitle: { flex: 1, fontSize: 12, color: colors.text.secondary },
+
+  captureWrap: { paddingBottom: spacing[1] },
+  captureBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[2],
+  },
+  captureBtnText: { fontSize: 12, color: G.muted, fontWeight: '500' },
+  captureInputRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: G.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: G.cardBorder,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  captureInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 4 },
 
   emptyBody: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
   emptyTitle: { fontSize: 26, fontWeight: '900', color: colors.text.primary },
