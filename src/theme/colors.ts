@@ -16,7 +16,7 @@ export const colors = {
   tabs: {
     dashboard: '#E5E5EA',  // neutral/white — no strong accent
     tasks:     '#3DBE75',  // emerald green — action, energy
-    finances:  '#4ECBA8',  // teal — money, growth
+    finances:  '#EF4444',  // red — expenses, budget
     calendar:  '#BF80FF',  // soft violet — time, planning
     analytics: '#FF9F6B',  // warm orange — data, insights
   },
