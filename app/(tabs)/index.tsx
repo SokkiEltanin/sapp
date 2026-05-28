@@ -501,12 +501,8 @@ export default function DashboardScreen() {
       <SafeAreaView style={s.safe} edges={['top']} {...panHandlers}>
         <Animated.View style={[{ flex: 1 }, animatedStyle]}>
 
-          {/* Top bar */}
+          {/* Top bar — minimal */}
           <View style={s.topBar}>
-            <View>
-              <Text style={s.greetingText}>{greeting}</Text>
-              <Text style={s.dateText}>{dateLabel}</Text>
-            </View>
             <TouchableOpacity onPress={() => { haptic.tap(); router.push('/settings' as any); }} style={s.settingsBtn} activeOpacity={0.7}>
               <Settings size={17} color={colors.text.secondary} />
             </TouchableOpacity>
@@ -521,13 +517,12 @@ export default function DashboardScreen() {
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} />}
           >
 
-            {/* ══ GLASSMORPHISM MOOD CARD ══════════════════════════════════ */}
+            {/* ══ MAIN GLASSMORPHISM CARD ══════════════════════════════════ */}
             <TouchableOpacity
               onPress={() => { haptic.tap(); openCheckIn(); }}
               activeOpacity={0.92}
-              style={s.moodWrap}
+              style={s.mainCard}
             >
-              {/* Animated color blob — blurred by BlurView above */}
               <Animated.View style={[s.moodBlob, {
                 backgroundColor: moodBlobColor,
                 transform: [{ scale: blobScale }],
@@ -535,71 +530,87 @@ export default function DashboardScreen() {
               }]} />
 
               <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
-                {/* Glass border overlay */}
                 <View style={s.moodGlassBorder} />
 
-                {todayEntry ? (
-                  /* ── Filled state ───────────────────────────────────── */
-                  <View style={s.moodFilled}>
-                    <View style={s.moodTopRow}>
-                      <Text style={[s.moodBigLabel, { color: moodBlobColor }]}>
-                        {MOOD_LABELS[todayEntry.mood]}
-                      </Text>
-                      {moodStreak > 1 && (
-                        <View style={s.streakPill}>
-                          <Flame size={10} color={colors.accent.amber} />
-                          <Text style={s.streakText}>{moodStreak}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={s.energyRow}>
-                      <Zap size={11} color={ENERGY_COLORS[todayEntry.energy]} />
-                      <Text style={[s.energyText, { color: ENERGY_COLORS[todayEntry.energy] }]}>
-                        {ENERGY_LABELS[todayEntry.energy]}
-                      </Text>
-                      <View style={s.energyBarTrack}>
-                        <View style={[s.energyBarFill, {
-                          width: `${(todayEntry.energy / 5) * 100}%`,
-                          backgroundColor: ENERGY_COLORS[todayEntry.energy],
-                        }]} />
+                <View style={s.mainCardInner}>
+                  {/* Top row: date + weather */}
+                  <View style={s.mainTopRow}>
+                    <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
+                    {weather && (
+                      <View style={s.mainWeatherRow}>
+                        <CloudSun size={12} color={accentColor} />
+                        <Text style={s.mainWeatherText}>Jest aktualnie {weather.temp}°C</Text>
                       </View>
-                    </View>
+                    )}
+                  </View>
 
-                    {todayEntry.note ? (
-                      <Text style={s.moodNote} numberOfLines={2}>{todayEntry.note}</Text>
-                    ) : null}
-                    <Text style={s.humorText}>{humor}</Text>
+                  {/* Big greeting */}
+                  <Text style={s.mainGreeting}>{greeting.toUpperCase()}</Text>
+
+                  {/* Bottom: task count + mood */}
+                  <View style={s.mainBottom}>
+                    <Text style={s.mainTaskLine}>
+                      {'Masz do zrobienia jeszcze '}
+                      <Text style={[s.mainTaskBold, {
+                        color: overdueTasks.length > 0 ? colors.accent.red : colors.tabs.tasks,
+                      }]}>
+                        {`${todayTasks.length + overdueTasks.length} ${plTasks(todayTasks.length + overdueTasks.length)}`}
+                      </Text>
+                      {' na dzisiaj.'}
+                    </Text>
+
+                    {todayEntry ? (
+                      <View style={s.moodStateRow}>
+                        <Text style={s.moodStateEmoji}>{MOOD_EMOJIS[todayEntry.mood]}</Text>
+                        <Text style={[s.moodStateName, { color: MOOD_COLORS[todayEntry.mood] }]}>
+                          {MOOD_LABELS[todayEntry.mood]}
+                        </Text>
+                        {moodStreak > 1 && (
+                          <View style={s.streakPill}>
+                            <Flame size={9} color={colors.accent.amber} />
+                            <Text style={s.streakText}>{moodStreak}</Text>
+                          </View>
+                        )}
+                        <Text style={s.humorText}>{humor}</Text>
+                      </View>
+                    ) : (
+                      <View style={s.quickMoodRow}>
+                        {([1, 2, 3, 4, 5] as MoodLevel[]).map(level => (
+                          <TouchableOpacity
+                            key={level}
+                            style={[s.quickMoodBtn, { borderColor: MOOD_COLORS[level] + '40' }]}
+                            onPress={(e) => { (e as any).stopPropagation?.(); handleQuickMood(level); }}
+                            activeOpacity={0.75}
+                          >
+                            <Text style={s.quickMoodEmoji}>{MOOD_EMOJIS[level]}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
                   </View>
-                ) : (
-                  /* ── Empty state — quick picker ─────────────────────── */
-                  <View style={s.moodEmpty}>
-                    <Smile size={20} color={colors.text.muted} />
-                    <Text style={s.moodPrompt}>Jak się czujesz?</Text>
-                    <View style={s.quickMoodRow}>
-                      {([1, 2, 3, 4, 5] as MoodLevel[]).map(level => (
-                        <TouchableOpacity
-                          key={level}
-                          style={[s.quickMoodBtn, { borderColor: MOOD_COLORS[level] + '40' }]}
-                          onPress={(e) => { (e as any).stopPropagation?.(); handleQuickMood(level); }}
-                          activeOpacity={0.75}
-                        >
-                          <Text style={s.quickMoodEmoji}>{MOOD_EMOJIS[level]}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
+                </View>
               </BlurView>
             </TouchableOpacity>
 
-            {/* ══ WEATHER TILE ════════════════════════════════════════════ */}
-            {weather && (
-              <View style={s.weatherRow}>
-                <CloudSun size={14} color={accentColor} />
-                <Text style={s.weatherTemp}>{weather.temp}°C</Text>
-                <Text style={s.weatherDesc}>{weather.desc}</Text>
-              </View>
+            {/* ══ BUDGET WARNING CARD ══════════════════════════════════════ */}
+            {budgetRemaining && budgetRemaining.pct >= 0.7 && (
+              <TouchableOpacity
+                style={s.budgetWarnCard}
+                onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
+                activeOpacity={0.8}
+              >
+                <Text style={s.budgetWarnText}>
+                  {'Zbliżasz się do limitu wydatków '}
+                  <Text style={s.budgetWarnBold}>#budżet</Text>
+                  {'   '}
+                  <Text style={s.budgetWarnPct}>{Math.round(budgetRemaining.pct * 100)}%</Text>
+                </Text>
+                <View style={s.budgetWarnTrack}>
+                  <View style={[s.budgetWarnFill, {
+                    width: `${Math.min(100, budgetRemaining.pct * 100)}%` as any,
+                  }]} />
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* ══ TODAY ACTIVITY STRIP ════════════════════════════════════ */}
@@ -1140,24 +1151,20 @@ const s = StyleSheet.create({
 
   // Top bar
   topBar: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: spacing[5], paddingTop: spacing[3], paddingBottom: spacing[2],
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
+    paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[1],
   },
-  greetingText: {
-    fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.6,
-  },
-  dateText: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
   settingsBtn: {
     width: 34, height: 34, borderRadius: radius.md,
     backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
-    alignItems: 'center', justifyContent: 'center', marginTop: 4,
+    alignItems: 'center', justifyContent: 'center',
   },
 
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[2] },
 
-  // ── Glassmorphism mood card ────────────────────────────────────────────────
-  moodWrap: {
-    height: 190,
+  // ── Main glassmorphism card (Figma) ───────────────────────────────────────
+  mainCard: {
+    height: 220,
     borderRadius: radius.xl,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1165,11 +1172,11 @@ const s = StyleSheet.create({
   },
   moodBlob: {
     position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    top: -40,
-    left: '20%',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    top: -60,
+    left: '15%',
   },
   moodGlassBorder: {
     ...StyleSheet.absoluteFillObject,
@@ -1177,11 +1184,36 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.10)',
   },
-  moodFilled: {
-    flex: 1, padding: spacing[5], justifyContent: 'center', gap: spacing[2],
+  mainCardInner: {
+    flex: 1, padding: spacing[5],
+    justifyContent: 'space-between',
   },
-  moodTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  moodBigLabel: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+  mainTopRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  mainDate: {
+    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.8,
+  },
+  mainWeatherRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+  },
+  mainWeatherText: {
+    fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.50)',
+  },
+  mainGreeting: {
+    fontSize: 30, fontWeight: '800', color: colors.text.primary,
+    letterSpacing: -0.8, marginTop: spacing[2],
+  },
+  mainBottom: { gap: spacing[2] },
+  mainTaskLine: {
+    fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.70)',
+  },
+  mainTaskBold: { fontWeight: '800' },
+  moodStateRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+  },
+  moodStateEmoji: { fontSize: 16 },
+  moodStateName: { fontSize: 12, fontWeight: '700' },
   streakPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: colors.accent.amber + '20',
@@ -1189,27 +1221,38 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: colors.accent.amber + '40',
   },
   streakText: { fontSize: 11, fontWeight: '700', color: colors.accent.amber },
-  energyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  energyText: { fontSize: 12, fontWeight: '600' },
-  energyBarTrack: {
-    flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden',
-  },
-  energyBarFill: { height: '100%', borderRadius: 2 },
-  moodNote: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontStyle: 'italic', lineHeight: 18 },
-  humorText: { fontSize: 11, color: 'rgba(255,255,255,0.40)' },
+  humorText: { flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' },
 
-  moodEmpty: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3], padding: spacing[5],
-  },
-  moodPrompt: { fontSize: 15, fontWeight: '600', color: colors.text.secondary },
   quickMoodRow: { flexDirection: 'row', gap: spacing[3] },
   quickMoodBtn: {
-    width: 44, height: 44, borderRadius: radius.md,
+    width: 40, height: 40, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1,
   },
-  quickMoodEmoji: { fontSize: 22 },
+  quickMoodEmoji: { fontSize: 20 },
+
+  // ── Budget warning card ───────────────────────────────────────────────────
+  budgetWarnCard: {
+    backgroundColor: colors.bg.card,
+    borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(81,102,245,0.25)',
+    paddingHorizontal: spacing[4], paddingVertical: spacing[4],
+    gap: spacing[3],
+  },
+  budgetWarnText: {
+    fontSize: 13, fontWeight: '500', color: colors.text.secondary,
+  },
+  budgetWarnBold: { fontWeight: '700', color: colors.text.primary },
+  budgetWarnPct: { fontWeight: '800', color: colors.accent.blue },
+  budgetWarnTrack: {
+    height: 4, backgroundColor: 'rgba(81,102,245,0.15)',
+    borderRadius: 2, overflow: 'hidden',
+  },
+  budgetWarnFill: {
+    height: '100%', borderRadius: 2,
+    backgroundColor: colors.accent.blue,
+  },
 
   // ── Tools row ─────────────────────────────────────────────────────────────
   toolsRow: { flexDirection: 'row', gap: spacing[2] },
@@ -1283,13 +1326,6 @@ const s = StyleSheet.create({
   },
   miniWorkFill: { height: '100%', borderRadius: 1 },
 
-  // ── Weather ────────────────────────────────────────────────────────────────
-  weatherRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingHorizontal: spacing[2],
-  },
-  weatherTemp: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  weatherDesc: { fontSize: 12, color: colors.text.muted },
 
   activityStrip: {
     flexDirection: 'row', gap: spacing[2],
