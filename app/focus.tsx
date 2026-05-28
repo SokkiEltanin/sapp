@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  X, CheckCircle2, ChevronRight, Timer, CheckSquare, Square, Plus, Check,
+  X, Timer, CheckSquare, Square, Plus, Check, ArrowLeft,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -11,7 +11,6 @@ import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
-import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 
 const G = {
@@ -30,25 +29,19 @@ function todayStr() {
 
 const DOW_PL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 
-function deadlineInfo(iso: string): { label: string; color: string } {
+function deadlineSub(iso: string): { label: string; color: string } {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const target = new Date(iso.split('T')[0] + 'T00:00:00');
   const days = Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
   if (days < 0)  return { label: 'PRZETERMINOWANE', color: colors.accent.red };
-  if (days === 0) return { label: 'TERMIN DZIŚ',     color: colors.accent.amber };
-  if (days === 1) return { label: 'Jutro',           color: colors.accent.amber };
-  if (days <= 6) return { label: `W ${DOW_PL[target.getDay()].toUpperCase()}`, color: colors.text.secondary };
+  if (days === 0) return { label: 'NA DZIŚ', color: colors.accent.amber };
+  if (days === 1) return { label: 'NA JUTRO', color: colors.accent.amber };
+  if (days <= 6) return { label: `NA ${DOW_PL[target.getDay()].toUpperCase()}`, color: G.muted };
   const [, m, d] = iso.split('T')[0].split('-');
-  return { label: `${parseInt(d)}.${parseInt(m)}`, color: colors.text.muted };
+  return { label: `ZAPLANOWANE ${parseInt(d)}.${parseInt(m)}`, color: G.muted };
 }
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
-
-function priorityColor(p: string) {
-  if (p === 'high') return colors.accent.red;
-  if (p === 'low')  return colors.text.muted;
-  return colors.accent.purple;
-}
 
 export default function FocusScreen() {
   const { tasks, toggle, toggleSubtask, create } = useTasks();
@@ -69,7 +62,7 @@ export default function FocusScreen() {
           t.scheduledDate === today ||
           t.priority === 'high' ||
           (!t.deadline && !t.scheduledDate) ||
-          (t.deadline?.split('T')[0] && t.deadline.split('T')[0] < today) // overdue
+          (t.deadline?.split('T')[0] && t.deadline.split('T')[0] < today)
         )
       )
       .sort((a, b) => {
@@ -81,11 +74,8 @@ export default function FocusScreen() {
 
   const task = queue[0] ?? null;
   const remaining = queue.length;
-
-  const estimatedMins = useMemo(() => {
-    const total = queue.reduce((sum, t) => sum + (t.estimatedPomodoros ?? 0), 0);
-    return total > 0 ? total * 25 : null;
-  }, [queue]);
+  const subtasksDone  = task?.subtasks?.filter(s => s.done).length ?? 0;
+  const subtasksTotal = task?.subtasks?.length ?? 0;
 
   const handleDone = () => {
     if (!task) return;
@@ -119,75 +109,58 @@ export default function FocusScreen() {
     setCaptureOpen(false);
   };
 
-  const subtasksDone   = task?.subtasks?.filter(s => s.done).length ?? 0;
-  const subtasksTotal  = task?.subtasks?.length ?? 0;
-  const subtasksPct    = subtasksTotal > 0 ? subtasksDone / subtasksTotal : 0;
+  const deadline = task?.deadline || task?.scheduledDate
+    ? deadlineSub((task.deadline || task.scheduledDate)!)
+    : null;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
+
       {/* Header */}
-      <View style={styles.header}>
-        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
-          <X size={20} color={colors.text.secondary} />
+      <View style={s.header}>
+        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.headerBtn}>
+          <ArrowLeft size={18} color={colors.text.secondary} />
         </PressableScale>
-        <Text style={styles.headerTitle}>Tryb skupienia</Text>
-        <View style={styles.queueBadge}>
-          <Text style={styles.queueText}>{remaining} zad.</Text>
-          {estimatedMins !== null && (
-            <Text style={styles.queueEstimate}>
-              {'~' + (estimatedMins >= 60
-                ? `${Math.floor(estimatedMins / 60)}h${estimatedMins % 60 > 0 ? `${estimatedMins % 60}m` : ''}`
-                : `${estimatedMins}m`)}
-            </Text>
-          )}
+        <Text style={s.headerTitle}>SKUPIENIE</Text>
+        <View style={s.queuePill}>
+          <Text style={s.queueText}>{remaining}</Text>
         </View>
       </View>
 
       {task ? (
-        <View style={styles.body}>
-          {/* Priority badge */}
-          <View style={[styles.priorityBadge, { backgroundColor: priorityColor(task.priority) + '18', borderColor: priorityColor(task.priority) + '40' }]}>
-            <View style={[styles.priorityDot, { backgroundColor: priorityColor(task.priority) }]} />
-            <Text style={[styles.priorityText, { color: priorityColor(task.priority) }]}>
-              {{ high: 'Pilne', normal: 'Normalne', low: 'Niski priorytet' }[task.priority] ?? 'Normal'}
+        <View style={s.body}>
+
+          {/* ── MAIN TASK CARD (60-65% height) ── */}
+          <View style={s.taskCard}>
+
+            {/* Top: date/deadline sub */}
+            <Text style={[s.cardSub, deadline && { color: deadline.color }]}>
+              {deadline ? deadline.label : 'BEZ TERMINU'}
             </Text>
-          </View>
 
-          {/* Task title */}
-          <Text style={styles.taskTitle}>{task.title}</Text>
+            {/* Title */}
+            <Text style={s.cardTitle} numberOfLines={4}>
+              {task.title.toUpperCase()}
+            </Text>
 
-          {task.description ? (
-            <Text style={styles.taskDesc}>{task.description}</Text>
-          ) : null}
+            {/* Description if any */}
+            {task.description ? (
+              <Text style={s.cardDesc} numberOfLines={3}>{task.description}</Text>
+            ) : null}
 
-          {/* Deadline */}
-          {task.deadline && (() => {
-            const { label, color } = deadlineInfo(task.deadline);
-            return (
-              <View style={[styles.deadlinePill, { backgroundColor: color + '18', borderColor: color + '40' }]}>
-                <Text style={[styles.deadlineText, { color }]}>{label}</Text>
-              </View>
-            );
-          })()}
-
-          {/* Subtasks */}
-          {subtasksTotal > 0 && (
-            <View style={styles.subtasksCard}>
-              <View style={styles.subtasksHeader}>
-                <Text style={styles.subtasksLabel}>Kroki</Text>
-                <Text style={styles.subtasksCount}>{subtasksDone}/{subtasksTotal}</Text>
-              </View>
-              <View style={styles.subtasksProgressTrack}>
-                <View style={[styles.subtasksProgressFill, {
-                  width: `${subtasksPct * 100}%`,
-                  backgroundColor: subtasksPct === 1 ? G.accent : colors.accent.blue,
-                }]} />
-              </View>
-              <View style={styles.subtasksList}>
+            {/* Subtasks */}
+            {subtasksTotal > 0 && (
+              <ScrollView style={s.subList} showsVerticalScrollIndicator={false}>
+                <View style={s.subProgressTrack}>
+                  <View style={[s.subProgressFill, {
+                    width: `${(subtasksDone / subtasksTotal) * 100}%` as any,
+                    backgroundColor: subtasksDone === subtasksTotal ? G.accent : 'rgba(46,222,160,0.50)',
+                  }]} />
+                </View>
                 {task.subtasks?.map(sub => (
                   <TouchableOpacity
                     key={sub.id}
-                    style={styles.subtaskRow}
+                    style={s.subRow}
                     onPress={() => {
                       const willFinishAll = !sub.done && subtasksDone + 1 === subtasksTotal;
                       willFinishAll ? haptic.success() : haptic.tap();
@@ -196,239 +169,278 @@ export default function FocusScreen() {
                     activeOpacity={0.75}
                   >
                     {sub.done
-                      ? <CheckSquare size={18} color={G.accent} />
-                      : <Square size={18} color='rgba(255,255,255,0.2)' strokeWidth={1.5} />
+                      ? <CheckSquare size={16} color={G.accent} strokeWidth={2} />
+                      : <Square size={16} color='rgba(255,255,255,0.25)' strokeWidth={1.5} />
                     }
-                    <Text style={[styles.subtaskText, sub.done && styles.subtaskTextDone]}>
+                    <Text style={[s.subText, sub.done && s.subTextDone]}>
                       {sub.title}
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
+            )}
+
+            {/* Spacer pushes toggle to bottom */}
+            <View style={{ flex: 1 }} />
+
+            {/* Bottom row: milestones count + toggle complete */}
+            <View style={s.cardBottom}>
+              {subtasksTotal > 0 && (
+                <Text style={s.subCount}>{subtasksDone}/{subtasksTotal} kroków</Text>
+              )}
+              <View style={{ flex: 1 }} />
+              {/* Toggle pill (Figma spec: same as tasks list) */}
+              <TouchableOpacity
+                style={s.toggleWrap}
+                onPress={handleDone}
+                activeOpacity={0.8}
+                hitSlop={8}
+              >
+                <View style={[s.toggleTrack]}>
+                  <View style={[s.toggleDot, s.toggleDotLeft]} />
+                  <View style={[s.toggleDot, s.toggleDotRight]} />
+                </View>
+              </TouchableOpacity>
             </View>
-          )}
-
-          {/* Pomodoro CTA */}
-          <PressableScale onPress={handlePomodoro} style={styles.pomCta}>
-            <Timer size={16} color={colors.accent.purple} />
-            <Text style={styles.pomCtaText}>
-              {'Zacznij Pomodoro' + (task.estimatedPomodoros ? ` · ${task.estimatedPomodoros}×25 min` : '')}
-            </Text>
-            <ChevronRight size={14} color={colors.accent.purple} />
-          </PressableScale>
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <PressableScale onPress={handleSkip} style={styles.skipBtn}>
-              <Text style={styles.skipText}>Pomiń</Text>
-            </PressableScale>
-            <PressableScale onPress={handleDone} style={styles.doneBtn}>
-              <CheckCircle2 size={22} color={colors.bg.primary} />
-              <Text style={styles.doneBtnText}>Gotowe!</Text>
-            </PressableScale>
           </View>
 
-          {/* Queue preview */}
-          {queue.length > 1 && (
-            <View style={styles.nextWrap}>
-              <Text style={styles.nextLabel}>Następne:</Text>
-              <Text style={styles.nextTitle} numberOfLines={1}>{queue[1].title}</Text>
-            </View>
-          )}
+          {/* ── BELOW CARD ── */}
+          <View style={s.belowCard}>
 
-          {/* Quick capture */}
-          <View style={styles.captureWrap}>
-            {captureOpen ? (
-              <View style={styles.captureInputRow}>
-                <TextInput
-                  autoFocus
-                  style={styles.captureInput}
-                  value={captureText}
-                  onChangeText={setCaptureText}
-                  placeholder="Nowe zadanie..."
-                  placeholderTextColor={G.muted}
-                  onSubmitEditing={handleCapture}
-                  returnKeyType="done"
-                  maxLength={80}
-                />
-                <TouchableOpacity onPress={handleCapture} hitSlop={8} activeOpacity={0.7}>
-                  <Check size={16} color={captureText.trim() ? G.accent : G.muted} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { haptic.tap(); setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
-                  <X size={14} color={G.muted} />
-                </TouchableOpacity>
-              </View>
+            {/* Pomodoro CTA */}
+            {task.estimatedPomodoros && task.estimatedPomodoros > 0 ? (
+              <TouchableOpacity style={s.pomCta} onPress={handlePomodoro} activeOpacity={0.8}>
+                <Timer size={15} color='#2BC8E0' strokeWidth={2} />
+                <Text style={s.pomCtaText}>
+                  {`Pomodoro · ${task.estimatedPomodoros}×25 min`}
+                </Text>
+              </TouchableOpacity>
             ) : (
-              <TouchableOpacity onPress={() => { setCaptureOpen(true); haptic.tap(); }} style={styles.captureBtn} activeOpacity={0.7}>
-                <Plus size={11} color={G.muted} />
-                <Text style={styles.captureBtnText}>Przechwyt</Text>
+              <TouchableOpacity style={s.pomCtaGhost} onPress={handlePomodoro} activeOpacity={0.8}>
+                <Timer size={14} color={colors.text.muted} strokeWidth={1.5} />
+                <Text style={s.pomCtaGhostText}>Zacznij Pomodoro</Text>
               </TouchableOpacity>
             )}
+
+            {/* Next task preview */}
+            {queue.length > 1 && (
+              <View style={s.nextRow}>
+                <Text style={s.nextLabel}>Następne:</Text>
+                <Text style={s.nextTitle} numberOfLines={1}>{queue[1].title.toUpperCase()}</Text>
+              </View>
+            )}
+
+            {/* Skip + capture row */}
+            <View style={s.bottomRow}>
+              <TouchableOpacity style={s.skipBtn} onPress={handleSkip} activeOpacity={0.75}>
+                <Text style={s.skipText}>POMIŃ</Text>
+              </TouchableOpacity>
+
+              <View style={{ flex: 1 }} />
+
+              {captureOpen ? (
+                <View style={s.captureInputRow}>
+                  <TextInput
+                    autoFocus
+                    style={s.captureInput}
+                    value={captureText}
+                    onChangeText={setCaptureText}
+                    placeholder="Nowe zadanie..."
+                    placeholderTextColor={G.muted}
+                    onSubmitEditing={handleCapture}
+                    returnKeyType="done"
+                    maxLength={80}
+                  />
+                  <TouchableOpacity onPress={handleCapture} hitSlop={8}>
+                    <Check size={15} color={captureText.trim() ? G.accent : G.muted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { haptic.tap(); setCaptureOpen(false); setCaptureText(''); }} hitSlop={8}>
+                    <X size={13} color={G.muted} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={s.addBtn}
+                  onPress={() => { setCaptureOpen(true); haptic.tap(); }}
+                  activeOpacity={0.8}
+                >
+                  <Plus size={20} color={colors.bg.primary} strokeWidth={2.5} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       ) : (
-        <View style={styles.emptyBody}>
-          <CheckCircle2 size={64} color={G.accent} strokeWidth={1.5} />
-          <Text style={styles.emptyTitle}>Wszystko zrobione!</Text>
-          <Text style={styles.emptySub}>
+        /* ── EMPTY STATE ── */
+        <View style={s.emptyBody}>
+          <View style={s.emptyIcon}>
+            <Text style={s.emptyEmoji}>✓</Text>
+          </View>
+          <Text style={s.emptyTitle}>WSZYSTKO ZROBIONE</Text>
+          <Text style={s.emptySub}>
             {skipSet.size > 0
               ? `Pominięto ${skipSet.size} zadań`
-              : 'Nie ma aktywnych zadań na dziś'}
+              : 'Brak aktywnych zadań na dziś'}
           </Text>
-          <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.backHome}>
-            <Text style={styles.backHomeText}>Wróć</Text>
+          <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.backBtn}>
+            <Text style={s.backBtnText}>Wróć</Text>
           </PressableScale>
-
-          {/* Quick capture in empty state */}
-          <View style={[styles.captureWrap, { marginTop: spacing[2] }]}>
-            {captureOpen ? (
-              <View style={styles.captureInputRow}>
-                <TextInput
-                  autoFocus
-                  style={styles.captureInput}
-                  value={captureText}
-                  onChangeText={setCaptureText}
-                  placeholder="Nowe zadanie..."
-                  placeholderTextColor={G.muted}
-                  onSubmitEditing={handleCapture}
-                  returnKeyType="done"
-                  maxLength={80}
-                />
-                <TouchableOpacity onPress={handleCapture} hitSlop={8} activeOpacity={0.7}>
-                  <Check size={16} color={captureText.trim() ? G.accent : G.muted} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { haptic.tap(); setCaptureOpen(false); setCaptureText(''); }} hitSlop={8} activeOpacity={0.7}>
-                  <X size={14} color={G.muted} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => { setCaptureOpen(true); haptic.tap(); }} style={styles.captureBtn} activeOpacity={0.7}>
-                <Plus size={11} color={G.muted} />
-                <Text style={styles.captureBtnText}>Przechwyt</Text>
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
       )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg.primary },
 
+  // ── Header ───────────────────────────────────────────────────────────────────
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    gap: spacing[3],
   },
-  closeBtn: {
+  headerBtn: {
     width: 36, height: 36, borderRadius: radius.md,
     backgroundColor: G.card, borderWidth: 1, borderColor: G.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 14, fontWeight: '700', color: colors.text.secondary },
-  queueBadge: {
-    paddingHorizontal: spacing[3], paddingVertical: 5,
-    borderRadius: radius.full, backgroundColor: G.accentDim,
-    borderWidth: 1, borderColor: G.cardBorder,
-    alignItems: 'center',
+  headerTitle: {
+    flex: 1, fontSize: 13, fontWeight: '800', color: colors.text.muted,
+    letterSpacing: 1.4,
   },
-  queueText: { fontSize: 11, fontWeight: '600', color: G.muted },
-  queueEstimate: { fontSize: 9, fontWeight: '500', color: G.muted, marginTop: 1 },
+  queuePill: {
+    minWidth: 32, height: 26, borderRadius: 13,
+    backgroundColor: G.accentDim, borderWidth: 1, borderColor: G.cardBorder,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: spacing[3],
+  },
+  queueText: { fontSize: 12, fontWeight: '800', color: G.accent },
 
+  // ── Body ─────────────────────────────────────────────────────────────────────
   body: {
-    flex: 1, paddingHorizontal: spacing[5], paddingTop: spacing[6],
-    gap: spacing[4],
+    flex: 1, paddingHorizontal: spacing[4],
+    paddingBottom: spacing[4], gap: spacing[4],
   },
 
-  priorityBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing[3], paddingVertical: 5,
-    borderRadius: radius.full, borderWidth: 1,
-  },
-  priorityDot: { width: 6, height: 6, borderRadius: 3 },
-  priorityText: { fontSize: 11, fontWeight: '700' },
-
-  taskTitle: {
-    fontSize: 32, fontWeight: '900', color: colors.text.primary,
-    lineHeight: 40, letterSpacing: -0.5,
-  },
-  taskDesc: { fontSize: 14, color: colors.text.secondary, lineHeight: 22 },
-  deadlinePill: {
-    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center',
-    borderRadius: 8, borderWidth: 1,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  deadlineText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-
-  subtasksCard: {
-    backgroundColor: G.card, borderRadius: radius.xl,
+  // ── Task card (60-65% of screen) ──────────────────────────────────────────────
+  taskCard: {
+    flex: 0.62,
+    backgroundColor: G.card, borderRadius: 20,
     borderWidth: 1, borderColor: G.cardBorder,
-    padding: spacing[4], gap: spacing[3],
+    padding: spacing[5], gap: spacing[3],
   },
-  subtasksHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subtasksLabel: { fontSize: 11, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
-  subtasksCount: { fontSize: 12, fontWeight: '700', color: colors.text.secondary },
-  subtasksProgressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  subtasksProgressFill: { height: 3, borderRadius: radius.full },
-  subtasksList: { gap: spacing[2] },
-  subtaskRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 2 },
-  subtaskText: { flex: 1, fontSize: 14, color: colors.text.primary, fontWeight: '500' },
-  subtaskTextDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  cardSub: {
+    fontSize: 10, fontWeight: '700', letterSpacing: 1.4,
+    color: G.muted,
+  },
+  cardTitle: {
+    fontSize: 20, fontWeight: '800', color: colors.white,
+    letterSpacing: 0.3, lineHeight: 28,
+  },
+  cardDesc: {
+    fontSize: 13, color: colors.text.secondary, lineHeight: 20,
+  },
+
+  // Subtasks
+  subList: { flex: 1 },
+  subProgressTrack: {
+    height: 3, backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 2, overflow: 'hidden', marginBottom: spacing[3],
+  },
+  subProgressFill: { height: 3, borderRadius: 2 },
+  subRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: spacing[2],
+    borderBottomWidth: 1, borderBottomColor: 'rgba(46,222,160,0.08)',
+  },
+  subText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
+  subTextDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+
+  // Card bottom row
+  cardBottom: { flexDirection: 'row', alignItems: 'center' },
+  subCount: { fontSize: 10, fontWeight: '600', color: G.muted, letterSpacing: 0.5 },
+
+  // Toggle pill (same as tasks list toggle)
+  toggleWrap: { alignItems: 'center', justifyContent: 'center' },
+  toggleTrack: {
+    width: 54, height: 28, borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 7, justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: G.cardBorder,
+  },
+  toggleDot: { width: 12, height: 12, borderRadius: 6 },
+  toggleDotLeft:  { backgroundColor: 'rgba(255,255,255,0.22)' },
+  toggleDotRight: { backgroundColor: 'rgba(255,255,255,0.10)' },
+
+  // ── Below card ────────────────────────────────────────────────────────────────
+  belowCard: {
+    flex: 1, gap: spacing[3], justifyContent: 'flex-end',
+  },
 
   pomCta: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.accent.purple + '15',
+    backgroundColor: 'rgba(43,200,224,0.10)',
     borderRadius: radius.lg, borderWidth: 1,
-    borderColor: colors.accent.purple + '35',
-    padding: spacing[4],
+    borderColor: 'rgba(43,200,224,0.25)',
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
   },
-  pomCtaText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.accent.purple },
+  pomCtaText: { flex: 1, fontSize: 13, fontWeight: '700', color: '#2BC8E0' },
+  pomCtaGhost: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  pomCtaGhostText: { fontSize: 12, color: colors.text.muted },
 
-  actions: { flexDirection: 'row', gap: spacing[3], marginTop: 'auto' },
+  nextRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingTop: spacing[2],
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  nextLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8 },
+  nextTitle: { flex: 1, fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
+
+  bottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   skipBtn: {
-    flex: 1, paddingVertical: spacing[4], borderRadius: radius.xl,
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    borderRadius: radius.full,
     backgroundColor: G.card, borderWidth: 1, borderColor: G.cardBorder,
-    alignItems: 'center',
   },
-  skipText: { fontSize: 15, fontWeight: '600', color: G.muted },
-  doneBtn: {
-    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing[2], paddingVertical: spacing[4], borderRadius: radius.xl,
+  skipText: { fontSize: 11, fontWeight: '800', color: G.muted, letterSpacing: 1 },
+
+  // Green "+" FAB (Figma: bottom right)
+  addBtn: {
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: G.accent,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: G.accent, shadowOpacity: 0.4, shadowRadius: 12,
+    elevation: 8,
   },
-  doneBtnText: { fontSize: 17, fontWeight: '800', color: colors.bg.primary },
 
-  nextWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingVertical: spacing[3],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
-  },
-  nextLabel: { fontSize: 11, color: colors.text.muted, fontWeight: '600' },
-  nextTitle: { flex: 1, fontSize: 12, color: colors.text.secondary },
-
-  captureWrap: { paddingBottom: spacing[1] },
-  captureBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    alignSelf: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[2],
-  },
-  captureBtnText: { fontSize: 12, color: G.muted, fontWeight: '500' },
   captureInputRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: G.card, borderRadius: radius.lg,
     borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   captureInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 4 },
 
+  // ── Empty state ───────────────────────────────────────────────────────────────
   emptyBody: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
-  emptyTitle: { fontSize: 26, fontWeight: '900', color: colors.text.primary },
-  emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 22 },
-  backHome: {
-    marginTop: spacing[4], paddingHorizontal: spacing[6], paddingVertical: spacing[4],
+  emptyIcon: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: G.accentDim, borderWidth: 1, borderColor: G.cardBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyEmoji: { fontSize: 36, fontWeight: '800', color: G.accent },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: colors.text.primary, letterSpacing: 1 },
+  emptySub: { fontSize: 13, color: colors.text.muted, textAlign: 'center' },
+  backBtn: {
+    paddingHorizontal: spacing[6], paddingVertical: spacing[4],
     backgroundColor: G.accentDim, borderRadius: radius.xl,
     borderWidth: 1, borderColor: G.cardBorder,
   },
-  backHomeText: { fontSize: 15, fontWeight: '700', color: G.accent },
+  backBtnText: { fontSize: 14, fontWeight: '700', color: G.accent },
 });
