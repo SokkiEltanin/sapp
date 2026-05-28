@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
   ChevronRight, Trash2, X,
-  Square, CheckSquare2, Clock, ArrowRight, Timer, RefreshCw,
+  Square, CheckSquare2, Clock, Timer, RefreshCw,
 } from 'lucide-react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import TopPill from '@/components/ui/TopPill';
@@ -26,11 +26,11 @@ import { notificationsService } from '@/services/notificationsService';
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 const G = {
-  card:       '#0D2318',
-  cardBorder: 'rgba(61,190,117,0.18)',
-  accent:     '#3DBE75',
-  accentDim:  'rgba(61,190,117,0.22)',
-  accentText: '#3DBE75',
+  card:       '#0C2218',
+  cardBorder: 'rgba(46,222,160,0.20)',
+  accent:     '#2EDEA0',
+  accentDim:  'rgba(46,222,160,0.18)',
+  accentText: '#2EDEA0',
   overdueCard:'#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
 };
@@ -201,26 +201,18 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
       onPress={() => onEdit(task)}
       activeOpacity={0.75}
     >
-      {/* Action pill */}
-      <View style={[s.actionPill, overdue && { borderColor: colors.accent.red + '40' }]}>
-        <TouchableOpacity
-          style={s.actionHalf}
-          onPress={() => onComplete(task)}
-          hitSlop={6}
-          activeOpacity={0.7}
-        >
-          <Check size={14} color={isDone ? G.accent : colors.text.secondary} strokeWidth={2.5} />
-        </TouchableOpacity>
-        <View style={s.actionDivider} />
-        <TouchableOpacity
-          style={s.actionHalf}
-          onPress={() => onEdit(task)}
-          hitSlop={6}
-          activeOpacity={0.7}
-        >
-          <Pencil size={13} color={colors.text.secondary} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
+      {/* Toggle pill */}
+      <TouchableOpacity
+        style={s.toggleWrap}
+        onPress={(e: any) => { e.stopPropagation?.(); haptic.tap(); onComplete(task); }}
+        hitSlop={6}
+        activeOpacity={0.8}
+      >
+        <View style={[s.toggleTrack, isDone && s.toggleTrackDone]}>
+          <View style={[s.toggleDot, s.toggleDotLeft, isDone && s.toggleDotActive]} />
+          <View style={[s.toggleDot, s.toggleDotRight]} />
+        </View>
+      </TouchableOpacity>
 
       {/* Content */}
       <View style={s.cardContent}>
@@ -582,15 +574,20 @@ const ss = StyleSheet.create({
 
 // ─── Quick capture bar ────────────────────────────────────────────────────────
 
-function QuickCapture({ onCreate }: { onCreate: (title: string, scheduleToday: boolean) => void }) {
+const SORT_SHORT: Record<SortKey, string> = { deadline: 'TERM', priority: 'PRYR', created: 'NOW', alpha: 'A-Z' };
+
+function QuickCapture({ onCreate, sort, onSortChange }: {
+  onCreate: (title: string, scheduleToday: boolean) => void;
+  sort: SortKey;
+  onSortChange: (k: SortKey) => void;
+}) {
   const [text, setText] = useState('');
-  const [todayMode, setTodayMode] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   const submit = () => {
     const t = text.trim();
-    if (!t) return;
-    onCreate(t, todayMode);
+    if (!t) { router.push('/tasks/add' as any); return; }
+    onCreate(t, false);
     setText('');
     haptic.tap();
   };
@@ -598,6 +595,16 @@ function QuickCapture({ onCreate }: { onCreate: (title: string, scheduleToday: b
   return (
     <View style={qc.wrap}>
       <View style={qc.row}>
+        <TouchableOpacity
+          onPress={() => { haptic.tap(); onSortChange(sort === 'alpha' ? 'deadline' : 'alpha'); }}
+          style={[qc.sortChip, sort === 'alpha' && qc.sortChipActive]}
+          activeOpacity={0.75}
+          hitSlop={6}
+        >
+          <Text style={[qc.sortChipText, sort === 'alpha' && qc.sortChipTextActive]}>
+            {SORT_SHORT[sort]}
+          </Text>
+        </TouchableOpacity>
         <TextInput
           ref={inputRef}
           value={text}
@@ -610,20 +617,12 @@ function QuickCapture({ onCreate }: { onCreate: (title: string, scheduleToday: b
           blurOnSubmit={false}
         />
         <TouchableOpacity
-          onPress={() => { setTodayMode(v => !v); haptic.tap(); }}
-          style={[qc.todayChip, todayMode && qc.todayChipActive]}
-          activeOpacity={0.75}
-          hitSlop={6}
-        >
-          <Text style={[qc.todayChipText, todayMode && qc.todayChipTextActive]}>Dziś</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={[qc.btn, text.trim().length > 0 && qc.btnActive]}
           onPress={submit}
           activeOpacity={0.75}
           hitSlop={8}
         >
-          <ArrowRight size={16} color={text.trim().length > 0 ? G.card : colors.text.muted} strokeWidth={2.5} />
+          <Plus size={16} color={text.trim().length > 0 ? G.card : colors.text.muted} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
     </View>
@@ -640,13 +639,14 @@ const qc = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: G.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: G.cardBorder,
-    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
   input: {
     flex: 1, fontSize: 14, fontWeight: '600', color: colors.white, letterSpacing: 0.2,
+    paddingHorizontal: spacing[2],
   },
   btn: {
-    width: 30, height: 30, borderRadius: 15,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
@@ -654,17 +654,18 @@ const qc = StyleSheet.create({
   btnActive: {
     backgroundColor: G.accent, borderColor: G.accent,
   },
-  todayChip: {
-    paddingHorizontal: spacing[3], paddingVertical: 5,
+  sortChip: {
+    paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: radius.full, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: 'rgba(255,255,255,0.06)',
+    minWidth: 44, alignItems: 'center',
   },
-  todayChipActive: {
+  sortChipActive: {
     backgroundColor: G.accentDim, borderColor: G.accent + '80',
   },
-  todayChipText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
-  todayChipTextActive: { color: G.accent },
+  sortChipText: { fontSize: 10, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.5 },
+  sortChipTextActive: { color: G.accent },
 });
 
 // ─── Filter pills ─────────────────────────────────────────────────────────────
@@ -1075,7 +1076,7 @@ export default function TasksScreen() {
         />
 
         {/* Quick capture */}
-        <QuickCapture onCreate={handleQuickCreate} />
+        <QuickCapture onCreate={handleQuickCreate} sort={sort} onSortChange={setSort} />
       </Animated.View>
 
       {/* Modals */}
@@ -1131,20 +1132,33 @@ const s = StyleSheet.create({
   },
   cardDone: { opacity: 0.45 },
 
-  actionPill: {
-    flexDirection: 'row', alignItems: 'center',
+  toggleWrap: {
     marginLeft: spacing[3],
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(61,190,117,0.2)',
-    overflow: 'hidden',
-    height: 44,
-  },
-  actionHalf: {
-    width: 36, height: 44,
     alignItems: 'center', justifyContent: 'center',
   },
-  actionDivider: {
-    width: 1, height: 22, backgroundColor: 'rgba(61,190,117,0.2)',
+  toggleTrack: {
+    width: 54, height: 28, borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 7,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: G.cardBorder,
+  },
+  toggleTrackDone: {
+    backgroundColor: 'rgba(46,222,160,0.18)',
+    borderColor: G.accent + '70',
+  },
+  toggleDot: {
+    width: 12, height: 12, borderRadius: 6,
+  },
+  toggleDotLeft: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  toggleDotRight: {
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  toggleDotActive: {
+    backgroundColor: G.accent,
   },
 
   cardContent: { flex: 1, gap: 3 },

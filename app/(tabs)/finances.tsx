@@ -19,7 +19,6 @@ import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
 import TopPill from '@/components/ui/TopPill';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
-import ExpenseSummaryCard from '@/components/expenses/ExpenseSummaryCard';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
@@ -34,11 +33,11 @@ import { haptic } from '@/utils/haptics';
 const MONTHS_BACK = 6;
 
 const F = {
-  card:       '#041412',
-  cardBorder: 'rgba(78,203,168,0.18)',
-  accent:     '#4ECBA8',
-  accentDim:  'rgba(78,203,168,0.12)',
-  muted:      'rgba(78,203,168,0.45)',
+  card:       '#1C0808',
+  cardBorder: 'rgba(230,53,53,0.18)',
+  accent:     '#E63535',
+  accentDim:  'rgba(230,53,53,0.14)',
+  muted:      'rgba(230,53,53,0.55)',
 };
 
 function isExp(e: Expense)  { return !e.type || e.type === 'expense'; }
@@ -312,6 +311,7 @@ export default function FinancesScreen() {
     return filtered.map(([date, items]) => ({
       title: formatDate(date + 'T12:00:00'),
       data: items,
+      total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
     }));
   }, [grouped, activeTagFilter]);
 
@@ -370,14 +370,24 @@ export default function FinancesScreen() {
             }
             ListHeaderComponent={
               <>
-                <ExpenseSummaryCard
-                  monthExpenses={stats.monthExpenses}
-                  monthIncome={stats.monthIncome}
-                  thisWeek={stats.thisWeek}
-                  lastWeek={stats.lastWeek}
-                  topCategory={stats.topCategory}
-                  monthCategorySpend={stats.monthCategorySpend}
-                />
+                {/* Hero amount card */}
+                <View style={styles.heroListCard}>
+                  <Text style={styles.heroListDate}>
+                    {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
+                  </Text>
+                  <View style={styles.heroListAmountRow}>
+                    <Text style={styles.heroListAmount}>{stats.monthExpenses.toFixed(0)}</Text>
+                    <Text style={styles.heroListCurrency}> PLN</Text>
+                  </View>
+                  {stats.monthIncome > 0 && (
+                    <Text style={styles.heroListSub}>
+                      {stats.monthIncome > stats.monthExpenses
+                        ? `Zaoszczędziłeś ${(stats.monthIncome - stats.monthExpenses).toFixed(0)} zł`
+                        : `Przekroczono przychody o ${(stats.monthExpenses - stats.monthIncome).toFixed(0)} zł`
+                      }
+                    </Text>
+                  )}
+                </View>
                 {availableTags.length > 0 && (
                   <ScrollView
                     horizontal
@@ -409,10 +419,11 @@ export default function FinancesScreen() {
                 )}
               </>
             }
-            renderSectionHeader={({ section: { title } }) => (
+            renderSectionHeader={({ section }) => (
               <View style={styles.sectionHeader}>
-                <View style={styles.sectionDot} />
-                <Text style={styles.sectionTitle}>{title}</Text>
+                <Text style={styles.sectionTitle}>{(section as any).title}</Text>
+                <View style={styles.sectionLine} />
+                <Text style={styles.sectionTotal}>{((section as any).total as number).toFixed(0)} PLN</Text>
               </View>
             )}
             renderItem={({ item, index }) => (
@@ -906,14 +917,39 @@ const styles = StyleSheet.create({
   segText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
   segTextActive: { color: colors.tabs.finances, fontWeight: '700' },
 
+  // ── Hero list card ───────────────────────────────────────────────────────────
+  heroListCard: {
+    marginHorizontal: spacing[4], marginBottom: spacing[3], marginTop: spacing[2],
+    backgroundColor: F.card,
+    borderRadius: radius.xl, padding: spacing[5],
+    borderWidth: 1, borderColor: F.cardBorder,
+    gap: spacing[2],
+  },
+  heroListDate: {
+    fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5,
+  },
+  heroListAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  heroListAmount: {
+    fontSize: 42, fontWeight: '800', color: colors.white, letterSpacing: -2, lineHeight: 46,
+  },
+  heroListCurrency: {
+    fontSize: 20, fontWeight: '600', color: colors.text.muted, paddingBottom: 4,
+  },
+  heroListSub: {
+    fontSize: 12, color: F.muted, fontWeight: '500',
+  },
+
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[2],
   },
-  sectionDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' },
+  sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
   sectionTitle: {
     ...typography.label, color: colors.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
+  },
+  sectionTotal: {
+    fontSize: 11, fontWeight: '700', color: F.accent, letterSpacing: 0.3,
   },
   listPadding: { paddingHorizontal: spacing[4] },
 
