@@ -54,7 +54,8 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
         {HEADERS.map((h, i) => (
           <Text key={h} style={[
             styles.header,
-            (i >= 5) && styles.headerWeekend,
+            i === 5 && styles.headerSat,
+            i === 6 && styles.headerSun,
             detailed && styles.headerDetailed,
           ]}>{h}</Text>
         ))}
@@ -106,7 +107,8 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                         styles.detailedNum,
                         isTd && styles.detailedNumTextToday,
                         sel && !isTd && styles.detailedNumTextSel,
-                        !isTd && !sel && isWeekend && styles.detailedNumWeekend,
+                        !isTd && !sel && i === 5 && styles.detailedNumWeekend,
+                        !isTd && !sel && i === 6 && styles.detailedNumSun,
                       ]}>
                         {day}
                       </Text>
@@ -143,10 +145,10 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                       style={[styles.eventPill, {
                         backgroundColor: tk.priority === 'high'
                           ? colors.accent.danger + '25'
-                          : 'rgba(255,255,255,0.07)',
+                          : '#2EDEA0' + '22',
                         borderLeftColor: tk.priority === 'high'
                           ? colors.accent.danger
-                          : 'rgba(255,255,255,0.3)',
+                          : '#2EDEA0',
                       }]}
                     >
                       <Text style={styles.eventPillText} numberOfLines={1}>
@@ -169,7 +171,8 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                     styles.num,
                     sel && styles.numSel,
                     isTd && !sel && styles.numToday,
-                    isWeekend && !sel && styles.numWeekend,
+                    i === 5 && !sel && !isTd && styles.numSat,
+                    i === 6 && !sel && !isTd && styles.numSun,
                   ]}>
                     {day}
                   </Text>
@@ -220,7 +223,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', paddingVertical: spacing[1],
   },
   headerDetailed: { fontSize: 9, letterSpacing: 0.5 },
-  headerWeekend: { color: colors.text.muted, opacity: 0.55 },
+  headerSat: { opacity: 0.55 },
+  headerSun: { color: '#FF6B6B' },
 
   row: { flexDirection: 'row' },
   rowDetailed: {
@@ -241,7 +245,8 @@ const styles = StyleSheet.create({
   num: { fontSize: 14, fontWeight: '400', color: colors.text.secondary, lineHeight: 18 },
   numSel: { color: colors.bg.primary, fontWeight: '800' },
   numToday: { color: colors.text.primary, fontWeight: '700' },
-  numWeekend: { opacity: 0.5 },
+  numSat: { opacity: 0.55 },
+  numSun: { color: '#FF6B6B', opacity: 0.85 },
   moodDot: { width: 16, height: 3, borderRadius: 2, opacity: 0.9 },
   dots: { flexDirection: 'row', gap: 3, height: 5 },
   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' },
@@ -277,7 +282,8 @@ const styles = StyleSheet.create({
   },
   detailedNumTextToday: { color: colors.white, fontWeight: '800' },
   detailedNumTextSel:   { color: colors.bg.primary, fontWeight: '800' },
-  detailedNumWeekend:   { color: colors.accent.red, opacity: 0.8 },
+  detailedNumWeekend:   { opacity: 0.55 },
+  detailedNumSun:       { color: '#FF6B6B', opacity: 0.85 },
 
   moodDotTiny: { width: 5, height: 5, borderRadius: 3 },
 

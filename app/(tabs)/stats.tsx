@@ -30,11 +30,11 @@ import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { haptic } from '@/utils/haptics';
 
 const VP = {
-  card:       '#100A18',
-  cardBorder: 'rgba(191,128,255,0.18)',
-  accent:     '#BF80FF',
-  accentDim:  'rgba(191,128,255,0.12)',
-  muted:      'rgba(191,128,255,0.45)',
+  card:       '#0E1428',
+  cardBorder: 'rgba(58,76,156,0.22)',
+  accent:     '#3A4C9C',
+  accentDim:  'rgba(58,76,156,0.18)',
+  muted:      'rgba(58,76,156,0.55)',
 };
 const V = VP.accent; // kept for existing inline expressions
 
@@ -662,8 +662,8 @@ const styles = StyleSheet.create({
   modeBtnActive: {
     backgroundColor: V + '20',
   },
-  monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
-  yearLabel:  { ...typography.caption, color: VP.muted, marginTop: 2 },
+  monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  yearLabel:  { ...typography.caption, color: VP.accent, marginTop: 2, fontWeight: '700' },
 
   swipeHint: {
     fontSize: 9, color: colors.text.muted, textAlign: 'center',
