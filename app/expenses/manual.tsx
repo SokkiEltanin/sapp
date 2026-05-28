@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
+  TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -226,7 +226,7 @@ export default function ManualReceiptScreen() {
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   });
-  const { addExpense, expenses } = useExpensesStore();
+  const addExpense = useExpensesStore(s => s.addExpense);
 
   function makeItem(): Item {
     return {
@@ -260,7 +260,7 @@ export default function ManualReceiptScreen() {
 
   const save = async () => {
     if (validItems.length === 0) {
-      Alert.alert('Brak produktów', 'Dodaj co najmniej jeden produkt z ceną.');
+      toast.error('Dodaj co najmniej jeden produkt z ceną');
       return;
     }
     setSaving(true);
@@ -279,7 +279,7 @@ export default function ManualReceiptScreen() {
         const unitPrice = parseFloat(it.price.replace(',', '.'));
         const qty = Math.max(1, parseFloat(it.quantity) || 1);
         const price = Math.round(unitPrice * qty * 100) / 100;
-        return {
+        const item: ReceiptItem = {
           name: it.name.trim(),
           price,
           category: it.category,
@@ -287,6 +287,7 @@ export default function ManualReceiptScreen() {
           unitPrice,
           tags: it.tags.length > 0 ? it.tags : getFoodTags(it.name),
         };
+        return item;
       });
 
       const totalAmount = receiptItems.reduce((s, it) => s + it.price, 0);
@@ -295,9 +296,10 @@ export default function ManualReceiptScreen() {
       for (const it of receiptItems) catAmts.set(it.category, (catAmts.get(it.category) ?? 0) + it.price);
       const dominantCat = [...catAmts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'groceries';
 
-      const storeTag = store ? store.toLowerCase().split(' ')[0] : undefined;
       const foodTags = [...new Set(receiptItems.flatMap(it => it.tags))];
-      const tags = [storeTag, ...foodTags].filter(Boolean) as string[];
+      const tags: string[] = store
+        ? [store.toLowerCase().split(' ')[0], ...foodTags]
+        : foodTags;
 
       const expense = await expensesService.add({
         type: 'expense',
@@ -307,33 +309,36 @@ export default function ManualReceiptScreen() {
         tags,
         note: store || 'Paragon ręczny',
         date: dateParsed,
-        storeName: store || undefined,
+        ...(store ? { storeName: store } : {}),
         receiptItems,
       });
+
       addExpense(expense);
-
-      const budgets = await getBudgets();
-      const nowM = dateParsed.slice(0, 7);
-      for (const [cat, addedAmt] of catAmts) {
-        const limit = budgets[cat];
-        if (!limit || limit <= 0) continue;
-        const prevSpent = expenses
-          .filter(e => (!e.type || e.type === 'expense') && e.category === cat && e.date.startsWith(nowM))
-          .reduce((s, e) => s + e.amount, 0);
-        const monthSpent = prevSpent + addedAmt;
-        const pct = monthSpent / limit;
-        if (pct >= 1) {
-          toast.error(`Budżet "${CATEGORY_META[cat]?.label}" przekroczony! ${monthSpent.toFixed(0)}/${limit} zł`);
-        } else if (pct >= 0.85) {
-          toast.info(`Uwaga: ${Math.round(pct * 100)}% budżetu "${CATEGORY_META[cat]?.label}" wykorzystane`);
-        }
-      }
-
       haptic.success();
+      toast.success(`Zapisano ${receiptItems.length} pozycji · ${totalAmount.toFixed(2)} zł`);
       router.back();
+
+      // Budget alerts - non-blocking, fire after navigation
+      getBudgets().then(budgets => {
+        const nowM = dateParsed.slice(0, 7);
+        const currentExpenses = useExpensesStore.getState().expenses;
+        for (const [cat, addedAmt] of catAmts) {
+          const limit = budgets[cat];
+          if (!limit || limit <= 0) continue;
+          const prevSpent = currentExpenses
+            .filter(e => (!e.type || e.type === 'expense') && e.category === cat && e.date.startsWith(nowM))
+            .reduce((s, e) => s + e.amount, 0);
+          const pct = prevSpent / limit;
+          if (pct >= 1) {
+            toast.error(`Budżet "${CATEGORY_META[cat]?.label}" przekroczony!`);
+          } else if (pct >= 0.85) {
+            toast.info(`${Math.round(pct * 100)}% budżetu "${CATEGORY_META[cat]?.label}" wykorzystane`);
+          }
+        }
+      }).catch(() => {});
     } catch (e: any) {
       setSaving(false);
-      Alert.alert('Błąd', e.message);
+      toast.error(e?.message ?? 'Błąd zapisu paragonu');
     }
   };
 
