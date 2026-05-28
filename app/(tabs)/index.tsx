@@ -201,25 +201,64 @@ function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
   return d.toISOString().split('T')[0];
 }
 
-// ─── Wave chart ───────────────────────────────────────────────────────────────
+// ─── Wave charts ──────────────────────────────────────────────────────────────
 
 const WAVE_W = 320;
 const WAVE_H = 64;
 
-function WaveChart({ data, color, dotColors }: { data: number[]; color: string; dotColors?: (string | null)[] }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data, 1);
+function buildWavePath(data: number[], max: number) {
   const pts = data.map((v, i) => ({
     x: (i / (data.length - 1)) * WAVE_W,
     y: WAVE_H - 6 - ((v / max) * (WAVE_H - 18)),
   }));
   let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
   for (let i = 1; i < pts.length; i++) {
-    const px = pts[i - 1].x, py = pts[i - 1].y, cx = pts[i].x, cy = pts[i].y;
+    const px = pts[i-1].x, py = pts[i-1].y, cx = pts[i].x, cy = pts[i].y;
     const cpx = (px + cx) / 2;
     line += ` C ${cpx.toFixed(1)} ${py.toFixed(1)}, ${cpx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
   }
-  const fill = `${line} L ${pts[pts.length - 1].x.toFixed(1)} ${WAVE_H} L ${pts[0].x.toFixed(1)} ${WAVE_H} Z`;
+  const fill = `${line} L ${pts[pts.length-1].x.toFixed(1)} ${WAVE_H} L ${pts[0].x.toFixed(1)} ${WAVE_H} Z`;
+  return { line, fill, pts };
+}
+
+// Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
+function DualWaveChart({ data1, data2, color1, color2 }: {
+  data1: number[]; data2: number[]; color1: string; color2: string;
+}) {
+  if (data1.length < 2) return null;
+  const max = Math.max(...data1, ...data2, 1);
+  const p1  = buildWavePath(data1, max);
+  const p2  = buildWavePath(data2, max);
+  return (
+    <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
+      <Defs>
+        <SvgLinearGradient id="dwg1" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color1} stopOpacity="0.28" />
+          <Stop offset="1" stopColor={color1} stopOpacity="0" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="dwg2" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color2} stopOpacity="0.16" />
+          <Stop offset="1" stopColor={color2} stopOpacity="0" />
+        </SvgLinearGradient>
+      </Defs>
+      <Path d={p1.fill} fill="url(#dwg1)" />
+      <Path d={p2.fill} fill="url(#dwg2)" />
+      <Path d={p1.line} stroke={color1} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+      <Path d={p2.line} stroke={color2} strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 3" />
+      {p1.pts.map((p, i) => (
+        <Path key={`d1_${i}`}
+          d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0`}
+          fill={color1} opacity={data1[i] > 0 ? '1' : '0.15'}
+        />
+      ))}
+    </Svg>
+  );
+}
+
+function WaveChart({ data, color, dotColors }: { data: number[]; color: string; dotColors?: (string | null)[] }) {
+  if (data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const { line, fill, pts } = buildWavePath(data, max);
   const gradId = `wg_${color.replace('#', '')}`;
   return (
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
@@ -241,6 +280,64 @@ function WaveChart({ data, color, dotColors }: { data: number[]; color: string; 
         );
       })}
     </Svg>
+  );
+}
+
+// ─── Mood mini calendar ────────────────────────────────────────────────────────
+
+const MINI_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+
+function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) {
+  const now = new Date();
+  const year  = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = now.getDate();
+  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
+  const p2 = (n: number) => String(n).padStart(2, '0');
+
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row' }}>
+        {MINI_DAYS.map(d => (
+          <View key={d} style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 7, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.4 }}>{d}</Text>
+          </View>
+        ))}
+      </View>
+      {rows.map((row, ri) => (
+        <View key={ri} style={{ flexDirection: 'row' }}>
+          {row.map((day, ci) => {
+            if (!day) return <View key={ci} style={{ flex: 1 }} />;
+            const dateStr = `${year}-${p2(month + 1)}-${p2(day)}`;
+            const entries = moodByDay[dateStr] ?? [];
+            const avgM = entries.length ? entries.reduce((a, b) => a + b.mood, 0) / entries.length : null;
+            const mc = avgM != null ? moodColor(avgM) : null;
+            const isT = day === today;
+            return (
+              <View key={ci} style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
+                <View style={{
+                  width: 14, height: 14, borderRadius: 7,
+                  backgroundColor: mc ? mc : 'rgba(255,255,255,0.05)',
+                  opacity: mc ? 0.88 : 1,
+                  borderWidth: isT ? 1.5 : 0,
+                  borderColor: isT ? 'rgba(255,255,255,0.45)' : 'transparent',
+                }} />
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -467,25 +564,28 @@ export default function DashboardScreen() {
       const moodVals = dates.flatMap(d => (moodByDay[d] ?? []).map(e => e.mood));
       const avgMood  = moodVals.length ? moodVals.reduce((a, b) => a + b, 0) / moodVals.length : null;
       const sw = sweetsTotal(expenses, dates);
+      const food      = groceryTotal(expenses, dates);
       const totalSpend = allSpend(expenses, dates);
-      return { offset, dates, avgMood, sweets: sw, totalSpend, isCurrent: offset === weekOffset };
+      return { offset, dates, avgMood, sweets: sw, food, totalSpend, isCurrent: offset === weekOffset };
     });
   }, [weekOffset, moodByDay, expenses]);
 
-  const weekdayBreakdown = useMemo(() => {
+  // Average spending per day-of-week across ALL historical data
+  const weekdayAvg = useMemo(() => {
     const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
-    const totals = [0, 0, 0, 0, 0, 0, 0];
-    const now = new Date();
-    const monthStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    const totals  = [0, 0, 0, 0, 0, 0, 0];
+    const dateSets: Set<string>[] = Array.from({ length: 7 }, () => new Set());
     for (const e of expenses) {
-      if ((!e.type || e.type === 'expense') && e.date.startsWith(monthStr)) {
+      if (!e.type || e.type === 'expense') {
         const d = new Date(e.date + 'T12:00:00');
         const dow = (d.getDay() + 6) % 7;
         totals[dow] += e.amount;
+        dateSets[dow].add(e.date.slice(0, 10));
       }
     }
-    const max = Math.max(...totals, 1);
-    return days.map((label, i) => ({ label, total: totals[i], pct: totals[i] / max }));
+    const avgs = totals.map((t, i) => dateSets[i].size > 0 ? t / dateSets[i].size : 0);
+    const maxAvg = Math.max(...avgs, 1);
+    return days.map((label, i) => ({ label, avg: avgs[i], pct: avgs[i] / maxAvg }));
   }, [expenses]);
 
   const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -1007,21 +1107,28 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {/* ══ 8-WEEK SPENDING WAVE ════════════════════════════════════ */}
-            {weekOverview.filter(w => w.totalSpend > 0).length >= 2 && (
+            {/* ══ SŁODYCZE VS JEDZENIE — 8 TYGODNI ═══════════════════════ */}
+            {weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
               <View style={s.card}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={colors.tabs.finances} />
-                  <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>Wydatki — 8 tygodni</Text>
-                  <View style={[s.avgPill, { backgroundColor: colors.tabs.finances + '20', marginLeft: 'auto' as any }]}>
-                    <Text style={[s.avgPillText, { color: colors.tabs.finances }]}>
-                      {weekOverview.find(w => w.isCurrent)?.totalSpend.toFixed(0)} zł
-                    </Text>
+                  <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>Słodycze vs jedzenie</Text>
+                  <View style={s.dualLegend}>
+                    <View style={s.dualLegendItem}>
+                      <View style={[s.dualLegendLine, { backgroundColor: colors.accent.green }]} />
+                      <Text style={s.dualLegendLabel}>jedzenie</Text>
+                    </View>
+                    <View style={s.dualLegendItem}>
+                      <View style={[s.dualLegendLine, { backgroundColor: colors.accent.amber, opacity: 0.8 }]} />
+                      <Text style={s.dualLegendLabel}>słodycze</Text>
+                    </View>
                   </View>
                 </View>
-                <WaveChart
-                  data={weekOverview.map(w => w.totalSpend)}
-                  color={colors.tabs.finances}
+                <DualWaveChart
+                  data1={weekOverview.map(w => w.food)}
+                  data2={weekOverview.map(w => w.sweets)}
+                  color1={colors.accent.green}
+                  color2={colors.accent.amber}
                 />
                 <View style={s.waveLabels}>
                   {weekOverview.map((w, i) => (
@@ -1033,27 +1140,48 @@ export default function DashboardScreen() {
               </View>
             )}
 
-            {/* ══ DAY-OF-WEEK SPENDING ════════════════════════════════════ */}
-            {weekdayBreakdown.some(d => d.total > 0) && (
+            {/* ══ W JAKIE DNI WYDAJESZ NAJWIĘCEJ? ════════════════════════ */}
+            {weekdayAvg.some(d => d.avg > 0) && (
               <View style={s.card}>
                 <View style={s.cardHeader}>
-                  <BarChart2 size={13} color={colors.tabs.finances} />
-                  <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>W jakie dni wydajesz?</Text>
+                  <BarChart2 size={13} color={accentColor} />
+                  <Text style={[s.cardTitle, { color: accentColor }]}>W jakie dni wydajesz?</Text>
+                  <Text style={[s.cardTitle, { marginLeft: 'auto' as any, color: colors.text.muted }]}>śr. zł/dzień</Text>
                 </View>
                 <View style={s.dowRow}>
-                  {weekdayBreakdown.map((d, i) => (
-                    <View key={i} style={s.dowCol}>
-                      <View style={s.dowBar}>
-                        <View style={[s.dowFill, {
-                          height: Math.max(d.pct * 44, d.total > 0 ? 4 : 0),
-                          backgroundColor: i >= 5 ? colors.accent.amber : colors.tabs.finances,
-                          opacity: d.total > 0 ? 1 : 0.12,
-                        }]} />
+                  {weekdayAvg.map((d, i) => {
+                    const isWeekend = i >= 5;
+                    const barColor = isWeekend ? accentColor + 'AA' : accentColor;
+                    return (
+                      <View key={i} style={s.dowCol}>
+                        {d.avg > 0 && (
+                          <Text style={[s.dowAvgLabel, { color: isWeekend ? accentColor + 'AA' : accentColor }]}>
+                            {d.avg >= 100 ? `${(d.avg / 1).toFixed(0)}` : d.avg.toFixed(0)}
+                          </Text>
+                        )}
+                        <View style={s.dowBar}>
+                          <View style={[s.dowFill, {
+                            height: Math.max(d.pct * 44, d.avg > 0 ? 4 : 0),
+                            backgroundColor: barColor,
+                            opacity: d.avg > 0 ? 1 : 0.1,
+                          }]} />
+                        </View>
+                        <Text style={[s.dowLabel, isWeekend && { color: accentColor + 'AA' }]}>{d.label}</Text>
                       </View>
-                      <Text style={[s.dowLabel, i >= 5 && { color: colors.accent.amber }]}>{d.label}</Text>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
+              </View>
+            )}
+
+            {/* ══ NASTRÓJ — KALENDARZ MIESIĄCA ════════════════════════════ */}
+            {Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
+              <View style={s.card}>
+                <View style={s.cardHeader}>
+                  <Smile size={13} color={colors.text.muted} />
+                  <Text style={s.cardTitle}>Nastrój — ten miesiąc</Text>
+                </View>
+                <MoodMiniCal moodByDay={moodByDay} />
               </View>
             )}
 
@@ -1528,7 +1656,14 @@ const s = StyleSheet.create({
     borderRadius: 4, overflow: 'hidden', justifyContent: 'flex-end',
   },
   dowFill: { width: '100%', borderRadius: 4 },
-  dowLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+  dowLabel:    { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+  dowAvgLabel: { fontSize: 8, fontWeight: '700', letterSpacing: -0.2, marginBottom: 2 },
+
+  // ── Dual-wave legend ───────────────────────────────────────────────────────
+  dualLegend:      { flexDirection: 'row', gap: 10, marginLeft: 'auto' as any },
+  dualLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dualLegendLine:  { width: 10, height: 2, borderRadius: 1 },
+  dualLegendLabel: { fontSize: 9, color: colors.text.muted },
 
   // ── Subscription payment modal ─────────────────────────────────────────────
   payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
