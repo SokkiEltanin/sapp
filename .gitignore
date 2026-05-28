@@ -37,6 +37,10 @@ yarn-error.*
 .env*.local
 .env
 
+# Sensitive config — keys stored in GitHub Secrets
+.env.local
+google-services.json
+
 # Build artifacts
 *.apk
 *.aab
