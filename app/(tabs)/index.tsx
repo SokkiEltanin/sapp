@@ -467,9 +467,26 @@ export default function DashboardScreen() {
       const moodVals = dates.flatMap(d => (moodByDay[d] ?? []).map(e => e.mood));
       const avgMood  = moodVals.length ? moodVals.reduce((a, b) => a + b, 0) / moodVals.length : null;
       const sw = sweetsTotal(expenses, dates);
-      return { offset, dates, avgMood, sweets: sw, isCurrent: offset === weekOffset };
+      const totalSpend = allSpend(expenses, dates);
+      return { offset, dates, avgMood, sweets: sw, totalSpend, isCurrent: offset === weekOffset };
     });
   }, [weekOffset, moodByDay, expenses]);
+
+  const weekdayBreakdown = useMemo(() => {
+    const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+    const totals = [0, 0, 0, 0, 0, 0, 0];
+    const now = new Date();
+    const monthStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    for (const e of expenses) {
+      if ((!e.type || e.type === 'expense') && e.date.startsWith(monthStr)) {
+        const d = new Date(e.date + 'T12:00:00');
+        const dow = (d.getDay() + 6) % 7;
+        totals[dow] += e.amount;
+      }
+    }
+    const max = Math.max(...totals, 1);
+    return days.map((label, i) => ({ label, total: totals[i], pct: totals[i] / max }));
+  }, [expenses]);
 
   const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
     .replace(/^\w/, c => c.toUpperCase());
@@ -990,6 +1007,56 @@ export default function DashboardScreen() {
               </View>
             </View>
 
+            {/* ══ 8-WEEK SPENDING WAVE ════════════════════════════════════ */}
+            {weekOverview.filter(w => w.totalSpend > 0).length >= 2 && (
+              <View style={s.card}>
+                <View style={s.cardHeader}>
+                  <Wallet size={13} color={colors.tabs.finances} />
+                  <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>Wydatki — 8 tygodni</Text>
+                  <View style={[s.avgPill, { backgroundColor: colors.tabs.finances + '20', marginLeft: 'auto' as any }]}>
+                    <Text style={[s.avgPillText, { color: colors.tabs.finances }]}>
+                      {weekOverview.find(w => w.isCurrent)?.totalSpend.toFixed(0)} zł
+                    </Text>
+                  </View>
+                </View>
+                <WaveChart
+                  data={weekOverview.map(w => w.totalSpend)}
+                  color={colors.tabs.finances}
+                />
+                <View style={s.waveLabels}>
+                  {weekOverview.map((w, i) => (
+                    <Text key={i} style={[s.waveLabel, w.isCurrent && { color: colors.tabs.finances, fontWeight: '700' }]}>
+                      {weekLabel(w.dates).split(' ')[0]}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* ══ DAY-OF-WEEK SPENDING ════════════════════════════════════ */}
+            {weekdayBreakdown.some(d => d.total > 0) && (
+              <View style={s.card}>
+                <View style={s.cardHeader}>
+                  <BarChart2 size={13} color={colors.tabs.finances} />
+                  <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>W jakie dni wydajesz?</Text>
+                </View>
+                <View style={s.dowRow}>
+                  {weekdayBreakdown.map((d, i) => (
+                    <View key={i} style={s.dowCol}>
+                      <View style={s.dowBar}>
+                        <View style={[s.dowFill, {
+                          height: Math.max(d.pct * 44, d.total > 0 ? 4 : 0),
+                          backgroundColor: i >= 5 ? colors.accent.amber : colors.tabs.finances,
+                          opacity: d.total > 0 ? 1 : 0.12,
+                        }]} />
+                      </View>
+                      <Text style={[s.dowLabel, i >= 5 && { color: colors.accent.amber }]}>{d.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* ══ 8-WEEK MOOD WAVE ════════════════════════════════════════ */}
             {weekOverview.filter(w => w.avgMood !== null).length >= 3 && (
               <View style={s.card}>
@@ -1451,6 +1518,17 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(43,200,224,0.08)',
   },
+
+  // ── Day-of-week bar chart ──────────────────────────────────────────────────
+  dowRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  dowCol: { flex: 1, alignItems: 'center', gap: 4 },
+  dowBar: {
+    width: '100%', height: 48,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 4, overflow: 'hidden', justifyContent: 'flex-end',
+  },
+  dowFill: { width: '100%', borderRadius: 4 },
+  dowLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
 
   // ── Subscription payment modal ─────────────────────────────────────────────
   payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
