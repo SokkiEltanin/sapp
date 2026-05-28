@@ -345,7 +345,7 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
 
 export default function DashboardScreen() {
   const { panHandlers, animatedStyle } = useTabSwipe();
-  const { color: accentColor, greeting, gradientTop } = useTimeAccent();
+  const { color: accentColor, greeting, gradientTop, cardBg, cardBgDark } = useTimeAccent();
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
   const pomodoro = usePomodoroStore();
@@ -712,7 +712,7 @@ export default function DashboardScreen() {
             {/* ══ BUDGET WARNING CARD ══════════════════════════════════════ */}
             {budgetRemaining && budgetRemaining.pct >= 0.7 && (
               <TouchableOpacity
-                style={s.budgetWarnCard}
+                style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
                 onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
                 activeOpacity={0.8}
               >
@@ -774,7 +774,7 @@ export default function DashboardScreen() {
             <View style={s.miniRow}>
               {/* Tasks tile */}
               <TouchableOpacity
-                style={[s.miniCard, { borderColor: colors.tabs.tasks + '30' }]}
+                style={[s.miniCard, { backgroundColor: cardBg, borderColor: colors.tabs.tasks + '30' }]}
                 onPress={() => router.push('/(tabs)/tasks' as any)}
                 activeOpacity={0.8}
               >
@@ -796,7 +796,7 @@ export default function DashboardScreen() {
 
               {/* Work live tile (only when working) */}
               {workEarnings.isWorking ? (
-                <View style={[s.miniCard, { borderColor: (wc ?? colors.accent.blue) + '30' }]}>
+                <View style={[s.miniCard, { backgroundColor: cardBg, borderColor: (wc ?? colors.accent.blue) + '30' }]}>
                   <View style={s.miniCardTop}>
                     <Briefcase size={13} color={wc ?? colors.accent.blue} />
                     <Text style={[s.miniCardNum, { color: wc ?? colors.accent.blue }]}>
@@ -814,7 +814,7 @@ export default function DashboardScreen() {
               ) : (
                 /* Budget tile when not working */
                 <TouchableOpacity
-                  style={[s.miniCard, { borderColor: colors.tabs.finances + '30' }]}
+                  style={[s.miniCard, { backgroundColor: cardBg, borderColor: colors.tabs.finances + '30' }]}
                   onPress={() => router.push('/(tabs)/finances' as any)}
                   activeOpacity={0.8}
                 >
@@ -848,7 +848,7 @@ export default function DashboardScreen() {
               const totalCount     = combined.length;
               const hasOverdue     = overdueTasks.length > 0;
               return (
-                <View style={[s.todayCard, hasOverdue && { borderColor: colors.accent.red + '30' }]}>
+                <View style={[s.todayCard, { backgroundColor: cardBg }, hasOverdue && { borderColor: colors.accent.red + '30' }]}>
                   <View style={s.todayHeader}>
                     <Check size={12} color={hasOverdue ? colors.accent.red : colors.tabs.tasks} strokeWidth={3} />
                     <Text style={[s.todayTitle, hasOverdue && { color: colors.accent.red }]}>
@@ -974,7 +974,7 @@ export default function DashboardScreen() {
               const pct       = habits.length > 0 ? doneCount / habits.length : 0;
               return (
                 <TouchableOpacity
-                  style={s.habitsCard}
+                  style={[s.habitsCard, { backgroundColor: cardBg }]}
                   onPress={() => router.push('/habits' as any)}
                   activeOpacity={0.8}
                 >
@@ -1043,7 +1043,7 @@ export default function DashboardScreen() {
             })()}
 
             {/* ══ WEEKLY / MONTHLY FINANCES ════════════════════════════════ */}
-            <View style={s.card}>
+            <View style={[s.card, { backgroundColor: cardBg }]}>
               <View style={s.cardHeader}>
                 <Wallet size={13} color={colors.tabs.finances} />
                 <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>
@@ -1109,7 +1109,7 @@ export default function DashboardScreen() {
 
             {/* ══ SŁODYCZE VS JEDZENIE — 8 TYGODNI ═══════════════════════ */}
             {weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
-              <View style={s.card}>
+              <View style={[s.card, { backgroundColor: cardBg }]}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={colors.tabs.finances} />
                   <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>Słodycze vs jedzenie</Text>
@@ -1142,7 +1142,7 @@ export default function DashboardScreen() {
 
             {/* ══ W JAKIE DNI WYDAJESZ NAJWIĘCEJ? ════════════════════════ */}
             {weekdayAvg.some(d => d.avg > 0) && (
-              <View style={s.card}>
+              <View style={[s.card, { backgroundColor: cardBg }]}>
                 <View style={s.cardHeader}>
                   <BarChart2 size={13} color={accentColor} />
                   <Text style={[s.cardTitle, { color: accentColor }]}>W jakie dni wydajesz?</Text>
@@ -1176,7 +1176,7 @@ export default function DashboardScreen() {
 
             {/* ══ NASTRÓJ — KALENDARZ MIESIĄCA ════════════════════════════ */}
             {Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
-              <View style={s.card}>
+              <View style={[s.card, { backgroundColor: cardBg }]}>
                 <View style={s.cardHeader}>
                   <Smile size={13} color={colors.text.muted} />
                   <Text style={s.cardTitle}>Nastrój — ten miesiąc</Text>
@@ -1187,7 +1187,7 @@ export default function DashboardScreen() {
 
             {/* ══ 8-WEEK MOOD WAVE ════════════════════════════════════════ */}
             {weekOverview.filter(w => w.avgMood !== null).length >= 3 && (
-              <View style={s.card}>
+              <View style={[s.card, { backgroundColor: cardBg }]}>
                 <View style={s.cardHeader}>
                   <Smile size={13} color={colors.text.muted} />
                   <Text style={s.cardTitle}>Nastrój — 8 tygodni</Text>
@@ -1216,7 +1216,7 @@ export default function DashboardScreen() {
 
             {/* ══ HUMOR TILE ══════════════════════════════════════════════ */}
             {todayEntry && (
-              <View style={s.humorTile}>
+              <View style={[s.humorTile, { backgroundColor: cardBg }]}>
                 <Text style={s.humorTileEmoji}>{MOOD_EMOJIS[todayEntry.mood]}</Text>
                 <Text style={s.humorTileText}>{humor}</Text>
               </View>
@@ -1230,7 +1230,7 @@ export default function DashboardScreen() {
               const monthActive = calTasks.filter(t => t.status !== 'done').length;
               if (monthDone + monthActive === 0) return null;
               return (
-                <TouchableOpacity style={s.card} onPress={() => router.push('/(tabs)/tasks' as any)} activeOpacity={0.8}>
+                <TouchableOpacity style={[s.card, { backgroundColor: cardBg }]} onPress={() => router.push('/(tabs)/tasks' as any)} activeOpacity={0.8}>
                   <View style={s.cardHeader}>
                     <CheckCircle2 size={13} color={colors.text.muted} />
                     <Text style={s.cardTitle}>{MONTH_SHORT[now.getMonth()]} — zadania</Text>
@@ -1262,7 +1262,7 @@ export default function DashboardScreen() {
 
             {/* ══ GOOGLE CALENDAR ═════════════════════════════════════════ */}
             {(gcalToday.length > 0 || gcalTomorrow.length > 0) && (
-              <View style={s.card}>
+              <View style={[s.card, { backgroundColor: cardBg }]}>
                 <View style={s.cardHeader}>
                   <CalendarDays size={13} color={colors.text.muted} />
                   <Text style={s.cardTitle}>Google Kalendarz</Text>

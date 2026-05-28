@@ -1,64 +1,64 @@
 export const colors = {
   bg: {
-    primary:   '#141414',  // near-black base
-    secondary: '#1A1A1A',
-    card:      '#282828',  // dark gray card
-    elevated:  '#303030',
+    primary:   '#1A1C1C',
+    secondary: '#1F2121',
+    card:      '#242626',
+    elevated:  '#2C2E2E',
     overlay:   'rgba(0,0,0,0.85)',
   },
   text: {
-    primary:   '#FFFFFF',
-    secondary: '#8C8C8C',  // mid gray
-    muted:     '#484848',
+    primary:   '#D9D9D9',
+    secondary: 'rgba(217,217,217,0.60)',
+    muted:     'rgba(217,217,217,0.32)',
     inverse:   '#000000',
   },
 
   // ── Per-tab identity palette ─────────────────────────────────────
   tabs: {
-    dashboard: '#C8C8C8',  // neutral light — time accent overrides
-    tasks:     '#2EDEA0',  // mint green
-    finances:  '#E63535',  // red
-    calendar:  '#3A4C9C',  // indigo blue
-    analytics: '#F97316',  // orange (unchanged)
+    dashboard: '#46B0DE',  // day cyan — useTimeAccent overrides
+    tasks:     '#2AC68F',  // mint green
+    finances:  '#E43434',  // red
+    calendar:  '#3A4C9C',  // indigo
+    analytics: '#F97316',  // orange
   },
 
-  // ── Accent colors (per-module) ───────────────────────────────────
+  // ── Accent colors ────────────────────────────────────────────────
   accent: {
-    // blue pair (Row 2)
-    blue:   '#5166F5',
-    blueDark: '#1E2242',
-    // cyan pair (Row 3)
-    cyan:   '#2BC8E0',
-    cyanDark: '#0E262C',
-    // green pair (Row 4)
-    green:  '#2EDEA0',
-    greenDark: '#0C2218',
-    // indigo pair (Row 5)
+    // blue-night pair
+    blue:   '#5B7BE3',
+    blueDark: '#282F44',
+    // cyan-day pair
+    cyan:   '#46B0DE',
+    cyanDark: '#1B3947',
+    // green-tasks pair
+    green:  '#2AC68F',
+    greenDark: '#28443A',
+    // indigo pair
     indigo: '#3A4C9C',
     indigoDark: '#1A2048',
-    // red pair (Row 6)
-    red:    '#E63535',
-    redDark: '#5C1010',
-    // other
+    // red-finances pair
+    red:    '#E43434',
+    redDark: '#5B1818',
+    // misc
     amber:  '#FBBF24',
     purple: '#BF80FF',
     pink:   '#F472B6',
     orange: '#F97316',
-    // legacy aliases
+    // legacy
     primary:   '#BF80FF',
     secondary: '#F472B6',
-    success:   '#2EDEA0',
-    danger:    '#E63535',
+    success:   '#2AC68F',
+    danger:    '#E43434',
     warning:   '#FBBF24',
   },
 
-  // ── Dark card tints per module (light accent + ~10% opacity) ─────
+  // ── Tints ────────────────────────────────────────────────────────
   tint: {
-    blue:   'rgba(81,102,245,0.12)',
-    cyan:   'rgba(43,200,224,0.12)',
-    green:  'rgba(46,222,160,0.12)',
+    blue:   'rgba(91,123,227,0.12)',
+    cyan:   'rgba(70,176,222,0.12)',
+    green:  'rgba(42,198,143,0.12)',
     indigo: 'rgba(58,76,156,0.12)',
-    red:    'rgba(230,53,53,0.12)',
+    red:    'rgba(228,52,52,0.12)',
     amber:  'rgba(251,191,36,0.12)',
     purple: 'rgba(191,128,255,0.12)',
     pink:   'rgba(244,114,182,0.12)',
@@ -66,11 +66,11 @@ export const colors = {
   },
 
   border: {
-    default: 'rgba(255,255,255,0.10)',
-    subtle:  'rgba(255,255,255,0.05)',
-    focus:   'rgba(255,255,255,0.25)',
-    card:    'rgba(255,255,255,0.08)',
-    glass:   'rgba(255,255,255,0.12)',
+    default: 'rgba(217,217,217,0.10)',
+    subtle:  'rgba(217,217,217,0.05)',
+    focus:   'rgba(217,217,217,0.25)',
+    card:    'rgba(217,217,217,0.08)',
+    glass:   'rgba(217,217,217,0.12)',
   },
 
   brand: {
@@ -79,22 +79,22 @@ export const colors = {
 
   // Time-of-day gradient top colors
   timeGradient: {
-    night:     '#0A0A1E',
-    dawn:      '#1A0E06',
-    morning:   '#060D1A',
-    afternoon: '#0D0A18',
-    evening:   '#180A08',
+    night:     '#0B0E1A',
+    dawn:      '#0B0E1A',
+    morning:   '#091820',
+    afternoon: '#091820',
+    evening:   '#0B0E1A',
   },
 
   transparent: 'transparent',
-  white:  '#FFFFFF',
+  white:  '#D9D9D9',
   black:  '#000000',
-  // legacy screen-level color aliases
-  expenses: '#E63535',
+  // legacy aliases
+  expenses: '#E43434',
   calendar: '#3A4C9C',
-  health:   '#2EDEA0',
+  health:   '#2AC68F',
   mood:     '#F472B6',
-  tasks:    '#2EDEA0',
+  tasks:    '#2AC68F',
 } as const;
 
 export type Colors = typeof colors;

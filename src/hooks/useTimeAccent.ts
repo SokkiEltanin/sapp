@@ -1,14 +1,22 @@
 import { useMemo } from 'react';
-import { colors } from '@/theme';
 
 export type TimeOfDay = 'night' | 'dawn' | 'morning' | 'afternoon' | 'evening';
 
-const ACCENTS: Record<TimeOfDay, { color: string; greeting: string; gradientTop: string }> = {
-  night:     { color: colors.tabs.calendar,  greeting: 'Dobranoc',     gradientTop: colors.timeGradient.night },
-  dawn:      { color: colors.accent.amber,   greeting: 'Świt',         gradientTop: colors.timeGradient.dawn },
-  morning:   { color: colors.tabs.tasks,     greeting: 'Dzień dobry',  gradientTop: colors.timeGradient.morning },
-  afternoon: { color: colors.tabs.calendar,  greeting: 'Cześć',        gradientTop: colors.timeGradient.afternoon },
-  evening:   { color: colors.accent.orange,  greeting: 'Dobry wieczór', gradientTop: colors.timeGradient.evening },
+interface TimeAccent {
+  color: string;
+  greeting: string;
+  gradientTop: string;
+  cardBg: string;
+  cardBgDark: string;
+  timeOfDay: TimeOfDay;
+}
+
+const ACCENTS: Record<TimeOfDay, Omit<TimeAccent, 'timeOfDay'>> = {
+  night:     { color: '#5B7BE3', greeting: 'Dobranoc',      gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
+  dawn:      { color: '#5B7BE3', greeting: 'Świt',          gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
+  morning:   { color: '#46B0DE', greeting: 'Dzień dobry',   gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
+  afternoon: { color: '#46B0DE', greeting: 'Cześć',         gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
+  evening:   { color: '#5B7BE3', greeting: 'Dobry wieczór', gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
 };
 
 function timeOfDay(h: number): TimeOfDay {
@@ -19,7 +27,7 @@ function timeOfDay(h: number): TimeOfDay {
   return 'night';
 }
 
-export function useTimeAccent() {
+export function useTimeAccent(): TimeAccent {
   return useMemo(() => {
     const tod = timeOfDay(new Date().getHours());
     return { ...ACCENTS[tod], timeOfDay: tod };

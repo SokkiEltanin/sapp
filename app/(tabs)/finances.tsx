@@ -23,11 +23,11 @@ import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { haptic } from '@/utils/haptics';
 
 const F = {
-  card:       '#1C0808',
-  cardBorder: 'rgba(230,53,53,0.18)',
-  accent:     '#E63535',
-  accentDim:  'rgba(230,53,53,0.14)',
-  muted:      'rgba(230,53,53,0.55)',
+  card:       '#5B1818',
+  cardBorder: 'rgba(228,52,52,0.18)',
+  accent:     '#E43434',
+  accentDim:  'rgba(228,52,52,0.14)',
+  muted:      'rgba(228,52,52,0.55)',
 };
 
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }

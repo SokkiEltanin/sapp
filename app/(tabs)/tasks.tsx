@@ -26,10 +26,10 @@ import { notificationsService } from '@/services/notificationsService';
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 const G = {
-  card:         '#0C2218',
-  cardBorder:   'rgba(46,222,160,0.20)',
-  accent:       '#2EDEA0',
-  accentDim:    'rgba(46,222,160,0.18)',
+  card:         '#28443A',
+  cardBorder:   'rgba(42,198,143,0.20)',
+  accent:       '#2AC68F',
+  accentDim:    'rgba(42,198,143,0.18)',
   overdueCard:  '#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
 };
