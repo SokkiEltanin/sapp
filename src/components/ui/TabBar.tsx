@@ -32,7 +32,7 @@ const TABS = [
 // null = dynamic time accent on home
 const TAB_ACCENTS = [
   null,
-  colors.tabs.tasks,    // #3DBE75 green
+  colors.tabs.tasks,    // #2EDEA0 green
   colors.tabs.calendar, // #BF80FF violet
   colors.tabs.finances, // #EF4444 red
 ] as const;

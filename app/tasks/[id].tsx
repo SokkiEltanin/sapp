@@ -31,11 +31,11 @@ import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
 import { haptic } from '@/utils/haptics';
 
 const G = {
-  card:       '#0D2318',
-  cardBorder: 'rgba(61,190,117,0.18)',
-  accent:     '#3DBE75',
-  accentDim:  'rgba(61,190,117,0.14)',
-  muted:      'rgba(61,190,117,0.45)',
+  card:       '#0C2218',
+  cardBorder: 'rgba(46,222,160,0.20)',
+  accent:     '#2EDEA0',
+  accentDim:  'rgba(46,222,160,0.18)',
+  muted:      'rgba(46,222,160,0.50)',
 };
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -298,7 +298,7 @@ export default function TaskDetailScreen() {
                 placeholderTextColor={colors.text.muted}
               />
             ) : (
-              <Text style={[styles.titleText, done && styles.titleDone]}>{task.title}</Text>
+              <Text style={[styles.titleText, done && styles.titleDone]}>{task.title.toUpperCase()}</Text>
             )}
           </View>
 

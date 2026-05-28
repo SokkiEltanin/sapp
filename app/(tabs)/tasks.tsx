@@ -437,7 +437,7 @@ const dm = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   kav: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#0D2318',
+    backgroundColor: G.card,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     borderWidth: 1, borderBottomWidth: 0,
     borderColor: G.cardBorder,
@@ -455,12 +455,12 @@ const dm = StyleSheet.create({
   descText:  { fontSize: 13, color: colors.text.secondary, lineHeight: 19, marginTop: 4 },
   closeBtn:  { padding: 4 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  tagChip: { fontSize: 10, fontWeight: '600', color: 'rgba(61,190,117,0.50)' },
+  tagChip: { fontSize: 10, fontWeight: '600', color: G.accent + '80' },
   body: { paddingHorizontal: spacing[5], paddingTop: spacing[4] },
   milestoneRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(61,190,117,0.08)',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(46,222,160,0.08)',
   },
   milestoneText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
   milestoneDone: { textDecorationLine: 'line-through', color: colors.text.muted },
@@ -509,7 +509,7 @@ const dm = StyleSheet.create({
   snoozeRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: spacing[3],
-    borderTopWidth: 1, borderTopColor: 'rgba(61,190,117,0.06)',
+    borderTopWidth: 1, borderTopColor: 'rgba(46,222,160,0.06)',
   },
   snoozeRowText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text.secondary },
 });
@@ -755,7 +755,7 @@ const fp = StyleSheet.create({
   },
   badge: {
     minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: 'rgba(61,190,117,0.18)',
+    backgroundColor: G.accentDim,
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 4,
   },

@@ -22,11 +22,11 @@ import { haptic } from '@/utils/haptics';
 // ─── Green palette ────────────────────────────────────────────────────────────
 
 const G = {
-  card:       '#0D2318',
-  cardBorder: 'rgba(61,190,117,0.18)',
-  accent:     '#3DBE75',
-  accentDim:  'rgba(61,190,117,0.14)',
-  muted:      'rgba(61,190,117,0.45)',
+  card:       '#0C2218',
+  cardBorder: 'rgba(46,222,160,0.20)',
+  accent:     '#2EDEA0',
+  accentDim:  'rgba(46,222,160,0.18)',
+  muted:      'rgba(46,222,160,0.50)',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────���───────────
@@ -552,7 +552,7 @@ const s = StyleSheet.create({
     backgroundColor: G.accent, borderRadius: radius.full,
     paddingHorizontal: spacing[3], paddingVertical: 7,
   },
-  saveBtnDisabled: { backgroundColor: 'rgba(61,190,117,0.15)', borderWidth: 1, borderColor: G.cardBorder },
+  saveBtnDisabled: { backgroundColor: 'rgba(46,222,160,0.12)', borderWidth: 1, borderColor: G.cardBorder },
   saveBtnText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary },
 
   scroll: { paddingHorizontal: spacing[4], paddingTop: spacing[3], gap: spacing[3] },
@@ -675,6 +675,6 @@ const s = StyleSheet.create({
     backgroundColor: G.accent, borderRadius: radius.xl,
     paddingVertical: 15, width: '100%',
   },
-  ctaDisabled: { backgroundColor: 'rgba(61,190,117,0.18)' },
+  ctaDisabled: { backgroundColor: 'rgba(46,222,160,0.15)' },
   ctaText: { fontSize: 15, fontWeight: '800', color: colors.bg.primary, letterSpacing: -0.2 },
 });
