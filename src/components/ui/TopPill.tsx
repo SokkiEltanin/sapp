@@ -1,0 +1,271 @@
+import { useMemo, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { router } from 'expo-router';
+import { usePomodoroStore } from '@/store/pomodoroStore';
+import { useCalendarStore } from '@/store/calendarStore';
+import { useWorkStore } from '@/store/workStore';
+import { useExpensesStore } from '@/store/expensesStore';
+import { colors, spacing } from '@/theme';
+import { haptic } from '@/utils/haptics';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function pad(n: number) { return String(n).padStart(2, '0'); }
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function tomorrowIso() {
+  const d = new Date(); d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function weekEndIso() {
+  const d = new Date(); d.setDate(d.getDate() + 7);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function fmtTimer(secs: number) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${pad(m)}:${pad(s)}`;
+}
+function daysUntil(iso: string, today: string) {
+  const ms = new Date(iso + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+// ─── Pill data type ───────────────────────────────────────────────────────────
+
+interface PillItem {
+  badge: string;
+  color: string;
+  text: string;
+  route: string;
+  key: string; // for animation change detection
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function TopPill() {
+  const today    = todayIso();
+  const tomorrow = tomorrowIso();
+  const weekEnd  = weekEndIso();
+
+  // ── Store selectors ────────────────────────────────────────────────────────
+  const pomRunning   = usePomodoroStore(s => s.isRunning);
+  const pomMode      = usePomodoroStore(s => s.mode);
+  const pomRemaining = usePomodoroStore(s => s.remaining);
+  const pomTitle     = usePomodoroStore(s => s.taskTitle);
+
+  const calTasks   = useCalendarStore(s => s.tasks);
+  const gcalEvents = useCalendarStore(s => s.gcalEvents);
+
+  const shifts     = useWorkStore(s => s.shifts);
+  const workPrefix = useWorkStore(s => s.settings.workPrefix ?? '');
+
+  const expenses   = useExpensesStore(s => s.expenses);
+
+  // ── Priority logic ─────────────────────────────────────────────────────────
+  const item: PillItem | null = useMemo(() => {
+
+    // 1 — Pomodoro running (work session)
+    if (pomRunning && pomMode === 'work') {
+      return {
+        badge:  fmtTimer(pomRemaining),
+        color:  colors.tabs.tasks,      // #2EDEA0 green
+        text:   (pomTitle ?? 'POMODORO').toUpperCase(),
+        route:  '/pomodoro',
+        key:    `pom-${pomRemaining}`,
+      };
+    }
+
+    // 2 — Work shift TODAY
+    const todayShift = shifts.find(sh => sh.date === today);
+    if (todayShift) {
+      const pre = workPrefix ? `${workPrefix} ` : '';
+      return {
+        badge: 'DZISIAJ',
+        color:  '#2BC8E0',             // cyan
+        text:  `${pre}MASZ ZMIANĘ NA ${todayShift.startTime}`,
+        route: '/(tabs)/stats',
+        key:   `shift-today`,
+      };
+    }
+
+    // 3 — Work shift TOMORROW
+    const tomShift = shifts.find(sh => sh.date === tomorrow);
+    if (tomShift) {
+      const pre = workPrefix ? `${workPrefix} ` : '';
+      return {
+        badge: 'JUTRO',
+        color:  colors.accent.blue,    // #5166F5
+        text:  `${pre}MASZ ZMIANĘ NA ${tomShift.startTime}`,
+        route: '/(tabs)/stats',
+        key:   `shift-tom`,
+      };
+    }
+
+    // 4 — Overdue tasks (status pending + deadline < today)
+    const overdue = calTasks.filter(t =>
+      t.status === 'pending' &&
+      t.deadline &&
+      t.deadline.split('T')[0] < today
+    );
+    if (overdue.length > 0) {
+      const first = overdue.sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0];
+      return {
+        badge: `${overdue.length} ZALEGŁE`,
+        color:  colors.tabs.finances,  // #E63535 red
+        text:   first.title.toUpperCase(),
+        route:  '/(tabs)/tasks',
+        key:    `overdue-${overdue.length}`,
+      };
+    }
+
+    // 5 — Nearest task deadline within 7 days
+    const nearDeadline = calTasks
+      .filter(t =>
+        t.status !== 'done' &&
+        t.deadline &&
+        t.deadline.split('T')[0] > today &&
+        t.deadline.split('T')[0] <= weekEnd
+      )
+      .sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0];
+
+    if (nearDeadline) {
+      const days = daysUntil(nearDeadline.deadline!.split('T')[0], today);
+      const label = days === 1 ? 'JUTRO' : `${days} DNI`;
+      return {
+        badge:  label,
+        color:  colors.tabs.calendar,  // #3A4C9C indigo
+        text:   nearDeadline.title.toUpperCase(),
+        route:  '/(tabs)/tasks',
+        key:    `deadline-${nearDeadline.id}`,
+      };
+    }
+
+    // 6 — Google Calendar event today (first upcoming by startTime)
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const gcalToday = gcalEvents
+      .filter(e => e.date === today)
+      .filter(e => {
+        if (!e.startTime) return false;
+        const [h, m] = e.startTime.split(':').map(Number);
+        return h * 60 + m >= nowMins; // not started yet OR in progress
+      })
+      .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+    if (gcalToday.length > 0) {
+      const ev = gcalToday[0];
+      const [h, m] = ev.startTime!.split(':').map(Number);
+      const diffM = h * 60 + m - nowMins;
+      const timeLabel = diffM <= 0 ? 'TERAZ' : diffM < 60 ? `ZA ${diffM} MIN` : ev.startTime!;
+      return {
+        badge: timeLabel,
+        color:  '#2BC8E0',
+        text:   ev.title.toUpperCase(),
+        route:  '/(tabs)/stats',
+        key:    `gcal-${ev.id}`,
+      };
+    }
+
+    // 7 — Last expense
+    const lastExp = expenses.find(e => !e.type || e.type === 'expense');
+    if (lastExp) {
+      const tag = lastExp.tags[0] ? `#${lastExp.tags[0]}` : lastExp.category;
+      return {
+        badge: `${Math.round(lastExp.amount)} PLN`,
+        color:  colors.tabs.finances,  // #E63535
+        text:  `OSTATNIO NA ${tag.toUpperCase()}`,
+        route: '/(tabs)/finances',
+        key:   `exp-${lastExp.id}`,
+      };
+    }
+
+    return null;
+  }, [
+    pomRunning, pomMode, pomRemaining, pomTitle,
+    shifts, workPrefix,
+    calTasks,
+    gcalEvents,
+    expenses,
+    today, tomorrow, weekEnd,
+  ]);
+
+  // ── Fade animation on content change ──────────────────────────────────────
+  const opacity  = useRef(new Animated.Value(item ? 1 : 0)).current;
+  const prevKey  = useRef<string | null>(item?.key ?? null);
+
+  useEffect(() => {
+    if (!item) {
+      Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+      return;
+    }
+    if (prevKey.current !== item.key) {
+      // Cross-fade: out → in
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0, duration: 120, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    }
+    prevKey.current = item.key;
+  }, [item?.key]);
+
+  if (!item) return null;
+
+  return (
+    <Animated.View style={{ opacity }}>
+      <TouchableOpacity
+        style={s.pill}
+        onPress={() => { haptic.tap(); router.push(item.route as any); }}
+        activeOpacity={0.75}
+      >
+        <View style={[s.badge, { backgroundColor: item.color }]}>
+          <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
+        </View>
+        <Text style={s.text} numberOfLines={1}>{item.text}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 4,
+    backgroundColor: 'rgba(18,18,18,0.97)',
+    borderRadius: 999,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    gap: 8,
+  },
+  badge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: 0.4,
+  },
+  text: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.white,
+    letterSpacing: 0.2,
+  },
+});

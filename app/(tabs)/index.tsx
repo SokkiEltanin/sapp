@@ -19,6 +19,7 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import TopPill from '@/components/ui/TopPill';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -484,51 +485,6 @@ export default function DashboardScreen() {
   }, [budgets, stats.monthExpenses]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
-  const lifebarState = useMemo(() => {
-    // Priority 1: Pomodoro running
-    if (pomodoro.isRunning && pomodoro.mode === 'work') {
-      const m = Math.floor(pomodoro.remaining / 60);
-      const sec = pomodoro.remaining % 60;
-      return {
-        label: pomodoro.taskTitle ?? 'Focus',
-        value: `${m}:${String(sec).padStart(2, '0')}`,
-        color: colors.accent.red,
-        icon: 'timer' as const,
-      };
-    }
-    // Priority 2: Current calendar event (started ≤ now, ends > now)
-    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
-    const currentEvent = gcalToday.find(e => {
-      if (!e.startTime || !e.endTime) return false;
-      const [sh, sm] = e.startTime.split(':').map(Number);
-      const [eh, em] = e.endTime.split(':').map(Number);
-      const startMins = sh * 60 + sm, endMins = eh * 60 + em;
-      return nowMins >= startMins && nowMins < endMins;
-    });
-    if (currentEvent) {
-      const [eh, em] = currentEvent.endTime!.split(':').map(Number);
-      const endMins = eh * 60 + em;
-      const left = endMins - nowMins;
-      return {
-        label: currentEvent.title,
-        value: `kończy się za ${left} min`,
-        color: currentEvent.color ?? colors.accent.blue,
-        icon: 'calendar' as const,
-      };
-    }
-    // Priority 3: Budget near limit (≥ 85%)
-    if (budgetRemaining && budgetRemaining.pct >= 0.85) {
-      const pct = Math.round(budgetRemaining.pct * 100);
-      return {
-        label: 'Budżet',
-        value: `${pct}% wydane`,
-        color: pct >= 100 ? colors.accent.red : colors.accent.amber,
-        icon: 'wallet' as const,
-      };
-    }
-    return null;
-  }, [pomodoro.isRunning, pomodoro.remaining, pomodoro.mode, pomodoro.taskTitle, gcalToday, budgetRemaining]);
-
   // ─── Render ───────────────────────────────────────────────────────────────
   const moodBlobColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : accentColor;
 
@@ -556,15 +512,8 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ── Floating Lifebar ──────────────────────────────────── */}
-          {lifebarState && (
-            <View style={s.lifebar}>
-              <View style={[s.lifebarDot, { backgroundColor: lifebarState.color }]} />
-              <Text style={s.lifebarLabel} numberOfLines={1}>{lifebarState.label}</Text>
-              <View style={{ flex: 1 }} />
-              <Text style={[s.lifebarValue, { color: lifebarState.color }]}>{lifebarState.value}</Text>
-            </View>
-          )}
+          {/* ── Top Pill — global status ────────────────────────── */}
+          <TopPill />
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -1333,19 +1282,6 @@ const s = StyleSheet.create({
     borderRadius: 1, overflow: 'hidden', marginTop: spacing[1],
   },
   miniWorkFill: { height: '100%', borderRadius: 1 },
-
-  // ── Floating Lifebar ──────────────────────────────────────────────────────
-  lifebar: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    marginHorizontal: spacing[4], marginBottom: spacing[2],
-    paddingHorizontal: spacing[4], paddingVertical: 10,
-    backgroundColor: 'rgba(18,18,18,0.92)',
-    borderRadius: radius.full,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-  },
-  lifebarDot: { width: 6, height: 6, borderRadius: 3 },
-  lifebarLabel: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, flex: 1 },
-  lifebarValue: { fontSize: 12, fontWeight: '700' },
 
   // ── Weather ────────────────────────────────────────────────────────────────
   weatherRow: {

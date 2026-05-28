@@ -17,6 +17,7 @@ import { pl } from 'date-fns/locale';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
+import TopPill from '@/components/ui/TopPill';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import ExpenseSummaryCard from '@/components/expenses/ExpenseSummaryCard';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -316,6 +317,7 @@ export default function FinancesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
+      <TopPill />
       <Animated.View style={[{ flex: 1 }, animatedStyle]}>
         <ScreenHeader
           title="Finanse"
