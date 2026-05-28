@@ -635,10 +635,10 @@ export default function DashboardScreen() {
                   color: accentColor,
                 },
                 {
-                  icon: <Timer size={11} color={todayPomCount > 0 ? '#22D3EE' : colors.text.muted} />,
+                  icon: <Timer size={11} color={todayPomCount > 0 ? '#2BC8E0' : colors.text.muted} />,
                   label: `${todayPomCount}×`,
                   active: todayPomCount > 0,
-                  color: '#22D3EE',
+                  color: '#2BC8E0',
                 },
               ];
               return (
@@ -789,7 +789,7 @@ export default function DashboardScreen() {
                           activeOpacity={0.7}
                           style={s.todayPomBtn}
                         >
-                          <Timer size={12} color='rgba(34,211,238,0.7)' />
+                          <Timer size={12} color='rgba(43,200,224,0.7)' />
                         </TouchableOpacity>
                       </TouchableOpacity>
                     );
@@ -804,7 +804,7 @@ export default function DashboardScreen() {
                 { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',  accent: '#F97316', sub: null },
                 { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',   accent: '#A78BFA', sub: null },
                 { label: 'Skupienie',icon: <Activity  size={18} color='#F43F5E' />, route: '/focus',   accent: '#F43F5E', sub: null },
-                { label: 'Pomodoro', icon: <Timer     size={18} color='#22D3EE' />, route: '/pomodoro',accent: '#22D3EE', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
+                { label: 'Pomodoro', icon: <Timer     size={18} color='#2BC8E0' />, route: '/pomodoro',accent: '#2BC8E0', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
               ] as const).map(tool => (
                 <TouchableOpacity
                   key={tool.route}
@@ -1449,7 +1449,7 @@ const s = StyleSheet.create({
   todayPomBtn: {
     width: 26, height: 26, borderRadius: 13,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(34,211,238,0.08)',
+    backgroundColor: 'rgba(43,200,224,0.08)',
   },
 
   // ── Subscription payment modal ─────────────────────────────────────────────

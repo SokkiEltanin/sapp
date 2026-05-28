@@ -17,10 +17,10 @@ import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const C = {
-  accent: '#22D3EE',
-  dim:    'rgba(34,211,238,0.14)',
-  border: 'rgba(34,211,238,0.22)',
-  muted:  'rgba(34,211,238,0.45)',
+  accent: '#2BC8E0',
+  dim:    'rgba(43,200,224,0.14)',
+  border: 'rgba(43,200,224,0.22)',
+  muted:  'rgba(43,200,224,0.45)',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -368,8 +368,8 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 onPress={() => { haptic.tap(); onPomodoro(task); onClose(); }}
                 activeOpacity={0.8}
               >
-                <Timer size={15} color='#22D3EE' />
-                <Text style={[dm.footerBtnText, { color: '#22D3EE' }]}>Pomodoro</Text>
+                <Timer size={15} color='#2BC8E0' />
+                <Text style={[dm.footerBtnText, { color: '#2BC8E0' }]}>Pomodoro</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={dm.footerBtn}
@@ -492,8 +492,8 @@ const dm = StyleSheet.create({
     borderColor: colors.accent.amber + '30',
   },
   footerBtnPom: {
-    backgroundColor: 'rgba(34,211,238,0.12)',
-    borderColor: 'rgba(34,211,238,0.30)',
+    backgroundColor: 'rgba(43,200,224,0.12)',
+    borderColor: 'rgba(43,200,224,0.30)',
   },
   footerBtnText: { fontSize: 13, fontWeight: '700', color: G.accent },
   snoozeSheet: {
