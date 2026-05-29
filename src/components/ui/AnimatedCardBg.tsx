@@ -1,22 +1,21 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import type { TimeOfDay } from '@/hooks/useTimeAccent';
 
 // ─── Stars (night / dawn / evening) ──────────────────────────────────────────
 
-const STAR_COUNT = 20;
+const STAR_COUNT = 18;
 
 function StarField() {
   const stars = useMemo(() =>
     Array.from({ length: STAR_COUNT }, () => ({
-      lx: 4 + Math.random() * 92,          // % from left
-      ly: 4 + Math.random() * 92,          // % from top
-      sz: 1 + Math.random() * 2,
-      opacity: new Animated.Value(0.05 + Math.random() * 0.3),
-      ty:      new Animated.Value(0),
-      twDur:   1100 + Math.random() * 2200,
-      fallDur: 9000 + Math.random() * 11000,
-      delay:   Math.random() * 5000,
+      lx: 5 + Math.random() * 90,
+      ly: 5 + Math.random() * 88,
+      sz: 1 + Math.random() * 1.5,
+      opacity: new Animated.Value(0.04 + Math.random() * 0.18),
+      twDur:   1400 + Math.random() * 2600,
+      delay:   Math.random() * 4000,
     })),
   []);
 
@@ -29,17 +28,12 @@ function StarField() {
     stars.forEach(s => {
       const t = setTimeout(() => {
         if (!alive) return;
-        const twinkle = Animated.loop(Animated.sequence([
-          Animated.timing(s.opacity, { toValue: 0.6 + Math.random() * 0.4, duration: s.twDur, useNativeDriver: true }),
-          Animated.timing(s.opacity, { toValue: 0.02 + Math.random() * 0.1, duration: s.twDur, useNativeDriver: true }),
+        const anim = Animated.loop(Animated.sequence([
+          Animated.timing(s.opacity, { toValue: 0.5 + Math.random() * 0.3, duration: s.twDur, useNativeDriver: true }),
+          Animated.timing(s.opacity, { toValue: 0.02 + Math.random() * 0.06, duration: s.twDur, useNativeDriver: true }),
         ]));
-        const fall = Animated.loop(Animated.sequence([
-          Animated.timing(s.ty, { toValue: 42, duration: s.fallDur, useNativeDriver: true }),
-          Animated.timing(s.ty, { toValue: 0,  duration: 0,          useNativeDriver: true }),
-        ]));
-        twinkle.start();
-        fall.start();
-        loops.current.push(twinkle, fall);
+        anim.start();
+        loops.current.push(anim);
       }, s.delay);
       timers.push(t);
     });
@@ -66,7 +60,6 @@ function StarField() {
             borderRadius: s.sz,
             backgroundColor: '#FFFFFF',
             opacity: s.opacity,
-            transform: [{ translateY: s.ty }],
           }}
         />
       ))}
@@ -74,46 +67,26 @@ function StarField() {
   );
 }
 
-// ─── Cloud blob shape ─────────────────────────────────────────────────────────
+// ─── Cloud (SVG circles of same fill merge into seamless shape) ───────────────
 
-function CloudBlob({ w, h }: { w: number; h: number }) {
-  const r = h * 0.5;
+function CloudSvg({ w, h }: { w: number; h: number }) {
   return (
-    <View style={{ width: w, height: h }}>
-      {/* base pill */}
-      <View style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: h * 0.52, borderRadius: h * 0.26,
-        backgroundColor: 'rgba(255,255,255,0.92)',
-      }} />
-      {/* left bump */}
-      <View style={{
-        position: 'absolute', bottom: h * 0.3, left: w * 0.08,
-        width: w * 0.30, height: h * 0.68, borderRadius: w * 0.15,
-        backgroundColor: 'rgba(255,255,255,0.92)',
-      }} />
-      {/* centre bump (tallest) */}
-      <View style={{
-        position: 'absolute', bottom: h * 0.3, left: w * 0.30,
-        width: w * 0.38, height: h * 0.95, borderRadius: w * 0.19,
-        backgroundColor: 'rgba(255,255,255,0.92)',
-      }} />
-      {/* right bump */}
-      <View style={{
-        position: 'absolute', bottom: h * 0.3, left: w * 0.60,
-        width: w * 0.28, height: h * 0.60, borderRadius: w * 0.14,
-        backgroundColor: 'rgba(255,255,255,0.92)',
-      }} />
-    </View>
+    <Svg width={w} height={h}>
+      <Circle cx={w * 0.50} cy={h * 0.74} r={h * 0.26} fill="white" />
+      <Circle cx={w * 0.22} cy={h * 0.64} r={h * 0.24} fill="white" />
+      <Circle cx={w * 0.44} cy={h * 0.42} r={h * 0.32} fill="white" />
+      <Circle cx={w * 0.66} cy={h * 0.50} r={h * 0.26} fill="white" />
+      <Circle cx={w * 0.80} cy={h * 0.68} r={h * 0.22} fill="white" />
+    </Svg>
   );
 }
 
-// ─── Clouds (morning / afternoon) ────────────────────────────────────────────
+// ─── Cloud layer ──────────────────────────────────────────────────────────────
 
 const CLOUD_DEFS = [
-  { w: 200, h: 60, initX: -240, y:  6, dur: 26000, op: 0.12 },
-  { w: 150, h: 46, initX:  -80, y: 36, dur: 19000, op: 0.09 },
-  { w: 220, h: 70, initX:  120, y: 16, dur: 33000, op: 0.10 },
+  { w: 180, h: 56, initX: -220, y:  4, dur: 28000, op: 0.07 },
+  { w: 140, h: 44, initX:  -60, y: 30, dur: 22000, op: 0.06 },
+  { w: 200, h: 64, initX:  110, y: 10, dur: 36000, op: 0.06 },
 ];
 
 function CloudLayer() {
@@ -126,8 +99,8 @@ function CloudLayer() {
   useEffect(() => {
     CLOUD_DEFS.forEach((c, i) => {
       const anim = Animated.loop(Animated.sequence([
-        Animated.timing(xAnims[i], { toValue: 440, duration: c.dur, useNativeDriver: true }),
-        Animated.timing(xAnims[i], { toValue: c.initX - 10, duration: 0, useNativeDriver: true }),
+        Animated.timing(xAnims[i], { toValue: 460, duration: c.dur, useNativeDriver: true }),
+        Animated.timing(xAnims[i], { toValue: c.initX, duration: 0, useNativeDriver: true }),
       ]));
       anim.start();
       loops.current.push(anim);
@@ -151,7 +124,7 @@ function CloudLayer() {
             transform: [{ translateX: xAnims[i] }],
           }}
         >
-          <CloudBlob w={c.w} h={c.h} />
+          <CloudSvg w={c.w} h={c.h} />
         </Animated.View>
       ))}
     </View>

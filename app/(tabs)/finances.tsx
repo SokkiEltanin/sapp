@@ -5,10 +5,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ScanLine, RefreshCcw, Tag, Plus } from 'lucide-react-native';
+import { ScanLine, RefreshCcw, Tag } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
+import { BlurView } from 'expo-blur';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -101,23 +102,27 @@ export default function FinancesScreen() {
           }
           ListHeaderComponent={
             <>
-              {/* ── Hero amount card ─── */}
+              {/* ── Hero amount card (glassmorphism) ─── */}
               <View style={st.hero}>
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: F.card }]} />
                 <AnimatedCardBg timeOfDay={timeOfDay} />
-                <Text style={st.heroDate}>
-                  {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
-                </Text>
-                <View style={st.heroAmountRow}>
-                  <Text style={st.heroAmount}>{stats.monthExpenses.toFixed(0)}</Text>
-                  <Text style={st.heroCurrency}> PLN</Text>
-                </View>
-                {stats.monthIncome > 0 && (
-                  <Text style={st.heroSub}>
-                    {stats.monthIncome > stats.monthExpenses
-                      ? `Zaoszczędziłeś ${(stats.monthIncome - stats.monthExpenses).toFixed(0)} zł`
-                      : `Przekroczono przychody o ${(stats.monthExpenses - stats.monthIncome).toFixed(0)} zł`}
+                <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={st.heroContent}>
+                  <Text style={st.heroDate}>
+                    {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
                   </Text>
-                )}
+                  <View style={st.heroAmountRow}>
+                    <Text style={st.heroAmount}>{stats.monthExpenses.toFixed(0)}</Text>
+                    <Text style={st.heroCurrency}> PLN</Text>
+                  </View>
+                  {stats.monthIncome > 0 && (
+                    <Text style={st.heroSub}>
+                      {stats.monthIncome > stats.monthExpenses
+                        ? `Zaoszczędziłeś ${(stats.monthIncome - stats.monthExpenses).toFixed(0)} zł`
+                        : `Przekroczono przychody o ${(stats.monthExpenses - stats.monthIncome).toFixed(0)} zł`}
+                    </Text>
+                  )}
+                </View>
               </View>
 
               {/* ── Tag filter chips ─── */}
@@ -178,14 +183,6 @@ export default function FinancesScreen() {
           stickySectionHeadersEnabled={false}
         />
 
-        {/* ── Red FAB ─── */}
-        <TouchableOpacity
-          style={st.fab}
-          onPress={() => { haptic.tap(); router.push('/expenses/add' as any); }}
-          activeOpacity={0.85}
-        >
-          <Plus size={22} color={colors.bg.primary} strokeWidth={2.8} />
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -203,11 +200,14 @@ const st = StyleSheet.create({
   // ── Hero card ─────────────────────────────────────────────────────────────────
   hero: {
     marginHorizontal: spacing[4], marginTop: spacing[2], marginBottom: spacing[3],
-    backgroundColor: F.card,
-    borderRadius: radius.xl, padding: spacing[5],
+    borderRadius: radius.xl,
     borderWidth: 1, borderColor: F.cardBorder,
-    gap: spacing[2],
     overflow: 'hidden',
+    minHeight: 130,
+  },
+  heroContent: {
+    padding: spacing[5],
+    gap: spacing[2],
   },
   heroDate:      { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
@@ -243,15 +243,4 @@ const st = StyleSheet.create({
   emptyTitle: { fontSize: 17, fontWeight: '800', color: colors.text.secondary },
   emptySub:   { fontSize: 13, color: colors.text.muted },
 
-  // ── FAB ───────────────────────────────────────────────────────────────────────
-  fab: {
-    position: 'absolute', bottom: 24, right: 20,
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: F.accent,
-    alignItems: 'center', justifyContent: 'center',
-    elevation: 12,
-    shadowColor: F.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45, shadowRadius: 12,
-  },
 });

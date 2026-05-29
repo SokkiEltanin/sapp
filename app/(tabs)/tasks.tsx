@@ -387,9 +387,9 @@ const dm = StyleSheet.create({
 
 // ─── Sort sheet ───────────────────────────────────────────────────────────────
 
-function SortSheet({ sort, onSelect, onClose }: { sort: SortKey; onSelect: (k: SortKey) => void; onClose: () => void }) {
+function SortSheet({ sort, onSelect, onClose, visible }: { sort: SortKey; onSelect: (k: SortKey) => void; onClose: () => void; visible: boolean }) {
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={ss.overlay} onPress={onClose} />
       <View style={ss.sheet}>
         <View style={ss.handle} />
@@ -593,7 +593,7 @@ export default function TasksScreen() {
         onUpdate={update} onDelete={handleDelete} onAddSubtask={addSubtask}
         onToggleSubtask={toggleSubtask} onSnooze={snooze} onPomodoro={handlePomodoro}
       />
-      <SortSheet sort={sort} onSelect={setSort} onClose={() => setSortOpen(false)} />
+      <SortSheet sort={sort} onSelect={setSort} onClose={() => setSortOpen(false)} visible={sortOpen} />
     </SafeAreaView>
   );
 }

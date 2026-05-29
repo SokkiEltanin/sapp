@@ -368,25 +368,7 @@ export default function DashboardScreen() {
   const [weekOffset, setWeekOffset] = useState(0);
 
   // ── Animations ────────────────────────────────────────────────────────────
-  const blobScale   = useRef(new Animated.Value(1)).current;
-  const blobOpacity = useRef(new Animated.Value(0.5)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(blobScale, { toValue: 1.25, duration: 3400, useNativeDriver: true }),
-          Animated.timing(blobScale, { toValue: 0.85, duration: 3400, useNativeDriver: true }),
-        ]),
-        Animated.sequence([
-          Animated.timing(blobOpacity, { toValue: 0.68, duration: 2600, useNativeDriver: true }),
-          Animated.timing(blobOpacity, { toValue: 0.30, duration: 2600, useNativeDriver: true }),
-        ]),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
+  // static blob — subtle color tint behind glassmorphism, no pulsing
 
   // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -604,6 +586,7 @@ export default function DashboardScreen() {
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
   const moodBlobColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : accentColor;
+  const blobOpacity   = 0.13;
 
   return (
     <View style={s.root}>
@@ -637,9 +620,8 @@ export default function DashboardScreen() {
               activeOpacity={0.92}
               style={s.mainCard}
             >
-              <Animated.View style={[s.moodBlob, {
+              <View style={[s.moodBlob, {
                 backgroundColor: moodBlobColor,
-                transform: [{ scale: blobScale }],
                 opacity: blobOpacity,
               }]} />
 
@@ -663,46 +645,15 @@ export default function DashboardScreen() {
                   {/* Big greeting */}
                   <Text style={s.mainGreeting}>{greeting.toUpperCase()}</Text>
 
-                  {/* Bottom: task count + mood */}
+                  {/* Bottom: task count */}
                   <View style={s.mainBottom}>
                     <Text style={s.mainTaskLine}>
                       {'Masz do zrobienia jeszcze '}
-                      <Text style={[s.mainTaskBold, {
-                        color: overdueTasks.length > 0 ? colors.accent.red : colors.tabs.tasks,
-                      }]}>
+                      <Text style={s.mainTaskBold}>
                         {`${todayTasks.length + overdueTasks.length} ${plTasks(todayTasks.length + overdueTasks.length)}`}
                       </Text>
                       {' na dzisiaj.'}
                     </Text>
-
-                    {todayEntry ? (
-                      <View style={s.moodStateRow}>
-                        <Text style={s.moodStateEmoji}>{MOOD_EMOJIS[todayEntry.mood]}</Text>
-                        <Text style={[s.moodStateName, { color: MOOD_COLORS[todayEntry.mood] }]}>
-                          {MOOD_LABELS[todayEntry.mood]}
-                        </Text>
-                        {moodStreak > 1 && (
-                          <View style={s.streakPill}>
-                            <Flame size={9} color={colors.accent.amber} />
-                            <Text style={s.streakText}>{moodStreak}</Text>
-                          </View>
-                        )}
-                        <Text style={s.humorText}>{humor}</Text>
-                      </View>
-                    ) : (
-                      <View style={s.quickMoodRow}>
-                        {([1, 2, 3, 4, 5] as MoodLevel[]).map(level => (
-                          <TouchableOpacity
-                            key={level}
-                            style={[s.quickMoodBtn, { borderColor: MOOD_COLORS[level] + '40' }]}
-                            onPress={(e) => { (e as any).stopPropagation?.(); handleQuickMood(level); }}
-                            activeOpacity={0.75}
-                          >
-                            <Text style={s.quickMoodEmoji}>{MOOD_EMOJIS[level]}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
                   </View>
                 </View>
               </BlurView>
@@ -1402,7 +1353,7 @@ const s = StyleSheet.create({
   mainTaskLine: {
     fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.70)',
   },
-  mainTaskBold: { fontWeight: '800' },
+  mainTaskBold: { fontWeight: '800', color: colors.white },
   moodStateRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
   },
