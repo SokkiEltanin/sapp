@@ -4,7 +4,8 @@ import { Tabs, usePathname, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, runOnJS, cancelAnimation,
+  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+  runOnJS, cancelAnimation,
 } from 'react-native-reanimated';
 import { colors } from '@/theme';
 import TabBar from '@/components/ui/TabBar';
@@ -43,7 +44,7 @@ export default function TabsLayout() {
       if (busy.value) return;
       const i = idxSV.value;
       const blocked = (e.translationX > 0 && i === 0) || (e.translationX < 0 && i === TABS.length - 1);
-      tx.value = blocked ? e.translationX * 0.08 : e.translationX;
+      tx.value = blocked ? e.translationX * 0.06 : e.translationX;
     })
     .onEnd(e => {
       'worklet';
@@ -58,17 +59,30 @@ export default function TabsLayout() {
         return;
       }
 
-      // Instant snap to 0 then navigate — spring during navigation causes glitch
+      // Slide screen off-canvas, then navigate.
+      // useEffect fires on pathname change → cancelAnimation + tx=0 → new screen at center.
       busy.value = true;
-      const nextI = fwd ? i + 1 : i - 1;
-      tx.value = 0;
-      runOnJS(doNavigate)(TABS[nextI] as string);
+      const nextI  = fwd ? i + 1 : i - 1;
+      const exitTo = fwd ? -W : W;
+      tx.value = withTiming(exitTo, { duration: 220 }, () => {
+        runOnJS(doNavigate)(TABS[nextI] as string);
+      });
     }),
   []);
 
+  // Current screen slides with tx
   const screenStyle = useAnimatedStyle(() => ({
     flex: 1,
     transform: [{ translateX: tx.value }],
+  }));
+
+  // Adjacent fill: same bg color, stays beside the sliding screen so no gray gap is visible
+  const adjacentStyle = useAnimatedStyle(() => ({
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.bg.primary,
+    // When sliding left (tx<0): fill is to the right (tx+W)
+    // When sliding right (tx>0): fill is to the left (tx-W)
+    transform: [{ translateX: tx.value + (tx.value < 0 ? W : -W) }],
   }));
 
   return (
@@ -80,18 +94,22 @@ export default function TabsLayout() {
 
       {/* Sliding tab screens */}
       <GestureDetector gesture={pan}>
-        <Animated.View style={screenStyle}>
-          <Tabs tabBar={() => null} screenOptions={{ headerShown: false }}>
-            <Tabs.Screen name="index"    />
-            <Tabs.Screen name="tasks"    />
-            <Tabs.Screen name="stats"    />
-            <Tabs.Screen name="finances" />
-            <Tabs.Screen name="analytics" options={{ href: null }} />
-            <Tabs.Screen name="calendar"  options={{ href: null }} />
-            <Tabs.Screen name="mood"      options={{ href: null }} />
-            <Tabs.Screen name="health"    options={{ href: null }} />
-          </Tabs>
-        </Animated.View>
+        <View style={s.swipeContainer}>
+          {/* Fills the gap beside the sliding screen — prevents gray background flash */}
+          <Animated.View style={adjacentStyle} pointerEvents="none" />
+          <Animated.View style={screenStyle}>
+            <Tabs tabBar={() => null} screenOptions={{ headerShown: false }}>
+              <Tabs.Screen name="index"    />
+              <Tabs.Screen name="tasks"    />
+              <Tabs.Screen name="stats"    />
+              <Tabs.Screen name="finances" />
+              <Tabs.Screen name="analytics" options={{ href: null }} />
+              <Tabs.Screen name="calendar"  options={{ href: null }} />
+              <Tabs.Screen name="mood"      options={{ href: null }} />
+              <Tabs.Screen name="health"    options={{ href: null }} />
+            </Tabs>
+          </Animated.View>
+        </View>
       </GestureDetector>
 
       {/* Fixed tab bar */}
@@ -101,6 +119,7 @@ export default function TabsLayout() {
 }
 
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: colors.bg.primary },
-  topArea: { backgroundColor: 'transparent' },
+  root:           { flex: 1, backgroundColor: colors.bg.primary },
+  topArea:        { backgroundColor: 'transparent' },
+  swipeContainer: { flex: 1, overflow: 'hidden' },
 });

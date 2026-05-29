@@ -641,6 +641,13 @@ export default function DashboardScreen() {
               <AnimatedCardBg timeOfDay={timeOfDay} />
 
               <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
+                {/* Soft bottom-up gradient inside card */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.18)']}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                  pointerEvents="none"
+                />
                 <View style={s.moodGlassBorder} />
 
                 <View style={s.mainCardInner}>
@@ -649,8 +656,11 @@ export default function DashboardScreen() {
                     <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
                     {weather && (
                       <View style={s.mainWeatherRow}>
-                        <CloudSun size={12} color={accentColor} />
-                        <Text style={s.mainWeatherText}>Jest aktualnie {weather.temp}°C</Text>
+                        <CloudSun size={22} color={accentColor} strokeWidth={1.6} />
+                        <View style={s.mainWeatherInfo}>
+                          <Text style={s.mainWeatherTemp}>{weather.temp}°C</Text>
+                          <Text style={s.mainWeatherDesc}>{weather.desc.toUpperCase()}</Text>
+                        </View>
                       </View>
                     )}
                   </View>
@@ -658,14 +668,14 @@ export default function DashboardScreen() {
                   {/* Big greeting */}
                   <Text style={s.mainGreeting}>{greeting.toUpperCase()}</Text>
 
-                  {/* Bottom: task count */}
+                  {/* Bottom: task count — BOLD */}
                   <View style={s.mainBottom}>
                     <Text style={s.mainTaskLine}>
-                      {'Masz do zrobienia jeszcze '}
+                      {'Masz do zrobienia '}
                       <Text style={s.mainTaskBold}>
                         {`${todayTasks.length + overdueTasks.length} ${plTasks(todayTasks.length + overdueTasks.length)}`}
                       </Text>
-                      {' na dzisiaj.'}
+                      {' na dziś.'}
                     </Text>
                   </View>
                 </View>
@@ -702,16 +712,16 @@ export default function DashboardScreen() {
             {(doneToday > 0 || habitsDoneIds.length > 0 || !!todayEntry || todayPomCount > 0) && (() => {
               const items = [
                 {
-                  icon: <CheckCircle2 size={11} color={doneToday > 0 ? colors.accent.green : colors.text.muted} strokeWidth={2} />,
+                  icon: <CheckCircle2 size={11} color={doneToday > 0 ? accentColor : colors.text.muted} strokeWidth={2} />,
                   label: `${doneToday} zad.`,
                   active: doneToday > 0,
-                  color: colors.accent.green,
+                  color: accentColor,
                 },
                 {
-                  icon: <Flame size={11} color={habitsDoneIds.length > 0 ? colors.accent.amber : colors.text.muted} />,
+                  icon: <Flame size={11} color={habitsDoneIds.length > 0 ? accentColor : colors.text.muted} />,
                   label: habits.length > 0 ? `${habitsDoneIds.length}/${habits.length}` : `${habitsDoneIds.length}`,
                   active: habitsDoneIds.length > 0,
-                  color: colors.accent.amber,
+                  color: accentColor,
                 },
                 {
                   icon: <Smile size={11} color={todayEntry ? accentColor : colors.text.muted} />,
@@ -720,10 +730,10 @@ export default function DashboardScreen() {
                   color: accentColor,
                 },
                 {
-                  icon: <Timer size={11} color={todayPomCount > 0 ? '#2BC8E0' : colors.text.muted} />,
+                  icon: <Timer size={11} color={todayPomCount > 0 ? accentColor : colors.text.muted} />,
                   label: `${todayPomCount}×`,
                   active: todayPomCount > 0,
-                  color: '#2BC8E0',
+                  color: accentColor,
                 },
               ];
               return (
@@ -758,7 +768,7 @@ export default function DashboardScreen() {
                   <Text style={s.miniCardSub} numberOfLines={1}>→ {nextDeadline.label}</Text>
                 )}
                 {doneToday > 0 && (
-                  <Text style={[s.miniCardSub, { color: colors.accent.green }]}>✓ {doneToday} dziś</Text>
+                  <Text style={[s.miniCardSub, { color: accentColor }]}>✓ {doneToday} dziś</Text>
                 )}
               </TouchableOpacity>
 
@@ -886,10 +896,10 @@ export default function DashboardScreen() {
             {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
             <View style={s.toolsRow}>
               {([
-                { label: 'Nawyki',   icon: <Flame     size={18} color='#F97316' />, route: '/habits',  accent: '#F97316', sub: null },
-                { label: 'Notatki',  icon: <FileText  size={18} color='#A78BFA' />, route: '/notes',   accent: '#A78BFA', sub: null },
-                { label: 'Skupienie',icon: <Activity  size={18} color='#F43F5E' />, route: '/focus',   accent: '#F43F5E', sub: null },
-                { label: 'Pomodoro', icon: <Timer     size={18} color='#2BC8E0' />, route: '/pomodoro',accent: '#2BC8E0', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
+                { label: 'Nawyki',    Icon: Flame,    route: '/habits',   sub: null                               },
+                { label: 'Notatki',   Icon: FileText,  route: '/notes',    sub: null                               },
+                { label: 'Skupienie', Icon: Activity,  route: '/focus',    sub: null                               },
+                { label: 'Pomodoro',  Icon: Timer,     route: '/pomodoro', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
               ] as const).map(tool => (
                 <TouchableOpacity
                   key={tool.route}
@@ -897,12 +907,12 @@ export default function DashboardScreen() {
                   onPress={() => router.push(tool.route as any)}
                   activeOpacity={0.75}
                 >
-                  <View style={[s.toolIcon, { backgroundColor: tool.accent + '15' }]}>
-                    {tool.icon}
+                  <View style={s.toolIcon}>
+                    <tool.Icon size={18} color={accentColor} />
                   </View>
                   <Text style={s.toolLabel}>{tool.label}</Text>
                   {tool.sub && (
-                    <Text style={[s.toolSub, { color: tool.accent }]}>{tool.sub}</Text>
+                    <Text style={[s.toolSub, { color: accentColor }]}>{tool.sub}</Text>
                   )}
                 </TouchableOpacity>
               ))}
@@ -919,7 +929,7 @@ export default function DashboardScreen() {
                   onPress={() => { haptic.tap(); router.push('/habits' as any); }}
                   activeOpacity={0.8}
                 >
-                  <Flame size={14} color={colors.accent.amber} />
+                  <Flame size={14} color={accentColor} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.habitsNudgeTitle}>
                       {notDone.length === 1 ? 'Jeszcze 1 nawyk dziś'
@@ -930,7 +940,7 @@ export default function DashboardScreen() {
                       {notDone.slice(0, 3).map(h => h.title).join(' · ')}{notDone.length > 3 ? ` +${notDone.length - 3}` : ''}
                     </Text>
                   </View>
-                  <ChevronRight size={13} color={colors.accent.amber + '80'} />
+                  <ChevronRight size={13} color={accentColor + '80'} />
                 </TouchableOpacity>
               );
             })()}
@@ -948,12 +958,12 @@ export default function DashboardScreen() {
                 >
                   <View style={s.habitsHeader}>
                     <View style={s.habitsHeaderLeft}>
-                      <Flame size={13} color={allDone ? colors.accent.green : '#F97316'} />
-                      <Text style={[s.habitsTitle, allDone && { color: colors.accent.green }]}>
+                      <Flame size={13} color={accentColor} />
+                      <Text style={[s.habitsTitle, allDone && { color: accentColor }]}>
                         {allDone ? 'Nawyki na dziś gotowe!' : 'Nawyki — dziś'}
                       </Text>
                     </View>
-                    <Text style={[s.habitsBadge, allDone && { color: colors.accent.green }]}>
+                    <Text style={[s.habitsBadge, allDone && { color: accentColor }]}>
                       {doneCount}/{habits.length}
                     </Text>
                   </View>
@@ -962,7 +972,7 @@ export default function DashboardScreen() {
                   <View style={s.habitsTrack}>
                     <View style={[s.habitsFill, {
                       width: `${pct * 100}%` as any,
-                      backgroundColor: allDone ? colors.accent.green : '#F97316',
+                      backgroundColor: accentColor,
                     }]} />
                   </View>
 
@@ -1083,11 +1093,11 @@ export default function DashboardScreen() {
                   <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>Słodycze vs jedzenie</Text>
                   <View style={s.dualLegend}>
                     <View style={s.dualLegendItem}>
-                      <View style={[s.dualLegendLine, { backgroundColor: colors.accent.green }]} />
+                      <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
                       <Text style={s.dualLegendLabel}>jedzenie</Text>
                     </View>
                     <View style={s.dualLegendItem}>
-                      <View style={[s.dualLegendLine, { backgroundColor: colors.accent.amber, opacity: 0.8 }]} />
+                      <View style={[s.dualLegendLine, { backgroundColor: accentColor, opacity: 0.4 }]} />
                       <Text style={s.dualLegendLabel}>słodycze</Text>
                     </View>
                   </View>
@@ -1095,8 +1105,8 @@ export default function DashboardScreen() {
                 <DualWaveChart
                   data1={weekOverview.map(w => w.food)}
                   data2={weekOverview.map(w => w.sweets)}
-                  color1={colors.accent.green}
-                  color2={colors.accent.amber}
+                  color1={accentColor}
+                  color2={accentColor + '60'}
                 />
                 <View style={s.waveLabels}>
                   {weekOverview.map((w, i) => (
@@ -1199,7 +1209,7 @@ export default function DashboardScreen() {
                   </View>
                   <View style={s.finRow}>
                     <View style={s.finStat}>
-                      <Text style={[s.finVal, { color: colors.accent.green }]}>{monthDone}</Text>
+                      <Text style={[s.finVal, { color: accentColor }]}>{monthDone}</Text>
                       <Text style={s.finKey}>ukończone</Text>
                     </View>
                     <View style={s.finDivider} />
@@ -1211,7 +1221,7 @@ export default function DashboardScreen() {
                       <>
                         <View style={s.finDivider} />
                         <View style={s.finStat}>
-                          <Text style={[s.finVal, { color: colors.accent.amber }]}>{todayTasks.length}</Text>
+                          <Text style={[s.finVal, { color: accentColor }]}>{todayTasks.length}</Text>
                           <Text style={s.finKey}>na dziś</Text>
                         </View>
                       </>
@@ -1351,20 +1361,24 @@ const s = StyleSheet.create({
     fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.8,
   },
   mainWeatherRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  mainWeatherText: {
-    fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.50)',
+  mainWeatherInfo: { alignItems: 'flex-end' },
+  mainWeatherTemp: {
+    fontSize: 18, fontWeight: '700', color: colors.white, lineHeight: 20,
+  },
+  mainWeatherDesc: {
+    fontSize: 8, fontWeight: '600', color: 'rgba(255,255,255,0.40)', letterSpacing: 0.6,
   },
   mainGreeting: {
-    fontSize: 30, fontWeight: '800', color: colors.text.primary,
-    letterSpacing: -0.8, marginTop: spacing[2],
+    fontSize: 32, fontWeight: '800', color: colors.text.primary,
+    letterSpacing: -1, marginTop: spacing[2],
   },
   mainBottom: { gap: spacing[2] },
   mainTaskLine: {
-    fontSize: 13, fontWeight: '500', color: 'rgba(255,255,255,0.70)',
+    fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.80)',
   },
-  mainTaskBold: { fontWeight: '800', color: colors.white },
+  mainTaskBold: { fontWeight: '900', color: colors.white },
   moodStateRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
   },
@@ -1435,25 +1449,25 @@ const s = StyleSheet.create({
   // ── Evening habits nudge ──────────────────────────────────────────────────
   habitsNudge: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.accent.amber + '0E',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: radius.xl, padding: spacing[4],
-    borderWidth: 1, borderColor: colors.accent.amber + '35',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  habitsNudgeTitle: { fontSize: 13, fontWeight: '700', color: colors.accent.amber, marginBottom: 2 },
-  habitsNudgeSub: { fontSize: 11, color: colors.accent.amber + '80' },
+  habitsNudgeTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
+  habitsNudgeSub: { fontSize: 11, color: colors.text.muted },
 
   // ── Habits today card ─────────────────────────────────────────────────────
   habitsCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: 'rgba(249,115,22,0.20)',
+    borderRadius: radius.xl,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
     padding: spacing[4], gap: spacing[3],
   },
   habitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   habitsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  habitsTitle: { fontSize: 13, fontWeight: '700', color: '#F97316' },
-  habitsBadge: { fontSize: 14, fontWeight: '800', color: '#F97316' },
+  habitsTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  habitsBadge: { fontSize: 14, fontWeight: '800', color: colors.text.secondary },
   habitsTrack: {
-    height: 3, backgroundColor: 'rgba(249,115,22,0.12)',
+    height: 3, backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 2, overflow: 'hidden',
   },
   habitsFill: { height: 3, borderRadius: 2 },
