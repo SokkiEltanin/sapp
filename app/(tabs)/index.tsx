@@ -575,13 +575,33 @@ export default function DashboardScreen() {
 
   const humor = useMemo(() => humorLine(todayEntry?.mood), [todayEntry?.mood]);
 
-  // ── Budget remaining ──────────────────────────────────────────────────────
+  // ── Budget remaining (overall, for mini tile) ─────────────────────────────
   const budgetRemaining = useMemo(() => {
     const totalBudget = Object.values(budgets).reduce((s, v) => s + (v ?? 0), 0);
     if (totalBudget <= 0) return null;
     const remaining = totalBudget - stats.monthExpenses;
     return { remaining, totalBudget, pct: Math.min(1, stats.monthExpenses / totalBudget) };
   }, [budgets, stats.monthExpenses]);
+
+  // ── Per-category budget alert (for warning card) ───────────────────────────
+  const budgetAlertCard = useMemo(() => {
+    const monthKey = today.slice(0, 7);
+    const monthlySpend: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type && e.type !== 'expense') continue;
+      if (e.date.slice(0, 7) !== monthKey) continue;
+      monthlySpend[e.category] = (monthlySpend[e.category] ?? 0) + e.amount;
+    }
+    const alerts = Object.entries(budgets)
+      .filter(([, limit]) => limit != null && (limit as number) > 0)
+      .map(([cat, limit]) => ({
+        cat, spend: monthlySpend[cat] ?? 0, limit: limit as number,
+        pct: (monthlySpend[cat] ?? 0) / (limit as number),
+      }))
+      .filter(a => a.pct >= 0.70)
+      .sort((a, b) => b.pct - a.pct);
+    return alerts[0] ?? null;
+  }, [expenses, budgets, today]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -652,8 +672,13 @@ export default function DashboardScreen() {
               </BlurView>
             </TouchableOpacity>
 
+            {/* ══ HUMOR LINE — after main card ════════════════════════════ */}
+            {todayEntry && (
+              <Text style={s.humorLine}>{humor}</Text>
+            )}
+
             {/* ══ BUDGET WARNING CARD ══════════════════════════════════════ */}
-            {budgetRemaining && budgetRemaining.pct >= 0.7 && (
+            {budgetAlertCard && (
               <TouchableOpacity
                 style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
                 onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
@@ -661,13 +686,13 @@ export default function DashboardScreen() {
               >
                 <Text style={s.budgetWarnText}>
                   {'Zbliżasz się do limitu wydatków '}
-                  <Text style={s.budgetWarnBold}>#budżet</Text>
+                  <Text style={s.budgetWarnBold}>#{budgetAlertCard.cat}</Text>
                   {'   '}
-                  <Text style={s.budgetWarnPct}>{Math.round(budgetRemaining.pct * 100)}%</Text>
+                  <Text style={s.budgetWarnPct}>{Math.round(budgetAlertCard.pct * 100)}%</Text>
                 </Text>
                 <View style={s.budgetWarnTrack}>
                   <View style={[s.budgetWarnFill, {
-                    width: `${Math.min(100, budgetRemaining.pct * 100)}%` as any,
+                    width: `${Math.min(100, budgetAlertCard.pct * 100)}%` as any,
                   }]} />
                 </View>
               </TouchableOpacity>
@@ -1157,13 +1182,6 @@ export default function DashboardScreen() {
               </View>
             )}
 
-            {/* ══ HUMOR TILE ══════════════════════════════════════════════ */}
-            {todayEntry && (
-              <View style={[s.humorTile, { backgroundColor: cardBg }]}>
-                <Text style={s.humorTileEmoji}>{MOOD_EMOJIS[todayEntry.mood]}</Text>
-                <Text style={s.humorTileText}>{humor}</Text>
-              </View>
-            )}
 
             {/* ══ MONTH TASK STATS ════════════════════════════════════════ */}
             {(() => {
@@ -1389,7 +1407,15 @@ const s = StyleSheet.create({
   },
   budgetWarnFill: {
     height: '100%', borderRadius: 2,
-    backgroundColor: colors.accent.blue,
+    backgroundColor: '#5166F5',
+  },
+
+  // ── Humor line (below main card) ──────────────────────────────────────────
+  humorLine: {
+    fontSize: 12, fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.32)',
+    textAlign: 'center',
+    paddingHorizontal: spacing[2],
   },
 
   // ── Tools row ─────────────────────────────────────────────────────────────
