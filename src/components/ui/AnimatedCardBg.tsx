@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Path, Defs, Filter, FeGaussianBlur } from 'react-native-svg';
 import type { TimeOfDay } from '@/hooks/useTimeAccent';
 
 // ─── Stars (night / dawn / evening) ──────────────────────────────────────────
@@ -10,12 +10,12 @@ const STAR_COUNT = 18;
 function StarField() {
   const stars = useMemo(() =>
     Array.from({ length: STAR_COUNT }, () => ({
-      lx: 5 + Math.random() * 90,
-      ly: 5 + Math.random() * 88,
-      sz: 1 + Math.random() * 1.5,
+      lx:    5 + Math.random() * 90,
+      ly:    5 + Math.random() * 88,
+      sz:    1 + Math.random() * 1.5,
       opacity: new Animated.Value(0.04 + Math.random() * 0.18),
-      twDur:   1400 + Math.random() * 2600,
-      delay:   Math.random() * 4000,
+      twDur: 1400 + Math.random() * 2600,
+      delay: Math.random() * 4000,
     })),
   []);
 
@@ -24,7 +24,6 @@ function StarField() {
   useEffect(() => {
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
-
     stars.forEach(s => {
       const t = setTimeout(() => {
         if (!alive) return;
@@ -37,7 +36,6 @@ function StarField() {
       }, s.delay);
       timers.push(t);
     });
-
     return () => {
       alive = false;
       timers.forEach(clearTimeout);
@@ -67,16 +65,42 @@ function StarField() {
   );
 }
 
-// ─── Cloud (SVG circles of same fill merge into seamless shape) ───────────────
+// ─── Cloud silhouettes ────────────────────────────────────────────────────────
+// 3 distinct bezier-path cloud shapes, all fit within viewBox "0 0 100 55"
 
-function CloudSvg({ w, h }: { w: number; h: number }) {
+const CLOUD_PATHS = [
+  // Wide cloud with 3 bumps
+  'M 8 52 Q 0 52 0 42 Q 0 28 16 26 Q 10 6 30 6 Q 38 -2 52 8 Q 62 2 74 12 Q 86 8 90 24 Q 98 22 100 36 Q 100 52 84 52 Z',
+  // Round puffy cloud
+  'M 10 50 Q 0 50 0 38 Q 0 22 14 20 Q 8 2 28 2 Q 38 -4 50 6 Q 60 0 68 10 Q 80 6 84 22 Q 90 24 90 38 Q 90 50 74 50 Z',
+  // Elongated wispy cloud
+  'M 6 46 Q 0 46 0 38 Q 0 28 12 26 Q 6 10 24 10 Q 32 4 44 14 Q 54 6 68 16 Q 78 10 86 22 Q 96 20 100 32 Q 100 46 88 46 Z',
+];
+
+function CloudSvg({ shape, blurId }: { shape: number; blurId: string }) {
   return (
-    <Svg width={w} height={h}>
-      <Circle cx={w * 0.50} cy={h * 0.74} r={h * 0.26} fill="white" />
-      <Circle cx={w * 0.22} cy={h * 0.64} r={h * 0.24} fill="white" />
-      <Circle cx={w * 0.44} cy={h * 0.42} r={h * 0.32} fill="white" />
-      <Circle cx={w * 0.66} cy={h * 0.50} r={h * 0.26} fill="white" />
-      <Circle cx={w * 0.80} cy={h * 0.68} r={h * 0.22} fill="white" />
+    <Svg
+      width="100%"
+      height="100%"
+      viewBox="0 0 100 55"
+      style={StyleSheet.absoluteFill}
+    >
+      <Defs>
+        <Filter
+          id={blurId}
+          x="-15%"
+          y="-15%"
+          width="130%"
+          height="130%"
+        >
+          <FeGaussianBlur stdDeviation="2" />
+        </Filter>
+      </Defs>
+      <Path
+        d={CLOUD_PATHS[shape]}
+        fill="white"
+        filter={`url(#${blurId})`}
+      />
     </Svg>
   );
 }
@@ -84,9 +108,9 @@ function CloudSvg({ w, h }: { w: number; h: number }) {
 // ─── Cloud layer ──────────────────────────────────────────────────────────────
 
 const CLOUD_DEFS = [
-  { w: 180, h: 56, initX: -220, y:  4, dur: 28000, op: 0.07 },
-  { w: 140, h: 44, initX:  -60, y: 30, dur: 22000, op: 0.06 },
-  { w: 200, h: 64, initX:  110, y: 10, dur: 36000, op: 0.06 },
+  { shape: 0, w: 200, h: 65, initX: -240, y:  2, dur: 32000, op: 0.11 },
+  { shape: 1, w: 155, h: 55, initX:  -70, y: 22, dur: 24000, op: 0.10 },
+  { shape: 2, w: 220, h: 62, initX:  100, y:  8, dur: 42000, op: 0.09 },
 ];
 
 function CloudLayer() {
@@ -99,7 +123,7 @@ function CloudLayer() {
   useEffect(() => {
     CLOUD_DEFS.forEach((c, i) => {
       const anim = Animated.loop(Animated.sequence([
-        Animated.timing(xAnims[i], { toValue: 460, duration: c.dur, useNativeDriver: true }),
+        Animated.timing(xAnims[i], { toValue: 480, duration: c.dur, useNativeDriver: true }),
         Animated.timing(xAnims[i], { toValue: c.initX, duration: 0, useNativeDriver: true }),
       ]));
       anim.start();
@@ -118,13 +142,15 @@ function CloudLayer() {
           key={i}
           style={{
             position: 'absolute',
-            top: c.y,
-            left: 0,
+            top:    c.y,
+            left:   0,
+            width:  c.w,
+            height: c.h,
             opacity: c.op,
             transform: [{ translateX: xAnims[i] }],
           }}
         >
-          <CloudSvg w={c.w} h={c.h} />
+          <CloudSvg shape={c.shape} blurId={`cloud-blur-${i}`} />
         </Animated.View>
       ))}
     </View>

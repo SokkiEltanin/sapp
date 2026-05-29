@@ -585,8 +585,6 @@ export default function DashboardScreen() {
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
-  const moodBlobColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : accentColor;
-  const blobOpacity   = 0.13;
 
   return (
     <View style={s.root}>
@@ -620,11 +618,6 @@ export default function DashboardScreen() {
               activeOpacity={0.92}
               style={s.mainCard}
             >
-              <View style={[s.moodBlob, {
-                backgroundColor: moodBlobColor,
-                opacity: blobOpacity,
-              }]} />
-
               <AnimatedCardBg timeOfDay={timeOfDay} />
 
               <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
@@ -875,7 +868,7 @@ export default function DashboardScreen() {
               ] as const).map(tool => (
                 <TouchableOpacity
                   key={tool.route}
-                  style={[s.toolTile, { borderColor: tool.accent + '30' }]}
+                  style={[s.toolTile, { borderColor: tool.accent + '30', backgroundColor: cardBg }]}
                   onPress={() => router.push(tool.route as any)}
                   activeOpacity={0.75}
                 >
@@ -1403,7 +1396,7 @@ const s = StyleSheet.create({
   toolsRow: { flexDirection: 'row', gap: spacing[2] },
   toolTile: {
     flex: 1, alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    borderRadius: radius.xl,
     borderWidth: 1, paddingVertical: spacing[3],
   },
   toolIcon: {

@@ -12,8 +12,6 @@ import TopPill from '@/components/ui/TopPill';
 
 const W = Dimensions.get('window').width;
 const TABS = ['/', '/tasks', '/stats', '/finances'] as const;
-// Background tint shown behind the sliding screen during swipe transitions
-const TAB_BG = ['#1B2235', '#032217', '#0E1428', '#2A0A0A'] as const;
 
 function tabIdx(path: string): number {
   const i = (TABS as readonly string[]).indexOf(path);
@@ -59,15 +57,11 @@ export default function TabsLayout() {
         return;
       }
 
+      // Snap back to 0 and navigate — no spring-to-W (avoids colored stuck screen)
       busy.value = true;
       const nextI = fwd ? i + 1 : i - 1;
-      const dir   = fwd ? -1 : 1;
-
-      tx.value = withSpring(dir * W, { damping: 22, stiffness: 180 }, (finished) => {
-        if (finished) {
-          runOnJS(doNavigate)(TABS[nextI] as string);
-        }
-      });
+      tx.value = withSpring(0, { damping: 30, stiffness: 400 });
+      runOnJS(doNavigate)(TABS[nextI] as string);
     }),
   []);
 
@@ -76,28 +70,8 @@ export default function TabsLayout() {
     transform: [{ translateX: tx.value }],
   }));
 
-  const prevBgStyle = useAnimatedStyle(() => {
-    const i = idxSV.value;
-    return {
-      backgroundColor: i > 0 ? TAB_BG[i - 1] as string : 'transparent',
-      transform: [{ translateX: -W + tx.value }],
-    };
-  });
-
-  const nextBgStyle = useAnimatedStyle(() => {
-    const i = idxSV.value;
-    return {
-      backgroundColor: i < TABS.length - 1 ? TAB_BG[i + 1] as string : 'transparent',
-      transform: [{ translateX: W + tx.value }],
-    };
-  });
-
   return (
     <View style={s.root}>
-      {/* Adjacent tab background tints (behind sliding content) */}
-      <Animated.View style={[StyleSheet.absoluteFill, prevBgStyle]} />
-      <Animated.View style={[StyleSheet.absoluteFill, nextBgStyle]} />
-
       {/* Global TopPill — fixed, never slides */}
       <SafeAreaView style={s.topArea} edges={['top']}>
         <TopPill />

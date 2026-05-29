@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -262,16 +263,23 @@ export default function TopPill() {
 
   return (
     <Animated.View style={{ opacity }}>
-      <TouchableOpacity
-        style={s.pill}
-        onPress={() => { haptic.tap(); router.push(item.route as any); }}
-        activeOpacity={0.75}
+      <LinearGradient
+        colors={[item.color, item.color + '55', 'rgba(255,255,255,0.04)']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={s.pillGradient}
       >
-        <View style={[s.badge, { backgroundColor: item.color }]}>
-          <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
-        </View>
-        <Text style={s.text} numberOfLines={1}>{item.text}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={s.pill}
+          onPress={() => { haptic.tap(); router.push(item.route as any); }}
+          activeOpacity={0.75}
+        >
+          <View style={[s.badge, { backgroundColor: item.color }]}>
+            <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
+          </View>
+          <Text style={s.text} numberOfLines={1}>{item.text}</Text>
+        </TouchableOpacity>
+      </LinearGradient>
     </Animated.View>
   );
 }
@@ -279,16 +287,18 @@ export default function TopPill() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  pillGradient: {
     marginHorizontal: 16,
     marginTop: 6,
     marginBottom: 4,
+    borderRadius: 999,
+    padding: 1.5,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(18,18,18,0.97)',
     borderRadius: 999,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
     paddingHorizontal: 6,
     paddingVertical: 5,
     gap: 8,

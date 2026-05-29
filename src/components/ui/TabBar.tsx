@@ -40,6 +40,13 @@ const QUICK_ACTIONS = [
   { label: 'PARSER PAR.', color: colors.accent.blue,   route: '/expenses/scan' },
 ];
 
+const FINANCE_ACTIONS = [
+  { label: 'WYDATEK',  color: colors.tabs.finances, route: '/expenses/add'  },
+  { label: 'PRZYCHÓD', color: colors.tabs.tasks,    route: '/expenses/add'  },
+];
+
+const MAX_ACTIONS = Math.max(QUICK_ACTIONS.length, FINANCE_ACTIONS.length);
+
 const FAB_SIZE = 48;
 const PILL_H   = 52;
 
@@ -61,25 +68,38 @@ export default function TabBar({ currentIndex }: Props) {
   const activeAccent = TAB_ACCENTS[currentIndex] ?? timeAccent;
 
   const fabProgress  = useRef(new Animated.Value(0)).current;
-  const itemAnims    = useRef(QUICK_ACTIONS.map(() => new Animated.Value(0))).current;
+  const itemAnims    = useRef(Array.from({ length: MAX_ACTIONS }, () => new Animated.Value(0))).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
   const menuBase = (insets.bottom || 16) + 8 + PILL_H + 12 + FAB_SIZE + 12;
 
+  const menuActions = currentIndex === 3 ? FINANCE_ACTIONS : QUICK_ACTIONS;
+
   const openMenu = () => {
-    haptic.tap();
     setOpen(true);
     Animated.parallel([
       Animated.timing(backdropAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
       Animated.timing(fabProgress,  { toValue: 1, duration: 220, useNativeDriver: true }),
-      ...itemAnims.map((anim, i) => {
-        anim.setValue(0);
-        return Animated.spring(anim, {
+      ...menuActions.map((_, i) => {
+        itemAnims[i].setValue(0);
+        return Animated.spring(itemAnims[i], {
           toValue: 1, useNativeDriver: true,
           damping: 16, stiffness: 220, delay: i * 40,
         } as any);
       }),
     ]).start();
+  };
+
+  const handleFabPress = () => {
+    haptic.tap();
+    if (open) { closeMenu(); return; }
+    if (currentIndex === 1) {
+      router.push('/tasks/add' as any);
+    } else if (currentIndex === 2) {
+      router.push('/calendar/add' as any);
+    } else {
+      openMenu();
+    }
   };
 
   const closeMenu = (cb?: () => void) => {
@@ -118,7 +138,7 @@ export default function TabBar({ currentIndex }: Props) {
         </Animated.View>
 
         <View style={[s.quickMenu, { bottom: menuBase + 12 }]}>
-          {QUICK_ACTIONS.map((action, i) => {
+          {menuActions.map((action, i) => {
             const translateY = itemAnims[i].interpolate({
               inputRange: [0, 1], outputRange: [20, 0], extrapolate: 'clamp',
             });
@@ -151,7 +171,7 @@ export default function TabBar({ currentIndex }: Props) {
         <View style={s.fabRow}>
           <TouchableOpacity
             style={[s.fab, { backgroundColor: activeAccent, shadowColor: activeAccent }]}
-            onPress={open ? () => closeMenu() : openMenu}
+            onPress={handleFabPress}
             activeOpacity={0.85}
           >
             <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
