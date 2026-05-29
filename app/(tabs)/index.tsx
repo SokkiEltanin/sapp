@@ -577,7 +577,9 @@ export default function DashboardScreen() {
     const dateSets: Set<string>[] = Array.from({ length: 7 }, () => new Set());
     for (const e of expenses) {
       if (!e.type || e.type === 'expense') {
+        if (!e.date) continue;
         const d = new Date(e.date + 'T12:00:00');
+        if (isNaN(d.getTime())) continue;
         const dow = (d.getDay() + 6) % 7;
         totals[dow] += e.amount;
         dateSets[dow].add(e.date.slice(0, 10));
