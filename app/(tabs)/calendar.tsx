@@ -20,7 +20,6 @@ import { calendarService, tasksService } from '@/services/calendarService';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
-import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { haptic } from '@/utils/haptics';
 import { CalendarEvent, Task, MoodEntry } from '@/types';
 
@@ -257,7 +256,6 @@ const m = StyleSheet.create({
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
-  const { panHandlers, animatedStyle } = useTabSwipe();
   const { events, gcalEvents, tasks, selectedDate, setEvents, setGcalEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
@@ -424,7 +422,7 @@ export default function CalendarScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Full-screen month modal (event list) */}
       <MonthModal
         visible={modalVisible}

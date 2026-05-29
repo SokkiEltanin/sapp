@@ -39,7 +39,6 @@ import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { workService } from '@/services/workService';
-import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { expensesService } from '@/services/expensesService';
@@ -344,7 +343,6 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
-  const { panHandlers, animatedStyle } = useTabSwipe();
   const { color: accentColor, greeting, gradientTop, cardBg, cardBgDark } = useTimeAccent();
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
@@ -617,8 +615,8 @@ export default function DashboardScreen() {
         end={{ x: 0.6, y: 0.52 }}
       />
 
-      <SafeAreaView style={s.safe} edges={['top']} {...panHandlers}>
-        <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={{ flex: 1 }}>
 
           {/* Top bar — minimal */}
           <View style={s.topBar}>
@@ -1298,7 +1296,7 @@ export default function DashboardScreen() {
 
             <View style={{ height: 120 }} />
           </ScrollView>
-        </Animated.View>
+        </View>
       </SafeAreaView>
 
       {/* Mood check-in modal */}

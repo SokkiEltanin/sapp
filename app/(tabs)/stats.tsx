@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
-  PanResponder, Animated, Modal, TouchableOpacity,
+  PanResponder, Modal, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -26,7 +26,6 @@ import { CalendarEvent, Task } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
-import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { haptic } from '@/utils/haptics';
 
 const VP = {
@@ -247,7 +246,6 @@ const dm = StyleSheet.create({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function CalendarTabScreen() {
-  const { panHandlers, animatedStyle } = useTabSwipe();
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
@@ -408,9 +406,9 @@ export default function CalendarTabScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']} {...panHandlers}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <TopPill />
-      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+      <View style={{ flex: 1 }}>
         <ScreenHeader
           title="Kalendarz"
           subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
@@ -603,7 +601,7 @@ export default function CalendarTabScreen() {
             )}
           </View>
         </ScrollView>
-      </Animated.View>
+      </View>
 
       {/* ── Day modal ── */}
       {dayModalDate && (

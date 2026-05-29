@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, Pressable, TextInput, KeyboardAvoidingView,
-  Platform, ScrollView, Animated, RefreshControl,
+  Platform, ScrollView, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -20,7 +20,6 @@ import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
-import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { notificationsService } from '@/services/notificationsService';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -468,7 +467,6 @@ const sw = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
-  const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
   const startPomodoro  = usePomodoroStore(s => s.startFor);
@@ -503,9 +501,9 @@ export default function TasksScreen() {
   }, [sorted, done, today, sort, doneCollapsed]);
 
   return (
-    <SafeAreaView style={s.root} edges={['top']} {...panHandlers}>
+    <SafeAreaView style={s.root} edges={['top']}>
       <TopPill />
-      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+      <View style={{ flex: 1 }}>
 
         {/* Header */}
         <View style={s.header}>
@@ -591,7 +589,7 @@ export default function TasksScreen() {
           </TouchableOpacity>
         </View>
 
-      </Animated.View>
+      </View>
 
       <TaskDetailModal
         task={detailTask} visible={detailVisible} onClose={() => setDetailVisible(false)}

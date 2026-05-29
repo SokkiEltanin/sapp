@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import {
@@ -14,7 +14,6 @@ import { useMoodStore } from '@/store/moodStore';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MoodLevel, MOOD_COLORS } from '@/types';
 import { colors, spacing, radius } from '@/theme';
-import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { haptic } from '@/utils/haptics';
 
 // ─── Habit icon map ───────────────────────────────────────────────────────────
@@ -125,7 +124,6 @@ function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsScreen() {
-  const { panHandlers, animatedStyle } = useTabSwipe();
   const { tasks }    = useCalendarStore();
   const { habits, completions, getLast30, getStreak, todayDone } = useHabits();
   const { entries: moodEntries }                   = useMoodStore();
@@ -230,8 +228,8 @@ export default function AnalyticsScreen() {
   const weekEnd   = dates[6].slice(5).replace('-', '/');
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']} {...panHandlers}>
-      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <View style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
           {/* Header */}
@@ -454,7 +452,7 @@ export default function AnalyticsScreen() {
           )}
 
         </ScrollView>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }

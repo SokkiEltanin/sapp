@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, RefreshControl, SectionList,
-  Animated, ScrollView, TouchableOpacity,
+  ScrollView, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -19,7 +19,6 @@ import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
 import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
-import { useTabSwipe } from '@/hooks/useTabSwipe';
 import { haptic } from '@/utils/haptics';
 
 const F = {
@@ -33,7 +32,6 @@ const F = {
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
 
 export default function FinancesScreen() {
-  const { panHandlers, animatedStyle } = useTabSwipe();
   const { grouped, stats, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
@@ -68,9 +66,9 @@ export default function FinancesScreen() {
   }, [grouped, activeTagFilter]);
 
   return (
-    <SafeAreaView style={st.root} edges={['top']} {...panHandlers}>
+    <SafeAreaView style={st.root} edges={['top']}>
       <TopPill />
-      <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+      <View style={{ flex: 1 }}>
         <ScreenHeader
           title="Finanse"
           subtitle={new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}
@@ -186,7 +184,7 @@ export default function FinancesScreen() {
         >
           <Plus size={22} color={colors.bg.primary} strokeWidth={2.8} />
         </TouchableOpacity>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }

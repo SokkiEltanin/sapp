@@ -6,8 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet,
-  Plus, ScanLine, CheckSquare, Smile, Flame, Receipt,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,40 +14,36 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { haptic } from '@/utils/haptics';
 
-type BottomTabBarProps = {
-  state: { index: number; routes: { name: string }[] };
-  navigation: { navigate: (name: string) => void };
-  descriptors: Record<string, any>;
-};
+type Props = { currentIndex: number };
 
-// Dashboard → Zadania → Kalendarz → Finanse
+const TAB_PATHS = ['/', '/tasks', '/stats', '/finances'] as const;
+
 const TABS = [
-  { name: 'index',    Icon: LayoutDashboard },
-  { name: 'tasks',    Icon: ListTodo        },
-  { name: 'stats',    Icon: CalendarDays    },
-  { name: 'finances', Icon: Wallet          },
+  { Icon: LayoutDashboard },
+  { Icon: ListTodo        },
+  { Icon: CalendarDays    },
+  { Icon: Wallet          },
 ];
 
-// null = dynamic time accent on home
 const TAB_ACCENTS = [
   null,
-  colors.tabs.tasks,    // #2EDEA0 green
-  colors.tabs.calendar, // #BF80FF violet
-  colors.tabs.finances, // #EF4444 red
+  colors.tabs.tasks,
+  colors.tabs.calendar,
+  colors.tabs.finances,
 ] as const;
 
 const QUICK_ACTIONS = [
-  { label: 'NAWYK',       color: '#F97316',            route: '/habits'         },
-  { label: 'HUMOR',       color: colors.accent.purple, route: '/(tabs)/mood'    },
-  { label: 'WYD/PRZYCH',  color: colors.accent.red,    route: '/expenses/add'   },
-  { label: 'ZADANIE',     color: colors.tabs.tasks,    route: '/tasks/add'      },
-  { label: 'PARSER PAR.', color: colors.accent.blue,   route: '/expenses/scan'  },
+  { label: 'NAWYK',       color: '#F97316',            route: '/habits'        },
+  { label: 'HUMOR',       color: colors.accent.purple, route: '/(tabs)/mood'   },
+  { label: 'WYD/PRZYCH',  color: colors.accent.red,    route: '/expenses/add'  },
+  { label: 'ZADANIE',     color: colors.tabs.tasks,    route: '/tasks/add'     },
+  { label: 'PARSER PAR.', color: colors.accent.blue,   route: '/expenses/scan' },
 ];
 
 const FAB_SIZE = 48;
 const PILL_H   = 52;
 
-export default function TabBar({ state, navigation }: BottomTabBarProps) {
+export default function TabBar({ currentIndex }: Props) {
   const [open, setOpen]       = useState(false);
   const insets                = useSafeAreaInsets();
   const { color: timeAccent } = useTimeAccent();
@@ -56,14 +51,14 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
   const todayStr = (() => {
     const d = new Date();
     const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   })();
 
   const pendingCount  = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending').length);
   const overdueCount  = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && t.deadline && t.deadline.split('T')[0] < todayStr).length);
   const todayDueCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && (t.deadline?.split('T')[0] === todayStr || t.scheduledDate === todayStr)).length);
 
-  const activeAccent  = TAB_ACCENTS[state.index] ?? timeAccent;
+  const activeAccent = TAB_ACCENTS[currentIndex] ?? timeAccent;
 
   const fabProgress  = useRef(new Animated.Value(0)).current;
   const itemAnims    = useRef(QUICK_ACTIONS.map(() => new Animated.Value(0))).current;
@@ -167,22 +162,25 @@ export default function TabBar({ state, navigation }: BottomTabBarProps) {
 
         {/* 4-tab pill */}
         <View style={s.pill}>
-          {TABS.map((tab, i) => {
-            const focused    = state.index === i;
-            const accent     = TAB_ACCENTS[i] ?? timeAccent;
-            const showBadge  = tab.name === 'tasks' && pendingCount > 0;
+          {TABS.map(({ Icon }, i) => {
+            const focused   = currentIndex === i;
+            const accent    = TAB_ACCENTS[i] ?? timeAccent;
+            const showBadge = i === 1 && pendingCount > 0;
             return (
               <TouchableOpacity
-                key={tab.name}
+                key={i}
                 style={s.tabItem}
-                onPress={() => { haptic.tap(); navigation.navigate(tab.name); }}
+                onPress={() => {
+                  haptic.tap();
+                  if (currentIndex !== i) router.navigate(TAB_PATHS[i] as any);
+                }}
                 activeOpacity={0.7}
               >
                 {focused && (
                   <View style={[s.activePill, { backgroundColor: accent + '28' }]} />
                 )}
                 <View style={s.iconWrap}>
-                  <tab.Icon
+                  <Icon
                     size={20}
                     color={focused ? accent : colors.text.muted}
                     strokeWidth={focused ? 2.2 : 1.5}
