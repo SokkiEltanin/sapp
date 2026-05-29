@@ -568,7 +568,7 @@ export default function TasksScreen() {
           }
         />
 
-        {/* Bottom bar: sort chip + FAB */}
+        {/* Bottom bar: sort chip only — FAB handled globally by TabBar */}
         <View style={s.bottomBar}>
           <TouchableOpacity
             style={[s.sortChip, sort === 'alpha' && s.sortChipActive]}
@@ -576,13 +576,6 @@ export default function TasksScreen() {
             activeOpacity={0.75}
           >
             <Text style={[s.sortChipText, sort === 'alpha' && s.sortChipTextActive]}>{SORT_LABEL[sort]}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.fab}
-            onPress={() => { haptic.tap(); router.push('/tasks/add' as any); }}
-            activeOpacity={0.85}
-          >
-            <Plus size={22} color={G.card} strokeWidth={2.8} />
           </TouchableOpacity>
         </View>
 
@@ -695,13 +688,4 @@ const s = StyleSheet.create({
   sortChipActive: { backgroundColor: G.accentDim, borderColor: G.accent + '80' },
   sortChipText: { fontSize: 11, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.5 },
   sortChipTextActive: { color: G.accent },
-
-  fab: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: G.accent,
-    alignItems: 'center', justifyContent: 'center',
-    elevation: 12, shadowColor: G.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45, shadowRadius: 12,
-  },
 });

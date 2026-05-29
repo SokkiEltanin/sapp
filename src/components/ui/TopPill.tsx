@@ -264,7 +264,7 @@ export default function TopPill() {
   return (
     <Animated.View style={{ opacity }}>
       <LinearGradient
-        colors={[item.color, item.color + '55', 'rgba(255,255,255,0.04)']}
+        colors={[item.color + 'EE', item.color + '30', item.color + '00']}
         start={{ x: 0, y: 0.5 }}
         end={{ x: 1, y: 0.5 }}
         style={s.pillGradient}
