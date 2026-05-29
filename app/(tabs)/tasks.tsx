@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   Modal, Pressable, TextInput, KeyboardAvoidingView,
@@ -19,6 +19,7 @@ import { haptic } from '@/utils/haptics';
 import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { notificationsService } from '@/services/notificationsService';
+import { useUiActions } from '@/store/uiActions';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
@@ -471,6 +472,8 @@ export default function TasksScreen() {
 
   const [sort, setSort]       = useState<SortKey>('deadline');
   const [sortOpen, setSortOpen] = useState(false);
+  const tasksSortTrigger = useUiActions(s => s.tasksSortTrigger);
+  useEffect(() => { if (tasksSortTrigger > 0) setSortOpen(true); }, [tasksSortTrigger]);
   const [detailTask, setDetailTask]     = useState<Task | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [doneCollapsed, setDoneCollapsed] = useState(true);
@@ -568,16 +571,6 @@ export default function TasksScreen() {
           }
         />
 
-        {/* Bottom bar: sort chip only — FAB handled globally by TabBar */}
-        <View style={s.bottomBar}>
-          <TouchableOpacity
-            style={[s.sortChip, sort === 'alpha' && s.sortChipActive]}
-            onPress={() => { haptic.tap(); setSortOpen(true); }}
-            activeOpacity={0.75}
-          >
-            <Text style={[s.sortChipText, sort === 'alpha' && s.sortChipTextActive]}>{SORT_LABEL[sort]}</Text>
-          </TouchableOpacity>
-        </View>
 
       </View>
 
@@ -671,21 +664,4 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text.secondary },
   emptySub:   { fontSize: 13, color: colors.text.muted },
 
-  // ── Bottom bar ─────────────────────────────────────────────────────────────
-  bottomBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing[5], paddingBottom: spacing[5], paddingTop: spacing[3],
-    borderTopWidth: 1, borderTopColor: G.cardBorder,
-    backgroundColor: colors.bg.primary,
-  },
-  sortChip: {
-    paddingHorizontal: spacing[4], paddingVertical: spacing[2],
-    borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    minWidth: 56, alignItems: 'center',
-  },
-  sortChipActive: { backgroundColor: G.accentDim, borderColor: G.accent + '80' },
-  sortChipText: { fontSize: 11, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.5 },
-  sortChipTextActive: { color: G.accent },
 });

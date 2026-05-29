@@ -4,7 +4,7 @@ import { Tabs, usePathname, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, runOnJS,
+  useSharedValue, useAnimatedStyle, withSpring, runOnJS, cancelAnimation,
 } from 'react-native-reanimated';
 import { colors } from '@/theme';
 import TabBar from '@/components/ui/TabBar';
@@ -25,6 +25,7 @@ export default function TabsLayout() {
   const busy  = useSharedValue(false);
 
   useEffect(() => {
+    cancelAnimation(tx);
     idxSV.value = tabIdx(pathname);
     busy.value  = false;
     tx.value    = 0;
@@ -57,10 +58,10 @@ export default function TabsLayout() {
         return;
       }
 
-      // Snap back to 0 and navigate — no spring-to-W (avoids colored stuck screen)
+      // Instant snap to 0 then navigate — spring during navigation causes glitch
       busy.value = true;
       const nextI = fwd ? i + 1 : i - 1;
-      tx.value = withSpring(0, { damping: 30, stiffness: 400 });
+      tx.value = 0;
       runOnJS(doNavigate)(TABS[nextI] as string);
     }),
   []);

@@ -3,11 +3,11 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   Pressable, Animated, Modal,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal,
 } from 'lucide-react-native';
+import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -66,6 +66,7 @@ export default function TabBar({ currentIndex }: Props) {
   const todayDueCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && (t.deadline?.split('T')[0] === todayStr || t.scheduledDate === todayStr)).length);
 
   const activeAccent = TAB_ACCENTS[currentIndex] ?? timeAccent;
+  const triggerTasksSort = useUiActions(s => s.triggerTasksSort);
 
   const fabProgress  = useRef(new Animated.Value(0)).current;
   const itemAnims    = useRef(Array.from({ length: MAX_ACTIONS }, () => new Animated.Value(0))).current;
@@ -161,14 +162,19 @@ export default function TabBar({ currentIndex }: Props) {
       </Modal>
 
       {/* ── Bar ────────────────────────────────────────────────────── */}
-      <LinearGradient
-        colors={['rgba(0,0,0,0)', activeAccent + '28']}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]}
-      >
-        {/* FAB */}
+      <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]}>
+        {/* FAB row — floating above pill, no background */}
         <View style={s.fabRow}>
+          {/* Secondary: sort button for tasks tab */}
+          {currentIndex === 1 && (
+            <TouchableOpacity
+              style={[s.sortFab, { borderColor: activeAccent + '50' }]}
+              onPress={() => { haptic.tap(); triggerTasksSort(); }}
+              activeOpacity={0.85}
+            >
+              <SlidersHorizontal size={18} color={activeAccent} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[s.fab, { backgroundColor: activeAccent, shadowColor: activeAccent }]}
             onPress={handleFabPress}
@@ -215,7 +221,7 @@ export default function TabBar({ currentIndex }: Props) {
             );
           })}
         </View>
-      </LinearGradient>
+      </View>
     </>
   );
 }
@@ -223,14 +229,16 @@ export default function TabBar({ currentIndex }: Props) {
 const s = StyleSheet.create({
   container: {
     paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingTop: 4,
   },
 
   fabRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     paddingRight: 4,
-    marginBottom: 8,
+    marginBottom: 6,
+    gap: 8,
   },
   fab: {
     width: FAB_SIZE, height: FAB_SIZE,
@@ -239,6 +247,16 @@ const s = StyleSheet.create({
     elevation: 12,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5, shadowRadius: 16,
+  },
+  sortFab: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(18,18,18,0.97)',
+    borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    elevation: 8,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 8,
   },
 
   pill: {
