@@ -44,6 +44,7 @@ import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
+import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -342,7 +343,7 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
-  const { color: accentColor, greeting, gradientTop, cardBg, cardBgDark } = useTimeAccent();
+  const { color: accentColor, greeting, gradientTop, cardBg, cardBgDark, timeOfDay } = useTimeAccent();
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
   const pomodoro = usePomodoroStore();
@@ -641,6 +642,8 @@ export default function DashboardScreen() {
                 transform: [{ scale: blobScale }],
                 opacity: blobOpacity,
               }]} />
+
+              <AnimatedCardBg timeOfDay={timeOfDay} />
 
               <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
                 <View style={s.moodGlassBorder} />

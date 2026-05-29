@@ -10,6 +10,8 @@ import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
+import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -31,6 +33,7 @@ const F = {
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
 
 export default function FinancesScreen() {
+  const { timeOfDay } = useTimeAccent();
   const { grouped, stats, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
@@ -100,6 +103,7 @@ export default function FinancesScreen() {
             <>
               {/* ── Hero amount card ─── */}
               <View style={st.hero}>
+                <AnimatedCardBg timeOfDay={timeOfDay} />
                 <Text style={st.heroDate}>
                   {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
                 </Text>
@@ -203,6 +207,7 @@ const st = StyleSheet.create({
     borderRadius: radius.xl, padding: spacing[5],
     borderWidth: 1, borderColor: F.cardBorder,
     gap: spacing[2],
+    overflow: 'hidden',
   },
   heroDate:      { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
