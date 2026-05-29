@@ -1,12 +1,14 @@
 import { useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Tabs, usePathname, router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, runOnJS,
 } from 'react-native-reanimated';
 import { colors } from '@/theme';
 import TabBar from '@/components/ui/TabBar';
+import TopPill from '@/components/ui/TopPill';
 
 const W = Dimensions.get('window').width;
 const TABS = ['/', '/tasks', '/stats', '/finances'] as const;
@@ -92,8 +94,16 @@ export default function TabsLayout() {
 
   return (
     <View style={s.root}>
+      {/* Adjacent tab background tints (behind sliding content) */}
       <Animated.View style={[StyleSheet.absoluteFill, prevBgStyle]} />
       <Animated.View style={[StyleSheet.absoluteFill, nextBgStyle]} />
+
+      {/* Global TopPill — fixed, never slides */}
+      <SafeAreaView style={s.topArea} edges={['top']}>
+        <TopPill />
+      </SafeAreaView>
+
+      {/* Sliding tab screens */}
       <GestureDetector gesture={pan}>
         <Animated.View style={screenStyle}>
           <Tabs tabBar={() => null} screenOptions={{ headerShown: false }}>
@@ -108,11 +118,14 @@ export default function TabsLayout() {
           </Tabs>
         </Animated.View>
       </GestureDetector>
+
+      {/* Fixed tab bar */}
       <TabBar currentIndex={tabIdx(pathname)} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg.primary },
+  root:    { flex: 1, backgroundColor: colors.bg.primary },
+  topArea: { backgroundColor: 'transparent' },
 });

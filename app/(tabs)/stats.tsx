@@ -12,7 +12,6 @@ import {
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
-import TopPill from '@/components/ui/TopPill';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
 import TaskItem from '@/components/calendar/TaskItem';
@@ -406,8 +405,7 @@ export default function CalendarTabScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <TopPill />
+    <SafeAreaView style={styles.container} edges={[]}>
       <View style={{ flex: 1 }}>
         <ScreenHeader
           title="Kalendarz"

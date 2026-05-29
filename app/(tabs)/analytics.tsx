@@ -228,7 +228,7 @@ export default function AnalyticsScreen() {
   const weekEnd   = dates[6].slice(5).replace('-', '/');
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={[]}>
       <View style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 

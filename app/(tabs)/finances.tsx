@@ -11,7 +11,6 @@ import { pl } from 'date-fns/locale';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
-import TopPill from '@/components/ui/TopPill';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -66,8 +65,7 @@ export default function FinancesScreen() {
   }, [grouped, activeTagFilter]);
 
   return (
-    <SafeAreaView style={st.root} edges={['top']}>
-      <TopPill />
+    <SafeAreaView style={st.root} edges={[]}>
       <View style={{ flex: 1 }}>
         <ScreenHeader
           title="Finanse"

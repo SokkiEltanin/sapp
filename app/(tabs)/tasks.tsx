@@ -12,8 +12,6 @@ import {
   Square, CheckSquare2, Clock, Timer, RefreshCw,
 } from 'lucide-react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import TopPill from '@/components/ui/TopPill';
-
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
@@ -501,8 +499,7 @@ export default function TasksScreen() {
   }, [sorted, done, today, sort, doneCollapsed]);
 
   return (
-    <SafeAreaView style={s.root} edges={['top']}>
-      <TopPill />
+    <SafeAreaView style={s.root} edges={[]}>
       <View style={{ flex: 1 }}>
 
         {/* Header */}

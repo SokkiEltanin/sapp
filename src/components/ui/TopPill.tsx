@@ -1,11 +1,14 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
 import { useExpensesStore } from '@/store/expensesStore';
-import { colors, spacing } from '@/theme';
+import { useMoodStore } from '@/store/moodStore';
+import { useHabits } from '@/hooks/useHabits';
+import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { colors } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,6 +53,7 @@ export default function TopPill() {
   const today    = todayIso();
   const tomorrow = tomorrowIso();
   const weekEnd  = weekEndIso();
+  const hour     = new Date().getHours();
 
   // ── Store selectors ────────────────────────────────────────────────────────
   const pomRunning   = usePomodoroStore(s => s.isRunning);
@@ -64,6 +68,12 @@ export default function TopPill() {
   const workPrefix = useWorkStore(s => s.settings.workPrefix ?? '');
 
   const expenses   = useExpensesStore(s => s.expenses);
+
+  const { habits, todayDone } = useHabits();
+  const todayMoodEntry = useMoodStore(s => s.todayEntry);
+
+  const [budgets, setBudgets] = useState<MonthlyBudgets>({});
+  useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
 
   // ── Priority logic ─────────────────────────────────────────────────────────
   const item: PillItem | null = useMemo(() => {
@@ -122,25 +132,25 @@ export default function TopPill() {
       };
     }
 
-    // 5 — Nearest task deadline within 7 days
-    const nearDeadline = calTasks
-      .filter(t =>
-        t.status !== 'done' &&
-        t.deadline &&
-        t.deadline.split('T')[0] > today &&
-        t.deadline.split('T')[0] <= weekEnd
-      )
-      .sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0];
-
-    if (nearDeadline) {
-      const days = daysUntil(nearDeadline.deadline!.split('T')[0], today);
-      const label = days === 1 ? 'JUTRO' : `${days} DNI`;
+    // 5 — Budget ≥85% of monthly limit
+    const monthlySpend: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type && e.type !== 'expense') continue;
+      if (e.date.slice(0, 7) !== today.slice(0, 7)) continue;
+      monthlySpend[e.category] = (monthlySpend[e.category] ?? 0) + e.amount;
+    }
+    const budgetAlerts = Object.entries(budgets)
+      .map(([cat, limit]) => ({ cat, spend: monthlySpend[cat] ?? 0, limit: limit!, pct: (monthlySpend[cat] ?? 0) / limit! }))
+      .filter(a => a.pct >= 0.85)
+      .sort((a, b) => b.pct - a.pct);
+    if (budgetAlerts.length > 0) {
+      const first = budgetAlerts[0];
       return {
-        badge:  label,
-        color:  colors.tabs.calendar,  // #3A4C9C indigo
-        text:   nearDeadline.title.toUpperCase(),
-        route:  '/(tabs)/tasks',
-        key:    `deadline-${nearDeadline.id}`,
+        badge: `${Math.round(first.spend)} PLN`,
+        color:  colors.tabs.finances,  // #E43434 red
+        text:  `ZBLIŻASZ SIĘ DO LIMITU #${first.cat}`,
+        route: '/(tabs)/finances',
+        key:   `budget-${first.cat}`,
       };
     }
 
@@ -168,16 +178,50 @@ export default function TopPill() {
       };
     }
 
-    // 7 — Last expense
-    const lastExp = expenses.find(e => !e.type || e.type === 'expense');
-    if (lastExp) {
-      const tag = lastExp.tags[0] ? `#${lastExp.tags[0]}` : lastExp.category;
+    // 7 — Nearest task deadline within 7 days (countdown)
+    const nearDeadline = calTasks
+      .filter(t =>
+        t.status !== 'done' &&
+        t.deadline &&
+        t.deadline.split('T')[0] > today &&
+        t.deadline.split('T')[0] <= weekEnd
+      )
+      .sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0];
+    if (nearDeadline) {
+      const days = daysUntil(nearDeadline.deadline!.split('T')[0], today);
+      const label = days === 1 ? 'JUTRO' : `${days} DNI`;
       return {
-        badge: `${Math.round(lastExp.amount)} PLN`,
-        color:  colors.tabs.finances,  // #E63535
-        text:  `OSTATNIO NA ${tag.toUpperCase()}`,
-        route: '/(tabs)/finances',
-        key:   `exp-${lastExp.id}`,
+        badge:  label,
+        color:  colors.tabs.calendar,  // #3A4C9C indigo
+        text:   `DO KOŃCA: ${nearDeadline.title.toUpperCase()}`,
+        route:  '/(tabs)/tasks',
+        key:    `deadline-${nearDeadline.id}`,
+      };
+    }
+
+    // 8 — Habit streak at risk (after 17:00, any habit not done today)
+    if (hour >= 17) {
+      const undone = habits.filter(h => !todayDone.includes(h.id));
+      if (undone.length > 0) {
+        const first = undone[0];
+        return {
+          badge: 'SERIA!',
+          color:  '#F59E0B',             // amber
+          text:   `${first.title.toUpperCase()} NIE ZAZNACZONY`,
+          route:  '/habits',
+          key:    `habit-${first.id}`,
+        };
+      }
+    }
+
+    // 9 — No mood entry today (after 18:00)
+    if (hour >= 18 && !todayMoodEntry) {
+      return {
+        badge: 'NASTRÓJ',
+        color:  '#F472B6',             // pink
+        text:   'JAK SIĘ CZUJESZ DZISIAJ?',
+        route:  '/(tabs)/mood',
+        key:    'mood-missing',
       };
     }
 
@@ -187,8 +231,10 @@ export default function TopPill() {
     shifts, workPrefix,
     calTasks,
     gcalEvents,
-    expenses,
-    today, tomorrow, weekEnd,
+    expenses, budgets,
+    habits, todayDone,
+    todayMoodEntry,
+    today, tomorrow, weekEnd, hour,
   ]);
 
   // ── Fade animation on content change ──────────────────────────────────────

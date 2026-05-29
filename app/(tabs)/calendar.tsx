@@ -422,7 +422,7 @@ export default function CalendarScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       {/* Full-screen month modal (event list) */}
       <MonthModal
         visible={modalVisible}

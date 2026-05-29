@@ -19,7 +19,6 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import TopPill from '@/components/ui/TopPill';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -615,7 +614,7 @@ export default function DashboardScreen() {
         end={{ x: 0.6, y: 0.52 }}
       />
 
-      <SafeAreaView style={s.safe} edges={['top']}>
+      <SafeAreaView style={s.safe} edges={[]}>
         <View style={{ flex: 1 }}>
 
           {/* Top bar — minimal */}
@@ -624,9 +623,6 @@ export default function DashboardScreen() {
               <Settings size={17} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
-
-          {/* ── Top Pill — global status ────────────────────────── */}
-          <TopPill />
 
           <ScrollView
             showsVerticalScrollIndicator={false}

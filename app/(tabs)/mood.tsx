@@ -415,7 +415,7 @@ export default function MoodScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <ScreenHeader
         title="Nastrój"
         subtitle="Twoje samopoczucie"
