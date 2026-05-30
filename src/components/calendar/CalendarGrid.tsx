@@ -129,10 +129,10 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                       }]}
                     >
                       <Text style={styles.eventPillText} numberOfLines={1}>
-                        {ev.startTime
-                          ? `${ev.startTime.slice(0, 5)}${ev.endTime ? `-${ev.endTime.slice(0, 5)}` : ''} `
-                          : ''}
                         {ev.title}
+                        {ev.startTime
+                          ? ` ${ev.startTime.slice(0, 5)}${ev.endTime ? `-${ev.endTime.slice(0, 5)}` : ''}`
+                          : ''}
                       </Text>
                     </Pressable>
                   ))}

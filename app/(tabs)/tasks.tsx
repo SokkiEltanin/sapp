@@ -120,10 +120,10 @@ type SectionHeader = { type: 'section'; key: string; label: string; color: strin
 type ListItem = Task | SectionHeader | 'done-header';
 
 const SECTION_DEFS = [
-  { key: 'overdue',  label: 'PRZETERMINOWANE', color: '#FF6B6B' },
-  { key: 'today',    label: 'DZIŚ',            color: '#FBBF24' },
-  { key: 'tomorrow', label: 'JUTRO',           color: '#F97316' },
-  { key: 'week',     label: 'W TYM TYGODNIU',  color: G.accent  },
+  { key: 'overdue',  label: 'PRZETERMINOWANE', color: G.accent  },
+  { key: 'today',    label: 'DZIŚ',            color: G.accent  },
+  { key: 'tomorrow', label: 'JUTRO',           color: G.accent + 'BB' },
+  { key: 'week',     label: 'W TYM TYGODNIU',  color: G.accent + '80' },
   { key: 'later',    label: 'PÓŹNIEJ',          color: colors.text.muted },
   { key: 'none',     label: 'BEZ TERMINU',      color: colors.text.muted },
 ] as const;
@@ -170,12 +170,12 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
   const isToday  = dueDays === 0;
 
   const cardBg     = overdue ? G.overdueCard : G.card;
-  const cardBorder = overdue ? G.overdueBorder : isToday ? 'rgba(251,191,36,0.25)' : G.cardBorder;
+  const cardBorder = overdue ? G.overdueBorder : isToday ? G.accentDim : G.cardBorder;
   const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.accent
-    : overdue            ? colors.accent.red
-    : task.status === 'snoozed' ? colors.accent.amber
-    : isToday            ? colors.accent.amber
-    : dueDays === 1      ? '#F97316'
+    : overdue            ? G.accent
+    : task.status === 'snoozed' ? colors.text.muted
+    : isToday            ? G.accent
+    : dueDays === 1      ? G.accent + 'CC'
     : colors.text.muted;
 
   return (
@@ -184,18 +184,15 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
       onPress={() => onEdit(task)}
       activeOpacity={0.75}
     >
-      {/* Left controls: toggle + edit */}
+      {/* Left controls: done swoosh + edit */}
       <View style={s.leftControls}>
         <TouchableOpacity
-          style={s.toggleWrap}
+          style={[s.doneBtn, isDone && s.doneBtnActive]}
           onPress={(e: any) => { e.stopPropagation?.(); haptic.tap(); onComplete(task); }}
           hitSlop={6}
           activeOpacity={0.8}
         >
-          <View style={[s.toggleTrack, isDone && s.toggleTrackDone]}>
-            <View style={[s.toggleDot, s.toggleDotLeft, isDone && s.toggleDotActive]} />
-            <View style={[s.toggleDot, s.toggleDotRight]} />
-          </View>
+          <Check size={15} color={isDone ? G.accent : 'rgba(255,255,255,0.22)'} strokeWidth={2.8} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -211,7 +208,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
       {/* Content */}
       <View style={s.cardContent}>
         <Text
-          style={[s.cardTitle, isDone && s.cardTitleDone, task.priority === 'high' && !isDone && { color: colors.accent.red }]}
+          style={[s.cardTitle, isDone && s.cardTitleDone, task.priority === 'high' && !isDone && { color: G.accent }]}
           numberOfLines={2}
         >
           {task.title.toUpperCase()}
@@ -610,7 +607,16 @@ const s = StyleSheet.create({
     marginLeft: spacing[3],
     flexDirection: 'row', alignItems: 'center', gap: 6,
   },
-  toggleWrap: { alignItems: 'center', justifyContent: 'center' },
+  doneBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  doneBtnActive: {
+    backgroundColor: G.accentDim,
+    borderColor: G.accent + '70',
+  },
   toggleTrack: {
     width: 54, height: 28, borderRadius: 14,
     flexDirection: 'row', alignItems: 'center',

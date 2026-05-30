@@ -651,33 +651,31 @@ export default function DashboardScreen() {
                 <View style={s.moodGlassBorder} />
 
                 <View style={s.mainCardInner}>
-                  {/* Top row: date + weather */}
-                  <View style={s.mainTopRow}>
-                    <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
-                    {weather && (
-                      <View style={s.mainWeatherRow}>
-                        <CloudSun size={22} color={accentColor} strokeWidth={1.6} />
-                        <View style={s.mainWeatherInfo}>
-                          <Text style={s.mainWeatherTemp}>{weather.temp}°C</Text>
-                          <Text style={s.mainWeatherDesc}>{weather.desc.toUpperCase()}</Text>
-                        </View>
+                  {/* Weather widget — top right */}
+                  {weather && (
+                    <View style={s.mainWeatherRow}>
+                      <CloudSun size={22} color={accentColor} strokeWidth={1.6} />
+                      <View style={s.mainWeatherInfo}>
+                        <Text style={s.mainWeatherTemp}>{weather.temp}°C</Text>
+                        <Text style={s.mainWeatherDesc}>{weather.desc.toUpperCase()}</Text>
                       </View>
-                    )}
-                  </View>
+                    </View>
+                  )}
 
-                  {/* Big greeting */}
-                  <Text style={s.mainGreeting}>{greeting.toUpperCase()}</Text>
+                  {/* Date label + greeting — compact stacked */}
+                  <View style={s.mainGreetingBlock}>
+                    <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
+                    <Text style={s.mainGreeting}>{greeting.toUpperCase()}</Text>
+                  </View>
 
                   {/* Bottom: task count — BOLD */}
-                  <View style={s.mainBottom}>
-                    <Text style={s.mainTaskLine}>
-                      {'Masz do zrobienia '}
-                      <Text style={s.mainTaskBold}>
-                        {`${todayTasks.length + overdueTasks.length} ${plTasks(todayTasks.length + overdueTasks.length)}`}
-                      </Text>
-                      {' na dziś.'}
+                  <Text style={s.mainTaskLine}>
+                    {'Masz do zrobienia '}
+                    <Text style={s.mainTaskBold}>
+                      {`${todayTasks.length + overdueTasks.length} ${plTasks(todayTasks.length + overdueTasks.length)}`}
                     </Text>
-                  </View>
+                    {' na dziś.'}
+                  </Text>
                 </View>
               </BlurView>
             </TouchableOpacity>
@@ -757,12 +755,12 @@ export default function DashboardScreen() {
                 activeOpacity={0.8}
               >
                 <View style={s.miniCardTop}>
-                  <CheckCircle2 size={13} color={colors.tabs.tasks} />
-                  <Text style={[s.miniCardNum, { color: colors.tabs.tasks }]}>{pendingTasks.length}</Text>
+                  <CheckCircle2 size={13} color={accentColor} />
+                  <Text style={[s.miniCardNum, { color: colors.white }]}>{pendingTasks.length}</Text>
                 </View>
                 <Text style={s.miniCardLabel}>{plTasks(pendingTasks.length)}</Text>
                 {todayTasks.length > 0 && (
-                  <Text style={[s.miniCardSub, { color: colors.tabs.tasks }]}>{todayTasks.length} na dziś</Text>
+                  <Text style={[s.miniCardSub, { color: accentColor }]}>{todayTasks.length} na dziś</Text>
                 )}
                 {nextDeadline && (
                   <Text style={s.miniCardSub} numberOfLines={1}>→ {nextDeadline.label}</Text>
@@ -776,8 +774,8 @@ export default function DashboardScreen() {
               {workEarnings.isWorking ? (
                 <View style={[s.miniCard, { backgroundColor: cardBgDark }]}>
                   <View style={s.miniCardTop}>
-                    <Briefcase size={13} color={wc ?? colors.accent.blue} />
-                    <Text style={[s.miniCardNum, { color: wc ?? colors.accent.blue }]}>
+                    <Briefcase size={13} color={accentColor} />
+                    <Text style={[s.miniCardNum, { color: colors.white }]}>
                       {workEarnings.totalEarned.toFixed(2)}
                     </Text>
                   </View>
@@ -785,7 +783,7 @@ export default function DashboardScreen() {
                   <View style={s.miniWorkTrack}>
                     <View style={[s.miniWorkFill, {
                       width: `${workEarnings.progressPct * 100}%`,
-                      backgroundColor: wc ?? colors.accent.blue,
+                      backgroundColor: accentColor,
                     }]} />
                   </View>
                 </View>
@@ -797,8 +795,8 @@ export default function DashboardScreen() {
                   activeOpacity={0.8}
                 >
                   <View style={s.miniCardTop}>
-                    <Wallet size={13} color={colors.tabs.finances} />
-                    <Text style={[s.miniCardNum, { color: budgetRemaining && budgetRemaining.remaining < 0 ? colors.accent.red : colors.tabs.finances }]}>
+                    <Wallet size={13} color={accentColor} />
+                    <Text style={[s.miniCardNum, { color: colors.white }]}>
                       {budgetRemaining ? Math.abs(Math.round(budgetRemaining.remaining)) : Math.round(stats.monthExpenses)}
                     </Text>
                   </View>
@@ -809,7 +807,7 @@ export default function DashboardScreen() {
                     <View style={s.miniWorkTrack}>
                       <View style={[s.miniWorkFill, {
                         width: `${budgetRemaining.pct * 100}%`,
-                        backgroundColor: budgetRemaining.pct >= 0.9 ? colors.accent.red : colors.tabs.finances,
+                        backgroundColor: '#5166F5',
                       }]} />
                     </View>
                   )}
@@ -1023,8 +1021,8 @@ export default function DashboardScreen() {
             {/* ══ WEEKLY / MONTHLY FINANCES ════════════════════════════════ */}
             <View style={[s.card, { backgroundColor: cardBgDark }]}>
               <View style={s.cardHeader}>
-                <Wallet size={13} color={colors.tabs.finances} />
-                <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>
+                <Wallet size={13} color={accentColor} />
+                <Text style={[s.cardTitle, { color: accentColor }]}>
                   {finPeriod === 'week' ? 'Tydzień' : MONTH_SHORT[new Date().getMonth()]}
                 </Text>
 
@@ -1034,13 +1032,13 @@ export default function DashboardScreen() {
                     style={[s.periodBtn, finPeriod === 'week' && s.periodBtnActive]}
                     onPress={() => { haptic.tap(); setFinPeriod('week'); }}
                   >
-                    <Text style={[s.periodBtnText, finPeriod === 'week' && { color: colors.tabs.finances }]}>7 dni</Text>
+                    <Text style={[s.periodBtnText, finPeriod === 'week' && { color: accentColor }]}>7 dni</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[s.periodBtn, finPeriod === 'month' && s.periodBtnActive]}
                     onPress={() => { haptic.tap(); setFinPeriod('month'); }}
                   >
-                    <Text style={[s.periodBtnText, finPeriod === 'month' && { color: colors.tabs.finances }]}>Mies.</Text>
+                    <Text style={[s.periodBtnText, finPeriod === 'month' && { color: accentColor }]}>Mies.</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -1089,8 +1087,8 @@ export default function DashboardScreen() {
             {weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
-                  <Wallet size={13} color={colors.tabs.finances} />
-                  <Text style={[s.cardTitle, { color: colors.tabs.finances }]}>Słodycze vs jedzenie</Text>
+                  <Wallet size={13} color={accentColor} />
+                  <Text style={[s.cardTitle, { color: accentColor }]}>Słodycze vs jedzenie</Text>
                   <View style={s.dualLegend}>
                     <View style={s.dualLegendItem}>
                       <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
@@ -1110,7 +1108,7 @@ export default function DashboardScreen() {
                 />
                 <View style={s.waveLabels}>
                   {weekOverview.map((w, i) => (
-                    <Text key={i} style={[s.waveLabel, w.isCurrent && { color: colors.tabs.finances, fontWeight: '700' }]}>
+                    <Text key={i} style={[s.waveLabel, w.isCurrent && { color: accentColor, fontWeight: '700' }]}>
                       {weekLabel(w.dates).split(' ')[0]}
                     </Text>
                   ))}
@@ -1214,7 +1212,7 @@ export default function DashboardScreen() {
                     </View>
                     <View style={s.finDivider} />
                     <View style={s.finStat}>
-                      <Text style={[s.finVal, { color: colors.tabs.tasks }]}>{monthActive}</Text>
+                      <Text style={[s.finVal, { color: colors.accent.blue }]}>{monthActive}</Text>
                       <Text style={s.finKey}>aktywne</Text>
                     </View>
                     {todayTasks.length > 0 && (
@@ -1265,7 +1263,7 @@ export default function DashboardScreen() {
               </View>
             )}
 
-            <View style={{ height: 120 }} />
+            <View style={{ height: 180 }} />
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -1354,14 +1352,8 @@ const s = StyleSheet.create({
     flex: 1, padding: spacing[5],
     justifyContent: 'space-between',
   },
-  mainTopRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  mainDate: {
-    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.45)', letterSpacing: 0.8,
-  },
   mainWeatherRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-end',
   },
   mainWeatherInfo: { alignItems: 'flex-end' },
   mainWeatherTemp: {
@@ -1370,11 +1362,14 @@ const s = StyleSheet.create({
   mainWeatherDesc: {
     fontSize: 8, fontWeight: '600', color: 'rgba(255,255,255,0.40)', letterSpacing: 0.6,
   },
-  mainGreeting: {
-    fontSize: 32, fontWeight: '800', color: colors.text.primary,
-    letterSpacing: -1, marginTop: spacing[2],
+  mainGreetingBlock: { gap: 0 },
+  mainDate: {
+    fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.40)', letterSpacing: 1,
   },
-  mainBottom: { gap: spacing[2] },
+  mainGreeting: {
+    fontSize: 36, fontWeight: '900', color: colors.white,
+    letterSpacing: -1.5, lineHeight: 40,
+  },
   mainTaskLine: {
     fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.80)',
   },
@@ -1544,7 +1539,7 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing[2], paddingVertical: 3,
     borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent',
   },
-  periodBtnActive: { borderColor: colors.tabs.finances + '50', backgroundColor: colors.tabs.finances + '15' },
+  periodBtnActive: { borderColor: colors.accent.blue + '50', backgroundColor: colors.accent.blue + '15' },
   periodBtnText: { fontSize: 10, fontWeight: '600', color: colors.text.muted },
   navArrow: { padding: 2 },
   weekLabelText: { fontSize: 10, color: colors.text.muted },
@@ -1554,7 +1549,7 @@ const s = StyleSheet.create({
   finStat: { flex: 1, alignItems: 'center', gap: 2 },
   finVal: { fontSize: 20, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
   finKey: { fontSize: 10, color: colors.text.muted },
-  finPct: { fontSize: 10, color: colors.tabs.finances, fontWeight: '600' },
+  finPct: { fontSize: 10, color: colors.accent.blue, fontWeight: '600' },
   finDivider: { width: 1, height: 40, backgroundColor: colors.border.subtle, alignSelf: 'center' },
 
   // ── Wave chart labels ──────────────────────────────────────────────────────
@@ -1577,7 +1572,7 @@ const s = StyleSheet.create({
   todayCard: {
     backgroundColor: colors.bg.card, borderRadius: radius.xl,
     padding: spacing[4], borderWidth: 1,
-    borderColor: colors.tabs.tasks + '28',
+    borderColor: colors.accent.blue + '28',
     gap: 0,
   },
   todayHeader: {
@@ -1585,24 +1580,24 @@ const s = StyleSheet.create({
     paddingBottom: spacing[2],
   },
   todayTitle: {
-    fontSize: 10, fontWeight: '800', color: colors.tabs.tasks, letterSpacing: 1.5,
+    fontSize: 10, fontWeight: '800', color: colors.accent.blue, letterSpacing: 1.5,
   },
   todayBadge: {
-    backgroundColor: colors.tabs.tasks + '20', borderRadius: 10,
+    backgroundColor: colors.accent.blue + '20', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 2,
   },
-  todayBadgeText: { fontSize: 11, fontWeight: '800', color: colors.tabs.tasks },
+  todayBadgeText: { fontSize: 11, fontWeight: '800', color: colors.accent.blue },
   todayMore: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 2 },
-  todayMoreText: { fontSize: 11, fontWeight: '600', color: colors.tabs.tasks },
+  todayMoreText: { fontSize: 11, fontWeight: '600', color: colors.accent.blue },
   todayRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: 7,
-    borderTopWidth: 1, borderTopColor: colors.tabs.tasks + '12',
+    borderTopWidth: 1, borderTopColor: colors.accent.blue + '12',
   },
   todayCheck: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: colors.tabs.tasks + '15',
-    borderWidth: 1.5, borderColor: colors.tabs.tasks + '45',
+    backgroundColor: colors.accent.blue + '15',
+    borderWidth: 1.5, borderColor: colors.accent.blue + '45',
     alignItems: 'center', justifyContent: 'center',
   },
   todayCheckUrgent: {
@@ -1657,12 +1652,12 @@ const s = StyleSheet.create({
   },
   payIconWrap: {
     width: 52, height: 52, borderRadius: radius.full,
-    backgroundColor: colors.tabs.tasks + '18',
+    backgroundColor: colors.accent.blue + '18',
     alignItems: 'center', justifyContent: 'center',
   },
   payTitle:  { fontSize: 10, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
   payName:   { fontSize: 20, fontWeight: '800', color: colors.text.primary, textAlign: 'center' },
-  payAmount: { fontSize: 28, fontWeight: '800', color: colors.tabs.tasks },
+  payAmount: { fontSize: 28, fontWeight: '800', color: colors.accent.blue },
   payHint:   { fontSize: 14, color: colors.text.secondary, textAlign: 'center' },
   payQueue:  { fontSize: 11, color: colors.text.muted },
   payBtns:   { flexDirection: 'row', gap: spacing[3], width: '100%', marginTop: spacing[2] },
