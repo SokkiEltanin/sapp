@@ -9,7 +9,6 @@ import { ScanLine, RefreshCcw, Tag } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
-import { BlurView } from 'expo-blur';
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -24,11 +23,11 @@ import { colors, spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
 const F = {
-  card:       '#5B1818',
-  cardBorder: 'rgba(228,52,52,0.18)',
+  card:       '#0E0707',        // near-black, slight red undertone
+  cardBorder: 'rgba(228,52,52,0.22)',
   accent:     '#E43434',
   accentDim:  'rgba(228,52,52,0.14)',
-  muted:      'rgba(228,52,52,0.55)',
+  muted:      'rgba(228,52,52,0.50)',
 };
 
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
@@ -102,11 +101,15 @@ export default function FinancesScreen() {
           }
           ListHeaderComponent={
             <>
-              {/* ── Hero amount card (glassmorphism) ─── */}
-              <View style={st.hero}>
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: F.card }]} />
+              {/* ── Hero amount card (dark + red gradient border) ─── */}
+              <LinearGradient
+                colors={[F.accent + 'AA', F.accent + '25', 'transparent']}
+                start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+                style={st.heroBorder}
+              >
+                <View style={st.heroInner}>
                 <AnimatedCardBg timeOfDay={timeOfDay} />
-                <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
                 <View style={st.heroContent}>
                   <Text style={st.heroDate}>
                     {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
@@ -123,7 +126,8 @@ export default function FinancesScreen() {
                     </Text>
                   )}
                 </View>
-              </View>
+                </View>
+              </LinearGradient>
 
               {/* ── Tag filter chips ─── */}
               {availableTags.length > 0 && (
@@ -198,12 +202,16 @@ const st = StyleSheet.create({
   },
 
   // ── Hero card ─────────────────────────────────────────────────────────────────
-  hero: {
+  heroBorder: {
     marginHorizontal: spacing[4], marginTop: spacing[2], marginBottom: spacing[3],
     borderRadius: radius.xl,
-    borderWidth: 1, borderColor: F.cardBorder,
+    padding: 1.5,
+  },
+  heroInner: {
+    borderRadius: radius.xl,
     overflow: 'hidden',
     minHeight: 130,
+    backgroundColor: F.card,
   },
   heroContent: {
     padding: spacing[5],

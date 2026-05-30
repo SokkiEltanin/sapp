@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
-import Svg, { Path, Defs, Filter, FeGaussianBlur } from 'react-native-svg';
+import Svg, { Circle, G, Defs, Filter, FeGaussianBlur } from 'react-native-svg';
 import type { TimeOfDay } from '@/hooks/useTimeAccent';
 
 // ─── Stars (night / dawn / evening) ──────────────────────────────────────────
 
-const STAR_COUNT = 18;
+const STAR_COUNT = 20;
 
 function StarField() {
   const stars = useMemo(() =>
     Array.from({ length: STAR_COUNT }, () => ({
       lx:    5 + Math.random() * 90,
       ly:    5 + Math.random() * 88,
-      sz:    1 + Math.random() * 1.5,
-      opacity: new Animated.Value(0.04 + Math.random() * 0.18),
-      twDur: 1400 + Math.random() * 2600,
-      delay: Math.random() * 4000,
+      sz:    0.8 + Math.random() * 1.6,
+      opacity: new Animated.Value(0.04 + Math.random() * 0.14),
+      twDur: 1600 + Math.random() * 2800,
+      delay: Math.random() * 5000,
     })),
   []);
 
@@ -28,7 +28,7 @@ function StarField() {
       const t = setTimeout(() => {
         if (!alive) return;
         const anim = Animated.loop(Animated.sequence([
-          Animated.timing(s.opacity, { toValue: 0.5 + Math.random() * 0.3, duration: s.twDur, useNativeDriver: true }),
+          Animated.timing(s.opacity, { toValue: 0.45 + Math.random() * 0.35, duration: s.twDur, useNativeDriver: true }),
           Animated.timing(s.opacity, { toValue: 0.02 + Math.random() * 0.06, duration: s.twDur, useNativeDriver: true }),
         ]));
         anim.start();
@@ -65,52 +65,68 @@ function StarField() {
   );
 }
 
-// ─── Cloud silhouettes ────────────────────────────────────────────────────────
-// 3 distinct bezier-path cloud shapes, all fit within viewBox "0 0 100 55"
+// ─── Cloud (overlapping circles — MUST use r > gap/2 so they merge) ──────────
+//
+// Key insight: adjacent circles spaced 0.19*w apart need r > 0.095*w to merge.
+// We use r = w/8 = 0.125*w which guarantees clean merging.
+// feGaussianBlur on the group softens edges into natural cloud texture.
 
-const CLOUD_PATHS = [
-  // Wide cloud with 3 bumps
-  'M 8 52 Q 0 52 0 42 Q 0 28 16 26 Q 10 6 30 6 Q 38 -2 52 8 Q 62 2 74 12 Q 86 8 90 24 Q 98 22 100 36 Q 100 52 84 52 Z',
-  // Round puffy cloud
-  'M 10 50 Q 0 50 0 38 Q 0 22 14 20 Q 8 2 28 2 Q 38 -4 50 6 Q 60 0 68 10 Q 80 6 84 22 Q 90 24 90 38 Q 90 50 74 50 Z',
-  // Elongated wispy cloud
-  'M 6 46 Q 0 46 0 38 Q 0 28 12 26 Q 6 10 24 10 Q 32 4 44 14 Q 54 6 68 16 Q 78 10 86 22 Q 96 20 100 32 Q 100 46 88 46 Z',
+type CloudDef = { w: number; h: number; initX: number; y: number; dur: number; op: number };
+
+// 3 cloud shapes defined as fractions: [cx_frac, cy_frac, r_scale]
+// r = r_scale * (w / 8)
+const CLOUD_SHAPES = [
+  // Compact cumulus (5 circles, 3 rows: base/body/peak)
+  [
+    [0.15, 0.80, 0.80], [0.38, 0.80, 0.90], [0.62, 0.80, 0.90], [0.85, 0.80, 0.80],
+    [0.28, 0.54, 0.95], [0.55, 0.48, 1.15], [0.78, 0.54, 0.95],
+    [0.52, 0.22, 0.95],
+  ],
+  // Wide flat cloud (more horizontal spread)
+  [
+    [0.10, 0.82, 0.75], [0.28, 0.82, 0.85], [0.50, 0.82, 0.88], [0.72, 0.82, 0.85], [0.90, 0.82, 0.75],
+    [0.22, 0.56, 0.90], [0.50, 0.50, 1.05], [0.76, 0.56, 0.90],
+  ],
+  // Tall puffy (strong vertical development)
+  [
+    [0.18, 0.82, 0.80], [0.42, 0.82, 0.92], [0.66, 0.82, 0.92], [0.88, 0.82, 0.80],
+    [0.30, 0.55, 1.00], [0.58, 0.50, 1.18], [0.82, 0.55, 1.00],
+    [0.44, 0.24, 0.92], [0.68, 0.24, 0.92],
+  ],
 ];
 
-function CloudSvg({ shape, blurId }: { shape: number; blurId: string }) {
+function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number; blurId: string }) {
+  const circles = CLOUD_SHAPES[shape];
+  const rUnit = w / 8;
   return (
-    <Svg
-      width="100%"
-      height="100%"
-      viewBox="0 0 100 55"
-      style={StyleSheet.absoluteFill}
-    >
+    <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
       <Defs>
-        <Filter
-          id={blurId}
-          x="-15%"
-          y="-15%"
-          width="130%"
-          height="130%"
-        >
-          <FeGaussianBlur stdDeviation="2" />
+        {/* Very gentle blur — just softens circle edges, relies on BlurView above for depth */}
+        <Filter id={blurId} x="-8%" y="-8%" width="116%" height="116%">
+          <FeGaussianBlur stdDeviation="1.2" />
         </Filter>
       </Defs>
-      <Path
-        d={CLOUD_PATHS[shape]}
-        fill="white"
-        filter={`url(#${blurId})`}
-      />
+      <G filter={`url(#${blurId})`}>
+        {circles.map(([cx, cy, rs], i) => (
+          <Circle
+            key={i}
+            cx={cx * w}
+            cy={cy * h}
+            r={rs * rUnit}
+            fill="white"
+          />
+        ))}
+      </G>
     </Svg>
   );
 }
 
 // ─── Cloud layer ──────────────────────────────────────────────────────────────
 
-const CLOUD_DEFS = [
-  { shape: 0, w: 200, h: 65, initX: -240, y:  2, dur: 32000, op: 0.11 },
-  { shape: 1, w: 155, h: 55, initX:  -70, y: 22, dur: 24000, op: 0.10 },
-  { shape: 2, w: 220, h: 62, initX:  100, y:  8, dur: 42000, op: 0.09 },
+const CLOUD_DEFS: CloudDef[] = [
+  { w: 200, h: 70, initX: -240, y:  0, dur: 30000, op: 0.12 },
+  { w: 160, h: 60, initX:  -70, y: 20, dur: 22000, op: 0.10 },
+  { w: 220, h: 75, initX:  110, y:  5, dur: 40000, op: 0.11 },
 ];
 
 function CloudLayer() {
@@ -123,7 +139,7 @@ function CloudLayer() {
   useEffect(() => {
     CLOUD_DEFS.forEach((c, i) => {
       const anim = Animated.loop(Animated.sequence([
-        Animated.timing(xAnims[i], { toValue: 480, duration: c.dur, useNativeDriver: true }),
+        Animated.timing(xAnims[i], { toValue: 500, duration: c.dur, useNativeDriver: true }),
         Animated.timing(xAnims[i], { toValue: c.initX, duration: 0, useNativeDriver: true }),
       ]));
       anim.start();
@@ -150,7 +166,7 @@ function CloudLayer() {
             transform: [{ translateX: xAnims[i] }],
           }}
         >
-          <CloudSvg shape={c.shape} blurId={`cloud-blur-${i}`} />
+          <CloudSvg shape={i} w={c.w} h={c.h} blurId={`cb${i}`} />
         </Animated.View>
       ))}
     </View>

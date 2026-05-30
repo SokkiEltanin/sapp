@@ -4,7 +4,7 @@ import { Tabs, usePathname, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withTiming,
+  useSharedValue, useAnimatedStyle, withSpring,
   runOnJS, cancelAnimation,
 } from 'react-native-reanimated';
 import { colors } from '@/theme';
@@ -59,14 +59,11 @@ export default function TabsLayout() {
         return;
       }
 
-      // Slide screen off-canvas, then navigate.
-      // useEffect fires on pathname change → cancelAnimation + tx=0 → new screen at center.
+      // Instant snap, then navigate — any animation reveals gray background
       busy.value = true;
-      const nextI  = fwd ? i + 1 : i - 1;
-      const exitTo = fwd ? -W : W;
-      tx.value = withTiming(exitTo, { duration: 220 }, () => {
-        runOnJS(doNavigate)(TABS[nextI] as string);
-      });
+      const nextI = fwd ? i + 1 : i - 1;
+      tx.value = 0;
+      runOnJS(doNavigate)(TABS[nextI] as string);
     }),
   []);
 

@@ -756,7 +756,7 @@ export default function DashboardScreen() {
               >
                 <View style={s.miniCardTop}>
                   <CheckCircle2 size={13} color={accentColor} />
-                  <Text style={[s.miniCardNum, { color: colors.white }]}>{pendingTasks.length}</Text>
+                  <Text style={[s.miniCardNum, { color: '#FFFFFF' }]}>{pendingTasks.length}</Text>
                 </View>
                 <Text style={s.miniCardLabel}>{plTasks(pendingTasks.length)}</Text>
                 {todayTasks.length > 0 && (
@@ -775,7 +775,7 @@ export default function DashboardScreen() {
                 <View style={[s.miniCard, { backgroundColor: cardBgDark }]}>
                   <View style={s.miniCardTop}>
                     <Briefcase size={13} color={accentColor} />
-                    <Text style={[s.miniCardNum, { color: colors.white }]}>
+                    <Text style={[s.miniCardNum, { color: '#FFFFFF' }]}>
                       {workEarnings.totalEarned.toFixed(2)}
                     </Text>
                   </View>
@@ -796,7 +796,7 @@ export default function DashboardScreen() {
                 >
                   <View style={s.miniCardTop}>
                     <Wallet size={13} color={accentColor} />
-                    <Text style={[s.miniCardNum, { color: colors.white }]}>
+                    <Text style={[s.miniCardNum, { color: '#FFFFFF' }]}>
                       {budgetRemaining ? Math.abs(Math.round(budgetRemaining.remaining)) : Math.round(stats.monthExpenses)}
                     </Text>
                   </View>
