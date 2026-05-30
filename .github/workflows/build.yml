@@ -130,13 +130,18 @@ jobs:
       - name: Rename APK
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          cp android/app/build/outputs/apk/release/app-release.apk sapp-v${VERSION}.apk
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          # Filename carries the build number AND commit SHA so it is always
+          # obvious which build/commit an installed APK came from.
+          cp android/app/build/outputs/apk/release/app-release.apk \
+            "sapp-build${{ github.run_number }}-v${VERSION}-${SHORT_SHA}.apk"
+          echo "Built: sapp-build${{ github.run_number }}-v${VERSION}-${SHORT_SHA}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sapp-apk
-          path: sapp-v*.apk
+          name: sapp-build${{ github.run_number }}
+          path: sapp-build*.apk
           retention-days: 30
 
       - name: Create GitHub Release
@@ -144,7 +149,11 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: "Build #${{ github.run_number }}"
-          files: sapp-v*.apk
+          body: |
+            **Build #${{ github.run_number }}**
+            Commit: ${{ github.sha }}
+            Message: ${{ github.event.head_commit.message }}
+          files: sapp-build*.apk
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

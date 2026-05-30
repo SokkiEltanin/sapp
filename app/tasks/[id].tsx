@@ -136,14 +136,14 @@ const rw = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TaskDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const { tasks, update, remove, toggle, unsnooze, addSubtask, toggleSubtask, removeSubtask } = useTasks();
   const startPomodoro = usePomodoroStore(s => s.startFor);
   const updateTaskStore = useCalendarStore(s => s.updateTask);
 
   const task = tasks.find(t => t.id === id);
 
-  const [editing, setEditing]           = useState(false);
+  const [editing, setEditing]           = useState(edit === '1');
   const [title, setTitle]               = useState(task?.title ?? '');
   const [description, setDescription]   = useState(task?.description ?? '');
   const [deadline, setDeadline]         = useState(fmtDate(task?.deadline));

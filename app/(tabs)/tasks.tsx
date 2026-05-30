@@ -157,11 +157,12 @@ function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem
 
 // ─── Task card ────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
+function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
   task: Task;
   pomodoroTaskId?: string;
   onComplete: (task: Task) => void;
   onEdit: (task: Task) => void;
+  onEditDirect: (task: Task) => void;
 }) {
   const overdue  = task.status !== 'done' && task.status !== 'snoozed' && !!task.deadline && task.deadline.split('T')[0] < todayStr();
   const isDone   = task.status === 'done';
@@ -197,7 +198,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
 
         <TouchableOpacity
           style={s.editBtn}
-          onPress={(e: any) => { e.stopPropagation?.(); haptic.tap(); onEdit(task); }}
+          onPress={(e: any) => { e.stopPropagation?.(); haptic.tap(); onEditDirect(task); }}
           hitSlop={6}
           activeOpacity={0.8}
         >
@@ -314,7 +315,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 <Timer size={15} color='#2BC8E0' />
                 <Text style={[dm.footerBtnText, { color: '#2BC8E0' }]}>Pomodoro</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dm.footerBtn} onPress={() => { haptic.tap(); onClose(); router.push(`/tasks/${task.id}` as any); }} activeOpacity={0.8}>
+              <TouchableOpacity style={dm.footerBtn} onPress={() => { haptic.tap(); onClose(); router.push(`/tasks/${task.id}?edit=1` as any); }} activeOpacity={0.8}>
                 <Pencil size={15} color={G.accent} />
                 <Text style={dm.footerBtnText}>Edytuj</Text>
               </TouchableOpacity>
@@ -420,9 +421,10 @@ const ss = StyleSheet.create({
 
 // ─── Swipe row ────────────────────────────────────────────────────────────────
 
-function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onQuickSnooze }: {
+function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQuickSnooze }: {
   task: Task; pomodoroTaskId?: string;
-  onComplete: (task: Task) => void; onEdit: (task: Task) => void; onQuickSnooze: (id: string) => void;
+  onComplete: (task: Task) => void; onEdit: (task: Task) => void;
+  onEditDirect: (task: Task) => void; onQuickSnooze: (id: string) => void;
 }) {
   const swRef = useRef<SwipeableMethods>(null);
   const isDone = task.status === 'done';
@@ -447,7 +449,7 @@ function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onQuickSnooze }: {
         else if (!isDone) { onQuickSnooze(task.id); }
       }}
     >
-      <TaskCard task={task} pomodoroTaskId={pomodoroTaskId} onComplete={onComplete} onEdit={onEdit} />
+      <TaskCard task={task} pomodoroTaskId={pomodoroTaskId} onComplete={onComplete} onEdit={onEdit} onEditDirect={onEditDirect} />
     </ReanimatedSwipeable>
   );
 }
@@ -487,6 +489,7 @@ export default function TasksScreen() {
   }, [toggle]);
 
   const handleEditPress     = useCallback((task: Task) => { setDetailTask(task); setDetailVisible(true); }, []);
+  const handleEditDirect    = useCallback((task: Task) => { haptic.tap(); router.push(`/tasks/${task.id}?edit=1` as any); }, []);
   const handleDelete        = useCallback((id: string) => { remove(id); toast.info('Usunięto'); }, [remove]);
   const handlePomodoro      = useCallback((task: Task) => { startPomodoro(task.id, task.title); router.push('/pomodoro' as any); }, [startPomodoro]);
   const handleQuickSnooze   = useCallback((id: string) => { const d = new Date(); d.setHours(d.getHours() + 1); snooze(id, d); haptic.tap(); toast.info('Odłożono na godzinę'); }, [snooze]);
@@ -553,6 +556,7 @@ export default function TasksScreen() {
                 pomodoroTaskId={pomodoroTaskId}
                 onComplete={handleCompletePress}
                 onEdit={handleEditPress}
+                onEditDirect={handleEditDirect}
                 onQuickSnooze={handleQuickSnooze}
               />
             );

@@ -48,10 +48,23 @@ export default function TabsLayout() {
         <TopPill />
       </SafeAreaView>
 
-      {/* Tab screens — swipe to switch (instant, no drag animation) */}
+      {/* Tab screens — swipe to switch (instant, no drag animation).
+          detachInactiveScreens=false + lazy=false keep all screens mounted AND
+          attached to the native hierarchy, so switching is a pure visibility
+          toggle with no repaint → no gray flash, no double-render. */}
       <GestureDetector gesture={pan}>
         <View style={s.swipeContainer}>
-          <Tabs tabBar={() => null} screenOptions={{ headerShown: false, lazy: false, animation: 'none' }}>
+          <Tabs
+            tabBar={() => null}
+            detachInactiveScreens={false}
+            screenOptions={{
+              headerShown: false,
+              lazy: false,
+              animation: 'none',
+              freezeOnBlur: false,
+              sceneStyle: { backgroundColor: colors.bg.primary },
+            }}
+          >
             <Tabs.Screen name="index"    />
             <Tabs.Screen name="tasks"    />
             <Tabs.Screen name="stats"    />
