@@ -431,7 +431,7 @@ export default function CalendarTabScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
-          contentContainerStyle={{ paddingBottom: 140 }}
+          contentContainerStyle={{ paddingBottom: 180 }}
         >
           {/* ── Calendar area with gesture ── */}
           <View {...calGesturePR.panHandlers}>

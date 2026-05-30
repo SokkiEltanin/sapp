@@ -1,12 +1,9 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Tabs, usePathname, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring,
-  runOnJS, cancelAnimation,
-} from 'react-native-reanimated';
+import { runOnJS } from 'react-native-reanimated';
 import { colors } from '@/theme';
 import TabBar from '@/components/ui/TabBar';
 import TopPill from '@/components/ui/TopPill';
@@ -21,96 +18,54 @@ function tabIdx(path: string): number {
 
 export default function TabsLayout() {
   const pathname = usePathname();
-  const idxSV = useSharedValue(tabIdx(pathname));
-  const tx    = useSharedValue(0);
-  const busy  = useSharedValue(false);
+  const currentIdx = tabIdx(pathname);
 
-  useEffect(() => {
-    cancelAnimation(tx);
-    idxSV.value = tabIdx(pathname);
-    busy.value  = false;
-    tx.value    = 0;
-  }, [pathname]);
-
-  const doNavigate = useCallback((path: string) => {
-    router.navigate(path as any);
+  const goTo = useCallback((idx: number) => {
+    if (idx < 0 || idx >= TABS.length) return;
+    router.navigate(TABS[idx] as any);
   }, []);
 
+  // Pure swipe-detection — NO visual drag. The gesture only reads direction and
+  // navigates. Nothing translates on screen, so there is no gray gap and no
+  // "pop-in" of the next screen. Reliable by construction.
   const pan = useMemo(() => Gesture.Pan()
-    .activeOffsetX([-14, 14])
-    .failOffsetY([-20, 20])
-    .onUpdate(e => {
-      'worklet';
-      if (busy.value) return;
-      const i = idxSV.value;
-      const blocked = (e.translationX > 0 && i === 0) || (e.translationX < 0 && i === TABS.length - 1);
-      tx.value = blocked ? e.translationX * 0.06 : e.translationX;
-    })
+    .activeOffsetX([-22, 22])
+    .failOffsetY([-24, 24])
     .onEnd(e => {
       'worklet';
-      if (busy.value) return;
-      const i   = idxSV.value;
-      const ok  = Math.abs(e.translationX) > W * 0.25 || Math.abs(e.velocityX) > 500;
-      const fwd = e.translationX < 0 && i < TABS.length - 1;
-      const bck = e.translationX > 0 && i > 0;
-
-      if (!ok || !(fwd || bck)) {
-        tx.value = withSpring(0, { damping: 26, stiffness: 280 });
-        return;
-      }
-
-      // Instant snap, then navigate — any animation reveals gray background
-      busy.value = true;
-      const nextI = fwd ? i + 1 : i - 1;
-      tx.value = 0;
-      runOnJS(doNavigate)(TABS[nextI] as string);
+      const ok = Math.abs(e.translationX) > W * 0.28 || Math.abs(e.velocityX) > 550;
+      if (!ok) return;
+      const i = tabIdx(pathname);
+      if (e.translationX < 0 && i < TABS.length - 1) runOnJS(goTo)(i + 1);
+      else if (e.translationX > 0 && i > 0)          runOnJS(goTo)(i - 1);
     }),
-  []);
-
-  // Current screen slides with tx
-  const screenStyle = useAnimatedStyle(() => ({
-    flex: 1,
-    transform: [{ translateX: tx.value }],
-  }));
-
-  // Adjacent fill: same bg color, stays beside the sliding screen so no gray gap is visible
-  const adjacentStyle = useAnimatedStyle(() => ({
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.bg.primary,
-    // When sliding left (tx<0): fill is to the right (tx+W)
-    // When sliding right (tx>0): fill is to the left (tx-W)
-    transform: [{ translateX: tx.value + (tx.value < 0 ? W : -W) }],
-  }));
+  [pathname, goTo]);
 
   return (
     <View style={s.root}>
-      {/* Global TopPill — fixed, never slides */}
+      {/* Global TopPill — fixed */}
       <SafeAreaView style={s.topArea} edges={['top']}>
         <TopPill />
       </SafeAreaView>
 
-      {/* Sliding tab screens */}
+      {/* Tab screens — swipe to switch (instant, no drag animation) */}
       <GestureDetector gesture={pan}>
         <View style={s.swipeContainer}>
-          {/* Fills the gap beside the sliding screen — prevents gray background flash */}
-          <Animated.View style={adjacentStyle} pointerEvents="none" />
-          <Animated.View style={screenStyle}>
-            <Tabs tabBar={() => null} screenOptions={{ headerShown: false }}>
-              <Tabs.Screen name="index"    />
-              <Tabs.Screen name="tasks"    />
-              <Tabs.Screen name="stats"    />
-              <Tabs.Screen name="finances" />
-              <Tabs.Screen name="analytics" options={{ href: null }} />
-              <Tabs.Screen name="calendar"  options={{ href: null }} />
-              <Tabs.Screen name="mood"      options={{ href: null }} />
-              <Tabs.Screen name="health"    options={{ href: null }} />
-            </Tabs>
-          </Animated.View>
+          <Tabs tabBar={() => null} screenOptions={{ headerShown: false, lazy: false, animation: 'none' }}>
+            <Tabs.Screen name="index"    />
+            <Tabs.Screen name="tasks"    />
+            <Tabs.Screen name="stats"    />
+            <Tabs.Screen name="finances" />
+            <Tabs.Screen name="analytics" options={{ href: null }} />
+            <Tabs.Screen name="calendar"  options={{ href: null }} />
+            <Tabs.Screen name="mood"      options={{ href: null }} />
+            <Tabs.Screen name="health"    options={{ href: null }} />
+          </Tabs>
         </View>
       </GestureDetector>
 
       {/* Fixed tab bar */}
-      <TabBar currentIndex={tabIdx(pathname)} />
+      <TabBar currentIndex={currentIdx} />
     </View>
   );
 }

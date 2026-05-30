@@ -459,7 +459,7 @@ export default function AnalyticsScreen() {
 
 const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: colors.bg.primary },
-  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 100 },
+  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
 
   header: {
     paddingTop: spacing[2], paddingBottom: spacing[1],

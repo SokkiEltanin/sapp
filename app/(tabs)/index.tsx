@@ -384,7 +384,11 @@ export default function DashboardScreen() {
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     googleCalendarService.getStoredToken().then(token => {
-      if (token) googleCalendarService.fetchEvents(1, 14).then(evs => setGcalEvents(evs)).catch(() => {});
+      if (token) {
+        googleCalendarService.fetchEvents(1, 14).then(evs => setGcalEvents(evs)).catch(() => {});
+      } else {
+        setGcalEvents([]);  // clear any cached events from a previous session
+      }
     });
   }, []);
 
@@ -619,12 +623,14 @@ export default function DashboardScreen() {
       <SafeAreaView style={s.safe} edges={[]}>
         <View style={{ flex: 1 }}>
 
-          {/* Top bar — minimal */}
-          <View style={s.topBar}>
-            <TouchableOpacity onPress={() => { haptic.tap(); router.push('/settings' as any); }} style={s.settingsBtn} activeOpacity={0.7}>
-              <Settings size={17} color={colors.text.secondary} />
-            </TouchableOpacity>
-          </View>
+          {/* Settings — absolute overlay, takes no layout height */}
+          <TouchableOpacity
+            onPress={() => { haptic.tap(); router.push('/settings' as any); }}
+            style={s.settingsBtn}
+            activeOpacity={0.7}
+          >
+            <Settings size={17} color={colors.text.secondary} />
+          </TouchableOpacity>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -1263,7 +1269,7 @@ export default function DashboardScreen() {
               </View>
             )}
 
-            <View style={{ height: 180 }} />
+            <View style={{ height: 220 }} />
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -1313,18 +1319,14 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg.primary },
   safe: { flex: 1 },
 
-  // Top bar
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
-    paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[1],
-  },
   settingsBtn: {
+    position: 'absolute', top: 12, right: spacing[4], zIndex: 10,
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: 'rgba(24,26,26,0.80)', borderWidth: 1, borderColor: colors.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
 
-  scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[2] },
+  scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[5] },
 
   // ── Main glassmorphism card (Figma) ───────────────────────────────────────
   mainCard: {

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal, ScanLine,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -173,6 +173,16 @@ export default function TabBar({ currentIndex }: Props) {
               activeOpacity={0.85}
             >
               <SlidersHorizontal size={18} color={activeAccent} />
+            </TouchableOpacity>
+          )}
+          {/* Secondary: scan receipt for finances tab */}
+          {currentIndex === 3 && (
+            <TouchableOpacity
+              style={[s.sortFab, { borderColor: activeAccent + '50' }]}
+              onPress={() => { haptic.tap(); router.push('/expenses/scan' as any); }}
+              activeOpacity={0.85}
+            >
+              <ScanLine size={18} color={activeAccent} />
             </TouchableOpacity>
           )}
           <TouchableOpacity

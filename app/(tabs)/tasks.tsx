@@ -214,7 +214,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit }: {
           {task.title.toUpperCase()}
         </Text>
         <Text style={[s.cardSub, { color: subColor }]}>{subtitle}</Text>
-        {(task.subtasks?.length > 0 || task.estimatedPomodoros > 0 || task.tags?.length > 0) && (
+        {((task.subtasks?.length ?? 0) > 0 || (task.estimatedPomodoros ?? 0) > 0 || (task.tags?.length ?? 0) > 0) && (
           <View style={s.cardMeta}>
             {task.subtasks && task.subtasks.length > 0 && (() => {
               const done = task.subtasks.filter(st => st.done).length;

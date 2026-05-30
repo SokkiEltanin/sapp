@@ -545,7 +545,7 @@ export default function HealthScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
-  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
+  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
 
   card: { gap: spacing[3] },
   tealCard: { gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },

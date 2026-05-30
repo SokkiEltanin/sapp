@@ -4,8 +4,10 @@ import {
   ScrollView, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
-import { ScanLine, RefreshCcw, Tag } from 'lucide-react-native';
+import { RefreshCcw, Tag } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -32,11 +34,66 @@ const F = {
 
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
 
+function pad(n: number) { return String(n).padStart(2, '0'); }
+function toStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+
+// Current week dates (Mon→Sun)
+function weekDates(): string[] {
+  const today = new Date();
+  const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
+  const mon = new Date(today); mon.setDate(today.getDate() - dow);
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return toStr(d); });
+}
+// Current month dates (1..N)
+function monthDates(): string[] {
+  const d = new Date(), y = d.getFullYear(), m = d.getMonth();
+  const n = new Date(y, m + 1, 0).getDate();
+  return Array.from({ length: n }, (_, i) => `${y}-${pad(m + 1)}-${pad(i + 1)}`);
+}
+
+// ─── Wave chart ────────────────────────────────────────────────────────────────
+const WAVE_W = 320, WAVE_H = 70;
+
+function WaveChart({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * WAVE_W,
+    y: WAVE_H - 8 - (v / max) * (WAVE_H - 20),
+  }));
+  let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const px = pts[i - 1].x, py = pts[i - 1].y, cx = pts[i].x, cy = pts[i].y;
+    const mx = (px + cx) / 2;
+    line += ` C ${mx.toFixed(1)} ${py.toFixed(1)}, ${mx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
+  }
+  const fill = `${line} L ${WAVE_W} ${WAVE_H} L 0 ${WAVE_H} Z`;
+  return (
+    <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
+      <Defs>
+        <SvgLinearGradient id="finwave" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity="0.32" />
+          <Stop offset="1" stopColor={color} stopOpacity="0" />
+        </SvgLinearGradient>
+      </Defs>
+      <Path d={fill} fill="url(#finwave)" />
+      <Path d={line} stroke={color} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map((p, i) => (
+        <Path key={i}
+          d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0`}
+          fill={color} opacity={data[i] > 0 ? '1' : '0.2'}
+        />
+      ))}
+    </Svg>
+  );
+}
+
 export default function FinancesScreen() {
   const { timeOfDay } = useTimeAccent();
   const { grouped, stats, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
 
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
@@ -51,6 +108,38 @@ export default function FinancesScreen() {
     }
     return Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 12).map(([tag]) => tag);
   }, [expenses]);
+
+  // Chart data: spending per day (week) or per week-of-month (month)
+  const chartData = useMemo(() => {
+    const byDate: Record<string, number> = {};
+    for (const e of expenses) {
+      if (!isExp(e)) continue;
+      const k = e.date.slice(0, 10);
+      byDate[k] = (byDate[k] ?? 0) + e.amount;
+    }
+    if (chartPeriod === 'week') {
+      const dates = weekDates();
+      return {
+        values: dates.map(d => byDate[d] ?? 0),
+        labels: ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'],
+        total: dates.reduce((s, d) => s + (byDate[d] ?? 0), 0),
+      };
+    } else {
+      // group month into ~5 weekly buckets
+      const dates = monthDates();
+      const buckets: number[] = [0, 0, 0, 0, 0];
+      for (const d of dates) {
+        const day = parseInt(d.slice(8, 10), 10);
+        const wi = Math.min(4, Math.floor((day - 1) / 7));
+        buckets[wi] += byDate[d] ?? 0;
+      }
+      return {
+        values: buckets,
+        labels: ['T1', 'T2', 'T3', 'T4', 'T5'],
+        total: buckets.reduce((s, v) => s + v, 0),
+      };
+    }
+  }, [expenses, chartPeriod]);
 
   const sections = useMemo(() => {
     const filtered = activeTagFilter
@@ -76,20 +165,12 @@ export default function FinancesScreen() {
           accentColor={colors.tabs.finances}
           style={{ borderBottomColor: F.cardBorder }}
           rightSlot={
-            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-              <PressableScale
-                onPress={() => { haptic.tap(); router.push('/expenses/scan' as any); }}
-                style={st.hBtn}
-              >
-                <ScanLine size={17} color={colors.accent.blue} />
-              </PressableScale>
-              <PressableScale
-                onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }}
-                style={st.hBtn}
-              >
-                <RefreshCcw size={17} color={colors.text.secondary} />
-              </PressableScale>
-            </View>
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }}
+              style={st.hBtn}
+            >
+              <RefreshCcw size={17} color={colors.text.secondary} />
+            </PressableScale>
           }
         />
 
@@ -108,26 +189,56 @@ export default function FinancesScreen() {
                 style={st.heroBorder}
               >
                 <View style={st.heroInner}>
-                <AnimatedCardBg timeOfDay={timeOfDay} />
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
-                <View style={st.heroContent}>
-                  <Text style={st.heroDate}>
-                    {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
-                  </Text>
-                  <View style={st.heroAmountRow}>
-                    <Text style={st.heroAmount}>{stats.monthExpenses.toFixed(0)}</Text>
-                    <Text style={st.heroCurrency}> PLN</Text>
-                  </View>
-                  {stats.monthIncome > 0 && (
-                    <Text style={st.heroSub}>
-                      {stats.monthIncome > stats.monthExpenses
-                        ? `Zaoszczędziłeś ${(stats.monthIncome - stats.monthExpenses).toFixed(0)} zł`
-                        : `Przekroczono przychody o ${(stats.monthExpenses - stats.monthIncome).toFixed(0)} zł`}
+                  <AnimatedCardBg timeOfDay={timeOfDay} />
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+                  <View style={st.heroContent}>
+                    <Text style={st.heroDate}>
+                      {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
                     </Text>
-                  )}
-                </View>
+                    <View style={st.heroAmountRow}>
+                      <Text style={st.heroAmount}>{stats.monthExpenses.toFixed(0)}</Text>
+                      <Text style={st.heroCurrency}> PLN</Text>
+                    </View>
+                    {stats.monthIncome > 0 && (
+                      <Text style={st.heroSub}>
+                        {stats.monthIncome > stats.monthExpenses
+                          ? `Zaoszczędziłeś ${(stats.monthIncome - stats.monthExpenses).toFixed(0)} zł`
+                          : `Przekroczono przychody o ${(stats.monthExpenses - stats.monthIncome).toFixed(0)} zł`}
+                      </Text>
+                    )}
+                  </View>
                 </View>
               </LinearGradient>
+
+              {/* ── Spending wave chart + period toggle ─── */}
+              <View style={st.chartCard}>
+                <View style={st.chartHeader}>
+                  <Text style={st.chartTitle}>WYDATKI — {chartPeriod === 'week' ? 'TYDZIEŃ' : 'MIESIĄC'}</Text>
+                  <View style={st.toggle}>
+                    <TouchableOpacity
+                      style={[st.toggleBtn, chartPeriod === 'week' && st.toggleBtnOn]}
+                      onPress={() => { haptic.tap(); setChartPeriod('week'); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[st.toggleText, chartPeriod === 'week' && st.toggleTextOn]}>Tydz.</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[st.toggleBtn, chartPeriod === 'month' && st.toggleBtnOn]}
+                      onPress={() => { haptic.tap(); setChartPeriod('month'); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[st.toggleText, chartPeriod === 'month' && st.toggleTextOn]}>Mies.</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Text style={st.chartTotal}>{chartData.total.toFixed(0)} <Text style={st.chartTotalUnit}>zł</Text></Text>
+                <WaveChart data={chartData.values} color={F.accent} />
+                <View style={st.chartLabels}>
+                  {chartData.labels.map((l, i) => (
+                    <Text key={i} style={st.chartLabel}>{l}</Text>
+                  ))}
+                </View>
+              </View>
 
               {/* ── Tag filter chips ─── */}
               {availableTags.length > 0 && (
@@ -183,7 +294,7 @@ export default function FinancesScreen() {
               </View>
             ) : null
           }
-          contentContainerStyle={{ paddingBottom: 160 }}
+          contentContainerStyle={{ paddingBottom: 200 }}
           stickySectionHeadersEnabled={false}
         />
 
@@ -219,9 +330,31 @@ const st = StyleSheet.create({
   },
   heroDate:      { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  heroAmount:    { fontSize: 42, fontWeight: '800', color: colors.white, letterSpacing: -2, lineHeight: 46 },
+  heroAmount:    { fontSize: 42, fontWeight: '800', color: '#FFFFFF', letterSpacing: -2, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: colors.text.muted, paddingBottom: 4 },
   heroSub:       { fontSize: 12, color: F.muted, fontWeight: '500' },
+
+  // ── Chart card ──────────────────────────────────────────────────────────────
+  chartCard: {
+    marginHorizontal: spacing[4], marginBottom: spacing[3],
+    backgroundColor: F.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: F.cardBorder,
+    padding: spacing[4], gap: spacing[2],
+  },
+  chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  chartTitle: { fontSize: 11, fontWeight: '800', color: F.accent, letterSpacing: 1 },
+  toggle: {
+    flexDirection: 'row', gap: 2, backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: radius.full, padding: 2,
+  },
+  toggleBtn: { paddingHorizontal: spacing[3], paddingVertical: 4, borderRadius: radius.full },
+  toggleBtnOn: { backgroundColor: F.accent + '25' },
+  toggleText: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
+  toggleTextOn: { color: F.accent },
+  chartTotal: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1 },
+  chartTotalUnit: { fontSize: 14, fontWeight: '600', color: colors.text.muted },
+  chartLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+  chartLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
 
   // ── Tag filters ───────────────────────────────────────────────────────────────
   tagRow: { paddingHorizontal: spacing[4], gap: spacing[2] },

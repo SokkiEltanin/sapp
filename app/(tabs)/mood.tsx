@@ -581,7 +581,7 @@ export default function MoodScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
-  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
+  scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
   addBtn: {
     width: 36, height: 36, borderRadius: radius.md,
     backgroundColor: P.accent, alignItems: 'center', justifyContent: 'center',
