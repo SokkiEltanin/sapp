@@ -596,7 +596,7 @@ const s = StyleSheet.create({
   title:    { fontSize: 28, fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
   subtitle: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
 
-  list: { paddingHorizontal: spacing[4], paddingBottom: 120, gap: spacing[2] },
+  list: { paddingHorizontal: spacing[4], paddingBottom: 180, gap: spacing[2] },
 
   // ── Task card ──────────────────────────────────────────────────────────────
   card: {

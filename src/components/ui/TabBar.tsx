@@ -162,9 +162,11 @@ export default function TabBar({ currentIndex }: Props) {
       </Modal>
 
       {/* ── Bar ────────────────────────────────────────────────────── */}
-      <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]}>
+      {/* box-none: transparent areas pass touches through to the content
+          behind, so only the FAB + pill are interactive and the bar floats. */}
+      <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]} pointerEvents="box-none">
         {/* FAB row — floating above pill, no background */}
-        <View style={s.fabRow}>
+        <View style={s.fabRow} pointerEvents="box-none">
           {/* Secondary: sort button for tasks tab */}
           {currentIndex === 1 && (
             <TouchableOpacity
@@ -238,8 +240,11 @@ export default function TabBar({ currentIndex }: Props) {
 
 const s = StyleSheet.create({
   container: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
     paddingHorizontal: 12,
     paddingTop: 4,
+    backgroundColor: 'transparent',
   },
 
   fabRow: {
