@@ -34,6 +34,7 @@ import {
 } from '@/types';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -357,6 +358,7 @@ export default function DashboardScreen() {
   const { subscriptions, update: updateSub } = useSubscriptions();
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
+  const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
@@ -380,6 +382,7 @@ export default function DashboardScreen() {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
     if (moodEntries.length === 0) moodService.getAll().then(setMood).catch(() => {});
     getBudgets().then(setBudgets);
+    getTagBudgetRules().then(setTagRules).catch(() => {});
     fetchWeather().then(w => { if (w) setWeather(w); });
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
@@ -607,6 +610,32 @@ export default function DashboardScreen() {
     return alerts[0] ?? null;
   }, [expenses, budgets, today]);
 
+  // ── Tag limit bars (e.g. #słodycze) — ALWAYS shown with current % ───────────
+  const tagLimits = useMemo(() => {
+    const inPeriod = (date: string, period: 'week' | 'month') => {
+      const d = date.slice(0, 10);
+      if (period === 'month') return d.slice(0, 7) === today.slice(0, 7);
+      return weekDates.includes(d);
+    };
+    return tagRules
+      .filter(r => r.limit > 0)
+      .map(rule => {
+        let spend = 0;
+        for (const e of expenses) {
+          if (e.type === 'income') continue;
+          if (!inPeriod(e.date, rule.period)) continue;
+          if (e.tags?.includes(rule.tag)) spend += e.amount;
+          else if (e.receiptItems?.some(it => it.tags.includes(rule.tag))) {
+            spend += e.receiptItems
+              .filter(it => it.tags.includes(rule.tag))
+              .reduce((s, it) => s + it.price, 0);
+          }
+        }
+        return { ...rule, spend, pct: spend / rule.limit };
+      })
+      .sort((a, b) => b.pct - a.pct);
+  }, [tagRules, expenses, today, weekDates]);
+
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -682,7 +711,36 @@ export default function DashboardScreen() {
               <Text style={s.humorLine}>{humor}</Text>
             )}
 
-            {/* ══ BUDGET WARNING CARD ══════════════════════════════════════ */}
+            {/* ══ TAG LIMIT BARS (#słodycze itp.) — always visible with % ════ */}
+            {tagLimits.map(t => {
+              const pctClamped = Math.min(100, Math.round(t.pct * 100));
+              const over = t.pct >= 1;
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
+                  onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.budgetWarnText}>
+                    {over ? 'Przekroczono limit wydatków ' : 'Zbliżasz się do limitu wydatków '}
+                    <Text style={s.budgetWarnBold}>#{t.tag}</Text>
+                    {'   '}
+                    <Text style={[s.budgetWarnPct, over && { color: colors.accent.red }]}>
+                      {Math.round(t.pct * 100)}%
+                    </Text>
+                  </Text>
+                  <View style={s.budgetWarnTrack}>
+                    <View style={[s.budgetWarnFill, {
+                      width: `${pctClamped}%` as any,
+                      backgroundColor: over ? colors.accent.red : '#5166F5',
+                    }]} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* ══ BUDGET WARNING CARD (category budgets) ════════════════════ */}
             {budgetAlertCard && (
               <TouchableOpacity
                 style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
