@@ -679,6 +679,26 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Diagnostics */}
+        <View>
+          <Text style={styles.sectionTitle}>Diagnostyka</Text>
+          <View style={styles.card}>
+            <PressableScale
+              onPress={() => { router.push('/expenses/audit' as any); }}
+              style={styles.row}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#E4343418' }]}>
+                <LucideIcons.Receipt size={16} color="#E43434" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Audyt finansów</Text>
+                <Text style={styles.rowSub}>Zobacz dokładnie co składa się na sumę miesiąca</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+          </View>
+        </View>
+
         {/* About */}
         <View>
           <Text style={styles.sectionTitle}>Aplikacja</Text>

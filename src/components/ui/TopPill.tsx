@@ -38,6 +38,12 @@ function daysUntil(iso: string, today: string) {
   return Math.round(ms / 86_400_000);
 }
 
+// Safe uppercase — Google Calendar events can have an empty/undefined title,
+// and `undefined.toUpperCase()` would throw and crash the whole pill.
+function up(s: string | undefined | null): string {
+  return (s ?? '').toUpperCase();
+}
+
 // ─── Pill data type ───────────────────────────────────────────────────────────
 
 interface PillItem {
@@ -78,6 +84,7 @@ export default function TopPill() {
 
   // ── Priority logic ─────────────────────────────────────────────────────────
   const item: PillItem | null = useMemo(() => {
+   try {
 
     // 1 — Pomodoro running (work session)
     if (pomRunning && pomMode === 'work') {
@@ -127,7 +134,7 @@ export default function TopPill() {
       return {
         badge: `${overdue.length} ZALEGŁE`,
         color:  colors.tabs.finances,  // #E63535 red
-        text:   first.title.toUpperCase(),
+        text:   up(first.title),
         route:  '/(tabs)/tasks',
         key:    `overdue-${overdue.length}`,
       };
@@ -173,7 +180,7 @@ export default function TopPill() {
       return {
         badge: timeLabel,
         color:  '#2BC8E0',
-        text:   ev.title.toUpperCase(),
+        text:   up(ev.title) || 'WYDARZENIE',
         route:  '/(tabs)/stats',
         key:    `gcal-${ev.id}`,
       };
@@ -194,7 +201,7 @@ export default function TopPill() {
       return {
         badge:  label,
         color:  colors.tabs.calendar,  // #3A4C9C indigo
-        text:   `DO KOŃCA: ${nearDeadline.title.toUpperCase()}`,
+        text:   `DO KOŃCA: ${up(nearDeadline.title)}`,
         route:  '/(tabs)/tasks',
         key:    `deadline-${nearDeadline.id}`,
       };
@@ -208,7 +215,7 @@ export default function TopPill() {
         return {
           badge: 'SERIA!',
           color:  '#F59E0B',             // amber
-          text:   `${first.title.toUpperCase()} NIE ZAZNACZONY`,
+          text:   `${up(first.title)} NIE ZAZNACZONY`,
           route:  '/habits',
           key:    `habit-${first.id}`,
         };
@@ -227,6 +234,10 @@ export default function TopPill() {
     }
 
     return null;
+   } catch {
+    // Never let the pill crash — bad data just hides it this render
+    return null;
+   }
   }, [
     pomRunning, pomMode, pomRemaining, pomTitle,
     shifts, workPrefix,

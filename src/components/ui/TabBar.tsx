@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal, ScanLine,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal, ScanLine, Settings,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -167,6 +167,16 @@ export default function TabBar({ currentIndex }: Props) {
       <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]} pointerEvents="box-none">
         {/* FAB row — floating above pill, no background */}
         <View style={s.fabRow} pointerEvents="box-none">
+          {/* Secondary: settings button for dashboard tab */}
+          {currentIndex === 0 && (
+            <TouchableOpacity
+              style={[s.sortFab, { borderColor: activeAccent + '50' }]}
+              onPress={() => { haptic.tap(); router.push('/settings' as any); }}
+              activeOpacity={0.85}
+            >
+              <Settings size={18} color={activeAccent} />
+            </TouchableOpacity>
+          )}
           {/* Secondary: sort button for tasks tab */}
           {currentIndex === 1 && (
             <TouchableOpacity

@@ -207,6 +207,13 @@ export default function FinancesScreen() {
                 <View style={st.heroInner}>
                   <AnimatedCardBg timeOfDay={timeOfDay} />
                   <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+                  {/* subtle red identity tint — NOT a solid fill, keeps the glass look */}
+                  <LinearGradient
+                    colors={['rgba(228,52,52,0.10)', 'rgba(228,52,52,0.02)']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                    pointerEvents="none"
+                  />
                   <View style={st.heroContent}>
                     <Text style={st.heroDate}>
                       {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
@@ -338,7 +345,9 @@ const st = StyleSheet.create({
     borderRadius: radius.xl,
     overflow: 'hidden',
     minHeight: 130,
-    backgroundColor: F.card,
+    // No solid fill — glass shows the animated clouds + subtle red tint, like
+    // the dashboard hero. A faint base only so it isn't pure-transparent.
+    backgroundColor: 'rgba(20,12,12,0.35)',
   },
   heroContent: {
     padding: spacing[5],

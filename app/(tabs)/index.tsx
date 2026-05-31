@@ -12,7 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
   TrendingUp, TrendingDown, Flame, Smile, Zap,
-  CalendarDays, Settings, Wallet,
+  CalendarDays, Wallet,
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
@@ -622,15 +622,6 @@ export default function DashboardScreen() {
 
       <SafeAreaView style={s.safe} edges={[]}>
         <View style={{ flex: 1 }}>
-
-          {/* Settings — absolute overlay, takes no layout height */}
-          <TouchableOpacity
-            onPress={() => { haptic.tap(); router.push('/settings' as any); }}
-            style={s.settingsBtn}
-            activeOpacity={0.7}
-          >
-            <Settings size={17} color={colors.text.secondary} />
-          </TouchableOpacity>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
@@ -1318,13 +1309,6 @@ export default function DashboardScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg.primary },
   safe: { flex: 1 },
-
-  settingsBtn: {
-    position: 'absolute', top: 12, right: spacing[4], zIndex: 10,
-    width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: 'rgba(24,26,26,0.80)', borderWidth: 1, borderColor: colors.border.default,
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[5] },
 
