@@ -11,6 +11,7 @@ import {
 import * as LucideIcons from 'lucide-react-native';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, linkWithCredential, signInWithCredential, onAuthStateChanged } from 'firebase/auth';
+import * as Updates from 'expo-updates';
 import { auth } from '@/services/firebase';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -82,16 +83,46 @@ export default function SettingsScreen() {
       if (!idToken) throw new Error('Brak id_token');
       const credential = GoogleAuthProvider.credential(idToken);
       const current = auth.currentUser;
-      const doLink = current?.isAnonymous
-        ? linkWithCredential(current, credential)
-        : signInWithCredential(auth, credential);
-      const result = await doLink;
-      setGoogleUser(result.user.email ?? result.user.displayName);
-      // Store calendar access token
+
+      let result;
+      if (current?.isAnonymous) {
+        // Try to link the anonymous account → Google (keeps the same UID, so the
+        // data created while anonymous stays attached).
+        try {
+          result = await linkWithCredential(current, credential);
+        } catch (linkErr: any) {
+          // The Google account was already used before (it owns a different UID).
+          // Sign in to THAT existing account instead — its data is the source of truth.
+          if (linkErr?.code === 'auth/credential-already-in-use'
+              || linkErr?.code === 'auth/email-already-in-use') {
+            result = await signInWithCredential(auth, credential);
+          } else {
+            throw linkErr;
+          }
+        }
+      } else {
+        result = await signInWithCredential(auth, credential);
+      }
+
+      // Store calendar access token for gcal sync after reload
       try {
         const tokens = await GoogleSignin.getTokens();
         await googleCalendarService.storeToken(tokens.accessToken);
       } catch {}
+
+      setGoogleUser(result.user.email ?? result.user.displayName);
+
+      // CRITICAL: after Google sign-in the active account may have changed, so
+      // every in-memory store could hold the PREVIOUS account's data while
+      // services now read the new UID's Firestore path → a half-refreshed,
+      // inconsistent app (wrong finances, vanished lifebar). A full reload
+      // re-initialises everything cleanly under the correct account and loads
+      // the Google Calendar token in one clean pass.
+      Alert.alert(
+        'Zalogowano',
+        'Aplikacja zostanie przeładowana, aby poprawnie wczytać Twoje dane.',
+        [{ text: 'OK', onPress: () => { Updates.reloadAsync().catch(() => {}); } }],
+      );
     } catch (e: any) {
       if (e.code !== statusCodes.SIGN_IN_CANCELLED) {
         Alert.alert('Błąd logowania', `${e.message}\n\nKod: ${e.code ?? 'brak'}`);
