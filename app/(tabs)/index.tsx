@@ -823,7 +823,7 @@ export default function DashboardScreen() {
               return (
                 <View style={[s.todayCard, { backgroundColor: cardBgDark }, hasOverdue && { borderColor: colors.accent.red + '30' }]}>
                   <View style={s.todayHeader}>
-                    <Check size={12} color={hasOverdue ? colors.accent.red : colors.tabs.tasks} strokeWidth={3} />
+                    <Check size={12} color={hasOverdue ? colors.accent.red : accentColor} strokeWidth={3} />
                     <Text style={[s.todayTitle, hasOverdue && { color: colors.accent.red }]}>
                       {hasOverdue ? 'ZALEGŁE & DZIŚ' : 'DZIŚ'}
                     </Text>
@@ -833,13 +833,13 @@ export default function DashboardScreen() {
                     {totalCount > 4 && (
                       <TouchableOpacity onPress={() => { haptic.tap(); router.push('/(tabs)/tasks' as any); }} style={s.todayMore}>
                         <Text style={[s.todayMoreText, hasOverdue && { color: colors.accent.red }]}>+{totalCount - 4} więcej</Text>
-                        <ChevronRight size={11} color={hasOverdue ? colors.accent.red : colors.tabs.tasks} />
+                        <ChevronRight size={11} color={hasOverdue ? colors.accent.red : accentColor} />
                       </TouchableOpacity>
                     )}
                   </View>
                   {shown.map(task => {
                     const isOverdue = task.deadline && task.deadline.split('T')[0] < today;
-                    const checkColor = isOverdue ? colors.accent.red : task.priority === 'high' ? colors.accent.red : colors.tabs.tasks;
+                    const checkColor = isOverdue ? colors.accent.red : task.priority === 'high' ? colors.accent.red : accentColor;
                     return (
                       <TouchableOpacity
                         key={task.id}
