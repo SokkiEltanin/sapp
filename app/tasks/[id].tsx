@@ -106,8 +106,8 @@ function PomRing({ done, total }: { done: number; total: number }) {
 }
 const pr = StyleSheet.create({
   wrap: { gap: 6 },
-  track: { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
-  fill: { height: 4, borderRadius: 2 },
+  track: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4 },
   text: { fontSize: 12, color: colors.text.secondary },
 });
 
@@ -768,8 +768,8 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 11, color: colors.text.muted },
 
   subtaskProgress: { fontSize: 11, fontWeight: '700', color: G.accent, marginLeft: 'auto' },
-  subProgressTrack: { height: 2, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 1, overflow: 'hidden' },
-  subProgressFill: { height: 2, borderRadius: 1 },
+  subProgressTrack: { height: 7, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  subProgressFill: { height: '100%', borderRadius: radius.full },
   subRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: spacing[2],

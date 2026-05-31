@@ -345,10 +345,10 @@ const s = StyleSheet.create({
   // Subtasks
   subList: { flex: 1 },
   subProgressTrack: {
-    height: 3, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 2, overflow: 'hidden', marginBottom: spacing[3],
+    height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 4, overflow: 'hidden', marginBottom: spacing[3],
   },
-  subProgressFill: { height: 3, borderRadius: 2 },
+  subProgressFill: { height: '100%', borderRadius: 4 },
   subRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: spacing[2],

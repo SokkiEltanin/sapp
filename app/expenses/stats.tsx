@@ -957,10 +957,10 @@ const styles = StyleSheet.create({
   catAmount:   { ...typography.label, fontWeight: '700', fontSize: 13, color: colors.text.primary },
   changeBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
   changeBadgeText: { fontSize: 10, fontWeight: '700' },
-  catBarTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  catBarFill:  { height: 3, borderRadius: radius.full },
-  budgetBarTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, overflow: 'hidden', marginTop: 2 },
-  budgetBarFill:  { height: 3, borderRadius: radius.full },
+  catBarTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  catBarFill:  { height: '100%', borderRadius: radius.full },
+  budgetBarTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden', marginTop: 2 },
+  budgetBarFill:  { height: '100%', borderRadius: radius.full },
   catPct:      { ...typography.caption, color: colors.text.muted, fontSize: 9 },
 
   txList:      { marginLeft: 46, marginTop: spacing[1], marginBottom: spacing[2], gap: 4 },
@@ -995,8 +995,8 @@ const styles = StyleSheet.create({
   foodChangeBadgeText:{ fontSize: 13, fontWeight: '800' },
   foodTagRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   foodTagName:       { fontSize: 11, color: colors.text.secondary, width: 68, fontWeight: '500' },
-  foodTagBarTrack:   { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  foodTagBarFill:    { height: 4, borderRadius: radius.full, backgroundColor: colors.accent.green },
+  foodTagBarTrack:   { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  foodTagBarFill:    { height: '100%', borderRadius: radius.full, backgroundColor: colors.accent.green },
   foodTagAmt:        { fontSize: 11, fontWeight: '700', color: colors.text.primary, width: 46, textAlign: 'right' },
   foodTagChange:     { fontSize: 10, width: 38, textAlign: 'right', color: colors.text.muted },
 
@@ -1040,8 +1040,8 @@ const styles = StyleSheet.create({
 
   tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },
-  tagBarTrack: { flex: 1, height: 5, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  tagBarFill:  { height: 5, borderRadius: radius.full, backgroundColor: colors.accent.blue },
+  tagBarTrack: { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  tagBarFill:  { height: '100%', borderRadius: radius.full, backgroundColor: colors.accent.blue },
   tagAmount:   { fontSize: 12, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
 
   empty:     { alignItems: 'center', paddingVertical: spacing[12], gap: spacing[2] },

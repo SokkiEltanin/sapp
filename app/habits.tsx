@@ -206,10 +206,10 @@ const hr = StyleSheet.create({
 
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   progressTrack: {
-    flex: 1, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+    flex: 1, height: 8, borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
   },
-  progressFill: { height: 4, borderRadius: 2 },
+  progressFill: { height: '100%', borderRadius: 4 },
   countLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, minWidth: 40, textAlign: 'right' },
 
   deleteBtn: { padding: spacing[1] },
@@ -807,8 +807,8 @@ const styles = StyleSheet.create({
   },
   iconBtnActive: { backgroundColor: colors.accent.purple + '18', borderColor: colors.accent.purple + '40' },
   addBtn: { backgroundColor: colors.accent.amber, borderColor: colors.accent.amber },
-  progressTrack: { height: 2, backgroundColor: 'rgba(251,191,36,0.12)', overflow: 'hidden' },
-  progressFill: { height: 2, borderRadius: 1 },
+  progressTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 4 },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 60 },
 
   allDoneCard: {

@@ -771,10 +771,10 @@ const styles = StyleSheet.create({
   },
   habitName: { flex: 1, fontSize: 12, color: colors.text.primary, fontWeight: '500' },
   habitBarTrack: {
-    width: 60, height: 3, borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.07)', overflow: 'hidden',
+    width: 60, height: 7, borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
   },
-  habitBarFill: { height: 3, borderRadius: radius.full },
+  habitBarFill: { height: '100%', borderRadius: radius.full },
   habitPct: { fontSize: 10, fontWeight: '700', width: 24, textAlign: 'right' },
 
   empty: { fontSize: 13, color: colors.text.muted, paddingVertical: spacing[1] },

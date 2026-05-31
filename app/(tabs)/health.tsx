@@ -556,8 +556,8 @@ const styles = StyleSheet.create({
   heroNum: { fontSize: 44, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
   heroSub: { ...typography.caption, color: colors.text.muted },
 
-  progressTrack: { height: 3, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  progressFill: { height: 3, borderRadius: radius.full },
+  progressTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: radius.full },
 
   stepControls: { flexDirection: 'row', gap: spacing[1] },
   stepBtn: {
@@ -594,8 +594,8 @@ const styles = StyleSheet.create({
   minuteText: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
   minuteTextActive: { color: T.accent, fontWeight: '700' },
 
-  microBar: { height: 2, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: radius.full, overflow: 'hidden' },
-  microFill: { height: 2, borderRadius: radius.full },
+  microBar: { height: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  microFill: { height: '100%', borderRadius: radius.full },
 
   qualityBadge: {
     marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3,

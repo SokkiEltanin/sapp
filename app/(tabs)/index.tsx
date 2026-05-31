@@ -1464,10 +1464,10 @@ const s = StyleSheet.create({
   habitsTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   habitsBadge: { fontSize: 14, fontWeight: '800', color: colors.text.secondary },
   habitsTrack: {
-    height: 3, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 2, overflow: 'hidden',
+    height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 4, overflow: 'hidden',
   },
-  habitsFill: { height: 3, borderRadius: 2 },
+  habitsFill: { height: '100%', borderRadius: 4 },
   habitsDotsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   habitsDot: {
     width: 32, height: 32, borderRadius: 16,
