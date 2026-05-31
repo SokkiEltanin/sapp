@@ -116,9 +116,12 @@ export default function FinancesScreen() {
   const monthTotals = useMemo(() => {
     const now = new Date();
     const mk = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`; // e.g. "2026-05"
+    // Dedupe by id first — guards against any accidental duplicate entries
+    // inflating the total (a reported cause of the "sum too large" bug).
+    const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let exp = 0, inc = 0;
-    for (const e of expenses) {
-      if (e.date.slice(0, 7) !== mk) continue;
+    for (const e of unique) {
+      if ((e.date ?? '').slice(0, 7) !== mk) continue;
       if (e.type === 'income') inc += e.amount;
       else if (isExp(e))       exp += e.amount;
     }
@@ -205,15 +208,18 @@ export default function FinancesScreen() {
                 style={st.heroBorder}
               >
                 <View style={st.heroInner}>
-                  <AnimatedCardBg timeOfDay={timeOfDay} />
-                  <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
-                  {/* subtle red identity tint — NOT a solid fill, keeps the glass look */}
+                  {/* Base "sky" gradient — varied dark-red tones give the frosted
+                      glass real depth (the finances list behind is flat, so the
+                      glass needs its own backdrop, exactly like the dashboard). */}
                   <LinearGradient
-                    colors={['rgba(228,52,52,0.10)', 'rgba(228,52,52,0.02)']}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    colors={['#2A1117', '#180A0C', '#0C0607']}
+                    start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}
                     style={StyleSheet.absoluteFill}
-                    pointerEvents="none"
                   />
+                  <AnimatedCardBg timeOfDay={timeOfDay} />
+                  <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                  {/* crisp inner glass edge */}
+                  <View style={st.heroGlassBorder} pointerEvents="none" />
                   <View style={st.heroContent}>
                     <Text style={st.heroDate}>
                       {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
@@ -345,9 +351,14 @@ const st = StyleSheet.create({
     borderRadius: radius.xl,
     overflow: 'hidden',
     minHeight: 130,
-    // No solid fill — glass shows the animated clouds + subtle red tint, like
-    // the dashboard hero. A faint base only so it isn't pure-transparent.
-    backgroundColor: 'rgba(20,12,12,0.35)',
+    // No solid fill — the base sky gradient + clouds + BlurView provide the
+    // glassmorphism, mirroring the dashboard hero exactly.
+  },
+  heroGlassBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   heroContent: {
     padding: spacing[5],
