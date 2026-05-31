@@ -1,7 +1,9 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore, collection, doc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import * as firebaseAuth from 'firebase/auth';
 import { initializeAuth, getAuth, Auth, indexedDBLocalPersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? '',
@@ -18,10 +20,25 @@ const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) 
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
 
+// CRITICAL: on React Native, auth state must persist via AsyncStorage. The web
+// `indexedDBLocalPersistence` does NOT work on a device — without real
+// persistence the session is lost on every app restart, which (combined with the
+// anonymous-sign-in fallback) causes an infinite login→reload→login loop.
+// `getReactNativePersistence` only exists in firebase/auth's RN build, so it's
+// accessed dynamically to keep the web/Node typecheck happy.
+const getRNPersistence = (firebaseAuth as any).getReactNativePersistence as
+  | ((storage: unknown) => unknown)
+  | undefined;
+
 let _auth: Auth;
 try {
-  _auth = initializeAuth(app, { persistence: indexedDBLocalPersistence });
+  _auth = initializeAuth(app, {
+    persistence: getRNPersistence
+      ? (getRNPersistence(AsyncStorage) as any)
+      : indexedDBLocalPersistence,
+  });
 } catch {
+  // initializeAuth throws if auth was already initialised (e.g. fast refresh)
   _auth = getAuth(app);
 }
 export const auth: Auth = _auth;
