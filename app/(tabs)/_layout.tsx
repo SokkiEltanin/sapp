@@ -28,6 +28,10 @@ export default function TabsLayout() {
   // Pure swipe-detection — NO visual drag. The gesture only reads direction and
   // navigates. Nothing translates on screen, so there is no gray gap and no
   // "pop-in" of the next screen. Reliable by construction.
+  //
+  // CRITICAL: the worklet must NOT call the JS function tabIdx() — that crashes
+  // Reanimated. We capture `currentIdx` (a plain number) into the worklet closure
+  // instead; primitives are safe to capture.
   const pan = useMemo(() => Gesture.Pan()
     .activeOffsetX([-22, 22])
     .failOffsetY([-24, 24])
@@ -35,11 +39,10 @@ export default function TabsLayout() {
       'worklet';
       const ok = Math.abs(e.translationX) > W * 0.28 || Math.abs(e.velocityX) > 550;
       if (!ok) return;
-      const i = tabIdx(pathname);
-      if (e.translationX < 0 && i < TABS.length - 1) runOnJS(goTo)(i + 1);
-      else if (e.translationX > 0 && i > 0)          runOnJS(goTo)(i - 1);
+      if (e.translationX < 0 && currentIdx < TABS.length - 1) runOnJS(goTo)(currentIdx + 1);
+      else if (e.translationX > 0 && currentIdx > 0)          runOnJS(goTo)(currentIdx - 1);
     }),
-  [pathname, goTo]);
+  [currentIdx, goTo]);
 
   return (
     <View style={s.root}>
@@ -61,7 +64,7 @@ export default function TabsLayout() {
               headerShown: false,
               lazy: false,
               animation: 'none',
-              freezeOnBlur: false,
+              freezeOnBlur: true,
               sceneStyle: { backgroundColor: colors.bg.primary },
             }}
           >

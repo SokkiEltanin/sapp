@@ -1408,16 +1408,16 @@ const s = StyleSheet.create({
     gap: spacing[3],
   },
   budgetWarnText: {
-    fontSize: 13, fontWeight: '500', color: colors.text.secondary,
+    fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.55)',
   },
-  budgetWarnBold: { fontWeight: '700', color: colors.text.primary },
-  budgetWarnPct: { fontWeight: '800', color: colors.accent.blue },
+  budgetWarnBold: { fontWeight: '800', color: '#FFFFFF' },
+  budgetWarnPct: { fontWeight: '700', color: '#FFFFFF' },
   budgetWarnTrack: {
-    height: 4, backgroundColor: 'rgba(81,102,245,0.15)',
-    borderRadius: 2, overflow: 'hidden',
+    height: 10, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 5, overflow: 'hidden',
   },
   budgetWarnFill: {
-    height: '100%', borderRadius: 2,
+    height: '100%', borderRadius: 5,
     backgroundColor: '#5166F5',
   },
 
@@ -1496,10 +1496,10 @@ const s = StyleSheet.create({
   miniCardLabel: { fontSize: 11, color: colors.text.muted },
   miniCardSub: { fontSize: 11, color: colors.text.muted },
   miniWorkTrack: {
-    height: 2, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 1, overflow: 'hidden', marginTop: spacing[1],
+    height: 6, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 3, overflow: 'hidden', marginTop: spacing[1],
   },
-  miniWorkFill: { height: '100%', borderRadius: 1 },
+  miniWorkFill: { height: '100%', borderRadius: 3 },
 
 
   activityStrip: {

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
 import { RefreshCcw, Tag } from 'lucide-react-native';
@@ -90,7 +91,7 @@ function WaveChart({ data, color }: { data: number[]; color: string }) {
 
 export default function FinancesScreen() {
   const { timeOfDay } = useTimeAccent();
-  const { grouped, stats, isLoading, reload } = useExpenses();
+  const { grouped, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
@@ -107,6 +108,21 @@ export default function FinancesScreen() {
       if (e.receiptItems) for (const it of e.receiptItems) for (const t of it.tags) freq[t] = (freq[t] ?? 0) + 1;
     }
     return Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 12).map(([tag]) => tag);
+  }, [expenses]);
+
+  // Explicit, auditable current-month totals (string-based date match — no
+  // timezone drift, no risk of pulling in adjacent months). Expenses and income
+  // are kept strictly separate.
+  const monthTotals = useMemo(() => {
+    const now = new Date();
+    const mk = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`; // e.g. "2026-05"
+    let exp = 0, inc = 0;
+    for (const e of expenses) {
+      if (e.date.slice(0, 7) !== mk) continue;
+      if (e.type === 'income') inc += e.amount;
+      else if (isExp(e))       exp += e.amount;
+    }
+    return { exp, inc };
   }, [expenses]);
 
   // Chart data: spending per day (week) or per week-of-month (month)
@@ -190,20 +206,20 @@ export default function FinancesScreen() {
               >
                 <View style={st.heroInner}>
                   <AnimatedCardBg timeOfDay={timeOfDay} />
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+                  <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
                   <View style={st.heroContent}>
                     <Text style={st.heroDate}>
                       {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
                     </Text>
                     <View style={st.heroAmountRow}>
-                      <Text style={st.heroAmount}>{stats.monthExpenses.toFixed(0)}</Text>
+                      <Text style={st.heroAmount}>{monthTotals.exp.toFixed(0)}</Text>
                       <Text style={st.heroCurrency}> PLN</Text>
                     </View>
-                    {stats.monthIncome > 0 && (
+                    {monthTotals.inc > 0 && (
                       <Text style={st.heroSub}>
-                        {stats.monthIncome > stats.monthExpenses
-                          ? `Zaoszczędziłeś ${(stats.monthIncome - stats.monthExpenses).toFixed(0)} zł`
-                          : `Przekroczono przychody o ${(stats.monthExpenses - stats.monthIncome).toFixed(0)} zł`}
+                        {monthTotals.inc > monthTotals.exp
+                          ? `Zaoszczędziłeś ${(monthTotals.inc - monthTotals.exp).toFixed(0)} zł`
+                          : `Przekroczono przychody o ${(monthTotals.exp - monthTotals.inc).toFixed(0)} zł`}
                       </Text>
                     )}
                   </View>

@@ -99,11 +99,12 @@ function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number
   const circles = CLOUD_SHAPES[shape];
   const rUnit = w / 8;
   return (
-    <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+    // Oversized viewBox padding so the heavy blur isn't clipped at the edges
+    <Svg width={w} height={h} viewBox={`-20 -20 ${w + 40} ${h + 40}`}>
       <Defs>
-        {/* Very gentle blur — just softens circle edges, relies on BlurView above for depth */}
-        <Filter id={blurId} x="-8%" y="-8%" width="116%" height="116%">
-          <FeGaussianBlur stdDeviation="1.2" />
+        {/* Heavy blur → foggy, haze-like clouds with very soft edges */}
+        <Filter id={blurId} x="-40%" y="-40%" width="180%" height="180%">
+          <FeGaussianBlur stdDeviation="5.5" />
         </Filter>
       </Defs>
       <G filter={`url(#${blurId})`}>
@@ -122,11 +123,16 @@ function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number
 }
 
 // ─── Cloud layer ──────────────────────────────────────────────────────────────
+// All clouds START fully off-screen left (initX = -(w + margin)) and drift to
+// off-screen right, then reset off-screen left. They can NEVER appear mid-card
+// on spawn. Staggered delays spread them out so they don't clump.
 
-const CLOUD_DEFS: CloudDef[] = [
-  { w: 200, h: 70, initX: -240, y:  0, dur: 30000, op: 0.12 },
-  { w: 160, h: 60, initX:  -70, y: 20, dur: 22000, op: 0.10 },
-  { w: 220, h: 75, initX:  110, y:  5, dur: 40000, op: 0.11 },
+const TRAVEL_END = 520; // px — past the right edge of any card
+
+const CLOUD_DEFS: (CloudDef & { delay: number })[] = [
+  { w: 210, h: 72, initX: -250, y:  2, dur: 34000, op: 0.13, delay: 0     },
+  { w: 165, h: 60, initX: -210, y: 24, dur: 26000, op: 0.11, delay: 11000 },
+  { w: 230, h: 78, initX: -270, y:  8, dur: 44000, op: 0.12, delay: 5000  },
 ];
 
 function CloudLayer() {
@@ -137,15 +143,23 @@ function CloudLayer() {
   const loops = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
+    let alive = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     CLOUD_DEFS.forEach((c, i) => {
-      const anim = Animated.loop(Animated.sequence([
-        Animated.timing(xAnims[i], { toValue: 500, duration: c.dur, useNativeDriver: true }),
-        Animated.timing(xAnims[i], { toValue: c.initX, duration: 0, useNativeDriver: true }),
-      ]));
-      anim.start();
-      loops.current.push(anim);
+      const t = setTimeout(() => {
+        if (!alive) return;
+        const anim = Animated.loop(Animated.sequence([
+          Animated.timing(xAnims[i], { toValue: TRAVEL_END, duration: c.dur, useNativeDriver: true }),
+          Animated.timing(xAnims[i], { toValue: c.initX, duration: 0, useNativeDriver: true }),
+        ]));
+        anim.start();
+        loops.current.push(anim);
+      }, c.delay);
+      timers.push(t);
     });
     return () => {
+      alive = false;
+      timers.forEach(clearTimeout);
       loops.current.forEach(l => l.stop());
       loops.current = [];
     };
