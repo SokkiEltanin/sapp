@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
-import Svg, { Circle, G, Defs, Filter, FeGaussianBlur } from 'react-native-svg';
+import Svg, { Circle, G, Defs, Filter, FeGaussianBlur, RadialGradient, Stop } from 'react-native-svg';
 import type { TimeOfDay } from '@/hooks/useTimeAccent';
 
 // ─── Stars (night / dawn / evening) ──────────────────────────────────────────
@@ -98,6 +98,7 @@ const CLOUD_SHAPES = [
 function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number; blurId: string }) {
   const circles = CLOUD_SHAPES[shape];
   const rUnit = w / 8;
+  const gradId = `${blurId}-g`;
   return (
     // Oversized viewBox padding so the heavy blur isn't clipped at the edges
     <Svg width={w} height={h} viewBox={`-20 -20 ${w + 40} ${h + 40}`}>
@@ -106,6 +107,13 @@ function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number
         <Filter id={blurId} x="-40%" y="-40%" width="180%" height="180%">
           <FeGaussianBlur stdDeviation="5.5" />
         </Filter>
+        {/* Radial fill → luminous puffy centre fading to soft transparent edges,
+            so each puff reads like a real lit cloud instead of a flat blob. */}
+        <RadialGradient id={gradId} cx="50%" cy="38%" r="65%">
+          <Stop offset="0"   stopColor="#FFFFFF" stopOpacity="1" />
+          <Stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.85" />
+          <Stop offset="1"   stopColor="#FFFFFF" stopOpacity="0.45" />
+        </RadialGradient>
       </Defs>
       <G filter={`url(#${blurId})`}>
         {circles.map(([cx, cy, rs], i) => (
@@ -114,7 +122,7 @@ function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number
             cx={cx * w}
             cy={cy * h}
             r={rs * rUnit}
-            fill="white"
+            fill={`url(#${gradId})`}
           />
         ))}
       </G>

@@ -1374,7 +1374,7 @@ const s = StyleSheet.create({
 
   // ── Main glassmorphism card (Figma) ───────────────────────────────────────
   mainCard: {
-    height: 220,
+    height: 176,
     borderRadius: radius.xl,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1395,7 +1395,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.10)',
   },
   mainCardInner: {
-    flex: 1, padding: spacing[5],
+    flex: 1, paddingHorizontal: spacing[5], paddingVertical: spacing[4],
     justifyContent: 'space-between',
   },
   mainWeatherRow: {
@@ -1413,8 +1413,11 @@ const s = StyleSheet.create({
     fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.40)', letterSpacing: 1,
   },
   mainGreeting: {
-    fontSize: 36, fontWeight: '900', color: colors.white,
-    letterSpacing: -1.5, lineHeight: 40,
+    fontSize: 40, fontWeight: '900', color: colors.white,
+    letterSpacing: -2, lineHeight: 42,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   mainTaskLine: {
     fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.80)',
