@@ -360,6 +360,7 @@ export default function DashboardScreen() {
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
+  const [workHoursChart, setWorkHoursChart] = useState(false);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
 
@@ -577,6 +578,36 @@ export default function DashboardScreen() {
     const maxAvg = Math.max(...avgs, 1);
     return days.map((label, i) => ({ label, avg: avgs[i], pct: avgs[i] / maxAvg }));
   }, [expenses]);
+
+  // Work hours per month over the last 6 months (from work events identified by
+  // workColor / workPrefix). Data-driven — null if work tracking isn't set up.
+  const workMonthly = useMemo(() => {
+    const wcol = workSettings.workColor;
+    const wp   = workSettings.workPrefix?.trim().toLowerCase();
+    if (!wcol && !wp) return null;
+    const isWork = (e: typeof allEvents[number]) => {
+      if (!e.startTime || !e.endTime) return false;
+      if (wcol && e.color === wcol) return true;
+      if (wp && e.title?.toLowerCase().startsWith(wp)) return true;
+      return false;
+    };
+    const dur = (e: typeof allEvents[number]) => {
+      const [sh, sm] = e.startTime!.split(':').map(Number);
+      const [eh, em] = e.endTime!.split(':').map(Number);
+      return Math.max(0, (eh * 60 + em) - (sh * 60 + sm)) / 60;
+    };
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, idx) => {
+      const i = 5 - idx;
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      const hours = allEvents
+        .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
+        .reduce((s, e) => s + dur(e), 0);
+      return { ym, label: MONTH_SHORT[d.getMonth()], hours, isCurrent: i === 0 };
+    });
+    return { months, currentHours: months[5].hours };
+  }, [allEvents, workSettings]);
 
   const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
     .replace(/^\w/, c => c.toUpperCase());
@@ -1207,6 +1238,49 @@ export default function DashboardScreen() {
               </View>
             )}
 
+            {/* ══ GODZINY PRACY — miesiąc / 6 msc wave ════════════════════ */}
+            {workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Briefcase size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Godziny pracy</Text>
+                  <TouchableOpacity
+                    onPress={() => { haptic.tap(); setWorkHoursChart(v => !v); }}
+                    style={s.workToggle}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.workToggleText, { color: accentColor }]}>
+                      {workHoursChart ? 'Ten miesiąc' : 'Ostatnie 6 msc'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {!workHoursChart ? (
+                  <View style={s.workHoursRow}>
+                    <Text style={[s.workHoursBig, { color: '#FFFFFF' }]}>
+                      {workMonthly.currentHours.toFixed(0)}
+                      <Text style={s.workHoursUnit}> h</Text>
+                    </Text>
+                    <Text style={s.workHoursSub}>przepracowane w tym miesiącu</Text>
+                  </View>
+                ) : (
+                  <>
+                    <WaveChart
+                      data={workMonthly.months.map(m => m.hours)}
+                      color={accentColor}
+                    />
+                    <View style={s.waveLabels}>
+                      {workMonthly.months.map((m, i) => (
+                        <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>
+                          {m.label}
+                        </Text>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
+
             {/* ══ NASTRÓJ — KALENDARZ MIESIĄCA ════════════════════════════ */}
             {Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -1571,6 +1645,17 @@ const s = StyleSheet.create({
   humorTileText: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.text.secondary, lineHeight: 18, fontStyle: 'italic' },
 
   // ── Standard card ──────────────────────────────────────────────────────────
+  // ── Work hours widget ──────────────────────────────────────────────────────
+  workToggle: {
+    marginLeft: 'auto', paddingHorizontal: spacing[3], paddingVertical: 4,
+    borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  workToggleText: { fontSize: 10, fontWeight: '700' },
+  workHoursRow: { marginTop: spacing[1], gap: 2 },
+  workHoursBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+  workHoursUnit: { fontSize: 16, fontWeight: '700', color: colors.text.muted },
+  workHoursSub: { fontSize: 12, color: colors.text.secondary },
+
   card: {
     backgroundColor: colors.bg.card,
     borderRadius: radius.xl,
