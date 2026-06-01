@@ -225,7 +225,7 @@ export default function TabBar({ currentIndex }: Props) {
                 activeOpacity={0.7}
               >
                 {focused && (
-                  <View style={[s.activePill, { backgroundColor: accent + '28' }]} />
+                  <View style={[s.activePill, { backgroundColor: accent + '40', borderWidth: 1, borderColor: accent + '55' }]} />
                 )}
                 <View style={s.iconWrap}>
                   <Icon
@@ -301,13 +301,13 @@ const s = StyleSheet.create({
   tabItem: {
     flex: 1,
     alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     position: 'relative',
   },
   activePill: {
     position: 'absolute',
-    width: '80%', height: '100%',
-    borderRadius: 16,
+    width: '100%', height: '100%',
+    borderRadius: 20,
   },
   iconWrap: { position: 'relative', zIndex: 1 },
 

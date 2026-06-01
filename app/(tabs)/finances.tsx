@@ -128,6 +128,8 @@ export default function FinancesScreen() {
     return { exp, inc };
   }, [expenses]);
 
+  const balance = monthTotals.inc - monthTotals.exp;
+
   // Chart data: spending per day (week) or per week-of-month (month)
   const chartData = useMemo(() => {
     const byDate: Record<string, number> = {};
@@ -208,33 +210,39 @@ export default function FinancesScreen() {
                 style={st.heroBorder}
               >
                 <View style={st.heroInner}>
-                  {/* Base "sky" gradient — varied dark-red tones give the frosted
-                      glass real depth (the finances list behind is flat, so the
-                      glass needs its own backdrop, exactly like the dashboard). */}
+                  {/* Very subtle warm-dark base — low contrast so the frost reads
+                      as glass (stars showing through), NOT a visible red panel. */}
                   <LinearGradient
-                    colors={['#2A1117', '#180A0C', '#0C0607']}
+                    colors={['#1C1517', '#161113', '#121011']}
                     start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
                   <AnimatedCardBg timeOfDay={timeOfDay} />
-                  <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-                  {/* crisp inner glass edge */}
+                  <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
+                  {/* soft bottom shade, same as dashboard glass */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.18)']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                    pointerEvents="none"
+                  />
                   <View style={st.heroGlassBorder} pointerEvents="none" />
                   <View style={st.heroContent}>
                     <Text style={st.heroDate}>
                       {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
                     </Text>
+                    {/* BILANS = przychody − wydatky (saldo miesiąca) */}
                     <View style={st.heroAmountRow}>
-                      <Text style={st.heroAmount}>{monthTotals.exp.toFixed(0)}</Text>
+                      <Text style={[st.heroAmount, { color: balance >= 0 ? '#FFFFFF' : '#FF8A8A' }]}>
+                        {balance >= 0 ? '+' : '−'}{Math.abs(balance).toFixed(0)}
+                      </Text>
                       <Text style={st.heroCurrency}> PLN</Text>
                     </View>
-                    {monthTotals.inc > 0 && (
-                      <Text style={st.heroSub}>
-                        {monthTotals.inc > monthTotals.exp
-                          ? `Zaoszczędziłeś ${(monthTotals.inc - monthTotals.exp).toFixed(0)} zł`
-                          : `Przekroczono przychody o ${(monthTotals.exp - monthTotals.inc).toFixed(0)} zł`}
-                      </Text>
-                    )}
+                    <Text style={st.heroSub}>
+                      Wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
+                      {'   ·   '}
+                      Przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
+                    </Text>
                   </View>
                 </View>
               </LinearGradient>
@@ -368,7 +376,8 @@ const st = StyleSheet.create({
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
   heroAmount:    { fontSize: 42, fontWeight: '800', color: '#FFFFFF', letterSpacing: -2, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: colors.text.muted, paddingBottom: 4 },
-  heroSub:       { fontSize: 12, color: F.muted, fontWeight: '500' },
+  heroSub:       { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
+  heroSubStrong: { color: '#FFFFFF', fontWeight: '800' },
 
   // ── Chart card ──────────────────────────────────────────────────────────────
   chartCard: {

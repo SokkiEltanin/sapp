@@ -1077,7 +1077,7 @@ export default function DashboardScreen() {
             <View style={[s.card, { backgroundColor: cardBgDark }]}>
               <View style={s.cardHeader}>
                 <Wallet size={13} color={accentColor} />
-                <Text style={[s.cardTitle, { color: accentColor }]}>
+                <Text style={[s.cardTitle]}>
                   {finPeriod === 'week' ? 'Tydzień' : MONTH_SHORT[new Date().getMonth()]}
                 </Text>
 
@@ -1143,7 +1143,7 @@ export default function DashboardScreen() {
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={accentColor} />
-                  <Text style={[s.cardTitle, { color: accentColor }]}>Słodycze vs jedzenie</Text>
+                  <Text style={[s.cardTitle]}>Słodycze vs jedzenie</Text>
                   <View style={s.dualLegend}>
                     <View style={s.dualLegendItem}>
                       <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
@@ -1176,7 +1176,7 @@ export default function DashboardScreen() {
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <BarChart2 size={13} color={accentColor} />
-                  <Text style={[s.cardTitle, { color: accentColor }]}>W jakie dni wydajesz?</Text>
+                  <Text style={[s.cardTitle]}>W jakie dni wydajesz?</Text>
                   <Text style={[s.cardTitle, { marginLeft: 'auto' as any, color: colors.text.muted }]}>śr. zł/dzień</Text>
                 </View>
                 <View style={s.dowRow}>
@@ -1535,8 +1535,8 @@ const s = StyleSheet.create({
   },
   miniCardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   miniCardNum: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  miniCardLabel: { fontSize: 11, color: colors.text.muted },
-  miniCardSub: { fontSize: 11, color: colors.text.muted },
+  miniCardLabel: { fontSize: 11, fontWeight: '600', color: colors.text.secondary },
+  miniCardSub: { fontSize: 11, color: colors.text.secondary },
   miniWorkTrack: {
     height: 6, backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 3, overflow: 'hidden', marginTop: spacing[1],
@@ -1575,7 +1575,7 @@ const s = StyleSheet.create({
     gap: spacing[3],
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardTitle: { fontSize: 12, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  cardTitle: { fontSize: 12, fontWeight: '800', color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.8 },
 
   // ── Period toggle ──────────────────────────────────────────────────────────
   periodToggle: { flexDirection: 'row', marginLeft: spacing[2], gap: 2, marginRight: 'auto' as any },

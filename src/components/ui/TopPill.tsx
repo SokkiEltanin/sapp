@@ -140,6 +140,24 @@ export default function TopPill() {
       };
     }
 
+    // 4b — Tasks due / scheduled TODAY (deadline today OR scheduledDate today).
+    // These fall between "overdue (<today)" and "near deadline (>today)", so
+    // without this the pill would vanish on a day full of today-tasks.
+    const todayTasks = calTasks.filter(t =>
+      t.status !== 'done' &&
+      ((t.deadline && t.deadline.split('T')[0] === today) || t.scheduledDate === today)
+    );
+    if (todayTasks.length > 0) {
+      const first = todayTasks[0];
+      return {
+        badge: todayTasks.length > 1 ? `${todayTasks.length} DZIŚ` : 'DZIŚ',
+        color:  colors.accent.blue,
+        text:   up(first.title),
+        route:  '/(tabs)/tasks',
+        key:    `today-${todayTasks.length}`,
+      };
+    }
+
     // 5 — Budget ≥85% of monthly limit
     const monthlySpend: Record<string, number> = {};
     for (const e of expenses) {
@@ -233,7 +251,25 @@ export default function TopPill() {
       };
     }
 
-    return null;
+    // 10 — Fallback: nothing pressing → a calm positive state so the lifebar
+    // never just disappears. Shows pending count, or an "all clear" message.
+    const pending = calTasks.filter(t => t.status !== 'done').length;
+    if (pending > 0) {
+      return {
+        badge: `${pending}`,
+        color:  colors.accent.blue,
+        text:   pending === 1 ? 'JEDNO ZADANIE W TOKU' : 'ZADAŃ W TOKU',
+        route:  '/(tabs)/tasks',
+        key:    `pending-${pending}`,
+      };
+    }
+    return {
+      badge: 'LUZ',
+      color:  colors.tabs.tasks,       // green
+      text:   'WSZYSTKO OGARNIĘTE',
+      route:  '/(tabs)/tasks',
+      key:    'all-clear',
+    };
    } catch {
     // Never let the pill crash — bad data just hides it this render
     return null;
