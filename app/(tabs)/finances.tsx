@@ -121,16 +121,24 @@ export default function FinancesScreen() {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let exp = 0, inc = 0;          // current month
     let allExp = 0, allInc = 0;    // all-time (overall balance)
+    let food = 0, sweets = 0;      // current month: groceries + #słodycze items
     for (const e of unique) {
       const isIncome = e.type === 'income';
       const isExpense = isExp(e);
       if (isIncome) allInc += e.amount;
       else if (isExpense) allExp += e.amount;
       if ((e.date ?? '').slice(0, 7) !== mk) continue;
-      if (isIncome) inc += e.amount;
-      else if (isExpense) exp += e.amount;
+      if (isIncome) { inc += e.amount; continue; }
+      if (!isExpense) continue;
+      exp += e.amount;
+      if (e.category === 'groceries') food += e.amount;
+      // sweets = items tagged "słodycze" (top-level tag or per-receipt-item tag)
+      if (e.tags?.includes('słodycze')) sweets += e.amount;
+      else if (e.receiptItems) {
+        for (const it of e.receiptItems) if (it.tags.includes('słodycze')) sweets += it.price;
+      }
     }
-    return { exp, inc, allExp, allInc };
+    return { exp, inc, allExp, allInc, food, sweets };
   }, [expenses]);
 
   // Overall account balance = ALL income − ALL expenses (not just this month).
@@ -246,6 +254,11 @@ export default function FinancesScreen() {
                       W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
                       {'   ·   '}
                       Przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
+                    </Text>
+                    <Text style={st.heroSub2}>
+                      Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
+                      {'   ·   '}
+                      Słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
                     </Text>
                   </View>
                 </View>
@@ -381,6 +394,7 @@ const st = StyleSheet.create({
   heroAmount:    { fontSize: 42, fontWeight: '800', color: '#FFFFFF', letterSpacing: -2, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: colors.text.muted, paddingBottom: 4 },
   heroSub:       { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
+  heroSub2:      { fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginTop: 2 },
   heroSubStrong: { color: '#FFFFFF', fontWeight: '800' },
 
   // ── Chart card ──────────────────────────────────────────────────────────────
