@@ -557,20 +557,21 @@ export default function DashboardScreen() {
     });
   }, [weekOffset, moodByDay, expenses]);
 
-  // Average spending per day-of-week across ALL historical data
+  // Average spending on FOOD per day-of-week (groceries only — other expenses
+  // filtered out, per design). Data-driven from all historical grocery entries.
   const weekdayAvg = useMemo(() => {
     const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
     const totals  = [0, 0, 0, 0, 0, 0, 0];
     const dateSets: Set<string>[] = Array.from({ length: 7 }, () => new Set());
     for (const e of expenses) {
-      if (!e.type || e.type === 'expense') {
-        if (!e.date) continue;
-        const d = new Date(e.date + 'T12:00:00');
-        if (isNaN(d.getTime())) continue;
-        const dow = (d.getDay() + 6) % 7;
-        totals[dow] += e.amount;
-        dateSets[dow].add(e.date.slice(0, 10));
-      }
+      if (e.type && e.type !== 'expense') continue;
+      if (e.category !== 'groceries') continue; // food only
+      if (!e.date) continue;
+      const d = new Date(e.date + 'T12:00:00');
+      if (isNaN(d.getTime())) continue;
+      const dow = (d.getDay() + 6) % 7;
+      totals[dow] += e.amount;
+      dateSets[dow].add(e.date.slice(0, 10));
     }
     const avgs = totals.map((t, i) => dateSets[i].size > 0 ? t / dateSets[i].size : 0);
     const maxAvg = Math.max(...avgs, 1);
@@ -1177,7 +1178,7 @@ export default function DashboardScreen() {
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <BarChart2 size={13} color={accentColor} />
-                  <Text style={[s.cardTitle]}>W jakie dni wydajesz?</Text>
+                  <Text style={[s.cardTitle]}>W jakie dni jesz najwięcej?</Text>
                   <Text style={[s.cardTitle, { marginLeft: 'auto' as any, color: colors.text.muted }]}>śr. zł/dzień</Text>
                 </View>
                 <View style={s.dowRow}>
