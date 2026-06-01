@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import {
   ChevronLeft, Bell, BellOff, Moon, Sun,
   Smile, ListTodo, CalendarDays, Database, Check,
-  Zap, ClipboardList, LogIn, User, Briefcase,
+  Zap, ClipboardList, LogIn, User, Briefcase, Wallet, Clock,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -48,13 +48,25 @@ export default function SettingsScreen() {
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
 
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
+  const [salaryInput, setSalaryInput] = useState(String(workSettings.monthlySalary ?? ''));
+  const [hoursInput, setHoursInput]   = useState(String(workSettings.hoursPerMonth ?? ''));
 
   useEffect(() => {
     workService.getSettings().then(s => {
       setWorkSettings(s);
       setWorkPrefix(s.workPrefix ?? '');
+      setSalaryInput(String(s.monthlySalary ?? ''));
+      setHoursInput(String(s.hoursPerMonth ?? ''));
     }).catch(() => {});
   }, []);
+
+  const saveWorkNumber = async (field: 'monthlySalary' | 'hoursPerMonth', raw: string) => {
+    const n = parseFloat(raw.replace(',', '.'));
+    if (isNaN(n) || n < 0) return;
+    const newS = { ...workSettings, [field]: n };
+    setWorkSettings(newS);
+    try { await workService.saveSettings(newS); } catch {}
+  };
 
   const saveWorkPrefix = async (prefix: string) => {
     const trimmed = prefix.trim();
@@ -333,6 +345,67 @@ export default function SettingsScreen() {
                 style={{
                   fontSize: 14, fontWeight: '700', color: '#60A5FA',
                   minWidth: 72, textAlign: 'right',
+                  paddingVertical: 4, paddingHorizontal: spacing[2],
+                  backgroundColor: '#60A5FA12', borderRadius: radius.md,
+                  borderWidth: 1, borderColor: '#60A5FA30',
+                }}
+              />
+            </View>
+
+            {/* Monthly salary — editable so the live "zł/sekundę" can be corrected */}
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                <Wallet size={16} color="#2AC68F" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Pensja miesięczna (zł)</Text>
+                <Text style={styles.rowSub}>Podstawa wyliczania zarobku na żywo</Text>
+              </View>
+              <TextInput
+                value={salaryInput}
+                onChangeText={setSalaryInput}
+                onBlur={() => saveWorkNumber('monthlySalary', salaryInput)}
+                keyboardType="numeric"
+                placeholder="5000"
+                placeholderTextColor={colors.text.muted}
+                style={{
+                  fontSize: 14, fontWeight: '700', color: '#2AC68F',
+                  minWidth: 80, textAlign: 'right',
+                  paddingVertical: 4, paddingHorizontal: spacing[2],
+                  backgroundColor: '#2AC68F12', borderRadius: radius.md,
+                  borderWidth: 1, borderColor: '#2AC68F30',
+                }}
+              />
+            </View>
+
+            {/* Hours per month */}
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
+              <View style={[styles.iconWrap, { backgroundColor: '#60A5FA18' }]}>
+                <Clock size={16} color="#60A5FA" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Godzin w miesiącu</Text>
+                <Text style={styles.rowSub}>
+                  {(() => {
+                    const sal = parseFloat(salaryInput.replace(',', '.'));
+                    const hrs = parseFloat(hoursInput.replace(',', '.'));
+                    if (!isNaN(sal) && !isNaN(hrs) && hrs > 0) {
+                      return `≈ ${(sal / hrs).toFixed(2)} zł/h  ·  ${(sal / hrs / 3600).toFixed(4)} zł/s`;
+                    }
+                    return 'Np. 168 — do wyliczenia stawki godzinowej';
+                  })()}
+                </Text>
+              </View>
+              <TextInput
+                value={hoursInput}
+                onChangeText={setHoursInput}
+                onBlur={() => saveWorkNumber('hoursPerMonth', hoursInput)}
+                keyboardType="numeric"
+                placeholder="168"
+                placeholderTextColor={colors.text.muted}
+                style={{
+                  fontSize: 14, fontWeight: '700', color: '#60A5FA',
+                  minWidth: 64, textAlign: 'right',
                   paddingVertical: 4, paddingHorizontal: spacing[2],
                   backgroundColor: '#60A5FA12', borderRadius: radius.md,
                   borderWidth: 1, borderColor: '#60A5FA30',

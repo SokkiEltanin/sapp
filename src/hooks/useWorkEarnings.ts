@@ -43,17 +43,23 @@ export function useWorkEarnings(
   }, []);
 
   // ── Salary from income entries tagged with work prefix ───────────────────
-  const salaryUsed = useMemo(() => {
-    if (!expenses?.length || !settings.workPrefix?.trim()) return settings.monthlySalary;
+  // Returns the most recent [prefix] paycheck amount AND the YYYY-MM month it
+  // was received, so the hourly rate can be derived from the hours actually
+  // worked in that paycheck's month (not the partial current month).
+  const salaryInfo = useMemo(() => {
+    const fallback = { amount: settings.monthlySalary, month: null as string | null };
+    if (!expenses?.length || !settings.workPrefix?.trim()) return fallback;
     const wp = settings.workPrefix.trim().toLowerCase();
     const candidates = expenses.filter(e =>
       e.type === 'income' &&
       e.tags.some(t => t.toLowerCase() === wp)
     );
-    if (!candidates.length) return settings.monthlySalary;
+    if (!candidates.length) return fallback;
     candidates.sort((a, b) => b.date.localeCompare(a.date));
-    return candidates[0].amount;
+    return { amount: candidates[0].amount, month: candidates[0].date.slice(0, 7) };
   }, [expenses, settings.workPrefix, settings.monthlySalary]);
+
+  const salaryUsed = salaryInfo.amount;
 
   // ── Color-mode / prefix-mode: derive everything from calendar events ─────
   const colorMode = useMemo(() => {
@@ -92,13 +98,26 @@ export function useWorkEarnings(
   }, [events, settings.workColor, settings.workPrefix, tick]);
 
   // ── Per-second rate ───────────────────────────────────────────────────────
+  // CORRECT rate = last paycheck ÷ hours worked in the paycheck's month.
+  // (Dividing by the partial CURRENT-month hours was the bug that inflated the
+  // hourly rate — e.g. 4200 zł / 61h so-far = 69 zł/h instead of 4200/168 = 25.)
   const perSecond = useMemo(() => {
-    if (colorMode) {
-      const hours = colorMode.monthWorkHours > 0 ? colorMode.monthWorkHours : settings.hoursPerMonth;
+    if (colorMode && salaryInfo.month) {
+      const hoursForMonth = (ym: string) => colorMode.workEvents
+        .filter(e => e.date.slice(0, 7) === ym)
+        .reduce((s, e) => s + Math.max(0, timeToMins(e.endTime!) - timeToMins(e.startTime!)), 0) / 60;
+      // Paycheck month, then the previous month (salaries are often paid in
+      // arrears), then the user's configured hoursPerMonth as a safe fallback.
+      const [py, pm] = salaryInfo.month.split('-').map(Number);
+      const prev = new Date(py, pm - 2, 1);
+      const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
+      const hours = hoursForMonth(salaryInfo.month) || hoursForMonth(prevMonth) || settings.hoursPerMonth;
       return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
-    return salaryUsed / (settings.hoursPerMonth * 3600);
-  }, [colorMode, settings, salaryUsed]);
+    // No tagged paycheck → straightforward monthlySalary / hoursPerMonth (both
+    // editable in Settings so the user can correct a wrong rate).
+    return settings.hoursPerMonth > 0 ? salaryUsed / (settings.hoursPerMonth * 3600) : 0;
+  }, [colorMode, salaryInfo, settings.hoursPerMonth, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {
