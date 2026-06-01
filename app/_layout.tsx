@@ -104,13 +104,20 @@ export default function RootLayout() {
         else        router.push('/(tabs)/tasks' as any);
       } else if (screen === 'calendar' || screen === 'calendar_event') {
         if (eventId) router.push(`/calendar/${eventId}` as any);
-        else         router.push('/(tabs)/tasks' as any);
+        else         router.push('/(tabs)/stats' as any); // calendar lives in the stats tab
       } else if (screen === 'habits') {
         router.push('/habits' as any);
       } else if (screen === 'subscriptions') {
         router.push('/expenses/subscriptions' as any);
       } else if (screen === 'finances') {
         router.push('/(tabs)/finances' as any);
+      } else if (screen === 'index') {
+        router.push('/(tabs)/' as any);       // work shift → dashboard (live earnings widget)
+      } else if (screen === 'work' || screen === 'stats') {
+        router.push('/(tabs)/stats' as any);
+      } else {
+        // Never leave a tap dead — fall back to the dashboard.
+        router.push('/(tabs)/' as any);
       }
     }
 
