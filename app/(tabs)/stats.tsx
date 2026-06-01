@@ -44,7 +44,8 @@ const MONTH_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wr
 const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
 
 type CalMode = 'month-detailed' | 'month-mini' | 'week';
-const MODE_ORDER: CalMode[] = ['month-detailed', 'month-mini', 'week'];
+// Only two styles, per design: full month grid ↔ compact week agenda.
+const MODE_ORDER: CalMode[] = ['month-detailed', 'week'];
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -518,9 +519,7 @@ export default function CalendarTabScreen() {
           {/* Swipe hint label */}
           <Text style={styles.swipeHint}>
             {calMode === 'month-detailed'
-              ? 'Przesuń w górę → widok mini'
-              : calMode === 'month-mini'
-              ? 'Przesuń w górę → tydzień  ·  w dół → szczegóły'
+              ? 'Przesuń w górę → agenda tygodnia'
               : 'Przesuń w dół → widok miesięczny'}
           </Text>
 
