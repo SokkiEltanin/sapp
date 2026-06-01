@@ -35,6 +35,7 @@ import {
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
+import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -96,11 +97,15 @@ async function fetchWeather(): Promise<WeatherData | null> {
     if (status !== 'granted') return null;
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
     const { latitude, longitude } = loc.coords;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current_weather=true&temperature_unit=celsius`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current_weather=true&daily=sunrise,sunset&timezone=auto&temperature_unit=celsius`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     const cw = data.current_weather;
+    // Persist today's sunrise/sunset so the theme follows the real sun.
+    const sr = data.daily?.sunrise?.[0];
+    const ss = data.daily?.sunset?.[0];
+    if (sr && ss) setSunTimes(isoToDecimalHour(sr), isoToDecimalHour(ss)).catch(() => {});
     return { temp: Math.round(cw.temperature), desc: WMO_DESC[cw.weathercode] ?? 'Nieznana pogoda', wmo: cw.weathercode };
   } catch { return null; }
 }
@@ -177,6 +182,16 @@ function plTasks(n: number): string {
   if (m10 === 1 && m100 !== 11) return 'zadanie';
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'zadania';
   return 'zadań';
+}
+// Dynamic tag-limit message that escalates with how much of the limit is used.
+function tagLimitMsg(pct: number): string {
+  if (pct >= 1)    return 'Przekroczono limit';
+  if (pct >= 0.85) return 'Hamuj! Limit prawie wyczerpany';
+  if (pct >= 0.6)  return 'Robi się gorąco';
+  if (pct >= 0.35) return 'Powoli, powoli';
+  if (pct >= 0.15) return 'Kurde, raz Cię pokusiło';
+  if (pct > 0)     return 'Na razie idzie dobrze';
+  return 'Czysto, zero wydatków';
 }
 function humorLine(mood?: number): string {
   if (mood === undefined) return 'Czysty start. Jak się czujesz?';
@@ -384,7 +399,7 @@ export default function DashboardScreen() {
     if (moodEntries.length === 0) moodService.getAll().then(setMood).catch(() => {});
     getBudgets().then(setBudgets);
     getTagBudgetRules().then(setTagRules).catch(() => {});
-    fetchWeather().then(w => { if (w) setWeather(w); });
+    hydrateSunTimes().then(() => fetchWeather()).then(w => { if (w) setWeather(w); });
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     googleCalendarService.getStoredToken().then(token => {
@@ -472,7 +487,13 @@ export default function DashboardScreen() {
   }, []);
 
   useEffect(() => { loadPomSessions(); }, []);
-  useFocusEffect(useCallback(() => { loadPomSessions(); }, [loadPomSessions]));
+  useFocusEffect(useCallback(() => {
+    loadPomSessions();
+    // Reload budgets + tag rules so a limit added in Settings shows immediately
+    // (and persists across app restarts via their AsyncStorage backing).
+    getBudgets().then(setBudgets).catch(() => {});
+    getTagBudgetRules().then(setTagRules).catch(() => {});
+  }, [loadPomSessions]));
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const today     = todayStr();
@@ -756,7 +777,7 @@ export default function DashboardScreen() {
                   activeOpacity={0.8}
                 >
                   <Text style={s.budgetWarnText}>
-                    {over ? 'Przekroczono limit wydatków ' : 'Zbliżasz się do limitu wydatków '}
+                    {tagLimitMsg(t.pct)}{' · '}
                     <Text style={s.budgetWarnBold}>#{t.tag}</Text>
                     {'   '}
                     <Text style={[s.budgetWarnPct, over && { color: colors.accent.red }]}>
@@ -982,6 +1003,7 @@ export default function DashboardScreen() {
             {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
             <View style={s.toolsRow}>
               {([
+                { label: 'Humor',     Icon: Smile,     route: '/(tabs)/mood', sub: todayEntry ? '✓' : null         },
                 { label: 'Nawyki',    Icon: Flame,    route: '/habits',   sub: null                               },
                 { label: 'Notatki',   Icon: FileText,  route: '/notes',    sub: null                               },
                 { label: 'Skupienie', Icon: Activity,  route: '/focus',    sub: null                               },
