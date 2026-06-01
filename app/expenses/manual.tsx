@@ -71,6 +71,7 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
 }) {
   const [catOpen, setCatOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [newTag, setNewTag] = useState('');
   const [suggCat, setSuggCat] = useState<ExpenseCategory | null>(null);
   const suggTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meta = getCategoryMeta(item.category);
@@ -199,6 +200,16 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
 
       {tagsOpen && (
         <View style={styles.tagPicker}>
+          {/* custom tags already on the item but not in the preset list */}
+          {item.tags.filter(t => !ITEM_TAGS.includes(t)).map(tag => (
+            <PressableScale
+              key={tag}
+              onPress={() => toggleTag(tag)}
+              style={[styles.tagPickerItem, styles.tagPickerItemActive]}
+            >
+              <Text style={[styles.tagPickerText, { color: colors.accent.blue }]}>{tag} ×</Text>
+            </PressableScale>
+          ))}
           {ITEM_TAGS.map(tag => {
             const active = item.tags.includes(tag);
             return (
@@ -211,6 +222,24 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
               </PressableScale>
             );
           })}
+          {/* add a custom tag — handled everywhere else in the app (filters,
+              tag budgets) because it lands in the item's tags array */}
+          <View style={styles.customTagRow}>
+            <TextInput
+              value={newTag}
+              onChangeText={setNewTag}
+              placeholder="+ własny tag"
+              placeholderTextColor={colors.text.muted}
+              autoCapitalize="none"
+              style={styles.customTagInput}
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                const t = newTag.trim().toLowerCase().replace(/\s+/g, '-');
+                if (t && !item.tags.includes(t)) onUpdate({ tags: [...item.tags, t] });
+                setNewTag('');
+              }}
+            />
+          </View>
         </View>
       )}
     </View>
@@ -541,6 +570,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent.blue + '18',
   },
   tagPickerText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  customTagRow: { width: '100%', marginTop: 6 },
+  customTagInput: {
+    fontSize: 12, color: colors.text.primary,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.md,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
 
   pickerScroll: {
     backgroundColor: colors.bg.elevated,
