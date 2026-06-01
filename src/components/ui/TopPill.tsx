@@ -9,6 +9,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useHabits } from '@/hooks/useHabits';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -61,6 +62,7 @@ export default function TopPill() {
   const tomorrow = tomorrowIso();
   const weekEnd  = weekEndIso();
   const hour     = new Date().getHours();
+  const { color: timeAccent } = useTimeAccent(); // cyan by day, blue by night
 
   // ── Store selectors ────────────────────────────────────────────────────────
   const pomRunning   = usePomodoroStore(s => s.isRunning);
@@ -151,7 +153,7 @@ export default function TopPill() {
       const first = todayTasks[0];
       return {
         badge: todayTasks.length > 1 ? `${todayTasks.length} DZIŚ` : 'DZIŚ',
-        color:  colors.accent.blue,
+        color:  timeAccent,
         text:   up(first.title),
         route:  '/(tabs)/tasks',
         key:    `today-${todayTasks.length}`,
@@ -257,7 +259,7 @@ export default function TopPill() {
     if (pending > 0) {
       return {
         badge: `${pending}`,
-        color:  colors.accent.blue,
+        color:  timeAccent,
         text:   pending === 1 ? 'JEDNO ZADANIE W TOKU' : 'ZADAŃ W TOKU',
         route:  '/(tabs)/tasks',
         key:    `pending-${pending}`,
@@ -282,7 +284,7 @@ export default function TopPill() {
     expenses, budgets,
     habits, todayDone,
     todayMoodEntry,
-    today, tomorrow, weekEnd, hour,
+    today, tomorrow, weekEnd, hour, timeAccent,
   ]);
 
   // ── Fade animation on content change ──────────────────────────────────────
@@ -340,11 +342,17 @@ const s = StyleSheet.create({
     marginBottom: 4,
     borderRadius: 999,
     padding: 1.5,
+    // Shadow so the pill visibly floats above the page (no solid band behind).
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(18,18,18,0.97)',
+    backgroundColor: 'rgba(14,16,20,0.92)',
     borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 5,

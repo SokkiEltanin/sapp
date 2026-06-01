@@ -119,16 +119,22 @@ export default function FinancesScreen() {
     // Dedupe by id first — guards against any accidental duplicate entries
     // inflating the total (a reported cause of the "sum too large" bug).
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
-    let exp = 0, inc = 0;
+    let exp = 0, inc = 0;          // current month
+    let allExp = 0, allInc = 0;    // all-time (overall balance)
     for (const e of unique) {
+      const isIncome = e.type === 'income';
+      const isExpense = isExp(e);
+      if (isIncome) allInc += e.amount;
+      else if (isExpense) allExp += e.amount;
       if ((e.date ?? '').slice(0, 7) !== mk) continue;
-      if (e.type === 'income') inc += e.amount;
-      else if (isExp(e))       exp += e.amount;
+      if (isIncome) inc += e.amount;
+      else if (isExpense) exp += e.amount;
     }
-    return { exp, inc };
+    return { exp, inc, allExp, allInc };
   }, [expenses]);
 
-  const balance = monthTotals.inc - monthTotals.exp;
+  // Overall account balance = ALL income − ALL expenses (not just this month).
+  const balance = monthTotals.allInc - monthTotals.allExp;
 
   // Chart data: spending per day (week) or per week-of-month (month)
   const chartData = useMemo(() => {
@@ -228,10 +234,8 @@ export default function FinancesScreen() {
                   />
                   <View style={st.heroGlassBorder} pointerEvents="none" />
                   <View style={st.heroContent}>
-                    <Text style={st.heroDate}>
-                      {format(new Date(), 'EEEE, d MMMM', { locale: pl }).toUpperCase()}
-                    </Text>
-                    {/* BILANS = przychody − wydatky (saldo miesiąca) */}
+                    <Text style={st.heroDate}>SALDO KONTA</Text>
+                    {/* BILANS OGÓLNY = wszystkie przychody − wszystkie wydatki */}
                     <View style={st.heroAmountRow}>
                       <Text style={[st.heroAmount, { color: balance >= 0 ? '#FFFFFF' : '#FF8A8A' }]}>
                         {balance >= 0 ? '+' : '−'}{Math.abs(balance).toFixed(0)}
@@ -239,7 +243,7 @@ export default function FinancesScreen() {
                       <Text style={st.heroCurrency}> PLN</Text>
                     </View>
                     <Text style={st.heroSub}>
-                      Wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
+                      W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
                       {'   ·   '}
                       Przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
                     </Text>

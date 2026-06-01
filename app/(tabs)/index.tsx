@@ -688,10 +688,11 @@ export default function DashboardScreen() {
                     </View>
                   )}
 
-                  {/* Date label + greeting — compact stacked */}
+                  {/* Date label + greeting — compact stacked. Greeting tinted with
+                      the time-of-day accent (cyan by day, blue by night). */}
                   <View style={s.mainGreetingBlock}>
                     <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
-                    <Text style={s.mainGreeting}>{greeting.toUpperCase()}</Text>
+                    <Text style={[s.mainGreeting, { color: accentColor }]}>{greeting.toUpperCase()}</Text>
                   </View>
 
                   {/* Bottom: task count — BOLD */}
