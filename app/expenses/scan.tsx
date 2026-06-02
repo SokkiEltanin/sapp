@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { X, Check, Tag, PenLine, Plus, Trash2 } from 'lucide-react-native';
@@ -282,6 +282,10 @@ export default function ScanReceiptModal() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <View style={styles.header}>
         <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
@@ -502,6 +506,7 @@ export default function ScanReceiptModal() {
           </View>
         </>
       )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

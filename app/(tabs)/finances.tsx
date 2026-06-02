@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, RefreshControl, SectionList,
   ScrollView, TouchableOpacity,
@@ -6,8 +6,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { getBalanceOffset } from '@/utils/accountBalance';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
@@ -95,10 +96,13 @@ export default function FinancesScreen() {
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
+  const [balanceOffset, setBalanceOffset] = useState(0);
 
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
   }, []);
+  // Re-read the offset on focus so a value set in Settings shows immediately.
+  useFocusEffect(useCallback(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []));
 
   const availableTags = useMemo(() => {
     const freq: Record<string, number> = {};
@@ -142,7 +146,8 @@ export default function FinancesScreen() {
   }, [expenses]);
 
   // Overall account balance = ALL income − ALL expenses (not just this month).
-  const balance = monthTotals.allInc - monthTotals.allExp;
+  // displayed balance = manual offset (money you had before tracking) + net flow
+  const balance = balanceOffset + monthTotals.allInc - monthTotals.allExp;
 
   // Chart data: spending per day (week) or per week-of-month (month)
   const chartData = useMemo(() => {

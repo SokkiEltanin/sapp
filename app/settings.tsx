@@ -1,5 +1,6 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -95,6 +96,32 @@ export default function SettingsScreen() {
 
   const [googleUser, setGoogleUser]   = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
+
+  // ── Account balance reconciliation ──────────────────────────────────────────
+  // Net of all entered transactions (income − expenses). Income without a proper
+  // type is treated as an expense (same rule as the rest of the app) — the Audit
+  // screen flags those.
+  const accountNet = useMemo(() => {
+    const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
+    let inc = 0, exp = 0;
+    for (const e of unique) {
+      if (e.type === 'income') inc += e.amount;
+      else exp += e.amount;
+    }
+    return inc - exp;
+  }, [expenses]);
+  const [balanceOffset, setBalanceOffsetState] = useState(0);
+  const [balanceInput, setBalanceInput] = useState('');
+  useEffect(() => { getBalanceOffset().then(setBalanceOffsetState).catch(() => {}); }, []);
+  const saveAccountBalance = async () => {
+    const real = parseFloat(balanceInput.replace(/\s/g, '').replace(',', '.'));
+    if (isNaN(real)) return;
+    const offset = real - accountNet;
+    setBalanceOffsetState(offset);
+    await setBalanceOffset(offset);
+    setBalanceInput('');
+    toast.success('Zapisano saldo konta');
+  };
 
   // ── App icon picker ─────────────────────────────────────────────────────────
   const [appIcon, setAppIconState] = useState('basic');
@@ -444,6 +471,40 @@ export default function SettingsScreen() {
                   paddingVertical: 4, paddingHorizontal: spacing[2],
                   backgroundColor: '#60A5FA12', borderRadius: radius.md,
                   borderWidth: 1, borderColor: '#60A5FA30',
+                }}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Account balance reconciliation */}
+        <View>
+          <Text style={styles.sectionTitle}>Saldo konta</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={[styles.iconWrap, { backgroundColor: '#5B7BE318' }]}>
+                <Wallet size={16} color="#5B7BE3" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Aktualne saldo konta</Text>
+                <Text style={styles.rowSub}>
+                  App liczy teraz: {(balanceOffset + accountNet).toFixed(2)} zł.{'\n'}
+                  Wpisz ile masz realnie — reszta policzy się sama.
+                </Text>
+              </View>
+              <TextInput
+                value={balanceInput}
+                onChangeText={setBalanceInput}
+                onBlur={saveAccountBalance}
+                keyboardType="numeric"
+                placeholder="np. 230,50"
+                placeholderTextColor={colors.text.muted}
+                style={{
+                  fontSize: 14, fontWeight: '700', color: '#5B7BE3',
+                  minWidth: 90, textAlign: 'right',
+                  paddingVertical: 4, paddingHorizontal: spacing[2],
+                  backgroundColor: '#5B7BE312', borderRadius: radius.md,
+                  borderWidth: 1, borderColor: '#5B7BE330',
                 }}
               />
             </View>

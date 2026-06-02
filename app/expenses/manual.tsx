@@ -138,7 +138,12 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
         {/* Qty × price row */}
         <View style={styles.priceRow}>
           <View style={styles.qtyWrap}>
-            <Text style={styles.qtyLabel}>szt.</Text>
+            <TouchableOpacity
+              onPress={() => onUpdate({ quantity: String(Math.max(1, Math.round((parseFloat(item.quantity) || 1) - 1))) })}
+              style={styles.qtyStep} hitSlop={6}
+            >
+              <Text style={styles.qtyStepText}>−</Text>
+            </TouchableOpacity>
             <TextInput
               value={item.quantity}
               onChangeText={quantity => onUpdate({ quantity })}
@@ -146,7 +151,14 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
               placeholderTextColor={colors.text.muted}
               style={styles.qtyInput}
               keyboardType="decimal-pad"
+              selectTextOnFocus
             />
+            <TouchableOpacity
+              onPress={() => onUpdate({ quantity: String(Math.round((parseFloat(item.quantity) || 0) + 1)) })}
+              style={styles.qtyStep} hitSlop={6}
+            >
+              <Text style={styles.qtyStepText}>+</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.timesSign}>×</Text>
           <TextInput
@@ -157,6 +169,7 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
             style={styles.unitPriceInput}
             keyboardType="decimal-pad"
             returnKeyType="done"
+            selectTextOnFocus
           />
           <Text style={styles.priceSuffix}>zł</Text>
           {qty > 1 && unitPrice > 0 && (
@@ -511,15 +524,21 @@ const styles = StyleSheet.create({
   // qty × price row
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   qtyWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 2,
     backgroundColor: colors.bg.elevated, borderRadius: radius.sm,
     borderWidth: 1, borderColor: colors.border.default,
-    paddingHorizontal: spacing[2], paddingVertical: 5,
+    paddingHorizontal: 4, paddingVertical: 3,
   },
+  qtyStep: {
+    width: 26, height: 26, borderRadius: radius.sm,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  qtyStepText: { fontSize: 18, fontWeight: '700', color: colors.accent.blue, lineHeight: 20 },
   qtyLabel: { fontSize: 9, color: colors.text.muted, fontWeight: '500' },
   qtyInput: {
     fontSize: 14, fontWeight: '700', color: colors.text.primary,
-    width: 30, textAlign: 'center', paddingVertical: 0,
+    width: 34, textAlign: 'center', paddingVertical: 0,
   },
   timesSign: { fontSize: 13, color: colors.text.muted },
   unitPriceInput: {
