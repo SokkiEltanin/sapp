@@ -42,6 +42,22 @@ jobs:
           EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: 1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a.apps.googleusercontent.com
           EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: 1020705470960-h29iavvvn5e1iipg76kdbn8cih7vg5oo.apps.googleusercontent.com
 
+      - name: Force Kotlin jvmTarget 17 for all modules
+        run: |
+          # expo-dynamic-app-icon compiles Kotlin to JVM 11 by default and then
+          # cannot inline JVM 17 bytecode from expo-modules-core. Force every
+          # module's Kotlin compile to target 17. Uses subprojects + configureEach
+          # (NOT allprojects/afterEvaluate) to avoid "project already evaluated".
+          cat >> android/build.gradle << 'EOF'
+
+          subprojects {
+              tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                  kotlinOptions { jvmTarget = "17" }
+              }
+          }
+          EOF
+          echo "=== appended jvmTarget block to android/build.gradle ===" && tail -8 android/build.gradle
+
       - name: Copy google-services.json to Android project
         run: cp google-services.json android/app/google-services.json
 
