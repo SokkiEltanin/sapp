@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -12,6 +12,7 @@ import * as LucideIcons from 'lucide-react-native';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { GoogleAuthProvider, linkWithCredential, signInWithCredential, onAuthStateChanged } from 'firebase/auth';
 import * as Updates from 'expo-updates';
+import { setAppIcon, getAppIcon } from 'expo-dynamic-app-icon';
 import { auth } from '@/services/firebase';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -26,6 +27,7 @@ import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS } 
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
+import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
 import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
 import { appSettings } from '@/utils/appSettings';
@@ -40,6 +42,16 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = '6.0.0';
+
+// Alternate launcher icons — names MUST match the expo-dynamic-app-icon plugin
+// config keys in app.json (which point at assets/logo_<name>.png).
+const APP_ICONS = [
+  { name: 'basic',  label: 'Podstawowa', color: '#8A8F98' },
+  { name: 'blue',   label: 'Niebieska',  color: '#5B7BE3' },
+  { name: 'green',  label: 'Zielona',    color: '#2AC68F' },
+  { name: 'orange', label: 'Pomarańcz.', color: '#F97316' },
+  { name: 'pink',   label: 'Różowa',     color: '#F472B6' },
+];
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
@@ -77,6 +89,23 @@ export default function SettingsScreen() {
 
   const [googleUser, setGoogleUser]   = useState<string | null>(null);
   const [googleLinking, setGoogleLinking] = useState(false);
+
+  // ── App icon picker ─────────────────────────────────────────────────────────
+  const [appIcon, setAppIconState] = useState('basic');
+  useEffect(() => {
+    try { const cur = getAppIcon(); if (cur && cur !== 'DEFAULT') setAppIconState(cur); } catch {}
+  }, []);
+  const handlePickIcon = (name: string) => {
+    haptic.tap();
+    try {
+      const res = setAppIcon(name);
+      if (res === false) { toast.error('Zmiana ikony wymaga nowego builda'); return; }
+      setAppIconState(name);
+      toast.success('Zmieniono ikonę aplikacji');
+    } catch {
+      toast.error('Zmiana ikony dostępna po nowym buildzie');
+    }
+  };
   const [hapticsOn, setHapticsOn]     = useState(appSettings.isHapticsEnabled());
 
   useEffect(() => {
@@ -412,6 +441,38 @@ export default function SettingsScreen() {
                 }}
               />
             </View>
+          </View>
+        </View>
+
+        {/* App icon picker */}
+        <View>
+          <Text style={styles.sectionTitle}>Ikona aplikacji</Text>
+          <View style={styles.card}>
+            <View style={styles.iconPickerRow}>
+              {APP_ICONS.map(ic => {
+                const active = appIcon === ic.name;
+                return (
+                  <TouchableOpacity
+                    key={ic.name}
+                    onPress={() => handlePickIcon(ic.name)}
+                    style={styles.iconSwatchWrap}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[
+                      styles.iconSwatch,
+                      { backgroundColor: ic.color },
+                      active && styles.iconSwatchActive,
+                    ]}>
+                      {active && <Check size={18} color="#FFFFFF" strokeWidth={3} />}
+                    </View>
+                    <Text style={[styles.iconSwatchLabel, active && { color: colors.text.primary }]}>
+                      {ic.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.iconHint}>Zmiana ikony na ekranie głównym (Android)</Text>
           </View>
         </View>
 
@@ -857,6 +918,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
     marginBottom: spacing[2], marginTop: spacing[2],
   },
+  iconPickerRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingVertical: spacing[2],
+  },
+  iconSwatchWrap: { alignItems: 'center', gap: 6, flex: 1 },
+  iconSwatch: {
+    width: 46, height: 46, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'transparent',
+  },
+  iconSwatchActive: { borderColor: '#FFFFFF' },
+  iconSwatchLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted, textAlign: 'center' },
+  iconHint: { fontSize: 11, color: colors.text.muted, marginTop: spacing[2], textAlign: 'center' },
   card: {
     backgroundColor: colors.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
