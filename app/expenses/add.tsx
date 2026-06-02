@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
-  Platform, Alert, InteractionManager,
+  Platform, Alert, InteractionManager, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,6 +19,7 @@ import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { getPayers, addPayer } from '@/utils/payers';
 import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -45,6 +46,10 @@ export default function AddExpenseModal() {
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving] = useState(false);
   const [budgets, setBudgets] = useState<MonthlyBudgets>({});
+  const [payers, setPayers] = useState<string[]>([]);
+  const [payer, setPayer] = useState<string>('');
+  const [addingPayer, setAddingPayer] = useState(false);
+  const [newPayer, setNewPayer] = useState('');
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -54,6 +59,7 @@ export default function AddExpenseModal() {
   const expenses    = useExpensesStore((s) => s.expenses);
 
   useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
+  useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
 
   const isIncome = txType === 'income';
   const amountColor = isIncome ? colors.accent.success : colors.text.primary;
@@ -104,6 +110,7 @@ export default function AddExpenseModal() {
         tags,
         note,
         date: dateParsed,
+        payer: payer || undefined,
       });
       haptic.success();
       router.back();
@@ -209,6 +216,42 @@ export default function AddExpenseModal() {
 
           {/* Date */}
           <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Wybierz datę" />
+
+          {/* Who paid */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>{isIncome ? 'Kto otrzymał' : 'Kto zapłacił'}</Text>
+            <View style={styles.payerRow}>
+              {payers.map(p => {
+                const active = payer === p;
+                return (
+                  <PressableScale key={p} onPress={() => setPayer(p)} style={[styles.payerChip, active && styles.payerChipActive]}>
+                    <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>{p}</Text>
+                  </PressableScale>
+                );
+              })}
+              {addingPayer ? (
+                <TextInput
+                  value={newPayer}
+                  onChangeText={setNewPayer}
+                  placeholder="Imię…"
+                  placeholderTextColor={colors.text.muted}
+                  style={styles.payerInput}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={async () => {
+                    const name = newPayer.trim();
+                    if (name) { const list = await addPayer(name); setPayers(list); setPayer(name); }
+                    setNewPayer(''); setAddingPayer(false);
+                  }}
+                  onBlur={() => { setNewPayer(''); setAddingPayer(false); }}
+                />
+              ) : (
+                <PressableScale onPress={() => setAddingPayer(true)} style={styles.payerAddChip}>
+                  <Text style={styles.payerAddText}>+ osoba</Text>
+                </PressableScale>
+              )}
+            </View>
+          </View>
 
           {/* Category */}
           <View style={styles.section}>
@@ -347,6 +390,26 @@ const styles = StyleSheet.create({
   amountDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginTop: spacing[1] },
   amountHint: { ...typography.caption, fontSize: 11, letterSpacing: 0.5, color: colors.text.muted },
   section: { gap: spacing[3] },
+  payerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  payerChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: colors.bg.card,
+  },
+  payerChipActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue },
+  payerChipText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  payerChipTextActive: { color: colors.accent.blue },
+  payerInput: {
+    minWidth: 90, paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '60',
+    backgroundColor: 'rgba(255,255,255,0.04)', fontSize: 13, color: colors.text.primary,
+  },
+  payerAddChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderStyle: 'dashed',
+    borderColor: colors.border.focus,
+  },
+  payerAddText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
   sectionLabel: {
     ...typography.label, color: colors.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,

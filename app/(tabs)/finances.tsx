@@ -95,8 +95,16 @@ export default function FinancesScreen() {
   const { grouped, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [activePayer, setActivePayer] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
   const [balanceOffset, setBalanceOffset] = useState(0);
+
+  // Distinct payers that actually appear in the data (for the filter row).
+  const payersInData = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of expenses) if (e.payer) set.add(e.payer);
+    return Array.from(set);
+  }, [expenses]);
 
   useEffect(() => {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
@@ -182,19 +190,25 @@ export default function FinancesScreen() {
   }, [expenses, chartPeriod]);
 
   const sections = useMemo(() => {
-    const filtered = activeTagFilter
-      ? grouped.map(([date, items]) => [date, items.filter(e => {
-          if (e.tags.includes(activeTagFilter)) return true;
-          if (e.receiptItems?.some(it => it.tags.includes(activeTagFilter))) return true;
-          return false;
-        })] as [string, typeof items]).filter(([, items]) => items.length > 0)
+    const matches = (e: Expense) => {
+      if (activePayer && e.payer !== activePayer) return false;
+      if (activeTagFilter) {
+        if (e.tags.includes(activeTagFilter)) return true;
+        if (e.receiptItems?.some(it => it.tags.includes(activeTagFilter))) return true;
+        return false;
+      }
+      return true;
+    };
+    const filtered = (activeTagFilter || activePayer)
+      ? grouped.map(([date, items]) => [date, items.filter(matches)] as [string, typeof items])
+          .filter(([, items]) => items.length > 0)
       : grouped;
     return filtered.map(([date, items]) => ({
       title: formatDate(date + 'T12:00:00'),
       data: items,
       total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
     }));
-  }, [grouped, activeTagFilter]);
+  }, [grouped, activeTagFilter, activePayer]);
 
   return (
     <SafeAreaView style={st.root} edges={[]}>
@@ -298,6 +312,34 @@ export default function FinancesScreen() {
                   ))}
                 </View>
               </View>
+
+              {/* ── Payer filter chips (who paid) ─── */}
+              {payersInData.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={st.tagRow}
+                  style={{ marginBottom: 8 }}
+                >
+                  <TouchableOpacity
+                    onPress={() => { haptic.tap(); setActivePayer(null); }}
+                    style={[st.tagChip, !activePayer && st.tagChipOn]}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[st.tagText, !activePayer && st.tagTextOn]}>Wszyscy</Text>
+                  </TouchableOpacity>
+                  {payersInData.map(p => (
+                    <TouchableOpacity
+                      key={p}
+                      onPress={() => { haptic.tap(); setActivePayer(activePayer === p ? null : p); }}
+                      style={[st.tagChip, activePayer === p && st.tagChipOn]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[st.tagText, activePayer === p && st.tagTextOn]}>{p}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
 
               {/* ── Tag filter chips ─── */}
               {availableTags.length > 0 && (
