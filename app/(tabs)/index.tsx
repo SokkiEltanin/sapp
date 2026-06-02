@@ -1210,6 +1210,14 @@ export default function DashboardScreen() {
                     </View>
                   </View>
                 </View>
+                {/* Values above each point — food spend per week (rounded zł) */}
+                <View style={s.waveValues}>
+                  {weekOverview.map((w, i) => (
+                    <Text key={i} style={[s.waveValue, w.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+                      {w.food > 0 ? Math.round(w.food) : ''}
+                    </Text>
+                  ))}
+                </View>
                 <DualWaveChart
                   data1={weekOverview.map(w => w.food)}
                   data2={weekOverview.map(w => w.sweets)}
@@ -1287,6 +1295,13 @@ export default function DashboardScreen() {
                   </View>
                 ) : (
                   <>
+                    <View style={s.waveValues}>
+                      {workMonthly.months.map((m, i) => (
+                        <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+                          {m.hours > 0 ? `${Math.round(m.hours)}h` : ''}
+                        </Text>
+                      ))}
+                    </View>
                     <WaveChart
                       data={workMonthly.months.map(m => m.hours)}
                       color={accentColor}
@@ -1716,6 +1731,8 @@ const s = StyleSheet.create({
   avgPillText: { fontSize: 11, fontWeight: '700' },
   waveLabels: { flexDirection: 'row' },
   waveLabel: { flex: 1, fontSize: 8, color: colors.text.muted, textAlign: 'center' },
+  waveValues: { flexDirection: 'row', marginBottom: 2 },
+  waveValue: { flex: 1, fontSize: 9, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' },
 
   // ── Google Calendar ────────────────────────────────────────────────────────
   gcalDayLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
