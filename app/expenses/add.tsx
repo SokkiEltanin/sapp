@@ -154,21 +154,21 @@ export default function AddExpenseModal() {
           </PressableScale>
         </View>
 
-        {/* Type toggle */}
+        {/* Type toggle — segmented pill, expense=red / income=green */}
         <View style={styles.typeToggle}>
           <PressableScale
             onPress={() => handleTypeSwitch('expense')}
-            style={[styles.typeBtn, !isIncome && styles.typeBtnActive]}
+            style={[styles.typeBtn, !isIncome && { backgroundColor: '#E43434' }]}
           >
-            <TrendingDown size={16} color={!isIncome ? colors.bg.primary : colors.text.muted} />
-            <Text style={[styles.typeBtnText, !isIncome && styles.typeBtnTextActive]}>Wydatek</Text>
+            <TrendingDown size={16} color={!isIncome ? '#FFFFFF' : colors.text.muted} strokeWidth={2.4} />
+            <Text style={[styles.typeBtnText, !isIncome && { color: '#FFFFFF' }]}>Wydatek</Text>
           </PressableScale>
           <PressableScale
             onPress={() => handleTypeSwitch('income')}
-            style={[styles.typeBtn, isIncome && styles.typeBtnActive]}
+            style={[styles.typeBtn, isIncome && { backgroundColor: '#2AC68F' }]}
           >
-            <TrendingUp size={16} color={isIncome ? colors.bg.primary : colors.text.muted} />
-            <Text style={[styles.typeBtnText, isIncome && styles.typeBtnTextActive]}>Przychód</Text>
+            <TrendingUp size={16} color={isIncome ? '#FFFFFF' : colors.text.muted} strokeWidth={2.4} />
+            <Text style={[styles.typeBtnText, isIncome && { color: '#FFFFFF' }]}>Przychód</Text>
           </PressableScale>
         </View>
 
@@ -322,21 +322,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...typography.h4, color: colors.text.primary },
   typeToggle: {
-    flexDirection: 'row', gap: spacing[2],
-    paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    flexDirection: 'row', gap: 4,
+    marginHorizontal: spacing[4], marginVertical: spacing[3],
+    padding: 4, borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing[2], paddingVertical: spacing[2], borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
+    gap: spacing[2], paddingVertical: spacing[3], borderRadius: radius.full,
+    backgroundColor: 'transparent',
   },
-  typeBtnActive: {
-    backgroundColor: colors.text.primary,
-    borderColor: colors.text.primary,
-  },
-  typeBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '600' },
-  typeBtnTextActive: { color: colors.bg.primary },
+  typeBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '700' },
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: spacing[6] },
   amountWrap: {
     borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',

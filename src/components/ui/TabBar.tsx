@@ -41,8 +41,8 @@ const QUICK_ACTIONS = [
 ];
 
 const FINANCE_ACTIONS = [
-  { label: 'WYDATEK',  color: colors.tabs.finances, route: '/expenses/add'  },
-  { label: 'PRZYCHÓD', color: colors.tabs.tasks,    route: '/expenses/add'  },
+  { label: 'WYDATEK',  color: colors.tabs.finances, route: '/expenses/add?type=expense' },
+  { label: 'PRZYCHÓD', color: colors.tabs.tasks,    route: '/expenses/add?type=income'  },
 ];
 
 const MAX_ACTIONS = Math.max(QUICK_ACTIONS.length, FINANCE_ACTIONS.length);
