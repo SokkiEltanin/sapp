@@ -66,7 +66,7 @@ jobs:
           import re, sys
           with open('android/app/build.gradle', 'r') as f:
               content = f.read()
-          PROPS = '\n            storeFile file(MYAPP_UPLOAD_STORE_FILE)\n            storePassword MYAPP_UPLOAD_STORE_PASSWORD\n            keyAlias MYAPP_UPLOAD_KEY_ALIAS\n            keyPassword MYAPP_UPLOAD_KEY_PASSWORD'
+          PROPS = '\n            storeFile file(project.MYAPP_UPLOAD_STORE_FILE)\n            storePassword project.MYAPP_UPLOAD_STORE_PASSWORD\n            keyAlias project.MYAPP_UPLOAD_KEY_ALIAS\n            keyPassword project.MYAPP_UPLOAD_KEY_PASSWORD'
           if 'MYAPP_UPLOAD_STORE_FILE' not in content:
               rel_cfg = '\n        release {' + PROPS + '\n        }'
               if 'signingConfigs' in content:
