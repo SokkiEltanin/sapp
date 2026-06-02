@@ -23,9 +23,10 @@ module.exports = ({ config }) => {
   }
 
   const plugins = [...(config.plugins || [])];
-  // Align Kotlin JVM target with Java 17 (required by the dynamic-app-icon module)
-  plugins.push('./plugins/withKotlinJvm17');
-  // Register every discovered icon variant
+  // NOTE: the Kotlin JVM-target validation is relaxed in CI via a gradle.properties
+  // line (see .github/workflows/build.yml). We intentionally do NOT use a
+  // withGradleProperties plugin here — rewriting gradle.properties at prebuild can
+  // drop the trailing newline and corrupt the keystore props appended afterwards.
   if (appIcons.length > 0) {
     plugins.push(['expo-dynamic-app-icon', iconConfig]);
   }

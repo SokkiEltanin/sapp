@@ -48,17 +48,17 @@ jobs:
       - name: Setup signing keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/sapp-release.keystore
-          cat >> android/gradle.properties << 'EOF'
-          MYAPP_UPLOAD_STORE_FILE=sapp-release.keystore
-          MYAPP_UPLOAD_STORE_PASSWORD=sapp123release
-          MYAPP_UPLOAD_KEY_ALIAS=sapp
-          MYAPP_UPLOAD_KEY_PASSWORD=sapp123release
-          EOF
-
-      - name: Relax Kotlin/Java JVM-target validation (expo-dynamic-app-icon)
-        run: |
-          grep -q "kotlin.jvm.target.validation.mode" android/gradle.properties \
-            || echo "kotlin.jvm.target.validation.mode=warning" >> android/gradle.properties
+          # Guarantee a trailing newline so appended props never merge with the
+          # last existing line, then append each property on its own clean line.
+          printf '\n' >> android/gradle.properties
+          {
+            echo "MYAPP_UPLOAD_STORE_FILE=sapp-release.keystore"
+            echo "MYAPP_UPLOAD_STORE_PASSWORD=sapp123release"
+            echo "MYAPP_UPLOAD_KEY_ALIAS=sapp"
+            echo "MYAPP_UPLOAD_KEY_PASSWORD=sapp123release"
+            echo "kotlin.jvm.target.validation.mode=warning"
+          } >> android/gradle.properties
+          echo "=== tail of gradle.properties ===" && tail -8 android/gradle.properties
 
       - name: Inject signing config into build.gradle
         run: |
