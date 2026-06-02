@@ -13,6 +13,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { GoogleAuthProvider, linkWithCredential, signInWithCredential, onAuthStateChanged } from 'firebase/auth';
 import * as Updates from 'expo-updates';
 import { setAppIcon, getAppIcon } from 'expo-dynamic-app-icon';
+import Constants from 'expo-constants';
 import { auth } from '@/services/firebase';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -43,15 +44,20 @@ GoogleSignin.configure({
 
 const APP_VERSION = '6.0.0';
 
-// Alternate launcher icons — names MUST match the expo-dynamic-app-icon plugin
-// config keys in app.json (which point at assets/logo_<name>.png).
-const APP_ICONS = [
-  { name: 'basic',  label: 'Podstawowa', color: '#8A8F98' },
-  { name: 'blue',   label: 'Niebieska',  color: '#5B7BE3' },
-  { name: 'green',  label: 'Zielona',    color: '#2AC68F' },
-  { name: 'orange', label: 'Pomarańcz.', color: '#F97316' },
-  { name: 'pink',   label: 'Różowa',     color: '#F472B6' },
-];
+// Alternate launcher icons are AUTO-DISCOVERED at build time from
+// assets/logo_<name>.png and exposed via extra.appIcons (see app.config.js).
+// Just drop a new logo_<color>.png into assets and rebuild — it shows up here.
+const ICON_COLORS: Record<string, string> = {
+  basic: '#8A8F98', blue: '#5B7BE3', green: '#2AC68F', orange: '#F97316',
+  pink: '#F472B6', red: '#E43434', purple: '#BF80FF', yellow: '#FBBF24',
+  cyan: '#46B0DE', teal: '#2DD4BF', white: '#E5E7EB', black: '#3A3A3A',
+};
+const ICON_NAMES: string[] = ((Constants.expoConfig?.extra as any)?.appIcons as string[]) ?? ['basic'];
+const APP_ICONS = ICON_NAMES.map(name => ({
+  name,
+  label: name.charAt(0).toUpperCase() + name.slice(1),
+  color: ICON_COLORS[name] ?? '#8A8F98',
+}));
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();

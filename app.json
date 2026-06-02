@@ -58,16 +58,6 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.1020705470960-3ki9emg74h6emun2nv1eh8cldgp2pn7a"
         }
-      ],
-      [
-        "expo-dynamic-app-icon",
-        {
-          "basic":  { "image": "./assets/logo_basic.png",  "prerendered": true },
-          "blue":   { "image": "./assets/logo_blue.png",   "prerendered": true },
-          "green":  { "image": "./assets/logo_green.png",  "prerendered": true },
-          "orange": { "image": "./assets/logo_orange.png", "prerendered": true },
-          "pink":   { "image": "./assets/logo_pink.png",   "prerendered": true }
-        }
       ]
     ],
     "experiments": {

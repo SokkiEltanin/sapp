@@ -362,9 +362,9 @@ function GradientGreeting({ text, baseColor }: { text: string; baseColor: string
   return (
     <Svg height={46} width="100%">
       <Defs>
-        <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0"    stopColor="#FFFFFF" stopOpacity="0.98" />
-          <Stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.88" />
+        <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0"    stopColor="#FFFFFF"   stopOpacity="0.98" />
+          <Stop offset="0.5"  stopColor="#FFFFFF"   stopOpacity="0.9" />
           <Stop offset="1"    stopColor={baseColor} stopOpacity="1" />
         </SvgLinearGradient>
       </Defs>
