@@ -6,7 +6,7 @@ import {
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import {
@@ -353,6 +353,32 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
         </View>
       ))}
     </View>
+  );
+}
+
+// ─── Gradient greeting (big bold title with a subtle top-light gradient) ───────
+
+function GradientGreeting({ text, baseColor }: { text: string; baseColor: string }) {
+  return (
+    <Svg height={46} width="100%">
+      <Defs>
+        <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0"    stopColor="#FFFFFF" stopOpacity="0.98" />
+          <Stop offset="0.55" stopColor="#FFFFFF" stopOpacity="0.88" />
+          <Stop offset="1"    stopColor={baseColor} stopOpacity="1" />
+        </SvgLinearGradient>
+      </Defs>
+      <SvgText
+        x={0}
+        y={37}
+        fontSize={40}
+        fontWeight="900"
+        fill="url(#greetGrad)"
+        letterSpacing={-1.5}
+      >
+        {text}
+      </SvgText>
+    </Svg>
   );
 }
 
@@ -745,7 +771,7 @@ export default function DashboardScreen() {
                       the time-of-day accent (cyan by day, blue by night). */}
                   <View style={s.mainGreetingBlock}>
                     <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
-                    <Text style={[s.mainGreeting, { color: accentColor }]}>{greeting.toUpperCase()}</Text>
+                    <GradientGreeting text={greeting.toUpperCase()} baseColor={accentColor} />
                   </View>
 
                   {/* Bottom: task count — BOLD */}
