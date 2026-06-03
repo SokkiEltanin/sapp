@@ -337,6 +337,12 @@ export default function FinancesScreen() {
                   </View>
                 </View>
                 <Text style={st.chartTotal}>{chartData.total.toFixed(0)} <Text style={st.chartTotalUnit}>zł</Text></Text>
+                {/* Values above each point — spend per day/week (rounded zł) */}
+                <View style={st.chartValues}>
+                  {chartData.values.map((v, i) => (
+                    <Text key={i} style={st.chartValue}>{v > 0 ? Math.round(v) : ''}</Text>
+                  ))}
+                </View>
                 <WaveChart data={chartData.values} color={F.accent} />
                 <View style={st.chartLabels}>
                   {chartData.labels.map((l, i) => (
@@ -511,6 +517,8 @@ const st = StyleSheet.create({
   toggleTextOn: { color: F.accent },
   chartTotal: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1 },
   chartTotalUnit: { fontSize: 14, fontWeight: '600', color: colors.text.muted },
+  chartValues: { flexDirection: 'row', marginBottom: 2 },
+  chartValue: { flex: 1, fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.55)', textAlign: 'center' },
   chartLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
   chartLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
 
@@ -533,7 +541,7 @@ const st = StyleSheet.create({
   },
   sectionLine:  { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
   sectionTitle: { fontSize: 11, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '700' },
-  sectionTotal: { fontSize: 11, fontWeight: '700', color: F.accent, letterSpacing: 0.3 },
+  sectionTotal: { fontSize: 11, fontWeight: '700', color: 'rgba(228,52,52,0.55)', letterSpacing: 0.3 },
 
   itemPad: { paddingHorizontal: spacing[4] },
 

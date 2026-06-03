@@ -50,9 +50,12 @@ export function useWorkEarnings(
     const fallback = { amount: settings.monthlySalary, month: null as string | null };
     if (!expenses?.length || !settings.workPrefix?.trim()) return fallback;
     const wp = settings.workPrefix.trim().toLowerCase();
+    // A paycheck = income carrying the [JD] prefix, whether as a tag OR in the note.
     const candidates = expenses.filter(e =>
-      e.type === 'income' &&
-      e.tags.some(t => t.toLowerCase() === wp)
+      e.type === 'income' && (
+        e.tags.some(t => t.toLowerCase() === wp) ||
+        (e.note ?? '').toLowerCase().includes(wp)
+      )
     );
     if (!candidates.length) return fallback;
     candidates.sort((a, b) => b.date.localeCompare(a.date));

@@ -819,7 +819,7 @@ export default function DashboardScreen() {
                   <View style={s.budgetWarnTrack}>
                     <View style={[s.budgetWarnFill, {
                       width: `${pctClamped}%` as any,
-                      backgroundColor: over ? colors.accent.red : '#5166F5',
+                      backgroundColor: over ? colors.accent.red : accentColor,
                     }]} />
                   </View>
                 </TouchableOpacity>
@@ -842,6 +842,7 @@ export default function DashboardScreen() {
                 <View style={s.budgetWarnTrack}>
                   <View style={[s.budgetWarnFill, {
                     width: `${Math.min(100, budgetAlertCard.pct * 100)}%` as any,
+                    backgroundColor: accentColor,
                   }]} />
                 </View>
               </TouchableOpacity>
@@ -948,7 +949,7 @@ export default function DashboardScreen() {
                     <View style={s.miniWorkTrack}>
                       <View style={[s.miniWorkFill, {
                         width: `${budgetRemaining.pct * 100}%`,
-                        backgroundColor: '#5166F5',
+                        backgroundColor: accentColor,
                       }]} />
                     </View>
                   )}
