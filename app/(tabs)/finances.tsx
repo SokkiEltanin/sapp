@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
+import { useStatsScope, isMine, inScope } from '@/store/statsScope';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag } from 'lucide-react-native';
@@ -98,6 +99,8 @@ export default function FinancesScreen() {
   const [activePayer, setActivePayer] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
   const [balanceOffset, setBalanceOffset] = useState(0);
+  const scope = useStatsScope(s => s.scope);
+  const toggleScope = useStatsScope(s => s.toggle);
 
   // Distinct payers that actually appear in the data (for the filter row).
   const payersInData = useMemo(() => {
@@ -137,12 +140,18 @@ export default function FinancesScreen() {
     for (const e of unique) {
       const isIncome = e.type === 'income';
       const isExpense = isExp(e);
-      if (isIncome) allInc += e.amount;
-      else if (isExpense) allExp += e.amount;
+      const mine = isMine(e);
+      // Money totals & balance: only what I paid / received.
+      if (mine) {
+        if (isIncome) allInc += e.amount;
+        else if (isExpense) allExp += e.amount;
+      }
       if ((e.date ?? '').slice(0, 7) !== mk) continue;
-      if (isIncome) { inc += e.amount; continue; }
+      if (mine && isIncome) { inc += e.amount; continue; }
       if (!isExpense) continue;
-      exp += e.amount;
+      if (mine) exp += e.amount;
+      // Consumption (food / sweets): everyone or only me, per the scope toggle.
+      if (!inScope(e, scope)) continue;
       if (e.category === 'groceries') food += e.amount;
       // sweets = items tagged "słodycze" (top-level tag or per-receipt-item tag)
       if (e.tags?.includes('słodycze')) sweets += e.amount;
@@ -151,17 +160,18 @@ export default function FinancesScreen() {
       }
     }
     return { exp, inc, allExp, allInc, food, sweets };
-  }, [expenses]);
+  }, [expenses, scope]);
 
   // Overall account balance = ALL income − ALL expenses (not just this month).
   // displayed balance = manual offset (money you had before tracking) + net flow
   const balance = balanceOffset + monthTotals.allInc - monthTotals.allExp;
 
-  // Chart data: spending per day (week) or per week-of-month (month)
+  // Chart data: spending per day (week) or per week-of-month (month) — scoped.
   const chartData = useMemo(() => {
     const byDate: Record<string, number> = {};
     for (const e of expenses) {
       if (!isExp(e)) continue;
+      if (!inScope(e, scope)) continue;
       const k = e.date.slice(0, 10);
       byDate[k] = (byDate[k] ?? 0) + e.amount;
     }
@@ -187,7 +197,7 @@ export default function FinancesScreen() {
         total: buckets.reduce((s, v) => s + v, 0),
       };
     }
-  }, [expenses, chartPeriod]);
+  }, [expenses, chartPeriod, scope]);
 
   const sections = useMemo(() => {
     const matches = (e: Expense) => {
@@ -278,10 +288,32 @@ export default function FinancesScreen() {
                       Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
                       {'   ·   '}
                       Słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
+                      {'  '}<Text style={st.heroScopeTag}>({scope === 'all' ? 'wszyscy' : 'ja'})</Text>
                     </Text>
                   </View>
                 </View>
               </LinearGradient>
+
+              {/* ── Stats scope toggle: everyone vs only me ─── */}
+              <View style={st.scopeRow}>
+                <Text style={st.scopeLabel}>Statystyki:</Text>
+                <View style={st.scopeToggle}>
+                  <TouchableOpacity
+                    style={[st.scopeBtn, scope === 'all' && st.scopeBtnOn]}
+                    onPress={() => { haptic.tap(); if (scope !== 'all') toggleScope(); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[st.scopeBtnText, scope === 'all' && st.scopeBtnTextOn]}>Wszyscy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[st.scopeBtn, scope === 'mine' && st.scopeBtnOn]}
+                    onPress={() => { haptic.tap(); if (scope !== 'mine') toggleScope(); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[st.scopeBtnText, scope === 'mine' && st.scopeBtnTextOn]}>Tylko ja</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* ── Spending wave chart + period toggle ─── */}
               <View style={st.chartCard}>
@@ -443,6 +475,22 @@ const st = StyleSheet.create({
   heroSub:       { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
   heroSub2:      { fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginTop: 2 },
   heroSubStrong: { color: '#FFFFFF', fontWeight: '800' },
+  heroScopeTag:  { color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontStyle: 'italic' },
+
+  // ── Stats scope toggle ──────────────────────────────────────────────────────
+  scopeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    marginHorizontal: spacing[4], marginBottom: spacing[3],
+  },
+  scopeLabel: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  scopeToggle: {
+    flexDirection: 'row', gap: 2, marginLeft: 'auto',
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, padding: 2,
+  },
+  scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
+  scopeBtnOn: { backgroundColor: colors.accent.blue + '30' },
+  scopeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  scopeBtnTextOn: { color: colors.accent.blue },
 
   // ── Chart card ──────────────────────────────────────────────────────────────
   chartCard: {

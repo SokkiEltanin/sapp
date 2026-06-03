@@ -36,6 +36,7 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
+import { useStatsScope, inScope } from '@/store/statsScope';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -391,6 +392,11 @@ export default function DashboardScreen() {
   const pomodoro = usePomodoroStore();
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
+  const scope = useStatsScope(s => s.scope);
+  const toggleScope = useStatsScope(s => s.toggle);
+  // Consumption stats (food, sweets, spending charts) use this scoped view;
+  // "all" = whole household, "mine" = only what I paid. Synced with Finances.
+  const scopedExpenses = useMemo(() => expenses.filter(e => inScope(e, scope)), [expenses, scope]);
   const { tasks, isLoading: tasksLoading, reload: reloadTasks, toggle: toggleTask } = useTasks();
   const { habits, todayDone: habitsDoneIds, toggle: toggleHabit, increment: incrementHabit, getTodayCount, getStreak } = useHabits();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
@@ -580,12 +586,12 @@ export default function DashboardScreen() {
   }, []);
 
   const activeDates = finPeriod === 'week' ? weekDates : monthDates;
-  const weekTotal  = useMemo(() => allSpend(expenses, weekDates), [expenses, weekDates]);
-  const weekFood   = useMemo(() => groceryTotal(expenses, weekDates), [expenses, weekDates]);
-  const weekSweets = useMemo(() => sweetsTotal(expenses, weekDates), [expenses, weekDates]);
-  const monthTotal  = useMemo(() => allSpend(expenses, monthDates), [expenses, monthDates]);
-  const monthFood   = useMemo(() => groceryTotal(expenses, monthDates), [expenses, monthDates]);
-  const monthSweets = useMemo(() => sweetsTotal(expenses, monthDates), [expenses, monthDates]);
+  const weekTotal  = useMemo(() => allSpend(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
+  const weekFood   = useMemo(() => groceryTotal(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
+  const weekSweets = useMemo(() => sweetsTotal(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
+  const monthTotal  = useMemo(() => allSpend(scopedExpenses, monthDates), [scopedExpenses, monthDates]);
+  const monthFood   = useMemo(() => groceryTotal(scopedExpenses, monthDates), [scopedExpenses, monthDates]);
+  const monthSweets = useMemo(() => sweetsTotal(scopedExpenses, monthDates), [scopedExpenses, monthDates]);
 
   const displayTotal  = finPeriod === 'week' ? weekTotal  : monthTotal;
   const displayFood   = finPeriod === 'week' ? weekFood   : monthFood;
@@ -598,12 +604,12 @@ export default function DashboardScreen() {
       const dates  = getWeekDates(offset);
       const moodVals = dates.flatMap(d => (moodByDay[d] ?? []).map(e => e.mood));
       const avgMood  = moodVals.length ? moodVals.reduce((a, b) => a + b, 0) / moodVals.length : null;
-      const sw = sweetsTotal(expenses, dates);
-      const food      = groceryTotal(expenses, dates);
-      const totalSpend = allSpend(expenses, dates);
+      const sw = sweetsTotal(scopedExpenses, dates);
+      const food      = groceryTotal(scopedExpenses, dates);
+      const totalSpend = allSpend(scopedExpenses, dates);
       return { offset, dates, avgMood, sweets: sw, food, totalSpend, isCurrent: offset === weekOffset };
     });
-  }, [weekOffset, moodByDay, expenses]);
+  }, [weekOffset, moodByDay, scopedExpenses]);
 
   // Average spending on FOOD per day-of-week (groceries only — other expenses
   // filtered out, per design). Data-driven from all historical grocery entries.
@@ -611,7 +617,7 @@ export default function DashboardScreen() {
     const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
     const totals  = [0, 0, 0, 0, 0, 0, 0];
     const dateSets: Set<string>[] = Array.from({ length: 7 }, () => new Set());
-    for (const e of expenses) {
+    for (const e of scopedExpenses) {
       if (e.type && e.type !== 'expense') continue;
       if (e.category !== 'groceries') continue; // food only
       if (!e.date) continue;
@@ -624,7 +630,7 @@ export default function DashboardScreen() {
     const avgs = totals.map((t, i) => dateSets[i].size > 0 ? t / dateSets[i].size : 0);
     const maxAvg = Math.max(...avgs, 1);
     return days.map((label, i) => ({ label, avg: avgs[i], pct: avgs[i] / maxAvg }));
-  }, [expenses]);
+  }, [scopedExpenses]);
 
   // Work hours per month over the last 6 months (from work events identified by
   // workColor / workPrefix). Data-driven — null if work tracking isn't set up.
@@ -700,7 +706,7 @@ export default function DashboardScreen() {
       .filter(r => r.limit > 0)
       .map(rule => {
         let spend = 0;
-        for (const e of expenses) {
+        for (const e of scopedExpenses) {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
           if (e.tags?.includes(rule.tag)) spend += e.amount;
@@ -713,7 +719,7 @@ export default function DashboardScreen() {
         return { ...rule, spend, pct: spend / rule.limit };
       })
       .sort((a, b) => b.pct - a.pct);
-  }, [tagRules, expenses, today, weekDates]);
+  }, [tagRules, scopedExpenses, today, weekDates]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1153,6 +1159,27 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               );
             })()}
+
+            {/* ══ STATS SCOPE TOGGLE (everyone vs only me) ════════════════ */}
+            <View style={s.scopeRow}>
+              <Text style={s.scopeLabel}>Statystyki:</Text>
+              <View style={s.scopeToggle}>
+                <TouchableOpacity
+                  style={[s.scopeBtn, scope === 'all' && { backgroundColor: accentColor + '30' }]}
+                  onPress={() => { haptic.tap(); if (scope !== 'all') toggleScope(); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.scopeBtnText, scope === 'all' && { color: accentColor }]}>Wszyscy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.scopeBtn, scope === 'mine' && { backgroundColor: accentColor + '30' }]}
+                  onPress={() => { haptic.tap(); if (scope !== 'mine') toggleScope(); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.scopeBtnText, scope === 'mine' && { color: accentColor }]}>Tylko ja</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             {/* ══ WEEKLY / MONTHLY FINANCES ════════════════════════════════ */}
             <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -1665,6 +1692,16 @@ const s = StyleSheet.create({
     paddingHorizontal: 2,
   },
   habitCountText: { fontSize: 8, fontWeight: '800', color: colors.bg.primary },
+
+  // ── Stats scope toggle (everyone / only me) ─────────────────────────────────
+  scopeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  scopeLabel: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  scopeToggle: {
+    flexDirection: 'row', gap: 2, marginLeft: 'auto',
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, padding: 2,
+  },
+  scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
+  scopeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
   habitsMore: { fontSize: 11, color: colors.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
