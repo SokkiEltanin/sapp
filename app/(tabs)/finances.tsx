@@ -368,13 +368,18 @@ export default function FinancesScreen() {
                     </View>
                   </View>
                 </View>
-                {/* Values above each point — expenses per day/week (rounded zł) */}
+                {/* Expense values above the chart (red), income values below (green) */}
                 <View style={st.chartValues}>
                   {chartData.values.map((v, i) => (
-                    <Text key={i} style={st.chartValue}>{v > 0 ? Math.round(v) : ''}</Text>
+                    <Text key={i} style={[st.chartValue, { color: '#E97171' }]}>{v > 0 ? Math.round(v) : ''}</Text>
                   ))}
                 </View>
                 <DualFinWave exp={chartData.values} inc={chartData.incValues} />
+                <View style={st.chartValues}>
+                  {chartData.incValues.map((v, i) => (
+                    <Text key={i} style={[st.chartValue, { color: '#2AC68F' }]}>{v > 0 ? Math.round(v) : ''}</Text>
+                  ))}
+                </View>
                 <View style={st.chartLabels}>
                   {chartData.labels.map((l, i) => (
                     <Text key={i} style={st.chartLabel}>{l}</Text>
