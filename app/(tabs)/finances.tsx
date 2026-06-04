@@ -57,11 +57,11 @@ function monthDates(): string[] {
 // ─── Wave chart ────────────────────────────────────────────────────────────────
 const WAVE_W = 320, WAVE_H = 70;
 
-function WaveChart({ data, color }: { data: number[]; color: string }) {
-  if (data.length < 2) return null;
-  const max = Math.max(...data, 1);
+// Points at column centres ((i+0.5)/n) so they line up with the value/label rows.
+function buildFinPath(data: number[], max: number) {
+  const n = data.length;
   const pts = data.map((v, i) => ({
-    x: (i / (data.length - 1)) * WAVE_W,
+    x: ((i + 0.5) / n) * WAVE_W,
     y: WAVE_H - 8 - (v / max) * (WAVE_H - 20),
   }));
   let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
@@ -71,22 +71,31 @@ function WaveChart({ data, color }: { data: number[]; color: string }) {
     line += ` C ${mx.toFixed(1)} ${py.toFixed(1)}, ${mx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
   }
   const fill = `${line} L ${WAVE_W} ${WAVE_H} L 0 ${WAVE_H} Z`;
+  return { line, fill, pts };
+}
+
+// Dual wave: expenses (red, solid) + income (green, dashed), shared scale.
+function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
+  if (exp.length < 2) return null;
+  const max = Math.max(...exp, ...inc, 1);
+  const E = buildFinPath(exp, max);
+  const I = buildFinPath(inc, max);
   return (
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
       <Defs>
-        <SvgLinearGradient id="finwave" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={color} stopOpacity="0.32" />
-          <Stop offset="1" stopColor={color} stopOpacity="0" />
+        <SvgLinearGradient id="finExp" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#E43434" stopOpacity="0.28" />
+          <Stop offset="1" stopColor="#E43434" stopOpacity="0" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="finInc" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#2AC68F" stopOpacity="0.20" />
+          <Stop offset="1" stopColor="#2AC68F" stopOpacity="0" />
         </SvgLinearGradient>
       </Defs>
-      <Path d={fill} fill="url(#finwave)" />
-      <Path d={line} stroke={color} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-      {pts.map((p, i) => (
-        <Path key={i}
-          d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0`}
-          fill={color} opacity={data[i] > 0 ? '1' : '0.2'}
-        />
-      ))}
+      <Path d={E.fill} fill="url(#finExp)" />
+      <Path d={I.fill} fill="url(#finInc)" />
+      <Path d={E.line} stroke="#E43434" strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+      <Path d={I.line} stroke="#2AC68F" strokeWidth="1.8" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 3" />
     </Svg>
   );
 }
@@ -166,35 +175,43 @@ export default function FinancesScreen() {
   // displayed balance = manual offset (money you had before tracking) + net flow
   const balance = balanceOffset + monthTotals.allInc - monthTotals.allExp;
 
-  // Chart data: spending per day (week) or per week-of-month (month) — scoped.
+  // Chart data: expenses AND income per day (week) or per week-of-month (month).
+  // Expenses respect the scope toggle; income is always mine (my paychecks).
   const chartData = useMemo(() => {
-    const byDate: Record<string, number> = {};
+    const expByDate: Record<string, number> = {};
+    const incByDate: Record<string, number> = {};
     for (const e of expenses) {
-      if (!isExp(e)) continue;
-      if (!inScope(e, scope)) continue;
       const k = e.date.slice(0, 10);
-      byDate[k] = (byDate[k] ?? 0) + e.amount;
+      if (e.type === 'income') {
+        if (isMine(e)) incByDate[k] = (incByDate[k] ?? 0) + e.amount;
+      } else if (isExp(e) && inScope(e, scope)) {
+        expByDate[k] = (expByDate[k] ?? 0) + e.amount;
+      }
     }
     if (chartPeriod === 'week') {
       const dates = weekDates();
       return {
-        values: dates.map(d => byDate[d] ?? 0),
+        values:    dates.map(d => expByDate[d] ?? 0),
+        incValues: dates.map(d => incByDate[d] ?? 0),
         labels: ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'],
-        total: dates.reduce((s, d) => s + (byDate[d] ?? 0), 0),
+        total:    dates.reduce((s, d) => s + (expByDate[d] ?? 0), 0),
+        incTotal: dates.reduce((s, d) => s + (incByDate[d] ?? 0), 0),
       };
     } else {
-      // group month into ~5 weekly buckets
       const dates = monthDates();
-      const buckets: number[] = [0, 0, 0, 0, 0];
+      const exp: number[] = [0, 0, 0, 0, 0];
+      const inc: number[] = [0, 0, 0, 0, 0];
       for (const d of dates) {
         const day = parseInt(d.slice(8, 10), 10);
         const wi = Math.min(4, Math.floor((day - 1) / 7));
-        buckets[wi] += byDate[d] ?? 0;
+        exp[wi] += expByDate[d] ?? 0;
+        inc[wi] += incByDate[d] ?? 0;
       }
       return {
-        values: buckets,
+        values: exp, incValues: inc,
         labels: ['T1', 'T2', 'T3', 'T4', 'T5'],
-        total: buckets.reduce((s, v) => s + v, 0),
+        total: exp.reduce((s, v) => s + v, 0),
+        incTotal: inc.reduce((s, v) => s + v, 0),
       };
     }
   }, [expenses, chartPeriod, scope]);
@@ -336,14 +353,28 @@ export default function FinancesScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={st.chartTotal}>{chartData.total.toFixed(0)} <Text style={st.chartTotalUnit}>zł</Text></Text>
-                {/* Values above each point — spend per day/week (rounded zł) */}
+                <View style={st.chartTotalsRow}>
+                  <Text style={st.chartTotal}>
+                    {chartData.total.toFixed(0)} <Text style={st.chartTotalUnit}>zł</Text>
+                  </Text>
+                  <View style={st.chartLegend}>
+                    <View style={st.legendItem}>
+                      <View style={[st.legendDot, { backgroundColor: '#E43434' }]} />
+                      <Text style={st.legendText}>wydatki</Text>
+                    </View>
+                    <View style={st.legendItem}>
+                      <View style={[st.legendDash, { backgroundColor: '#2AC68F' }]} />
+                      <Text style={st.legendText}>przychody {chartData.incTotal.toFixed(0)} zł</Text>
+                    </View>
+                  </View>
+                </View>
+                {/* Values above each point — expenses per day/week (rounded zł) */}
                 <View style={st.chartValues}>
                   {chartData.values.map((v, i) => (
                     <Text key={i} style={st.chartValue}>{v > 0 ? Math.round(v) : ''}</Text>
                   ))}
                 </View>
-                <WaveChart data={chartData.values} color={F.accent} />
+                <DualFinWave exp={chartData.values} inc={chartData.incValues} />
                 <View style={st.chartLabels}>
                   {chartData.labels.map((l, i) => (
                     <Text key={i} style={st.chartLabel}>{l}</Text>
@@ -515,12 +546,18 @@ const st = StyleSheet.create({
   toggleBtnOn: { backgroundColor: F.accent + '25' },
   toggleText: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
   toggleTextOn: { color: F.accent },
+  chartTotalsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   chartTotal: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1 },
   chartTotalUnit: { fontSize: 14, fontWeight: '600', color: colors.text.muted },
+  chartLegend: { gap: 3, alignItems: 'flex-end', paddingBottom: 2 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendDash: { width: 10, height: 2, borderRadius: 1 },
+  legendText: { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
   chartValues: { flexDirection: 'row', marginBottom: 2 },
   chartValue: { flex: 1, fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.55)', textAlign: 'center' },
-  chartLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
-  chartLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+  chartLabels: { flexDirection: 'row' },
+  chartLabel: { flex: 1, fontSize: 9, fontWeight: '600', color: colors.text.muted, textAlign: 'center' },
 
   // ── Tag filters ───────────────────────────────────────────────────────────────
   tagRow: { paddingHorizontal: spacing[4], gap: spacing[2] },

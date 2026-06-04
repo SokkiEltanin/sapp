@@ -223,8 +223,11 @@ const WAVE_W = 320;
 const WAVE_H = 64;
 
 function buildWavePath(data: number[], max: number) {
+  // Plot points at COLUMN CENTRES ((i+0.5)/n) so they line up with the flex:1
+  // value/label rows underneath. (Edge-to-edge i/(n-1) drifts out of alignment.)
+  const n = data.length;
   const pts = data.map((v, i) => ({
-    x: (i / (data.length - 1)) * WAVE_W,
+    x: ((i + 0.5) / n) * WAVE_W,
     y: WAVE_H - 6 - ((v / max) * (WAVE_H - 18)),
   }));
   let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
@@ -233,7 +236,7 @@ function buildWavePath(data: number[], max: number) {
     const cpx = (px + cx) / 2;
     line += ` C ${cpx.toFixed(1)} ${py.toFixed(1)}, ${cpx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
   }
-  const fill = `${line} L ${pts[pts.length-1].x.toFixed(1)} ${WAVE_H} L ${pts[0].x.toFixed(1)} ${WAVE_H} Z`;
+  const fill = `${line} L ${WAVE_W} ${WAVE_H} L 0 ${WAVE_H} Z`;
   return { line, fill, pts };
 }
 
@@ -721,6 +724,49 @@ export default function DashboardScreen() {
       .sort((a, b) => b.pct - a.pct);
   }, [tagRules, scopedExpenses, today, weekDates]);
 
+  // ── Dynamic hero briefing ──────────────────────────────────────────────────
+  // A contextual one-liner — complements the TopPill (which shows the single top
+  // priority) by giving a broader daily summary. { pre, bold, post } parts.
+  const heroSummary = useMemo(() => {
+    const hour = new Date().getHours();
+    const dueCount = todayTasks.length + overdueTasks.length;
+
+    if (workEarnings.isWorking) {
+      return { pre: 'Jesteś w pracy — zarobione już ', bold: `${workEarnings.totalEarned.toFixed(2)} zł`, post: '.' };
+    }
+    if (overdueTasks.length > 0) {
+      return { pre: 'Masz ', bold: `${overdueTasks.length} ${plTasks(overdueTasks.length)} po terminie`, post: ' — ogarnij je.' };
+    }
+    if (todayTasks.length > 0) {
+      return {
+        pre: 'Na dziś ', bold: `${todayTasks.length} ${plTasks(todayTasks.length)}`,
+        post: doneToday > 0 ? `, ${doneToday} już z głowy.` : '.',
+      };
+    }
+    if (gcalToday.length > 0) {
+      const ev = gcalToday[0];
+      return { pre: 'Dziś w kalendarzu: ', bold: (ev.title || 'wydarzenie'), post: ev.startTime ? ` o ${ev.startTime}.` : '.' };
+    }
+    if (budgetAlertCard) {
+      return { pre: 'Uważaj na wydatki ', bold: `#${budgetAlertCard.cat}`, post: ` — ${Math.round(budgetAlertCard.pct * 100)}% limitu.` };
+    }
+    if (hour >= 17 && habits.length > 0) {
+      const undone = habits.length - habitsDoneIds.length;
+      if (undone > 0) return { pre: 'Wieczór — zostało ', bold: `${undone} ${undone === 1 ? 'nawyk' : 'nawyki'}`, post: ' do odhaczenia.' };
+    }
+    if (hour >= 18 && !todayEntry) {
+      return { pre: 'Jak ', bold: 'minął Ci dzień', post: '? Zapisz nastrój.' };
+    }
+    if (dueCount === 0 && doneToday > 0) {
+      return { pre: 'Wszystko ogarnięte — ', bold: `${doneToday} ${plTasks(doneToday)} dziś`, post: '. Dobra robota!' };
+    }
+    return { pre: 'Czysty grafik — ', bold: 'co dziś zdziałasz', post: '?' };
+  }, [
+    todayTasks.length, overdueTasks.length, doneToday, gcalToday, budgetAlertCard,
+    habits.length, habitsDoneIds.length, todayEntry,
+    workEarnings.isWorking, workEarnings.totalEarned,
+  ]);
+
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -780,13 +826,11 @@ export default function DashboardScreen() {
                     <GradientGreeting text={greeting.toUpperCase()} baseColor={accentColor} />
                   </View>
 
-                  {/* Bottom: task count — BOLD */}
+                  {/* Bottom: dynamic contextual briefing — BOLD highlight */}
                   <Text style={s.mainTaskLine}>
-                    {'Masz do zrobienia '}
-                    <Text style={s.mainTaskBold}>
-                      {`${todayTasks.length + overdueTasks.length} ${plTasks(todayTasks.length + overdueTasks.length)}`}
-                    </Text>
-                    {' na dziś.'}
+                    {heroSummary.pre}
+                    <Text style={s.mainTaskBold}>{heroSummary.bold}</Text>
+                    {heroSummary.post}
                   </Text>
                 </View>
               </BlurView>
