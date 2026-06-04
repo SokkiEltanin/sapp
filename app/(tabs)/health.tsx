@@ -508,7 +508,7 @@ export default function HealthScreen() {
       </ScrollView>
       {/* Weight input modal */}
       <Modal visible={weightModal} transparent animationType="fade" onRequestClose={() => setWeightModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Pressable style={wm.overlay} onPress={() => setWeightModal(false)} />
           <View style={wm.sheet}>
             <Text style={wm.title}>Masa ciała</Text>

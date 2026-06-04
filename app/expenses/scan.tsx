@@ -284,7 +284,7 @@ export default function ScanReceiptModal() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.header}>
         <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>

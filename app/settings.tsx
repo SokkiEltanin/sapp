@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
+import { isMine } from '@/store/statsScope';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -105,6 +106,10 @@ export default function SettingsScreen() {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let inc = 0, exp = 0;
     for (const e of unique) {
+      // MUST match the Finances balance: only MY transactions count toward my
+      // money. Otherwise the saved offset is computed against a different net
+      // and the displayed balance drifts.
+      if (!isMine(e)) continue;
       if (e.type === 'income') inc += e.amount;
       else exp += e.amount;
     }

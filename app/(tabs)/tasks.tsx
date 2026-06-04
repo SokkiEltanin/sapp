@@ -273,7 +273,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={dm.overlay}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={dm.kav}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={dm.kav}>
           <View style={dm.sheet}>
             <View style={dm.header}>
               <View style={dm.headerLeft}>

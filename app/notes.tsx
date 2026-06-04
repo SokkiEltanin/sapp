@@ -340,7 +340,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
       <SafeAreaView style={em.safe} edges={['top', 'bottom']}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           {/* Header */}
           <View style={em.header}>
