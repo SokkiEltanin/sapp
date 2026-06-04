@@ -64,8 +64,39 @@ const APP_ICONS = ICON_NAMES.map(name => ({
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
-  const { tasks, events } = useCalendarStore();
+  const { tasks, events, gcalEvents } = useCalendarStore();
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
+
+  // ── Work calculation diagnostics ────────────────────────────────────────────
+  // Shows EXACTLY what the rate is derived from: [JD] events → hours this month,
+  // the settings salary/hours, the last [JD] paycheck, and the resulting rate.
+  const workDiag = useMemo(() => {
+    const wp = (workSettings.workPrefix ?? '').trim().toLowerCase();
+    const wc = workSettings.workColor;
+    if (!wp && !wc) return null;
+    const t2m = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+    const p2 = (n: number) => String(n).padStart(2, '0');
+    const allEvents = [...events, ...gcalEvents];
+    const isWork = (e: any) => !!e.startTime && !!e.endTime &&
+      ((wc && e.color === wc) || (wp && (e.title ?? '').toLowerCase().startsWith(wp)));
+    const hoursIn = (ym: string) => allEvents
+      .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
+      .reduce((s, e) => s + Math.max(0, t2m(e.endTime ?? '0:0') - t2m(e.startTime ?? '0:0')) / 60, 0);
+    const now = new Date();
+    const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
+    const monthEvents = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === mk);
+    const monthHours = hoursIn(mk);
+    const candidates = expenses.filter(e =>
+      e.type === 'income' && (e.tags.some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp))
+    ).sort((a, b) => b.date.localeCompare(a.date));
+    const lastPaycheck = candidates[0] ?? null;
+    const payMonth = lastPaycheck?.date.slice(0, 7) ?? null;
+    const payHours = payMonth ? hoursIn(payMonth) : 0;
+    const rate = lastPaycheck && payHours > 0
+      ? lastPaycheck.amount / payHours
+      : (workSettings.hoursPerMonth > 0 ? workSettings.monthlySalary / workSettings.hoursPerMonth : 0);
+    return { eventCount: monthEvents.length, monthHours, lastPaycheck, payMonth, payHours, rate };
+  }, [events, gcalEvents, expenses, workSettings]);
 
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
   const [salaryInput, setSalaryInput] = useState(String(workSettings.monthlySalary ?? ''));
@@ -479,6 +510,40 @@ export default function SettingsScreen() {
                 }}
               />
             </View>
+
+            {/* Live diagnostics — what the rate is actually derived from */}
+            {workDiag && (
+              <View style={styles.diagBox}>
+                <Text style={styles.diagTitle}>JAK TO SIĘ LICZY (prefiks „{(workSettings.workPrefix ?? '').trim() || '—'}")</Text>
+                <View style={styles.diagRow}>
+                  <Text style={styles.diagKey}>Godziny z kalendarza (ten mies.)</Text>
+                  <Text style={styles.diagVal}>{workDiag.monthHours.toFixed(1)} h · {workDiag.eventCount} zmian</Text>
+                </View>
+                <View style={styles.diagRow}>
+                  <Text style={styles.diagKey}>Ustawienia: pensja / godziny</Text>
+                  <Text style={styles.diagVal}>{workSettings.monthlySalary} zł / {workSettings.hoursPerMonth} h</Text>
+                </View>
+                <View style={styles.diagRow}>
+                  <Text style={styles.diagKey}>Ostatnia wypłata [{(workSettings.workPrefix ?? '').trim()}]</Text>
+                  <Text style={[styles.diagVal, { color: workDiag.lastPaycheck ? '#2AC68F' : colors.accent.red }]}>
+                    {workDiag.lastPaycheck
+                      ? `${workDiag.lastPaycheck.amount.toFixed(0)} zł (${workDiag.payMonth}, ${workDiag.payHours.toFixed(0)}h)`
+                      : 'nie znaleziono'}
+                  </Text>
+                </View>
+                <View style={styles.diagRow}>
+                  <Text style={styles.diagKey}>Wyliczona stawka</Text>
+                  <Text style={[styles.diagVal, { color: '#FBBF24', fontWeight: '800' }]}>
+                    {workDiag.rate.toFixed(2)} zł/h
+                  </Text>
+                </View>
+                {!workDiag.lastPaycheck && (
+                  <Text style={styles.diagHint}>
+                    Dodaj przychód z tagiem lub notatką „{(workSettings.workPrefix ?? '').trim()}", a stawka policzy się z godzin tego miesiąca.
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
@@ -1020,6 +1085,15 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowLabel: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '500' },
   rowSub: { ...typography.caption, color: colors.text.muted, marginTop: 1 },
+  diagBox: {
+    marginTop: spacing[2], paddingTop: spacing[3],
+    borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[2],
+  },
+  diagTitle: { fontSize: 9, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.8 },
+  diagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
+  diagKey: { flex: 1, fontSize: 12, color: colors.text.secondary },
+  diagVal: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  diagHint: { fontSize: 11, color: colors.accent.amber, lineHeight: 15, marginTop: 2 },
   timeRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingBottom: spacing[3],

@@ -16,6 +16,7 @@ import {
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
+  ShoppingCart, Candy, Store, Package, Sparkles,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -767,6 +768,41 @@ export default function DashboardScreen() {
     workEarnings.isWorking, workEarnings.totalEarned,
   ]);
 
+  // ── Fun facts / advanced analytics from all shopping data ──────────────────
+  const funFacts = useMemo(() => {
+    const productCount: Record<string, number> = {};
+    const sweetCount:   Record<string, number> = {};
+    const storeCount:   Record<string, number> = {};
+    let totalItems = 0;
+    let biggest = { name: '', amount: 0 };
+    for (const e of expenses) {
+      if (e.type === 'income') continue;
+      if (e.amount > biggest.amount) biggest = { name: e.note || e.storeName || e.category, amount: e.amount };
+      if (e.storeName) storeCount[e.storeName] = (storeCount[e.storeName] ?? 0) + 1;
+      for (const it of (e.receiptItems ?? [])) {
+        const name = it.name?.trim();
+        if (!name) continue;
+        totalItems++;
+        productCount[name] = (productCount[name] ?? 0) + 1;
+        if (it.tags?.includes('słodycze')) sweetCount[name] = (sweetCount[name] ?? 0) + 1;
+      }
+    }
+    const top = (obj: Record<string, number>) => {
+      const e = Object.entries(obj).sort((a, b) => b[1] - a[1])[0];
+      return e ? { name: e[0], count: e[1] } : null;
+    };
+    const facts: { icon: 'cart' | 'candy' | 'store' | 'package' | 'flame'; label: string }[] = [];
+    const fp = top(productCount);
+    if (fp && fp.count >= 2) facts.push({ icon: 'cart', label: `Najczęściej kupujesz: ${fp.name} (×${fp.count})` });
+    const fs = top(sweetCount);
+    if (fs && fs.count >= 2) facts.push({ icon: 'candy', label: `Ulubiony słodycz: ${fs.name} (×${fs.count})` });
+    const st = top(storeCount);
+    if (st && st.count >= 2) facts.push({ icon: 'store', label: `Najczęstszy sklep: ${st.name} (${st.count}×)` });
+    if (totalItems >= 5) facts.push({ icon: 'package', label: `Kupiłeś łącznie ${totalItems} produktów` });
+    if (biggest.amount > 0) facts.push({ icon: 'flame', label: `Największy zakup: ${biggest.name} (${biggest.amount.toFixed(0)} zł)` });
+    return facts;
+  }, [expenses]);
+
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -1416,6 +1452,32 @@ export default function DashboardScreen() {
               </View>
             )}
 
+            {/* ══ CIEKAWOSTKI — analiza zakupów ═══════════════════════════ */}
+            {funFacts.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Sparkles size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Ciekawostki</Text>
+                </View>
+                <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                  {funFacts.map((f, i) => {
+                    const Icon = f.icon === 'cart' ? ShoppingCart
+                      : f.icon === 'candy' ? Candy
+                      : f.icon === 'store' ? Store
+                      : f.icon === 'package' ? Package : Flame;
+                    return (
+                      <View key={i} style={s.factRow}>
+                        <View style={[s.factIcon, { backgroundColor: accentColor + '18' }]}>
+                          <Icon size={13} color={accentColor} />
+                        </View>
+                        <Text style={s.factText} numberOfLines={2}>{f.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
             {/* ══ NASTRÓJ — KALENDARZ MIESIĄCA ════════════════════════════ */}
             {Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -1747,6 +1809,14 @@ const s = StyleSheet.create({
   },
   scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
   scopeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+
+  // ── Fun facts ───────────────────────────────────────────────────────────────
+  factRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  factIcon: {
+    width: 26, height: 26, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  factText: { flex: 1, fontSize: 12.5, color: colors.text.secondary, fontWeight: '500' },
   habitsMore: { fontSize: 11, color: colors.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
