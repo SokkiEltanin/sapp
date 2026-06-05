@@ -440,7 +440,10 @@ export default function DashboardScreen() {
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     googleCalendarService.getStoredToken().then(token => {
       if (token) {
-        googleCalendarService.fetchEvents(1, 14).then(evs => setGcalEvents(evs)).catch(() => {});
+        // Fetch a WIDE window (≈2.5 months back) — this overwrites the shared
+        // gcalEvents store, and Settings derives monthly work hours from it.
+        // A narrow window here was silently undercounting work shifts.
+        googleCalendarService.fetchEvents(75, 60).then(evs => setGcalEvents(evs)).catch(() => {});
       } else {
         setGcalEvents([]);  // clear any cached events from a previous session
       }
@@ -801,6 +804,29 @@ export default function DashboardScreen() {
     if (totalItems >= 5) facts.push({ icon: 'package', label: `Kupiłeś łącznie ${totalItems} produktów` });
     if (biggest.amount > 0) facts.push({ icon: 'flame', label: `Największy zakup: ${biggest.name} (${biggest.amount.toFixed(0)} zł)` });
     return facts;
+  }, [expenses]);
+
+  // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
+  const topProducts = useMemo(() => {
+    const count: Record<string, number> = {};
+    const spent: Record<string, number> = {};
+    const label: Record<string, string> = {};
+    for (const e of expenses) {
+      if (e.type === 'income') continue;
+      for (const it of (e.receiptItems ?? [])) {
+        const name = it.name?.trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        count[key] = (count[key] ?? 0) + 1;
+        spent[key] = (spent[key] ?? 0) + (it.price ?? 0);
+        if (!label[key]) label[key] = name; // first-seen original casing
+      }
+    }
+    return Object.entries(count)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .filter(([, c]) => c >= 2)
+      .map(([key, c]) => ({ name: label[key] ?? key, count: c, spent: spent[key] ?? 0 }));
   }, [expenses]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
@@ -1452,6 +1478,38 @@ export default function DashboardScreen() {
               </View>
             )}
 
+            {/* ══ TOP 3 NAJCZĘŚCIEJ KUPOWANE ══════════════════════════════ */}
+            {topProducts.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <ShoppingCart size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Top 3 najczęściej kupowane</Text>
+                </View>
+                <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                  {topProducts.map((p, i) => {
+                    const max = topProducts[0].count || 1;
+                    const medals = ['#FBBF24', '#9CA3AF', '#B45309'];
+                    return (
+                      <View key={p.name} style={s.topRow}>
+                        <View style={[s.topRank, { backgroundColor: medals[i] + '22', borderColor: medals[i] + '55' }]}>
+                          <Text style={[s.topRankText, { color: medals[i] }]}>{i + 1}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={s.topNameRow}>
+                            <Text style={s.topName} numberOfLines={1}>{p.name}</Text>
+                            <Text style={s.topCount}>×{p.count}</Text>
+                          </View>
+                          <View style={s.topBarTrack}>
+                            <View style={[s.topBarFill, { width: `${Math.max(8, (p.count / max) * 100)}%`, backgroundColor: accentColor }]} />
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
             {/* ══ CIEKAWOSTKI — analiza zakupów ═══════════════════════════ */}
             {funFacts.length > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -1817,6 +1875,17 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   factText: { flex: 1, fontSize: 12.5, color: colors.text.secondary, fontWeight: '500' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  topRank: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  topRankText: { fontSize: 12, fontWeight: '800' },
+  topNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
+  topName: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '600' },
+  topCount: { fontSize: 12, color: colors.text.muted, fontWeight: '700' },
+  topBarTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 5, overflow: 'hidden' },
+  topBarFill: { height: 5, borderRadius: 3 },
   habitsMore: { fontSize: 11, color: colors.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────

@@ -69,6 +69,18 @@ export default function SettingsScreen() {
     const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
     const monthEvents = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === mk);
     const monthHours = hoursIn(mk);
+    // The actual detected shifts this month — shown so the user can verify the
+    // count and tap to edit any of them.
+    const monthShifts = monthEvents
+      .map(e => ({
+        id: e.id as string,
+        title: (e.title ?? '') as string,
+        date: (e.date ?? '').slice(0, 10),
+        startTime: e.startTime as string,
+        endTime: e.endTime as string,
+        hours: Math.max(0, t2m(e.endTime ?? '0:0') - t2m(e.startTime ?? '0:0')) / 60,
+      }))
+      .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
     const candidates = expenses.filter(e =>
       e.type === 'income' && (e.tags.some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp))
     ).sort((a, b) => b.date.localeCompare(a.date));
@@ -81,7 +93,7 @@ export default function SettingsScreen() {
     const rate = lastPaycheck && payHours > 0
       ? lastPaycheck.amount / payHours
       : (fallbackHours > 0 ? workSettings.monthlySalary / fallbackHours : 0);
-    return { eventCount: monthEvents.length, monthHours, lastPaycheck, payMonth, payHours, rate, fallbackHours };
+    return { eventCount: monthEvents.length, monthHours, monthShifts, lastPaycheck, payMonth, payHours, rate, fallbackHours };
   }, [events, gcalEvents, expenses, workSettings]);
 
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
@@ -520,6 +532,30 @@ export default function SettingsScreen() {
                     ? 'Pensja i godziny z pól wyżej to tylko zapas — gdy jest wypłata [' + (workSettings.workPrefix ?? '').trim() + '], stawka liczy się z niej i godzin z kalendarza.'
                     : 'Dodaj przychód z tagiem lub notatką „' + (workSettings.workPrefix ?? '').trim() + '" — stawka policzy się z godzin kalendarza tego miesiąca.'}
                 </Text>
+
+                {/* Detected shifts — what's actually counted; tap to edit */}
+                <View style={styles.shiftList}>
+                  <Text style={styles.shiftListTitle}>WYKRYTE ZMIANY — {workDiag.eventCount} ({workDiag.monthHours.toFixed(1)} h)</Text>
+                  {workDiag.monthShifts.length === 0 ? (
+                    <Text style={styles.shiftEmpty}>Brak zmian tego miesiąca pasujących do prefiksu.</Text>
+                  ) : (
+                    workDiag.monthShifts.map(s => (
+                      <PressableScale
+                        key={s.id}
+                        onPress={() => { haptic.tap(); router.push(`/calendar/${s.id}` as any); }}
+                        style={styles.shiftRow}
+                      >
+                        <View style={styles.shiftDot} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.shiftTitle} numberOfLines={1}>{s.title || 'Zmiana'}</Text>
+                          <Text style={styles.shiftMeta}>{s.date} · {s.startTime}–{s.endTime}</Text>
+                        </View>
+                        <Text style={styles.shiftHours}>{s.hours.toFixed(1)} h</Text>
+                        <LucideIcons.Pencil size={13} color={colors.text.muted} />
+                      </PressableScale>
+                    ))
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -1027,6 +1063,21 @@ const styles = StyleSheet.create({
   diagItemLabel: { fontSize: 10.5, color: colors.text.muted, fontWeight: '500' },
   diagItemVal: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   diagHint: { fontSize: 11, color: colors.accent.amber, lineHeight: 15, marginTop: 2 },
+  shiftList: {
+    marginTop: spacing[2], paddingTop: spacing[3],
+    borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[1],
+  },
+  shiftListTitle: { fontSize: 9, fontWeight: '800', color: '#60A5FA', letterSpacing: 0.8, marginBottom: spacing[1] },
+  shiftEmpty: { fontSize: 11, color: colors.text.muted, fontStyle: 'italic' },
+  shiftRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: 7, paddingHorizontal: spacing[2],
+    backgroundColor: 'rgba(96,165,250,0.07)', borderRadius: radius.md,
+  },
+  shiftDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#60A5FA' },
+  shiftTitle: { fontSize: 12.5, fontWeight: '600', color: colors.text.primary },
+  shiftMeta: { fontSize: 10.5, color: colors.text.muted, marginTop: 1 },
+  shiftHours: { fontSize: 12, fontWeight: '700', color: '#60A5FA' },
   timeRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingBottom: spacing[3],

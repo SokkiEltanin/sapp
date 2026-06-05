@@ -189,7 +189,7 @@ export const googleCalendarService = {
     return resp.ok || resp.status === 204;
   },
 
-  async fetchEvents(daysBack = 7, daysForward = 60): Promise<CalendarEvent[]> {
+  async fetchEvents(daysBack = 75, daysForward = 60): Promise<CalendarEvent[]> {
     let token = await this.getStoredToken();
     if (!token) {
       token = await this.refreshToken();

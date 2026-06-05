@@ -294,7 +294,7 @@ export default function CalendarScreen() {
     // Also load Google Calendar events (non-blocking)
     googleCalendarService.getStoredToken().then(token => {
       if (token) {
-        googleCalendarService.fetchEvents(0, 60).then(setGcalEvents).catch(() => {});
+        googleCalendarService.fetchEvents(75, 60).then(setGcalEvents).catch(() => {});
       }
     });
   };
