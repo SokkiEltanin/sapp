@@ -176,6 +176,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <KeyboardAvoidingView
+          behavior="padding"
+          style={{ width: '100%' }}
+          pointerEvents="box-none"
+        >
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
 
           {/* Header */}
@@ -260,6 +265,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               </View>
           </ScrollView>
         </Animated.View>
+        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );
