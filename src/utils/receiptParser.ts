@@ -9,6 +9,8 @@ export interface ReceiptProduct {
   discountPercent?: number;
   promotion?: string;
   category: ExpenseCategory;
+  kind?: 'deposit';     // bottle deposit (kaucja) — separate from product stats
+  suspect?: boolean;    // line that smells like a non-product (total/header) — UI auto-deselects
 }
 
 export interface ParsedReceipt {
@@ -540,9 +542,195 @@ function cleanName(raw: string): string {
   return s;
 }
 
-// ─── Main parser ──────────────────────────────────────────────────────────────
+// ─── Shared detectors (used by every store parser) ────────────────────────────
+
+// Tolerant price parse — handles OCR artefacts like "259, 21" or "6 ,49".
+function parsePrice(s: string): number {
+  const m = s.match(/(\d+)\s*[.,]\s*(\d{2})\b/);
+  if (m) return parseFloat(`${m[1]}.${m[2]}`);
+  const n = parseFloat(s.replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+export type StoreKey = 'kaufland' | 'biedronka' | 'lidl' | 'generic';
+
+function storeKeyFromText(text: string): StoreKey {
+  const head = text.slice(0, 400);
+  if (/\bkaufland\b/i.test(head) || /\bkaufland\b/i.test(text)) return 'kaufland';
+  if (/\bbiedronka\b|jeronimo\s*martins/i.test(head) || /\bbiedronka\b|jeronimo\s*martins/i.test(text)) return 'biedronka';
+  if (/\blidl\b/i.test(head) || /\blidl\b/i.test(text)) return 'lidl';
+  return 'generic';
+}
+
+function detectStoreName(text: string, lines: string[]): string | undefined {
+  const headerText = lines.slice(0, 12).join(' ');
+  for (const brand of STORE_BRANDS) if (brand.pattern.test(headerText)) return brand.name;
+  for (const brand of STORE_BRANDS) if (brand.pattern.test(text)) return brand.name;
+  return undefined;
+}
+
+function detectDate(text: string): string | undefined {
+  const isoMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (isoMatch) return isoMatch[1];
+  const dmyMatch = text.match(/\b(\d{2}[./]\d{2}[./]\d{4})\b/);
+  if (dmyMatch) {
+    const p = dmyMatch[1].split(/[./]/);
+    return `${p[2]}-${p[1]}-${p[0]}`;
+  }
+  return undefined;
+}
+
+function detectTotal(text: string): number {
+  const totalPatterns = [
+    /SUMA\s+PLN\s+(\d+\s*[.,]\s*\d{2})/i,
+    /DO\s+ZAP[ŁL]ATY\s+(?:PLN\s+)?(\d+\s*[.,]\s*\d{2})/i,
+    /RAZEM\s+(?:PLN\s+)?(\d+\s*[.,]\s*\d{2})/i,
+    /SUMA\s*:?\s*(\d+\s*[.,]\s*\d{2})/i,
+    /[ŁL][AĄ]CZNIE\s+(?:PLN\s+)?(\d+\s*[.,]\s*\d{2})/i,
+    /TOTAL\s+PLN\s+(\d+\s*[.,]\s*\d{2})/i,
+    /TOTAL\s+(?:PLN\s+)?(\d+\s*[.,]\s*\d{2})/i,
+  ];
+  for (const pat of totalPatterns) {
+    const m = text.match(pat);
+    if (m) return parsePrice(m[1]);
+  }
+  return 0;
+}
+
+// Is this a bottle-deposit / kaucja line?
+function isDepositName(s: string): boolean {
+  return /butelka\s*pet|kaucja|opłat[ay]?\s*depoz|depozyt|\bpet\b/i.test(s);
+}
+
+// ─── Store router ─────────────────────────────────────────────────────────────
+
+const SUSPECT_NAME_RE = /^(total|suma|razem|price\s*in\s*pln|ptu|taxed|none|do\s*zap|reszta|sprzeda|p[łl]atno|got[óo]wk|karta|kwota|vat|paragon|niefiskal|fiskaln)/i;
 
 export function parseReceiptText(text: string): ParsedReceipt {
+  let r: ParsedReceipt;
+  switch (storeKeyFromText(text)) {
+    case 'kaufland':  r = parseKaufland(text); break;
+    case 'biedronka': r = parseBiedronka(text); break;
+    default:          r = parseGeneric(text); break;
+  }
+  // Flag lines that smell like a non-product so the UI can auto-deselect them.
+  for (const p of r.products) {
+    if (p.kind === 'deposit') continue;
+    if (SUSPECT_NAME_RE.test(p.name) || /^[\d\s.,]+$/.test(p.name)) p.suspect = true;
+  }
+  return r;
+}
+
+// ─── Kaufland ─────────────────────────────────────────────────────────────────
+// OCR layout: product NAME on one line, PRICE on the next. Bottle deposits show
+// as `butelkaPET` + `0,50`. Column jumble sometimes drops a price before its
+// name, so a small stray-price buffer recovers the trailing item.
+
+const KFL_PRICE_RE = /^\d+\s*[.,]\s*\d{2}$/;
+
+function parseKaufland(text: string): ParsedReceipt {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const products: ReceiptProduct[] = [];
+  let totalDiscount = 0;
+  let pendingName: string | null = null;
+  let pendingDeposit = false;
+  const strayPrices: number[] = [];
+
+  const emit = (name: string, price: number, deposit: boolean) => {
+    if (price <= 0 || price > 5000) return;
+    if (deposit) {
+      products.push({ name: 'Kaucja (butelka)', quantity: 1, unitPrice: price, finalPrice: price, category: 'groceries', kind: 'deposit' });
+    } else {
+      const clean = cleanName(name);
+      if (clean.length < 2) return;
+      products.push({ name: clean, quantity: 1, unitPrice: price, finalPrice: price, category: categorize(clean) });
+    }
+  };
+
+  const flushPending = () => {
+    if (pendingName !== null && strayPrices.length) {
+      emit(pendingName, strayPrices.shift()!, pendingDeposit);
+    }
+    pendingName = null; pendingDeposit = false;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    if (i === 0) continue;                          // store header line
+    if (/^price in pln$/i.test(raw)) continue;
+    if (/^(total|suma|razem|do zap|p[łl]atno|got[óo]wka|karta)\b/i.test(raw)) { flushPending(); break; }
+    if (/^none$/i.test(raw)) continue;
+
+    if (KFL_PRICE_RE.test(raw)) {
+      const price = parsePrice(raw);
+      if (pendingName !== null) { emit(pendingName, price, pendingDeposit); pendingName = null; pendingDeposit = false; }
+      else strayPrices.push(price);
+      continue;
+    }
+
+    // a name line
+    if (raw.length < 2 || !/[A-Za-zżźćńółęąśŻŹĆĄŚĘÓŁŃ]/.test(raw)) continue;
+    flushPending();                                  // previous name had no own price → try a stray
+    pendingName = raw;
+    pendingDeposit = isDepositName(raw);
+  }
+  flushPending();
+
+  const subtotal = products.reduce((s, p) => s + p.finalPrice, 0);
+  const total = detectTotal(text);
+  return {
+    storeName: detectStoreName(text, lines) ?? 'Kaufland',
+    date: detectDate(text),
+    products, subtotal, totalDiscount, total: total || subtotal, raw: text,
+  };
+}
+
+// ─── Biedronka ────────────────────────────────────────────────────────────────
+// Heavily column-jumbled OCR. The one reliable signal is the item pattern
+// `NAME <VAT> <qty> x <unitPrice>`; everything else (the scattered discount /
+// price columns) is unrecoverable, so we extract items and lean on the
+// selected-sum-vs-total banner in the UI as the safety net.
+
+// NAME <VAT> <qty> x <unitPrice>. Unit price may have 1–2 decimals (OCR drops a
+// trailing zero, e.g. "9,4"); accepting both stops a missed item from bleeding
+// its successor's name.
+const BIE_ITEM_RE = /([A-Za-zżźćńółęąśŻŹĆĄŚĘÓŁŃ][^\n]*?)\s+([ABC])\s*(\d+[.,]\d{1,3})\s*[x×*]\s*(\d+[.,]\d{1,2})/g;
+
+function parseBiedronka(text: string): ParsedReceipt {
+  const products: ReceiptProduct[] = [];
+  const flat = text.replace(/\r/g, '');
+  let m: RegExpExecArray | null;
+  BIE_ITEM_RE.lastIndex = 0;
+  while ((m = BIE_ITEM_RE.exec(flat)) !== null) {
+    let rawName = m[1].trim();
+    // Scrub contamination from neighbouring columns:
+    rawName = rawName.replace(/^.*?\d+[.,]\d{2}[A-C]?\s+/, '');     // leading price/VAT column
+    rawName = rawName.replace(/^.*[x×*]\s*\d+[.,]\d{1,2}\s+/i, '');  // a prior item's "x price " tail
+    rawName = rawName.replace(/^(discount|rabat|opust)\s+/i, '');    // stray discount word
+    rawName = rawName.trim();
+    const qty = parseFloat(m[3].replace(',', '.'));
+    const unit = parseFloat(m[4].replace(',', '.'));
+    if (unit <= 0 || unit > 5000) continue;
+    const name = cleanName(rawName);
+    if (name.length < 2) continue;
+    const finalPrice = Math.round(qty * unit * 100) / 100;
+    if (finalPrice <= 0 || finalPrice > 5000) continue;
+    products.push({ name, quantity: qty, unitPrice: unit, finalPrice, category: categorize(name) });
+  }
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const subtotal = products.reduce((s, p) => s + p.finalPrice, 0);
+  const total = detectTotal(text);
+  return {
+    storeName: detectStoreName(text, lines) ?? 'Biedronka',
+    date: detectDate(text),
+    products, subtotal, totalDiscount: 0, total: total || subtotal, raw: text,
+  };
+}
+
+// ─── Generic parser (fallback for all other stores) ───────────────────────────
+
+function parseGeneric(text: string): ParsedReceipt {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
   const products: ReceiptProduct[] = [];

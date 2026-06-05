@@ -28,6 +28,7 @@ export interface ReceiptItem {
   unitPrice: number;
   discount?: number;
   tags: string[];       // food sub-tags: 'mięso', 'nabiał', 'słodycze', etc.
+  kind?: 'deposit';     // bottle deposit (kaucja) — kept separate from product stats
 }
 
 export interface Expense {

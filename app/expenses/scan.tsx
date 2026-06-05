@@ -14,6 +14,7 @@ import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import {
   loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory,
   loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
+  loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -108,8 +109,22 @@ export default function ScanReceiptModal() {
   };
 
   const applyParsedReceipt = async (parsed: ParsedReceipt) => {
-    setReceipt(parsed);
-    setSelected(new Set(parsed.products.map((_, i) => i)));
+    // Apply what we've learned about this store's lines: drop the ones marked
+    // "not a product", and un-flag the ones confirmed as real products.
+    const lineMem = await loadLineMemory();
+    const kept = parsed.products.filter(p =>
+      p.kind === 'deposit' || lineVerdict(lineMem, parsed.storeName, p.name) !== 'ignore'
+    );
+    const products = kept.map(p => {
+      if (p.kind === 'deposit') return p;
+      const v = lineVerdict(lineMem, parsed.storeName, p.name);
+      return { ...p, suspect: p.suspect && v !== 'product' };
+    });
+    const r: ParsedReceipt = { ...parsed, products };
+
+    setReceipt(r);
+    // Select everything except the still-suspect lines (user confirms by ticking).
+    setSelected(new Set(products.map((_, i) => i).filter(i => !products[i].suspect)));
     setCatPickerFor(null);
     setEditedPrices({});
     setEditedNames({});
@@ -118,11 +133,11 @@ export default function ScanReceiptModal() {
     setCustomProducts([]);
     setCustomCatPickerFor(null);
     setCustomTagPickerFor(null);
-    if (parsed.date) setDateInput(parsed.date);
+    if (r.date) setDateInput(r.date);
     const [catMemory, tagMemory] = await Promise.all([loadProductMemory(), loadTagMemory()]);
     const [rememberedCats, rememberedTags] = await Promise.all([
-      applyProductMemory(parsed.products, catMemory),
-      applyTagMemory(parsed.products, tagMemory),
+      applyProductMemory(r.products, catMemory),
+      applyTagMemory(r.products, tagMemory),
     ]);
     setEditedCats(rememberedCats);
     setEditedTags(rememberedTags);
@@ -180,6 +195,20 @@ export default function ScanReceiptModal() {
     }
     return Array.from(map.entries());
   }, [displayItems, sortMode, editedCats]);
+
+  // ── Reconciliation: selected sum vs receipt total ──────────────────────────────
+  const selectedSum = useMemo(() => {
+    let s = 0;
+    if (receipt) for (const i of selected) s += getPrice(i);
+    for (const p of customProducts) {
+      if (!p.name.trim()) continue;
+      s += parseFloat(p.price.replace(',', '.')) || 0;
+    }
+    return Math.round(s * 100) / 100;
+  }, [receipt, selected, customProducts, editedPrices]);
+
+  const reconDelta = receipt?.total ? Math.round((selectedSum - receipt.total) * 100) / 100 : 0;
+  const reconOk = Math.abs(reconDelta) <= 0.05;
 
   // ── Save ──────────────────────────────────────────────────────────────────────
 
@@ -255,6 +284,14 @@ export default function ScanReceiptModal() {
       receipt.products.forEach((p, i) => { parsedCats[i] = p.category; });
       saveProductCategories(receipt.products, editedCats, parsedCats, editedNames).catch(() => {});
       saveTagMemory(receipt.products, editedTags, editedNames).catch(() => {});
+      // Learn renamed products → canonical name (unifies stats across OCR/stores).
+      saveNameAliases(receipt.products, editedNames).catch(() => {});
+      // Learn per-store verdicts on SUSPECT lines: kept = real product, dropped = junk.
+      const verdicts = receipt.products
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.suspect)
+        .map(({ p, i }) => ({ name: (editedNames[i]?.trim() || p.name), verdict: (selected.has(i) ? 'product' : 'ignore') as 'product' | 'ignore' }));
+      saveLineVerdicts(receipt.storeName, verdicts).catch(() => {});
       if (validCustom.length > 0) {
         saveCustomProductsToMemory(validCustom.map(p => ({ name: p.name.trim(), category: p.category }))).catch(() => {});
         const taggedCustom = validCustom.filter(p => p.tags.length > 0).map(p => ({ name: p.name.trim(), tags: p.tags }));
@@ -533,6 +570,19 @@ export default function ScanReceiptModal() {
                 </PressableScale>
               )}
             </View>
+            {/* Sum reconciliation — catches mis-parsed lines (CENA/Total) */}
+            {receipt && receipt.total > 0 && (
+              <View style={[styles.reconRow, reconOk ? styles.reconOk : styles.reconWarn]}>
+                {reconOk
+                  ? <LucideIcons.CheckCircle2 size={14} color={colors.accent.green} />
+                  : <LucideIcons.AlertTriangle size={14} color="#FBBF24" />}
+                <Text style={styles.reconText}>
+                  Zaznaczone: <Text style={styles.reconStrong}>{selectedSum.toFixed(2)} zł</Text>
+                  {'  ·  '}Paragon: <Text style={styles.reconStrong}>{receipt.total.toFixed(2)} zł</Text>
+                  {!reconOk && <Text style={styles.reconDelta}>{'  '}({reconDelta > 0 ? '+' : ''}{reconDelta.toFixed(2)})</Text>}
+                </Text>
+              </View>
+            )}
             <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data paragonu" />
             <AnimatedButton
               onPress={saveSelected}
@@ -645,9 +695,15 @@ function ProductRow({
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
 
+  const isDeposit = product.kind === 'deposit';
   return (
     <View style={styles.productWrap}>
-      <View style={[styles.productRow, selected && styles.productRowSelected]}>
+      <View style={[
+        styles.productRow,
+        selected && styles.productRowSelected,
+        !selected && styles.productRowInactive,
+        product.suspect && !selected && styles.productRowSuspect,
+      ]}>
         <PressableScale onPress={onToggle} style={[styles.checkbox, selected && styles.checkboxDone]}>
           {selected && <Check size={12} color={colors.bg.primary} />}
         </PressableScale>
@@ -659,6 +715,18 @@ function ProductRow({
 
         {/* Product info */}
         <View style={styles.productInfo}>
+          {product.suspect && !selected && (
+            <View style={styles.suspectBadge}>
+              <LucideIcons.HelpCircle size={11} color="#FBBF24" />
+              <Text style={styles.suspectText}>To produkt? Zaznacz aby dodać (lub popraw nazwę). Zostaw odznaczone = nie produkt — zapamiętam dla tego sklepu.</Text>
+            </View>
+          )}
+          {isDeposit && (
+            <View style={styles.depositBadge}>
+              <LucideIcons.Recycle size={11} color={colors.text.muted} />
+              <Text style={styles.depositText}>kaucja za butelkę</Text>
+            </View>
+          )}
           <TextInput
             value={productName}
             onChangeText={onNameChange}
@@ -968,6 +1036,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.subtle,
   },
   productRowSelected: { borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.04)' },
+  productRowInactive: { opacity: 0.5 },
+  productRowSuspect: { opacity: 0.92, borderColor: 'rgba(251,191,36,0.45)', backgroundColor: 'rgba(251,191,36,0.06)' },
+  suspectBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
+  suspectText: { flex: 1, fontSize: 10, color: '#FBBF24', fontWeight: '600', lineHeight: 13 },
+  depositBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  depositText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  reconRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: 8, paddingHorizontal: spacing[3], borderRadius: radius.md, borderWidth: 1,
+  },
+  reconOk: { backgroundColor: 'rgba(42,198,143,0.08)', borderColor: 'rgba(42,198,143,0.35)' },
+  reconWarn: { backgroundColor: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.4)' },
+  reconText: { flex: 1, fontSize: 11.5, color: colors.text.secondary },
+  reconStrong: { color: colors.text.primary, fontWeight: '700' },
+  reconDelta: { color: '#FBBF24', fontWeight: '700' },
   checkbox: {
     width: 20, height: 20, borderRadius: 5, borderWidth: 2,
     borderColor: colors.border.default, alignItems: 'center', justifyContent: 'center',

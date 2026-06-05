@@ -16,7 +16,7 @@ import {
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
-  ShoppingCart, Candy, Store, Package, Sparkles,
+  ShoppingCart, Candy, Store, Package, Sparkles, Scale,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -38,6 +38,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope } from '@/store/statsScope';
+import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -414,6 +415,7 @@ export default function DashboardScreen() {
   const [workHoursChart, setWorkHoursChart] = useState(false);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
+  const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -526,6 +528,7 @@ export default function DashboardScreen() {
   }, []);
 
   useEffect(() => { loadPomSessions(); }, []);
+  useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
   useFocusEffect(useCallback(() => {
     loadPomSessions();
     // Reload budgets + tag rules so a limit added in Settings shows immediately
@@ -778,21 +781,26 @@ export default function DashboardScreen() {
     const storeCount:   Record<string, number> = {};
     let totalItems = 0;
     let biggest = { name: '', amount: 0 };
+    const labelOf: Record<string, string> = {};
     for (const e of expenses) {
       if (e.type === 'income') continue;
       if (e.amount > biggest.amount) biggest = { name: e.note || e.storeName || e.category, amount: e.amount };
       if (e.storeName) storeCount[e.storeName] = (storeCount[e.storeName] ?? 0) + 1;
       for (const it of (e.receiptItems ?? [])) {
+        if (it.kind === 'deposit') continue;
         const name = it.name?.trim();
         if (!name) continue;
         totalItems++;
-        productCount[name] = (productCount[name] ?? 0) + 1;
-        if (it.tags?.includes('słodycze')) sweetCount[name] = (sweetCount[name] ?? 0) + 1;
+        const canon = canonicalProductName(name, nameAliases);
+        const key = normalizeProductName(canon) || canon.toLowerCase();
+        if (!labelOf[key]) labelOf[key] = canon;
+        productCount[key] = (productCount[key] ?? 0) + 1;
+        if (it.tags?.includes('słodycze')) sweetCount[key] = (sweetCount[key] ?? 0) + 1;
       }
     }
     const top = (obj: Record<string, number>) => {
       const e = Object.entries(obj).sort((a, b) => b[1] - a[1])[0];
-      return e ? { name: e[0], count: e[1] } : null;
+      return e ? { name: labelOf[e[0]] ?? e[0], count: e[1] } : null;
     };
     const facts: { icon: 'cart' | 'candy' | 'store' | 'package' | 'flame'; label: string }[] = [];
     const fp = top(productCount);
@@ -804,9 +812,53 @@ export default function DashboardScreen() {
     if (totalItems >= 5) facts.push({ icon: 'package', label: `Kupiłeś łącznie ${totalItems} produktów` });
     if (biggest.amount > 0) facts.push({ icon: 'flame', label: `Największy zakup: ${biggest.name} (${biggest.amount.toFixed(0)} zł)` });
     return facts;
-  }, [expenses]);
+  }, [expenses, nameAliases]);
+
+  // ── Weight ciekawostka: kg per food group THIS MONTH, with top-2 breakdown ──
+  // e.g. "10 kg sera — 4 kg gouda, 6 kg cesarski". Best-effort: only weighed
+  // items (fractional quantity = kg) of the same tag group are summed.
+  const weightFacts = useMemo(() => {
+    const monthKey = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
+    const GROUPS: { tag: string; label: string }[] = [
+      { tag: 'nabiał', label: 'sera/nabiału' },
+      { tag: 'mięso', label: 'mięsa' },
+      { tag: 'owoce', label: 'owoców' },
+      { tag: 'warzywa', label: 'warzyw' },
+    ];
+    const groupKg: Record<string, number> = {};
+    const groupItems: Record<string, Record<string, number>> = {};
+    for (const e of scopedExpenses) {
+      if (e.type === 'income') continue;
+      if (!(e.date ?? '').startsWith(monthKey)) continue;
+      for (const it of (e.receiptItems ?? [])) {
+        if (it.kind === 'deposit') continue;
+        const q = it.quantity ?? 0;
+        // weighed item heuristic: non-integer qty in a plausible kg range
+        if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
+        const tags = it.tags ?? [];
+        for (const g of GROUPS) {
+          if (!tags.includes(g.tag)) continue;
+          groupKg[g.tag] = (groupKg[g.tag] ?? 0) + q;
+          const canon = canonicalProductName(it.name ?? '', nameAliases);
+          (groupItems[g.tag] ??= {})[canon] = (groupItems[g.tag]?.[canon] ?? 0) + q;
+        }
+      }
+    }
+    const out: string[] = [];
+    for (const g of GROUPS) {
+      const kg = groupKg[g.tag] ?? 0;
+      if (kg < 1) continue;
+      const parts = Object.entries(groupItems[g.tag] ?? {})
+        .sort((a, b) => b[1] - a[1]).slice(0, 2)
+        .map(([n, v]) => `${v.toFixed(1).replace('.0', '')} kg ${n}`);
+      out.push(`Ten miesiąc: ${kg.toFixed(1).replace('.0', '')} kg ${g.label}${parts.length ? ` — ${parts.join(', ')}` : ''}`);
+    }
+    return out;
+  }, [scopedExpenses, nameAliases]);
 
   // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
+  // Grouped by CANONICAL identity so OCR variants / cross-store spellings of the
+  // same product merge (learned via name aliases when you rename in the scanner).
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
@@ -814,12 +866,15 @@ export default function DashboardScreen() {
     for (const e of expenses) {
       if (e.type === 'income') continue;
       for (const it of (e.receiptItems ?? [])) {
+        if (it.kind === 'deposit') continue;
         const name = it.name?.trim();
         if (!name) continue;
-        const key = name.toLowerCase();
+        const canon = canonicalProductName(name, nameAliases);
+        const key = normalizeProductName(canon);
+        if (!key) continue;
         count[key] = (count[key] ?? 0) + 1;
         spent[key] = (spent[key] ?? 0) + (it.price ?? 0);
-        if (!label[key]) label[key] = name; // first-seen original casing
+        if (!label[key]) label[key] = canon; // prettiest/canonical label
       }
     }
     return Object.entries(count)
@@ -827,7 +882,7 @@ export default function DashboardScreen() {
       .slice(0, 3)
       .filter(([, c]) => c >= 2)
       .map(([key, c]) => ({ name: label[key] ?? key, count: c, spent: spent[key] ?? 0 }));
-  }, [expenses]);
+  }, [expenses, nameAliases]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -1511,13 +1566,21 @@ export default function DashboardScreen() {
             )}
 
             {/* ══ CIEKAWOSTKI — analiza zakupów ═══════════════════════════ */}
-            {funFacts.length > 0 && (
+            {(funFacts.length > 0 || weightFacts.length > 0) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Sparkles size={13} color={accentColor} />
                   <Text style={s.cardTitle}>Ciekawostki</Text>
                 </View>
                 <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                  {weightFacts.map((label, i) => (
+                    <View key={`w${i}`} style={s.factRow}>
+                      <View style={[s.factIcon, { backgroundColor: accentColor + '18' }]}>
+                        <Scale size={13} color={accentColor} />
+                      </View>
+                      <Text style={s.factText} numberOfLines={2}>{label}</Text>
+                    </View>
+                  ))}
                   {funFacts.map((f, i) => {
                     const Icon = f.icon === 'cart' ? ShoppingCart
                       : f.icon === 'candy' ? Candy
