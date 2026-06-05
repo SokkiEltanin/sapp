@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
+import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -57,14 +58,14 @@ export default function SettingsScreen() {
     const wp = (workSettings.workPrefix ?? '').trim().toLowerCase();
     const wc = workSettings.workColor;
     if (!wp && !wc) return null;
-    const t2m = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
     const p2 = (n: number) => String(n).padStart(2, '0');
     const allEvents = [...events, ...gcalEvents];
-    const isWork = (e: any) => !!e.startTime && !!e.endTime &&
-      ((wc && e.color === wc) || (wp && (e.title ?? '').toLowerCase().startsWith(wp)));
+    const isWork = (e: any) => isWorkEvent(e, { workColor: wc, workPrefix: wp });
+    // Hours read from the TITLE range ("HH:MM - HH:MM" / "(Nh)") so shifts that
+    // differ from the calendar event's default time are counted correctly.
     const hoursIn = (ym: string) => allEvents
       .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
-      .reduce((s, e) => s + Math.max(0, t2m(e.endTime ?? '0:0') - t2m(e.startTime ?? '0:0')) / 60, 0);
+      .reduce((s, e) => s + shiftHours(e), 0);
     const now = new Date();
     const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
     const monthEvents = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === mk);
@@ -72,14 +73,17 @@ export default function SettingsScreen() {
     // The actual detected shifts this month — shown so the user can verify the
     // count and tap to edit any of them.
     const monthShifts = monthEvents
-      .map(e => ({
-        id: e.id as string,
-        title: (e.title ?? '') as string,
-        date: (e.date ?? '').slice(0, 10),
-        startTime: e.startTime as string,
-        endTime: e.endTime as string,
-        hours: Math.max(0, t2m(e.endTime ?? '0:0') - t2m(e.startTime ?? '0:0')) / 60,
-      }))
+      .map(e => {
+        const r = shiftClockRange(e);
+        return {
+          id: e.id as string,
+          title: (e.title ?? '') as string,
+          date: (e.date ?? '').slice(0, 10),
+          startTime: r?.start ?? (e.startTime as string) ?? '',
+          endTime: r?.end ?? (e.endTime as string) ?? '',
+          hours: shiftHours(e),
+        };
+      })
       .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
     const candidates = expenses.filter(e =>
       e.type === 'income' && (e.tags.some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp))

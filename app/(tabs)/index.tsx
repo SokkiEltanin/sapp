@@ -39,6 +39,7 @@ import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope } from '@/store/statsScope';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
+import { shiftHours, isWorkEvent } from '@/utils/workEvents';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -489,18 +490,9 @@ export default function DashboardScreen() {
   useEffect(() => {
     if (!workSettings.workColor && !workSettings.workPrefix) return;
     const wp = workSettings.workPrefix?.trim().toLowerCase();
-    const workEvs = allEvents.filter(e => {
-      if (!e.startTime || !e.endTime) return false;
-      if (wc && e.color === wc) return true;
-      if (wp && e.title.toLowerCase().startsWith(wp)) return true;
-      return false;
-    });
+    const workEvs = allEvents.filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }));
     if (workEvs.length === 0) return;
-    const monthHours = workEvs.reduce((sum, e) => {
-      const [sh, sm] = e.startTime!.split(':').map(Number);
-      const [eh, em] = e.endTime!.split(':').map(Number);
-      return sum + Math.max(0, (eh * 60 + em - sh * 60 - sm)) / 60;
-    }, 0);
+    const monthHours = workEvs.reduce((sum, e) => sum + shiftHours(e), 0);
     const hrs = monthHours > 0 ? monthHours : workSettings.hoursPerMonth;
     const wp2 = wp;
     const salaryIncome = wp2 ? expenses.find(e => e.type === 'income' && e.tags.some(t => t.toLowerCase() === wp2)) : null;
@@ -648,17 +640,8 @@ export default function DashboardScreen() {
     const wcol = workSettings.workColor;
     const wp   = workSettings.workPrefix?.trim().toLowerCase();
     if (!wcol && !wp) return null;
-    const isWork = (e: typeof allEvents[number]) => {
-      if (!e.startTime || !e.endTime) return false;
-      if (wcol && e.color === wcol) return true;
-      if (wp && e.title?.toLowerCase().startsWith(wp)) return true;
-      return false;
-    };
-    const dur = (e: typeof allEvents[number]) => {
-      const [sh, sm] = e.startTime!.split(':').map(Number);
-      const [eh, em] = e.endTime!.split(':').map(Number);
-      return Math.max(0, (eh * 60 + em) - (sh * 60 + sm)) / 60;
-    };
+    const isWork = (e: typeof allEvents[number]) => isWorkEvent(e, { workColor: wcol, workPrefix: wp });
+    const dur = (e: typeof allEvents[number]) => shiftHours(e);
     const now = new Date();
     const months = Array.from({ length: 6 }, (_, idx) => {
       const i = 5 - idx;

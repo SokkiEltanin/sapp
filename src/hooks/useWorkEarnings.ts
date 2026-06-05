@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { WorkShift, WorkSettings, CalendarEvent, Expense } from '@/types';
+import { shiftMinutes, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -70,32 +71,24 @@ export function useWorkEarnings(
     const wc = settings.workColor;
     const wp = settings.workPrefix?.trim().toLowerCase();
 
-    const isWorkEvent = (e: CalendarEvent) => {
-      if (!e.startTime || !e.endTime) return false;
-      if (wc && e.color === wc) return true;
-      if (wp && e.title.toLowerCase().startsWith(wp)) return true;
-      return false;
-    };
+    const workEvents = events.filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }));
 
-    const workEvents = events.filter(isWorkEvent);
-
-    // Total work hours this month
+    // Total work hours this month — hours come from the TITLE range when present.
     const monthStart = monthStartStr();
     const monthEvents = workEvents.filter(e => e.date.slice(0, 10) >= monthStart);
-    const totalMonthMins = monthEvents.reduce((sum, e) => {
-      return sum + Math.max(0, timeToMins(e.endTime!) - timeToMins(e.startTime!));
-    }, 0);
+    const totalMonthMins = monthEvents.reduce((sum, e) => sum + shiftMinutes(e), 0);
     const monthWorkHours = totalMonthMins / 60;
 
-    // Active event right now (today, current time within event)
+    // Active event right now (today, current clock time within the shift range).
     const today = todayStr();
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
-    const activeEvent = workEvents.find(e =>
-      e.date.startsWith(today) &&
-      timeToMins(e.startTime!) <= nowMins &&
-      nowMins <= timeToMins(e.endTime!)
-    ) ?? null;
+    const activeEvent = workEvents.find(e => {
+      if (!e.date.startsWith(today)) return false;
+      const r = shiftClockRange(e);
+      if (!r) return false;
+      return timeToMins(r.start) <= nowMins && nowMins <= timeToMins(r.end);
+    }) ?? null;
 
     return { workEvents, monthWorkHours, activeEvent };
   }, [events, settings.workColor, settings.workPrefix, tick]);
@@ -108,7 +101,7 @@ export function useWorkEarnings(
     if (colorMode && salaryInfo.month) {
       const hoursForMonth = (ym: string) => colorMode.workEvents
         .filter(e => e.date.slice(0, 7) === ym)
-        .reduce((s, e) => s + Math.max(0, timeToMins(e.endTime!) - timeToMins(e.startTime!)), 0) / 60;
+        .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
       // Paycheck month, then the previous month (salaries are often paid in
       // arrears), then the user's configured hoursPerMonth as a safe fallback.
       const [py, pm] = salaryInfo.month.split('-').map(Number);
@@ -154,8 +147,9 @@ export function useWorkEarnings(
       const ae = colorMode.activeEvent;
       if (!ae) return empty;
       const now = new Date();
-      const startMins   = timeToMins(ae.startTime!);
-      const endMins     = timeToMins(ae.endTime!);
+      const range       = shiftClockRange(ae);
+      const startMins   = range ? timeToMins(range.start) : 0;
+      const endMins     = range ? timeToMins(range.end) : 0;
       const nowMins     = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
       const shiftDurMin = endMins - startMins;
       const workedMins  = Math.max(0, Math.min(nowMins - startMins, shiftDurMin));
