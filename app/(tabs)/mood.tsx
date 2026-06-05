@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag } from 'lucide-react-native';
+import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag, CalendarDays, Clock, BarChart3, Sunrise, Sun, Sunset, Moon } from 'lucide-react-native';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-native-svg';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
@@ -17,7 +19,7 @@ const P = {
 };
 import { useMoodStore } from '@/store/moodStore';
 import { moodService } from '@/services/moodService';
-import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel } from '@/types';
+import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -324,6 +326,333 @@ const ins = StyleSheet.create({
   tagText: { fontSize: 11, fontWeight: '600' },
 });
 
+// ─── Shared mood helpers ──────────────────────────────────────────────────────
+
+const MOOD_EMO: Record<MoodLevel, string> = { 1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩' };
+const WEEKDAYS_SHORT = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+
+function moodColorFor(avg: number): string {
+  const lvl = Math.max(1, Math.min(5, Math.round(avg))) as MoodLevel;
+  return MOOD_COLORS[lvl];
+}
+
+// ─── Mood + Energy wave (SVG, last 30 days) ───────────────────────────────────
+
+const WAVE_W = 320;
+const WAVE_H = 92;
+
+function buildSmoothPath(pts: { x: number; y: number }[]): string {
+  if (pts.length === 0) return '';
+  if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
+  const days = useMemo(() => {
+    const byDate: Record<string, MoodEntry> = {};
+    for (const e of entries) byDate[e.date] = e;
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = dateMinusDays(29 - i);
+      return { date: d, entry: byDate[d] ?? null };
+    });
+  }, [entries]);
+
+  const present = days.map((d, i) => ({ ...d, i })).filter(d => d.entry);
+  if (present.length < 3) return null;
+
+  const n = days.length;
+  const xOf = (i: number) => (i / (n - 1)) * WAVE_W;
+  const yOf = (v: number) => { const pad = 10; return pad + (1 - (v - 1) / 4) * (WAVE_H - 2 * pad); };
+
+  const moodPts   = present.map(d => ({ x: xOf(d.i), y: yOf(d.entry!.mood) }));
+  const energyPts = present.map(d => ({ x: xOf(d.i), y: yOf(d.entry!.energy) }));
+  const moodPath  = buildSmoothPath(moodPts);
+  const enPath    = buildSmoothPath(energyPts);
+  const fillPath  = `${moodPath} L ${moodPts[moodPts.length - 1].x.toFixed(1)} ${WAVE_H} L ${moodPts[0].x.toFixed(1)} ${WAVE_H} Z`;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardRow}>
+        <TrendingUp size={13} color={P.accent} />
+        <Text style={styles.cardLabel}>Nastrój i energia — 30 dni</Text>
+      </View>
+      <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`}>
+        <Defs>
+          <SvgGrad id="moodFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={P.accent} stopOpacity="0.30" />
+            <Stop offset="1" stopColor={P.accent} stopOpacity="0" />
+          </SvgGrad>
+        </Defs>
+        <Path d={fillPath} fill="url(#moodFill)" />
+        <Path d={enPath} stroke="#FBBF24" strokeWidth={2} fill="none" strokeDasharray="4 4" strokeLinecap="round" opacity={0.85} />
+        <Path d={moodPath} stroke={P.accent} strokeWidth={2.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        {moodPts.map((p, i) => (
+          <Circle key={i} cx={p.x} cy={p.y} r={2.6} fill={MOOD_COLORS[present[i].entry!.mood]} />
+        ))}
+      </Svg>
+      <View style={wv.legend}>
+        <View style={wv.legendItem}><View style={[wv.dot, { backgroundColor: P.accent }]} /><Text style={wv.legendText}>Nastrój</Text></View>
+        <View style={wv.legendItem}><View style={[wv.dash, { backgroundColor: '#FBBF24' }]} /><Text style={wv.legendText}>Energia</Text></View>
+      </View>
+    </View>
+  );
+}
+
+const wv = StyleSheet.create({
+  legend: { flexDirection: 'row', gap: spacing[4], justifyContent: 'center' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  dash: { width: 14, height: 3, borderRadius: 2 },
+  legendText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+});
+
+// ─── Mood distribution (how often each level, last 30d) ───────────────────────
+
+function MoodDistribution({ entries }: { entries: MoodEntry[] }) {
+  const recent = entries.filter(e => e.date >= dateMinusDays(30));
+  if (recent.length < 4) return null;
+  const counts: Record<MoodLevel, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const e of recent) counts[e.mood]++;
+  const total = recent.length;
+  const levels: MoodLevel[] = [5, 4, 3, 2, 1];
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardRow}>
+        <BarChart3 size={13} color={P.accent} />
+        <Text style={styles.cardLabel}>Rozkład nastroju — 30 dni</Text>
+      </View>
+      {/* Stacked proportion bar */}
+      <View style={dist.bar}>
+        {([1, 2, 3, 4, 5] as MoodLevel[]).map(lvl => counts[lvl] > 0 ? (
+          <View key={lvl} style={{ flex: counts[lvl], backgroundColor: MOOD_COLORS[lvl] }} />
+        ) : null)}
+      </View>
+      {/* Per-level rows */}
+      <View style={{ gap: 6 }}>
+        {levels.map(lvl => {
+          const pct = total ? Math.round((counts[lvl] / total) * 100) : 0;
+          return (
+            <View key={lvl} style={dist.row}>
+              <Text style={dist.emo}>{MOOD_EMO[lvl]}</Text>
+              <Text style={[dist.lvlLabel, { color: MOOD_COLORS[lvl] }]}>{MOOD_LABELS[lvl]}</Text>
+              <View style={dist.track}>
+                <View style={[dist.fill, { width: `${pct}%`, backgroundColor: MOOD_COLORS[lvl] }]} />
+              </View>
+              <Text style={dist.pct}>{pct}%</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const dist = StyleSheet.create({
+  bar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  emo: { fontSize: 14, width: 20 },
+  lvlLabel: { fontSize: 11, fontWeight: '700', width: 64 },
+  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
+  fill: { height: 7, borderRadius: 4 },
+  pct: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, width: 34, textAlign: 'right' },
+});
+
+// ─── Weekday pattern (avg mood per weekday) ───────────────────────────────────
+
+function WeekdayPattern({ entries }: { entries: MoodEntry[] }) {
+  if (entries.length < 5) return null;
+  const buckets = Array.from({ length: 7 }, () => ({ total: 0, count: 0 })); // Mon..Sun
+  for (const e of entries) {
+    const dow = (new Date(e.date).getDay() + 6) % 7; // Mon=0
+    buckets[dow].total += e.mood;
+    buckets[dow].count++;
+  }
+  const avgs = buckets.map(b => b.count ? b.total / b.count : null);
+  const valid = avgs.filter((v): v is number => v != null);
+  if (valid.length < 3) return null;
+  const best = Math.max(...valid);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardRow}>
+        <CalendarDays size={13} color={P.accent} />
+        <Text style={styles.cardLabel}>Nastrój wg dnia tygodnia</Text>
+      </View>
+      <View style={wd.row}>
+        {avgs.map((a, i) => (
+          <View key={i} style={wd.col}>
+            <View style={[
+              wd.cell,
+              { backgroundColor: a != null ? moodColorFor(a) + 'E6' : 'rgba(255,255,255,0.05)' },
+              a != null && a === best ? wd.cellBest : null,
+            ]}>
+              <Text style={[wd.cellVal, { color: a != null ? '#0B0B0B' : colors.text.muted }]}>
+                {a != null ? a.toFixed(1) : '–'}
+              </Text>
+            </View>
+            <Text style={wd.dow}>{WEEKDAYS_SHORT[i]}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const wd = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 5 },
+  col: { flex: 1, alignItems: 'center', gap: 5 },
+  cell: { width: '100%', aspectRatio: 1, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  cellBest: { borderWidth: 2, borderColor: '#FFFFFF' },
+  cellVal: { fontSize: 13, fontWeight: '800' },
+  dow: { fontSize: 9, fontWeight: '700', color: colors.text.muted },
+});
+
+// ─── Time-of-day pattern (from createdAt) ─────────────────────────────────────
+
+const TOD_BUCKETS = [
+  { key: 'rano',       label: 'Rano',       Icon: Sunrise, from: 6,  to: 12 },
+  { key: 'popoludnie', label: 'Popołudnie', Icon: Sun,     from: 12, to: 18 },
+  { key: 'wieczor',    label: 'Wieczór',    Icon: Sunset,  from: 18, to: 24 },
+  { key: 'noc',        label: 'Noc',        Icon: Moon,    from: 0,  to: 6  },
+];
+
+function TimeOfDayPattern({ entries }: { entries: MoodEntry[] }) {
+  const withTime = entries.filter(e => e.createdAt);
+  if (withTime.length < 5) return null;
+  const stats = TOD_BUCKETS.map(b => {
+    const inBucket = withTime.filter(e => {
+      const h = new Date(e.createdAt).getHours();
+      return h >= b.from && h < b.to;
+    });
+    const avg = inBucket.length ? inBucket.reduce((a, c) => a + c.mood, 0) / inBucket.length : null;
+    return { ...b, avg, count: inBucket.length };
+  });
+  if (stats.every(s => s.count === 0)) return null;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardRow}>
+        <Clock size={13} color={P.accent} />
+        <Text style={styles.cardLabel}>Nastrój wg pory dnia</Text>
+      </View>
+      <View style={tod.row}>
+        {stats.map(s => {
+          const c = s.avg != null ? moodColorFor(s.avg) : colors.text.muted;
+          return (
+            <View key={s.key} style={tod.tile}>
+              <s.Icon size={15} color={c} />
+              <Text style={[tod.val, { color: s.avg != null ? c : colors.text.muted }]}>
+                {s.avg != null ? s.avg.toFixed(1) : '–'}
+              </Text>
+              <Text style={tod.label}>{s.label}</Text>
+              <Text style={tod.count}>{s.count > 0 ? `${s.count}×` : ''}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const tod = StyleSheet.create({
+  row: { flexDirection: 'row', gap: spacing[2] },
+  tile: {
+    flex: 1, backgroundColor: colors.bg.elevated, borderRadius: radius.lg,
+    paddingVertical: spacing[3], gap: 3, alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+  },
+  val: { fontSize: 17, fontWeight: '800', letterSpacing: -0.5 },
+  label: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+  count: { fontSize: 9, color: colors.text.muted, opacity: 0.7 },
+});
+
+// ─── Month heatmap (calendar of mood colours) ─────────────────────────────────
+
+function MonthHeatmap({ entries }: { entries: MoodEntry[] }) {
+  const byDate = useMemo(() => {
+    const m: Record<string, MoodEntry> = {};
+    for (const e of entries) m[e.date] = e;
+    return m;
+  }, [entries]);
+
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayD = now.getDate();
+  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7;
+  const p2 = (n: number) => String(n).padStart(2, '0');
+
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+
+  const monthEntries = entries.filter(e => e.date.startsWith(`${year}-${p2(month + 1)}`));
+  if (monthEntries.length === 0) return null;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardRow}>
+        <CalendarDays size={13} color={P.accent} />
+        <Text style={styles.cardLabel}>Ten miesiąc</Text>
+      </View>
+      <View style={{ gap: 4 }}>
+        <View style={{ flexDirection: 'row' }}>
+          {WEEKDAYS_SHORT.map(d => (
+            <View key={d} style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={hm.dow}>{d}</Text>
+            </View>
+          ))}
+        </View>
+        {rows.map((row, ri) => (
+          <View key={ri} style={{ flexDirection: 'row' }}>
+            {row.map((day, ci) => {
+              if (!day) return <View key={ci} style={{ flex: 1 }} />;
+              const dateStr = `${year}-${p2(month + 1)}-${p2(day)}`;
+              const entry = byDate[dateStr];
+              const mc = entry ? MOOD_COLORS[entry.mood] : null;
+              const isT = day === todayD;
+              return (
+                <View key={ci} style={hm.cellWrap}>
+                  <View style={[
+                    hm.cell,
+                    { backgroundColor: mc ? mc + 'E6' : 'rgba(255,255,255,0.05)' },
+                    isT ? hm.cellToday : null,
+                  ]}>
+                    <Text style={[hm.cellDay, { color: mc ? '#0B0B0B' : colors.text.muted }]}>{day}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const hm = StyleSheet.create({
+  dow: { fontSize: 8, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.4 },
+  cellWrap: { flex: 1, alignItems: 'center', paddingVertical: 2 },
+  cell: { width: '88%', aspectRatio: 1, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  cellToday: { borderWidth: 1.5, borderColor: '#FFFFFF' },
+  cellDay: { fontSize: 10, fontWeight: '700' },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -348,8 +677,6 @@ function calcStreak(entries: MoodEntry[]): number {
 function avg(vals: number[]) {
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 }
-
-const CHART_DAYS = 28;
 
 export default function MoodScreen() {
   const { entries, setEntries, setLoading, deleteEntry } = useMoodStore();
@@ -383,15 +710,6 @@ export default function MoodScreen() {
   const avgEnergy = avg(last30.map(e => e.energy));
   const streak = useMemo(() => calcStreak(entries), [entries]);
   const recent = useMemo(() => entries.slice(0, 14), [entries]);
-
-  const chartDays = useMemo(() => {
-    const byDate: Record<string, MoodEntry> = {};
-    for (const e of entries) byDate[e.date] = e;
-    return Array.from({ length: CHART_DAYS }, (_, i) => {
-      const d = dateMinusDays(CHART_DAYS - 1 - i);
-      return { date: d, entry: byDate[d] ?? null };
-    });
-  }, [entries]);
 
   const todayColor = todayEntry ? MOOD_COLORS[todayEntry.mood] : colors.text.muted;
 
@@ -483,36 +801,14 @@ export default function MoodScreen() {
           ))}
         </View>
 
-        {/* 28-day chart */}
-        <View style={styles.card}>
-          <View style={styles.cardRow}>
-            <TrendingUp size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>Ostatnie 28 dni</Text>
-          </View>
-          <View style={styles.chartWrap}>
-            {chartDays.map(({ date, entry }, i) => {
-              const isToday = date === today;
-              const barH = entry ? Math.max(6, (entry.mood / 5) * 56) : 3;
-              const barColor = entry ? MOOD_COLORS[entry.mood] : 'rgba(255,255,255,0.07)';
-              return (
-                <View key={i} style={styles.chartCol}>
-                  <View style={styles.chartBarWrap}>
-                    <View style={[styles.chartBar, {
-                      height: barH, width: isToday ? 10 : 6,
-                      backgroundColor: barColor,
-                      opacity: entry ? 1 : 0.5,
-                    }]} />
-                  </View>
-                  {(i === 0 || i === 6 || i === 13 || i === 20 || i === 27) && (
-                    <Text style={[styles.chartLabel, isToday && { color: colors.text.secondary }]}>
-                      {isToday ? 'dziś' : fmtShort(date)}
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        </View>
+        {/* Mood + energy wave (30 days) */}
+        <MoodEnergyWave entries={entries} />
+
+        {/* Rich statistics */}
+        <MoodDistribution entries={entries} />
+        <WeekdayPattern entries={entries} />
+        <TimeOfDayPattern entries={entries} />
+        <MonthHeatmap entries={entries} />
 
         {/* Insights */}
         <MoodInsights entries={entries} />
