@@ -117,9 +117,12 @@ export function useWorkEarnings(
       const hours = hoursForMonth(salaryInfo.month) || hoursForMonth(prevMonth) || settings.hoursPerMonth;
       return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
-    // No tagged paycheck → straightforward monthlySalary / hoursPerMonth (both
-    // editable in Settings so the user can correct a wrong rate).
-    return settings.hoursPerMonth > 0 ? salaryUsed / (settings.hoursPerMonth * 3600) : 0;
+    // No tagged paycheck → salary ÷ hours. Hours DEFAULT to what's actually in
+    // the calendar this month (incl. Google events); the manual hoursPerMonth in
+    // Settings is only a backup when the calendar has no work events yet.
+    const calHours = colorMode?.monthWorkHours ?? 0;
+    const hours = calHours > 0 ? calHours : settings.hoursPerMonth;
+    return hours > 0 ? salaryUsed / (hours * 3600) : 0;
   }, [colorMode, salaryInfo, settings.hoursPerMonth, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────

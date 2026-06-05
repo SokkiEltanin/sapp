@@ -4,7 +4,7 @@ import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
   Animated, Pressable, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { X, Check } from 'lucide-react-native';
+import { X, Check, Plus } from 'lucide-react-native';
 
 import MoodPicker from './MoodPicker';
 import InputField from '@/components/ui/InputField';
@@ -46,6 +46,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const [note, setNote]         = useState(existingEntry?.note ?? '');
   const [tags, setTags]         = useState<string[]>(existingEntry?.tags ?? []);
   const [customTag, setCustomTag] = useState('');
+  const [customTagOpen, setCustomTagOpen] = useState(false);
   const [saving, setSaving]     = useState(false);
 
   const slideAnim = useRef(new Animated.Value(600)).current;
@@ -126,10 +127,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
 
   const addCustomTag = () => {
     const t = customTag.trim().toLowerCase();
-    if (!t || tags.includes(t)) { setCustomTag(''); return; }
+    if (!t || tags.includes(t)) { setCustomTag(''); setCustomTagOpen(false); return; }
     haptic.tap();
     setTags(prev => [...prev, t]);
     setCustomTag('');
+    setCustomTagOpen(false);
   };
 
   const handleSave = async () => {
@@ -207,38 +209,49 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               <MoodPicker value={mood} onChange={setMood} label="Nastrój" />
               <MoodPicker value={energy} onChange={setEnergy} label="Energia" mode="energy" />
 
-              {/* Tags */}
+              {/* Tags — custom-add plus pinned on the LEFT, tags scroll to the right */}
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Co czujesz?</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.tagsScroll}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {allDisplayTags.map(tag => (
-                    <Chip
-                      key={tag} label={tag}
-                      selected={tags.includes(tag)}
-                      onPress={() => toggleTag(tag)}
-                      color={chipColor}
-                      count={tagFrequency.get(tag)}
-                    />
-                  ))}
-                  {/* Inline custom tag input at end of scroll */}
-                  <View style={styles.customTagInline}>
+                <View style={styles.tagsRow}>
+                  {customTagOpen ? (
                     <TextInput
                       style={styles.customTagInputInline}
                       value={customTag}
                       onChangeText={setCustomTag}
-                      placeholder="+ własny"
+                      placeholder="własny…"
                       placeholderTextColor={colors.text.muted}
                       onSubmitEditing={addCustomTag}
+                      onBlur={() => { if (!customTag.trim()) setCustomTagOpen(false); }}
+                      autoFocus
                       returnKeyType="done"
                       maxLength={30}
                     />
-                  </View>
-                </ScrollView>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => { haptic.tap(); setCustomTagOpen(true); }}
+                      style={[styles.customTagPlus, chipColor ? { borderColor: chipColor + '70' } : null]}
+                      activeOpacity={0.8}
+                    >
+                      <Plus size={16} color={chipColor ?? colors.text.secondary} strokeWidth={2.6} />
+                    </TouchableOpacity>
+                  )}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tagsScroll}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {allDisplayTags.map(tag => (
+                      <Chip
+                        key={tag} label={tag}
+                        selected={tags.includes(tag)}
+                        onPress={() => toggleTag(tag)}
+                        color={chipColor}
+                        count={tagFrequency.get(tag)}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
               </View>
 
               <InputField
@@ -306,6 +319,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
   },
   tagsScroll: { flexDirection: 'row', gap: spacing[2], paddingRight: spacing[2] },
+
+  tagsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  customTagPlus: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.bg.elevated,
+    borderWidth: 1, borderColor: colors.border.default,
+  },
 
   customTagInline: {
     height: 30, justifyContent: 'center',

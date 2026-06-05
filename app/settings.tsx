@@ -75,10 +75,13 @@ export default function SettingsScreen() {
     const lastPaycheck = candidates[0] ?? null;
     const payMonth = lastPaycheck?.date.slice(0, 7) ?? null;
     const payHours = payMonth ? hoursIn(payMonth) : 0;
+    // Default hours basis = what's actually in the calendar this month (incl.
+    // Google). Manual hoursPerMonth is only a backup when calendar is empty.
+    const fallbackHours = monthHours > 0 ? monthHours : workSettings.hoursPerMonth;
     const rate = lastPaycheck && payHours > 0
       ? lastPaycheck.amount / payHours
-      : (workSettings.hoursPerMonth > 0 ? workSettings.monthlySalary / workSettings.hoursPerMonth : 0);
-    return { eventCount: monthEvents.length, monthHours, lastPaycheck, payMonth, payHours, rate };
+      : (fallbackHours > 0 ? workSettings.monthlySalary / fallbackHours : 0);
+    return { eventCount: monthEvents.length, monthHours, lastPaycheck, payMonth, payHours, rate, fallbackHours };
   }, [events, gcalEvents, expenses, workSettings]);
 
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
@@ -453,11 +456,15 @@ export default function SettingsScreen() {
                 <Text style={styles.rowSub}>
                   {(() => {
                     const sal = parseFloat(salaryInput.replace(',', '.'));
-                    const hrs = parseFloat(hoursInput.replace(',', '.'));
-                    if (!isNaN(sal) && !isNaN(hrs) && hrs > 0) {
-                      return `≈ ${(sal / hrs).toFixed(2)} zł/h  ·  ${(sal / hrs / 3600).toFixed(4)} zł/s`;
+                    const manual = parseFloat(hoursInput.replace(',', '.'));
+                    const cal = workDiag?.monthHours ?? 0;
+                    // Calendar hours are the default basis; manual only overrides.
+                    const hrs = !isNaN(manual) && manual > 0 ? manual : cal;
+                    if (!isNaN(sal) && hrs > 0) {
+                      const src = (!isNaN(manual) && manual > 0) ? 'ręcznie' : 'z kalendarza';
+                      return `≈ ${(sal / hrs).toFixed(2)} zł/h  ·  ${hrs.toFixed(0)} h ${src}`;
                     }
-                    return 'Np. 168 — do wyliczenia stawki godzinowej';
+                    return cal > 0 ? `Domyślnie ${cal.toFixed(0)} h z kalendarza` : 'Np. 168 — zapas gdy brak eventów';
                   })()}
                 </Text>
               </View>
@@ -466,7 +473,7 @@ export default function SettingsScreen() {
                 onChangeText={setHoursInput}
                 onBlur={() => saveWorkNumber('hoursPerMonth', hoursInput)}
                 keyboardType="numeric"
-                placeholder="168"
+                placeholder={workDiag && workDiag.monthHours > 0 ? workDiag.monthHours.toFixed(0) : '168'}
                 placeholderTextColor={colors.text.muted}
                 style={{
                   fontSize: 14, fontWeight: '700', color: '#60A5FA',
@@ -478,37 +485,41 @@ export default function SettingsScreen() {
               />
             </View>
 
-            {/* Live diagnostics — what the rate is actually derived from */}
+            {/* Live diagnostics — stacked so nothing gets clipped */}
             {workDiag && (
               <View style={styles.diagBox}>
-                <Text style={styles.diagTitle}>JAK TO SIĘ LICZY (prefiks „{(workSettings.workPrefix ?? '').trim() || '—'}")</Text>
-                <View style={styles.diagRow}>
-                  <Text style={styles.diagKey}>Godziny z kalendarza (ten mies.)</Text>
-                  <Text style={styles.diagVal}>{workDiag.monthHours.toFixed(1)} h · {workDiag.eventCount} zmian</Text>
+                <Text style={styles.diagTitle}>JAK LICZY SIĘ STAWKA (prefiks „{(workSettings.workPrefix ?? '').trim() || '—'}")</Text>
+
+                <View style={styles.diagItem}>
+                  <Text style={styles.diagItemLabel}>Godziny w kalendarzu — ten miesiąc (z Google też)</Text>
+                  <Text style={styles.diagItemVal}>{workDiag.monthHours.toFixed(1)} h · {workDiag.eventCount} zmian</Text>
                 </View>
-                <View style={styles.diagRow}>
-                  <Text style={styles.diagKey}>Ustawienia: pensja / godziny</Text>
-                  <Text style={styles.diagVal}>{workSettings.monthlySalary} zł / {workSettings.hoursPerMonth} h</Text>
-                </View>
-                <View style={styles.diagRow}>
-                  <Text style={styles.diagKey}>Ostatnia wypłata [{(workSettings.workPrefix ?? '').trim()}]</Text>
-                  <Text style={[styles.diagVal, { color: workDiag.lastPaycheck ? '#2AC68F' : colors.accent.red }]}>
+
+                <View style={styles.diagItem}>
+                  <Text style={styles.diagItemLabel}>Ostatnia wypłata [{(workSettings.workPrefix ?? '').trim()}]</Text>
+                  <Text style={[styles.diagItemVal, { color: workDiag.lastPaycheck ? '#2AC68F' : colors.accent.red }]}>
                     {workDiag.lastPaycheck
-                      ? `${workDiag.lastPaycheck.amount.toFixed(0)} zł (${workDiag.payMonth}, ${workDiag.payHours.toFixed(0)}h)`
+                      ? `${workDiag.lastPaycheck.amount.toFixed(0)} zł — ${workDiag.payMonth} (${workDiag.payHours.toFixed(0)} h w kalendarzu)`
                       : 'nie znaleziono'}
                   </Text>
                 </View>
-                <View style={styles.diagRow}>
-                  <Text style={styles.diagKey}>Wyliczona stawka</Text>
-                  <Text style={[styles.diagVal, { color: '#FBBF24', fontWeight: '800' }]}>
+
+                <View style={styles.diagItem}>
+                  <Text style={styles.diagItemLabel}>
+                    {workDiag.lastPaycheck
+                      ? 'Stawka = wypłata ÷ godziny z kalendarza'
+                      : `Stawka = pensja ÷ ${workDiag.fallbackHours.toFixed(0)} h z kalendarza`}
+                  </Text>
+                  <Text style={[styles.diagItemVal, { color: '#FBBF24', fontWeight: '800', fontSize: 16 }]}>
                     {workDiag.rate.toFixed(2)} zł/h
                   </Text>
                 </View>
-                {!workDiag.lastPaycheck && (
-                  <Text style={styles.diagHint}>
-                    Dodaj przychód z tagiem lub notatką „{(workSettings.workPrefix ?? '').trim()}", a stawka policzy się z godzin tego miesiąca.
-                  </Text>
-                )}
+
+                <Text style={styles.diagHint}>
+                  {workDiag.lastPaycheck
+                    ? 'Pensja i godziny z pól wyżej to tylko zapas — gdy jest wypłata [' + (workSettings.workPrefix ?? '').trim() + '], stawka liczy się z niej i godzin z kalendarza.'
+                    : 'Dodaj przychód z tagiem lub notatką „' + (workSettings.workPrefix ?? '').trim() + '" — stawka policzy się z godzin kalendarza tego miesiąca.'}
+                </Text>
               </View>
             )}
           </View>
@@ -1012,9 +1023,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[2],
   },
   diagTitle: { fontSize: 9, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.8 },
-  diagRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
-  diagKey: { flex: 1, fontSize: 12, color: colors.text.secondary },
-  diagVal: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  diagItem: { gap: 1 },
+  diagItemLabel: { fontSize: 10.5, color: colors.text.muted, fontWeight: '500' },
+  diagItemVal: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   diagHint: { fontSize: 11, color: colors.accent.amber, lineHeight: 15, marginTop: 2 },
   timeRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],

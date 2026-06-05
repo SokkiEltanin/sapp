@@ -18,6 +18,7 @@ import {
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
+import { getPayers, addPayer } from '@/utils/payers';
 import * as LucideIcons from 'lucide-react-native';
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
@@ -57,9 +58,14 @@ export default function ScanReceiptModal() {
   const [pastedText, setPastedText] = useState('');
   const [dateInput, setDateInput]   = useState(todayIso);
   const [tagFreq, setTagFreq]       = useState<Record<string, number>>({});
+  const [payers, setPayers]         = useState<string[]>([]);
+  const [payer, setPayer]           = useState<string>('');
+  const [addingPayer, setAddingPayer] = useState(false);
+  const [newPayer, setNewPayer]     = useState('');
   const addExpense = useExpensesStore(s => s.addExpense);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
+  useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
 
   const getCategory = (i: number): ExpenseCategory =>
     editedCats[i] ?? (receipt?.products[i].category ?? 'other');
@@ -240,6 +246,7 @@ export default function ScanReceiptModal() {
         note: receipt.storeName || 'Paragon',
         date: dateParsed,
         ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
+        ...(payer ? { payer } : {}),
         receiptItems,
       });
       addExpense(expense);
@@ -494,6 +501,38 @@ export default function ScanReceiptModal() {
           </ScrollView>
 
           <View style={styles.footer}>
+            {/* Kto zapłacił — domyślnie ja; zaznacz inną osobę gdy płacił ktoś inny */}
+            <View style={styles.payerRow}>
+              {payers.map(p => {
+                const active = payer === p;
+                return (
+                  <PressableScale key={p} onPress={() => { haptic.tap(); setPayer(active ? '' : p); }} style={[styles.payerChip, active && styles.payerChipActive]}>
+                    <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>{p}</Text>
+                  </PressableScale>
+                );
+              })}
+              {addingPayer ? (
+                <TextInput
+                  value={newPayer}
+                  onChangeText={setNewPayer}
+                  placeholder="Imię…"
+                  placeholderTextColor={colors.text.muted}
+                  style={styles.payerInput}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={async () => {
+                    const name = newPayer.trim();
+                    if (name) { const list = await addPayer(name); setPayers(list); setPayer(name); }
+                    setNewPayer(''); setAddingPayer(false);
+                  }}
+                  onBlur={() => { setNewPayer(''); setAddingPayer(false); }}
+                />
+              ) : (
+                <PressableScale onPress={() => setAddingPayer(true)} style={styles.payerAddChip}>
+                  <Text style={styles.payerAddText}>+ osoba</Text>
+                </PressableScale>
+              )}
+            </View>
             <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data paragonu" />
             <AnimatedButton
               onPress={saveSelected}
@@ -990,6 +1029,26 @@ const styles = StyleSheet.create({
 
   // ── Footer ─────────────────────────────────────────────────────────────────
   footer: { padding: spacing[4], gap: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  payerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  payerChip: {
+    paddingHorizontal: spacing[3], height: 32, borderRadius: radius.full,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+  },
+  payerChipActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue },
+  payerChipText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  payerChipTextActive: { color: colors.accent.blue },
+  payerInput: {
+    paddingHorizontal: spacing[3], height: 32, minWidth: 90, borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+    fontSize: 13, color: colors.text.primary,
+  },
+  payerAddChip: {
+    paddingHorizontal: spacing[3], height: 32, borderRadius: radius.full,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border.subtle, borderStyle: 'dashed',
+  },
+  payerAddText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
 
   // ── Editable product name ─────────────────────────────────────────────────
   productNameInput: {
