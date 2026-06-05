@@ -955,10 +955,12 @@ export default function DashboardScreen() {
                   <Text style={s.budgetWarnText}>
                     {tagLimitMsg(t.pct)}{' · '}
                     <Text style={s.budgetWarnBold}>#{t.tag}</Text>
+                    <Text style={s.budgetWarnPeriod}>{t.period === 'week' ? '  tygodniowy' : '  miesięczny'}</Text>
                     {'   '}
                     <Text style={[s.budgetWarnPct, over && { color: colors.accent.red }]}>
                       {Math.round(t.pct * 100)}%
                     </Text>
+                    <Text style={s.budgetWarnAmt}>{'   '}{Math.round(t.spend)}/{Math.round(t.limit)} zł</Text>
                   </Text>
                   <View style={s.budgetWarnTrack}>
                     <View style={[s.budgetWarnFill, {
@@ -991,46 +993,6 @@ export default function DashboardScreen() {
                 </View>
               </TouchableOpacity>
             )}
-
-            {/* ══ TODAY ACTIVITY STRIP ════════════════════════════════════ */}
-            {(doneToday > 0 || habitsDoneIds.length > 0 || !!todayEntry || todayPomCount > 0) && (() => {
-              const items = [
-                {
-                  icon: <CheckCircle2 size={11} color={doneToday > 0 ? accentColor : colors.text.muted} strokeWidth={2} />,
-                  label: `${doneToday} zad.`,
-                  active: doneToday > 0,
-                  color: accentColor,
-                },
-                {
-                  icon: <Flame size={11} color={habitsDoneIds.length > 0 ? accentColor : colors.text.muted} />,
-                  label: habits.length > 0 ? `${habitsDoneIds.length}/${habits.length}` : `${habitsDoneIds.length}`,
-                  active: habitsDoneIds.length > 0,
-                  color: accentColor,
-                },
-                {
-                  icon: <Smile size={11} color={todayEntry ? accentColor : colors.text.muted} />,
-                  label: todayEntry ? 'nastrój' : 'brak',
-                  active: !!todayEntry,
-                  color: accentColor,
-                },
-                {
-                  icon: <Timer size={11} color={todayPomCount > 0 ? accentColor : colors.text.muted} />,
-                  label: `${todayPomCount}×`,
-                  active: todayPomCount > 0,
-                  color: accentColor,
-                },
-              ];
-              return (
-                <View style={s.activityStrip}>
-                  {items.map((item, i) => (
-                    <View key={i} style={[s.activityBadge, item.active && { backgroundColor: item.color + '15', borderColor: item.color + '35' }]}>
-                      {item.icon}
-                      <Text style={[s.activityLabel, item.active && { color: item.color }]}>{item.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
 
             {/* ══ TASKS + WORK ROW ═════════════════════════════════════════ */}
             <View style={s.miniRow}>
@@ -1833,7 +1795,9 @@ const s = StyleSheet.create({
     fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.55)',
   },
   budgetWarnBold: { fontWeight: '800', color: '#FFFFFF' },
+  budgetWarnPeriod: { fontWeight: '700', color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
   budgetWarnPct: { fontWeight: '700', color: '#FFFFFF' },
+  budgetWarnAmt: { fontWeight: '600', color: 'rgba(255,255,255,0.45)', fontSize: 11 },
   budgetWarnTrack: {
     height: 10, backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 5, overflow: 'hidden',
