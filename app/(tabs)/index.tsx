@@ -40,7 +40,7 @@ import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope } from '@/store/statsScope';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
-import { shiftHours, isWorkEvent } from '@/utils/workEvents';
+import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
@@ -680,7 +680,20 @@ export default function DashboardScreen() {
     return `${t.getFullYear()}-${pad(t.getMonth()+1).padStart(2,'0')}-${pad(t.getDate()).padStart(2,'0')}`;
   }, []);
 
-  const gcalToday    = useMemo(() => gcalEvents.filter(e => e.date === today).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')), [gcalEvents, today]);
+  // Today's events, but DROP ones that have already ended (an event 10–21 stops
+  // showing as "today" after 21:00). All-day events (no time) always stay.
+  const gcalToday    = useMemo(() => {
+    const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+    const t2m = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+    return gcalEvents
+      .filter(e => e.date === today)
+      .filter(e => {
+        const r = shiftClockRange(e);
+        if (!r) return true;             // all-day / untimed → keep
+        return t2m(r.end) >= nowMins;    // keep only not-yet-ended
+      })
+      .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''));
+  }, [gcalEvents, today]);
   const gcalTomorrow = useMemo(() => gcalEvents.filter(e => e.date === tomorrow).sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')), [gcalEvents, tomorrow]);
 
   const nextDeadline = useMemo(() => {

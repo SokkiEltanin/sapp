@@ -102,19 +102,30 @@ export function useWorkEarnings(
       const hoursForMonth = (ym: string) => colorMode.workEvents
         .filter(e => e.date.slice(0, 7) === ym)
         .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
-      // Paycheck month, then the previous month (salaries are often paid in
-      // arrears), then the user's configured hoursPerMonth as a safe fallback.
-      const [py, pm] = salaryInfo.month.split('-').map(Number);
-      const prev = new Date(py, pm - 2, 1);
+      // Rate = last paycheck ÷ hours worked in the LAST COMPLETED month (relative
+      // to today). The current month is partial, so its hours would understate
+      // the denominator and inflate the live rate; the previous month has full
+      // data and matches the paycheck (paid in arrears). Fall back to the
+      // paycheck's own month, then the manual hoursPerMonth.
+      const now = new Date();
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
-      const hours = hoursForMonth(salaryInfo.month) || hoursForMonth(prevMonth) || settings.hoursPerMonth;
+      const hours = hoursForMonth(prevMonth) || hoursForMonth(salaryInfo.month) || settings.hoursPerMonth;
       return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
-    // No tagged paycheck → salary ÷ hours. Hours DEFAULT to what's actually in
-    // the calendar this month (incl. Google events); the manual hoursPerMonth in
-    // Settings is only a backup when the calendar has no work events yet.
-    const calHours = colorMode?.monthWorkHours ?? 0;
-    const hours = calHours > 0 ? calHours : settings.hoursPerMonth;
+    // No tagged paycheck → salary ÷ hours. Hours DEFAULT to the LAST COMPLETED
+    // month's calendar hours (full data); fall back to the manual hoursPerMonth.
+    let hours = settings.hoursPerMonth;
+    if (colorMode) {
+      const now = new Date();
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
+      const prevHours = colorMode.workEvents
+        .filter(e => e.date.slice(0, 7) === prevMonth)
+        .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
+      if (prevHours > 0) hours = prevHours;
+      else if (colorMode.monthWorkHours > 0) hours = colorMode.monthWorkHours;
+    }
     return hours > 0 ? salaryUsed / (hours * 3600) : 0;
   }, [colorMode, salaryInfo, settings.hoursPerMonth, salaryUsed]);
 

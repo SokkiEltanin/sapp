@@ -90,14 +90,18 @@ export default function SettingsScreen() {
     ).sort((a, b) => b.date.localeCompare(a.date));
     const lastPaycheck = candidates[0] ?? null;
     const payMonth = lastPaycheck?.date.slice(0, 7) ?? null;
+    // Denominator = the LAST COMPLETED month's hours (relative to today). The
+    // current month is partial; only the previous month has full data.
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${prevDate.getFullYear()}-${p2(prevDate.getMonth() + 1)}`;
+    const prevHours = hoursIn(prevMonth);
     const payHours = payMonth ? hoursIn(payMonth) : 0;
-    // Default hours basis = what's actually in the calendar this month (incl.
-    // Google). Manual hoursPerMonth is only a backup when calendar is empty.
-    const fallbackHours = monthHours > 0 ? monthHours : workSettings.hoursPerMonth;
-    const rate = lastPaycheck && payHours > 0
-      ? lastPaycheck.amount / payHours
-      : (fallbackHours > 0 ? workSettings.monthlySalary / fallbackHours : 0);
-    return { eventCount: monthEvents.length, monthHours, monthShifts, lastPaycheck, payMonth, payHours, rate, fallbackHours };
+    // Hours basis: previous month → paycheck month → current month → manual.
+    const basisHours = prevHours || payHours || monthHours || workSettings.hoursPerMonth;
+    const rate = lastPaycheck && basisHours > 0
+      ? lastPaycheck.amount / basisHours
+      : (basisHours > 0 ? workSettings.monthlySalary / basisHours : 0);
+    return { eventCount: monthEvents.length, monthHours, monthShifts, lastPaycheck, payMonth, payHours, prevMonth, prevHours, rate, fallbackHours: basisHours };
   }, [events, gcalEvents, expenses, workSettings]);
 
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
@@ -507,7 +511,7 @@ export default function SettingsScreen() {
                 <Text style={styles.diagTitle}>JAK LICZY SIĘ STAWKA (prefiks „{(workSettings.workPrefix ?? '').trim() || '—'}")</Text>
 
                 <View style={styles.diagItem}>
-                  <Text style={styles.diagItemLabel}>Godziny w kalendarzu — ten miesiąc (z Google też)</Text>
+                  <Text style={styles.diagItemLabel}>Godziny w kalendarzu — ten miesiąc (na żywo, z Google też)</Text>
                   <Text style={styles.diagItemVal}>{workDiag.monthHours.toFixed(1)} h · {workDiag.eventCount} zmian</Text>
                 </View>
 
@@ -515,16 +519,21 @@ export default function SettingsScreen() {
                   <Text style={styles.diagItemLabel}>Ostatnia wypłata [{(workSettings.workPrefix ?? '').trim()}]</Text>
                   <Text style={[styles.diagItemVal, { color: workDiag.lastPaycheck ? '#2AC68F' : colors.accent.red }]}>
                     {workDiag.lastPaycheck
-                      ? `${workDiag.lastPaycheck.amount.toFixed(0)} zł — ${workDiag.payMonth} (${workDiag.payHours.toFixed(0)} h w kalendarzu)`
+                      ? `${workDiag.lastPaycheck.amount.toFixed(0)} zł — ${workDiag.payMonth}`
                       : 'nie znaleziono'}
                   </Text>
                 </View>
 
                 <View style={styles.diagItem}>
+                  <Text style={styles.diagItemLabel}>Godziny — poprzedni miesiąc ({workDiag.prevMonth}, pełne dane = podstawa stawki)</Text>
+                  <Text style={styles.diagItemVal}>{workDiag.prevHours.toFixed(1)} h</Text>
+                </View>
+
+                <View style={styles.diagItem}>
                   <Text style={styles.diagItemLabel}>
                     {workDiag.lastPaycheck
-                      ? 'Stawka = wypłata ÷ godziny z kalendarza'
-                      : `Stawka = pensja ÷ ${workDiag.fallbackHours.toFixed(0)} h z kalendarza`}
+                      ? 'Stawka = wypłata ÷ godziny z poprzedniego miesiąca'
+                      : `Stawka = pensja ÷ ${workDiag.fallbackHours.toFixed(0)} h`}
                   </Text>
                   <Text style={[styles.diagItemVal, { color: '#FBBF24', fontWeight: '800', fontSize: 16 }]}>
                     {workDiag.rate.toFixed(2)} zł/h
@@ -532,9 +541,7 @@ export default function SettingsScreen() {
                 </View>
 
                 <Text style={styles.diagHint}>
-                  {workDiag.lastPaycheck
-                    ? 'Pensja i godziny z pól wyżej to tylko zapas — gdy jest wypłata [' + (workSettings.workPrefix ?? '').trim() + '], stawka liczy się z niej i godzin z kalendarza.'
-                    : 'Dodaj przychód z tagiem lub notatką „' + (workSettings.workPrefix ?? '').trim() + '" — stawka policzy się z godzin kalendarza tego miesiąca.'}
+                  Stawka na żywo liczy się z ostatniej wypłaty [{(workSettings.workPrefix ?? '').trim()}] i godzin z POPRZEDNIEGO (pełnego) miesiąca — bieżący miesiąc jest niepełny. Pola „pensja/godziny" wyżej to tylko zapas.
                 </Text>
 
                 {/* Detected shifts — what's actually counted; tap to edit */}
