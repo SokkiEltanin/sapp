@@ -54,6 +54,7 @@ export default function ScanReceiptModal() {
   const [customProducts, setCustomProducts] = useState<{ name: string; price: string; quantity: string; category: ExpenseCategory; tags: string[] }[]>([]);
   const [customCatPickerFor, setCustomCatPickerFor] = useState<number | null>(null);
   const [editedTags, setEditedTags]   = useState<Record<number, string[]>>({});
+  const [editedExcluded, setEditedExcluded] = useState<Record<number, boolean>>({});
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
   const [customTagPickerFor, setCustomTagPickerFor] = useState<number | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -129,6 +130,7 @@ export default function ScanReceiptModal() {
     setEditedPrices({});
     setEditedNames({});
     setEditedTags({});
+    setEditedExcluded({});
     setTagPickerFor(null);
     setCustomProducts([]);
     setCustomCatPickerFor(null);
@@ -239,6 +241,8 @@ export default function ScanReceiptModal() {
           tags: getProductTags(i),
         };
         if (p.discount != null) item.discount = p.discount;
+        if (editedExcluded[i]) item.excluded = true;
+        if (p.kind) item.kind = p.kind;
         return item;
       });
 
@@ -312,6 +316,7 @@ export default function ScanReceiptModal() {
     setEditedPrices({});
     setEditedNames({});
     setEditedTags({});
+    setEditedExcluded({});
     setTagPickerFor(null);
     setCatPickerFor(null);
     setCustomProducts([]);
@@ -474,6 +479,8 @@ export default function ScanReceiptModal() {
                         tagPickerOpen={tagPickerFor === i}
                         onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
                         tagFreq={tagFreq}
+                        excluded={!!editedExcluded[i]}
+                        onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
                       />
                     ))}
                   </View>
@@ -499,6 +506,8 @@ export default function ScanReceiptModal() {
                   tagPickerOpen={tagPickerFor === i}
                   onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
                   tagFreq={tagFreq}
+                  excluded={!!editedExcluded[i]}
+                  onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
                 />
               ))
             )}
@@ -674,6 +683,7 @@ function ProductRow({
   catPickerOpen, onCategoryPress, onCategoryChange,
   priceValue, onPriceChange, productName, onNameChange,
   productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
+  excluded, onToggleExcluded,
 }: {
   product: ReceiptProduct;
   category: ExpenseCategory;
@@ -691,6 +701,8 @@ function ProductRow({
   tagPickerOpen: boolean;
   onTagPickerPress: () => void;
   tagFreq?: Record<string, number>;
+  excluded?: boolean;
+  onToggleExcluded?: () => void;
 }) {
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
@@ -753,6 +765,16 @@ function ProductRow({
                 </Text>
               </View>
             </PressableScale>
+            {!isDeposit && onToggleExcluded && (
+              <PressableScale onPress={onToggleExcluded}>
+                <View style={[styles.exclBtn, excluded && styles.exclBtnActive]}>
+                  <LucideIcons.UserMinus size={9} color={excluded ? '#FBBF24' : colors.text.muted} />
+                  <Text style={[styles.exclBtnText, excluded && { color: '#FBBF24' }]}>
+                    {excluded ? 'nie moje' : 'moje'}
+                  </Text>
+                </View>
+              </PressableScale>
+            )}
             {product.quantity > 1 && (
               <Text style={styles.productMetaText}>· {product.quantity} szt.</Text>
             )}
@@ -1185,6 +1207,14 @@ const styles = StyleSheet.create({
   },
   tagEditBtnActive: { borderColor: colors.accent.blue + '60', backgroundColor: colors.accent.blue + '12' },
   tagEditBtnText: { fontSize: 9, color: colors.text.muted },
+  exclBtn: {
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+  },
+  exclBtnActive: { borderColor: 'rgba(251,191,36,0.5)', backgroundColor: 'rgba(251,191,36,0.12)' },
+  exclBtnText: { fontSize: 9, color: colors.text.muted },
   tagPickerItem: {
     paddingHorizontal: spacing[3], paddingVertical: 7,
     borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',

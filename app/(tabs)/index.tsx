@@ -38,7 +38,7 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
-import { useStatsScope, inScope } from '@/store/statsScope';
+import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
@@ -164,7 +164,7 @@ function sweetsTotal(expenses: Expense[], dates: string[]): number {
     if (e.type && e.type !== 'expense') continue;
     if (!set.has(e.date.slice(0, 10))) continue;
     for (const it of (e.receiptItems ?? [])) {
-      if (it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+      if (countsForConsumption(it) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
     }
   }
   return total;
@@ -852,9 +852,9 @@ export default function DashboardScreen() {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
           if (e.tags?.includes(rule.tag)) spend += e.amount;
-          else if (e.receiptItems?.some(it => it.tags.includes(rule.tag))) {
+          else if (e.receiptItems?.some(it => countsForConsumption(it) && it.tags.includes(rule.tag))) {
             spend += e.receiptItems
-              .filter(it => it.tags.includes(rule.tag))
+              .filter(it => countsForConsumption(it) && it.tags.includes(rule.tag))
               .reduce((s, it) => s + it.price, 0);
           }
         }
@@ -919,7 +919,7 @@ export default function DashboardScreen() {
       if (e.amount > biggest.amount) biggest = { name: e.note || e.storeName || e.category, amount: e.amount };
       if (e.storeName) storeCount[e.storeName] = (storeCount[e.storeName] ?? 0) + 1;
       for (const it of (e.receiptItems ?? [])) {
-        if (it.kind === 'deposit') continue;
+        if (!countsForConsumption(it)) continue;
         const name = it.name?.trim();
         if (!name) continue;
         totalItems++;
@@ -963,7 +963,7 @@ export default function DashboardScreen() {
       if (e.type === 'income') continue;
       if (!(e.date ?? '').startsWith(monthKey)) continue;
       for (const it of (e.receiptItems ?? [])) {
-        if (it.kind === 'deposit') continue;
+        if (!countsForConsumption(it)) continue;
         const q = it.quantity ?? 0;
         // weighed item heuristic: non-integer qty in a plausible kg range
         if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
@@ -998,7 +998,7 @@ export default function DashboardScreen() {
     for (const e of expenses) {
       if (e.type === 'income') continue;
       for (const it of (e.receiptItems ?? [])) {
-        if (it.kind === 'deposit') continue;
+        if (!countsForConsumption(it)) continue;
         const name = it.name?.trim();
         if (!name) continue;
         const canon = canonicalProductName(name, nameAliases);

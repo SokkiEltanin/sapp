@@ -22,6 +22,13 @@ export function inScope(e: { payer?: string }, scope: StatsScope): boolean {
   return scope === 'all' ? true : isMine(e);
 }
 
+// Does this receipt item count toward MY consumption stats (sweets bar, favourite
+// products, kg-per-group)? Deposits and items flagged "not mine" (gift / for
+// someone else) still count as money spent but are out of consumption analytics.
+export function countsForConsumption(it: { excluded?: boolean; kind?: string }): boolean {
+  return !it.excluded && it.kind !== 'deposit';
+}
+
 interface StatsScopeState {
   scope: StatsScope;
   setScope: (s: StatsScope) => void;

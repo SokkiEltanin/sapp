@@ -29,6 +29,9 @@ export interface ReceiptItem {
   discount?: number;
   tags: string[];       // food sub-tags: 'mięso', 'nabiał', 'słodycze', etc.
   kind?: 'deposit';     // bottle deposit (kaucja) — kept separate from product stats
+  excluded?: boolean;   // counts toward the money total, but NOT my consumption
+                        // stats (sweets bar, favourites, weight) — e.g. a gift
+                        // or something bought for someone else.
 }
 
 export interface Expense {

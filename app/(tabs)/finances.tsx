@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
-import { useStatsScope, isMine, inScope } from '@/store/statsScope';
+import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag } from 'lucide-react-native';
@@ -165,7 +165,7 @@ export default function FinancesScreen() {
       // sweets = items tagged "słodycze" (top-level tag or per-receipt-item tag)
       if (e.tags?.includes('słodycze')) sweets += e.amount;
       else if (e.receiptItems) {
-        for (const it of e.receiptItems) if (it.tags.includes('słodycze')) sweets += it.price;
+        for (const it of e.receiptItems) if (countsForConsumption(it) && it.tags.includes('słodycze')) sweets += it.price;
       }
     }
     return { exp, inc, allExp, allInc, food, sweets };
