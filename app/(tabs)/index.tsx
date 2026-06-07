@@ -16,7 +16,7 @@ import {
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
-  ShoppingCart, Candy, Store, Package, Sparkles, Scale,
+  ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -40,6 +40,7 @@ import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes
 import { useStatsScope, inScope } from '@/store/statsScope';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent } from '@/utils/workEvents';
+import { getAllNotes, Note } from '@/utils/notesStorage';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -417,6 +418,7 @@ export default function DashboardScreen() {
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
+  const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -527,6 +529,7 @@ export default function DashboardScreen() {
     // (and persists across app restarts via their AsyncStorage backing).
     getBudgets().then(setBudgets).catch(() => {});
     getTagBudgetRules().then(setTagRules).catch(() => {});
+    getAllNotes().then(ns => setPinnedNotes(ns.filter(n => n.pinned))).catch(() => {});
   }, [loadPomSessions]));
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -992,6 +995,36 @@ export default function DashboardScreen() {
                   }]} />
                 </View>
               </TouchableOpacity>
+            )}
+
+            {/* ══ PINNED NOTES ════════════════════════════════════════════ */}
+            {pinnedNotes.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark, gap: spacing[2] }]}>
+                <View style={s.cardHeader}>
+                  <Pin size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Przypięte notatki</Text>
+                </View>
+                {pinnedNotes.slice(0, 4).map(n => (
+                  <TouchableOpacity
+                    key={n.id}
+                    style={s.pinNoteRow}
+                    onPress={() => { haptic.tap(); router.push(`/notes?noteId=${n.id}` as any); }}
+                    activeOpacity={0.8}
+                  >
+                    <FileText size={13} color={accentColor} style={{ marginTop: 1 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.pinNoteTitle} numberOfLines={1}>{n.title || 'Bez tytułu'}</Text>
+                      {!!n.body?.trim() && <Text style={s.pinNoteBody} numberOfLines={2}>{n.body.trim()}</Text>}
+                      {(n.tags ?? []).length > 0 && (
+                        <Text style={s.pinNoteTags} numberOfLines={1}>{n.tags.map(t => `#${t}`).join(' ')}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity onPress={() => { haptic.tap(); router.push('/notes' as any); }} activeOpacity={0.7}>
+                  <Text style={[s.pinNoteMore, { color: accentColor }]}>Wszystkie notatki →</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* ══ TASKS + WORK ROW ═════════════════════════════════════════ */}
@@ -1960,6 +1993,11 @@ const s = StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   cardTitle: { fontSize: 12, fontWeight: '800', color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.8 },
+  pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
+  pinNoteTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  pinNoteBody: { fontSize: 11.5, color: colors.text.secondary, lineHeight: 16, marginTop: 1 },
+  pinNoteTags: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
 
   // ── Period toggle ──────────────────────────────────────────────────────────
   periodToggle: { flexDirection: 'row', marginLeft: spacing[2], gap: 2, marginRight: 'auto' as any },
