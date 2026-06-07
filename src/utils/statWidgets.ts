@@ -23,14 +23,14 @@ export const WIDGET_METRICS: MetricDef[] = [
   { id: 'food',       label: 'Jedzenie',           group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'sweets',     label: 'Słodycze (wydatki)', group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'income',     label: 'Przychody',          group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
-  { id: 'byCategory', label: 'Wydatki per kategoria', group: 'Finanse', unit: 'zł', viz: ['list'], periodic: false },
+  { id: 'byCategory', label: 'Wydatki per kategoria', group: 'Finanse', unit: 'zł', viz: ['list', 'donut'], periodic: false },
   // Konsumpcja
   { id: 'cheeseKg',   label: 'Nabiał / ser (kg)',  group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
   { id: 'meatKg',     label: 'Mięso (kg)',         group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
   { id: 'fruitKg',    label: 'Owoce (kg)',         group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
   { id: 'vegKg',      label: 'Warzywa (kg)',       group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
-  { id: 'topProducts', label: 'Top produkty',      group: 'Konsumpcja', unit: '×',  viz: ['list'], periodic: false },
-  { id: 'favSweets',  label: 'Ulubione słodycze',  group: 'Konsumpcja', unit: '×',  viz: ['list'], periodic: false },
+  { id: 'topProducts', label: 'Top produkty',      group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
+  { id: 'favSweets',  label: 'Ulubione słodycze',  group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
   { id: 'itemsCount', label: 'Liczba produktów',   group: 'Konsumpcja', unit: 'szt.', viz: ['number', 'wave'], periodic: true },
   // Nastrój i zdrowie
   { id: 'moodAvg',    label: 'Średni nastrój',     group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },

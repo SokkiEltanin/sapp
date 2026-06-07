@@ -6,7 +6,7 @@ import {
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText, Circle as SvgCircle, Line as SvgLine } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import {
@@ -283,11 +283,12 @@ function DualWaveChart({ data1, data2, color1, color2 }: {
   );
 }
 
-function WaveChart({ data, color, dotColors }: { data: number[]; color: string; dotColors?: (string | null)[] }) {
+function WaveChart({ data, color, dotColors, target }: { data: number[]; color: string; dotColors?: (string | null)[]; target?: number }) {
   if (data.length < 2) return null;
-  const max = Math.max(...data, 1);
+  const max = Math.max(...data, target ?? 0, 1);
   const { line, fill, pts } = buildWavePath(data, max);
   const gradId = `wg_${color.replace('#', '')}`;
+  const targetY = target && target > 0 ? WAVE_H - 6 - ((target / max) * (WAVE_H - 18)) : null;
   return (
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
       <Defs>
@@ -297,6 +298,9 @@ function WaveChart({ data, color, dotColors }: { data: number[]; color: string; 
         </SvgLinearGradient>
       </Defs>
       <Path d={fill} fill={`url(#${gradId})`} />
+      {targetY != null && (
+        <SvgLine x1="0" y1={targetY} x2={WAVE_W} y2={targetY} stroke="#FBBF24" strokeWidth="1" strokeDasharray="5 4" opacity="0.8" />
+      )}
       <Path d={line} stroke={color} strokeWidth="1.8" fill="none" strokeLinejoin="round" strokeLinecap="round" />
       {pts.map((p, i) => {
         const dc = dotColors?.[i] ?? color;
@@ -308,6 +312,43 @@ function WaveChart({ data, color, dotColors }: { data: number[]; color: string; 
         );
       })}
     </Svg>
+  );
+}
+
+// ─── Donut chart (stat widgets) ─────────────────────────────────────────────────
+
+const DONUT_COLORS = ['#6C9EFF', '#4ECBA8', '#FBBF24', '#F472B6', '#A78BFA', '#FB923C', '#9CA3AF'];
+
+function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: string }[]; fmt: (v: number, u: string) => string }) {
+  const total = rows.reduce((s, r) => s + r.value, 0) || 1;
+  const R = 30, SW = 12, C = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+      <Svg width={84} height={84} viewBox="0 0 84 84">
+        <SvgCircle cx={42} cy={42} r={R} stroke="rgba(255,255,255,0.06)" strokeWidth={SW} fill="none" />
+        {rows.map((r, i) => {
+          const frac = r.value / total;
+          const dash = `${(frac * C).toFixed(2)} ${C.toFixed(2)}`;
+          const off = -(acc * C);
+          acc += frac;
+          return (
+            <SvgCircle key={i} cx={42} cy={42} r={R}
+              stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth={SW} fill="none"
+              strokeDasharray={dash} strokeDashoffset={off} transform="rotate(-90 42 42)" />
+          );
+        })}
+      </Svg>
+      <View style={{ flex: 1, gap: 4 }}>
+        {rows.map((r, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+            <Text style={{ flex: 1, fontSize: 11.5, color: colors.text.secondary }} numberOfLines={1}>{r.label}</Text>
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.text.primary }}>{fmt(r.value, r.unit)}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -401,7 +442,7 @@ const EDIT_ROW_H = 56; // fixed height (incl. gap) used to translate drag → in
 
 function DashEditRow({
   id, index, count, title, isCustom, hiddenNow, accent, cardBg,
-  onMoveDir, onMoveTo, onToggleHidden, onRemove,
+  onMoveDir, onMoveTo, onToggleHidden, onRemove, onEdit,
 }: {
   id: string; index: number; count: number; title: string;
   isCustom: boolean; hiddenNow: boolean; accent: string; cardBg: string;
@@ -409,6 +450,7 @@ function DashEditRow({
   onMoveTo: (id: string, target: number) => void;
   onToggleHidden: (id: string) => void;
   onRemove: (id: string) => void;
+  onEdit?: (id: string) => void;
 }) {
   const ty = useSharedValue(0);
   const lifted = useSharedValue(0);
@@ -452,6 +494,11 @@ function DashEditRow({
         <Text style={[s.editRowTitle, hiddenNow && { opacity: 0.4 }]} numberOfLines={1}>
           {title}{isCustom ? '  · własny' : ''}
         </Text>
+        {onEdit && (
+          <TouchableOpacity onPress={() => { haptic.tap(); onEdit(id); }} hitSlop={8}>
+            <Pencil size={15} color={accent} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={() => { haptic.tap(); onToggleHidden(id); }} hitSlop={8}>
           {hiddenNow ? <EyeOff size={16} color={colors.text.muted} /> : <Eye size={16} color={accent} />}
         </TouchableOpacity>
@@ -691,12 +738,25 @@ export default function DashboardScreen() {
               </Text>
             ))}
           </View>
-          <WaveChart data={ser.values} color={accentColor} />
+          <WaveChart data={ser.values} color={accentColor} target={t.target} />
           <View style={s.waveLabels}>
             {ser.labels.map((l, i) => (
               <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>
             ))}
           </View>
+          {t.target ? <Text style={s.statSub}>Cel: {fmtStat(t.target, ser.unit)}</Text> : null}
+        </View>
+      );
+    }
+
+    if (viz === 'donut') {
+      const rows = metricList(t.metric!, statCtx, 6);
+      return (
+        <View style={[s.card, { backgroundColor: cardBgDark }]}>
+          {header}
+          {rows.length === 0
+            ? <Text style={s.statSub}>Brak danych jeszcze.</Text>
+            : <StatDonut rows={rows} fmt={fmtStat} />}
         </View>
       );
     }
@@ -740,11 +800,20 @@ export default function DashboardScreen() {
 
     // number
     const r = metricNumber(t.metric!, statCtx, period);
+    const pct = t.target && t.target > 0 ? Math.min(1, r.value / t.target) : null;
+    const over = t.target ? r.value > t.target : false;
     return (
       <View style={[s.card, { backgroundColor: cardBgDark }]}>
         {header}
-        <Text style={[s.statBig, { color: accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
-        {r.sub && <Text style={s.statSub}>{r.sub}</Text>}
+        <Text style={[s.statBig, { color: over ? colors.accent.red : accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+        {pct != null ? (
+          <>
+            <View style={s.statTargetTrack}>
+              <View style={[s.statTargetFill, { width: `${pct * 100}%`, backgroundColor: over ? colors.accent.red : accentColor }]} />
+            </View>
+            <Text style={s.statSub}>{Math.round((r.value / t.target!) * 100)}% celu ({fmtStat(t.target!, r.unit)})</Text>
+          </>
+        ) : (r.sub && <Text style={s.statSub}>{r.sub}</Text>)}
       </View>
     );
   };
@@ -1976,6 +2045,7 @@ export default function DashboardScreen() {
                           onMoveTo={handleMoveTo}
                           onToggleHidden={toggleHiddenSection}
                           onRemove={removeCustomTile}
+                          onEdit={ct?.type === 'stat' ? () => router.push(`/widget-builder?edit=${id}` as any) : undefined}
                         />
                       );
                     })}
@@ -2351,6 +2421,8 @@ const s = StyleSheet.create({
   // ── Stat widgets ──
   statBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 2 },
   statSub: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' },
+  statTargetFill: { height: 6, borderRadius: 3 },
   statListRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   statListRank: { fontSize: 11, fontWeight: '800', color: colors.text.muted, width: 16 },
   statListLabel: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '600' },

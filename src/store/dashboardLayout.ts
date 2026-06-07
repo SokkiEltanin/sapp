@@ -54,7 +54,7 @@ export const SECTION_TITLES: Record<string, string> = {
 };
 
 export type CustomTileType = 'note' | 'link' | 'stat';
-export type WidgetViz = 'number' | 'wave' | 'list' | 'compare';
+export type WidgetViz = 'number' | 'wave' | 'list' | 'compare' | 'donut';
 
 export interface CustomTile {
   id: string;            // 'custom:<timestamp>'
@@ -68,6 +68,7 @@ export interface CustomTile {
   metric2?: string;      // second metric id (viz 'compare')
   viz?: WidgetViz;
   period?: 'week' | 'month';
+  target?: number;       // optional goal — drawn as a line / progress on number & wave
 }
 
 interface DashboardLayoutState {
@@ -84,6 +85,7 @@ interface DashboardLayoutState {
   move: (id: string, dir: -1 | 1) => void;
   toggleHidden: (id: string) => void;
   addCustomTile: (tile: Omit<CustomTile, 'id'>) => void;
+  updateCustomTile: (id: string, patch: Partial<Omit<CustomTile, 'id' | 'type'>>) => void;
   removeCustomTile: (id: string) => void;
   reset: () => void;
 }
@@ -121,6 +123,10 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
           order: [id, ...s.order],   // new tiles land at the top so they're easy to find
         };
       }),
+
+      updateCustomTile: (id, patch) => set((s) => ({
+        customTiles: s.customTiles.map(t => t.id === id ? { ...t, ...patch } : t),
+      })),
 
       removeCustomTile: (id) => set((s) => ({
         customTiles: s.customTiles.filter(t => t.id !== id),

@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { ChevronLeft, Hash, BarChart3, List, GitCompare, Check, Wallet, ShoppingCart, Smile, Briefcase } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, Check, Wallet, ShoppingCart, Smile, Briefcase } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useDashboardLayout, WidgetViz } from '@/store/dashboardLayout';
@@ -18,18 +18,25 @@ const VIZ_META: { id: WidgetViz; label: string; Icon: any }[] = [
   { id: 'number',  label: 'Wielka liczba', Icon: Hash },
   { id: 'wave',    label: 'Mini-wykres',   Icon: BarChart3 },
   { id: 'list',    label: 'Lista (top)',   Icon: List },
+  { id: 'donut',   label: 'Donut',         Icon: PieChart },
   { id: 'compare', label: 'Porównanie',    Icon: GitCompare },
 ];
 
 export default function WidgetBuilder() {
   const addCustomTile = useDashboardLayout(s => s.addCustomTile);
+  const updateCustomTile = useDashboardLayout(s => s.updateCustomTile);
   const accent = '#6C9EFF';
 
-  const [metric, setMetric] = useState<string>('');
-  const [viz, setViz] = useState<WidgetViz>('number');
-  const [metric2, setMetric2] = useState<string>('');
-  const [period, setPeriod] = useState<'week' | 'month'>('month');
-  const [title, setTitle] = useState('');
+  // Edit mode: preload an existing tile by id (?edit=custom:...).
+  const { edit } = useLocalSearchParams<{ edit?: string }>();
+  const existing = useDashboardLayout(s => s.customTiles.find(t => t.id === edit));
+
+  const [metric, setMetric] = useState<string>(existing?.metric ?? '');
+  const [viz, setViz] = useState<WidgetViz>(existing?.viz ?? 'number');
+  const [metric2, setMetric2] = useState<string>(existing?.metric2 ?? '');
+  const [period, setPeriod] = useState<'week' | 'month'>(existing?.period ?? 'month');
+  const [title, setTitle] = useState(existing?.title ?? '');
+  const [targetInput, setTargetInput] = useState(existing?.target != null ? String(existing.target) : '');
 
   const def = metricById(metric);
   const vizOptions = useMemo(() => def ? VIZ_META.filter(v => def.viz.includes(v.id)) : [], [def]);
@@ -51,22 +58,26 @@ export default function WidgetBuilder() {
   );
 
   const canSave = !!def && (viz !== 'compare' || !!metric2);
+  const showTarget = !!def && (viz === 'number' || viz === 'wave') && def.unit !== '/5';
 
   const save = () => {
     if (!def) return;
     haptic.success();
-    addCustomTile({
-      type: 'stat',
+    const target = showTarget ? parseFloat(targetInput.replace(',', '.')) : NaN;
+    const cfg = {
       title: title.trim() || def.label,
       metric: def.id,
       metric2: viz === 'compare' ? metric2 : undefined,
       viz,
       period: def.periodic ? period : undefined,
-    });
+      target: !isNaN(target) && target > 0 ? target : undefined,
+    };
+    if (existing) updateCustomTile(existing.id, cfg);
+    else addCustomTile({ type: 'stat', ...cfg });
     router.back();
   };
 
-  const showPeriod = !!def && def.periodic && viz !== 'list';
+  const showPeriod = !!def && def.periodic && viz !== 'list' && viz !== 'donut';
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -74,7 +85,7 @@ export default function WidgetBuilder() {
         <PressableScale onPress={() => router.back()} style={s.backBtn}>
           <ChevronLeft size={22} color={colors.text.primary} />
         </PressableScale>
-        <Text style={s.headerTitle}>Nowy widget</Text>
+        <Text style={s.headerTitle}>{existing ? 'Edytuj widget' : 'Nowy widget'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -161,6 +172,21 @@ export default function WidgetBuilder() {
                 );
               })}
             </View>
+          </>
+        )}
+
+        {/* target / goal */}
+        {showTarget && (
+          <>
+            <Text style={s.step}>Cel (opcjonalnie)</Text>
+            <TextInput
+              value={targetInput}
+              onChangeText={setTargetInput}
+              keyboardType="numeric"
+              placeholder={`np. limit / cel w ${def!.unit || 'liczbie'}`}
+              placeholderTextColor={colors.text.muted}
+              style={s.titleInput}
+            />
           </>
         )}
 
