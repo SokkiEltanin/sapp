@@ -107,6 +107,28 @@ export default function SettingsScreen() {
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
   const [salaryInput, setSalaryInput] = useState(String(workSettings.monthlySalary ?? ''));
   const [hoursInput, setHoursInput]   = useState(String(workSettings.hoursPerMonth ?? ''));
+  const [rateOverrideInput, setRateOverrideInput] = useState('');
+
+  const nowYM = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const activeMonthOverride = workSettings.monthRateOverride?.[nowYM];
+  const activePermOverride  = workSettings.rateOverride;
+
+  // Override the live hourly rate — permanently, just this month, or clear it.
+  const applyRateOverride = async (kind: 'permanent' | 'month' | 'clear') => {
+    const newS: typeof workSettings = { ...workSettings };
+    if (kind === 'clear') {
+      delete newS.rateOverride;
+      if (newS.monthRateOverride) { const m = { ...newS.monthRateOverride }; delete m[nowYM]; newS.monthRateOverride = m; }
+    } else {
+      const v = parseFloat(rateOverrideInput.replace(',', '.'));
+      if (isNaN(v) || v <= 0) return;
+      if (kind === 'permanent') newS.rateOverride = v;
+      else newS.monthRateOverride = { ...(newS.monthRateOverride ?? {}), [nowYM]: v };
+    }
+    setWorkSettings(newS);
+    setRateOverrideInput('');
+    try { await workService.saveSettings(newS); } catch {}
+  };
 
   useEffect(() => {
     workService.getSettings().then(s => {
@@ -529,20 +551,74 @@ export default function SettingsScreen() {
                   <Text style={styles.diagItemVal}>{workDiag.prevHours.toFixed(1)} h</Text>
                 </View>
 
-                <View style={styles.diagItem}>
-                  <Text style={styles.diagItemLabel}>
-                    {workDiag.lastPaycheck
-                      ? 'Stawka = wypłata ÷ godziny z poprzedniego miesiąca'
-                      : `Stawka = pensja ÷ ${workDiag.fallbackHours.toFixed(0)} h`}
-                  </Text>
-                  <Text style={[styles.diagItemVal, { color: '#FBBF24', fontWeight: '800', fontSize: 16 }]}>
-                    {workDiag.rate.toFixed(2)} zł/h
-                  </Text>
-                </View>
+                {(() => {
+                  const effRate = activeMonthOverride ?? activePermOverride ?? workDiag.rate;
+                  const overridden = activeMonthOverride != null || activePermOverride != null;
+                  // #4 — derived stats from the effective rate.
+                  const monthEarn = workDiag.monthHours * effRate;
+                  const perShift  = workDiag.eventCount > 0 ? monthEarn / workDiag.eventCount : 0;
+                  const avgShiftH = workDiag.eventCount > 0 ? workDiag.monthHours / workDiag.eventCount : 0;
+                  return (
+                    <>
+                      <View style={styles.diagItem}>
+                        <Text style={styles.diagItemLabel}>
+                          {overridden
+                            ? `Stawka — NADPISANA (${activeMonthOverride != null ? 'ten miesiąc' : 'na stałe'})`
+                            : (workDiag.lastPaycheck ? 'Stawka = wypłata ÷ godziny z poprz. miesiąca' : 'Stawka (z pól zapasowych)')}
+                        </Text>
+                        <Text style={[styles.diagItemVal, { color: overridden ? '#60A5FA' : '#FBBF24', fontWeight: '800', fontSize: 18 }]}>
+                          {effRate.toFixed(2)} zł/h
+                        </Text>
+                      </View>
 
-                <Text style={styles.diagHint}>
-                  Stawka na żywo liczy się z ostatniej wypłaty [{(workSettings.workPrefix ?? '').trim()}] i godzin z POPRZEDNIEGO (pełnego) miesiąca — bieżący miesiąc jest niepełny. Pola „pensja/godziny" wyżej to tylko zapas.
-                </Text>
+                      {/* #4 — quick earnings stats */}
+                      <View style={styles.workStatsRow}>
+                        <View style={styles.workStatTile}>
+                          <Text style={styles.workStatVal}>{monthEarn.toFixed(0)} zł</Text>
+                          <Text style={styles.workStatKey}>ten miesiąc (szac.)</Text>
+                        </View>
+                        <View style={styles.workStatTile}>
+                          <Text style={styles.workStatVal}>{perShift.toFixed(0)} zł</Text>
+                          <Text style={styles.workStatKey}>śr. na zmianę</Text>
+                        </View>
+                        <View style={styles.workStatTile}>
+                          <Text style={styles.workStatVal}>{avgShiftH.toFixed(1)} h</Text>
+                          <Text style={styles.workStatKey}>śr. długość zmiany</Text>
+                        </View>
+                      </View>
+
+                      {/* Rate override editor */}
+                      <View style={styles.rateOvrBox}>
+                        <Text style={styles.rateOvrLabel}>Nadpisz stawkę (zł/h)</Text>
+                        <View style={styles.rateOvrRow}>
+                          <TextInput
+                            value={rateOverrideInput}
+                            onChangeText={setRateOverrideInput}
+                            keyboardType="decimal-pad"
+                            placeholder={effRate.toFixed(2)}
+                            placeholderTextColor={colors.text.muted}
+                            style={styles.rateOvrInput}
+                          />
+                          <PressableScale onPress={() => applyRateOverride('month')} style={[styles.rateOvrBtn, { borderColor: '#60A5FA55', backgroundColor: '#60A5FA14' }]}>
+                            <Text style={[styles.rateOvrBtnText, { color: '#60A5FA' }]}>Ten miesiąc</Text>
+                          </PressableScale>
+                          <PressableScale onPress={() => applyRateOverride('permanent')} style={[styles.rateOvrBtn, { borderColor: '#2AC68F55', backgroundColor: '#2AC68F14' }]}>
+                            <Text style={[styles.rateOvrBtnText, { color: '#2AC68F' }]}>Na stałe</Text>
+                          </PressableScale>
+                        </View>
+                        {(activeMonthOverride != null || activePermOverride != null) && (
+                          <PressableScale onPress={() => applyRateOverride('clear')} style={styles.rateOvrClear}>
+                            <Text style={styles.rateOvrClearText}>Wyczyść nadpisanie ({(activeMonthOverride ?? activePermOverride)!.toFixed(2)} zł/h)</Text>
+                          </PressableScale>
+                        )}
+                      </View>
+
+                      <Text style={styles.diagHint}>
+                        Stawka na żywo liczy się z ostatniej wypłaty [{(workSettings.workPrefix ?? '').trim()}] i godzin z POPRZEDNIEGO (pełnego) miesiąca. Możesz ją nadpisać — tylko na ten miesiąc albo na stałe.
+                      </Text>
+                    </>
+                  );
+                })()}
 
                 {/* Detected shifts — what's actually counted; tap to edit */}
                 <View style={styles.shiftList}>
@@ -1074,6 +1150,29 @@ const styles = StyleSheet.create({
   diagItemLabel: { fontSize: 10.5, color: colors.text.muted, fontWeight: '500' },
   diagItemVal: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
   diagHint: { fontSize: 11, color: colors.accent.amber, lineHeight: 15, marginTop: 2 },
+  workStatsRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
+  workStatTile: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.md,
+    paddingVertical: 8, paddingHorizontal: 6, alignItems: 'center', gap: 2,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+  },
+  workStatVal: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
+  workStatKey: { fontSize: 8.5, color: colors.text.muted, textAlign: 'center' },
+  rateOvrBox: {
+    marginTop: spacing[2], padding: spacing[3], borderRadius: radius.md,
+    backgroundColor: 'rgba(96,165,250,0.06)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.2)', gap: spacing[2],
+  },
+  rateOvrLabel: { fontSize: 10.5, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
+  rateOvrRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  rateOvrInput: {
+    width: 72, height: 34, borderRadius: radius.sm, textAlign: 'center',
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    color: colors.text.primary, fontSize: 14, fontWeight: '700',
+  },
+  rateOvrBtn: { flex: 1, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  rateOvrBtnText: { fontSize: 11.5, fontWeight: '700' },
+  rateOvrClear: { alignSelf: 'flex-start' },
+  rateOvrClearText: { fontSize: 10.5, color: colors.accent.red, fontWeight: '600' },
   shiftList: {
     marginTop: spacing[2], paddingTop: spacing[3],
     borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[1],

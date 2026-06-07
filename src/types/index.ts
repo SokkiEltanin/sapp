@@ -235,6 +235,8 @@ export interface WorkSettings {
   notifyEveryMinutes: number; // 0 = off
   workColor?: string;         // hex color — calendar events with this color count as work
   workPrefix?: string;        // title prefix — events starting with this count as work (e.g. "[JD]")
+  rateOverride?: number;      // fixed zł/h, overrides the computed rate PERMANENTLY
+  monthRateOverride?: Record<string, number>; // YYYY-MM → fixed zł/h for that month only
 }
 
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {

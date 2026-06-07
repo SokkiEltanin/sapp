@@ -98,6 +98,12 @@ export function useWorkEarnings(
   // (Dividing by the partial CURRENT-month hours was the bug that inflated the
   // hourly rate — e.g. 4200 zł / 61h so-far = 69 zł/h instead of 4200/168 = 25.)
   const perSecond = useMemo(() => {
+    // Manual overrides win: this-month override, then a permanent override.
+    const nowYM = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
+    const mOver = settings.monthRateOverride?.[nowYM];
+    if (mOver && mOver > 0) return mOver / 3600;
+    if (settings.rateOverride && settings.rateOverride > 0) return settings.rateOverride / 3600;
+
     if (colorMode && salaryInfo.month) {
       const hoursForMonth = (ym: string) => colorMode.workEvents
         .filter(e => e.date.slice(0, 7) === ym)
@@ -127,7 +133,7 @@ export function useWorkEarnings(
       else if (colorMode.monthWorkHours > 0) hours = colorMode.monthWorkHours;
     }
     return hours > 0 ? salaryUsed / (hours * 3600) : 0;
-  }, [colorMode, salaryInfo, settings.hoursPerMonth, salaryUsed]);
+  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.rateOverride, settings.monthRateOverride, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {
