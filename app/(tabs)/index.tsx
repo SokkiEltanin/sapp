@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Modal,
   RefreshControl, TouchableOpacity, Animated,
@@ -17,6 +17,7 @@ import {
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin,
+  ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -41,6 +42,7 @@ import { useStatsScope, inScope } from '@/store/statsScope';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
+import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -419,6 +421,21 @@ export default function DashboardScreen() {
   const [todayPomCount, setTodayPomCount] = useState(0);
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
+  const [allNotes, setAllNotes] = useState<Note[]>([]);
+
+  // ── Dashboard layout (edit mode) ──────────────────────────────────────────
+  const dashOrder      = useDashboardLayout(s => s.order);
+  const dashHidden     = useDashboardLayout(s => s.hidden);
+  const customTiles    = useDashboardLayout(s => s.customTiles);
+  const moveSection    = useDashboardLayout(s => s.move);
+  const toggleHiddenSection = useDashboardLayout(s => s.toggleHidden);
+  const addCustomTile  = useDashboardLayout(s => s.addCustomTile);
+  const removeCustomTile = useDashboardLayout(s => s.removeCustomTile);
+  const resetLayout    = useDashboardLayout(s => s.reset);
+  const [editingDash, setEditingDash] = useState(false);
+  const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles), [dashOrder, customTiles]);
+  const hiddenSet = useMemo(() => new Set(dashHidden), [dashHidden]);
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -529,13 +546,47 @@ export default function DashboardScreen() {
     // (and persists across app restarts via their AsyncStorage backing).
     getBudgets().then(setBudgets).catch(() => {});
     getTagBudgetRules().then(setTagRules).catch(() => {});
-    getAllNotes().then(ns => setPinnedNotes(ns.filter(n => n.pinned))).catch(() => {});
+    getAllNotes().then(ns => { setAllNotes(ns); setPinnedNotes(ns.filter(n => n.pinned)); }).catch(() => {});
   }, [loadPomSessions]));
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const today     = todayStr();
   const isLoading = finLoading || tasksLoading;
   const onRefresh = () => { reloadFin(); reloadTasks(); loadPomSessions(); };
+
+  // Render a user-added custom tile (a pinned note, or a quick link).
+  const renderCustomTile = (t: CustomTile): React.ReactNode => {
+    if (t.type === 'note') {
+      const note = allNotes.find(n => n.id === t.noteId);
+      return (
+        <TouchableOpacity
+          style={[s.card, { backgroundColor: cardBgDark, gap: spacing[1] }]}
+          onPress={() => { haptic.tap(); router.push((note ? `/notes?noteId=${note.id}` : '/notes') as any); }}
+          activeOpacity={0.85}
+        >
+          <View style={s.cardHeader}>
+            <Pin size={13} color={accentColor} />
+            <Text style={s.cardTitle} numberOfLines={1}>{t.title || note?.title || 'Notatka'}</Text>
+          </View>
+          {note?.body?.trim()
+            ? <Text style={s.pinNoteBody} numberOfLines={3}>{note.body.trim()}</Text>
+            : <Text style={s.pinNoteBody}>{note ? '' : 'Notatka usunięta — edytuj kafelek.'}</Text>}
+        </TouchableOpacity>
+      );
+    }
+    // link tile
+    return (
+      <TouchableOpacity
+        style={[s.card, { backgroundColor: cardBgDark, flexDirection: 'row', alignItems: 'center', gap: spacing[3] }]}
+        onPress={() => { haptic.tap(); if (t.route) router.push(t.route as any); }}
+        activeOpacity={0.85}
+      >
+        <View style={s.toolIcon}><Pin size={16} color={accentColor} /></View>
+        <Text style={s.cardTitle}>{t.title || 'Skrót'}</Text>
+        <ChevronRight size={14} color={colors.text.muted} style={{ marginLeft: 'auto' }} />
+      </TouchableOpacity>
+    );
+  };
 
   const pendingTasks   = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
   const overdueTasks   = useMemo(() => pendingTasks.filter(t => t.deadline && t.deadline.split('T')[0] < today).sort((a, b) => (a.deadline ?? '').localeCompare(b.deadline ?? '')), [pendingTasks, today]);
@@ -944,8 +995,25 @@ export default function DashboardScreen() {
               <Text style={s.humorLine}>{humor}</Text>
             )}
 
-            {/* ══ TAG LIMIT BARS (#słodycze itp.) — always visible with % ════ */}
-            {tagLimits.map(t => {
+            {/* ══ EDIT DASHBOARD CONTROL ══════════════════════════════════ */}
+            <View style={s.editCtrlRow}>
+              <TouchableOpacity
+                style={[s.editCtrlBtn, editingDash && { backgroundColor: accentColor + '22', borderColor: accentColor + '55' }]}
+                onPress={() => { haptic.tap(); setEditingDash(v => !v); }}
+                activeOpacity={0.8}
+              >
+                {editingDash ? <Check size={13} color={accentColor} /> : <Pencil size={12} color={colors.text.muted} />}
+                <Text style={[s.editCtrlText, editingDash && { color: accentColor }]}>
+                  {editingDash ? 'Gotowe' : 'Edytuj dashboard'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ══ DASHBOARD SECTIONS (reorderable registry) ═══════════════ */}
+            {(() => {
+              const nodes: Record<string, React.ReactNode> = {};
+
+              nodes['tag-limits'] = tagLimits.map(t => {
               const pctClamped = Math.min(100, Math.round(t.pct * 100));
               const over = t.pct >= 1;
               return (
@@ -973,10 +1041,9 @@ export default function DashboardScreen() {
                   </View>
                 </TouchableOpacity>
               );
-            })}
+            });
 
-            {/* ══ BUDGET WARNING CARD (category budgets) ════════════════════ */}
-            {budgetAlertCard && (
+            nodes['budget-warning'] = budgetAlertCard && (
               <TouchableOpacity
                 style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
                 onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
@@ -995,10 +1062,9 @@ export default function DashboardScreen() {
                   }]} />
                 </View>
               </TouchableOpacity>
-            )}
+            );
 
-            {/* ══ PINNED NOTES ════════════════════════════════════════════ */}
-            {pinnedNotes.length > 0 && (
+            nodes['pinned-notes'] = pinnedNotes.length > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark, gap: spacing[2] }]}>
                 <View style={s.cardHeader}>
                   <Pin size={13} color={accentColor} />
@@ -1025,9 +1091,9 @@ export default function DashboardScreen() {
                   <Text style={[s.pinNoteMore, { color: accentColor }]}>Wszystkie notatki →</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            );
 
-            {/* ══ TASKS + WORK ROW ═════════════════════════════════════════ */}
+            nodes['tasks-work-row'] = (
             <View style={s.miniRow}>
               {/* Tasks tile */}
               <TouchableOpacity
@@ -1095,9 +1161,9 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               )}
             </View>
+            );
 
-            {/* ══ TODAY'S + OVERDUE TASKS ══════════════════════════════════ */}
-            {(todayTasks.length > 0 || overdueTasks.length > 0) && (() => {
+            nodes['today-tasks'] = (todayTasks.length > 0 || overdueTasks.length > 0) && (() => {
               const PORD: Record<string, number> = { high: 0, normal: 1, low: 2 };
               const todaySorted    = [...todayTasks].sort((a, b) => (PORD[a.priority] ?? 1) - (PORD[b.priority] ?? 1));
               const combined       = [...overdueTasks, ...todaySorted];
@@ -1170,9 +1236,9 @@ export default function DashboardScreen() {
                   })}
                 </View>
               );
-            })()}
+            })();
 
-            {/* ══ TOOLS ROW ════════════════════════════════════════════════ */}
+            nodes['tools-row'] = (
             <View style={s.toolsRow}>
               {([
                 { label: 'Humor',     Icon: Smile,     route: '/(tabs)/mood', sub: todayEntry ? '✓' : null         },
@@ -1197,9 +1263,9 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            );
 
-            {/* ══ EVENING HABITS NUDGE ════════════════════════════════════ */}
-            {habits.length > 0 && new Date().getHours() >= 17 && (() => {
+            nodes['habits-nudge'] = habits.length > 0 && new Date().getHours() >= 17 && (() => {
               const notDone = habits.filter(h => !habitsDoneIds.includes(h.id));
               if (notDone.length === 0) return null;
               const maxStreak = Math.max(...notDone.map(h => getStreak(h.id)));
@@ -1223,10 +1289,9 @@ export default function DashboardScreen() {
                   <ChevronRight size={13} color={accentColor + '80'} />
                 </TouchableOpacity>
               );
-            })()}
+            })();
 
-            {/* ══ HABITS TODAY ════════════════════════════════════════════ */}
-            {habits.length > 0 && (() => {
+            nodes['habits-today'] = habits.length > 0 && (() => {
               const doneCount = habitsDoneIds.length;
               const allDone   = doneCount === habits.length;
               const pct       = habits.length > 0 ? doneCount / habits.length : 0;
@@ -1298,9 +1363,9 @@ export default function DashboardScreen() {
                   </View>
                 </TouchableOpacity>
               );
-            })()}
+            })();
 
-            {/* ══ STATS SCOPE TOGGLE (everyone vs only me) ════════════════ */}
+            nodes['stats-scope'] = (
             <View style={s.scopeRow}>
               <Text style={s.scopeLabel}>Statystyki:</Text>
               <View style={s.scopeToggle}>
@@ -1320,8 +1385,9 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            );
 
-            {/* ══ WEEKLY / MONTHLY FINANCES ════════════════════════════════ */}
+            nodes['finances'] = (
             <View style={[s.card, { backgroundColor: cardBgDark }]}>
               <View style={s.cardHeader}>
                 <Wallet size={13} color={accentColor} />
@@ -1385,9 +1451,9 @@ export default function DashboardScreen() {
                 </View>
               </View>
             </View>
+            );
 
-            {/* ══ SŁODYCZE VS JEDZENIE — 8 TYGODNI ═══════════════════════ */}
-            {weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
+            nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={accentColor} />
@@ -1425,10 +1491,9 @@ export default function DashboardScreen() {
                   ))}
                 </View>
               </View>
-            )}
+            );
 
-            {/* ══ W JAKIE DNI WYDAJESZ NAJWIĘCEJ? ════════════════════════ */}
-            {weekdayAvg.some(d => d.avg > 0) && (
+            nodes['spend-by-day'] = weekdayAvg.some(d => d.avg > 0) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <BarChart2 size={13} color={accentColor} />
@@ -1459,10 +1524,9 @@ export default function DashboardScreen() {
                   })}
                 </View>
               </View>
-            )}
+            );
 
-            {/* ══ GODZINY PRACY — miesiąc / 6 msc wave ════════════════════ */}
-            {workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (
+            nodes['work-hours'] = workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Briefcase size={13} color={accentColor} />
@@ -1509,10 +1573,9 @@ export default function DashboardScreen() {
                   </>
                 )}
               </View>
-            )}
+            );
 
-            {/* ══ TOP 3 NAJCZĘŚCIEJ KUPOWANE ══════════════════════════════ */}
-            {topProducts.length > 0 && (
+            nodes['top-products'] = topProducts.length > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <ShoppingCart size={13} color={accentColor} />
@@ -1541,10 +1604,9 @@ export default function DashboardScreen() {
                   })}
                 </View>
               </View>
-            )}
+            );
 
-            {/* ══ CIEKAWOSTKI — analiza zakupów ═══════════════════════════ */}
-            {(funFacts.length > 0 || weightFacts.length > 0) && (
+            nodes['fun-facts'] = (funFacts.length > 0 || weightFacts.length > 0) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Sparkles size={13} color={accentColor} />
@@ -1575,10 +1637,9 @@ export default function DashboardScreen() {
                   })}
                 </View>
               </View>
-            )}
+            );
 
-            {/* ══ NASTRÓJ — KALENDARZ MIESIĄCA ════════════════════════════ */}
-            {Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
+            nodes['mood-cal'] = Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Smile size={13} color={colors.text.muted} />
@@ -1586,10 +1647,9 @@ export default function DashboardScreen() {
                 </View>
                 <MoodMiniCal moodByDay={moodByDay} />
               </View>
-            )}
+            );
 
-            {/* ══ 8-WEEK MOOD WAVE ════════════════════════════════════════ */}
-            {weekOverview.filter(w => w.avgMood !== null).length >= 3 && (
+            nodes['mood-wave'] = weekOverview.filter(w => w.avgMood !== null).length >= 3 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Smile size={13} color={colors.text.muted} />
@@ -1615,11 +1675,9 @@ export default function DashboardScreen() {
                   ))}
                 </View>
               </View>
-            )}
+            );
 
-
-            {/* ══ MONTH TASK STATS ════════════════════════════════════════ */}
-            {(() => {
+            nodes['month-tasks'] = (() => {
               const now = new Date();
               const monthStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
               const monthDone   = calTasks.filter(t => t.status === 'done' && t.updatedAt?.startsWith(monthStr)).length;
@@ -1654,10 +1712,9 @@ export default function DashboardScreen() {
                   </View>
                 </TouchableOpacity>
               );
-            })()}
+            })();
 
-            {/* ══ GOOGLE CALENDAR ═════════════════════════════════════════ */}
-            {(gcalToday.length > 0 || gcalTomorrow.length > 0) && (
+            nodes['gcal'] = (gcalToday.length > 0 || gcalTomorrow.length > 0) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <CalendarDays size={13} color={colors.text.muted} />
@@ -1688,7 +1745,70 @@ export default function DashboardScreen() {
                   </>
                 )}
               </View>
-            )}
+            );
+
+              // custom user tiles
+              for (const t of customTiles) nodes[t.id] = renderCustomTile(t);
+
+              // ── Edit mode: reorder / hide / add / reset ──────────────────
+              if (editingDash) {
+                return (
+                  <View style={{ gap: spacing[2] }}>
+                    <View style={s.editBanner}>
+                      <Text style={s.editBannerText}>
+                        Zmień kolejność strzałkami, ukryj okiem, dodaj własny kafelek. „Gotowe" zapisuje.
+                      </Text>
+                    </View>
+                    {orderedSections.map((id, idx) => {
+                      const isCustom = id.startsWith('custom:');
+                      const ct = isCustom ? customTiles.find(t => t.id === id) : null;
+                      const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
+                      const hiddenNow = hiddenSet.has(id);
+                      return (
+                        <View key={id} style={[s.editRow, { backgroundColor: cardBgDark }]}>
+                          <GripVertical size={15} color={colors.text.muted} />
+                          <View style={s.editArrows}>
+                            <TouchableOpacity disabled={idx === 0} onPress={() => { haptic.tap(); moveSection(id, -1); }} style={s.editArrowBtn} hitSlop={6}>
+                              <ChevronUp size={16} color={idx === 0 ? colors.text.muted + '50' : colors.text.secondary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity disabled={idx === orderedSections.length - 1} onPress={() => { haptic.tap(); moveSection(id, 1); }} style={s.editArrowBtn} hitSlop={6}>
+                              <ChevronDown size={16} color={idx === orderedSections.length - 1 ? colors.text.muted + '50' : colors.text.secondary} />
+                            </TouchableOpacity>
+                          </View>
+                          <Text style={[s.editRowTitle, hiddenNow && { opacity: 0.4 }]} numberOfLines={1}>
+                            {title}{isCustom ? '  · własny' : ''}
+                          </Text>
+                          <TouchableOpacity onPress={() => { haptic.tap(); toggleHiddenSection(id); }} hitSlop={8}>
+                            {hiddenNow ? <EyeOff size={16} color={colors.text.muted} /> : <Eye size={16} color={accentColor} />}
+                          </TouchableOpacity>
+                          {isCustom && (
+                            <TouchableOpacity onPress={() => { haptic.medium(); removeCustomTile(id); }} hitSlop={8}>
+                              <Trash2 size={15} color={colors.accent.red} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
+                    })}
+                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); setNotePickerOpen(true); }} activeOpacity={0.85}>
+                      <Plus size={15} color={accentColor} />
+                      <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek z notatką</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.editResetBtn} onPress={() => { haptic.medium(); resetLayout(); }} activeOpacity={0.8}>
+                      <RotateCcw size={13} color={colors.text.muted} />
+                      <Text style={s.editResetText}>Przywróć domyślny układ</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              // ── Normal mode: render sections in saved order, skip hidden ──
+              return orderedSections.map(id => {
+                if (hiddenSet.has(id)) return null;
+                const node = nodes[id];
+                if (node === undefined) return null;
+                return <React.Fragment key={id}>{node}</React.Fragment>;
+              });
+            })()}
 
             <View style={{ height: 220 }} />
           </ScrollView>
@@ -1697,6 +1817,41 @@ export default function DashboardScreen() {
 
       {/* Mood check-in modal */}
       <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={todayEntry ?? null} />
+
+      {/* Note picker — add a note as a dashboard tile */}
+      <Modal visible={notePickerOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNotePickerOpen(false)}>
+        <View style={s.npOverlay}>
+          <View style={s.npCard}>
+            <View style={s.npHeader}>
+              <Text style={s.npTitle}>Wybierz notatkę</Text>
+              <TouchableOpacity onPress={() => setNotePickerOpen(false)} hitSlop={8}>
+                <X size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            {allNotes.length === 0 ? (
+              <Text style={s.npEmpty}>Brak notatek. Dodaj je w sekcji Notatki.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                {allNotes.map(n => (
+                  <TouchableOpacity
+                    key={n.id}
+                    style={s.npRow}
+                    onPress={() => {
+                      haptic.tap();
+                      addCustomTile({ type: 'note', title: n.title || 'Notatka', noteId: n.id });
+                      setNotePickerOpen(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <FileText size={14} color={accentColor} />
+                    <Text style={s.npRowText} numberOfLines={1}>{n.title || 'Bez tytułu'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Subscription payment modal */}
       {currentPayment && (
@@ -1998,6 +2153,49 @@ const s = StyleSheet.create({
   pinNoteBody: { fontSize: 11.5, color: colors.text.secondary, lineHeight: 16, marginTop: 1 },
   pinNoteTags: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
   pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+
+  // ── Edit-dashboard mode ──
+  editCtrlRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  editCtrlBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 6, paddingHorizontal: spacing[3],
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.subtle,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  editCtrlText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  editBanner: {
+    padding: spacing[3], borderRadius: radius.md,
+    backgroundColor: 'rgba(108,158,255,0.08)', borderWidth: 1, borderColor: 'rgba(108,158,255,0.25)',
+  },
+  editBannerText: { fontSize: 11.5, color: colors.text.secondary, lineHeight: 16 },
+  editRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: 10, paddingHorizontal: spacing[3],
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.subtle,
+  },
+  editArrows: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  editArrowBtn: { padding: 2 },
+  editRowTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.primary },
+  editAddBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 11, borderRadius: radius.md,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(108,158,255,0.4)',
+  },
+  editAddText: { fontSize: 12.5, fontWeight: '700' },
+  editResetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
+  editResetText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+
+  // ── Note picker modal ──
+  npOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing[4] },
+  npCard: { backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: colors.border.subtle },
+  npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  npTitle: { fontSize: 15, fontWeight: '800', color: colors.text.primary },
+  npEmpty: { fontSize: 12, color: colors.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
+  npRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  npRowText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
 
   // ── Period toggle ──────────────────────────────────────────────────────────
   periodToggle: { flexDirection: 'row', marginLeft: spacing[2], gap: 2, marginRight: 'auto' as any },
