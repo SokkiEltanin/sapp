@@ -63,7 +63,10 @@ export function useWorkEarnings(
     return { amount: candidates[0].amount, month: candidates[0].date.slice(0, 7) };
   }, [expenses, settings.workPrefix, settings.monthlySalary]);
 
-  const salaryUsed = salaryInfo.amount;
+  // Manual salary override wins over the detected last paycheck.
+  const salaryUsed = (settings.salaryOverride && settings.salaryOverride > 0)
+    ? settings.salaryOverride
+    : salaryInfo.amount;
 
   // ── Color-mode / prefix-mode: derive everything from calendar events ─────
   const colorMode = useMemo(() => {
@@ -104,19 +107,21 @@ export function useWorkEarnings(
     if (mOver && mOver > 0) return mOver / 3600;
     if (settings.rateOverride && settings.rateOverride > 0) return settings.rateOverride / 3600;
 
-    if (colorMode && salaryInfo.month) {
+    // Manual hours override wins over the calendar.
+    const hoursOverride = (settings.hoursOverride && settings.hoursOverride > 0) ? settings.hoursOverride : 0;
+
+    if (colorMode && (salaryInfo.month || hoursOverride)) {
       const hoursForMonth = (ym: string) => colorMode.workEvents
         .filter(e => e.date.slice(0, 7) === ym)
         .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
       // Rate = last paycheck ÷ hours worked in the LAST COMPLETED month (relative
       // to today). The current month is partial, so its hours would understate
       // the denominator and inflate the live rate; the previous month has full
-      // data and matches the paycheck (paid in arrears). Fall back to the
-      // paycheck's own month, then the manual hoursPerMonth.
+      // data and matches the paycheck (paid in arrears).
       const now = new Date();
       const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
-      const hours = hoursForMonth(prevMonth) || hoursForMonth(salaryInfo.month) || settings.hoursPerMonth;
+      const hours = hoursOverride || hoursForMonth(prevMonth) || (salaryInfo.month ? hoursForMonth(salaryInfo.month) : 0) || settings.hoursPerMonth;
       return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
     // No tagged paycheck → salary ÷ hours. Hours DEFAULT to the LAST COMPLETED
@@ -133,7 +138,7 @@ export function useWorkEarnings(
       else if (colorMode.monthWorkHours > 0) hours = colorMode.monthWorkHours;
     }
     return hours > 0 ? salaryUsed / (hours * 3600) : 0;
-  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.rateOverride, settings.monthRateOverride, salaryUsed]);
+  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.hoursOverride, settings.rateOverride, settings.monthRateOverride, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {

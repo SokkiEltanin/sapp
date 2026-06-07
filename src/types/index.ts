@@ -237,6 +237,8 @@ export interface WorkSettings {
   workPrefix?: string;        // title prefix — events starting with this count as work (e.g. "[JD]")
   rateOverride?: number;      // fixed zł/h, overrides the computed rate PERMANENTLY
   monthRateOverride?: Record<string, number>; // YYYY-MM → fixed zł/h for that month only
+  hoursOverride?: number;     // manual override of the previous-month hours used
+  salaryOverride?: number;    // manual override of the last-paycheck amount used
 }
 
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {
