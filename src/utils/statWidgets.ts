@@ -1,0 +1,250 @@
+import { Expense, MoodEntry, CalendarEvent, WorkSettings, Task } from '@/types';
+import { countsForConsumption, inScope, StatsScope } from '@/store/statsScope';
+import { canonicalProductName, normalizeProductName } from '@/utils/productMemory';
+import { isWorkEvent, shiftHours } from '@/utils/workEvents';
+import { WidgetViz } from '@/store/dashboardLayout';
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+
+export type MetricGroup = 'Finanse' | 'Konsumpcja' | 'Nastrój i zdrowie' | 'Praca i zadania';
+
+export interface MetricDef {
+  id: string;
+  label: string;
+  group: MetricGroup;
+  unit: string;             // 'zł' | 'kg' | 'h' | '' | '/5'
+  viz: WidgetViz[];         // supported visualizations
+  periodic: boolean;        // supports week/month + wave series
+}
+
+export const WIDGET_METRICS: MetricDef[] = [
+  // Finanse
+  { id: 'spend',      label: 'Wydatki',            group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'food',       label: 'Jedzenie',           group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'sweets',     label: 'Słodycze (wydatki)', group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'income',     label: 'Przychody',          group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'byCategory', label: 'Wydatki per kategoria', group: 'Finanse', unit: 'zł', viz: ['list'], periodic: false },
+  // Konsumpcja
+  { id: 'cheeseKg',   label: 'Nabiał / ser (kg)',  group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
+  { id: 'meatKg',     label: 'Mięso (kg)',         group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
+  { id: 'fruitKg',    label: 'Owoce (kg)',         group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
+  { id: 'vegKg',      label: 'Warzywa (kg)',       group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
+  { id: 'topProducts', label: 'Top produkty',      group: 'Konsumpcja', unit: '×',  viz: ['list'], periodic: false },
+  { id: 'favSweets',  label: 'Ulubione słodycze',  group: 'Konsumpcja', unit: '×',  viz: ['list'], periodic: false },
+  { id: 'itemsCount', label: 'Liczba produktów',   group: 'Konsumpcja', unit: 'szt.', viz: ['number', 'wave'], periodic: true },
+  // Nastrój i zdrowie
+  { id: 'moodAvg',    label: 'Średni nastrój',     group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'energyAvg',  label: 'Średnia energia',    group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'moodStreak', label: 'Seria check-inów',   group: 'Nastrój i zdrowie', unit: 'dni', viz: ['number'], periodic: false },
+  // Praca i zadania
+  { id: 'workHours',  label: 'Godziny pracy',      group: 'Praca i zadania', unit: 'h',  viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'earnings',   label: 'Zarobek (szac.)',    group: 'Praca i zadania', unit: 'zł', viz: ['number', 'wave'], periodic: true },
+  { id: 'tasksDone',  label: 'Ukończone zadania',  group: 'Praca i zadania', unit: '',   viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'habitsToday', label: 'Nawyki dziś',       group: 'Praca i zadania', unit: '',   viz: ['number'], periodic: false },
+];
+
+export function metricById(id?: string): MetricDef | undefined {
+  return WIDGET_METRICS.find(m => m.id === id);
+}
+
+// ─── Context ──────────────────────────────────────────────────────────────────
+
+export interface StatCtx {
+  expenses: Expense[];
+  scope: StatsScope;
+  moodEntries: MoodEntry[];
+  workEvents: CalendarEvent[];      // all events (local + gcal)
+  workSettings: WorkSettings;
+  ratePerHour: number;              // effective zł/h for earnings
+  tasks: Task[];
+  habitsTotal: number;
+  habitsDone: number;
+  nameAliases: Record<string, string>;
+}
+
+type Period = 'week' | 'month';
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function pad(n: number) { return String(n).padStart(2, '0'); }
+const MONTHS = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+
+// YYYY-MM for a month `offset` back (0 = current).
+function monthKey(offset: number): string {
+  const d = new Date(); const x = new Date(d.getFullYear(), d.getMonth() - offset, 1);
+  return `${x.getFullYear()}-${pad(x.getMonth() + 1)}`;
+}
+function monthLabel(offset: number): string {
+  const d = new Date(); const x = new Date(d.getFullYear(), d.getMonth() - offset, 1);
+  return MONTHS[x.getMonth()];
+}
+// 7 date strings (Mon..Sun) for the week `offset` back.
+function weekDates(offset: number): string[] {
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // Mon=0
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow - offset * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+}
+function weekLabel(offset: number): string {
+  const ds = weekDates(offset);
+  return ds[0].slice(8) + '.' + ds[0].slice(5, 7);
+}
+
+// Does an expense fall in a given period bucket?
+function inMonth(e: Expense, ym: string) { return (e.date ?? '').slice(0, 7) === ym; }
+function inWeek(e: Expense, dates: string[]) { const s = new Set(dates); return s.has((e.date ?? '').slice(0, 10)); }
+
+const GROUP_TAG: Record<string, string> = { cheeseKg: 'nabiał', meatKg: 'mięso', fruitKg: 'owoce', vegKg: 'warzywa' };
+const SWEETS_TAGS = ['słodycze'];
+
+// ─── Core numeric metric for one period bucket ────────────────────────────────
+
+function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean,
+                     moodPred: (d: string) => boolean): number {
+  const exp = ctx.expenses;
+  switch (metric) {
+    case 'spend':
+      return exp.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && pred(e))
+        .reduce((s, e) => s + e.amount, 0);
+    case 'income':
+      return exp.filter(e => e.type === 'income' && pred(e)).reduce((s, e) => s + e.amount, 0);
+    case 'food':
+      return exp.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && inScope(e, ctx.scope) && pred(e))
+        .reduce((s, e) => s + e.amount, 0);
+    case 'sweets': {
+      let total = 0;
+      for (const e of exp) {
+        if (e.type && e.type !== 'expense') continue;
+        if (!inScope(e, ctx.scope) || !pred(e)) continue;
+        if (e.tags?.includes('słodycze')) { total += e.amount; continue; }
+        for (const it of (e.receiptItems ?? [])) {
+          if (countsForConsumption(it) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+        }
+      }
+      return total;
+    }
+    case 'itemsCount': {
+      let n = 0;
+      for (const e of exp) {
+        if (e.type && e.type !== 'expense') continue;
+        if (!inScope(e, ctx.scope) || !pred(e)) continue;
+        for (const it of (e.receiptItems ?? [])) if (countsForConsumption(it)) n++;
+      }
+      return n;
+    }
+    case 'cheeseKg': case 'meatKg': case 'fruitKg': case 'vegKg': {
+      const tag = GROUP_TAG[metric]; let kg = 0;
+      for (const e of exp) {
+        if (e.type === 'income' || !inScope(e, ctx.scope) || !pred(e)) continue;
+        for (const it of (e.receiptItems ?? [])) {
+          if (!countsForConsumption(it)) continue;
+          const q = it.quantity ?? 0;
+          if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
+          if ((it.tags ?? []).includes(tag)) kg += q;
+        }
+      }
+      return kg;
+    }
+    case 'moodAvg': case 'energyAvg': {
+      const rows = ctx.moodEntries.filter(m => moodPred(m.date));
+      if (!rows.length) return 0;
+      const key = metric === 'moodAvg' ? 'mood' : 'energy';
+      return rows.reduce((s, m) => s + (m as any)[key], 0) / rows.length;
+    }
+    case 'workHours': {
+      const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
+      return ctx.workEvents
+        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)))
+        .reduce((s, e) => s + shiftHours(e), 0);
+    }
+    case 'earnings': {
+      const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
+      const h = ctx.workEvents
+        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)))
+        .reduce((s, e) => s + shiftHours(e), 0);
+      return h * ctx.ratePerHour;
+    }
+    case 'tasksDone':
+      return ctx.tasks.filter(t => t.status === 'done' && moodPred((t.updatedAt ?? '').slice(0, 10))).length;
+    default:
+      return 0;
+  }
+}
+
+// Build predicates for a period bucket (offset back).
+function predsFor(period: Period, offset: number): { exp: (e: Expense) => boolean; day: (d: string) => boolean; label: string } {
+  if (period === 'month') {
+    const ym = monthKey(offset);
+    return { exp: e => inMonth(e, ym), day: d => d.slice(0, 7) === ym, label: monthLabel(offset) };
+  }
+  const ds = weekDates(offset); const set = new Set(ds);
+  return { exp: e => inWeek(e, ds), day: d => set.has(d.slice(0, 10)), label: weekLabel(offset) };
+}
+
+// ─── Public compute ───────────────────────────────────────────────────────────
+
+export interface NumberResult { value: number; unit: string; sub?: string }
+export interface SeriesResult { values: number[]; labels: string[]; unit: string }
+export interface ListRow { label: string; value: number; unit: string }
+
+export function metricNumber(metric: string, ctx: StatCtx, period: Period): NumberResult {
+  const def = metricById(metric);
+  const unit = def?.unit ?? '';
+  if (metric === 'moodStreak') {
+    const set = new Set(ctx.moodEntries.map(m => m.date));
+    let streak = 0; const d = new Date();
+    for (;;) { const s = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; if (!set.has(s)) break; streak++; d.setDate(d.getDate() - 1); }
+    return { value: streak, unit };
+  }
+  if (metric === 'habitsToday') return { value: ctx.habitsDone, unit: `/ ${ctx.habitsTotal}` };
+  const p = predsFor(period, 0);
+  const value = bucketValue(metric, ctx, p.exp, p.day);
+  return { value, unit, sub: period === 'month' ? 'ten miesiąc' : 'ten tydzień' };
+}
+
+export function metricSeries(metric: string, ctx: StatCtx, period: Period, n = 6): SeriesResult {
+  const def = metricById(metric);
+  const values: number[] = []; const labels: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const p = predsFor(period, i);
+    values.push(bucketValue(metric, ctx, p.exp, p.day));
+    labels.push(p.label);
+  }
+  return { values, labels, unit: def?.unit ?? '' };
+}
+
+export function metricList(metric: string, ctx: StatCtx, limit = 5): ListRow[] {
+  const exp = ctx.expenses;
+  if (metric === 'byCategory') {
+    const now = new Date(); const ym = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    const sums: Record<string, number> = {};
+    for (const e of exp) {
+      if (e.type === 'income' || !inScope(e, ctx.scope) || !inMonth(e, ym)) continue;
+      sums[e.category] = (sums[e.category] ?? 0) + e.amount;
+    }
+    return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, limit)
+      .map(([label, value]) => ({ label, value: Math.round(value), unit: 'zł' }));
+  }
+  // topProducts / favSweets — by count, canonical, consumption-only
+  const count: Record<string, number> = {}; const label: Record<string, string> = {};
+  const sweetsOnly = metric === 'favSweets';
+  for (const e of exp) {
+    if (e.type === 'income' || !inScope(e, ctx.scope)) continue;
+    for (const it of (e.receiptItems ?? [])) {
+      if (!countsForConsumption(it)) continue;
+      if (sweetsOnly && !(it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) continue;
+      const name = it.name?.trim(); if (!name) continue;
+      const canon = canonicalProductName(name, ctx.nameAliases);
+      const key = normalizeProductName(canon) || canon.toLowerCase();
+      if (!key) continue;
+      count[key] = (count[key] ?? 0) + 1;
+      if (!label[key]) label[key] = canon;
+    }
+  }
+  return Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, limit)
+    .filter(([, c]) => c >= 1)
+    .map(([key, c]) => ({ label: label[key] ?? key, value: c, unit: '×' }));
+}

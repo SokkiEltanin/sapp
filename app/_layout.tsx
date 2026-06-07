@@ -161,6 +161,7 @@ export default function RootLayout() {
           <Stack.Screen name="weekly" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="focus" options={{ animation: 'fade' }} />
           <Stack.Screen name="notes" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="widget-builder" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="expenses/templates" options={{ animation: 'fade' }} />
           <Stack.Screen name="work/add" options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
         </Stack>

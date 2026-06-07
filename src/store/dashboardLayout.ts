@@ -53,7 +53,8 @@ export const SECTION_TITLES: Record<string, string> = {
   'gcal':           'Kalendarz Google',
 };
 
-export type CustomTileType = 'note' | 'link';
+export type CustomTileType = 'note' | 'link' | 'stat';
+export type WidgetViz = 'number' | 'wave' | 'list' | 'compare';
 
 export interface CustomTile {
   id: string;            // 'custom:<timestamp>'
@@ -62,6 +63,11 @@ export interface CustomTile {
   noteId?: string;       // type 'note'
   route?: string;        // type 'link'
   icon?: string;         // lucide icon name (type 'link')
+  // type 'stat':
+  metric?: string;       // metric id from statWidgets registry
+  metric2?: string;      // second metric id (viz 'compare')
+  viz?: WidgetViz;
+  period?: 'week' | 'month';
 }
 
 interface DashboardLayoutState {
@@ -70,6 +76,10 @@ interface DashboardLayoutState {
   customTiles: CustomTile[];
   _hydrated: boolean;
 
+  editRequested: boolean;   // set from Settings to open the dashboard in edit mode
+
+  requestEdit: () => void;
+  clearEditRequest: () => void;
   setOrder: (order: string[]) => void;
   move: (id: string, dir: -1 | 1) => void;
   toggleHidden: (id: string) => void;
@@ -85,7 +95,10 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
       hidden: [],
       customTiles: [],
       _hydrated: false,
+      editRequested: false,
 
+      requestEdit: () => set({ editRequested: true }),
+      clearEditRequest: () => set({ editRequested: false }),
       setOrder: (order) => set({ order }),
 
       move: (id, dir) => set((s) => {
@@ -120,6 +133,7 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
     {
       name: 'dashboard-layout-v1',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (s) => ({ order: s.order, hidden: s.hidden, customTiles: s.customTiles }),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

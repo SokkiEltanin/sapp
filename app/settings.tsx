@@ -35,6 +35,7 @@ import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
 import { appSettings } from '@/utils/appSettings';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { useWorkStore } from '@/store/workStore';
+import { useDashboardLayout } from '@/store/dashboardLayout';
 import { workService } from '@/services/workService';
 
 GoogleSignin.configure({
@@ -960,6 +961,26 @@ export default function SettingsScreen() {
                 </PressableScale>
               </View>
             )}
+          </View>
+        </View>
+
+        {/* Personalization */}
+        <View>
+          <Text style={styles.sectionTitle}>Personalizacja</Text>
+          <View style={styles.card}>
+            <PressableScale
+              onPress={() => { useDashboardLayout.getState().requestEdit(); router.push('/(tabs)' as any); }}
+              style={styles.row}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#6C9EFF18' }]}>
+                <LucideIcons.LayoutDashboard size={16} color="#6C9EFF" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Edytuj dashboard</Text>
+                <Text style={styles.rowSub}>Przesuwaj kafelki, ukrywaj, dodawaj widgety statystyk</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
           </View>
         </View>
 

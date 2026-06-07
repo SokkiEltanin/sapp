@@ -43,6 +43,7 @@ import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/u
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
+import { StatCtx, metricById, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { colors, spacing, radius } from '@/theme';
@@ -505,6 +506,8 @@ export default function DashboardScreen() {
   const addCustomTile  = useDashboardLayout(s => s.addCustomTile);
   const removeCustomTile = useDashboardLayout(s => s.removeCustomTile);
   const resetLayout    = useDashboardLayout(s => s.reset);
+  const editRequested  = useDashboardLayout(s => s.editRequested);
+  const clearEditRequest = useDashboardLayout(s => s.clearEditRequest);
   const [editingDash, setEditingDash] = useState(false);
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles), [dashOrder, customTiles]);
@@ -629,7 +632,8 @@ export default function DashboardScreen() {
     getBudgets().then(setBudgets).catch(() => {});
     getTagBudgetRules().then(setTagRules).catch(() => {});
     getAllNotes().then(ns => { setAllNotes(ns); setPinnedNotes(ns.filter(n => n.pinned)); }).catch(() => {});
-  }, [loadPomSessions]));
+    if (editRequested) { setEditingDash(true); clearEditRequest(); }
+  }, [loadPomSessions, editRequested]));
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const today     = todayStr();
@@ -637,7 +641,116 @@ export default function DashboardScreen() {
   const onRefresh = () => { reloadFin(); reloadTasks(); loadPomSessions(); };
 
   // Render a user-added custom tile (a pinned note, or a quick link).
+  // Data context for stat widgets (custom tiles of type 'stat').
+  const statCtx = useMemo<StatCtx>(() => ({
+    expenses,
+    scope,
+    moodEntries,
+    workEvents: allEvents,
+    workSettings,
+    ratePerHour: (workEarnings?.perSecond ?? 0) * 3600,
+    tasks: calTasks,
+    habitsTotal: habits.length,
+    habitsDone: habitsDoneIds.length,
+    nameAliases,
+  }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases]);
+
+  const fmtStat = (v: number, unit: string): string => {
+    if (unit === 'zł')   return `${Math.round(v)} zł`;
+    if (unit === 'kg')   return `${v.toFixed(1).replace('.0', '')} kg`;
+    if (unit === 'h')    return `${v.toFixed(1).replace('.0', '')} h`;
+    if (unit === '/5')   return v.toFixed(1);
+    if (unit === 'szt.') return `${Math.round(v)} szt.`;
+    if (unit === '×')    return `×${Math.round(v)}`;
+    if (unit === 'dni')  return `${Math.round(v)} dni`;
+    if (unit.startsWith('/')) return `${Math.round(v)} ${unit}`; // e.g. habits "/ 5"
+    return `${Math.round(v)}`;
+  };
+
+  const renderStatTile = (t: CustomTile): React.ReactNode => {
+    const def = metricById(t.metric);
+    if (!def) return <View style={[s.card, { backgroundColor: cardBgDark }]}><Text style={s.cardTitle}>Widget — błąd</Text></View>;
+    const period = (t.period ?? 'month') as 'week' | 'month';
+    const viz = t.viz ?? 'number';
+    const header = (
+      <View style={s.cardHeader}>
+        <BarChart2 size={13} color={accentColor} />
+        <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
+      </View>
+    );
+
+    if (viz === 'wave') {
+      const ser = metricSeries(t.metric!, statCtx, period);
+      return (
+        <View style={[s.card, { backgroundColor: cardBgDark }]}>
+          {header}
+          <View style={s.waveValues}>
+            {ser.values.map((v, i) => (
+              <Text key={i} style={[s.waveValue, i === ser.values.length - 1 && { color: accentColor, fontWeight: '800' }]}>
+                {v > 0 ? Math.round(v) : ''}
+              </Text>
+            ))}
+          </View>
+          <WaveChart data={ser.values} color={accentColor} />
+          <View style={s.waveLabels}>
+            {ser.labels.map((l, i) => (
+              <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    if (viz === 'compare') {
+      const a = metricSeries(t.metric!, statCtx, period);
+      const defB = metricById(t.metric2);
+      const b = defB ? metricSeries(t.metric2!, statCtx, period) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };
+      return (
+        <View style={[s.card, { backgroundColor: cardBgDark }]}>
+          {header}
+          <View style={s.statCmpRow}>
+            <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(a.values[a.values.length - 1] ?? 0, a.unit)}</Text><Text style={s.statCmpKey}>{def.label}</Text></View>
+            <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(b.values[b.values.length - 1] ?? 0, b.unit)}</Text><Text style={s.statCmpKey}>{defB?.label ?? '—'}</Text></View>
+          </View>
+          <DualWaveChart data1={a.values} data2={b.values} color1={accentColor} color2={'#FBBF24'} />
+          <View style={s.waveLabels}>
+            {a.labels.map((l, i) => <Text key={i} style={s.waveLabel}>{l}</Text>)}
+          </View>
+        </View>
+      );
+    }
+
+    if (viz === 'list') {
+      const rows = metricList(t.metric!, statCtx);
+      return (
+        <View style={[s.card, { backgroundColor: cardBgDark }]}>
+          {header}
+          {rows.length === 0 ? (
+            <Text style={s.statSub}>Brak danych jeszcze.</Text>
+          ) : rows.map((r, i) => (
+            <View key={r.label + i} style={s.statListRow}>
+              <Text style={s.statListRank}>{i + 1}</Text>
+              <Text style={s.statListLabel} numberOfLines={1}>{r.label}</Text>
+              <Text style={[s.statListVal, { color: accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // number
+    const r = metricNumber(t.metric!, statCtx, period);
+    return (
+      <View style={[s.card, { backgroundColor: cardBgDark }]}>
+        {header}
+        <Text style={[s.statBig, { color: accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+        {r.sub && <Text style={s.statSub}>{r.sub}</Text>}
+      </View>
+    );
+  };
+
   const renderCustomTile = (t: CustomTile): React.ReactNode => {
+    if (t.type === 'stat') return renderStatTile(t);
     if (t.type === 'note') {
       const note = allNotes.find(n => n.id === t.noteId);
       return (
@@ -1089,20 +1202,6 @@ export default function DashboardScreen() {
             {todayEntry && (
               <Text style={s.humorLine}>{humor}</Text>
             )}
-
-            {/* ══ EDIT DASHBOARD CONTROL ══════════════════════════════════ */}
-            <View style={s.editCtrlRow}>
-              <TouchableOpacity
-                style={[s.editCtrlBtn, editingDash && { backgroundColor: accentColor + '22', borderColor: accentColor + '55' }]}
-                onPress={() => { haptic.tap(); setEditingDash(v => !v); }}
-                activeOpacity={0.8}
-              >
-                {editingDash ? <Check size={13} color={accentColor} /> : <Pencil size={12} color={colors.text.muted} />}
-                <Text style={[s.editCtrlText, editingDash && { color: accentColor }]}>
-                  {editingDash ? 'Gotowe' : 'Edytuj dashboard'}
-                </Text>
-              </TouchableOpacity>
-            </View>
 
             {/* ══ DASHBOARD SECTIONS (reorderable registry) ═══════════════ */}
             {(() => {
@@ -1850,9 +1949,13 @@ export default function DashboardScreen() {
                 return (
                   <View style={{ gap: spacing[2] }}>
                     <View style={s.editBanner}>
-                      <Text style={s.editBannerText}>
-                        Zmień kolejność strzałkami, ukryj okiem, dodaj własny kafelek. „Gotowe" zapisuje.
+                      <Text style={[s.editBannerText, { flex: 1 }]}>
+                        Przeciągaj uchwytem ∥ lub strzałkami, ukryj okiem, dodaj widget.
                       </Text>
+                      <TouchableOpacity style={[s.editDoneBtn, { borderColor: accentColor + '66', backgroundColor: accentColor + '20' }]} onPress={() => { haptic.tap(); setEditingDash(false); }}>
+                        <Check size={13} color={accentColor} />
+                        <Text style={[s.editDoneText, { color: accentColor }]}>Gotowe</Text>
+                      </TouchableOpacity>
                     </View>
                     {orderedSections.map((id, idx) => {
                       const isCustom = id.startsWith('custom:');
@@ -1876,6 +1979,10 @@ export default function DashboardScreen() {
                         />
                       );
                     })}
+                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); router.push('/widget-builder' as any); }} activeOpacity={0.85}>
+                      <BarChart2 size={15} color={accentColor} />
+                      <Text style={[s.editAddText, { color: accentColor }]}>Dodaj widget statystyk</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); setNotePickerOpen(true); }} activeOpacity={0.85}>
                       <Plus size={15} color={accentColor} />
                       <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek z notatką</Text>
@@ -2241,6 +2348,17 @@ const s = StyleSheet.create({
   pinNoteTags: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
   pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
 
+  // ── Stat widgets ──
+  statBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 2 },
+  statSub: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  statListRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
+  statListRank: { fontSize: 11, fontWeight: '800', color: colors.text.muted, width: 16 },
+  statListLabel: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '600' },
+  statListVal: { fontSize: 13, fontWeight: '800' },
+  statCmpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: spacing[1] },
+  statCmpVal: { fontSize: 19, fontWeight: '800', letterSpacing: -0.5 },
+  statCmpKey: { fontSize: 10, color: colors.text.muted },
+
   // ── Edit-dashboard mode ──
   editCtrlRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   editCtrlBtn: {
@@ -2251,10 +2369,13 @@ const s = StyleSheet.create({
   },
   editCtrlText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
   editBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     padding: spacing[3], borderRadius: radius.md,
     backgroundColor: 'rgba(108,158,255,0.08)', borderWidth: 1, borderColor: 'rgba(108,158,255,0.25)',
   },
   editBannerText: { fontSize: 11.5, color: colors.text.secondary, lineHeight: 16 },
+  editDoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: spacing[3], borderRadius: radius.full, borderWidth: 1 },
+  editDoneText: { fontSize: 12, fontWeight: '800' },
   editRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: 10, paddingHorizontal: spacing[3],
