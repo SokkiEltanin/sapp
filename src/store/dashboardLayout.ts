@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // other section below is reorderable and identified by a stable id here.
 
 export const DEFAULT_DASHBOARD_SECTIONS = [
+  'weekly-insights',
   'tag-limits',
   'budget-warning',
   'pinned-notes',
@@ -32,6 +33,7 @@ export type SectionId = typeof DEFAULT_DASHBOARD_SECTIONS[number];
 
 // Human labels shown in the "Edytuj dashboard" editor.
 export const SECTION_TITLES: Record<string, string> = {
+  'weekly-insights': 'Przegląd tygodnia',
   'tag-limits':     'Limity tagów (#słodycze…)',
   'budget-warning': 'Ostrzeżenie o budżecie',
   'pinned-notes':   'Przypięte notatki',

@@ -702,6 +702,31 @@ export default function DashboardScreen() {
     nameAliases,
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases]);
 
+  // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
+  const weeklyInsights = useMemo(() => {
+    const wk = (metric: string) => { const sr = metricSeries(metric, statCtx, 'week', 2); return { now: sr.values[1] ?? 0, prev: sr.values[0] ?? 0 }; };
+    const pct = (now: number, prev: number) => prev > 0 ? Math.round(((now - prev) / prev) * 100) : null;
+    type Ins = { tone: 'good' | 'warn' | 'neutral'; text: string };
+    const out: Ins[] = [];
+    const sp = wk('spend');
+    if (sp.now > 0 || sp.prev > 0) {
+      const d = pct(sp.now, sp.prev);
+      out.push({ tone: d != null && d > 15 ? 'warn' : 'neutral', text: `Wydatki: ${Math.round(sp.now)} zł${d != null ? ` (${d >= 0 ? '+' : ''}${d}% vs poprzedni tydzień)` : ''}` });
+    }
+    const sw = wk('sweets');
+    if (sw.now > 0) { const d = pct(sw.now, sw.prev); out.push({ tone: d != null && d > 25 ? 'warn' : 'neutral', text: `Słodycze: ${Math.round(sw.now)} zł${d != null ? ` (${d >= 0 ? '+' : ''}${d}%)` : ''}` }); }
+    const md = wk('moodAvg');
+    if (md.now > 0) { const arrow = md.prev > 0 ? (md.now >= md.prev ? '↑' : '↓') : ''; out.push({ tone: md.now >= 3.5 ? 'good' : md.now < 2.5 ? 'warn' : 'neutral', text: `Średni nastrój: ${md.now.toFixed(1)}/5 ${arrow}`.trim() }); }
+    const wh = wk('workHours');
+    if (wh.now > 0) out.push({ tone: 'neutral', text: `Praca: ${wh.now.toFixed(1).replace('.0', '')} h w tym tygodniu` });
+    const td = wk('tasksDone');
+    if (td.now > 0) out.push({ tone: 'good', text: `Ukończone zadania: ${Math.round(td.now)}` });
+    // correlation nugget
+    if (wh.now >= 30 && sw.prev > 0 && sw.now > sw.prev * 1.2) out.push({ tone: 'warn', text: `Pracowity tydzień (${wh.now.toFixed(0)} h) i więcej słodyczy niż zwykle` });
+    if (habits.length > 0 && habitsDoneIds.length === habits.length) out.push({ tone: 'good', text: 'Wszystkie dzisiejsze nawyki odhaczone' });
+    return out;
+  }, [statCtx, habits.length, habitsDoneIds.length]);
+
   const fmtStat = (v: number, unit: string): string => {
     if (unit === 'zł')   return `${Math.round(v)} zł`;
     if (unit === 'kg')   return `${v.toFixed(1).replace('.0', '')} kg`;
@@ -1275,6 +1300,26 @@ export default function DashboardScreen() {
             {/* ══ DASHBOARD SECTIONS (reorderable registry) ═══════════════ */}
             {(() => {
               const nodes: Record<string, React.ReactNode> = {};
+
+              nodes['weekly-insights'] = weeklyInsights.length > 0 && (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Sparkles size={13} color={accentColor} />
+                    <Text style={s.cardTitle}>Przegląd tygodnia</Text>
+                  </View>
+                  <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                    {weeklyInsights.map((ins, i) => {
+                      const c = ins.tone === 'good' ? '#2AC68F' : ins.tone === 'warn' ? '#FBBF24' : colors.text.secondary;
+                      return (
+                        <View key={i} style={s.factRow}>
+                          <View style={[s.insightDot, { backgroundColor: c }]} />
+                          <Text style={[s.factText, { color: c }]} numberOfLines={2}>{ins.text}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
 
               nodes['tag-limits'] = tagLimits.map(t => {
               const pctClamped = Math.min(100, Math.round(t.pct * 100));
@@ -2423,6 +2468,7 @@ const s = StyleSheet.create({
   statSub: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
   statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' },
   statTargetFill: { height: 6, borderRadius: 3 },
+  insightDot: { width: 7, height: 7, borderRadius: 4, marginTop: 5 },
   statListRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
   statListRank: { fontSize: 11, fontWeight: '800', color: colors.text.muted, width: 16 },
   statListLabel: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '600' },
