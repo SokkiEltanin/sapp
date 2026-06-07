@@ -43,6 +43,8 @@ import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/u
 import { shiftHours, isWorkEvent } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { colors, spacing, radius } from '@/theme';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
@@ -392,6 +394,76 @@ function GradientGreeting({ text, baseColor }: { text: string; baseColor: string
   );
 }
 
+// ─── Edit-mode draggable row ──────────────────────────────────────────────────
+
+const EDIT_ROW_H = 56; // fixed height (incl. gap) used to translate drag → index
+
+function DashEditRow({
+  id, index, count, title, isCustom, hiddenNow, accent, cardBg,
+  onMoveDir, onMoveTo, onToggleHidden, onRemove,
+}: {
+  id: string; index: number; count: number; title: string;
+  isCustom: boolean; hiddenNow: boolean; accent: string; cardBg: string;
+  onMoveDir: (id: string, dir: -1 | 1) => void;
+  onMoveTo: (id: string, target: number) => void;
+  onToggleHidden: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const ty = useSharedValue(0);
+  const lifted = useSharedValue(0);
+
+  const pan = Gesture.Pan()
+    .activateAfterLongPress(120)
+    .onStart(() => { lifted.value = 1; })
+    .onUpdate(e => { ty.value = e.translationY; })
+    .onEnd(e => {
+      const delta = Math.round(e.translationY / EDIT_ROW_H);
+      let target = index + delta;
+      if (target < 0) target = 0;
+      if (target > count - 1) target = count - 1;
+      lifted.value = 0;
+      ty.value = withTiming(0, { duration: 140 });
+      if (target !== index) runOnJS(onMoveTo)(id, target);
+    });
+
+  const aStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: ty.value }, { scale: lifted.value ? 1.03 : 1 }],
+    zIndex: lifted.value ? 20 : 0,
+    opacity: lifted.value ? 0.97 : 1,
+  }));
+
+  return (
+    <Reanimated.View style={aStyle}>
+      <View style={[s.editRow, { backgroundColor: cardBg }]}>
+        <GestureDetector gesture={pan}>
+          <View style={s.editGrip} hitSlop={8}>
+            <GripVertical size={16} color={colors.text.muted} />
+          </View>
+        </GestureDetector>
+        <View style={s.editArrows}>
+          <TouchableOpacity disabled={index === 0} onPress={() => { haptic.tap(); onMoveDir(id, -1); }} style={s.editArrowBtn} hitSlop={6}>
+            <ChevronUp size={16} color={index === 0 ? colors.text.muted + '50' : colors.text.secondary} />
+          </TouchableOpacity>
+          <TouchableOpacity disabled={index === count - 1} onPress={() => { haptic.tap(); onMoveDir(id, 1); }} style={s.editArrowBtn} hitSlop={6}>
+            <ChevronDown size={16} color={index === count - 1 ? colors.text.muted + '50' : colors.text.secondary} />
+          </TouchableOpacity>
+        </View>
+        <Text style={[s.editRowTitle, hiddenNow && { opacity: 0.4 }]} numberOfLines={1}>
+          {title}{isCustom ? '  · własny' : ''}
+        </Text>
+        <TouchableOpacity onPress={() => { haptic.tap(); onToggleHidden(id); }} hitSlop={8}>
+          {hiddenNow ? <EyeOff size={16} color={colors.text.muted} /> : <Eye size={16} color={accent} />}
+        </TouchableOpacity>
+        {isCustom && (
+          <TouchableOpacity onPress={() => { haptic.medium(); onRemove(id); }} hitSlop={8}>
+            <Trash2 size={15} color={colors.accent.red} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </Reanimated.View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -428,6 +500,7 @@ export default function DashboardScreen() {
   const dashHidden     = useDashboardLayout(s => s.hidden);
   const customTiles    = useDashboardLayout(s => s.customTiles);
   const moveSection    = useDashboardLayout(s => s.move);
+  const setSectionOrder = useDashboardLayout(s => s.setOrder);
   const toggleHiddenSection = useDashboardLayout(s => s.toggleHidden);
   const addCustomTile  = useDashboardLayout(s => s.addCustomTile);
   const removeCustomTile = useDashboardLayout(s => s.removeCustomTile);
@@ -436,6 +509,15 @@ export default function DashboardScreen() {
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles), [dashOrder, customTiles]);
   const hiddenSet = useMemo(() => new Set(dashHidden), [dashHidden]);
+  const handleMoveTo = useCallback((id: string, target: number) => {
+    const cur = effectiveOrder(useDashboardLayout.getState().order, useDashboardLayout.getState().customTiles);
+    const from = cur.indexOf(id);
+    if (from < 0 || from === target) return;
+    cur.splice(from, 1);
+    cur.splice(target, 0, id);
+    setSectionOrder(cur);
+    haptic.tap();
+  }, [setSectionOrder]);
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -1763,30 +1845,22 @@ export default function DashboardScreen() {
                       const isCustom = id.startsWith('custom:');
                       const ct = isCustom ? customTiles.find(t => t.id === id) : null;
                       const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
-                      const hiddenNow = hiddenSet.has(id);
                       return (
-                        <View key={id} style={[s.editRow, { backgroundColor: cardBgDark }]}>
-                          <GripVertical size={15} color={colors.text.muted} />
-                          <View style={s.editArrows}>
-                            <TouchableOpacity disabled={idx === 0} onPress={() => { haptic.tap(); moveSection(id, -1); }} style={s.editArrowBtn} hitSlop={6}>
-                              <ChevronUp size={16} color={idx === 0 ? colors.text.muted + '50' : colors.text.secondary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity disabled={idx === orderedSections.length - 1} onPress={() => { haptic.tap(); moveSection(id, 1); }} style={s.editArrowBtn} hitSlop={6}>
-                              <ChevronDown size={16} color={idx === orderedSections.length - 1 ? colors.text.muted + '50' : colors.text.secondary} />
-                            </TouchableOpacity>
-                          </View>
-                          <Text style={[s.editRowTitle, hiddenNow && { opacity: 0.4 }]} numberOfLines={1}>
-                            {title}{isCustom ? '  · własny' : ''}
-                          </Text>
-                          <TouchableOpacity onPress={() => { haptic.tap(); toggleHiddenSection(id); }} hitSlop={8}>
-                            {hiddenNow ? <EyeOff size={16} color={colors.text.muted} /> : <Eye size={16} color={accentColor} />}
-                          </TouchableOpacity>
-                          {isCustom && (
-                            <TouchableOpacity onPress={() => { haptic.medium(); removeCustomTile(id); }} hitSlop={8}>
-                              <Trash2 size={15} color={colors.accent.red} />
-                            </TouchableOpacity>
-                          )}
-                        </View>
+                        <DashEditRow
+                          key={id}
+                          id={id}
+                          index={idx}
+                          count={orderedSections.length}
+                          title={title}
+                          isCustom={isCustom}
+                          hiddenNow={hiddenSet.has(id)}
+                          accent={accentColor}
+                          cardBg={cardBgDark}
+                          onMoveDir={moveSection}
+                          onMoveTo={handleMoveTo}
+                          onToggleHidden={toggleHiddenSection}
+                          onRemove={removeCustomTile}
+                        />
                       );
                     })}
                     <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); setNotePickerOpen(true); }} activeOpacity={0.85}>
@@ -2173,6 +2247,7 @@ const s = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: spacing[3],
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.subtle,
   },
+  editGrip: { paddingVertical: 4, paddingHorizontal: 2 },
   editArrows: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   editArrowBtn: { padding: 2 },
   editRowTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.primary },
