@@ -114,14 +114,14 @@ export function useWorkEarnings(
       const hoursForMonth = (ym: string) => colorMode.workEvents
         .filter(e => e.date.slice(0, 7) === ym)
         .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
-      // Rate = last paycheck ÷ hours worked in the LAST COMPLETED month (relative
-      // to today). The current month is partial, so its hours would understate
-      // the denominator and inflate the live rate; the previous month has full
-      // data and matches the paycheck (paid in arrears).
+      // Basis month = the previous completed month by default (current is
+      // partial → would inflate the rate). If a NEWER paycheck arrived (dated
+      // this month), use the paycheck's month instead.
       const now = new Date();
       const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
-      const hours = hoursOverride || hoursForMonth(prevMonth) || (salaryInfo.month ? hoursForMonth(salaryInfo.month) : 0) || settings.hoursPerMonth;
+      const basisMonth = (salaryInfo.month && salaryInfo.month > prevMonth) ? salaryInfo.month : prevMonth;
+      const hours = hoursOverride || hoursForMonth(basisMonth) || hoursForMonth(prevMonth) || settings.hoursPerMonth;
       return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
     // No tagged paycheck → salary ÷ hours. Hours DEFAULT to the LAST COMPLETED

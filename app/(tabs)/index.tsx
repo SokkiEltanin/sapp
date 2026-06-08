@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Modal,
+  View, Text, StyleSheet, ScrollView, Modal, Alert,
   RefreshControl, TouchableOpacity, Animated,
 } from 'react-native';
 import * as Location from 'expo-location';
@@ -442,7 +442,7 @@ function GradientGreeting({ text, baseColor }: { text: string; baseColor: string
 
 // ─── Edit-mode draggable row ──────────────────────────────────────────────────
 
-const EDIT_ROW_H = 56; // fixed height (incl. gap) used to translate drag → index
+const EDIT_ROW_H = 68; // fixed height (incl. gap) used to translate drag → index
 
 function DashEditRow({
   id, index, count, title, isCustom, hiddenNow, empty, accent, cardBg,
@@ -483,32 +483,32 @@ function DashEditRow({
     <Reanimated.View style={aStyle}>
       <View style={[s.editRow, { backgroundColor: cardBg }]}>
         <GestureDetector gesture={pan}>
-          <View style={s.editGrip} hitSlop={8}>
-            <GripVertical size={16} color={colors.text.muted} />
+          <View style={s.editCtrlBtn2} hitSlop={10}>
+            <GripVertical size={20} color={colors.text.muted} />
           </View>
         </GestureDetector>
         <View style={s.editArrows}>
-          <TouchableOpacity disabled={index === 0} onPress={() => { haptic.tap(); onMoveDir(id, -1); }} style={s.editArrowBtn} hitSlop={6}>
-            <ChevronUp size={16} color={index === 0 ? colors.text.muted + '50' : colors.text.secondary} />
+          <TouchableOpacity disabled={index === 0} onPress={() => { haptic.tap(); onMoveDir(id, -1); }} style={s.editArrowBtn2} hitSlop={8}>
+            <ChevronUp size={20} color={index === 0 ? colors.text.muted + '50' : colors.text.secondary} />
           </TouchableOpacity>
-          <TouchableOpacity disabled={index === count - 1} onPress={() => { haptic.tap(); onMoveDir(id, 1); }} style={s.editArrowBtn} hitSlop={6}>
-            <ChevronDown size={16} color={index === count - 1 ? colors.text.muted + '50' : colors.text.secondary} />
+          <TouchableOpacity disabled={index === count - 1} onPress={() => { haptic.tap(); onMoveDir(id, 1); }} style={s.editArrowBtn2} hitSlop={8}>
+            <ChevronDown size={20} color={index === count - 1 ? colors.text.muted + '50' : colors.text.secondary} />
           </TouchableOpacity>
         </View>
         <Text style={[s.editRowTitle, (hiddenNow || empty) && { opacity: 0.4 }]} numberOfLines={1}>
           {title}{isCustom ? '  · własny' : ''}{empty && !hiddenNow ? '  · brak danych' : ''}
         </Text>
         {onEdit && (
-          <TouchableOpacity onPress={() => { haptic.tap(); onEdit(id); }} hitSlop={8}>
-            <Pencil size={15} color={accent} />
+          <TouchableOpacity onPress={() => { haptic.tap(); onEdit(id); }} style={s.editCtrlBtn2} hitSlop={10}>
+            <Pencil size={19} color={accent} />
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => { haptic.tap(); onToggleHidden(id); }} hitSlop={8}>
-          {hiddenNow ? <EyeOff size={16} color={colors.text.muted} /> : <Eye size={16} color={accent} />}
+        <TouchableOpacity onPress={() => { haptic.tap(); onToggleHidden(id); }} style={s.editCtrlBtn2} hitSlop={10}>
+          {hiddenNow ? <EyeOff size={20} color={colors.text.muted} /> : <Eye size={20} color={accent} />}
         </TouchableOpacity>
         {isCustom && (
-          <TouchableOpacity onPress={() => { haptic.medium(); onRemove(id); }} hitSlop={8}>
-            <Trash2 size={15} color={colors.accent.red} />
+          <TouchableOpacity onPress={() => { haptic.medium(); onRemove(id); }} style={[s.editCtrlBtn2, { backgroundColor: 'rgba(228,52,52,0.12)' }]} hitSlop={10}>
+            <Trash2 size={19} color={colors.accent.red} />
           </TouchableOpacity>
         )}
       </View>
@@ -743,6 +743,14 @@ export default function DashboardScreen() {
     return `${Math.round(v)}`;
   };
 
+  // Compact value for above wave points (unit-aware, blank when zero).
+  const fmtWave = (v: number, unit: string): string => {
+    if (v <= 0) return '';
+    if (unit === 'kg' || unit === 'h') return v.toFixed(1).replace('.0', '');
+    if (unit === '/5') return v.toFixed(1);
+    return `${Math.round(v)}`;
+  };
+
   const renderStatTile = (t: CustomTile): React.ReactNode => {
     const def = metricById(t.metric);
     if (!def) return <View style={[s.card, { backgroundColor: cardBgDark }]}><Text style={s.cardTitle}>Widget — błąd</Text></View>;
@@ -763,7 +771,7 @@ export default function DashboardScreen() {
           <View style={s.waveValues}>
             {ser.values.map((v, i) => (
               <Text key={i} style={[s.waveValue, i === ser.values.length - 1 && { color: accentColor, fontWeight: '800' }]}>
-                {v > 0 ? Math.round(v) : ''}
+                {fmtWave(v, ser.unit)}
               </Text>
             ))}
           </View>
@@ -2094,7 +2102,10 @@ export default function DashboardScreen() {
                           onMoveDir={moveSection}
                           onMoveTo={handleMoveTo}
                           onToggleHidden={toggleHiddenSection}
-                          onRemove={removeCustomTile}
+                          onRemove={(rid) => Alert.alert('Usuń kafelek', `Na pewno usunąć „${title}"?`, [
+                            { text: 'Anuluj', style: 'cancel' },
+                            { text: 'Usuń', style: 'destructive', onPress: () => removeCustomTile(rid) },
+                          ])}
                           onEdit={ct?.type === 'stat' ? () => router.push(`/widget-builder?edit=${id}` as any) : undefined}
                         />
                       );
@@ -2500,13 +2511,15 @@ const s = StyleSheet.create({
   editDoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: spacing[3], borderRadius: radius.full, borderWidth: 1 },
   editDoneText: { fontSize: 12, fontWeight: '800' },
   editRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingVertical: 10, paddingHorizontal: spacing[3],
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingVertical: 8, paddingLeft: spacing[2], paddingRight: spacing[1],
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.subtle,
   },
   editGrip: { paddingVertical: 4, paddingHorizontal: 2 },
-  editArrows: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  editCtrlBtn2: { width: 38, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  editArrows: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   editArrowBtn: { padding: 2 },
+  editArrowBtn2: { width: 32, height: 40, alignItems: 'center', justifyContent: 'center' },
   editRowTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.primary },
   editAddBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,

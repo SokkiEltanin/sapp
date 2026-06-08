@@ -93,26 +93,29 @@ export default function SettingsScreen() {
     ).sort((a, b) => b.date.localeCompare(a.date));
     const lastPaycheck = candidates[0] ?? null;
     const payMonth = lastPaycheck?.date.slice(0, 7) ?? null;
-    // Denominator = the LAST COMPLETED month's hours (relative to today). The
-    // current month is partial; only the previous month has full data.
+    // Basis month = the month the rate is built from. Default: the previous
+    // completed month (the current one is partial). BUT if a NEWER paycheck has
+    // arrived (e.g. one dated this month), switch the basis to the paycheck's
+    // month — that's the period it actually covers.
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = `${prevDate.getFullYear()}-${p2(prevDate.getMonth() + 1)}`;
-    const prevHours = hoursIn(prevMonth);
-    // The shift list shows the month the rate is BUILT from (previous, full data).
-    const basisShifts = shiftsIn(prevMonth);
+    const basisMonth = (payMonth && payMonth > prevMonth) ? payMonth : prevMonth;
+    const basisHours = hoursIn(basisMonth);
+    const basisShifts = shiftsIn(basisMonth);
     // Effective inputs the live rate uses (manual override wins, else computed).
     const hasHoursOvr = workSettings.hoursOverride != null && workSettings.hoursOverride > 0;
     const hasSalaryOvr = workSettings.salaryOverride != null && workSettings.salaryOverride > 0;
-    const hoursUsed = hasHoursOvr ? workSettings.hoursOverride! : (prevHours || monthHours || workSettings.hoursPerMonth);
+    const hoursUsed = hasHoursOvr ? workSettings.hoursOverride! : (basisHours || monthHours || workSettings.hoursPerMonth);
     const salaryUsed = hasSalaryOvr ? workSettings.salaryOverride! : (lastPaycheck?.amount ?? workSettings.monthlySalary);
     const rate = hoursUsed > 0 ? salaryUsed / hoursUsed : 0;
     // Avg shift length from the BASIS month → per-day (per-shift) earnings.
-    const avgShiftH = basisShifts.length > 0 ? prevHours / basisShifts.length
+    const avgShiftH = basisShifts.length > 0 ? basisHours / basisShifts.length
                     : monthCount > 0 ? monthHours / monthCount : 0;
     const perDay = rate * avgShiftH;
     return {
       eventCount: monthCount, monthHours, basisShifts, lastPaycheck, payMonth,
-      prevMonth, prevHours, hoursUsed, salaryUsed, rate, avgShiftH, perDay, hasHoursOvr, hasSalaryOvr,
+      basisMonth, basisHours, basisFromPaycheck: basisMonth === payMonth,
+      hoursUsed, salaryUsed, rate, avgShiftH, perDay, hasHoursOvr, hasSalaryOvr,
     };
   }, [events, gcalEvents, expenses, workSettings]);
 
@@ -463,11 +466,13 @@ export default function SettingsScreen() {
                 <Clock size={16} color="#60A5FA" />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>Godziny — poprzedni miesiąc</Text>
+                <Text style={styles.rowLabel}>Godziny — miesiąc liczony{workDiag ? ` (${workDiag.basisMonth})` : ''}</Text>
                 <Text style={styles.rowSub}>
                   {workDiag?.hasHoursOvr
                     ? 'Ręcznie (nadpisane) — wyczyść pole, aby wrócić do kalendarza'
-                    : `Z kalendarza (${workDiag?.prevMonth ?? '—'}) — kliknij, aby nadpisać`}
+                    : workDiag?.basisFromPaycheck
+                      ? `Z kalendarza — miesiąc wypłaty (${workDiag.basisMonth}) — kliknij, aby nadpisać`
+                      : `Z kalendarza — poprzedni miesiąc (${workDiag?.basisMonth ?? '—'}) — kliknij, aby nadpisać`}
                 </Text>
               </View>
               <TextInput
@@ -475,7 +480,7 @@ export default function SettingsScreen() {
                 onChangeText={setHoursOvrField}
                 onBlur={() => saveOverride('hoursOverride', hoursOvrField)}
                 keyboardType="numeric"
-                placeholder={workDiag ? workDiag.prevHours.toFixed(0) : '—'}
+                placeholder={workDiag ? workDiag.basisHours.toFixed(0) : '—'}
                 placeholderTextColor="#60A5FA"
                 style={{
                   fontSize: 14, fontWeight: '700', color: '#60A5FA',
@@ -528,7 +533,7 @@ export default function SettingsScreen() {
                       {workDiag.rate.toFixed(2)} <Text style={styles.rateResultUnit}>zł/h</Text>
                     </Text>
                     <Text style={styles.rateResultSub}>
-                      = {workDiag.salaryUsed.toFixed(0)} zł ÷ {workDiag.hoursUsed.toFixed(0)} h ({workDiag.prevMonth})
+                      = {workDiag.salaryUsed.toFixed(0)} zł ÷ {workDiag.hoursUsed.toFixed(0)} h ({workDiag.basisMonth})
                     </Text>
                   </View>
                   <View style={styles.rateResultDay}>
@@ -538,14 +543,17 @@ export default function SettingsScreen() {
                 </View>
 
                 <Text style={styles.diagHint}>
-                  Zegar zarobków liczy z godzin POPRZEDNIEGO miesiąca (pełne dane) i ostatniej wypłaty. W tym miesiącu masz na razie {workDiag.monthHours.toFixed(1)} h — to tylko podgląd na żywo.
+                  {workDiag.basisFromPaycheck
+                    ? `Stawka liczona z miesiąca wypłaty (${workDiag.basisMonth}) i ostatniej wypłaty.`
+                    : `Stawka liczona z POPRZEDNIEGO (pełnego) miesiąca (${workDiag.basisMonth}) i ostatniej wypłaty.`}
+                  {' '}W tym miesiącu masz na razie {workDiag.monthHours.toFixed(1)} h — to tylko podgląd na żywo.
                 </Text>
 
-                {/* Detected shifts of the BASIS month (previous) — tap to edit */}
+                {/* Detected shifts of the BASIS month — tap to edit */}
                 <View style={styles.shiftList}>
-                  <Text style={styles.shiftListTitle}>ZMIANY — POPRZEDNI MIESIĄC ({workDiag.prevMonth}) · {workDiag.basisShifts.length} · {workDiag.prevHours.toFixed(1)} h</Text>
+                  <Text style={styles.shiftListTitle}>ZMIANY LICZONE — {workDiag.basisMonth} · {workDiag.basisShifts.length} · {workDiag.basisHours.toFixed(1)} h</Text>
                   {workDiag.basisShifts.length === 0 ? (
-                    <Text style={styles.shiftEmpty}>Brak zmian w {workDiag.prevMonth} pasujących do prefiksu „{(workSettings.workPrefix ?? '').trim()}".</Text>
+                    <Text style={styles.shiftEmpty}>Brak zmian w {workDiag.basisMonth} pasujących do prefiksu „{(workSettings.workPrefix ?? '').trim()}".</Text>
                   ) : (
                     workDiag.basisShifts.map(sh => (
                       <PressableScale
