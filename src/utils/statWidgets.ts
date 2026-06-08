@@ -110,6 +110,14 @@ function inWeek(e: Expense, dates: string[]) { const s = new Set(dates); return 
 const GROUP_TAG: Record<string, string> = { cheeseKg: 'nabiał', meatKg: 'mięso', fruitKg: 'owoce', vegKg: 'warzywa' };
 const SWEETS_TAGS = ['słodycze'];
 
+// Weight of a receipt item in kg: explicit weightKg wins; otherwise a fractional
+// quantity is treated as kg (weighed goods), integer "piece" counts are ignored.
+function itemKg(it: { weightKg?: number; quantity?: number }): number {
+  if (it.weightKg && it.weightKg > 0) return it.weightKg;
+  const q = it.quantity ?? 0;
+  return (q > 0 && q < 50 && !Number.isInteger(q)) ? q : 0;
+}
+
 // ─── Core numeric metric for one period bucket ────────────────────────────────
 
 function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean,
@@ -147,9 +155,8 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         if (e.type === 'income' || !inScope(e, ctx.scope) || !pred(e)) continue;
         for (const it of (e.receiptItems ?? [])) {
           if (!countsForConsumption(it)) continue;
-          const q = it.quantity ?? 0;
-          if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
-          if ((it.tags ?? []).includes(tag)) kg += q;
+          if (!(it.tags ?? []).includes(tag)) continue;
+          kg += itemKg(it);
         }
       }
       return kg;
@@ -189,9 +196,8 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         if (e.type === 'income' || !inScope(e, ctx.scope) || !pred(e)) continue;
         for (const it of (e.receiptItems ?? [])) {
           if (!countsForConsumption(it)) continue;
-          const q = it.quantity ?? 0;
-          if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
-          if ((it.tags ?? []).includes(tag)) kg += q;
+          if (!(it.tags ?? []).includes(tag)) continue;
+          kg += itemKg(it);
         }
       }
       return kg;

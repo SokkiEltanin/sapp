@@ -18,6 +18,7 @@ import {
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
+  Cloud, CloudDrizzle, CloudRain, Snowflake,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -861,8 +862,43 @@ export default function DashboardScreen() {
     );
   };
 
+  const renderWeatherTile = (t: CustomTile): React.ReactNode => {
+    const code = weather?.wmo ?? -1;
+    const WIcon = code < 0 ? CloudSun
+      : code === 0 ? Sun
+      : code <= 3 ? CloudSun
+      : code <= 48 ? Cloud
+      : code <= 67 ? CloudDrizzle
+      : code <= 77 ? Snowflake
+      : code <= 82 ? CloudRain
+      : code <= 86 ? Snowflake : Zap;
+    const temp = weather?.temp ?? null;
+    const warm = (temp ?? 15) >= 18;
+    const grad: [string, string] = warm ? ['#3A2A12', '#1A1410'] : ['#10243A', '#0F1620'];
+    return (
+      <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.card, { borderWidth: 1, borderColor: accentColor + '30' }]}>
+        <View style={s.cardHeader}>
+          <CloudSun size={13} color={accentColor} />
+          <Text style={s.cardTitle}>{t.title || 'Pogoda'}</Text>
+        </View>
+        {temp == null ? (
+          <Text style={s.statSub}>Pobieram pogodę…</Text>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] }}>
+            <WIcon size={44} color={warm ? '#FBBF24' : '#7FB2FF'} strokeWidth={1.6} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.weatherTemp}>{temp}°C</Text>
+              <Text style={s.weatherDesc}>{(weather?.desc ?? '').toUpperCase()}</Text>
+            </View>
+          </View>
+        )}
+      </LinearGradient>
+    );
+  };
+
   const renderCustomTile = (t: CustomTile): React.ReactNode => {
     if (t.type === 'stat') return renderStatTile(t);
+    if (t.type === 'weather') return renderWeatherTile(t);
     if (t.type === 'note') {
       const note = allNotes.find(n => n.id === t.noteId);
       return (
@@ -1189,15 +1225,17 @@ export default function DashboardScreen() {
       if (!(e.date ?? '').startsWith(monthKey)) continue;
       for (const it of (e.receiptItems ?? [])) {
         if (!countsForConsumption(it)) continue;
-        const q = it.quantity ?? 0;
-        // weighed item heuristic: non-integer qty in a plausible kg range
-        if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
+        // explicit weightKg wins; otherwise a fractional qty = kg
+        const q0 = it.quantity ?? 0;
+        const kg = it.weightKg && it.weightKg > 0 ? it.weightKg
+          : (q0 > 0 && q0 < 50 && !Number.isInteger(q0)) ? q0 : 0;
+        if (kg <= 0) continue;
         const tags = it.tags ?? [];
         for (const g of GROUPS) {
           if (!tags.includes(g.tag)) continue;
-          groupKg[g.tag] = (groupKg[g.tag] ?? 0) + q;
+          groupKg[g.tag] = (groupKg[g.tag] ?? 0) + kg;
           const canon = canonicalProductName(it.name ?? '', nameAliases);
-          (groupItems[g.tag] ??= {})[canon] = (groupItems[g.tag]?.[canon] ?? 0) + q;
+          (groupItems[g.tag] ??= {})[canon] = (groupItems[g.tag]?.[canon] ?? 0) + kg;
         }
       }
     }
@@ -2139,6 +2177,10 @@ export default function DashboardScreen() {
                       <Plus size={15} color={accentColor} />
                       <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek z notatką</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); addCustomTile({ type: 'weather', title: 'Pogoda' }); }} activeOpacity={0.85}>
+                      <CloudSun size={15} color={accentColor} />
+                      <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek z pogodą</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={s.editResetBtn} onPress={() => { haptic.medium(); resetLayout(); }} activeOpacity={0.8}>
                       <RotateCcw size={13} color={colors.text.muted} />
                       <Text style={s.editResetText}>Przywróć domyślny układ</Text>
@@ -2519,6 +2561,8 @@ const s = StyleSheet.create({
   statCmpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: spacing[1] },
   statCmpVal: { fontSize: 19, fontWeight: '800', letterSpacing: -0.5 },
   statCmpKey: { fontSize: 10, color: colors.text.muted },
+  weatherTemp: { fontSize: 30, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
+  weatherDesc: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.6 },
 
   // ── Edit-dashboard mode ──
   editCtrlRow: { flexDirection: 'row', justifyContent: 'flex-end' },

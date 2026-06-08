@@ -606,7 +606,7 @@ const nc = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NotesScreen() {
-  const { noteId } = useLocalSearchParams<{ noteId?: string }>();
+  const { noteId, new: newParam } = useLocalSearchParams<{ noteId?: string; new?: string }>();
   const [notes, setNotes]             = useState<Note[]>([]);
   const [folders, setFolders]         = useState<string[]>([]);
   const [activeFolder, setActiveFolder] = useState<string | null>(null); // null = all
@@ -662,6 +662,11 @@ export default function NotesScreen() {
     setEditorNote(null);
     setEditorOpen(true);
   };
+
+  // Opened from the global "+" with ?new=1 → jump straight into a new note.
+  useEffect(() => {
+    if (newParam) { setEditorNote(null); setEditorOpen(true); }
+  }, [newParam]);
 
   const openEdit = (note: Note) => {
     setEditorNote(note);

@@ -4,6 +4,8 @@ import {
   Pressable, Animated, Modal,
 } from 'react-native';
 import { router } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal, ScanLine, Settings,
 } from 'lucide-react-native';
@@ -33,6 +35,7 @@ const TAB_ACCENTS = [
 ] as const;
 
 const QUICK_ACTIONS = [
+  { label: 'NOTATKA',     color: '#6C9EFF',            route: '/notes?new=1'   },
   { label: 'NAWYK',       color: '#F97316',            route: '/habits'        },
   { label: 'HUMOR',       color: colors.accent.purple, route: '/(tabs)/mood'   },
   { label: 'WYD/PRZYCH',  color: colors.accent.red,    route: '/expenses/add'  },
@@ -165,6 +168,13 @@ export default function TabBar({ currentIndex }: Props) {
       {/* box-none: transparent areas pass touches through to the content
           behind, so only the FAB + pill are interactive and the bar floats. */}
       <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]} pointerEvents="box-none">
+        {/* Bottom scrim — content fades out under the bar */}
+        <LinearGradient
+          colors={['transparent', 'rgba(10,12,12,0.55)', colors.bg.primary]}
+          locations={[0, 0.55, 1]}
+          style={[s.scrim, { height: (insets.bottom || 0) + 120 }]}
+          pointerEvents="none"
+        />
         {/* FAB row — floating above pill, no background */}
         <View style={s.fabRow} pointerEvents="box-none">
           {/* Secondary: settings button for dashboard tab */}
@@ -208,8 +218,13 @@ export default function TabBar({ currentIndex }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* 4-tab pill */}
-        <View style={s.pill}>
+        {/* 4-tab pill — frosted glass with a faint accent hairline */}
+        <LinearGradient
+          colors={[activeAccent + '55', 'rgba(255,255,255,0.06)', activeAccent + '33']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={s.pillBorder}
+        >
+        <BlurView intensity={32} tint="dark" style={s.pill}>
           {TABS.map(({ Icon }, i) => {
             const focused   = currentIndex === i;
             const accent    = TAB_ACCENTS[i] ?? timeAccent;
@@ -242,7 +257,8 @@ export default function TabBar({ currentIndex }: Props) {
               </TouchableOpacity>
             );
           })}
-        </View>
+        </BlurView>
+        </LinearGradient>
       </View>
     </>
   );
@@ -284,18 +300,24 @@ const s = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 8,
   },
 
-  pill: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(18,18,18,0.97)',
-    borderRadius: 28,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 6,
-    paddingVertical: 6,
+  scrim: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+  },
+  pillBorder: {
+    borderRadius: 29,
+    padding: 1,
     elevation: 8,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.4, shadowRadius: 12,
+    shadowOpacity: 0.45, shadowRadius: 14,
+  },
+  pill: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(16,17,17,0.66)',
+    borderRadius: 28,
+    overflow: 'hidden',
+    paddingHorizontal: 6,
+    paddingVertical: 6,
   },
 
   tabItem: {

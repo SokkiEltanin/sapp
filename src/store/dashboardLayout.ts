@@ -55,7 +55,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'gcal':           'Kalendarz Google',
 };
 
-export type CustomTileType = 'note' | 'link' | 'stat';
+export type CustomTileType = 'note' | 'link' | 'stat' | 'weather';
 export type WidgetViz = 'number' | 'wave' | 'list' | 'compare' | 'donut';
 
 export interface CustomTile {

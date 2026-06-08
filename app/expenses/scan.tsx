@@ -55,6 +55,7 @@ export default function ScanReceiptModal() {
   const [customCatPickerFor, setCustomCatPickerFor] = useState<number | null>(null);
   const [editedTags, setEditedTags]   = useState<Record<number, string[]>>({});
   const [editedExcluded, setEditedExcluded] = useState<Record<number, boolean>>({});
+  const [editedWeight, setEditedWeight] = useState<Record<number, string>>({});
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
   const [customTagPickerFor, setCustomTagPickerFor] = useState<number | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -86,6 +87,13 @@ export default function ScanReceiptModal() {
 
   const getProductTags = (i: number): string[] =>
     editedTags[i] ?? getFoodTags(getProductName(i));
+
+  // Weighable food groups get an editable weight (receipts rarely list grams).
+  // Dairy (ser) defaults to 1 kg — the user's usual XXL pack.
+  const WEIGH_TAGS = ['nabiał', 'mięso', 'ryby', 'owoce', 'warzywa'];
+  const isWeighable = (i: number) => getProductTags(i).some(t => WEIGH_TAGS.includes(t));
+  const getWeight = (i: number): string =>
+    editedWeight[i] !== undefined ? editedWeight[i] : (getProductTags(i).includes('nabiał') ? '1' : '');
 
   const addCustomProduct = () => {
     setCustomProducts(prev => [...prev, { name: '', price: '0.00', quantity: '1', category: 'groceries', tags: [] }]);
@@ -131,6 +139,7 @@ export default function ScanReceiptModal() {
     setEditedNames({});
     setEditedTags({});
     setEditedExcluded({});
+    setEditedWeight({});
     setTagPickerFor(null);
     setCustomProducts([]);
     setCustomCatPickerFor(null);
@@ -243,6 +252,8 @@ export default function ScanReceiptModal() {
         if (p.discount != null) item.discount = p.discount;
         if (editedExcluded[i]) item.excluded = true;
         if (p.kind) item.kind = p.kind;
+        const w = parseFloat(getWeight(i).replace(',', '.'));
+        if (!isNaN(w) && w > 0) item.weightKg = w;
         return item;
       });
 
@@ -317,6 +328,7 @@ export default function ScanReceiptModal() {
     setEditedNames({});
     setEditedTags({});
     setEditedExcluded({});
+    setEditedWeight({});
     setTagPickerFor(null);
     setCatPickerFor(null);
     setCustomProducts([]);
@@ -481,6 +493,9 @@ export default function ScanReceiptModal() {
                         tagFreq={tagFreq}
                         excluded={!!editedExcluded[i]}
                         onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
+                        weighable={isWeighable(i)}
+                        weight={getWeight(i)}
+                        onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
                       />
                     ))}
                   </View>
@@ -508,6 +523,9 @@ export default function ScanReceiptModal() {
                   tagFreq={tagFreq}
                   excluded={!!editedExcluded[i]}
                   onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
+                  weighable={isWeighable(i)}
+                  weight={getWeight(i)}
+                  onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
                 />
               ))
             )}
@@ -683,7 +701,7 @@ function ProductRow({
   catPickerOpen, onCategoryPress, onCategoryChange,
   priceValue, onPriceChange, productName, onNameChange,
   productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
-  excluded, onToggleExcluded,
+  excluded, onToggleExcluded, weighable, weight, onWeightChange,
 }: {
   product: ReceiptProduct;
   category: ExpenseCategory;
@@ -703,6 +721,9 @@ function ProductRow({
   tagFreq?: Record<string, number>;
   excluded?: boolean;
   onToggleExcluded?: () => void;
+  weighable?: boolean;
+  weight?: string;
+  onWeightChange?: (v: string) => void;
 }) {
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
@@ -774,6 +795,21 @@ function ProductRow({
                   </Text>
                 </View>
               </PressableScale>
+            )}
+            {!isDeposit && weighable && (
+              <View style={styles.weighChip}>
+                <LucideIcons.Scale size={9} color="#60A5FA" />
+                <TextInput
+                  value={weight}
+                  onChangeText={onWeightChange}
+                  keyboardType="decimal-pad"
+                  placeholder="1"
+                  placeholderTextColor={colors.text.muted}
+                  style={styles.weighInput}
+                  selectTextOnFocus
+                />
+                <Text style={styles.weighUnit}>kg</Text>
+              </View>
             )}
             {product.quantity > 1 && (
               <Text style={styles.productMetaText}>· {product.quantity} szt.</Text>
@@ -1215,6 +1251,13 @@ const styles = StyleSheet.create({
   },
   exclBtnActive: { borderColor: 'rgba(251,191,36,0.5)', backgroundColor: 'rgba(251,191,36,0.12)' },
   exclBtnText: { fontSize: 9, color: colors.text.muted },
+  weighChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
+    borderWidth: 1, borderColor: 'rgba(96,165,250,0.4)', backgroundColor: 'rgba(96,165,250,0.10)',
+  },
+  weighInput: { minWidth: 22, fontSize: 10, fontWeight: '700', color: '#60A5FA', padding: 0, textAlign: 'center' },
+  weighUnit: { fontSize: 9, color: '#60A5FA', fontWeight: '600' },
   tagPickerItem: {
     paddingHorizontal: spacing[3], paddingVertical: 7,
     borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',

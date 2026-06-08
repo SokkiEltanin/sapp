@@ -38,6 +38,8 @@ export default function WidgetBuilder() {
   const [title, setTitle] = useState(existing?.title ?? '');
   const [targetInput, setTargetInput] = useState(existing?.target != null ? String(existing.target) : '');
   const [tag, setTag] = useState<string>(existing?.tag ?? '');
+  const [calcHours, setCalcHours] = useState('');
+  const [calcRate, setCalcRate] = useState('');
 
   const def = metricById(metric);
   const needsTag = !!def?.needsTag;
@@ -76,7 +78,12 @@ export default function WidgetBuilder() {
   const save = () => {
     if (!def) return;
     haptic.success();
-    const target = showTarget ? parseFloat(targetInput.replace(',', '.')) : NaN;
+    let target = showTarget ? parseFloat(targetInput.replace(',', '.')) : NaN;
+    if (metric === 'earnings' && showTarget) {
+      const h = parseFloat(calcHours.replace(',', '.'));
+      const r = parseFloat(calcRate.replace(',', '.'));
+      if (!isNaN(h) && !isNaN(r) && h > 0 && r > 0) target = Math.round(h * r);
+    }
     const cfg = {
       title: title.trim() || labelFor(def, tag),
       metric: def.id,
@@ -211,12 +218,22 @@ export default function WidgetBuilder() {
         {/* target / goal */}
         {showTarget && (
           <>
-            <Text style={s.step}>Cel (opcjonalnie)</Text>
+            <Text style={s.step}>{metric === 'earnings' ? 'Oczekiwany zarobek — linia (opcjonalnie)' : 'Cel (opcjonalnie)'}</Text>
+            {metric === 'earnings' && (
+              <View style={s.calcRow}>
+                <TextInput value={calcHours} onChangeText={setCalcHours} keyboardType="numeric"
+                  placeholder="godz." placeholderTextColor={colors.text.muted} style={s.calcInput} />
+                <Text style={s.calcX}>×</Text>
+                <TextInput value={calcRate} onChangeText={setCalcRate} keyboardType="numeric"
+                  placeholder="zł/h" placeholderTextColor={colors.text.muted} style={s.calcInput} />
+                <Text style={s.calcEq}>= {(() => { const h = parseFloat(calcHours.replace(',', '.')); const r = parseFloat(calcRate.replace(',', '.')); return (!isNaN(h) && !isNaN(r)) ? `${Math.round(h * r)} zł` : '—'; })()}</Text>
+              </View>
+            )}
             <TextInput
               value={targetInput}
               onChangeText={setTargetInput}
               keyboardType="numeric"
-              placeholder={`np. limit / cel w ${def!.unit || 'liczbie'}`}
+              placeholder={metric === 'earnings' ? 'albo wpisz kwotę ręcznie (zł)' : `np. limit / cel w ${def!.unit || 'liczbie'}`}
               placeholderTextColor={colors.text.muted}
               style={s.titleInput}
             />
@@ -284,6 +301,13 @@ const s = StyleSheet.create({
     backgroundColor: colors.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
     paddingHorizontal: spacing[3], paddingVertical: 11, fontSize: 14, color: colors.text.primary,
   },
+  calcRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
+  calcInput: {
+    flex: 1, backgroundColor: colors.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 14, color: colors.text.primary, textAlign: 'center',
+  },
+  calcX: { fontSize: 15, fontWeight: '700', color: colors.text.muted },
+  calcEq: { fontSize: 12, fontWeight: '700', color: '#6C9EFF', minWidth: 60, textAlign: 'right' },
   footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg },
   saveText: { fontSize: 15, fontWeight: '800', color: colors.bg.primary },

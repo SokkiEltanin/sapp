@@ -32,6 +32,8 @@ export interface ReceiptItem {
   excluded?: boolean;   // counts toward the money total, but NOT my consumption
                         // stats (sweets bar, favourites, weight) — e.g. a gift
                         // or something bought for someone else.
+  weightKg?: number;    // explicit weight (kg) — receipts rarely list grams, so
+                        // the scanner lets you set it (default 1 kg for dairy).
 }
 
 export interface Expense {
