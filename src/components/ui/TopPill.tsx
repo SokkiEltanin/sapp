@@ -8,6 +8,7 @@ import { useWorkStore } from '@/store/workStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useHabits } from '@/hooks/useHabits';
+import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors } from '@/theme';
@@ -73,10 +74,16 @@ export default function TopPill() {
   const calTasks   = useCalendarStore(s => s.tasks);
   const gcalEvents = useCalendarStore(s => s.gcalEvents);
 
-  const shifts     = useWorkStore(s => s.shifts);
-  const workPrefix = useWorkStore(s => s.settings.workPrefix ?? '');
+  const shifts        = useWorkStore(s => s.shifts);
+  const workSettings  = useWorkStore(s => s.settings);
+  const workPrefix    = workSettings.workPrefix ?? '';
 
+  const events     = useCalendarStore(s => s.events);
   const expenses   = useExpensesStore(s => s.expenses);
+
+  // Live earnings — ticks each second while a work shift is in progress.
+  const allEvents    = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
+  const workEarnings = useWorkEarnings(shifts, allEvents, workSettings, expenses);
 
   const { habits, todayDone } = useHabits();
   const todayMoodEntry = useMoodStore(s => s.todayEntry);
@@ -99,7 +106,18 @@ export default function TopPill() {
       };
     }
 
-    // 2 — Work shift TODAY
+    // 2 — Live earnings (currently in a work shift) — ticks every second
+    if (workEarnings.isWorking) {
+      return {
+        badge: `${workEarnings.totalEarned.toFixed(2)} zł`,
+        color: '#2AC68F',
+        text:  (workEarnings.activeEventTitle ? workEarnings.activeEventTitle.toUpperCase() : 'JESTEŚ W PRACY'),
+        route: '/settings',
+        key:   `earn-${Math.floor(workEarnings.totalEarned)}`,
+      };
+    }
+
+    // 3 — Work shift TODAY
     const todayShift = shifts.find(sh => sh.date === today);
     if (todayShift) {
       const pre = workPrefix ? `${workPrefix} ` : '';
@@ -278,6 +296,7 @@ export default function TopPill() {
    }
   }, [
     pomRunning, pomMode, pomRemaining, pomTitle,
+    workEarnings.isWorking, workEarnings.totalEarned, workEarnings.activeEventTitle,
     shifts, workPrefix,
     calTasks,
     gcalEvents,
