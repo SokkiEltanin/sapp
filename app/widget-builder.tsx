@@ -6,7 +6,7 @@ import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, Check, Wallet
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useDashboardLayout, WidgetViz } from '@/store/dashboardLayout';
-import { WIDGET_METRICS, MetricDef, MetricGroup, metricById } from '@/utils/statWidgets';
+import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS } from '@/utils/statWidgets';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -37,9 +37,14 @@ export default function WidgetBuilder() {
   const [period, setPeriod] = useState<'week' | 'month'>(existing?.period ?? 'month');
   const [title, setTitle] = useState(existing?.title ?? '');
   const [targetInput, setTargetInput] = useState(existing?.target != null ? String(existing.target) : '');
+  const [tag, setTag] = useState<string>(existing?.tag ?? '');
 
   const def = metricById(metric);
+  const needsTag = !!def?.needsTag;
   const vizOptions = useMemo(() => def ? VIZ_META.filter(v => def.viz.includes(v.id)) : [], [def]);
+
+  const labelFor = (m: MetricDef, t?: string) =>
+    m.needsTag && t ? `${t.charAt(0).toUpperCase() + t.slice(1)} (${m.unit})` : m.label;
 
   // pick a metric → default its viz + auto title
   const pickMetric = (m: MetricDef) => {
@@ -47,17 +52,25 @@ export default function WidgetBuilder() {
     setMetric(m.id);
     const firstViz = m.viz[0];
     setViz(firstViz);
-    setTitle(m.label);
+    if (!m.needsTag) setTag('');
+    setTitle(labelFor(m, m.needsTag ? tag : undefined));
     if (firstViz !== 'compare') setMetric2('');
   };
 
-  // Only same-unit metrics make sense to overlay on one chart.
+  const pickTag = (t: string) => {
+    haptic.tap();
+    setTag(t);
+    if (def) setTitle(labelFor(def, t));
+  };
+
+  // Any periodic, compare-capable metric — the chart normalises each line to its
+  // own scale, so cross-unit overlays (e.g. godziny pracy vs zarobek) work too.
   const compareCandidates = useMemo(
-    () => WIDGET_METRICS.filter(m => m.id !== metric && m.viz.includes('compare') && m.unit === def?.unit),
-    [metric, def],
+    () => WIDGET_METRICS.filter(m => m.id !== metric && m.viz.includes('compare')),
+    [metric],
   );
 
-  const canSave = !!def && (viz !== 'compare' || !!metric2);
+  const canSave = !!def && (viz !== 'compare' || !!metric2) && (!needsTag || !!tag);
   const showTarget = !!def && (viz === 'number' || viz === 'wave') && def.unit !== '/5';
 
   const save = () => {
@@ -65,12 +78,13 @@ export default function WidgetBuilder() {
     haptic.success();
     const target = showTarget ? parseFloat(targetInput.replace(',', '.')) : NaN;
     const cfg = {
-      title: title.trim() || def.label,
+      title: title.trim() || labelFor(def, tag),
       metric: def.id,
       metric2: viz === 'compare' ? metric2 : undefined,
       viz,
       period: def.periodic ? period : undefined,
       target: !isNaN(target) && target > 0 ? target : undefined,
+      tag: needsTag ? tag : undefined,
     };
     if (existing) updateCustomTile(existing.id, cfg);
     else addCustomTile({ type: 'stat', ...cfg });
@@ -116,6 +130,25 @@ export default function WidgetBuilder() {
             </View>
           );
         })}
+
+        {/* tag picker (tag-based metrics) */}
+        {needsTag && (
+          <>
+            <Text style={s.step}>Tag</Text>
+            <View style={s.chipsWrap}>
+              {WIDGET_TAGS.map(t => {
+                const active = tag === t;
+                return (
+                  <PressableScale key={t} onPress={() => pickTag(t)}>
+                    <View style={[s.chip, active && { backgroundColor: accent + '22', borderColor: accent }]}>
+                      <Text style={[s.chipText, active && { color: accent }]}>#{t}</Text>
+                    </View>
+                  </PressableScale>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         {/* 2 — viz */}
         {!!def && (

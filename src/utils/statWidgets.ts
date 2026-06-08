@@ -15,7 +15,14 @@ export interface MetricDef {
   unit: string;             // 'zł' | 'kg' | 'h' | '' | '/5'
   viz: WidgetViz[];         // supported visualizations
   periodic: boolean;        // supports week/month + wave series
+  needsTag?: boolean;       // requires a tag to be chosen in the builder
 }
+
+// Curated tags offered in the builder for tag-based metrics.
+export const WIDGET_TAGS = [
+  'słodycze', 'nabiał', 'mięso', 'ryby', 'owoce', 'warzywa', 'pieczywo',
+  'napoje', 'przekąski', 'chemia', 'higiena', 'dania gotowe',
+];
 
 export const WIDGET_METRICS: MetricDef[] = [
   // Finanse
@@ -32,6 +39,9 @@ export const WIDGET_METRICS: MetricDef[] = [
   { id: 'topProducts', label: 'Top produkty',      group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
   { id: 'favSweets',  label: 'Ulubione słodycze',  group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
   { id: 'itemsCount', label: 'Liczba produktów',   group: 'Konsumpcja', unit: 'szt.', viz: ['number', 'wave'], periodic: true },
+  { id: 'tagSpend',   label: 'Wydatki na tag…',    group: 'Konsumpcja', unit: 'zł',   viz: ['number', 'wave', 'compare'], periodic: true, needsTag: true },
+  { id: 'tagCount',   label: 'Sztuk z tagiem…',    group: 'Konsumpcja', unit: 'szt.', viz: ['number', 'wave'], periodic: true, needsTag: true },
+  { id: 'tagKg',      label: 'Kg z tagiem…',       group: 'Konsumpcja', unit: 'kg',   viz: ['number', 'compare'], periodic: true, needsTag: true },
   // Nastrój i zdrowie
   { id: 'moodAvg',    label: 'Średni nastrój',     group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'energyAvg',  label: 'Średnia energia',    group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },
@@ -103,9 +113,47 @@ const SWEETS_TAGS = ['słodycze'];
 // ─── Core numeric metric for one period bucket ────────────────────────────────
 
 function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean,
-                     moodPred: (d: string) => boolean): number {
+                     moodPred: (d: string) => boolean, tag?: string): number {
   const exp = ctx.expenses;
   switch (metric) {
+    case 'tagSpend': {
+      if (!tag) return 0;
+      let total = 0;
+      for (const e of exp) {
+        if (e.type && e.type !== 'expense') continue;
+        if (!inScope(e, ctx.scope) || !pred(e)) continue;
+        if (e.tags?.includes(tag)) { total += e.amount; continue; }
+        for (const it of (e.receiptItems ?? [])) {
+          if (countsForConsumption(it) && (it.tags ?? []).includes(tag)) total += it.price;
+        }
+      }
+      return total;
+    }
+    case 'tagCount': {
+      if (!tag) return 0;
+      let n = 0;
+      for (const e of exp) {
+        if (e.type === 'income' || !inScope(e, ctx.scope) || !pred(e)) continue;
+        for (const it of (e.receiptItems ?? [])) {
+          if (countsForConsumption(it) && (it.tags ?? []).includes(tag)) n++;
+        }
+      }
+      return n;
+    }
+    case 'tagKg': {
+      if (!tag) return 0;
+      let kg = 0;
+      for (const e of exp) {
+        if (e.type === 'income' || !inScope(e, ctx.scope) || !pred(e)) continue;
+        for (const it of (e.receiptItems ?? [])) {
+          if (!countsForConsumption(it)) continue;
+          const q = it.quantity ?? 0;
+          if (q <= 0 || q >= 50 || Number.isInteger(q)) continue;
+          if ((it.tags ?? []).includes(tag)) kg += q;
+        }
+      }
+      return kg;
+    }
     case 'spend':
       return exp.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && pred(e))
         .reduce((s, e) => s + e.amount, 0);
@@ -190,7 +238,7 @@ export interface NumberResult { value: number; unit: string; sub?: string }
 export interface SeriesResult { values: number[]; labels: string[]; unit: string }
 export interface ListRow { label: string; value: number; unit: string }
 
-export function metricNumber(metric: string, ctx: StatCtx, period: Period): NumberResult {
+export function metricNumber(metric: string, ctx: StatCtx, period: Period, tag?: string): NumberResult {
   const def = metricById(metric);
   const unit = def?.unit ?? '';
   if (metric === 'moodStreak') {
@@ -201,16 +249,16 @@ export function metricNumber(metric: string, ctx: StatCtx, period: Period): Numb
   }
   if (metric === 'habitsToday') return { value: ctx.habitsDone, unit: `/ ${ctx.habitsTotal}` };
   const p = predsFor(period, 0);
-  const value = bucketValue(metric, ctx, p.exp, p.day);
+  const value = bucketValue(metric, ctx, p.exp, p.day, tag);
   return { value, unit, sub: period === 'month' ? 'ten miesiąc' : 'ten tydzień' };
 }
 
-export function metricSeries(metric: string, ctx: StatCtx, period: Period, n = 6): SeriesResult {
+export function metricSeries(metric: string, ctx: StatCtx, period: Period, n = 6, tag?: string): SeriesResult {
   const def = metricById(metric);
   const values: number[] = []; const labels: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
     const p = predsFor(period, i);
-    values.push(bucketValue(metric, ctx, p.exp, p.day));
+    values.push(bucketValue(metric, ctx, p.exp, p.day, tag));
     labels.push(p.label);
   }
   return { values, labels, unit: def?.unit ?? '' };

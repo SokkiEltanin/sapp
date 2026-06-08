@@ -71,6 +71,7 @@ export interface CustomTile {
   viz?: WidgetViz;
   period?: 'week' | 'month';
   target?: number;       // optional goal — drawn as a line / progress on number & wave
+  tag?: string;          // for tag-based metrics (e.g. spend / count / kg on #tag)
 }
 
 interface DashboardLayoutState {

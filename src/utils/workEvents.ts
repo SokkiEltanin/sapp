@@ -6,7 +6,10 @@ import { CalendarEvent } from '@/types';
 // title is the source of truth: we read the "HH:MM - HH:MM" range (or a "(Nh)"
 // marker) and only fall back to the event's own times when the title has neither.
 
-const TIME_RANGE_RE = /(\d{1,2})[:.](\d{2})\s*[-–—]\s*(\d{1,2})[:.](\d{2})/;
+// "HH:MM - HH:MM" (also accepts "od HH:MM do HH:MM").
+const TIME_RANGE_RE = /(\d{1,2})[:.](\d{2})\s*(?:[-–—]|do)\s*(\d{1,2})[:.](\d{2})/i;
+// Hour-only range "10-21" / "10 - 21" / "od 10 do 21" (no minutes).
+const HOUR_RANGE_RE = /(?:^|\s|\])\s*(?:od\s*)?(\d{1,2})\s*(?:[-–—]|do)\s*(\d{1,2})(?=\s|\.|$|\()/i;
 const HOURS_PAREN_RE = /\(\s*(\d+(?:[.,]\d+)?)\s*h\s*\)/i;
 
 function hhmmToMin(hhmm: string): number {
@@ -23,11 +26,23 @@ function minToHHMM(min: number): string {
 export function titleTimeRange(title?: string): { startMin: number; endMin: number } | null {
   if (!title) return null;
   const m = title.match(TIME_RANGE_RE);
-  if (!m) return null;
-  const s = (+m[1]) * 60 + (+m[2]);
-  let e = (+m[3]) * 60 + (+m[4]);
-  if (e <= s) e += 24 * 60;
-  return { startMin: s, endMin: e };
+  if (m) {
+    const s = (+m[1]) * 60 + (+m[2]);
+    let e = (+m[3]) * 60 + (+m[4]);
+    if (e <= s) e += 24 * 60;
+    return { startMin: s, endMin: e };
+  }
+  // Fallback: hour-only range like "[JD] 10-21". Both must be plausible hours.
+  const h = title.match(HOUR_RANGE_RE);
+  if (h) {
+    const sh = +h[1], eh = +h[2];
+    if (sh <= 24 && eh <= 24 && sh !== eh) {
+      let s = sh * 60; let e = eh * 60;
+      if (e <= s) e += 24 * 60;
+      return { startMin: s, endMin: e };
+    }
+  }
+  return null;
 }
 
 // The shift's clock range (HH:MM strings) preferring the title, then event times.

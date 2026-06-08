@@ -69,11 +69,12 @@ export default function SettingsScreen() {
       .reduce((s, e) => s + shiftHours(e), 0);
     const now = new Date();
     const mk = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
-    const monthEvents = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === mk);
     const monthHours = hoursIn(mk);
-    // The actual detected shifts this month — shown so the user can verify the
-    // count and tap to edit any of them.
-    const monthShifts = monthEvents
+    const monthCount = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === mk).length;
+    // Detected shifts for a given month (sorted), so the user can verify what's
+    // counted and tap to edit any of them.
+    const shiftsIn = (ym: string) => allEvents
+      .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
       .map(e => {
         const r = shiftClockRange(e);
         return {
@@ -86,6 +87,7 @@ export default function SettingsScreen() {
         };
       })
       .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+
     const candidates = expenses.filter(e =>
       e.type === 'income' && (e.tags.some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp))
     ).sort((a, b) => b.date.localeCompare(a.date));
@@ -96,17 +98,20 @@ export default function SettingsScreen() {
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = `${prevDate.getFullYear()}-${p2(prevDate.getMonth() + 1)}`;
     const prevHours = hoursIn(prevMonth);
+    // The shift list shows the month the rate is BUILT from (previous, full data).
+    const basisShifts = shiftsIn(prevMonth);
     // Effective inputs the live rate uses (manual override wins, else computed).
     const hasHoursOvr = workSettings.hoursOverride != null && workSettings.hoursOverride > 0;
     const hasSalaryOvr = workSettings.salaryOverride != null && workSettings.salaryOverride > 0;
     const hoursUsed = hasHoursOvr ? workSettings.hoursOverride! : (prevHours || monthHours || workSettings.hoursPerMonth);
     const salaryUsed = hasSalaryOvr ? workSettings.salaryOverride! : (lastPaycheck?.amount ?? workSettings.monthlySalary);
     const rate = hoursUsed > 0 ? salaryUsed / hoursUsed : 0;
-    // Avg shift length this month → per-day (per-shift) earnings.
-    const avgShiftH = monthEvents.length > 0 ? monthHours / monthEvents.length : 0;
+    // Avg shift length from the BASIS month → per-day (per-shift) earnings.
+    const avgShiftH = basisShifts.length > 0 ? prevHours / basisShifts.length
+                    : monthCount > 0 ? monthHours / monthCount : 0;
     const perDay = rate * avgShiftH;
     return {
-      eventCount: monthEvents.length, monthHours, monthShifts, lastPaycheck, payMonth,
+      eventCount: monthCount, monthHours, basisShifts, lastPaycheck, payMonth,
       prevMonth, prevHours, hoursUsed, salaryUsed, rate, avgShiftH, perDay, hasHoursOvr, hasSalaryOvr,
     };
   }, [events, gcalEvents, expenses, workSettings]);
@@ -522,7 +527,9 @@ export default function SettingsScreen() {
                     <Text style={styles.rateResultRate}>
                       {workDiag.rate.toFixed(2)} <Text style={styles.rateResultUnit}>zł/h</Text>
                     </Text>
-                    <Text style={styles.rateResultSub}>= {workDiag.salaryUsed.toFixed(0)} zł ÷ {workDiag.hoursUsed.toFixed(0)} h</Text>
+                    <Text style={styles.rateResultSub}>
+                      = {workDiag.salaryUsed.toFixed(0)} zł ÷ {workDiag.hoursUsed.toFixed(0)} h ({workDiag.prevMonth})
+                    </Text>
                   </View>
                   <View style={styles.rateResultDay}>
                     <Text style={styles.rateResultDayVal}>{workDiag.perDay.toFixed(0)} zł</Text>
@@ -531,27 +538,27 @@ export default function SettingsScreen() {
                 </View>
 
                 <Text style={styles.diagHint}>
-                  To liczy zegar zarobków w pracy na żywo. Godziny i wypłata wyżej — kliknij, aby nadpisać; puste pole = bierze z kalendarza / ostatniej wypłaty [{(workSettings.workPrefix ?? '').trim()}].
+                  Zegar zarobków liczy z godzin POPRZEDNIEGO miesiąca (pełne dane) i ostatniej wypłaty. W tym miesiącu masz na razie {workDiag.monthHours.toFixed(1)} h — to tylko podgląd na żywo.
                 </Text>
 
-                {/* Detected shifts — what's actually counted; tap to edit */}
+                {/* Detected shifts of the BASIS month (previous) — tap to edit */}
                 <View style={styles.shiftList}>
-                  <Text style={styles.shiftListTitle}>WYKRYTE ZMIANY — {workDiag.eventCount} ({workDiag.monthHours.toFixed(1)} h)</Text>
-                  {workDiag.monthShifts.length === 0 ? (
-                    <Text style={styles.shiftEmpty}>Brak zmian tego miesiąca pasujących do prefiksu.</Text>
+                  <Text style={styles.shiftListTitle}>ZMIANY — POPRZEDNI MIESIĄC ({workDiag.prevMonth}) · {workDiag.basisShifts.length} · {workDiag.prevHours.toFixed(1)} h</Text>
+                  {workDiag.basisShifts.length === 0 ? (
+                    <Text style={styles.shiftEmpty}>Brak zmian w {workDiag.prevMonth} pasujących do prefiksu „{(workSettings.workPrefix ?? '').trim()}".</Text>
                   ) : (
-                    workDiag.monthShifts.map(s => (
+                    workDiag.basisShifts.map(sh => (
                       <PressableScale
-                        key={s.id}
-                        onPress={() => { haptic.tap(); router.push(`/calendar/${s.id}` as any); }}
+                        key={sh.id}
+                        onPress={() => { haptic.tap(); router.push(`/calendar/${sh.id}` as any); }}
                         style={styles.shiftRow}
                       >
                         <View style={styles.shiftDot} />
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.shiftTitle} numberOfLines={1}>{s.title || 'Zmiana'}</Text>
-                          <Text style={styles.shiftMeta}>{s.date} · {s.startTime}–{s.endTime}</Text>
+                          <Text style={styles.shiftTitle} numberOfLines={1}>{sh.title || 'Zmiana'}</Text>
+                          <Text style={styles.shiftMeta}>{sh.date} · {sh.startTime}–{sh.endTime}</Text>
                         </View>
-                        <Text style={styles.shiftHours}>{s.hours.toFixed(1)} h</Text>
+                        <Text style={styles.shiftHours}>{sh.hours.toFixed(1)} h</Text>
                         <LucideIcons.Pencil size={13} color={colors.text.muted} />
                       </PressableScale>
                     ))

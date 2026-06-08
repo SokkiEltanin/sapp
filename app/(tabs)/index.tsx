@@ -250,13 +250,17 @@ function buildWavePath(data: number[], max: number) {
 }
 
 // Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
-function DualWaveChart({ data1, data2, color1, color2 }: {
-  data1: number[]; data2: number[]; color1: string; color2: string;
+function DualWaveChart({ data1, data2, color1, color2, independent }: {
+  data1: number[]; data2: number[]; color1: string; color2: string; independent?: boolean;
 }) {
   if (data1.length < 2) return null;
-  const max = Math.max(...data1, ...data2, 1);
-  const p1  = buildWavePath(data1, max);
-  const p2  = buildWavePath(data2, max);
+  // Shared scale by default (comparable magnitudes, e.g. food vs sweets); when
+  // `independent`, each line uses its own max so cross-unit trends are visible.
+  const shared = Math.max(...data1, ...data2, 1);
+  const max1 = independent ? Math.max(...data1, 1) : shared;
+  const max2 = independent ? Math.max(...data2, 1) : shared;
+  const p1  = buildWavePath(data1, max1);
+  const p2  = buildWavePath(data2, max2);
   return (
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
       <Defs>
@@ -441,11 +445,11 @@ function GradientGreeting({ text, baseColor }: { text: string; baseColor: string
 const EDIT_ROW_H = 56; // fixed height (incl. gap) used to translate drag → index
 
 function DashEditRow({
-  id, index, count, title, isCustom, hiddenNow, accent, cardBg,
+  id, index, count, title, isCustom, hiddenNow, empty, accent, cardBg,
   onMoveDir, onMoveTo, onToggleHidden, onRemove, onEdit,
 }: {
   id: string; index: number; count: number; title: string;
-  isCustom: boolean; hiddenNow: boolean; accent: string; cardBg: string;
+  isCustom: boolean; hiddenNow: boolean; empty?: boolean; accent: string; cardBg: string;
   onMoveDir: (id: string, dir: -1 | 1) => void;
   onMoveTo: (id: string, target: number) => void;
   onToggleHidden: (id: string) => void;
@@ -491,8 +495,8 @@ function DashEditRow({
             <ChevronDown size={16} color={index === count - 1 ? colors.text.muted + '50' : colors.text.secondary} />
           </TouchableOpacity>
         </View>
-        <Text style={[s.editRowTitle, hiddenNow && { opacity: 0.4 }]} numberOfLines={1}>
-          {title}{isCustom ? '  · własny' : ''}
+        <Text style={[s.editRowTitle, (hiddenNow || empty) && { opacity: 0.4 }]} numberOfLines={1}>
+          {title}{isCustom ? '  · własny' : ''}{empty && !hiddenNow ? '  · brak danych' : ''}
         </Text>
         {onEdit && (
           <TouchableOpacity onPress={() => { haptic.tap(); onEdit(id); }} hitSlop={8}>
@@ -752,7 +756,7 @@ export default function DashboardScreen() {
     );
 
     if (viz === 'wave') {
-      const ser = metricSeries(t.metric!, statCtx, period);
+      const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
@@ -787,9 +791,9 @@ export default function DashboardScreen() {
     }
 
     if (viz === 'compare') {
-      const a = metricSeries(t.metric!, statCtx, period);
+      const a = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       const defB = metricById(t.metric2);
-      const b = defB ? metricSeries(t.metric2!, statCtx, period) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };
+      const b = defB ? metricSeries(t.metric2!, statCtx, period, 6, t.tag) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
@@ -797,7 +801,7 @@ export default function DashboardScreen() {
             <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(a.values[a.values.length - 1] ?? 0, a.unit)}</Text><Text style={s.statCmpKey}>{def.label}</Text></View>
             <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(b.values[b.values.length - 1] ?? 0, b.unit)}</Text><Text style={s.statCmpKey}>{defB?.label ?? '—'}</Text></View>
           </View>
-          <DualWaveChart data1={a.values} data2={b.values} color1={accentColor} color2={'#FBBF24'} />
+          <DualWaveChart data1={a.values} data2={b.values} color1={accentColor} color2={'#FBBF24'} independent={a.unit !== b.unit} />
           <View style={s.waveLabels}>
             {a.labels.map((l, i) => <Text key={i} style={s.waveLabel}>{l}</Text>)}
           </View>
@@ -824,7 +828,7 @@ export default function DashboardScreen() {
     }
 
     // number
-    const r = metricNumber(t.metric!, statCtx, period);
+    const r = metricNumber(t.metric!, statCtx, period, t.tag);
     const pct = t.target && t.target > 0 ? Math.min(1, r.value / t.target) : null;
     const over = t.target ? r.value > t.target : false;
     return (
@@ -2084,6 +2088,7 @@ export default function DashboardScreen() {
                           title={title}
                           isCustom={isCustom}
                           hiddenNow={hiddenSet.has(id)}
+                          empty={!nodes[id]}
                           accent={accentColor}
                           cardBg={cardBgDark}
                           onMoveDir={moveSection}
