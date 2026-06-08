@@ -245,7 +245,11 @@ function buildWavePath(data: number[], max: number) {
     const cpx = (px + cx) / 2;
     line += ` C ${cpx.toFixed(1)} ${py.toFixed(1)}, ${cpx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
   }
-  const fill = `${line} L ${WAVE_W} ${WAVE_H} L 0 ${WAVE_H} Z`;
+  // Fill drops straight DOWN at the first/last point (no diagonal wedge to the
+  // card corners — that slant looked off).
+  const fx0 = pts[0].x.toFixed(1);
+  const fxN = pts[pts.length - 1].x.toFixed(1);
+  const fill = `${line} L ${fxN} ${WAVE_H} L ${fx0} ${WAVE_H} Z`;
   return { line, fill, pts };
 }
 
@@ -417,22 +421,24 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
 // ─── Gradient greeting (big bold title with a subtle top-light gradient) ───────
 
 function GradientGreeting({ text, baseColor }: { text: string; baseColor: string }) {
+  // Heavy black title with a LIGHT gradient: the accent colour washes in from the
+  // LEFT and fades to near-white across the rest.
   return (
-    <Svg height={46} width="100%">
+    <Svg height={50} width="100%">
       <Defs>
         <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0"    stopColor="#FFFFFF"   stopOpacity="0.98" />
-          <Stop offset="0.5"  stopColor="#FFFFFF"   stopOpacity="0.9" />
-          <Stop offset="1"    stopColor={baseColor} stopOpacity="1" />
+          <Stop offset="0"    stopColor={baseColor} stopOpacity="1" />
+          <Stop offset="0.32" stopColor="#FFFFFF"   stopOpacity="0.97" />
+          <Stop offset="1"    stopColor="#FFFFFF"   stopOpacity="0.86" />
         </SvgLinearGradient>
       </Defs>
       <SvgText
         x={0}
-        y={37}
-        fontSize={40}
+        y={40}
+        fontSize={44}
         fontWeight="900"
         fill="url(#greetGrad)"
-        letterSpacing={-1.5}
+        letterSpacing={-2}
       >
         {text}
       </SvgText>
@@ -1258,51 +1264,66 @@ export default function DashboardScreen() {
           >
 
             {/* ══ MAIN GLASSMORPHISM CARD ══════════════════════════════════ */}
-            <TouchableOpacity
-              onPress={() => { haptic.tap(); openCheckIn(); }}
-              activeOpacity={0.92}
-              style={s.mainCard}
+            <LinearGradient
+              colors={[accentColor + 'CC', accentColor + '40', 'rgba(255,255,255,0.12)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.mainCardBorder}
             >
-              <AnimatedCardBg timeOfDay={timeOfDay} />
+              <TouchableOpacity
+                onPress={() => { haptic.tap(); openCheckIn(); }}
+                activeOpacity={0.92}
+                style={s.mainCard}
+              >
+                <AnimatedCardBg timeOfDay={timeOfDay} />
 
-              <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
-                {/* Soft bottom-up gradient inside card */}
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.18)']}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-                  pointerEvents="none"
-                />
-                <View style={s.moodGlassBorder} />
+                <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
+                  {/* Soft bottom-up gradient inside card */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.18)']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                    pointerEvents="none"
+                  />
+                  {/* Accent wash from the LEFT */}
+                  <LinearGradient
+                    colors={[accentColor + '2A', 'transparent']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0.3 }} end={{ x: 0.8, y: 0.6 }}
+                    pointerEvents="none"
+                  />
+                  <View style={s.moodGlassBorder} />
 
-                <View style={s.mainCardInner}>
-                  {/* Weather widget — top right */}
-                  {weather && (
-                    <View style={s.mainWeatherRow}>
-                      <CloudSun size={22} color={accentColor} strokeWidth={1.6} />
-                      <View style={s.mainWeatherInfo}>
-                        <Text style={s.mainWeatherTemp}>{weather.temp}°C</Text>
-                        <Text style={s.mainWeatherDesc}>{weather.desc.toUpperCase()}</Text>
-                      </View>
+                  <View style={s.mainCardInner}>
+                    {/* Top row: date/day on the LEFT, weather on the RIGHT */}
+                    <View style={s.mainTopRow}>
+                      <Text style={s.mainDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
+                      {weather && (
+                        <View style={s.mainWeatherRow}>
+                          <CloudSun size={20} color={accentColor} strokeWidth={1.7} />
+                          <View style={s.mainWeatherInfo}>
+                            <Text style={s.mainWeatherTemp}>{weather.temp}°C</Text>
+                            <Text style={s.mainWeatherDesc}>{weather.desc.toUpperCase()}</Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  )}
 
-                  {/* Date label + greeting — compact stacked. Greeting tinted with
-                      the time-of-day accent (cyan by day, blue by night). */}
-                  <View style={s.mainGreetingBlock}>
-                    <Text style={s.mainDate}>{dateLabel.toUpperCase()}</Text>
+                    {/* Heavy BLACK greeting, accent washing in from the left */}
                     <GradientGreeting text={greeting.toUpperCase()} baseColor={accentColor} />
-                  </View>
 
-                  {/* Bottom: dynamic contextual briefing — BOLD highlight */}
-                  <Text style={s.mainTaskLine}>
-                    {heroSummary.pre}
-                    <Text style={s.mainTaskBold}>{heroSummary.bold}</Text>
-                    {heroSummary.post}
-                  </Text>
-                </View>
-              </BlurView>
-            </TouchableOpacity>
+                    {/* Bottom: dynamic contextual briefing — BOLD highlight */}
+                    <Text style={s.mainTaskLine}>
+                      {heroSummary.pre}
+                      <Text style={s.mainTaskBold}>{heroSummary.bold}</Text>
+                      {heroSummary.post}
+                    </Text>
+                  </View>
+                </BlurView>
+
+                {/* A couple of sharper clouds drifting OVER the glass */}
+                <AnimatedCardBg timeOfDay={timeOfDay} layer="front" />
+              </TouchableOpacity>
+            </LinearGradient>
 
             {/* ══ HUMOR LINE — after main card ════════════════════════════ */}
             {todayEntry && (
@@ -2223,12 +2244,15 @@ const s = StyleSheet.create({
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[5] },
 
   // ── Main glassmorphism card (Figma) ───────────────────────────────────────
+  mainCardBorder: {
+    borderRadius: radius.xl + 1,
+    padding: 1.3,            // the gradient shows as a thin accent border
+  },
   mainCard: {
-    height: 176,
+    height: 190,
     borderRadius: radius.xl,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border.glass,
+    backgroundColor: colors.bg.primary,
   },
   moodBlob: {
     position: 'absolute',
@@ -2248,8 +2272,11 @@ const s = StyleSheet.create({
     flex: 1, paddingHorizontal: spacing[5], paddingVertical: spacing[4],
     justifyContent: 'space-between',
   },
+  mainTopRow: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing[3],
+  },
   mainWeatherRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-end',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   mainWeatherInfo: { alignItems: 'flex-end' },
   mainWeatherTemp: {
@@ -2260,7 +2287,7 @@ const s = StyleSheet.create({
   },
   mainGreetingBlock: { gap: 0 },
   mainDate: {
-    fontSize: 11, fontWeight: '500', color: 'rgba(255,255,255,0.40)', letterSpacing: 1,
+    flex: 1, fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.8,
   },
   mainGreeting: {
     fontSize: 40, fontWeight: '900', color: colors.white,

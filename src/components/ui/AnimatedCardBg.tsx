@@ -95,17 +95,17 @@ const CLOUD_SHAPES = [
   ],
 ];
 
-function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number; blurId: string }) {
-  const circles = CLOUD_SHAPES[shape];
+function CloudSvg({ shape, w, h, blurId, blur = 5.5 }: { shape: number; w: number; h: number; blurId: string; blur?: number }) {
+  const circles = CLOUD_SHAPES[shape % CLOUD_SHAPES.length];
   const rUnit = w / 8;
   const gradId = `${blurId}-g`;
   return (
     // Oversized viewBox padding so the heavy blur isn't clipped at the edges
     <Svg width={w} height={h} viewBox={`-20 -20 ${w + 40} ${h + 40}`}>
       <Defs>
-        {/* Heavy blur → foggy, haze-like clouds with very soft edges */}
+        {/* Blur → foggy, haze-like clouds with soft edges (less = sharper) */}
         <Filter id={blurId} x="-40%" y="-40%" width="180%" height="180%">
-          <FeGaussianBlur stdDeviation="5.5" />
+          <FeGaussianBlur stdDeviation={blur} />
         </Filter>
         {/* Radial fill → luminous puffy centre fading to soft transparent edges,
             so each puff reads like a real lit cloud instead of a flat blob. */}
@@ -135,25 +135,34 @@ function CloudSvg({ shape, w, h, blurId }: { shape: number; w: number; h: number
 // off-screen right, then reset off-screen left. They can NEVER appear mid-card
 // on spawn. Staggered delays spread them out so they don't clump.
 
-const TRAVEL_END = 520; // px — past the right edge of any card
+const TRAVEL_END = 540; // px — past the right edge of any card
 
-const CLOUD_DEFS: (CloudDef & { delay: number })[] = [
-  { w: 210, h: 72, initX: -250, y:  2, dur: 34000, op: 0.13, delay: 0     },
-  { w: 165, h: 60, initX: -210, y: 24, dur: 26000, op: 0.11, delay: 11000 },
-  { w: 230, h: 78, initX: -270, y:  8, dur: 44000, op: 0.12, delay: 5000  },
+// BACK clouds: drift behind the glass (blurred by the BlurView) — varied sizes
+// from tiny wisps to big cumulus, at different heights/speeds/opacities.
+const CLOUD_DEFS_BACK: (CloudDef & { delay: number; blur: number })[] = [
+  { w: 300, h: 96, initX: -340, y:  2, dur: 60000, op: 0.13, delay: 0,     blur: 6.0 },
+  { w: 120, h: 46, initX: -160, y: 30, dur: 26000, op: 0.10, delay: 9000,  blur: 5.0 },
+  { w: 210, h: 74, initX: -250, y: 14, dur: 40000, op: 0.12, delay: 4000,  blur: 5.5 },
+  { w: 90,  h: 38, initX: -130, y: 52, dur: 22000, op: 0.08, delay: 17000, blur: 4.5 },
+  { w: 250, h: 84, initX: -300, y:  6, dur: 52000, op: 0.11, delay: 26000, blur: 6.0 },
 ];
 
-function CloudLayer() {
-  const xAnims = useMemo(() =>
-    CLOUD_DEFS.map(c => new Animated.Value(c.initX)),
-  []);
+// FRONT clouds: a couple of faint, SHARPER wisps drifting OVER the card (not
+// blurred), so the sky reads with depth.
+const CLOUD_DEFS_FRONT: (CloudDef & { delay: number; blur: number })[] = [
+  { w: 150, h: 52, initX: -190, y: 10, dur: 50000, op: 0.07, delay: 3000,  blur: 2.6 },
+  { w: 100, h: 40, initX: -140, y: 44, dur: 36000, op: 0.05, delay: 21000, blur: 2.2 },
+];
 
+function CloudLayer({ layer = 'back' }: { layer?: 'back' | 'front' }) {
+  const defs = layer === 'front' ? CLOUD_DEFS_FRONT : CLOUD_DEFS_BACK;
+  const xAnims = useMemo(() => defs.map(c => new Animated.Value(c.initX)), [defs]);
   const loops = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    CLOUD_DEFS.forEach((c, i) => {
+    defs.forEach((c, i) => {
       const t = setTimeout(() => {
         if (!alive) return;
         const anim = Animated.loop(Animated.sequence([
@@ -171,24 +180,20 @@ function CloudLayer() {
       loops.current.forEach(l => l.stop());
       loops.current = [];
     };
-  }, []);
+  }, [defs, xAnims]);
 
   return (
     <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
-      {CLOUD_DEFS.map((c, i) => (
+      {defs.map((c, i) => (
         <Animated.View
           key={i}
           style={{
-            position: 'absolute',
-            top:    c.y,
-            left:   0,
-            width:  c.w,
-            height: c.h,
-            opacity: c.op,
+            position: 'absolute', top: c.y, left: 0,
+            width: c.w, height: c.h, opacity: c.op,
             transform: [{ translateX: xAnims[i] }],
           }}
         >
-          <CloudSvg shape={i} w={c.w} h={c.h} blurId={`cb${i}`} />
+          <CloudSvg shape={i} w={c.w} h={c.h} blurId={`c${layer}${i}`} blur={c.blur} />
         </Animated.View>
       ))}
     </View>
@@ -197,9 +202,11 @@ function CloudLayer() {
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
-interface Props { timeOfDay: TimeOfDay; }
+interface Props { timeOfDay: TimeOfDay; layer?: 'back' | 'front'; }
 
-export default function AnimatedCardBg({ timeOfDay }: Props) {
+export default function AnimatedCardBg({ timeOfDay, layer = 'back' }: Props) {
   const isNight = timeOfDay === 'night' || timeOfDay === 'evening' || timeOfDay === 'dawn';
-  return isNight ? <StarField /> : <CloudLayer />;
+  // Stars only behind the glass; front layer shows nothing at night.
+  if (isNight) return layer === 'front' ? null : <StarField />;
+  return <CloudLayer layer={layer} />;
 }
