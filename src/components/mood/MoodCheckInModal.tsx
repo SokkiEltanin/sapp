@@ -179,7 +179,10 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <KeyboardAvoidingView
-          behavior="padding"
+          // Android already pans the whole window over the keyboard
+          // (softwareKeyboardLayoutMode: 'pan'); adding padding here double-shifts
+          // the sheet and leaves a gap. iOS still needs padding.
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ width: '100%' }}
           pointerEvents="box-none"
         >

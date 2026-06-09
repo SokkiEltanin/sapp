@@ -93,13 +93,17 @@ export default function SettingsScreen() {
     ).sort((a, b) => b.date.localeCompare(a.date));
     const lastPaycheck = candidates[0] ?? null;
     const payMonth = lastPaycheck?.date.slice(0, 7) ?? null;
-    // Basis month = the month the rate is built from. Default: the previous
-    // completed month (the current one is partial). BUT if a NEWER paycheck has
-    // arrived (e.g. one dated this month), switch the basis to the paycheck's
-    // month — that's the period it actually covers.
+    // Salaries are paid in arrears: a paycheck DATED in month M is FOR the work
+    // of month M-1. So the hours basis = the month BEFORE the last paycheck's
+    // date (a June paycheck → May hours). No paycheck → previous calendar month.
+    const monthBefore = (ym: string) => {
+      const [y, m] = ym.split('-').map(Number);
+      const d = new Date(y, m - 2, 1);
+      return `${d.getFullYear()}-${p2(d.getMonth() + 1)}`;
+    };
     const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonth = `${prevDate.getFullYear()}-${p2(prevDate.getMonth() + 1)}`;
-    const basisMonth = (payMonth && payMonth > prevMonth) ? payMonth : prevMonth;
+    const basisMonth = payMonth ? monthBefore(payMonth) : prevMonth;
     const basisHours = hoursIn(basisMonth);
     const basisShifts = shiftsIn(basisMonth);
     // Effective inputs the live rate uses (manual override wins, else computed).
@@ -114,7 +118,7 @@ export default function SettingsScreen() {
     const perDay = rate * avgShiftH;
     return {
       eventCount: monthCount, monthHours, basisShifts, lastPaycheck, payMonth,
-      basisMonth, basisHours, basisFromPaycheck: basisMonth === payMonth,
+      basisMonth, basisHours, basisFromPaycheck: !!lastPaycheck,
       hoursUsed, salaryUsed, rate, avgShiftH, perDay, hasHoursOvr, hasSalaryOvr,
     };
   }, [events, gcalEvents, expenses, workSettings]);
@@ -474,7 +478,7 @@ export default function SettingsScreen() {
                   {workDiag?.hasHoursOvr
                     ? 'Ręcznie (nadpisane) — wyczyść pole, aby wrócić do kalendarza'
                     : workDiag?.basisFromPaycheck
-                      ? `Z kalendarza — miesiąc wypłaty (${workDiag.basisMonth}) — kliknij, aby nadpisać`
+                      ? `Z kalendarza — miesiąc którego dotyczy wypłata (${workDiag.basisMonth}) — kliknij, aby nadpisać`
                       : `Z kalendarza — poprzedni miesiąc (${workDiag?.basisMonth ?? '—'}) — kliknij, aby nadpisać`}
                 </Text>
               </View>
@@ -547,8 +551,8 @@ export default function SettingsScreen() {
 
                 <Text style={styles.diagHint}>
                   {workDiag.basisFromPaycheck
-                    ? `Stawka liczona z miesiąca wypłaty (${workDiag.basisMonth}) i ostatniej wypłaty.`
-                    : `Stawka liczona z POPRZEDNIEGO (pełnego) miesiąca (${workDiag.basisMonth}) i ostatniej wypłaty.`}
+                    ? `Wypłata jest z dołu: ostatnia wypłata${workDiag.payMonth ? ` (${workDiag.payMonth})` : ''} ÷ godziny z miesiąca, którego dotyczy (${workDiag.basisMonth}).`
+                    : `Stawka z POPRZEDNIEGO (pełnego) miesiąca (${workDiag.basisMonth}).`}
                   {' '}W tym miesiącu masz na razie {workDiag.monthHours.toFixed(1)} h — to tylko podgląd na żywo.
                 </Text>
 

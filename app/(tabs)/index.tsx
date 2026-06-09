@@ -332,22 +332,28 @@ function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: 
   const total = rows.reduce((s, r) => s + r.value, 0) || 1;
   const R = 30, SW = 12, C = 2 * Math.PI * R;
   let acc = 0;
+  const unit = rows[0]?.unit ?? '';
+  const totalLabel = unit === 'zł' ? `${Math.round(total)}` : unit === '×' ? `${Math.round(total)}` : `${Math.round(total)}`;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-      <Svg width={84} height={84} viewBox="0 0 84 84">
-        <SvgCircle cx={42} cy={42} r={R} stroke="rgba(255,255,255,0.06)" strokeWidth={SW} fill="none" />
-        {rows.map((r, i) => {
-          const frac = r.value / total;
-          const dash = `${(frac * C).toFixed(2)} ${C.toFixed(2)}`;
-          const off = -(acc * C);
-          acc += frac;
-          return (
-            <SvgCircle key={i} cx={42} cy={42} r={R}
-              stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth={SW} fill="none"
-              strokeDasharray={dash} strokeDashoffset={off} transform="rotate(-90 42 42)" />
-          );
-        })}
-      </Svg>
+      <View style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={84} height={84} viewBox="0 0 84 84" style={{ position: 'absolute' }}>
+          <SvgCircle cx={42} cy={42} r={R} stroke="rgba(255,255,255,0.06)" strokeWidth={SW} fill="none" />
+          {rows.map((r, i) => {
+            const frac = r.value / total;
+            const dash = `${(frac * C).toFixed(2)} ${C.toFixed(2)}`;
+            const off = -(acc * C);
+            acc += frac;
+            return (
+              <SvgCircle key={i} cx={42} cy={42} r={R}
+                stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth={SW} fill="none"
+                strokeDasharray={dash} strokeDashoffset={off} transform="rotate(-90 42 42)" />
+            );
+          })}
+        </Svg>
+        <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>{totalLabel}</Text>
+        <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>{unit === 'zł' ? 'zł' : 'razem'}</Text>
+      </View>
       <View style={{ flex: 1, gap: 4 }}>
         {rows.map((r, i) => (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -829,30 +835,54 @@ export default function DashboardScreen() {
 
     if (viz === 'list') {
       const rows = metricList(t.metric!, statCtx);
+      const maxV = rows[0]?.value || 1;
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
           {rows.length === 0 ? (
             <Text style={s.statSub}>Brak danych jeszcze.</Text>
           ) : rows.map((r, i) => (
-            <View key={r.label + i} style={s.statListRow}>
+            <View key={r.label + i} style={s.statListRow2}>
               <Text style={s.statListRank}>{i + 1}</Text>
-              <Text style={s.statListLabel} numberOfLines={1}>{r.label}</Text>
-              <Text style={[s.statListVal, { color: accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+              <View style={{ flex: 1, gap: 4 }}>
+                <View style={s.topNameRow}>
+                  <Text style={s.statListLabel} numberOfLines={1}>{r.label}</Text>
+                  <Text style={[s.statListVal, { color: accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+                </View>
+                <View style={s.topBarTrack}>
+                  <View style={[s.topBarFill, { width: `${Math.max(6, (r.value / maxV) * 100)}%`, backgroundColor: accentColor }]} />
+                </View>
+              </View>
             </View>
           ))}
         </View>
       );
     }
 
-    // number
+    // number — big value + trend vs previous period + optional goal/sparkline
     const r = metricNumber(t.metric!, statCtx, period, t.tag);
     const pct = t.target && t.target > 0 ? Math.min(1, r.value / t.target) : null;
     const over = t.target ? r.value > t.target : false;
+    let deltaPct: number | null = null; let trendUp = false; let spark: number[] | null = null;
+    if (def.periodic) {
+      const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
+      spark = ser.values;
+      const cur = ser.values[ser.values.length - 1] ?? 0;
+      const prev = ser.values[ser.values.length - 2] ?? 0;
+      if (prev > 0) { deltaPct = Math.round(((cur - prev) / prev) * 100); trendUp = cur >= prev; }
+    }
     return (
       <View style={[s.card, { backgroundColor: cardBgDark }]}>
         {header}
-        <Text style={[s.statBig, { color: over ? colors.accent.red : accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+        <View style={s.statNumRow}>
+          <Text style={[s.statBig, { color: over ? colors.accent.red : accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+          {deltaPct != null && (
+            <View style={[s.statDelta, { backgroundColor: (trendUp ? '#2AC68F' : '#FF6B6B') + '1E' }]}>
+              {trendUp ? <TrendingUp size={11} color="#2AC68F" /> : <TrendingDown size={11} color="#FF6B6B" />}
+              <Text style={[s.statDeltaText, { color: trendUp ? '#2AC68F' : '#FF6B6B' }]}>{deltaPct >= 0 ? '+' : ''}{deltaPct}%</Text>
+            </View>
+          )}
+        </View>
         {pct != null ? (
           <>
             <View style={s.statTargetTrack}>
@@ -860,7 +890,16 @@ export default function DashboardScreen() {
             </View>
             <Text style={s.statSub}>{Math.round((r.value / t.target!) * 100)}% celu ({fmtStat(t.target!, r.unit)})</Text>
           </>
-        ) : (r.sub && <Text style={s.statSub}>{r.sub}</Text>)}
+        ) : (
+          <Text style={s.statSub}>
+            {r.sub}{deltaPct != null ? `  ·  ${trendUp ? '↑' : '↓'} vs ${period === 'month' ? 'poprz. miesiąc' : 'poprz. tydzień'}` : ''}
+          </Text>
+        )}
+        {spark && spark.some(v => v > 0) && (
+          <View style={{ marginTop: spacing[2], opacity: 0.8 }}>
+            <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} />
+          </View>
+        )}
       </View>
     );
   };
@@ -2557,6 +2596,10 @@ const s = StyleSheet.create({
 
   // ── Stat widgets ──
   statBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 2 },
+  statNumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
+  statDelta: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
+  statDeltaText: { fontSize: 11, fontWeight: '800' },
+  statListRow2: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
   statSub: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
   statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' },
   statTargetFill: { height: 6, borderRadius: 3 },

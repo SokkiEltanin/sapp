@@ -114,13 +114,14 @@ export function useWorkEarnings(
       const hoursForMonth = (ym: string) => colorMode.workEvents
         .filter(e => e.date.slice(0, 7) === ym)
         .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
-      // Basis month = the previous completed month by default (current is
-      // partial → would inflate the rate). If a NEWER paycheck arrived (dated
-      // this month), use the paycheck's month instead.
+      // Salaries are paid in arrears: a paycheck dated month M is FOR month M-1.
+      // So the hours basis = the month BEFORE the paycheck's date; with no
+      // paycheck, the previous completed month (current is partial).
       const now = new Date();
       const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonth = `${prev.getFullYear()}-${pad(prev.getMonth() + 1)}`;
-      const basisMonth = (salaryInfo.month && salaryInfo.month > prevMonth) ? salaryInfo.month : prevMonth;
+      const monthBefore = (ym: string) => { const [y, m] = ym.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+      const basisMonth = salaryInfo.month ? monthBefore(salaryInfo.month) : prevMonth;
       const hours = hoursOverride || hoursForMonth(basisMonth) || hoursForMonth(prevMonth) || settings.hoursPerMonth;
       return hours > 0 ? salaryUsed / (hours * 3600) : 0;
     }
