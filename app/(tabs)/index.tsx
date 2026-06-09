@@ -40,7 +40,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
-import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
+import { loadNameAliases, canonicalProductName, normalizeProductName, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
@@ -551,6 +551,7 @@ export default function DashboardScreen() {
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
+  const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [allNotes, setAllNotes] = useState<Note[]>([]);
 
@@ -683,6 +684,7 @@ export default function DashboardScreen() {
 
   useEffect(() => { loadPomSessions(); }, []);
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
+  useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useFocusEffect(useCallback(() => {
     loadPomSessions();
     // Reload budgets + tag rules so a limit added in Settings shows immediately
@@ -711,7 +713,8 @@ export default function DashboardScreen() {
     habitsTotal: habits.length,
     habitsDone: habitsDoneIds.length,
     nameAliases,
-  }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases]);
+    weightMemory,
+  }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory]);
 
   // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
   const weeklyInsights = useMemo(() => {
@@ -1225,10 +1228,12 @@ export default function DashboardScreen() {
       if (!(e.date ?? '').startsWith(monthKey)) continue;
       for (const it of (e.receiptItems ?? [])) {
         if (!countsForConsumption(it)) continue;
-        // explicit weightKg wins; otherwise a fractional qty = kg
+        // weightKg (explicit) → fractional qty (receipt-weighed) → learned weight
         const q0 = it.quantity ?? 0;
+        const learned = it.name ? weightFor(it.name, weightMemory) : undefined;
         const kg = it.weightKg && it.weightKg > 0 ? it.weightKg
-          : (q0 > 0 && q0 < 50 && !Number.isInteger(q0)) ? q0 : 0;
+          : (q0 > 0 && q0 < 50 && !Number.isInteger(q0)) ? q0
+          : (learned && q0 > 0 && q0 < 50) ? learned * (Number.isInteger(q0) ? q0 : 1) : 0;
         if (kg <= 0) continue;
         const tags = it.tags ?? [];
         for (const g of GROUPS) {
@@ -1249,7 +1254,7 @@ export default function DashboardScreen() {
       out.push(`Ten miesiąc: ${kg.toFixed(1).replace('.0', '')} kg ${g.label}${parts.length ? ` — ${parts.join(', ')}` : ''}`);
     }
     return out;
-  }, [scopedExpenses, nameAliases]);
+  }, [scopedExpenses, nameAliases, weightMemory]);
 
   // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
   // Grouped by CANONICAL identity so OCR variants / cross-store spellings of the

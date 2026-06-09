@@ -1,6 +1,6 @@
 import { Expense, MoodEntry, CalendarEvent, WorkSettings, Task } from '@/types';
 import { countsForConsumption, inScope, StatsScope } from '@/store/statsScope';
-import { canonicalProductName, normalizeProductName } from '@/utils/productMemory';
+import { canonicalProductName, normalizeProductName, weightFor, WeightMemory } from '@/utils/productMemory';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { WidgetViz } from '@/store/dashboardLayout';
 
@@ -70,6 +70,7 @@ export interface StatCtx {
   habitsTotal: number;
   habitsDone: number;
   nameAliases: Record<string, string>;
+  weightMemory: WeightMemory;
 }
 
 type Period = 'week' | 'month';
@@ -110,12 +111,18 @@ function inWeek(e: Expense, dates: string[]) { const s = new Set(dates); return 
 const GROUP_TAG: Record<string, string> = { cheeseKg: 'nabiał', meatKg: 'mięso', fruitKg: 'owoce', vegKg: 'warzywa' };
 const SWEETS_TAGS = ['słodycze'];
 
-// Weight of a receipt item in kg: explicit weightKg wins; otherwise a fractional
-// quantity is treated as kg (weighed goods), integer "piece" counts are ignored.
-function itemKg(it: { weightKg?: number; quantity?: number }): number {
+// Weight of a receipt item in kg:
+//  1. explicit weightKg on the item wins,
+//  2. a fractional quantity is treated as kg (weighed goods),
+//  3. otherwise the per-product LEARNED weight × the piece count — so once you've
+//     set a product's weight, all its entries (past & future) count with it.
+function itemKg(it: { name?: string; weightKg?: number; quantity?: number }, wmem: WeightMemory): number {
   if (it.weightKg && it.weightKg > 0) return it.weightKg;
   const q = it.quantity ?? 0;
-  return (q > 0 && q < 50 && !Number.isInteger(q)) ? q : 0;
+  if (q > 0 && q < 50 && !Number.isInteger(q)) return q;          // weighed (kg)
+  const learned = it.name ? weightFor(it.name, wmem) : undefined;  // kg per piece
+  if (learned && q > 0 && q < 50) return learned * (Number.isInteger(q) ? q : 1);
+  return 0;
 }
 
 // ─── Core numeric metric for one period bucket ────────────────────────────────
@@ -156,7 +163,7 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         for (const it of (e.receiptItems ?? [])) {
           if (!countsForConsumption(it)) continue;
           if (!(it.tags ?? []).includes(tag)) continue;
-          kg += itemKg(it);
+          kg += itemKg(it, ctx.weightMemory);
         }
       }
       return kg;
@@ -197,7 +204,7 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         for (const it of (e.receiptItems ?? [])) {
           if (!countsForConsumption(it)) continue;
           if (!(it.tags ?? []).includes(tag)) continue;
-          kg += itemKg(it);
+          kg += itemKg(it, ctx.weightMemory);
         }
       }
       return kg;

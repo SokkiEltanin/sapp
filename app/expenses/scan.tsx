@@ -15,6 +15,7 @@ import {
   loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory,
   loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
   loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
+  loadWeightMemory, saveWeightMemory, weightFor, WeightMemory,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -56,6 +57,7 @@ export default function ScanReceiptModal() {
   const [editedTags, setEditedTags]   = useState<Record<number, string[]>>({});
   const [editedExcluded, setEditedExcluded] = useState<Record<number, boolean>>({});
   const [editedWeight, setEditedWeight] = useState<Record<number, string>>({});
+  const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
   const [customTagPickerFor, setCustomTagPickerFor] = useState<number | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -69,6 +71,7 @@ export default function ScanReceiptModal() {
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
+  useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
 
   const getCategory = (i: number): ExpenseCategory =>
     editedCats[i] ?? (receipt?.products[i].category ?? 'other');
@@ -92,8 +95,12 @@ export default function ScanReceiptModal() {
   // Dairy (ser) defaults to 1 kg — the user's usual XXL pack.
   const WEIGH_TAGS = ['nabiał', 'mięso', 'ryby', 'owoce', 'warzywa'];
   const isWeighable = (i: number) => getProductTags(i).some(t => WEIGH_TAGS.includes(t));
-  const getWeight = (i: number): string =>
-    editedWeight[i] !== undefined ? editedWeight[i] : (getProductTags(i).includes('nabiał') ? '1' : '');
+  const getWeight = (i: number): string => {
+    if (editedWeight[i] !== undefined) return editedWeight[i];
+    const learned = weightFor(getProductName(i), weightMemory); // remembered for this product
+    if (learned) return String(learned);
+    return getProductTags(i).includes('nabiał') ? '1' : ''; // dairy starts at 1 kg
+  };
 
   const addCustomProduct = () => {
     setCustomProducts(prev => [...prev, { name: '', price: '0.00', quantity: '1', category: 'groceries', tags: [] }]);
@@ -301,6 +308,11 @@ export default function ScanReceiptModal() {
       saveTagMemory(receipt.products, editedTags, editedNames).catch(() => {});
       // Learn renamed products → canonical name (unifies stats across OCR/stores).
       saveNameAliases(receipt.products, editedNames).catch(() => {});
+      // Learn per-product weights for the items being saved.
+      saveWeightMemory(Array.from(selected).map(i => {
+        const w = parseFloat(getWeight(i).replace(',', '.'));
+        return { name: getProductName(i), kg: isNaN(w) ? 0 : w };
+      })).catch(() => {});
       // Learn per-store verdicts on SUSPECT lines: kept = real product, dropped = junk.
       const verdicts = receipt.products
         .map((p, i) => ({ p, i }))

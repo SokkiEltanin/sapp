@@ -4,6 +4,7 @@ import { ExpenseCategory } from '@/types';
 const KEY      = 'product_category_memory';
 const TAG_KEY  = 'product_tag_memory';
 const NAME_KEY = 'product_name_aliases';
+const WEIGHT_KEY = 'product_weight_memory';
 const MAX_ENTRIES = 500;
 
 type ProductMemory = Record<string, ExpenseCategory>;
@@ -227,6 +228,40 @@ export function canonicalProductName(raw: string, aliases: NameAliases): string 
   const fuzzy = findFuzzyMatch(key, aliases);
   if (fuzzy) return fuzzy;
   return raw.trim();
+}
+
+// ─── Per-product weight memory (kg) ───────────────────────────────────────────
+// Receipts rarely list grams. The first time you set a weight for a product the
+// app remembers it (keyed by name), so the same product defaults to that weight
+// next time AND its past entries are counted with it. Always overridable.
+
+export type WeightMemory = Record<string, number>; // normalizedName → kg
+
+export async function loadWeightMemory(): Promise<WeightMemory> {
+  try {
+    const raw = await AsyncStorage.getItem(WEIGHT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveWeightMemory(items: { name: string; kg: number }[]): Promise<void> {
+  const valid = items.filter(i => i.name.trim() && i.kg > 0);
+  if (valid.length === 0) return;
+  try {
+    const mem = await loadWeightMemory();
+    for (const i of valid) mem[normalize(i.name)] = i.kg;
+    const entries = Object.entries(mem);
+    const trimmed = entries.length > MAX_ENTRIES ? Object.fromEntries(entries.slice(-MAX_ENTRIES)) : mem;
+    await AsyncStorage.setItem(WEIGHT_KEY, JSON.stringify(trimmed));
+  } catch {}
+}
+
+// Learned weight for a product name (exact then fuzzy).
+export function weightFor(name: string, mem: WeightMemory): number | undefined {
+  const key = normalize(name);
+  return mem[key] ?? findFuzzyMatch(key, mem);
 }
 
 // ─── Per-store line decisions (is this even a product?) ───────────────────────
