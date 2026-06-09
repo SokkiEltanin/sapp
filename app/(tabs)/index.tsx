@@ -40,6 +40,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
+import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
@@ -427,11 +428,13 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
 
 // ─── Gradient greeting (big bold title with a subtle top-light gradient) ───────
 
-function GradientGreeting({ text, baseColor }: { text: string; baseColor: string }) {
-  // Heavy black title with a LIGHT gradient: the accent colour washes in from the
-  // LEFT and fades to near-white across the rest.
+function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: string; font: HeroFont }) {
+  // Title with a LIGHT gradient (accent washing in from the LEFT). Font family,
+  // size and line box come from the chosen preset (system fonts have different
+  // metrics, so each is tuned).
+  const label = font.upper ? text.toUpperCase() : text;
   return (
-    <Svg height={50} width="100%">
+    <Svg height={font.height} width="100%">
       <Defs>
         <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0"    stopColor={baseColor} stopOpacity="1" />
@@ -441,13 +444,15 @@ function GradientGreeting({ text, baseColor }: { text: string; baseColor: string
       </Defs>
       <SvgText
         x={0}
-        y={40}
-        fontSize={44}
-        fontWeight="900"
+        y={font.baseY}
+        fontSize={font.size}
+        fontWeight={font.weight as any}
+        fontFamily={font.family}
+        fontStyle={font.italic ? 'italic' : 'normal'}
         fill="url(#greetGrad)"
-        letterSpacing={-2}
+        letterSpacing={font.spacing}
       >
-        {text}
+        {label}
       </SvgText>
     </Svg>
   );
@@ -533,6 +538,7 @@ function DashEditRow({
 
 export default function DashboardScreen() {
   const { color: accentColor, greeting, gradientTop, cardBg, cardBgDark, timeOfDay } = useTimeAccent();
+  const heroFont = heroFontById(useHeroFont(s => s.fontId));
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
   const pomodoro = usePomodoroStore();
@@ -1392,8 +1398,8 @@ export default function DashboardScreen() {
                       )}
                     </View>
 
-                    {/* Heavy BLACK greeting, accent washing in from the left */}
-                    <GradientGreeting text={greeting.toUpperCase()} baseColor={accentColor} />
+                    {/* Greeting in the chosen font, accent washing in from the left */}
+                    <GradientGreeting text={greeting} baseColor={accentColor} font={heroFont} />
 
                     {/* Bottom: dynamic contextual briefing — BOLD highlight */}
                     <Text style={s.mainTaskLine}>

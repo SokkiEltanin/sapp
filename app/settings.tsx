@@ -36,6 +36,7 @@ import { appSettings } from '@/utils/appSettings';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { useWorkStore } from '@/store/workStore';
 import { useDashboardLayout } from '@/store/dashboardLayout';
+import { useHeroFont, HERO_FONTS } from '@/store/heroFont';
 import { workService } from '@/services/workService';
 
 GoogleSignin.configure({
@@ -44,13 +45,16 @@ GoogleSignin.configure({
   scopes: ['https://www.googleapis.com/auth/calendar.events'],
 });
 
-const APP_VERSION = '6.0.0';
+const APP_VERSION = 'V2';
+const APP_BUILD = 213; // bump on each meaningful build
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
   const { tasks, events, gcalEvents } = useCalendarStore();
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
+  const heroFontId = useHeroFont(s => s.fontId);
+  const setHeroFont = useHeroFont(s => s.setFont);
 
   // ── Work calculation diagnostics ────────────────────────────────────────────
   // Shows EXACTLY what the rate is derived from: [JD] events → hours this month,
@@ -1010,6 +1014,38 @@ export default function SettingsScreen() {
               </View>
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
+
+            {/* Hero greeting font */}
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#F472B618' }]}>
+                  <LucideIcons.Type size={16} color="#F472B6" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Czcionka powitania</Text>
+                  <Text style={styles.rowSub}>Napis „DZIEŃ DOBRY" na dashboardzie</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+                {HERO_FONTS.map(f => {
+                  const active = heroFontId === f.id;
+                  return (
+                    <PressableScale key={f.id} onPress={() => { haptic.tap(); setHeroFont(f.id); }}>
+                      <View style={{
+                        paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md,
+                        borderWidth: 1, borderColor: active ? '#F472B6' : colors.border.default,
+                        backgroundColor: active ? '#F472B622' : colors.bg.elevated,
+                      }}>
+                        <Text style={{ fontFamily: f.family, fontWeight: f.weight as any, fontStyle: f.italic ? 'italic' : 'normal', fontSize: 16, color: active ? '#F472B6' : colors.text.primary }}>
+                          {f.upper ? 'DZIEŃ DOBRY' : 'Dzień dobry'}
+                        </Text>
+                        <Text style={{ fontSize: 9, color: colors.text.muted, marginTop: 2 }}>{f.label}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
           </View>
         </View>
 
@@ -1043,7 +1079,7 @@ export default function SettingsScreen() {
               </View>
               <View>
                 <Text style={styles.appName}>Sapp</Text>
-                <Text style={styles.appVersion}>Wersja {APP_VERSION}</Text>
+                <Text style={styles.appVersion}>{APP_VERSION} · BUILD #{APP_BUILD}</Text>
               </View>
             </View>
             <Text style={styles.aboutDesc}>

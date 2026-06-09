@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
-  Animated, Pressable, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
+  Animated, Pressable, TouchableOpacity, TextInput,
 } from 'react-native';
 import { X, Check, Plus } from 'lucide-react-native';
 
@@ -13,6 +13,7 @@ import Chip from '@/components/ui/Chip';
 import { MoodEntry, MoodLevel, MOOD_COLORS } from '@/types';
 import { moodService } from '@/services/moodService';
 import { useMoodStore } from '@/store/moodStore';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const PRESET_TAGS = [
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export default function MoodCheckInModal({ visible, onClose, existingEntry }: Props) {
+  const kb = useKeyboardHeight();
   const [mood, setMood]         = useState<MoodLevel | undefined>(existingEntry?.mood);
   const [energy, setEnergy]     = useState<MoodLevel | undefined>(existingEntry?.energy);
   const [note, setNote]         = useState(existingEntry?.note ?? '');
@@ -176,16 +178,8 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
 
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
-      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+      <Animated.View style={[styles.overlay, { opacity: fadeAnim, paddingBottom: kb }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <KeyboardAvoidingView
-          // Android already pans the whole window over the keyboard
-          // (softwareKeyboardLayoutMode: 'pan'); adding padding here double-shifts
-          // the sheet and leaves a gap. iOS still needs padding.
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ width: '100%' }}
-          pointerEvents="box-none"
-        >
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
 
           {/* Header */}
@@ -281,7 +275,6 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               </View>
           </ScrollView>
         </Animated.View>
-        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );

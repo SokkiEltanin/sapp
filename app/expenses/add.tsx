@@ -22,6 +22,9 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getPayers, addPayer } from '@/utils/payers';
 import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
+import { getBalanceOffset } from '@/utils/accountBalance';
+import { isMine } from '@/store/statsScope';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
@@ -57,12 +60,27 @@ export default function AddExpenseModal() {
   });
   const addExpense  = useExpensesStore((s) => s.addExpense);
   const expenses    = useExpensesStore((s) => s.expenses);
+  const [balanceOffset, setBalanceOffset] = useState(0);
+  const kb = useKeyboardHeight();
 
   useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
+  useEffect(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []);
 
   const isIncome = txType === 'income';
-  const amountColor = isIncome ? colors.accent.success : colors.text.primary;
+  const amountColor = isIncome ? '#2AC68F' : '#E43434';
+
+  // Current account balance (mine only — matches Finances) + projection after this.
+  const accountBalance = (() => {
+    const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
+    let net = 0;
+    for (const e of unique) { if (!isMine(e)) continue; net += e.type === 'income' ? e.amount : -e.amount; }
+    return balanceOffset + net;
+  })();
+  const amtNum = parseFloat(amount.replace(',', '.'));
+  const projectedBalance = !isNaN(amtNum) && amtNum > 0
+    ? accountBalance + (isIncome ? amtNum : -amtNum)
+    : null;
   const quickTags = isIncome ? INCOME_TAGS : EXPENSE_TAGS;
 
   const nowM = new Date().toISOString().slice(0, 7);
@@ -144,10 +162,7 @@ export default function AddExpenseModal() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
           <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
@@ -181,8 +196,9 @@ export default function AddExpenseModal() {
 
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: spacing[6] + kb }]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
           {/* Amount hero */}
@@ -199,9 +215,18 @@ export default function AddExpenseModal() {
               />
             </View>
             <View style={styles.amountDivider} />
-            <Text style={styles.amountHint}>
-              {isIncome ? 'Kwota przychodu' : 'Kwota wydatku'}
-            </Text>
+            <View style={styles.amountFootRow}>
+              <Text style={styles.amountHint}>
+                {isIncome ? 'Kwota przychodu' : 'Kwota wydatku'}
+              </Text>
+              {projectedBalance != null && (
+                <Text style={styles.amountProjected}>
+                  Zostanie <Text style={{ color: projectedBalance >= 0 ? '#2AC68F' : '#FF8A8A', fontWeight: '800' }}>
+                    {projectedBalance >= 0 ? '' : '−'}{Math.abs(Math.round(projectedBalance))} zł
+                  </Text>
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Note */}
@@ -336,7 +361,7 @@ export default function AddExpenseModal() {
           </View>
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { marginBottom: kb }]}>
           <AnimatedButton
             onPress={handleSave}
             label={saving ? 'Zapisuję...' : (isIncome ? 'Zapisz przychód' : 'Zapisz wydatek')}
@@ -346,7 +371,7 @@ export default function AddExpenseModal() {
             disabled={saving}
           />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -386,9 +411,14 @@ const styles = StyleSheet.create({
   },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   currencySymbol: { ...typography.h3, fontWeight: '300', fontSize: 20 },
-  amountInput: { fontSize: 38, fontWeight: '800', letterSpacing: -1 },
+  amountInput: {
+    fontSize: 38, fontWeight: '800', letterSpacing: -1,
+    lineHeight: 46, paddingVertical: 2, includeFontPadding: false as any, textAlignVertical: 'center',
+  },
   amountDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginTop: spacing[1] },
   amountHint: { ...typography.caption, fontSize: 11, letterSpacing: 0.5, color: colors.text.muted },
+  amountFootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
+  amountProjected: { fontSize: 11.5, color: colors.text.muted, fontWeight: '600' },
   section: { gap: spacing[3] },
   payerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   payerChip: {

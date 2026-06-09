@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Circle as SvgCircle, Text as SvgText, G as SvgG } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Circle as SvgCircle, Text as SvgText, G as SvgG, Line as SvgLine } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag } from 'lucide-react-native';
 import { format } from 'date-fns';
@@ -96,16 +96,20 @@ function DualFinWave({ exp, inc, markers }: { exp: number[]; inc: number[]; mark
       <Path d={I.fill} fill="url(#finInc)" />
       <Path d={E.line} stroke="#E43434" strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
       <Path d={I.line} stroke="#2AC68F" strokeWidth="1.8" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 3" />
-      {/* Key expenses — a dot on the line + a tiny label, kept subtle */}
-      {(markers ?? []).map((m, i) => {
+      {/* Key expenses — dot on the line + a label pinned to a top corner (first
+          left, second right) with a faint connector, so they never overlap. */}
+      {(markers ?? []).slice(0, 2).map((m, i) => {
         const p = E.pts[m.col];
         if (!p) return null;
-        const left = p.x < WAVE_W * 0.5;
+        const onLeft = i === 0;                  // first label → top-left, second → top-right
+        const lx = onLeft ? 3 : WAVE_W - 3;
+        const ly = 8;
         return (
           <SvgG key={i}>
+            <SvgLine x1={p.x} y1={p.y} x2={lx} y2={ly + 2} stroke="rgba(228,52,52,0.35)" strokeWidth={0.8} />
             <SvgCircle cx={p.x} cy={p.y} r={3} fill="#FFFFFF" stroke="#E43434" strokeWidth={1.5} />
-            <SvgText x={p.x + (left ? 5 : -5)} y={Math.max(9, p.y - 5)} fontSize={8} fontWeight="700"
-              fill="rgba(255,255,255,0.85)" textAnchor={left ? 'start' : 'end'}>
+            <SvgText x={lx} y={ly} fontSize={8} fontWeight="700"
+              fill="rgba(255,255,255,0.9)" textAnchor={onLeft ? 'start' : 'end'}>
               {m.label}
             </SvgText>
           </SvgG>
