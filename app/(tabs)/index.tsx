@@ -37,7 +37,7 @@ import {
 } from '@/types';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
-import { getTagBudgetRules, TagBudgetRule } from '@/utils/tagBudgets';
+import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel } from '@/utils/tagBudgets';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
 import { loadNameAliases, canonicalProductName, normalizeProductName, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
@@ -1111,18 +1111,20 @@ export default function DashboardScreen() {
     return tagRules
       .filter(r => r.limit > 0)
       .map(rule => {
+        const tags = ruleTags(rule);                    // one or more tags combined
+        const hasAny = (arr?: string[]) => !!arr && tags.some(t => arr.includes(t));
         let spend = 0;
         for (const e of scopedExpenses) {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
-          if (e.tags?.includes(rule.tag)) spend += e.amount;
-          else if (e.receiptItems?.some(it => countsForConsumption(it) && it.tags.includes(rule.tag))) {
+          if (hasAny(e.tags)) spend += e.amount;
+          else if (e.receiptItems?.some(it => countsForConsumption(it) && hasAny(it.tags))) {
             spend += e.receiptItems
-              .filter(it => countsForConsumption(it) && it.tags.includes(rule.tag))
+              .filter(it => countsForConsumption(it) && hasAny(it.tags))
               .reduce((s, it) => s + it.price, 0);
           }
         }
-        return { ...rule, spend, pct: spend / rule.limit };
+        return { ...rule, spend, pct: spend / rule.limit, label: ruleLabel(rule) };
       })
       .sort((a, b) => b.pct - a.pct);
   }, [tagRules, scopedExpenses, today, weekDates]);
@@ -1409,7 +1411,7 @@ export default function DashboardScreen() {
                 >
                   <Text style={s.budgetWarnText}>
                     {tagLimitMsg(t.pct)}{' · '}
-                    <Text style={s.budgetWarnBold}>#{t.tag}</Text>
+                    <Text style={s.budgetWarnBold}>{t.label}</Text>
                     <Text style={s.budgetWarnPeriod}>{t.period === 'week' ? '  tygodniowy' : '  miesięczny'}</Text>
                     {'   '}
                     <Text style={[s.budgetWarnPct, over && { color: colors.accent.red }]}>

@@ -25,7 +25,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { getBudgets, saveBudgets, MonthlyBudgets } from '@/utils/budgets';
-import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS } from '@/utils/tagBudgets';
+import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, ruleLabel } from '@/utils/tagBudgets';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -283,16 +283,19 @@ export default function SettingsScreen() {
   }, []);
 
   const handleAddTagRule = async () => {
-    const tag = newTag.trim().toLowerCase();
+    // Allow several tags separated by "+" or "," → one combined limit.
+    const tags = newTag.split(/[+,]/).map(t => t.trim().toLowerCase()).filter(Boolean);
     const limit = parseFloat(newTagLimit.replace(',', '.'));
-    if (!tag || !limit || limit <= 0) return;
-    if (tagRules.some(r => r.tag === tag && r.period === newTagPeriod)) {
-      toast.error('Reguła dla tego tagu już istnieje');
+    if (tags.length === 0 || !limit || limit <= 0) return;
+    const key = tags.slice().sort().join('+');
+    if (tagRules.some(r => (r.tags?.length ? r.tags.slice().sort().join('+') : r.tag) === key && r.period === newTagPeriod)) {
+      toast.error('Taka reguła już istnieje');
       return;
     }
     const rule: TagBudgetRule = {
       id: Date.now().toString(),
-      tag,
+      tag: tags[0],
+      ...(tags.length > 1 ? { tags } : {}),
       limit,
       period: newTagPeriod,
       createdAt: new Date().toISOString(),
@@ -302,7 +305,7 @@ export default function SettingsScreen() {
     await saveTagBudgetRules(updated);
     setNewTag('');
     setNewTagLimit('');
-    toast.success(`Reguła dla "${tag}" dodana`);
+    toast.success(`Reguła dla "${tags.map(t => `#${t}`).join(' + ')}" dodana`);
   };
 
   const handleDeleteTagRule = async (id: string) => {
@@ -853,7 +856,7 @@ export default function SettingsScreen() {
                   <Tag size={13} color={colors.accent.purple} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rowLabel}>{rule.tag}</Text>
+                  <Text style={styles.rowLabel}>{ruleLabel(rule)}</Text>
                   <Text style={styles.rowSub}>{rule.period === 'week' ? 'tygodniowo' : 'miesięcznie'}</Text>
                 </View>
                 <Text style={[styles.rowLabel, { color: colors.accent.amber }]}>{rule.limit} zł</Text>
@@ -863,21 +866,28 @@ export default function SettingsScreen() {
               </View>
             ))}
 
-            {/* Suggested tags */}
-            {tagRules.length === 0 && (
-              <View style={{ paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2] }}>
-                <Text style={styles.rowSub}>Sugerowane tagi z paragonów:</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                  {SUGGESTED_TAGS.map(t => (
-                    <PressableScale key={t} onPress={() => setNewTag(t)}
-                      style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
-                        backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default }}>
-                      <Text style={{ fontSize: 11, color: colors.text.secondary }}>{t}</Text>
-                    </PressableScale>
-                  ))}
-                </View>
+            {/* Suggested tags — tap to add; tap several to combine (np. słodycze + przekąski) */}
+            <View style={{ paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[2] }}>
+              <Text style={styles.rowSub}>Dotknij tag (kilka = wspólny limit):</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                <PressableScale onPress={() => setNewTag('słodycze + przekąski')}
+                  style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
+                    backgroundColor: colors.accent.purple + '20', borderWidth: 1, borderColor: colors.accent.purple + '55' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.accent.purple }}>słodycze + przekąski</Text>
+                </PressableScale>
+                {SUGGESTED_TAGS.map(t => (
+                  <PressableScale key={t} onPress={() => setNewTag(prev => {
+                    const parts = prev.split(/[+,]/).map(x => x.trim().toLowerCase()).filter(Boolean);
+                    if (parts.includes(t)) return prev;
+                    return parts.length ? `${prev.trim()} + ${t}` : t;
+                  })}
+                    style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full,
+                      backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default }}>
+                    <Text style={{ fontSize: 11, color: colors.text.secondary }}>{t}</Text>
+                  </PressableScale>
+                ))}
               </View>
-            )}
+            </View>
 
             {/* Add new rule */}
             <View style={{ padding: spacing[4], gap: spacing[3], borderTopWidth: tagRules.length > 0 ? 1 : 0, borderTopColor: 'rgba(255,255,255,0.05)' }}>
@@ -885,7 +895,7 @@ export default function SettingsScreen() {
                 <TextInput
                   value={newTag}
                   onChangeText={setNewTag}
-                  placeholder="tag (np. słodycze)"
+                  placeholder="tag, kilka przez +"
                   placeholderTextColor={colors.text.muted}
                   style={[styles.budgetInput, { flex: 2, textAlign: 'left', paddingHorizontal: spacing[3],
                     backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}

@@ -2,10 +2,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface TagBudgetRule {
   id: string;
-  tag: string;
+  tag: string;            // primary tag (kept for backward compat)
+  tags?: string[];        // if set, the limit covers ALL of these tags combined
   limit: number;
   period: 'week' | 'month';
   createdAt: string;
+}
+
+// The tags a rule covers (multi-tag rules combine spend across all of them).
+export function ruleTags(rule: TagBudgetRule): string[] {
+  return rule.tags && rule.tags.length > 0 ? rule.tags : [rule.tag];
+}
+
+// A short label like "#słodycze + #przekąski".
+export function ruleLabel(rule: TagBudgetRule): string {
+  return ruleTags(rule).map(t => `#${t}`).join(' + ');
 }
 
 const KEY = 'tag_budget_rules_v1';

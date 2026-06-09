@@ -354,8 +354,11 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'rum','gin','brandy','likier','szampan','prosecco','napój gazow',
   ]],
   ['przekąski',  [
-    'chipsy','paluszk','krakersy','orzeszk','migdał','słonecznik','prażynk',
-    'pistacj','popcorn','preczel','nachos','cashew','chrupki','puff','soletti',
+    'chipsy','chips','paluszk','krakers','orzeszk','orzech','migdał','słonecznik','prażynk','prażon',
+    'pistacj','popcorn','preczel','precel','nachos','cashew','nerkowc','chrupk','puff','soletti',
+    'grzank','grzanki','lays',"lay's",'ovenbaked','oven baked','pringles','doritos','cheetos',
+    'crunchips','tortilla chip','star chips','snack','przekąsk','w skor','w skorup','solone',
+    'krakelin','wafle ryż','wafle kukurydz','sezamk','flips','bake rolls','bakerolls',
   ]],
   ['chemia',     [
     'szampon','mydło','proszek','płyn do','chusteczk','papier toalet',
