@@ -6,6 +6,7 @@ export interface TagBudgetRule {
   tags?: string[];        // if set, the limit covers ALL of these tags combined
   limit: number;
   period: 'week' | 'month';
+  person?: string;        // if set, the bar counts only what THIS person ate
   createdAt: string;
 }
 
@@ -16,7 +17,24 @@ export function ruleTags(rule: TagBudgetRule): string[] {
 
 // A short label like "#słodycze + #przekąski".
 export function ruleLabel(rule: TagBudgetRule): string {
-  return ruleTags(rule).map(t => `#${t}`).join(' + ');
+  const base = ruleTags(rule).map(t => `#${t}`).join(' + ');
+  return rule.person ? `${base} · ${rule.person}` : base;
+}
+
+// How much of a receipt item's price counts toward a person's bar.
+//  - no person (combined bar)            → full price
+//  - item has eaters, includes person    → price split evenly among its eaters
+//  - item has eaters, excludes person    → 0
+//  - item has NO eaters (nobody marked)  → shared equally among everyone
+export function attributedPrice(
+  item: { price: number; eaters?: string[] },
+  person: string | undefined,
+  persons: string[],
+): number {
+  if (!person) return item.price;
+  const eaters = item.eaters ?? [];
+  if (eaters.length === 0) return item.price / Math.max(1, persons.length);
+  return eaters.includes(person) ? item.price / eaters.length : 0;
 }
 
 const KEY = 'tag_budget_rules_v1';

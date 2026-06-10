@@ -26,6 +26,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { getBudgets, saveBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, ruleLabel } from '@/utils/tagBudgets';
+import { getPayers } from '@/utils/payers';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -46,7 +47,7 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 213; // bump on each meaningful build
+const APP_BUILD = 214; // bump on each meaningful build
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
@@ -278,6 +279,8 @@ export default function SettingsScreen() {
   const [newTag, setNewTag] = useState('');
   const [newTagLimit, setNewTagLimit] = useState('');
   const [newTagPeriod, setNewTagPeriod] = useState<'week' | 'month'>('month');
+  const [newTagPerson, setNewTagPerson] = useState<string | null>(null);
+  const [payers, setPayers] = useState<string[]>([]);
 
   useEffect(() => {
     getBudgets().then(b => {
@@ -288,6 +291,7 @@ export default function SettingsScreen() {
       setBudgetInputs(inputs);
     });
     getTagBudgetRules().then(setTagRules);
+    getPayers().then(setPayers).catch(() => {});
   }, []);
 
   const handleAddTagRule = async () => {
@@ -304,6 +308,7 @@ export default function SettingsScreen() {
       id: Date.now().toString(),
       tag: tags[0],
       ...(tags.length > 1 ? { tags } : {}),
+      ...(newTagPerson ? { person: newTagPerson } : {}),
       limit,
       period: newTagPeriod,
       createdAt: new Date().toISOString(),
@@ -313,6 +318,7 @@ export default function SettingsScreen() {
     await saveTagBudgetRules(updated);
     setNewTag('');
     setNewTagLimit('');
+    setNewTagPerson(null);
     toast.success(`Reguła dla "${tags.map(t => `#${t}`).join(' + ')}" dodana`);
   };
 
@@ -918,6 +924,24 @@ export default function SettingsScreen() {
                     backgroundColor: colors.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default }]}
                 />
               </View>
+              {payers.length >= 2 && (
+                <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 11, color: colors.text.muted }}>Dla:</Text>
+                  {[null, ...payers].map(p => {
+                    const on = newTagPerson === p;
+                    return (
+                      <PressableScale key={p ?? 'all'} onPress={() => setNewTagPerson(p)}
+                        style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full,
+                          backgroundColor: on ? colors.accent.purple + '22' : colors.bg.elevated,
+                          borderWidth: 1, borderColor: on ? colors.accent.purple : colors.border.default }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: on ? colors.accent.purple : colors.text.secondary }}>
+                          {p ?? 'Wszyscy'}
+                        </Text>
+                      </PressableScale>
+                    );
+                  })}
+                </View>
+              )}
               <View style={{ flexDirection: 'row', gap: spacing[2] }}>
                 {(['week', 'month'] as const).map(p => (
                   <PressableScale key={p} onPress={() => setNewTagPeriod(p)}

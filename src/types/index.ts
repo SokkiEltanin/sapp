@@ -34,6 +34,8 @@ export interface ReceiptItem {
                         // or something bought for someone else.
   weightKg?: number;    // explicit weight (kg) — receipts rarely list grams, so
                         // the scanner lets you set it (default 1 kg for dairy).
+  eaters?: string[];    // who consumed this — drives per-person limit bars.
+                        // empty = shared (split among everyone). Stats count all.
 }
 
 export interface Expense {

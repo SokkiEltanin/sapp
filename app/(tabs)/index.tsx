@@ -37,7 +37,8 @@ import {
 } from '@/types';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
-import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel } from '@/utils/tagBudgets';
+import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
+import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
@@ -558,6 +559,7 @@ export default function DashboardScreen() {
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
+  const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [workHoursChart, setWorkHoursChart] = useState(false);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
@@ -613,6 +615,7 @@ export default function DashboardScreen() {
     if (moodEntries.length === 0) moodService.getAll().then(setMood).catch(() => {});
     getBudgets().then(setBudgets);
     getTagBudgetRules().then(setTagRules).catch(() => {});
+    getPayers().then(setPayers).catch(() => {});
     hydrateSunTimes().then(() => fetchWeather()).then(w => { if (w) setWeather(w); });
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
@@ -1194,17 +1197,20 @@ export default function DashboardScreen() {
         for (const e of scopedExpenses) {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
-          if (hasAny(e.tags)) spend += e.amount;
-          else if (e.receiptItems?.some(it => countsForConsumption(it) && hasAny(it.tags))) {
+          // Expense-level tag (no item breakdown): a person-scoped bar can't split
+          // it, so it only counts when that person was the payer.
+          if (hasAny(e.tags)) {
+            if (!rule.person || e.payer === rule.person) spend += e.amount;
+          } else if (e.receiptItems?.some(it => countsForConsumption(it) && hasAny(it.tags))) {
             spend += e.receiptItems
               .filter(it => countsForConsumption(it) && hasAny(it.tags))
-              .reduce((s, it) => s + it.price, 0);
+              .reduce((s, it) => s + attributedPrice(it, rule.person, payers), 0);
           }
         }
         return { ...rule, spend, pct: spend / rule.limit, label: ruleLabel(rule) };
       })
       .sort((a, b) => b.pct - a.pct);
-  }, [tagRules, scopedExpenses, today, weekDates]);
+  }, [tagRules, scopedExpenses, today, weekDates, payers]);
 
   // ── Dynamic hero briefing ──────────────────────────────────────────────────
   // A contextual one-liner — complements the TopPill (which shows the single top

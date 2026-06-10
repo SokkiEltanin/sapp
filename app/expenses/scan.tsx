@@ -56,6 +56,7 @@ export default function ScanReceiptModal() {
   const [customCatPickerFor, setCustomCatPickerFor] = useState<number | null>(null);
   const [editedTags, setEditedTags]   = useState<Record<number, string[]>>({});
   const [editedExcluded, setEditedExcluded] = useState<Record<number, boolean>>({});
+  const [editedEaters, setEditedEaters] = useState<Record<number, string[]>>({});
   const [editedWeight, setEditedWeight] = useState<Record<number, string>>({});
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
@@ -146,6 +147,7 @@ export default function ScanReceiptModal() {
     setEditedNames({});
     setEditedTags({});
     setEditedExcluded({});
+    setEditedEaters({});
     setEditedWeight({});
     setTagPickerFor(null);
     setCustomProducts([]);
@@ -258,6 +260,7 @@ export default function ScanReceiptModal() {
         };
         if (p.discount != null) item.discount = p.discount;
         if (editedExcluded[i]) item.excluded = true;
+        if (editedEaters[i]?.length) item.eaters = editedEaters[i];
         if (p.kind) item.kind = p.kind;
         const w = parseFloat(getWeight(i).replace(',', '.'));
         if (!isNaN(w) && w > 0) item.weightKg = w;
@@ -340,6 +343,7 @@ export default function ScanReceiptModal() {
     setEditedNames({});
     setEditedTags({});
     setEditedExcluded({});
+    setEditedEaters({});
     setEditedWeight({});
     setTagPickerFor(null);
     setCatPickerFor(null);
@@ -508,6 +512,9 @@ export default function ScanReceiptModal() {
                         weighable={isWeighable(i)}
                         weight={getWeight(i)}
                         onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
+                        payers={payers}
+                        eaters={editedEaters[i]}
+                        onEatersChange={e => setEditedEaters(prev => ({ ...prev, [i]: e }))}
                       />
                     ))}
                   </View>
@@ -538,6 +545,9 @@ export default function ScanReceiptModal() {
                   weighable={isWeighable(i)}
                   weight={getWeight(i)}
                   onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
+                  payers={payers}
+                  eaters={editedEaters[i]}
+                  onEatersChange={e => setEditedEaters(prev => ({ ...prev, [i]: e }))}
                 />
               ))
             )}
@@ -736,6 +746,7 @@ function ProductRow({
   priceValue, onPriceChange, productName, onNameChange,
   productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
   excluded, onToggleExcluded, weighable, weight, onWeightChange,
+  payers, eaters, onEatersChange,
 }: {
   product: ReceiptProduct;
   category: ExpenseCategory;
@@ -758,6 +769,9 @@ function ProductRow({
   weighable?: boolean;
   weight?: string;
   onWeightChange?: (v: string) => void;
+  payers?: string[];
+  eaters?: string[];
+  onEatersChange?: (eaters: string[]) => void;
 }) {
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
@@ -862,6 +876,25 @@ function ProductRow({
                   <Text style={styles.tagChipText}>{t}</Text>
                 </View>
               ))}
+            </View>
+          )}
+          {!isDeposit && onEatersChange && payers && payers.length >= 2 && (
+            <View style={styles.eaterRow}>
+              <Text style={styles.eaterLabel}>kto jadł:</Text>
+              {payers.map(p => {
+                const on = (eaters ?? []).includes(p);
+                return (
+                  <PressableScale key={p} onPress={() => {
+                    const cur = eaters ?? [];
+                    onEatersChange(on ? cur.filter(x => x !== p) : [...cur, p]);
+                  }}>
+                    <View style={[styles.eaterChip, on && styles.eaterChipOn]}>
+                      <Text style={[styles.eaterChipText, on && styles.eaterChipTextOn]}>{p}</Text>
+                    </View>
+                  </PressableScale>
+                );
+              })}
+              {(eaters ?? []).length === 0 && <Text style={styles.eaterHint}>· wspólnie</Text>}
             </View>
           )}
         </View>
@@ -1285,6 +1318,16 @@ const styles = StyleSheet.create({
   },
   exclBtnActive: { borderColor: 'rgba(251,191,36,0.5)', backgroundColor: 'rgba(251,191,36,0.12)' },
   exclBtnText: { fontSize: 9, color: colors.text.muted },
+  eaterRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
+  eaterLabel: { fontSize: 9, color: colors.text.muted, fontWeight: '600' },
+  eaterChip: {
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  eaterChipOn: { borderColor: 'rgba(74,203,168,0.6)', backgroundColor: 'rgba(74,203,168,0.15)' },
+  eaterChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  eaterChipTextOn: { color: '#4ECBA8' },
+  eaterHint: { fontSize: 9, color: colors.text.muted, fontStyle: 'italic' },
   weighChip: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
     paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
