@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Modal, Alert,
-  RefreshControl, TouchableOpacity, Animated,
+  RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,6 +58,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { expensesService } from '@/services/expensesService';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 
@@ -654,7 +655,10 @@ export default function DashboardScreen() {
       });
       const next = advanceNextBillingDate(currentPayment.nextBillingDate, currentPayment.billingCycle);
       await updateSub(currentPayment.id, { nextBillingDate: next });
-    } catch {}
+    } catch {
+      haptic.error();
+      toast.error('Nie udało się zapisać płatności — sprawdź połączenie');
+    }
     finally { setPaymentConfirming(false); setPaymentQueue(q => q.slice(1)); }
   }, [currentPayment, updateSub]);
 
@@ -688,7 +692,10 @@ export default function DashboardScreen() {
     try {
       const entry = await moodService.add({ date: todayStr(), mood: level, energy: 3, tags: [] });
       addEntry(entry);
-    } catch {}
+    } catch {
+      haptic.error();
+      toast.error('Nie zapisano nastroju — spróbuj ponownie');
+    }
   }, [todayEntry, openCheckIn, addEntry]);
 
   // ── Pomodoro history ──────────────────────────────────────────────────────
@@ -709,6 +716,25 @@ export default function DashboardScreen() {
     getAllNotes().then(ns => { setAllNotes(ns); setPinnedNotes(ns.filter(n => n.pinned)); }).catch(() => {});
     if (editRequested) { setEditingDash(true); clearEditRequest(); }
   }, [loadPomSessions, editRequested]));
+
+  // Hero animations run only while the dashboard is the active screen AND the app
+  // is foregrounded — paused otherwise so clouds/rain don't drain the battery on
+  // other tabs or in the background.
+  const [screenFocused, setScreenFocused] = useState(true);
+  useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
+  const [appActive, setAppActive] = useState(true);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => setAppActive(s === 'active'));
+    return () => sub.remove();
+  }, []);
+  // Respect the OS "reduce motion" accessibility setting — static hero when on.
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
+  }, []);
+  const heroActive = screenFocused && appActive && !reduceMotion;
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const today     = todayStr();
@@ -1402,7 +1428,7 @@ export default function DashboardScreen() {
                 activeOpacity={0.92}
                 style={s.mainCard}
               >
-                <AnimatedCardBg timeOfDay={timeOfDay} weatherCode={weather?.wmo} />
+                <AnimatedCardBg timeOfDay={timeOfDay} weatherCode={weather?.wmo} active={heroActive} />
 
                 <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
                   {/* Soft bottom-up gradient inside card */}
@@ -1449,7 +1475,7 @@ export default function DashboardScreen() {
                 </BlurView>
 
                 {/* A couple of sharper clouds drifting OVER the glass */}
-                <AnimatedCardBg timeOfDay={timeOfDay} layer="front" weatherCode={weather?.wmo} />
+                <AnimatedCardBg timeOfDay={timeOfDay} layer="front" weatherCode={weather?.wmo} active={heroActive} />
               </TouchableOpacity>
             </LinearGradient>
 

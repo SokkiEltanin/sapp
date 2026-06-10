@@ -7,7 +7,7 @@ import type { TimeOfDay } from '@/hooks/useTimeAccent';
 
 const STAR_COUNT = 20;
 
-function StarField() {
+function StarField({ active }: { active: boolean }) {
   const stars = useMemo(() =>
     Array.from({ length: STAR_COUNT }, () => ({
       lx:    5 + Math.random() * 90,
@@ -22,6 +22,7 @@ function StarField() {
   const loops = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
+    if (!active) return;                       // paused off-screen — save battery
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     stars.forEach(s => {
@@ -42,7 +43,7 @@ function StarField() {
       loops.current.forEach(l => l.stop());
       loops.current = [];
     };
-  }, []);
+  }, [active]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -154,12 +155,13 @@ const CLOUD_DEFS_FRONT: (CloudDef & { delay: number; blur: number })[] = [
   { w: 100, h: 40, initX: -140, y: 44, dur: 36000, op: 0.05, delay: 21000, blur: 2.2 },
 ];
 
-function CloudLayer({ layer = 'back' }: { layer?: 'back' | 'front' }) {
+function CloudLayer({ layer = 'back', active }: { layer?: 'back' | 'front'; active: boolean }) {
   const defs = layer === 'front' ? CLOUD_DEFS_FRONT : CLOUD_DEFS_BACK;
   const xAnims = useMemo(() => defs.map(c => new Animated.Value(c.initX)), [defs]);
   const loops = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
+    if (!active) return;                       // paused off-screen — save battery
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     defs.forEach((c, i) => {
@@ -180,7 +182,7 @@ function CloudLayer({ layer = 'back' }: { layer?: 'back' | 'front' }) {
       loops.current.forEach(l => l.stop());
       loops.current = [];
     };
-  }, [defs, xAnims]);
+  }, [defs, xAnims, active]);
 
   return (
     <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
@@ -204,7 +206,7 @@ function CloudLayer({ layer = 'back' }: { layer?: 'back' | 'front' }) {
 
 const PRECIP_TRAVEL = 230; // px — taller than any hero card
 
-function Precip({ kind }: { kind: 'rain' | 'snow' }) {
+function Precip({ kind, active }: { kind: 'rain' | 'snow'; active: boolean }) {
   const COUNT = kind === 'rain' ? 18 : 20;
   const parts = useMemo(() =>
     Array.from({ length: COUNT }, () => ({
@@ -220,6 +222,7 @@ function Precip({ kind }: { kind: 'rain' | 'snow' }) {
   const loops = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
+    if (!active) return;                       // paused off-screen — save battery
     let alive = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
     parts.forEach(p => {
@@ -232,7 +235,7 @@ function Precip({ kind }: { kind: 'rain' | 'snow' }) {
       timers.push(t);
     });
     return () => { alive = false; timers.forEach(clearTimeout); loops.current.forEach(l => l.stop()); loops.current = []; };
-  }, []);
+  }, [active]);
 
   return (
     <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
@@ -288,21 +291,21 @@ function conditionFor(code: number | undefined, isNight: boolean): Condition {
   return isNight ? 'stars' : 'clouds';     // 1–3 partly cloudy, 45–48 fog
 }
 
-interface Props { timeOfDay: TimeOfDay; layer?: 'back' | 'front'; weatherCode?: number; }
+interface Props { timeOfDay: TimeOfDay; layer?: 'back' | 'front'; weatherCode?: number; active?: boolean; }
 
-export default function AnimatedCardBg({ timeOfDay, layer = 'back', weatherCode }: Props) {
+export default function AnimatedCardBg({ timeOfDay, layer = 'back', weatherCode, active = true }: Props) {
   const isNight = timeOfDay === 'night' || timeOfDay === 'evening' || timeOfDay === 'dawn';
   const cond = conditionFor(weatherCode, isNight);
 
   // Front layer: only a couple of sharper clouds (for sun/clouds); nothing else.
-  if (layer === 'front') return cond === 'clouds' || cond === 'sun' ? <CloudLayer layer="front" /> : null;
+  if (layer === 'front') return cond === 'clouds' || cond === 'sun' ? <CloudLayer layer="front" active={active} /> : null;
 
   // Back layer — the main sky.
   switch (cond) {
-    case 'stars': return <StarField />;
-    case 'rain':  return <><CloudLayer /><Precip kind="rain" /></>;
-    case 'snow':  return <><CloudLayer /><Precip kind="snow" /></>;
-    case 'sun':   return <><SunGlow /><CloudLayer /></>;
-    default:      return <CloudLayer />;
+    case 'stars': return <StarField active={active} />;
+    case 'rain':  return <><CloudLayer active={active} /><Precip kind="rain" active={active} /></>;
+    case 'snow':  return <><CloudLayer active={active} /><Precip kind="snow" active={active} /></>;
+    case 'sun':   return <><SunGlow /><CloudLayer active={active} /></>;
+    default:      return <CloudLayer active={active} />;
   }
 }

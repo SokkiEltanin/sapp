@@ -5,6 +5,9 @@ import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { Task, TaskRecurring, Subtask } from '@/types';
 import { haptic } from '@/utils/haptics';
+import { toast } from '@/store/toastStore';
+
+const SAVE_FAIL = 'Nie zapisano — sprawdź połączenie';
 
 function nextDeadline(iso: string, recurring: TaskRecurring): string {
   const d = new Date(iso);
@@ -80,6 +83,8 @@ export function useTasks() {
     try {
       await tasksService.updateTask(id, updates);
     } catch {
+      haptic.error();
+      toast.error(SAVE_FAIL);
       load();
     }
   };
@@ -119,6 +124,8 @@ export function useTasks() {
     try {
       await tasksService.updateTask(id, { status: 'snoozed', snoozedUntil });
     } catch {
+      haptic.error();
+      toast.error(SAVE_FAIL);
       load();
     }
   };
@@ -129,6 +136,8 @@ export function useTasks() {
     try {
       await tasksService.updateTask(id, { status: 'pending' });
     } catch {
+      haptic.error();
+      toast.error(SAVE_FAIL);
       load();
     }
   };
@@ -136,7 +145,13 @@ export function useTasks() {
   const remove = async (id: string) => {
     deleteTask(id);
     notificationsService.cancelTaskReminder(id).catch(() => {});
-    await tasksService.deleteTask(id).catch(() => {});
+    try {
+      await tasksService.deleteTask(id);
+    } catch {
+      haptic.error();
+      toast.error('Nie usunięto — sprawdź połączenie');
+      load();
+    }
   };
 
   const getById = (id: string) => tasks.find(t => t.id === id) ?? null;
