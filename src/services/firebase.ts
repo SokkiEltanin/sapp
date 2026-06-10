@@ -52,3 +52,8 @@ function uid(): string {
 
 export const userCol = (col: string) => collection(db, 'users', uid(), col);
 export const userDoc = (col: string, id: string) => doc(db, 'users', uid(), col, id);
+// Nested subcollection/doc under a user document (e.g. backups/{id}/chunks/{n}).
+export const userSubcol = (col: string, id: string, sub: string) =>
+  collection(db, 'users', uid(), col, id, sub);
+export const userSubdoc = (col: string, id: string, sub: string, subId: string) =>
+  doc(db, 'users', uid(), col, id, sub, subId);

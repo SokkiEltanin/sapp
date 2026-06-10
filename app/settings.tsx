@@ -27,6 +27,7 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { getBudgets, saveBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, ruleLabel } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
+import BackupSection from '@/components/settings/BackupSection';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -47,7 +48,7 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 217; // bump on each meaningful build
+const APP_BUILD = 218; // bump on each meaningful build
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
@@ -982,6 +983,11 @@ export default function SettingsScreen() {
               </View>
             ))}
           </View>
+        </View>
+
+        {/* Cloud backup */}
+        <View>
+          <BackupSection appBuild={APP_BUILD} />
         </View>
 
         {/* Account */}

@@ -14,6 +14,7 @@ import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
+import { maybeAutoBackup } from '@/services/backupService';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -93,6 +94,13 @@ export default function RootLayout() {
     });
     return () => { unsub(); clearTimeout(timer); };
   }, []);
+
+  // Daily cloud backup — runs shortly after launch (throttled to once/24h inside).
+  useEffect(() => {
+    if (!authReady) return;
+    const t = setTimeout(() => { maybeAutoBackup().catch(() => {}); }, 8000);
+    return () => clearTimeout(t);
+  }, [authReady]);
 
   useEffect(() => {
     function handleNotifResponse(response: Notifications.NotificationResponse) {
