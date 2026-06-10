@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag, CalendarDays, Clock, BarChart3, Sunrise, Sun, Sunset, Moon } from 'lucide-react-native';
+import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag, CalendarDays, Clock, BarChart3, Sunrise, Sun, Sunset, Moon, Sparkles } from 'lucide-react-native';
 import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-native-svg';
@@ -18,6 +18,9 @@ const P = {
   muted:      'rgba(244,114,182,0.45)',
 };
 import { useMoodStore } from '@/store/moodStore';
+import { useCalendarStore } from '@/store/calendarStore';
+import { useWorkStore } from '@/store/workStore';
+import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { moodService } from '@/services/moodService';
 import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -111,13 +114,13 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
 
       {positive.length > 0 && (
         <View style={kw.section}>
-          <Text style={[kw.sectionLabel, { color: colors.accent.green }]}>Co Cię uszczęśliwia</Text>
+          <Text style={[kw.sectionLabel, { color: P.accent }]}>Co Cię cieszy</Text>
           <View style={kw.chips}>
             {positive.map(k => (
-              <View key={k.word} style={[kw.chip, { backgroundColor: colors.accent.green + '18', borderColor: colors.accent.green + '40' }]}>
-                <Text style={[kw.chipWord, { color: colors.accent.green }]}>{k.word}</Text>
+              <View key={k.word} style={[kw.chip, { backgroundColor: P.accent + '20', borderColor: P.accent + '55' }]}>
+                <Text style={[kw.chipWord, { color: P.accent }]}>{k.word}</Text>
                 {k.totalCount > 2 && (
-                  <Text style={[kw.chipCount, { color: colors.accent.green + '99' }]}>{k.totalCount}×</Text>
+                  <Text style={[kw.chipCount, { color: P.accent + 'AA' }]}>{k.totalCount}×</Text>
                 )}
               </View>
             ))}
@@ -127,13 +130,13 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
 
       {negative.length > 0 && (
         <View style={kw.section}>
-          <Text style={[kw.sectionLabel, { color: colors.accent.red }]}>Co Cię stresuje / denerwuje</Text>
+          <Text style={[kw.sectionLabel, { color: colors.text.muted }]}>Co Cię stresuje</Text>
           <View style={kw.chips}>
             {negative.map(k => (
-              <View key={k.word} style={[kw.chip, { backgroundColor: colors.accent.red + '18', borderColor: colors.accent.red + '40' }]}>
-                <Text style={[kw.chipWord, { color: colors.accent.red }]}>{k.word}</Text>
+              <View key={k.word} style={[kw.chip, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.18)' }]}>
+                <Text style={[kw.chipWord, { color: colors.text.secondary }]}>{k.word}</Text>
                 {k.totalCount > 2 && (
-                  <Text style={[kw.chipCount, { color: colors.accent.red + '99' }]}>{k.totalCount}×</Text>
+                  <Text style={[kw.chipCount, { color: colors.text.muted }]}>{k.totalCount}×</Text>
                 )}
               </View>
             ))}
@@ -232,10 +235,10 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
               <Text style={ins.tileLabel}>Ten miesiąc</Text>
               <View style={ins.tileRow}>
                 {trendUp
-                  ? <TrendingUp size={13} color={colors.accent.green} />
-                  : <TrendingDown size={13} color={colors.accent.red} />
+                  ? <TrendingUp size={13} color={P.accent} />
+                  : <TrendingDown size={13} color={colors.text.muted} />
                 }
-                <Text style={[ins.tileVal, { color: trendUp ? colors.accent.green : colors.accent.red }]}>
+                <Text style={[ins.tileVal, { color: trendUp ? P.accent : colors.text.secondary }]}>
                   {thisAvg!.toFixed(1)}
                 </Text>
               </View>
@@ -249,7 +252,7 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
           {hasBestDow && (
             <View style={ins.tile}>
               <Text style={ins.tileLabel}>Najlepszy dzień</Text>
-              <Text style={[ins.tileVal, { color: colors.accent.purple }]} numberOfLines={1}>
+              <Text style={[ins.tileVal, { color: P.accent }]} numberOfLines={1}>
                 {DOW_FULL[bestDow.i]}
               </Text>
               <Text style={ins.tileSub}>
@@ -263,13 +266,13 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
       {topGoodTags.length > 0 && (
         <View style={ins.tagSection}>
           <View style={ins.tagHeader}>
-            <Tag size={11} color={colors.accent.green} />
-            <Text style={[ins.tagSectionLabel, { color: colors.accent.green }]}>Dobry nastrój</Text>
+            <Tag size={11} color={P.accent} />
+            <Text style={[ins.tagSectionLabel, { color: P.accent }]}>Dobry nastrój</Text>
           </View>
           <View style={ins.tagRow}>
             {topGoodTags.map(tag => (
-              <View key={tag} style={[ins.tagChip, { backgroundColor: colors.accent.green + '18', borderColor: colors.accent.green + '35' }]}>
-                <Text style={[ins.tagText, { color: colors.accent.green }]}>#{tag}</Text>
+              <View key={tag} style={[ins.tagChip, { backgroundColor: P.accent + '20', borderColor: P.accent + '50' }]}>
+                <Text style={[ins.tagText, { color: P.accent }]}>#{tag}</Text>
               </View>
             ))}
           </View>
@@ -279,13 +282,13 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
       {topBadTags.length > 0 && (
         <View style={ins.tagSection}>
           <View style={ins.tagHeader}>
-            <Tag size={11} color={colors.accent.red} />
-            <Text style={[ins.tagSectionLabel, { color: colors.accent.red }]}>Niski nastrój</Text>
+            <Tag size={11} color={colors.text.muted} />
+            <Text style={[ins.tagSectionLabel, { color: colors.text.muted }]}>Niski nastrój</Text>
           </View>
           <View style={ins.tagRow}>
             {topBadTags.map(tag => (
-              <View key={tag} style={[ins.tagChip, { backgroundColor: colors.accent.red + '18', borderColor: colors.accent.red + '35' }]}>
-                <Text style={[ins.tagText, { color: colors.accent.red }]}>#{tag}</Text>
+              <View key={tag} style={[ins.tagChip, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.18)' }]}>
+                <Text style={[ins.tagText, { color: colors.text.secondary }]}>#{tag}</Text>
               </View>
             ))}
           </View>
@@ -394,7 +397,7 @@ function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
           </SvgGrad>
         </Defs>
         <Path d={fillPath} fill="url(#moodFill)" />
-        <Path d={enPath} stroke="#FBBF24" strokeWidth={2} fill="none" strokeDasharray="4 4" strokeLinecap="round" opacity={0.85} />
+        <Path d={enPath} stroke="rgba(255,255,255,0.6)" strokeWidth={1.8} fill="none" strokeDasharray="4 4" strokeLinecap="round" opacity={0.8} />
         <Path d={moodPath} stroke={P.accent} strokeWidth={2.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         {moodPts.map((p, i) => (
           <Circle key={i} cx={p.x} cy={p.y} r={2.6} fill={MOOD_COLORS[present[i].entry!.mood]} />
@@ -402,7 +405,7 @@ function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
       </Svg>
       <View style={wv.legend}>
         <View style={wv.legendItem}><View style={[wv.dot, { backgroundColor: P.accent }]} /><Text style={wv.legendText}>Nastrój</Text></View>
-        <View style={wv.legendItem}><View style={[wv.dash, { backgroundColor: '#FBBF24' }]} /><Text style={wv.legendText}>Energia</Text></View>
+        <View style={wv.legendItem}><View style={[wv.dash, { backgroundColor: 'rgba(255,255,255,0.6)' }]} /><Text style={wv.legendText}>Energia</Text></View>
       </View>
     </View>
   );
@@ -678,6 +681,97 @@ function avg(vals: number[]) {
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 }
 
+// ─── Patterns / conclusions (mood ↔ work / day type / keywords) ───────────────
+
+function dayBeforeStr(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d - 1);
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+}
+
+function buildPatterns(entries: MoodEntry[], workByDate: Record<string, number>): string[] {
+  const out: string[] = [];
+  const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+
+  // Work days vs days off
+  const workMood: number[] = [], offMood: number[] = [];
+  for (const e of entries) ((workByDate[e.date] ?? 0) > 0 ? workMood : offMood).push(e.mood);
+  const wM = mean(workMood), oM = mean(offMood);
+  if (wM != null && oM != null && workMood.length >= 3 && offMood.length >= 3 && Math.abs(oM - wM) >= 0.35) {
+    out.push(oM > wM
+      ? `W dni wolne masz lepszy humor (${oM.toFixed(1)}) niż w dni pracy (${wM.toFixed(1)}).`
+      : `W dni pracy masz lepszy humor (${wM.toFixed(1)}) niż w wolne (${oM.toFixed(1)}).`);
+  }
+
+  // Energy the day AFTER a work day
+  const afterWork: number[] = [], afterRest: number[] = [];
+  for (const e of entries) ((workByDate[dayBeforeStr(e.date)] ?? 0) > 0 ? afterWork : afterRest).push(e.energy);
+  const aw = mean(afterWork), ar = mean(afterRest);
+  if (aw != null && ar != null && afterWork.length >= 3 && afterRest.length >= 3 && Math.abs(ar - aw) >= 0.35) {
+    out.push(ar > aw
+      ? `Dzień po pracy masz zwykle mniej energii (${aw.toFixed(1)} vs ${ar.toFixed(1)}).`
+      : `Dzień po pracy masz zwykle więcej energii (${aw.toFixed(1)} vs ${ar.toFixed(1)}).`);
+  }
+
+  // Longer shifts → next-day mood
+  const afterLong: number[] = [], afterShort: number[] = [];
+  for (const e of entries) {
+    const h = workByDate[dayBeforeStr(e.date)] ?? 0;
+    if (h > 0) (h >= 9 ? afterLong : afterShort).push(e.mood);
+  }
+  const al = mean(afterLong), as = mean(afterShort);
+  if (al != null && as != null && afterLong.length >= 3 && afterShort.length >= 3 && Math.abs(as - al) >= 0.4) {
+    out.push(`Po dłuższych zmianach (9h+) masz nazajutrz ${al < as ? 'gorszy' : 'lepszy'} humor (${al.toFixed(1)} vs ${as.toFixed(1)}).`);
+  }
+
+  // Weekend vs weekday
+  const wknd: number[] = [], wkdy: number[] = [];
+  for (const e of entries) { const dow = new Date(e.date).getDay(); ((dow === 0 || dow === 6) ? wknd : wkdy).push(e.mood); }
+  const we = mean(wknd), wd = mean(wkdy);
+  if (we != null && wd != null && wknd.length >= 3 && wkdy.length >= 3 && Math.abs(we - wd) >= 0.35) {
+    out.push(we > wd
+      ? `W weekendy masz lepszy humor (${we.toFixed(1)}) niż w tygodniu (${wd.toFixed(1)}).`
+      : `W tygodniu masz lepszy humor (${wd.toFixed(1)}) niż w weekendy (${we.toFixed(1)}).`);
+  }
+
+  // Most common stress keyword
+  const { negative, positive } = extractKeywords(entries);
+  if (negative.length > 0) out.push(`Najczęściej stresują Cię: ${negative.slice(0, 2).map(k => k.word).join(', ')}.`);
+  if (positive.length > 0 && out.length < 5) out.push(`Najlepiej działają na Ciebie: ${positive.slice(0, 2).map(k => k.word).join(', ')}.`);
+
+  return out.slice(0, 5);
+}
+
+function MoodPatterns({ entries, workByDate }: { entries: MoodEntry[]; workByDate: Record<string, number> }) {
+  const lines = useMemo(() => buildPatterns(entries, workByDate), [entries, workByDate]);
+  if (entries.length < 6 || lines.length === 0) return null;
+  return (
+    <View style={pat.card}>
+      <View style={pat.header}>
+        <Sparkles size={13} color={P.accent} />
+        <Text style={pat.title}>Wnioski</Text>
+      </View>
+      <View style={{ gap: spacing[2] }}>
+        {lines.map((l, i) => (
+          <View key={i} style={pat.row}>
+            <View style={pat.dot} />
+            <Text style={pat.text}>{l}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const pat = StyleSheet.create({
+  card: { backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title: { fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  row: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start' },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: P.accent, marginTop: 6 },
+  text: { flex: 1, fontSize: 12.5, color: colors.text.secondary, lineHeight: 18 },
+});
+
 export default function MoodScreen() {
   const { entries, setEntries, setLoading, deleteEntry } = useMoodStore();
   const [modalOpen, setModalOpen] = useState(false);
@@ -708,6 +802,20 @@ export default function MoodScreen() {
   const last30 = useMemo(() => entries.filter(e => e.date >= dateMinusDays(30)), [entries]);
   const avgMood = avg(last30.map(e => e.mood));
   const avgEnergy = avg(last30.map(e => e.energy));
+
+  // Work hours per day (local + Google), for the mood↔work correlations.
+  const calEvents = useCalendarStore(s => s.events);
+  const gcalEvents = useCalendarStore(s => s.gcalEvents);
+  const workSettings = useWorkStore(s => s.settings);
+  const workByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of [...calEvents, ...gcalEvents]) {
+      if (!isWorkEvent(e, { workColor: workSettings.workColor, workPrefix: workSettings.workPrefix })) continue;
+      const d = (e.date ?? '').slice(0, 10);
+      if (d) map[d] = (map[d] ?? 0) + shiftHours(e);
+    }
+    return map;
+  }, [calEvents, gcalEvents, workSettings.workColor, workSettings.workPrefix]);
   const streak = useMemo(() => calcStreak(entries), [entries]);
   const recent = useMemo(() => entries.slice(0, 14), [entries]);
 
@@ -804,6 +912,9 @@ export default function MoodScreen() {
         {/* Mood + energy wave (30 days) */}
         <MoodEnergyWave entries={entries} />
 
+        {/* Conclusions from notes + work/day context */}
+        <MoodPatterns entries={entries} workByDate={workByDate} />
+
         {/* Rich statistics */}
         <MoodDistribution entries={entries} />
         <WeekdayPattern entries={entries} />
@@ -899,11 +1010,11 @@ const styles = StyleSheet.create({
   heroMood: { ...typography.h3, fontWeight: '700', marginTop: 2 },
   energyBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.accent.warning + '18',
+    backgroundColor: P.accent + '18',
     paddingHorizontal: spacing[2], paddingVertical: spacing[1], borderRadius: radius.sm,
   },
   energyEmoji: { fontSize: 14 },
-  energyText: { ...typography.caption, color: colors.accent.warning, fontWeight: '700', fontSize: 11 },
+  energyText: { ...typography.caption, color: P.accent, fontWeight: '700', fontSize: 11 },
   heroNote: { ...typography.bodySmall, color: colors.text.secondary, lineHeight: 18 },
   cta: { ...typography.caption, color: colors.text.muted },
 
