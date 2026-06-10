@@ -27,7 +27,7 @@ import * as LucideIcons from 'lucide-react-native';
 
 type SortMode = 'order' | 'category' | 'price';
 
-const ITEM_TAGS = ['słodycze', 'nabiał', 'mięso', 'warzywa', 'owoce', 'pieczywo', 'napoje', 'chemia'];
+const ITEM_TAGS = ['słodycze', 'przekąski', 'nabiał', 'mięso', 'ryby', 'warzywa', 'owoce', 'pieczywo', 'napoje', 'chemia', 'higiena', 'dania gotowe'];
 
 const SORT_OPTS: { mode: SortMode; label: string }[] = [
   { mode: 'order',    label: 'Paragon'   },
@@ -679,16 +679,24 @@ function TagPicker({ activeTags, onToggle, freq = {} }: {
   onToggle: (tag: string) => void;
   freq?: Record<string, number>;
 }) {
-  const sorted = useMemo(
-    () => [...ITEM_TAGS].sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0)),
-    [freq],
-  );
+  // Built-in tags + any previously-used custom tags (from tag memory), by frequency.
+  const sorted = useMemo(() => {
+    const all = new Set<string>([...ITEM_TAGS, ...Object.keys(freq), ...activeTags]);
+    return [...all].sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0));
+  }, [freq, activeTags]);
+  const [custom, setCustom] = useState('');
+  const addCustom = () => {
+    const t = custom.trim().toLowerCase();
+    if (t && !activeTags.includes(t)) onToggle(t);
+    setCustom('');
+  };
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.pickerScroll}
       contentContainerStyle={styles.pickerRow}
+      keyboardShouldPersistTaps="handled"
     >
       {sorted.map(tag => {
         const active = activeTags.includes(tag);
@@ -702,6 +710,20 @@ function TagPicker({ activeTags, onToggle, freq = {} }: {
           </PressableScale>
         );
       })}
+      <View style={[styles.tagPickerItem, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
+        <LucideIcons.Plus size={11} color={colors.text.muted} />
+        <TextInput
+          value={custom}
+          onChangeText={setCustom}
+          onSubmitEditing={addCustom}
+          onBlur={addCustom}
+          placeholder="własny"
+          placeholderTextColor={colors.text.muted}
+          autoCapitalize="none"
+          returnKeyType="done"
+          style={{ minWidth: 56, fontSize: 11, color: colors.text.primary, padding: 0 }}
+        />
+      </View>
     </ScrollView>
   );
 }

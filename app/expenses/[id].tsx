@@ -22,7 +22,7 @@ import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem } from '@/types';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
-import { saveCustomProductsToMemory, saveCustomTagsToMemory } from '@/utils/productMemory';
+import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
@@ -275,12 +275,31 @@ export default function ExpenseDetailScreen() {
     setEditedItems(next);
     setEditingItemIdx(null);
     // Save to shared product memory so future receipt scans auto-apply corrections
-    const changed = orig.category !== updated.category || JSON.stringify(orig.tags) !== JSON.stringify(updated.tags) || orig.name !== updated.name;
+    const tagsChanged = JSON.stringify(orig.tags) !== JSON.stringify(updated.tags);
+    const changed = orig.category !== updated.category || tagsChanged || orig.name !== updated.name;
     if (changed) {
       saveCustomProductsToMemory([{ name: updated.name, category: updated.category }]).catch(() => {});
       if (updated.tags.length > 0) {
         saveCustomTagsToMemory([{ name: updated.name, tags: updated.tags }]).catch(() => {});
       }
+    }
+    // Name changed → offer to apply the new name to EVERY product called the old
+    // name (learns a canonical alias → all past & future entries group/show under
+    // the new name in stats). "Tylko ten" just edits this line.
+    if (orig.name.trim() && updated.name.trim() && orig.name.trim() !== updated.name.trim()) {
+      Alert.alert(
+        'Zmień nazwę',
+        `Zastosować „${updated.name.trim()}" do wszystkich produktów „${orig.name.trim()}"?`,
+        [
+          { text: 'Tylko ten', style: 'cancel' },
+          {
+            text: 'Wszystkie', onPress: () => {
+              saveNameAliases([{ name: orig.name }], { 0: updated.name.trim() }).catch(() => {});
+              toast.success('Zastosowano do wszystkich');
+            },
+          },
+        ],
+      );
     }
   };
 
