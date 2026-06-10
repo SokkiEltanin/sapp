@@ -20,6 +20,8 @@ const P = {
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
+import { useExpensesStore } from '@/store/expensesStore';
+import { isMine } from '@/store/statsScope';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { moodService } from '@/services/moodService';
 import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel, ENERGY_COLORS } from '@/types';
@@ -689,7 +691,12 @@ function dayBeforeStr(dateStr: string): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
-function buildPatterns(entries: MoodEntry[], workByDate: Record<string, number>): string[] {
+function buildPatterns(
+  entries: MoodEntry[],
+  workByDate: Record<string, number>,
+  spendByDate: Record<string, number>,
+  doneTasksByDate: Record<string, number>,
+): string[] {
   const out: string[] = [];
   const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
 
@@ -734,16 +741,49 @@ function buildPatterns(entries: MoodEntry[], workByDate: Record<string, number>)
       : `W tygodniu masz lepszy humor (${wd.toFixed(1)}) niż w weekendy (${we.toFixed(1)}).`);
   }
 
+  // Spending vs mood — mine-spend on low-mood vs good-mood days.
+  const lowSpend: number[] = [], goodSpend: number[] = [];
+  for (const e of entries) {
+    const sp = spendByDate[e.date];
+    if (sp == null) continue;
+    if (e.mood <= 2) lowSpend.push(sp);
+    else if (e.mood >= 4) goodSpend.push(sp);
+  }
+  const ls = mean(lowSpend), gs = mean(goodSpend);
+  if (ls != null && gs != null && lowSpend.length >= 3 && goodSpend.length >= 3 && Math.abs(ls - gs) >= 10) {
+    out.push(ls > gs
+      ? `W gorsze dni wydajesz więcej — śr. ${Math.round(ls)} zł vs ${Math.round(gs)} zł w dobre.`
+      : `W lepsze dni wydajesz więcej — śr. ${Math.round(gs)} zł vs ${Math.round(ls)} zł w gorsze.`);
+  }
+
+  // Tasks done vs mood — days with ≥1 completed task vs none.
+  const doneMood: number[] = [], idleMood: number[] = [];
+  for (const e of entries) ((doneTasksByDate[e.date] ?? 0) > 0 ? doneMood : idleMood).push(e.mood);
+  const dm = mean(doneMood), im = mean(idleMood);
+  if (dm != null && im != null && doneMood.length >= 3 && idleMood.length >= 3 && Math.abs(dm - im) >= 0.35) {
+    out.push(dm > im
+      ? `W dni, gdy domykasz zadania, masz lepszy humor (${dm.toFixed(1)} vs ${im.toFixed(1)}).`
+      : `W dni z domkniętymi zadaniami humor jest niższy (${dm.toFixed(1)} vs ${im.toFixed(1)}) — może przeciążenie?`);
+  }
+
   // Most common stress keyword
   const { negative, positive } = extractKeywords(entries);
   if (negative.length > 0) out.push(`Najczęściej stresują Cię: ${negative.slice(0, 2).map(k => k.word).join(', ')}.`);
-  if (positive.length > 0 && out.length < 5) out.push(`Najlepiej działają na Ciebie: ${positive.slice(0, 2).map(k => k.word).join(', ')}.`);
+  if (positive.length > 0 && out.length < 6) out.push(`Najlepiej działają na Ciebie: ${positive.slice(0, 2).map(k => k.word).join(', ')}.`);
 
-  return out.slice(0, 5);
+  return out.slice(0, 6);
 }
 
-function MoodPatterns({ entries, workByDate }: { entries: MoodEntry[]; workByDate: Record<string, number> }) {
-  const lines = useMemo(() => buildPatterns(entries, workByDate), [entries, workByDate]);
+function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate }: {
+  entries: MoodEntry[];
+  workByDate: Record<string, number>;
+  spendByDate: Record<string, number>;
+  doneTasksByDate: Record<string, number>;
+}) {
+  const lines = useMemo(
+    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate),
+    [entries, workByDate, spendByDate, doneTasksByDate],
+  );
   if (entries.length < 6 || lines.length === 0) return null;
   return (
     <View style={pat.card}>
@@ -816,6 +856,29 @@ export default function MoodScreen() {
     }
     return map;
   }, [calEvents, gcalEvents, workSettings.workColor, workSettings.workPrefix]);
+
+  // Mine-only spend per day + completed-tasks per day — for cross-domain insights.
+  const allExpenses = useExpensesStore(s => s.expenses);
+  const allTasks = useCalendarStore(s => s.tasks);
+  const spendByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of allExpenses) {
+      if (e.type === 'income' || !isMine(e)) continue;
+      const d = e.date.slice(0, 10);
+      map[d] = (map[d] ?? 0) + e.amount;
+    }
+    return map;
+  }, [allExpenses]);
+  const doneTasksByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const t of allTasks) {
+      if (t.status !== 'done') continue;
+      const d = (t.updatedAt ?? '').slice(0, 10);
+      if (d) map[d] = (map[d] ?? 0) + 1;
+    }
+    return map;
+  }, [allTasks]);
+
   const streak = useMemo(() => calcStreak(entries), [entries]);
   const recent = useMemo(() => entries.slice(0, 14), [entries]);
 
@@ -913,7 +976,7 @@ export default function MoodScreen() {
         <MoodEnergyWave entries={entries} />
 
         {/* Conclusions from notes + work/day context */}
-        <MoodPatterns entries={entries} workByDate={workByDate} />
+        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} />
 
         {/* Rich statistics */}
         <MoodDistribution entries={entries} />
