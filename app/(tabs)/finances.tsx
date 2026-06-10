@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Circle as SvgCircle, Text as SvgText, G as SvgG, Line as SvgLine } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag } from 'lucide-react-native';
 import { format } from 'date-fns';
@@ -75,7 +75,7 @@ function buildFinPath(data: number[], max: number) {
 }
 
 // Dual wave: expenses (red, solid) + income (green, dashed), shared scale.
-function DualFinWave({ exp, inc, markers }: { exp: number[]; inc: number[]; markers?: { col: number; label: string }[] }) {
+function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
   if (exp.length < 2) return null;
   const max = Math.max(...exp, ...inc, 1);
   const E = buildFinPath(exp, max);
@@ -96,25 +96,6 @@ function DualFinWave({ exp, inc, markers }: { exp: number[]; inc: number[]; mark
       <Path d={I.fill} fill="url(#finInc)" />
       <Path d={E.line} stroke="#E43434" strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
       <Path d={I.line} stroke="#2AC68F" strokeWidth="1.8" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 3" />
-      {/* Key expenses — dot on the line + a label pinned to a top corner (first
-          left, second right) with a faint connector, so they never overlap. */}
-      {(markers ?? []).slice(0, 2).map((m, i) => {
-        const p = E.pts[m.col];
-        if (!p) return null;
-        const onLeft = i === 0;                  // first label → top-left, second → top-right
-        const lx = onLeft ? 3 : WAVE_W - 3;
-        const ly = 8;
-        return (
-          <SvgG key={i}>
-            <SvgLine x1={p.x} y1={p.y} x2={lx} y2={ly + 2} stroke="rgba(228,52,52,0.35)" strokeWidth={0.8} />
-            <SvgCircle cx={p.x} cy={p.y} r={3} fill="#FFFFFF" stroke="#E43434" strokeWidth={1.5} />
-            <SvgText x={lx} y={ly} fontSize={8} fontWeight="700"
-              fill="rgba(255,255,255,0.9)" textAnchor={onLeft ? 'start' : 'end'}>
-              {m.label}
-            </SvgText>
-          </SvgG>
-        );
-      })}
     </Svg>
   );
 }
@@ -209,25 +190,12 @@ export default function FinancesScreen() {
     }
     if (chartPeriod === 'week') {
       const dates = weekDates();
-      const idxOf = new Map(dates.map((d, i) => [d, i]));
-      // Key expenses: the 2 biggest single expenses this week (≥ 80 zł), shown as
-      // labelled dots so they don't clutter the line.
-      const markers = expenses
-        .filter(e => isExp(e) && inScope(e, scope) && idxOf.has(e.date.slice(0, 10)) && e.amount >= 80)
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 2)
-        .map(e => {
-          const raw = (e.note || e.storeName || e.category || '').trim();
-          const label = raw.length > 14 ? raw.slice(0, 13) + '…' : raw;
-          return { col: idxOf.get(e.date.slice(0, 10))!, label };
-        });
       return {
         values:    dates.map(d => expByDate[d] ?? 0),
         incValues: dates.map(d => incByDate[d] ?? 0),
         labels: ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'],
         total:    dates.reduce((s, d) => s + (expByDate[d] ?? 0), 0),
         incTotal: dates.reduce((s, d) => s + (incByDate[d] ?? 0), 0),
-        markers,
       };
     } else {
       const dates = monthDates();
@@ -244,7 +212,6 @@ export default function FinancesScreen() {
         labels: ['T1', 'T2', 'T3', 'T4', 'T5'],
         total: exp.reduce((s, v) => s + v, 0),
         incTotal: inc.reduce((s, v) => s + v, 0),
-        markers: [] as { col: number; label: string }[],
       };
     }
   }, [expenses, chartPeriod, scope]);
@@ -416,7 +383,7 @@ export default function FinancesScreen() {
                     <Text key={i} style={[st.chartValue, { color: '#E97171' }]}>{v > 0 ? Math.round(v) : ''}</Text>
                   ))}
                 </View>
-                <DualFinWave exp={chartData.values} inc={chartData.incValues} markers={chartPeriod === 'week' ? chartData.markers : undefined} />
+                <DualFinWave exp={chartData.values} inc={chartData.incValues} />
                 <View style={st.chartValues}>
                   {chartData.incValues.map((v, i) => (
                     <Text key={i} style={[st.chartValue, { color: '#2AC68F' }]}>{v > 0 ? Math.round(v) : ''}</Text>

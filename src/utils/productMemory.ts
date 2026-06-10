@@ -222,9 +222,72 @@ export async function saveNameAliases(
 
 // Resolve a raw product name to its canonical form using learned aliases
 // (exact key → fuzzy key → prettified raw fallback).
+// ─── Known product bases ──────────────────────────────────────────────────────
+// Many branded snacks/sweets appear under dozens of slightly different OCR names
+// and flavours ("Jeżyki", "jeżyki cherry", "jezykicherry"…). When a distinctive
+// base token shows up in a name we fold the whole family to ONE canonical name,
+// so stats group them automatically without the user renaming each variant.
+// Tokens are normalised (lowercase, no diacritics). Order = priority.
+const BRAND_CANON: { tokens: string[]; name: string }[] = [
+  { tokens: ['jezyki'],                 name: 'Jeżyki' },
+  { tokens: ['grzeski'],                name: 'Grześki' },
+  { tokens: ['princepolo'],             name: 'Prince Polo' },
+  { tokens: ['delicje'],                name: 'Delicje' },
+  { tokens: ['ptasiemleczko'],          name: 'Ptasie mleczko' },
+  { tokens: ['michalki'],               name: 'Michałki' },
+  { tokens: ['krowki', 'krowka'],       name: 'Krówki' },
+  { tokens: ['lays'],                   name: "Lay's" },
+  { tokens: ['pringles'],               name: 'Pringles' },
+  { tokens: ['doritos'],                name: 'Doritos' },
+  { tokens: ['cheetos'],                name: 'Cheetos' },
+  { tokens: ['chrupki'],                name: 'Chrupki' },
+  { tokens: ['krakers', 'krakersy'],    name: 'Krakersy' },
+  { tokens: ['paluszki'],               name: 'Paluszki' },
+  { tokens: ['precle', 'precelki'],     name: 'Precle' },
+  { tokens: ['nachos'],                 name: 'Nachos' },
+  { tokens: ['orzeszki', 'orzeszkiwskorupkach'], name: 'Orzeszki' },
+  { tokens: ['grzanki'],                name: 'Grzanki' },
+  { tokens: ['ovenbaked'],              name: 'Ovenbaked' },
+  { tokens: ['snickers'],               name: 'Snickers' },
+  { tokens: ['twix'],                   name: 'Twix' },
+  { tokens: ['kitkat'],                 name: 'KitKat' },
+  { tokens: ['kinder'],                 name: 'Kinder' },
+  { tokens: ['milka'],                  name: 'Milka' },
+  { tokens: ['wedel'],                  name: 'Wedel' },
+  { tokens: ['oreo'],                   name: 'Oreo' },
+  { tokens: ['lubella'],                name: 'Lubella' },
+  { tokens: ['coca', 'cocacola'],       name: 'Coca-Cola' },
+  { tokens: ['pepsi'],                  name: 'Pepsi' },
+  { tokens: ['redbull'],                name: 'Red Bull' },
+  { tokens: ['monster'],                name: 'Monster' },
+  { tokens: ['tymbark'],                name: 'Tymbark' },
+];
+
+function brandCanon(key: string): string | undefined {
+  const words = key.split(' ');
+  const flat = key.replace(/ /g, '');
+  for (const b of BRAND_CANON) {
+    for (const t of b.tokens) {
+      if (words.includes(t)) return b.name;                 // distinct word
+      if (t.length >= 6 && flat.includes(t)) return b.name; // concatenated / OCR-glued
+    }
+  }
+  return undefined;
+}
+
 export function canonicalProductName(raw: string, aliases: NameAliases): string {
   const key = normalizeProductName(raw);
+  // 1) user's own learned rename wins (most specific)
   if (aliases[key]) return aliases[key];
+  // 2) known product base — folds flavour/OCR variants to one family
+  const brand = brandCanon(key);
+  if (brand) return brand;
+  // 3) space-insensitive alias match (OCR glues/splits words differently)
+  const flat = key.replace(/ /g, '');
+  for (const k of Object.keys(aliases)) {
+    if (k.replace(/ /g, '') === flat) return aliases[k];
+  }
+  // 4) fuzzy match against learned aliases (typos / close variants)
   const fuzzy = findFuzzyMatch(key, aliases);
   if (fuzzy) return fuzzy;
   return raw.trim();

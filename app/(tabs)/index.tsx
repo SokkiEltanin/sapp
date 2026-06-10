@@ -63,7 +63,7 @@ import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SWEETS_TAGS = ['słodycze'];
+const SWEETS_TAGS = ['słodycze', 'przekąski']; // junk side: sweets + snacks (combined everywhere)
 
 const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   droplets:    Droplets,
@@ -1926,7 +1926,7 @@ export default function DashboardScreen() {
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={accentColor} />
-                  <Text style={[s.cardTitle]}>Słodycze vs jedzenie</Text>
+                  <Text style={[s.cardTitle]}>Słodycze + przekąski vs jedzenie</Text>
                   <View style={s.dualLegend}>
                     <View style={s.dualLegendItem}>
                       <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
@@ -1934,7 +1934,7 @@ export default function DashboardScreen() {
                     </View>
                     <View style={s.dualLegendItem}>
                       <View style={[s.dualLegendLine, { backgroundColor: accentColor, opacity: 0.4 }]} />
-                      <Text style={s.dualLegendLabel}>słodycze</Text>
+                      <Text style={s.dualLegendLabel}>słodycze+przekąski</Text>
                     </View>
                   </View>
                 </View>

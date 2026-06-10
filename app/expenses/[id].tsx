@@ -23,6 +23,7 @@ import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem } from '@/types';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
+import { getPayers } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
@@ -50,15 +51,26 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
   const [qty, setQty]           = useState(item.quantity.toString());
   const [category, setCategory] = useState<ExpenseCategory>(item.category);
   const [tags, setTags]         = useState<string[]>(item.tags ?? []);
+  const [eaters, setEaters]     = useState<string[]>(item.eaters ?? []);
+  const [customTag, setCustomTag] = useState('');
+  const [payers, setPayers]     = useState<string[]>([]);
+  useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
 
   const toggleTag = (t: string) =>
     setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  const toggleEater = (p: string) =>
+    setEaters(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  const addCustomTag = () => {
+    const t = customTag.trim().toLowerCase();
+    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
+    setCustomTag('');
+  };
 
   const handleSave = () => {
     const p = parseFloat(price.replace(',', '.'));
     const q = parseFloat(qty.replace(',', '.')) || 1;
     if (!name.trim() || isNaN(p) || p <= 0) return;
-    onSave({ ...item, name: name.trim(), price: p, quantity: q, category, tags });
+    onSave({ ...item, name: name.trim(), price: p, quantity: q, category, tags, eaters: eaters.length ? eaters : undefined });
   };
 
   return (
@@ -122,7 +134,7 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
       {/* Food sub-tags */}
       <Text style={ie.sectionLabel}>Tagi</Text>
       <View style={ie.tagsRow}>
-        {ITEM_TAGS.map(t => (
+        {[...new Set([...ITEM_TAGS, ...tags])].map(t => (
           <TouchableOpacity
             key={t}
             onPress={() => toggleTag(t)}
@@ -132,7 +144,43 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
             <Text style={[ie.tagChipText, tags.includes(t) && ie.tagChipTextSel]}>{t}</Text>
           </TouchableOpacity>
         ))}
+        <View style={[ie.tagChip, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
+          <LucideIcons.Plus size={10} color={colors.text.muted} />
+          <TextInput
+            value={customTag}
+            onChangeText={setCustomTag}
+            onSubmitEditing={addCustomTag}
+            onBlur={addCustomTag}
+            placeholder="własny"
+            placeholderTextColor={colors.text.muted}
+            autoCapitalize="none"
+            returnKeyType="done"
+            style={{ minWidth: 54, fontSize: 10, color: colors.text.primary, padding: 0 }}
+          />
+        </View>
       </View>
+
+      {/* Who ate it — drives the per-person limit bars */}
+      {payers.length >= 2 && (
+        <>
+          <Text style={ie.sectionLabel}>Kto jadł {eaters.length === 0 ? '· wspólnie' : ''}</Text>
+          <View style={ie.tagsRow}>
+            {payers.map(p => {
+              const on = eaters.includes(p);
+              return (
+                <TouchableOpacity
+                  key={p}
+                  onPress={() => toggleEater(p)}
+                  style={[ie.tagChip, on && { backgroundColor: '#4ECBA820', borderColor: '#4ECBA880' }]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[ie.tagChipText, on && { color: '#4ECBA8', fontWeight: '600' }]}>{p}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       {/* Actions */}
       <View style={ie.actions}>
