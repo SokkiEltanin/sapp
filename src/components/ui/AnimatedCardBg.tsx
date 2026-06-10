@@ -200,13 +200,109 @@ function CloudLayer({ layer = 'back' }: { layer?: 'back' | 'front' }) {
   );
 }
 
+// ─── Precipitation (rain / snow) ──────────────────────────────────────────────
+
+const PRECIP_TRAVEL = 230; // px — taller than any hero card
+
+function Precip({ kind }: { kind: 'rain' | 'snow' }) {
+  const COUNT = kind === 'rain' ? 18 : 20;
+  const parts = useMemo(() =>
+    Array.from({ length: COUNT }, () => ({
+      lx:    Math.random() * 100,
+      delay: Math.random() * 3500,
+      dur:   kind === 'rain' ? 650 + Math.random() * 450 : 3200 + Math.random() * 2600,
+      len:   kind === 'rain' ? 7 + Math.random() * 7 : 2 + Math.random() * 2.4,
+      drift: Math.random() * 18 - 9,
+      op:    kind === 'rain' ? 0.12 + Math.random() * 0.12 : 0.18 + Math.random() * 0.18,
+      v:     new Animated.Value(0),
+    })),
+  []);
+  const loops = useRef<Animated.CompositeAnimation[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    parts.forEach(p => {
+      const t = setTimeout(() => {
+        if (!alive) return;
+        const anim = Animated.loop(Animated.timing(p.v, { toValue: 1, duration: p.dur, useNativeDriver: true }));
+        anim.start();
+        loops.current.push(anim);
+      }, p.delay);
+      timers.push(t);
+    });
+    return () => { alive = false; timers.forEach(clearTimeout); loops.current.forEach(l => l.stop()); loops.current = []; };
+  }, []);
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
+      {parts.map((p, i) => {
+        const ty = p.v.interpolate({ inputRange: [0, 1], outputRange: [-14, PRECIP_TRAVEL] });
+        const tx = kind === 'snow' ? p.v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, p.drift, 0] }) : 0;
+        return (
+          <Animated.View
+            key={i}
+            style={{
+              position: 'absolute', top: 0, left: `${p.lx}%` as any,
+              width: kind === 'rain' ? 1.4 : p.len,
+              height: kind === 'rain' ? p.len : p.len,
+              borderRadius: kind === 'rain' ? 1 : p.len,
+              backgroundColor: kind === 'rain' ? '#9FC2FF' : '#FFFFFF',
+              opacity: p.op,
+              transform: [{ translateY: ty }, { translateX: tx }],
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+// Soft sun glow (clear sky, daytime).
+function SunGlow() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Defs>
+          <RadialGradient id="sun" cx="82%" cy="22%" r="42%">
+            <Stop offset="0"   stopColor="#FFE9A8" stopOpacity="0.55" />
+            <Stop offset="0.5" stopColor="#FFD15C" stopOpacity="0.22" />
+            <Stop offset="1"   stopColor="#FFD15C" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx="82%" cy="22%" r="60%" fill="url(#sun)" />
+      </Svg>
+    </View>
+  );
+}
+
 // ─── Export ───────────────────────────────────────────────────────────────────
 
-interface Props { timeOfDay: TimeOfDay; layer?: 'back' | 'front'; }
+type Condition = 'sun' | 'clouds' | 'rain' | 'snow' | 'stars';
 
-export default function AnimatedCardBg({ timeOfDay, layer = 'back' }: Props) {
+function conditionFor(code: number | undefined, isNight: boolean): Condition {
+  if (code == null || code < 0) return isNight ? 'stars' : 'clouds';
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return 'rain';
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
+  if (code === 0) return isNight ? 'stars' : 'sun';
+  return isNight ? 'stars' : 'clouds';     // 1–3 partly cloudy, 45–48 fog
+}
+
+interface Props { timeOfDay: TimeOfDay; layer?: 'back' | 'front'; weatherCode?: number; }
+
+export default function AnimatedCardBg({ timeOfDay, layer = 'back', weatherCode }: Props) {
   const isNight = timeOfDay === 'night' || timeOfDay === 'evening' || timeOfDay === 'dawn';
-  // Stars only behind the glass; front layer shows nothing at night.
-  if (isNight) return layer === 'front' ? null : <StarField />;
-  return <CloudLayer layer={layer} />;
+  const cond = conditionFor(weatherCode, isNight);
+
+  // Front layer: only a couple of sharper clouds (for sun/clouds); nothing else.
+  if (layer === 'front') return cond === 'clouds' || cond === 'sun' ? <CloudLayer layer="front" /> : null;
+
+  // Back layer — the main sky.
+  switch (cond) {
+    case 'stars': return <StarField />;
+    case 'rain':  return <><CloudLayer /><Precip kind="rain" /></>;
+    case 'snow':  return <><CloudLayer /><Precip kind="snow" /></>;
+    case 'sun':   return <><SunGlow /><CloudLayer /></>;
+    default:      return <CloudLayer />;
+  }
 }

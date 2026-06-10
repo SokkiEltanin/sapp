@@ -40,6 +40,7 @@ export default function WidgetBuilder() {
   const [tag, setTag] = useState<string>(existing?.tag ?? '');
   const [calcHours, setCalcHours] = useState('');
   const [calcRate, setCalcRate] = useState('');
+  const [compareOffset, setCompareOffset] = useState<number>(existing?.compareOffset ?? 1);
 
   const def = metricById(metric);
   const needsTag = !!def?.needsTag;
@@ -88,6 +89,7 @@ export default function WidgetBuilder() {
       title: title.trim() || labelFor(def, tag),
       metric: def.id,
       metric2: viz === 'compare' ? metric2 : undefined,
+      compareOffset: viz === 'compare' && metric2 === '__self__' ? compareOffset : undefined,
       viz,
       period: def.periodic ? period : undefined,
       target: !isNaN(target) && target > 0 ? target : undefined,
@@ -181,6 +183,24 @@ export default function WidgetBuilder() {
         {viz === 'compare' && (
           <>
             <Text style={s.step}>Porównaj z…</Text>
+            {/* Same metric, a different period (month-over-month / year-over-year) */}
+            <View style={[s.chipsWrap, { marginBottom: spacing[2] }]}>
+              {([
+                { off: 1,  label: period === 'month' ? 'Poprzedni miesiąc' : 'Poprzedni tydzień' },
+                { off: 3,  label: period === 'month' ? '3 mies. temu' : '3 tyg. temu' },
+                { off: 12, label: period === 'month' ? 'Rok temu' : '12 tyg. temu' },
+              ] as const).map(o => {
+                const active = metric2 === '__self__' && compareOffset === o.off;
+                return (
+                  <PressableScale key={o.off} onPress={() => { haptic.tap(); setMetric2('__self__'); setCompareOffset(o.off); }}>
+                    <View style={[s.chip, active && { backgroundColor: '#6C9EFF22', borderColor: '#6C9EFF' }]}>
+                      <Text style={[s.chipText, active && { color: '#6C9EFF' }]}>{o.label}</Text>
+                    </View>
+                  </PressableScale>
+                );
+              })}
+            </View>
+            <Text style={[s.rowSubLabel]}>…albo z inną metryką:</Text>
             <View style={s.chipsWrap}>
               {compareCandidates.map(m => {
                 const active = metric2 === m.id;
@@ -276,6 +296,7 @@ const s = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: colors.text.primary },
   scroll: { padding: spacing[4], gap: spacing[2] },
   step: { fontSize: 11, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[1] },
+  rowSubLabel: { fontSize: 11, color: colors.text.muted, marginBottom: spacing[1] },
   group: { marginBottom: spacing[2] },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing[1] },
   groupTitle: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },

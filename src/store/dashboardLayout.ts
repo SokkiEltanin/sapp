@@ -67,7 +67,8 @@ export interface CustomTile {
   icon?: string;         // lucide icon name (type 'link')
   // type 'stat':
   metric?: string;       // metric id from statWidgets registry
-  metric2?: string;      // second metric id (viz 'compare')
+  metric2?: string;      // second metric id (viz 'compare'); '__self__' = same metric, earlier period
+  compareOffset?: number;// periods back for a self comparison (1 = previous, 12 = a year ago)
   viz?: WidgetViz;
   period?: 'week' | 'month';
   target?: number;       // optional goal — drawn as a line / progress on number & wave

@@ -821,9 +821,41 @@ export default function DashboardScreen() {
     }
 
     if (viz === 'compare') {
+      // Self-comparison: same metric, current period vs `compareOffset` periods ago.
+      if (t.metric2 === '__self__') {
+        const off = t.compareOffset ?? 1;
+        const n = Math.max(6, off + 1);
+        const ser = metricSeries(t.metric!, statCtx, period, n, t.tag);
+        const nowV = ser.values[ser.values.length - 1] ?? 0;
+        const thenIdx = ser.values.length - 1 - off;
+        const thenV = thenIdx >= 0 ? ser.values[thenIdx] : 0;
+        const nowL = ser.labels[ser.labels.length - 1] ?? 'teraz';
+        const thenL = thenIdx >= 0 ? ser.labels[thenIdx] : '—';
+        const dPct = thenV > 0 ? Math.round(((nowV - thenV) / thenV) * 100) : null;
+        const up = nowV >= thenV;
+        return (
+          <View style={[s.card, { backgroundColor: cardBgDark }]}>
+            {header}
+            <View style={s.statCmpRow}>
+              <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(nowV, ser.unit)}</Text><Text style={s.statCmpKey}>{nowL}</Text></View>
+              {dPct != null && (
+                <View style={[s.statDelta, { backgroundColor: (up ? '#2AC68F' : '#FF6B6B') + '1E' }]}>
+                  {up ? <TrendingUp size={11} color="#2AC68F" /> : <TrendingDown size={11} color="#FF6B6B" />}
+                  <Text style={[s.statDeltaText, { color: up ? '#2AC68F' : '#FF6B6B' }]}>{dPct >= 0 ? '+' : ''}{dPct}%</Text>
+                </View>
+              )}
+              <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(thenV, ser.unit)}</Text><Text style={s.statCmpKey}>{thenL}</Text></View>
+            </View>
+            <WaveChart data={ser.values} color={accentColor} />
+            <View style={s.waveLabels}>
+              {ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, (i === ser.labels.length - 1 || i === thenIdx) && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}
+            </View>
+          </View>
+        );
+      }
       const a = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       const defB = metricById(t.metric2);
-      const b = defB ? metricSeries(t.metric2!, statCtx, period, 6, t.tag) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };
+      const b = defB ? metricSeries(t.metric2!, statCtx, period, 6) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
@@ -1364,7 +1396,7 @@ export default function DashboardScreen() {
                 activeOpacity={0.92}
                 style={s.mainCard}
               >
-                <AnimatedCardBg timeOfDay={timeOfDay} />
+                <AnimatedCardBg timeOfDay={timeOfDay} weatherCode={weather?.wmo} />
 
                 <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
                   {/* Soft bottom-up gradient inside card */}
@@ -1411,7 +1443,7 @@ export default function DashboardScreen() {
                 </BlurView>
 
                 {/* A couple of sharper clouds drifting OVER the glass */}
-                <AnimatedCardBg timeOfDay={timeOfDay} layer="front" />
+                <AnimatedCardBg timeOfDay={timeOfDay} layer="front" weatherCode={weather?.wmo} />
               </TouchableOpacity>
             </LinearGradient>
 

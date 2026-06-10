@@ -13,6 +13,7 @@ import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import { appSettings } from '@/utils/appSettings';
+import { notificationsService } from '@/services/notificationsService';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -75,6 +76,7 @@ export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => { appSettings.loadAll(); }, []);
+  useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);
 
   useEffect(() => {
     // Fallback: show app after 4s regardless (prevents permanent black screen)

@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { Subscription, Task } from '@/types';
 
 // ─── Keyword detection ────────────────────────────────────────────────────────
@@ -88,9 +89,26 @@ Notifications.setNotificationHandler({
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const notificationsService = {
+  // Android needs an explicit HIGH-importance channel for heads-up + sound.
+  async ensureAndroidChannel(): Promise<void> {
+    if (Platform.OS !== 'android') return;
+    try {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Przypomnienia',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: 'default',
+        vibrationPattern: [0, 250, 250, 250],
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+    } catch {}
+  },
+
   async requestPermissions(): Promise<boolean> {
-    const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
+    await this.ensureAndroidChannel();
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status === 'granted') return true;
+    const res = await Notifications.requestPermissionsAsync();
+    return res.status === 'granted';
   },
 
   async scheduleDailyMoodReminder(hour = 20, minute = 0): Promise<string> {
