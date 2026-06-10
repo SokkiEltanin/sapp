@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { CloudUpload, RotateCcw, Cloud } from 'lucide-react-native';
+import * as Updates from 'expo-updates';
+import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
@@ -22,9 +23,14 @@ function fmtSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function BackupSection({ appBuild }: { appBuild?: number }) {
+export default function BackupSection({ appBuild, googleUser, onConnectGoogle }: {
+  appBuild?: number;
+  googleUser?: string | null;
+  onConnectGoogle?: () => void;
+}) {
   const [backups, setBackups] = useState<BackupMeta[]>([]);
   const [busy, setBusy] = useState<'create' | 'restore' | 'load' | null>('load');
+  const protectedByGoogle = !!googleUser;
 
   const refresh = useCallback(async () => {
     try { setBackups(await listBackups()); } catch { /* offline */ }
@@ -61,7 +67,11 @@ export default function BackupSection({ appBuild }: { appBuild?: number }) {
             try {
               await restoreBackup(b.id);
               haptic.success();
-              Alert.alert('Przywrócono', 'Uruchom ponownie aplikację, aby wszystkie dane się odświeżyły.');
+              Alert.alert(
+                'Przywrócono',
+                'Aplikacja zostanie przeładowana, aby wczytać przywrócone dane.',
+                [{ text: 'OK', onPress: () => { Updates.reloadAsync().catch(() => {}); } }],
+              );
             } catch (e: any) {
               haptic.error();
               toast.error('Nie udało się przywrócić kopii');
@@ -83,6 +93,31 @@ export default function BackupSection({ appBuild }: { appBuild?: number }) {
       <Text style={s.sub}>
         Zapisuje wszystkie dane i ustawienia w chmurze (auto raz dziennie, trzymane ~3 dni w kółko). Możesz przywrócić ostatnią lub wybraną.
       </Text>
+
+      {protectedByGoogle ? (
+        <View style={[s.banner, { backgroundColor: '#2AC68F14', borderColor: '#2AC68F44' }]}>
+          <ShieldCheck size={15} color="#2AC68F" />
+          <Text style={[s.bannerText, { color: '#2AC68F' }]}>
+            Chronione kontem Google — kopie przetrwają reinstal i zmianę telefonu.
+          </Text>
+        </View>
+      ) : (
+        <View style={[s.banner, { backgroundColor: '#FBBF2414', borderColor: '#FBBF2444', flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+            <ShieldAlert size={15} color="#FBBF24" />
+            <Text style={[s.bannerText, { color: '#FBBF24' }]}>
+              Kopie są tylko na tym koncie urządzenia. Po reinstalu/zmianie telefonu przepadną. Połącz z Google, żeby przetrwały.
+            </Text>
+          </View>
+          {onConnectGoogle && (
+            <PressableScale onPress={onConnectGoogle}>
+              <View style={s.connectBtn}>
+                <Text style={s.connectText}>Połącz z Google</Text>
+              </View>
+            </PressableScale>
+          )}
+        </View>
+      )}
 
       <PressableScale onPress={onCreate} disabled={busy != null}>
         <View style={[s.createBtn, busy != null && { opacity: 0.5 }]}>
@@ -137,6 +172,16 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { ...typography.body, fontWeight: '700', color: colors.text.primary },
   sub: { fontSize: 12, color: colors.text.muted, lineHeight: 17, marginTop: -spacing[1] },
+  banner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2],
+    padding: spacing[3], borderRadius: radius.md, borderWidth: 1,
+  },
+  bannerText: { flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 16 },
+  connectBtn: {
+    alignItems: 'center', paddingVertical: spacing[2], borderRadius: radius.md,
+    backgroundColor: '#FBBF2422', borderWidth: 1, borderColor: '#FBBF2455',
+  },
+  connectText: { fontSize: 12, fontWeight: '700', color: '#FBBF24' },
   createBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.md,

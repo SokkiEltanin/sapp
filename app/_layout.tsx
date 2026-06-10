@@ -3,8 +3,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, ScrollView, StyleSheet, AppState } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, AppState, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as Updates from 'expo-updates';
 import { router } from 'expo-router';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,7 +15,7 @@ import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
-import { maybeAutoBackup } from '@/services/backupService';
+import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -100,6 +101,33 @@ export default function RootLayout() {
     if (!authReady) return;
     const t = setTimeout(() => { maybeAutoBackup().catch(() => {}); }, 8000);
     return () => clearTimeout(t);
+  }, [authReady]);
+
+  // After signing into a pre-existing Google account (e.g. on a fresh install),
+  // offer to restore that account's latest cloud backup so local config/data come
+  // back too — not just the live Firestore collections.
+  useEffect(() => {
+    if (!authReady) return;
+    (async () => {
+      try {
+        if ((await AsyncStorage.getItem('restore_prompt_pending')) !== '1') return;
+        await AsyncStorage.removeItem('restore_prompt_pending');
+        const last = await getLastBackup();
+        if (!last) return;
+        const when = new Date(last.createdAt).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        Alert.alert(
+          'Znaleziono kopię w chmurze',
+          `Z dnia ${when}. Przywrócić dane i ustawienia z tej kopii?`,
+          [
+            { text: 'Nie teraz', style: 'cancel' },
+            { text: 'Przywróć', onPress: async () => {
+                try { await restoreBackup(last.id); } catch {}
+                Updates.reloadAsync().catch(() => {});
+              } },
+          ],
+        );
+      } catch {}
+    })();
   }, [authReady]);
 
   useEffect(() => {

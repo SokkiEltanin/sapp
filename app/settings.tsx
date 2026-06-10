@@ -48,7 +48,7 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 219; // bump on each meaningful build
+const APP_BUILD = 220; // bump on each meaningful build
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
@@ -215,6 +215,7 @@ export default function SettingsScreen() {
       const current = auth.currentUser;
 
       let result;
+      let switchedAccount = false;     // signed into a DIFFERENT existing account
       if (current?.isAnonymous) {
         // Try to link the anonymous account → Google (keeps the same UID, so the
         // data created while anonymous stays attached).
@@ -226,13 +227,20 @@ export default function SettingsScreen() {
           if (linkErr?.code === 'auth/credential-already-in-use'
               || linkErr?.code === 'auth/email-already-in-use') {
             result = await signInWithCredential(auth, credential);
+            switchedAccount = true;
           } else {
             throw linkErr;
           }
         }
       } else {
         result = await signInWithCredential(auth, credential);
+        switchedAccount = true;
       }
+
+      // Switched to a pre-existing account (e.g. after a reinstall) → its cloud
+      // backup holds the local config/data this fresh install is missing. Flag it
+      // so the app offers to restore right after the reload.
+      if (switchedAccount) await AsyncStorage.setItem('restore_prompt_pending', '1');
 
       // Store calendar access token for gcal sync after reload
       try {
@@ -987,7 +995,7 @@ export default function SettingsScreen() {
 
         {/* Cloud backup */}
         <View>
-          <BackupSection appBuild={APP_BUILD} />
+          <BackupSection appBuild={APP_BUILD} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
         </View>
 
         {/* Account */}
