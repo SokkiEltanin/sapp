@@ -81,7 +81,7 @@ export default function BackupSection({ appBuild }: { appBuild?: number }) {
         <Text style={s.title}>Kopia zapasowa (chmura)</Text>
       </View>
       <Text style={s.sub}>
-        Zapisuje wszystkie dane i ustawienia w chmurze (auto raz dziennie). Możesz przywrócić ostatnią lub wybraną.
+        Zapisuje wszystkie dane i ustawienia w chmurze (auto raz dziennie, trzymane ~3 dni w kółko). Możesz przywrócić ostatnią lub wybraną.
       </Text>
 
       <PressableScale onPress={onCreate} disabled={busy != null}>

@@ -48,7 +48,7 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 218; // bump on each meaningful build
+const APP_BUILD = 219; // bump on each meaningful build
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();

@@ -16,10 +16,16 @@ import { workService } from './workService';
 // payers, weights, habits…) PLUS every Firestore collection (expenses, mood,
 // calendar, tasks, subscriptions, templates, work shifts). The JSON is split into
 // <1 MiB chunks and stored under users/{uid}/backups/{id}/chunks so it never hits
-// the Firestore document size limit. We keep the most recent MAX_BACKUPS.
+// the Firestore document size limit.
+//
+// Retention is a rolling window: keep backups from the last RETAIN_DAYS, but
+// always keep at least MIN_KEEP of the most recent ones (so you never end up with
+// zero after not opening the app for a while). Auto runs daily, so steady state is
+// ~3 backups — tiny, and Firestore never fills up.
 
 const BACKUPS = 'backups';
-const MAX_BACKUPS = 10;
+const RETAIN_DAYS = 3;
+const MIN_KEEP = 3;
 const CHUNK = 480_000;                 // chars per chunk, safely under 1 MiB
 const LAST_AUTO_KEY = 'backup_last_auto_at';
 const AUTO_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -113,8 +119,11 @@ async function deleteBackup(id: string): Promise<void> {
 }
 
 async function prune(): Promise<void> {
-  const all = await listBackups();
-  for (const b of all.slice(MAX_BACKUPS)) await deleteBackup(b.id).catch(() => {});
+  const all = await listBackups();                 // newest first
+  const cutoff = Date.now() - RETAIN_DAYS * 24 * 60 * 60 * 1000;
+  // Delete a backup only if it's both beyond MIN_KEEP and older than the window.
+  const stale = all.filter((b, i) => i >= MIN_KEEP && new Date(b.createdAt).getTime() < cutoff);
+  for (const b of stale) await deleteBackup(b.id).catch(() => {});
 }
 
 async function readSnapshot(id: string): Promise<Snapshot> {
