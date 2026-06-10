@@ -15,7 +15,7 @@ import {
   loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory,
   loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
   loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
-  loadWeightMemory, saveWeightMemory, weightFor, WeightMemory,
+  loadWeightMemory, saveWeightMemory, weightFor, WeightMemory, brandTag,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -89,8 +89,14 @@ export default function ScanReceiptModal() {
   const getProductName = (i: number): string =>
     editedNames[i] ?? (receipt?.products[i].name ?? '');
 
-  const getProductTags = (i: number): string[] =>
-    editedTags[i] ?? getFoodTags(getProductName(i));
+  const getProductTags = (i: number): string[] => {
+    if (editedTags[i]) return editedTags[i];
+    const name = getProductName(i);
+    const auto = getFoodTags(name);
+    if (auto.length > 0) return auto;
+    const bt = brandTag(name);          // fallback: recognised brand → its sub-tag
+    return bt ? [bt] : [];
+  };
 
   // Weighable food groups get an editable weight (receipts rarely list grams).
   // Dairy (ser) defaults to 1 kg — the user's usual XXL pack.

@@ -228,51 +228,82 @@ export async function saveNameAliases(
 // base token shows up in a name we fold the whole family to ONE canonical name,
 // so stats group them automatically without the user renaming each variant.
 // Tokens are normalised (lowercase, no diacritics). Order = priority.
-const BRAND_CANON: { tokens: string[]; name: string }[] = [
-  { tokens: ['jezyki'],                 name: 'Jeżyki' },
-  { tokens: ['grzeski'],                name: 'Grześki' },
-  { tokens: ['princepolo'],             name: 'Prince Polo' },
-  { tokens: ['delicje'],                name: 'Delicje' },
-  { tokens: ['ptasiemleczko'],          name: 'Ptasie mleczko' },
-  { tokens: ['michalki'],               name: 'Michałki' },
-  { tokens: ['krowki', 'krowka'],       name: 'Krówki' },
-  { tokens: ['lays'],                   name: "Lay's" },
-  { tokens: ['pringles'],               name: 'Pringles' },
-  { tokens: ['doritos'],                name: 'Doritos' },
-  { tokens: ['cheetos'],                name: 'Cheetos' },
-  { tokens: ['chrupki'],                name: 'Chrupki' },
-  { tokens: ['krakers', 'krakersy'],    name: 'Krakersy' },
-  { tokens: ['paluszki'],               name: 'Paluszki' },
-  { tokens: ['precle', 'precelki'],     name: 'Precle' },
-  { tokens: ['nachos'],                 name: 'Nachos' },
-  { tokens: ['orzeszki', 'orzeszkiwskorupkach'], name: 'Orzeszki' },
-  { tokens: ['grzanki'],                name: 'Grzanki' },
-  { tokens: ['ovenbaked'],              name: 'Ovenbaked' },
-  { tokens: ['snickers'],               name: 'Snickers' },
-  { tokens: ['twix'],                   name: 'Twix' },
-  { tokens: ['kitkat'],                 name: 'KitKat' },
-  { tokens: ['kinder'],                 name: 'Kinder' },
-  { tokens: ['milka'],                  name: 'Milka' },
-  { tokens: ['wedel'],                  name: 'Wedel' },
-  { tokens: ['oreo'],                   name: 'Oreo' },
+const BRAND_CANON: { tokens: string[]; name: string; tag?: string }[] = [
+  { tokens: ['jezyki'],                 name: 'Jeżyki',        tag: 'słodycze' },
+  { tokens: ['grzeski'],                name: 'Grześki',       tag: 'słodycze' },
+  { tokens: ['princepolo'],             name: 'Prince Polo',   tag: 'słodycze' },
+  { tokens: ['delicje'],                name: 'Delicje',       tag: 'słodycze' },
+  { tokens: ['ptasiemleczko'],          name: 'Ptasie mleczko',tag: 'słodycze' },
+  { tokens: ['michalki'],               name: 'Michałki',      tag: 'słodycze' },
+  { tokens: ['krowki', 'krowka'],       name: 'Krówki',        tag: 'słodycze' },
+  { tokens: ['lays'],                   name: "Lay's",         tag: 'przekąski' },
+  { tokens: ['pringles'],               name: 'Pringles',      tag: 'przekąski' },
+  { tokens: ['doritos'],                name: 'Doritos',       tag: 'przekąski' },
+  { tokens: ['cheetos'],                name: 'Cheetos',       tag: 'przekąski' },
+  { tokens: ['chrupki'],                name: 'Chrupki',       tag: 'przekąski' },
+  { tokens: ['krakers', 'krakersy'],    name: 'Krakersy',      tag: 'przekąski' },
+  { tokens: ['paluszki'],               name: 'Paluszki',      tag: 'przekąski' },
+  { tokens: ['precle', 'precelki'],     name: 'Precle',        tag: 'przekąski' },
+  { tokens: ['nachos'],                 name: 'Nachos',        tag: 'przekąski' },
+  { tokens: ['orzeszki', 'orzeszkiwskorupkach'], name: 'Orzeszki', tag: 'przekąski' },
+  { tokens: ['grzanki'],                name: 'Grzanki',       tag: 'przekąski' },
+  { tokens: ['ovenbaked'],              name: 'Ovenbaked',     tag: 'przekąski' },
+  { tokens: ['snickers'],               name: 'Snickers',      tag: 'słodycze' },
+  { tokens: ['twix'],                   name: 'Twix',          tag: 'słodycze' },
+  { tokens: ['kitkat'],                 name: 'KitKat',        tag: 'słodycze' },
+  { tokens: ['kinder'],                 name: 'Kinder',        tag: 'słodycze' },
+  { tokens: ['milka'],                  name: 'Milka',         tag: 'słodycze' },
+  { tokens: ['wedel'],                  name: 'Wedel',         tag: 'słodycze' },
+  { tokens: ['oreo'],                   name: 'Oreo',          tag: 'słodycze' },
   { tokens: ['lubella'],                name: 'Lubella' },
-  { tokens: ['coca', 'cocacola'],       name: 'Coca-Cola' },
-  { tokens: ['pepsi'],                  name: 'Pepsi' },
-  { tokens: ['redbull'],                name: 'Red Bull' },
-  { tokens: ['monster'],                name: 'Monster' },
-  { tokens: ['tymbark'],                name: 'Tymbark' },
+  { tokens: ['coca', 'cocacola'],       name: 'Coca-Cola',     tag: 'napoje' },
+  { tokens: ['pepsi'],                  name: 'Pepsi',         tag: 'napoje' },
+  { tokens: ['redbull'],                name: 'Red Bull',      tag: 'napoje' },
+  { tokens: ['monster'],                name: 'Monster',       tag: 'napoje' },
+  { tokens: ['tymbark'],                name: 'Tymbark',       tag: 'napoje' },
 ];
 
-function brandCanon(key: string): string | undefined {
+// Store private labels (Lidl, Biedronka, Kaufland…) span MANY different products,
+// so we do NOT fold them to one name — we only use them to imply a sub-tag
+// (e.g. anything "Pikok" is cold cuts → mięso, "Milbona" is dairy → nabiał).
+const STORE_LABELS: { tokens: string[]; tag: string }[] = [
+  // ─ Lidl ─
+  { tokens: ['pikok'],              tag: 'mięso' },
+  { tokens: ['dulano'],             tag: 'mięso' },
+  { tokens: ['milbona'],            tag: 'nabiał' },
+  { tokens: ['pilos'],              tag: 'nabiał' },
+  { tokens: ['sondey'],             tag: 'słodycze' },
+  { tokens: ['snackday', 'snack'],  tag: 'przekąski' },
+  { tokens: ['alesto'],             tag: 'przekąski' },
+  { tokens: ['chefselect', 'chef'], tag: 'dania gotowe' },
+  { tokens: ['freshona'],           tag: 'warzywa' },
+  { tokens: ['oceansea'],           tag: 'ryby' },
+  // ─ Biedronka ─
+  { tokens: ['dada'],               tag: 'chemia' },
+  // ─ Kaufland ─
+  { tokens: ['kclassic', 'kklassik'], tag: 'dania gotowe' },
+];
+
+function findInList<T extends { tokens: string[] }>(key: string, list: T[]): T | undefined {
   const words = key.split(' ');
   const flat = key.replace(/ /g, '');
-  for (const b of BRAND_CANON) {
+  for (const b of list) {
     for (const t of b.tokens) {
-      if (words.includes(t)) return b.name;                 // distinct word
-      if (t.length >= 6 && flat.includes(t)) return b.name; // concatenated / OCR-glued
+      if (words.includes(t)) return b;                  // distinct word
+      if (t.length >= 4 && flat.startsWith(t)) return b; // brand leads the name ("lay s"→"lays…")
+      if (t.length >= 6 && flat.includes(t)) return b;   // concatenated / OCR-glued mid-name
     }
   }
   return undefined;
+}
+
+const matchBrand = (key: string) => findInList(key, BRAND_CANON);
+
+// The food sub-tag implied by a recognised brand or store label (e.g. Lay's or
+// Pikok), or undefined. Fallback when keyword auto-tagging found nothing.
+export function brandTag(raw: string): string | undefined {
+  const key = normalizeProductName(raw);
+  return matchBrand(key)?.tag ?? findInList(key, STORE_LABELS)?.tag;
 }
 
 export function canonicalProductName(raw: string, aliases: NameAliases): string {
@@ -280,8 +311,8 @@ export function canonicalProductName(raw: string, aliases: NameAliases): string 
   // 1) user's own learned rename wins (most specific)
   if (aliases[key]) return aliases[key];
   // 2) known product base — folds flavour/OCR variants to one family
-  const brand = brandCanon(key);
-  if (brand) return brand;
+  const brand = matchBrand(key);
+  if (brand) return brand.name;
   // 3) space-insensitive alias match (OCR glues/splits words differently)
   const flat = key.replace(/ /g, '');
   for (const k of Object.keys(aliases)) {
