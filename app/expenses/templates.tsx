@@ -5,13 +5,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  X, Plus, Trash2, ChevronRight, ClipboardList, Check, TrendingDown, TrendingUp,
+  X, Plus, Trash2, Pencil, ClipboardList, Check, TrendingDown, TrendingUp,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import { templatesService } from '@/services/templatesService';
+import { expensesService } from '@/services/expensesService';
+import { useExpensesStore } from '@/store/expensesStore';
+import { getPayers } from '@/utils/payers';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { ExpenseTemplate, ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -34,8 +37,32 @@ export default function TemplatesScreen() {
   const [formCat, setFormCat]       = useState<ExpenseCategory>('other');
   const [formIncCat, setFormIncCat] = useState<IncomeCategory>('salary');
   const [saving, setSaving]         = useState(false);
+  const [defaultPayer, setDefaultPayer] = useState<string>('');
+  const addExpense = useExpensesStore(s => s.addExpense);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); getPayers().then(l => setDefaultPayer(l[0] ?? '')).catch(() => {}); }, []);
+
+  // One-click: create the transaction immediately from a template.
+  const addNow = async (tmpl: ExpenseTemplate) => {
+    haptic.success();
+    try {
+      const exp = await expensesService.add({
+        type: tmpl.type,
+        amount: tmpl.amount,
+        currency: tmpl.currency || 'PLN',
+        category: tmpl.category,
+        tags: tmpl.tags ?? [],
+        note: tmpl.note ?? '',
+        date: new Date().toISOString(),
+        payer: defaultPayer || undefined,
+      });
+      addExpense(exp);
+      toast.success(`${tmpl.type === 'income' ? '+' : '−'}${tmpl.amount.toFixed(2)} zł · ${tmpl.name}`);
+    } catch {
+      haptic.error();
+      toast.error('Nie dodano — sprawdź połączenie');
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -119,11 +146,15 @@ export default function TemplatesScreen() {
         <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={s.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
-        <Text style={s.title}>Szablony wydatków</Text>
+        <Text style={s.title}>Szablony</Text>
         <PressableScale onPress={openCreate} style={s.addBtn}>
           <Plus size={20} color={colors.text.primary} />
         </PressableScale>
       </View>
+
+      {templates.length > 0 && (
+        <Text style={s.hintBar}>Dotknij = dodaj od razu · ołówek = otwórz w formularzu</Text>
+      )}
 
       <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
         {loading ? (
@@ -141,7 +172,7 @@ export default function TemplatesScreen() {
             const IconComp = meta?.icon ? (LucideIcons as any)[meta.icon] : null;
             const isInc = tmpl.type === 'income';
             return (
-              <PressableScale key={tmpl.id} onPress={() => useTemplate(tmpl)}>
+              <PressableScale key={tmpl.id} onPress={() => addNow(tmpl)}>
                 <View style={s.row}>
                   <View style={[s.iconWrap, { backgroundColor: (meta?.color ?? colors.text.muted) + '18' }]}>
                     {IconComp
@@ -156,9 +187,12 @@ export default function TemplatesScreen() {
                     <Text style={s.rowSub}>{meta?.label ?? tmpl.category}{tmpl.note ? ` · ${tmpl.note}` : ''}</Text>
                   </View>
                   <Text style={[s.rowAmount, { color: isInc ? colors.accent.green : colors.text.primary }]}>
-                    {isInc ? '+' : '-'}{tmpl.amount.toFixed(2)} zł
+                    {isInc ? '+' : '−'}{tmpl.amount.toFixed(2)} zł
                   </Text>
-                  <PressableScale onPress={() => handleDelete(tmpl.id, tmpl.name)} style={s.deleteBtn}>
+                  <PressableScale onPress={() => useTemplate(tmpl)} style={s.iconBtn}>
+                    <Pencil size={14} color={colors.text.muted} />
+                  </PressableScale>
+                  <PressableScale onPress={() => handleDelete(tmpl.id, tmpl.name)} style={s.iconBtn}>
                     <Trash2 size={15} color={colors.text.muted} />
                   </PressableScale>
                 </View>
@@ -297,7 +331,8 @@ const s = StyleSheet.create({
   rowName: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
   rowSub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
   rowAmount: { fontSize: 14, fontWeight: '700' },
-  deleteBtn: { padding: spacing[1] },
+  iconBtn: { padding: spacing[1] },
+  hintBar: { fontSize: 11, color: colors.text.muted, textAlign: 'center', paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },

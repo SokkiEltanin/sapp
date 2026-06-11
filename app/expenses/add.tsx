@@ -17,6 +17,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { expensesService } from '@/services/expensesService';
+import { templatesService } from '@/services/templatesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getPayers, addPayer } from '@/utils/payers';
@@ -101,6 +102,23 @@ export default function AddExpenseModal() {
     haptic.tap();
     setTxType(type);
     setTags([]);
+  };
+
+  // Save the current form as a reusable template (one-click add later).
+  const saveAsTemplate = async () => {
+    const parsed = parseFloat(amount.replace(',', '.'));
+    if (!parsed || isNaN(parsed) || parsed <= 0) { Alert.alert('Błąd', 'Wpisz kwotę, zanim zapiszesz szablon'); return; }
+    const cat = isIncome ? incCat : expCat;
+    const catMeta: any = isIncome ? INCOME_CATEGORY_META : CATEGORY_META;
+    const name = (note.trim() || catMeta[cat]?.label || cat) as string;
+    try {
+      haptic.success();
+      await templatesService.add({ name, type: txType, amount: parsed, currency: 'PLN', category: cat, tags, note });
+      toast.success(`Szablon „${name}" zapisany`);
+    } catch {
+      haptic.error();
+      toast.error('Nie zapisano szablonu');
+    }
   };
 
   const handleSave = async () => {
@@ -370,6 +388,12 @@ export default function AddExpenseModal() {
             fullWidth
             disabled={saving}
           />
+          <PressableScale onPress={saveAsTemplate} disabled={saving}>
+            <View style={styles.saveTplBtn}>
+              <ClipboardList size={14} color={colors.text.secondary} />
+              <Text style={styles.saveTplText}>Zapisz jako szablon</Text>
+            </View>
+          </PressableScale>
         </View>
       </View>
     </SafeAreaView>
@@ -477,6 +501,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[2] },
+  saveTplBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[2],
+  },
+  saveTplText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
 });
 
