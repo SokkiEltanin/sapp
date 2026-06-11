@@ -432,11 +432,19 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
 
 function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: string; font: HeroFont }) {
   // Title with a LIGHT gradient (accent washing in from the LEFT). Font family,
-  // size and line box come from the chosen preset (system fonts have different
-  // metrics, so each is tuned).
+  // size and line box come from the chosen preset; the user can additionally
+  // scale the size and nudge the position, and pick a custom-loaded font family.
+  const scale = useHeroFont(s => s.sizeScale);
+  const offsetX = useHeroFont(s => s.offsetX);
+  const offsetY = useHeroFont(s => s.offsetY);
+  const customFamily = useHeroFont(s => s.customFamily);
+
   const label = font.upper ? text.toUpperCase() : text;
+  const size = font.size * scale;
+  const baseY = font.baseY * scale + offsetY;
+  const height = Math.ceil(font.height * scale) + Math.max(0, offsetY) + 6;
   return (
-    <Svg height={font.height} width="100%">
+    <Svg height={height} width="100%">
       <Defs>
         <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0"    stopColor={baseColor} stopOpacity="1" />
@@ -445,11 +453,11 @@ function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: 
         </SvgLinearGradient>
       </Defs>
       <SvgText
-        x={0}
-        y={font.baseY}
-        fontSize={font.size}
+        x={offsetX}
+        y={baseY}
+        fontSize={size}
         fontWeight={font.weight as any}
-        fontFamily={font.family}
+        fontFamily={customFamily || font.family}
         fontStyle={font.italic ? 'italic' : 'normal'}
         fill="url(#greetGrad)"
         letterSpacing={font.spacing}

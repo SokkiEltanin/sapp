@@ -48,7 +48,26 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 222; // bump on each meaningful build
+const APP_BUILD = 223; // bump on each meaningful build
+
+function HeroStepper({ label, value, onDec, onInc }: { label: string; value: string; onDec: () => void; onInc: () => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+      <Text style={{ flex: 1, fontSize: 12, color: colors.text.secondary }}>{label}</Text>
+      <PressableScale onPress={onDec}>
+        <View style={stepStyle}><LucideIcons.Minus size={15} color={colors.text.primary} /></View>
+      </PressableScale>
+      <Text style={{ minWidth: 52, textAlign: 'center', fontSize: 12, fontWeight: '700', color: colors.text.primary }}>{value}</Text>
+      <PressableScale onPress={onInc}>
+        <View style={stepStyle}><LucideIcons.Plus size={15} color={colors.text.primary} /></View>
+      </PressableScale>
+    </View>
+  );
+}
+const stepStyle = {
+  width: 34, height: 34, borderRadius: radius.md, alignItems: 'center' as const, justifyContent: 'center' as const,
+  backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+};
 
 export default function SettingsScreen() {
   const { entries: moodEntries } = useMoodStore();
@@ -57,6 +76,12 @@ export default function SettingsScreen() {
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
+  const heroSize = useHeroFont(s => s.sizeScale);
+  const setHeroSize = useHeroFont(s => s.setSizeScale);
+  const heroOffX = useHeroFont(s => s.offsetX);
+  const setHeroOffX = useHeroFont(s => s.setOffsetX);
+  const heroOffY = useHeroFont(s => s.offsetY);
+  const setHeroOffY = useHeroFont(s => s.setOffsetY);
 
   // ── Work calculation diagnostics ────────────────────────────────────────────
   // Shows EXACTLY what the rate is derived from: [JD] events → hours this month,
@@ -1082,6 +1107,24 @@ export default function SettingsScreen() {
                     </PressableScale>
                   );
                 })}
+              </View>
+
+              {/* Size + position fine-tuning */}
+              <View style={{ gap: spacing[2], marginTop: spacing[2] }}>
+                <HeroStepper label="Rozmiar" value={`${Math.round(heroSize * 100)}%`}
+                  onDec={() => { haptic.tap(); setHeroSize(heroSize - 0.1); }}
+                  onInc={() => { haptic.tap(); setHeroSize(heroSize + 0.1); }} />
+                <HeroStepper label="Pozycja ↔" value={`${heroOffX} px`}
+                  onDec={() => { haptic.tap(); setHeroOffX(heroOffX - 4); }}
+                  onInc={() => { haptic.tap(); setHeroOffX(heroOffX + 4); }} />
+                <HeroStepper label="Pozycja ↕" value={`${heroOffY} px`}
+                  onDec={() => { haptic.tap(); setHeroOffY(heroOffY - 4); }}
+                  onInc={() => { haptic.tap(); setHeroOffY(heroOffY + 4); }} />
+                {(heroSize !== 1 || heroOffX !== 0 || heroOffY !== 0) && (
+                  <PressableScale onPress={() => { haptic.tap(); setHeroSize(1); setHeroOffX(0); setHeroOffY(0); }}>
+                    <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'right' }}>Resetuj rozmiar i pozycję</Text>
+                  </PressableScale>
+                )}
               </View>
             </View>
           </View>

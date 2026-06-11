@@ -33,14 +33,32 @@ export function heroFontById(id?: string): HeroFont {
 
 interface HeroFontState {
   fontId: string;
+  sizeScale: number;   // multiplier on the preset size (1 = default)
+  offsetX: number;     // px horizontal nudge
+  offsetY: number;     // px vertical nudge
+  customFamily?: string; // a runtime-loaded custom font family name (optional)
+  customLabel?: string;  // display name for the custom font
   setFont: (id: string) => void;
+  setSizeScale: (v: number) => void;
+  setOffsetX: (v: number) => void;
+  setOffsetY: (v: number) => void;
+  setCustomFamily: (family?: string, label?: string) => void;
 }
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 export const useHeroFont = create<HeroFontState>()(
   persist(
     (set) => ({
       fontId: 'black',
+      sizeScale: 1,
+      offsetX: 0,
+      offsetY: 0,
       setFont: (fontId) => set({ fontId }),
+      setSizeScale: (v) => set({ sizeScale: clamp(Math.round(v * 100) / 100, 0.5, 2) }),
+      setOffsetX: (v) => set({ offsetX: clamp(Math.round(v), -60, 60) }),
+      setOffsetY: (v) => set({ offsetY: clamp(Math.round(v), -30, 40) }),
+      setCustomFamily: (customFamily, customLabel) => set({ customFamily, customLabel }),
     }),
     { name: 'hero-font-v1', storage: createJSONStorage(() => AsyncStorage) },
   ),
