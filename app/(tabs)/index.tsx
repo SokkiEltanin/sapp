@@ -775,6 +775,15 @@ export default function DashboardScreen() {
       const d = pct(sp.now, sp.prev);
       out.push({ tone: d != null && d > 15 ? 'warn' : 'neutral', text: `Wydatki: ${Math.round(sp.now)} zł${d != null ? ` (${d >= 0 ? '+' : ''}${d}% vs poprzedni tydzień)` : ''}` });
     }
+    // Month-end spending forecast — project the current pace to the end of the month.
+    const monthSpend = metricSeries('spend', statCtx, 'month', 1).values[0] ?? 0;
+    const dnow = new Date();
+    const dayOfMonth = dnow.getDate();
+    const daysInMonth = new Date(dnow.getFullYear(), dnow.getMonth() + 1, 0).getDate();
+    if (monthSpend > 0 && dayOfMonth >= 4 && dayOfMonth < daysInMonth) {
+      const projected = Math.round(monthSpend / dayOfMonth * daysInMonth);
+      out.push({ tone: 'neutral', text: `Tempo: ~${projected} zł do końca miesiąca (${Math.round(monthSpend)} zł dotąd)` });
+    }
     const sw = wk('sweets');
     if (sw.now > 0) { const d = pct(sw.now, sw.prev); out.push({ tone: d != null && d > 25 ? 'warn' : 'neutral', text: `Słodycze: ${Math.round(sw.now)} zł${d != null ? ` (${d >= 0 ? '+' : ''}${d}%)` : ''}` }); }
     const md = wk('moodAvg');
