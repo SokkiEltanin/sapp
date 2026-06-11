@@ -48,7 +48,7 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 226; // bump on each meaningful build
+const APP_BUILD = 227; // bump on each meaningful build
 
 function HeroStepper({ label, value, onDec, onInc }: { label: string; value: string; onDec: () => void; onInc: () => void }) {
   return (

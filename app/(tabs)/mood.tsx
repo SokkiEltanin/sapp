@@ -23,6 +23,7 @@ import { useWorkStore } from '@/store/workStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { isMine } from '@/store/statsScope';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
+import { getHealthHistory } from '@/utils/healthHistory';
 import { moodService } from '@/services/moodService';
 import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -696,6 +697,7 @@ function buildPatterns(
   workByDate: Record<string, number>,
   spendByDate: Record<string, number>,
   doneTasksByDate: Record<string, number>,
+  sleepMinByDate: Record<string, number>,
 ): string[] {
   const out: string[] = [];
   const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
@@ -766,6 +768,28 @@ function buildPatterns(
       : `W dni z domkniętymi zadaniami humor jest niższy (${dm.toFixed(1)} vs ${im.toFixed(1)}) — może przeciążenie?`);
   }
 
+  // Sleep ↔ energy / mood — well-slept (≥7h) vs short (<6h) nights.
+  const wellEnergy: number[] = [], shortEnergy: number[] = [];
+  const wellMood: number[] = [], shortMood: number[] = [];
+  for (const e of entries) {
+    const min = sleepMinByDate[e.date];
+    if (min == null || min <= 0) continue;
+    if (min >= 420) { wellEnergy.push(e.energy); wellMood.push(e.mood); }
+    else if (min < 360) { shortEnergy.push(e.energy); shortMood.push(e.mood); }
+  }
+  const wellEn = mean(wellEnergy), shortEn = mean(shortEnergy);
+  if (wellEn != null && shortEn != null && wellEnergy.length >= 3 && shortEnergy.length >= 3 && Math.abs(wellEn - shortEn) >= 0.35) {
+    out.push(wellEn > shortEn
+      ? `Po dobrym śnie (7h+) masz więcej energii (${wellEn.toFixed(1)} vs ${shortEn.toFixed(1)} po krótkim).`
+      : `Po krótkim śnie masz więcej energii (${shortEn.toFixed(1)} vs ${wellEn.toFixed(1)}) — ciekawe.`);
+  }
+  const wellMd = mean(wellMood), shortMd = mean(shortMood);
+  if (wellMd != null && shortMd != null && wellMood.length >= 3 && shortMood.length >= 3 && Math.abs(wellMd - shortMd) >= 0.35 && out.length < 6) {
+    out.push(wellMd > shortMd
+      ? `Lepiej wyspany masz lepszy humor (${wellMd.toFixed(1)} vs ${shortMd.toFixed(1)} po krótkim śnie).`
+      : `Po krótkim śnie humor bywa lepszy (${shortMd.toFixed(1)} vs ${wellMd.toFixed(1)}).`);
+  }
+
   // Most common stress keyword
   const { negative, positive } = extractKeywords(entries);
   if (negative.length > 0) out.push(`Najczęściej stresują Cię: ${negative.slice(0, 2).map(k => k.word).join(', ')}.`);
@@ -774,15 +798,16 @@ function buildPatterns(
   return out.slice(0, 6);
 }
 
-function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate }: {
+function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate }: {
   entries: MoodEntry[];
   workByDate: Record<string, number>;
   spendByDate: Record<string, number>;
   doneTasksByDate: Record<string, number>;
+  sleepMinByDate: Record<string, number>;
 }) {
   const lines = useMemo(
-    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate),
-    [entries, workByDate, spendByDate, doneTasksByDate],
+    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate),
+    [entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate],
   );
   if (entries.length < 6 || lines.length === 0) return null;
   return (
@@ -878,6 +903,16 @@ export default function MoodScreen() {
     }
     return map;
   }, [allTasks]);
+
+  // Sleep minutes per day (from the Zdrowie screen history) for sleep↔mood insights.
+  const [sleepMinByDate, setSleepMinByDate] = useState<Record<string, number>>({});
+  useEffect(() => {
+    getHealthHistory(60).then(h => {
+      const map: Record<string, number> = {};
+      for (const [date, v] of Object.entries(h)) if (v.sleepMinutes > 0) map[date] = v.sleepMinutes;
+      setSleepMinByDate(map);
+    }).catch(() => {});
+  }, [entries.length]);
 
   const streak = useMemo(() => calcStreak(entries), [entries]);
   const recent = useMemo(() => entries.slice(0, 14), [entries]);
@@ -976,7 +1011,7 @@ export default function MoodScreen() {
         <MoodEnergyWave entries={entries} />
 
         {/* Conclusions from notes + work/day context */}
-        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} />
+        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} sleepMinByDate={sleepMinByDate} />
 
         {/* Rich statistics */}
         <MoodDistribution entries={entries} />
