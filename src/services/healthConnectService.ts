@@ -1,0 +1,96 @@
+// Health Connect bridge (Android only). Reads steps / sleep / weight that Samsung
+// Health (or any app) writes into the on-device Health Connect store — no cloud,
+// no API key. The native module only exists in a build that bundled
+// react-native-health-connect, so everything is loaded lazily and degrades
+// gracefully (the Zdrowie screen keeps working with manual entry without it).
+
+let HC: any = null;
+function mod(): any {
+  if (HC) return HC;
+  try { HC = require('react-native-health-connect'); } catch { HC = null; }
+  return HC;
+}
+
+export function isHealthConnectAvailable(): boolean {
+  return !!mod();
+}
+
+const READ_PERMS = [
+  { accessType: 'read', recordType: 'Steps' },
+  { accessType: 'read', recordType: 'SleepSession' },
+  { accessType: 'read', recordType: 'Weight' },
+] as const;
+
+// Initialise + make sure we have read permission (prompts the user the first time).
+export async function ensureHealthConnect(): Promise<boolean> {
+  const hc = mod();
+  if (!hc) return false;
+  const ok = await hc.initialize();
+  if (!ok) return false;
+  let granted: any[] = [];
+  try { granted = await hc.getGrantedPermissions(); } catch { granted = []; }
+  const have = new Set((granted ?? []).map((p: any) => p.recordType));
+  const missing = READ_PERMS.filter(p => !have.has(p.recordType));
+  if (missing.length) {
+    const res = await hc.requestPermission(READ_PERMS as any);
+    return Array.isArray(res) ? res.length > 0 : true;
+  }
+  return true;
+}
+
+function dayFilter(date: Date) {
+  const start = new Date(date); start.setHours(0, 0, 0, 0);
+  const end = new Date(date); end.setHours(23, 59, 59, 999);
+  return { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() } as const;
+}
+
+async function read(hc: any, recordType: string, filter: any): Promise<any[]> {
+  const res = await hc.readRecords(recordType, { timeRangeFilter: filter });
+  return Array.isArray(res) ? res : (res?.records ?? []);
+}
+
+export interface HealthConnectDay {
+  steps: number;
+  sleepMinutes: number;
+  weightKg: number | null;
+}
+
+// Read one day's steps + sleep + latest weight. Returns null if HC unavailable.
+export async function readHealthDay(date: Date = new Date()): Promise<HealthConnectDay | null> {
+  const hc = mod();
+  if (!hc) return null;
+  const filter = dayFilter(date);
+
+  let steps = 0;
+  try {
+    const recs = await read(hc, 'Steps', filter);
+    steps = recs.reduce((s, r) => s + (r.count ?? 0), 0);
+  } catch {}
+
+  let sleepMinutes = 0;
+  try {
+    const recs = await read(hc, 'SleepSession', filter);
+    for (const r of recs) {
+      const st = new Date(r.startTime).getTime();
+      const en = new Date(r.endTime).getTime();
+      if (en > st) sleepMinutes += Math.round((en - st) / 60000);
+    }
+  } catch {}
+
+  let weightKg: number | null = null;
+  try {
+    let recs = await read(hc, 'Weight', filter);
+    if (recs.length === 0) {
+      // No weigh-in today → take the most recent from the last 30 days.
+      const wide = { operator: 'between', startTime: new Date(date.getTime() - 30 * 864e5).toISOString(), endTime: filter.endTime };
+      recs = await read(hc, 'Weight', wide);
+    }
+    if (recs.length) {
+      const last = recs[recs.length - 1];
+      const kg = last?.weight?.inKilograms ?? last?.weight?.value ?? null;
+      weightKg = typeof kg === 'number' ? Math.round(kg * 10) / 10 : null;
+    }
+  } catch {}
+
+  return { steps, sleepMinutes, weightKg };
+}

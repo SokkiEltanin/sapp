@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer } from 'lucide-react-native';
+import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
@@ -15,6 +15,7 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { MOOD_COLORS } from '@/types';
 import { getHealthGoals } from '@/utils/healthGoals';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay } from '@/services/healthConnectService';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ export default function HealthScreen() {
   const [weightModal, setWeightModal]   = useState(false);
   const [weightInput, setWeightInput]   = useState('');
   const [loaded, setLoaded]             = useState(false);
+  const [syncing, setSyncing]           = useState(false);
   const [weekSteps, setWeekSteps]       = useState<number[]>(Array(7).fill(0));
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
@@ -162,11 +164,42 @@ export default function HealthScreen() {
     return next;
   });
 
+  const syncHealthConnect = async () => {
+    if (Platform.OS !== 'android') { toast.info('Health Connect tylko na Androidzie'); return; }
+    if (!isHealthConnectAvailable()) { toast.error('Niedostępne w tej wersji — zbuduj nowy APK'); return; }
+    setSyncing(true);
+    try {
+      const ok = await ensureHealthConnect();
+      if (!ok) { haptic.error(); toast.error('Brak zgody Health Connect'); return; }
+      const d = await readHealthDay(new Date());
+      if (d) {
+        if (d.steps > 0) setSteps(d.steps);
+        if (d.sleepMinutes > 0) { setSleepH(Math.floor(d.sleepMinutes / 60)); setSleepM(d.sleepMinutes % 60); }
+        if (d.weightKg != null) setWeight(d.weightKg);
+        haptic.success();
+        toast.success('Zsynchronizowano z Health Connect');
+      } else {
+        toast.info('Brak danych w Health Connect');
+      }
+    } catch { haptic.error(); toast.error('Błąd synchronizacji'); }
+    finally { setSyncing(false); }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+        {/* Sync from the watch via Health Connect (Samsung Health → Health Connect) */}
+        <PressableScale onPress={syncHealthConnect} disabled={syncing}>
+          <View style={styles.syncBtn}>
+            <RefreshCw size={14} color={T.accent} />
+            <Text style={[styles.syncText, { color: T.accent }]}>
+              {syncing ? 'Synchronizuję…' : 'Synchronizuj z zegarka (Health Connect)'}
+            </Text>
+          </View>
+        </PressableScale>
 
         {/* Steps hero */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -546,6 +579,12 @@ export default function HealthScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
+  syncBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[3], borderRadius: radius.lg,
+    backgroundColor: T.accent + '14', borderWidth: 1, borderColor: T.accent + '33',
+  },
+  syncText: { fontSize: 13, fontWeight: '700' },
 
   card: { gap: spacing[3] },
   tealCard: { gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },
