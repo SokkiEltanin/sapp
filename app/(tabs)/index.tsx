@@ -682,16 +682,15 @@ export default function DashboardScreen() {
     const wp = workSettings.workPrefix?.trim().toLowerCase();
     const workEvs = allEvents.filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }));
     if (workEvs.length === 0) return;
-    const monthHours = workEvs.reduce((sum, e) => sum + shiftHours(e), 0);
-    const hrs = monthHours > 0 ? monthHours : workSettings.hoursPerMonth;
-    const wp2 = wp;
-    const salaryIncome = wp2 ? expenses.find(e => e.type === 'income' && e.tags.some(t => t.toLowerCase() === wp2)) : null;
-    const effectiveSalary = salaryIncome?.amount ?? workSettings.monthlySalary;
-    const perSecond = hrs > 0 ? effectiveSalary / (hrs * 3600) : 0;
+    // Use the SAME per-second rate the live earnings show (paid-in-arrears: last
+    // paycheck ÷ that month's hours, with overrides). The old per-shift notif
+    // diluted it by ALL logged hours, so a 12h shift read as ~100 zł.
+    const perSecond = workEarnings.perSecond;
+    if (!(perSecond > 0)) return;
     import('@/services/notificationsService').then(({ notificationsService }) => {
       notificationsService.scheduleWorkShiftNotifications(workEvs, perSecond).catch(() => {});
     });
-  }, [allEvents, workSettings]);
+  }, [allEvents, workSettings, workEarnings.perSecond]);
 
   // ── Quick mood handler ────────────────────────────────────────────────────
   const handleQuickMood = useCallback(async (level: MoodLevel) => {

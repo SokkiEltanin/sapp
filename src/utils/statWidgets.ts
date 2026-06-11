@@ -49,6 +49,7 @@ export const WIDGET_METRICS: MetricDef[] = [
   // Praca i zadania
   { id: 'workHours',  label: 'Godziny pracy',      group: 'Praca i zadania', unit: 'h',  viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'earnings',   label: 'Zarobek (szac.)',    group: 'Praca i zadania', unit: 'zł', viz: ['number', 'wave'], periodic: true },
+  { id: 'lastShift',  label: 'Ostatnia zmiana (szac.)', group: 'Praca i zadania', unit: 'zł', viz: ['number'], periodic: false },
   { id: 'tasksDone',  label: 'Ukończone zadania',  group: 'Praca i zadania', unit: '',   viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'habitsToday', label: 'Nawyki dziś',       group: 'Praca i zadania', unit: '',   viz: ['number'], periodic: false },
 ];
@@ -261,6 +262,19 @@ export function metricNumber(metric: string, ctx: StatCtx, period: Period, tag?:
     return { value: streak, unit };
   }
   if (metric === 'habitsToday') return { value: ctx.habitsDone, unit: `/ ${ctx.habitsTotal}` };
+  if (metric === 'lastShift') {
+    const today = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
+    const past = ctx.workEvents
+      .filter(e => isWorkEvent(e, { workColor: ctx.workSettings.workColor, workPrefix: ctx.workSettings.workPrefix }) && e.date.slice(0, 10) <= today)
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    const last = past[0];
+    const hrs = last ? shiftHours(last) : 0;
+    return {
+      value: Math.round(hrs * ctx.ratePerHour),
+      unit,
+      sub: last ? `${new Date(last.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · ${hrs.toFixed(1)} h` : 'brak zmian',
+    };
+  }
   const p = predsFor(period, 0);
   const value = bucketValue(metric, ctx, p.exp, p.day, tag);
   return { value, unit, sub: period === 'month' ? 'ten miesiąc' : 'ten tydzień' };
