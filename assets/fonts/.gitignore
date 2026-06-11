@@ -1,0 +1,10 @@
+# Only the fonts we actually bundle are tracked; ignore the rest of the dump
+# (extra airstrike variants, .otf/.woff duplicates, license .txt files).
+*
+!.gitignore
+!README.txt
+!Blackout.ttf
+!Pastel.ttf
+!airstrike.ttf
+!airstrikebold.ttf
+!airstrikecond.ttf

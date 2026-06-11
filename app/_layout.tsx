@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Text, ScrollView, StyleSheet, AppState, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
+import { useFonts } from 'expo-font';
 import { router } from 'expo-router';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -76,6 +77,17 @@ function AutoMoodPopup() {
 
 export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
+
+  // Bundled hero greeting fonts — registered by name so react-native-svg can use
+  // them. Non-blocking: the app renders immediately, the greeting updates once
+  // these finish loading.
+  useFonts({
+    Blackout:      require('../assets/fonts/Blackout.ttf'),
+    Pastel:        require('../assets/fonts/Pastel.ttf'),
+    Airstrike:     require('../assets/fonts/airstrike.ttf'),
+    AirstrikeBold: require('../assets/fonts/airstrikebold.ttf'),
+    AirstrikeCond: require('../assets/fonts/airstrikecond.ttf'),
+  });
 
   useEffect(() => { appSettings.loadAll(); }, []);
   useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);

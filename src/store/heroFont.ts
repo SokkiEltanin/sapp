@@ -25,6 +25,13 @@ export const HERO_FONTS: HeroFont[] = [
   { id: 'script',    label: 'Odręczny',           family: 'cursive',               weight: '700', spacing: 0,    size: 40, height: 56, baseY: 42, upper: false, italic: true },
   { id: 'mono',      label: 'Techniczny',         family: 'monospace',             weight: '700', spacing: -1,   size: 32, height: 46, baseY: 35, upper: true },
   { id: 'light',     label: 'Minimalistyczny',    family: 'sans-serif-thin',       weight: '300', spacing: 1,    size: 40, height: 50, baseY: 39, upper: true },
+  // Bundled custom display fonts (loaded by name in app/_layout via expo-font).
+  // Metrics are starting points — fine-tune per font with the size/position sliders.
+  { id: 'blackout',   label: 'Blackout',         family: 'Blackout',      weight: '400', spacing: 1,  size: 40, height: 52, baseY: 40, upper: true },
+  { id: 'pastel',     label: 'Pastel',           family: 'Pastel',        weight: '400', spacing: 0,  size: 40, height: 56, baseY: 42, upper: false },
+  { id: 'airstrike',  label: 'Airstrike',        family: 'Airstrike',     weight: '400', spacing: 0,  size: 38, height: 50, baseY: 38, upper: true },
+  { id: 'airstrikeB', label: 'Airstrike Bold',   family: 'AirstrikeBold', weight: '400', spacing: 0,  size: 38, height: 50, baseY: 38, upper: true },
+  { id: 'airstrikeC', label: 'Airstrike wąski',  family: 'AirstrikeCond', weight: '400', spacing: 0,  size: 42, height: 50, baseY: 39, upper: true },
 ];
 
 export function heroFontById(id?: string): HeroFont {
