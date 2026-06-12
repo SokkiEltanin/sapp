@@ -21,21 +21,36 @@ const READ_PERMS = [
   { accessType: 'read', recordType: 'Weight' },
 ] as const;
 
-// Initialise + make sure we have read permission (prompts the user the first time).
-export async function ensureHealthConnect(): Promise<boolean> {
+export type HCResult = { ok: boolean; reason?: 'no-module' | 'unavailable' | 'update' | 'init' | 'denied' | 'error' };
+
+// Initialise + make sure we have read permission (prompts the user the first
+// time). Gated on getSdkStatus() — the safe check that won't crash if Health
+// Connect isn't reachable — so a bad state shows a message instead of a crash.
+export async function ensureHealthConnect(): Promise<HCResult> {
   const hc = mod();
-  if (!hc) return false;
-  const ok = await hc.initialize();
-  if (!ok) return false;
-  let granted: any[] = [];
-  try { granted = await hc.getGrantedPermissions(); } catch { granted = []; }
-  const have = new Set((granted ?? []).map((p: any) => p.recordType));
-  const missing = READ_PERMS.filter(p => !have.has(p.recordType));
-  if (missing.length) {
-    const res = await hc.requestPermission(READ_PERMS as any);
-    return Array.isArray(res) ? res.length > 0 : true;
+  if (!hc) return { ok: false, reason: 'no-module' };
+  try {
+    const status = await hc.getSdkStatus();
+    const A = hc.SdkAvailabilityStatus ?? {};
+    if (status === A.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) return { ok: false, reason: 'update' };
+    if (A.SDK_AVAILABLE != null && status !== A.SDK_AVAILABLE) return { ok: false, reason: 'unavailable' };
+
+    const ok = await hc.initialize();
+    if (!ok) return { ok: false, reason: 'init' };
+
+    let granted: any[] = [];
+    try { granted = await hc.getGrantedPermissions(); } catch { granted = []; }
+    const have = new Set((granted ?? []).map((p: any) => p.recordType));
+    const missing = READ_PERMS.filter(p => !have.has(p.recordType));
+    if (missing.length) {
+      const res = await hc.requestPermission(READ_PERMS as any);
+      const arr = Array.isArray(res) ? res : [];
+      return { ok: arr.length > 0, reason: arr.length > 0 ? undefined : 'denied' };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'error' };
   }
-  return true;
 }
 
 function dayFilter(date: Date) {

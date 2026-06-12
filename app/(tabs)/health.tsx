@@ -169,8 +169,17 @@ export default function HealthScreen() {
     if (!isHealthConnectAvailable()) { toast.error('Niedostępne w tej wersji — zbuduj nowy APK'); return; }
     setSyncing(true);
     try {
-      const ok = await ensureHealthConnect();
-      if (!ok) { haptic.error(); toast.error('Brak zgody Health Connect'); return; }
+      const res = await ensureHealthConnect();
+      if (!res.ok) {
+        haptic.error();
+        const msg = res.reason === 'unavailable' ? 'Health Connect niedostępny na tym telefonie'
+          : res.reason === 'update' ? 'Zaktualizuj Health Connect w sklepie'
+          : res.reason === 'denied' ? 'Brak zgody — włącz dostęp w Health Connect'
+          : res.reason === 'no-module' ? 'Niedostępne w tej wersji — zbuduj nowy APK'
+          : 'Nie udało się połączyć z Health Connect';
+        toast.error(msg);
+        return;
+      }
       const d = await readHealthDay(new Date());
       if (d) {
         if (d.steps > 0) setSteps(d.steps);

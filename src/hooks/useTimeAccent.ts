@@ -13,11 +13,11 @@ interface TimeAccent {
 }
 
 const ACCENTS: Record<TimeOfDay, Omit<TimeAccent, 'timeOfDay'>> = {
-  night:     { color: '#5B7BE3', greeting: 'Dobranoc',   gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
-  dawn:      { color: '#5B7BE3', greeting: 'Dobranoc',   gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
-  morning:   { color: '#46B0DE', greeting: 'Dzień dobry', gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
-  afternoon: { color: '#46B0DE', greeting: 'Dzień dobry', gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
-  evening:   { color: '#5B7BE3', greeting: 'Dobranoc',   gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
+  night:     { color: '#5B7BE3', greeting: 'Good night',     gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
+  dawn:      { color: '#5B7BE3', greeting: 'Good morning',   gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
+  morning:   { color: '#46B0DE', greeting: 'Good morning',   gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
+  afternoon: { color: '#46B0DE', greeting: 'Good afternoon', gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
+  evening:   { color: '#5B7BE3', greeting: 'Good evening',   gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
 };
 
 // Fixed-hour fallback when real sun times aren't known yet.
