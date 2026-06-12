@@ -172,9 +172,15 @@ export default function HealthScreen() {
       const res = await ensureHealthConnect();
       if (!res.ok) {
         haptic.error();
+        if (res.reason === 'denied') {
+          // Open Health Connect so the user grants "Sapp" access by hand, then
+          // comes back and taps Synchronizuj again (no crashy in-app request).
+          toast.info('Włącz dostęp dla „Sapp", potem wróć i kliknij Synchronizuj');
+          await openHealthConnect();
+          return;
+        }
         const msg = res.reason === 'unavailable' ? 'Health Connect niedostępny na tym telefonie'
           : res.reason === 'update' ? 'Zaktualizuj Health Connect w sklepie'
-          : res.reason === 'denied' ? 'Brak zgody — włącz dostęp w Health Connect'
           : res.reason === 'no-module' ? 'Niedostępne w tej wersji — zbuduj nowy APK'
           : 'Nie udało się połączyć z Health Connect';
         toast.error(msg);

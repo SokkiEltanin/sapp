@@ -51,9 +51,11 @@ const READ_PERMS = [
 
 export type HCResult = { ok: boolean; reason?: 'no-module' | 'unavailable' | 'update' | 'init' | 'denied' | 'error' };
 
-// Initialise + make sure we have read permission (prompts the user the first
-// time). Gated on getSdkStatus() — the safe check that won't crash if Health
-// Connect isn't reachable — so a bad state shows a message instead of a crash.
+// Prepare Health Connect WITHOUT ever calling requestPermission() — that call
+// launches a system activity-for-result which is the most common native crash on
+// single-Activity Expo apps. We only do read-only calls (getSdkStatus, initialize,
+// getGrantedPermissions). If permissions are missing we report 'denied' and the UI
+// opens Health Connect settings so the user grants access by hand (crash-proof).
 export async function ensureHealthConnect(): Promise<HCResult> {
   const hc = mod();
   if (!hc) return { ok: false, reason: 'no-module' };
@@ -69,13 +71,8 @@ export async function ensureHealthConnect(): Promise<HCResult> {
     let granted: any[] = [];
     try { granted = await hc.getGrantedPermissions(); } catch { granted = []; }
     const have = new Set((granted ?? []).map((p: any) => p.recordType));
-    const missing = READ_PERMS.filter(p => !have.has(p.recordType));
-    if (missing.length) {
-      const res = await hc.requestPermission(READ_PERMS as any);
-      const arr = Array.isArray(res) ? res : [];
-      return { ok: arr.length > 0, reason: arr.length > 0 ? undefined : 'denied' };
-    }
-    return { ok: true };
+    const hasAll = READ_PERMS.every(p => have.has(p.recordType));
+    return hasAll ? { ok: true } : { ok: false, reason: 'denied' };
   } catch {
     return { ok: false, reason: 'error' };
   }
