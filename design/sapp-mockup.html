@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sapp — makiety ekranów (edytuj, odeślij, wdrożę 1:1)</title>
+<!--
+  JAK TEGO UŻYĆ
+  1. Otwórz ten plik w przeglądarce (dwuklik). Zobaczysz wszystkie ekrany jako telefon-ramki.
+  2. Edytuj co chcesz: kolory (sekcja :root), układ, treść, rozmiary, kolejność kart.
+     - Możesz przesuwać <section class="card"> w obrębie ekranu, zmieniać klasy, dopisywać swoje.
+  3. Odeślij mi ten plik (albo screeny) — przerobię apkę 1:1 pod Twój layout.
+  To są SCAFFOLDY (przybliżenie obecnego UI), nie 1:1 z apki — chodzi o punkt startu do Twojego redesignu.
+-->
+<style>
+  :root{
+    /* ——— PALETA (zmieniaj tutaj, zmieni się wszędzie) ——— */
+    --bg:#1A1C1C;            /* tło apki */
+    --card:#202323;          /* karta */
+    --card2:#171919;         /* ciemniejsza karta */
+    --line:rgba(255,255,255,.07);
+    --text:#D9D9D9;          /* główny tekst */
+    --muted:#8A9090;         /* przygaszony */
+    --white:#FFFFFF;
+
+    --tasks:#2AC68F;  --tasks-dim:#28443A;
+    --fin:#E43434;    --fin-dim:#5B1818;
+    --income:#2AC68F;
+    --day:#46B0DE;    --day-dim:#1B3947;
+    --night:#5B7BE3;  --night-dim:#282F44;
+    --mood:#F472B6;   --mood-dim:#170810;
+    --health:#34D399;
+    --amber:#FBBF24;
+    --radius:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  body{background:#0c0d0d;color:var(--text);padding:28px;-webkit-font-smoothing:antialiased}
+  h1.page{font-size:20px;color:#fff;margin-bottom:4px}
+  p.page{color:var(--muted);font-size:13px;margin-bottom:22px;max-width:820px}
+  .gallery{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start}
+
+  /* ——— Telefon ——— */
+  .phone{width:300px;flex:0 0 auto}
+  .phone > h2{font-size:13px;color:#fff;font-weight:700;margin:0 0 8px 4px;letter-spacing:.3px}
+  .phone > h2 small{color:var(--muted);font-weight:500}
+  .screen{
+    width:300px;height:620px;background:var(--bg);border-radius:34px;
+    border:8px solid #000;box-shadow:0 18px 40px rgba(0,0,0,.5);
+    overflow:hidden;position:relative;display:flex;flex-direction:column;
+  }
+  .statusbar{height:26px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:10px;color:var(--muted);flex:0 0 auto}
+  .scroll{flex:1;overflow:auto;padding:12px 12px 76px}
+  .scroll::-webkit-scrollbar{width:0}
+
+  /* ——— Elementy ——— */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+  .card.dark{background:var(--card2)}
+  .label{font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .row{display:flex;align-items:center;gap:10px}
+  .between{display:flex;align-items:center;justify-content:space-between}
+  .big{font-size:30px;font-weight:800;color:#fff;line-height:1}
+  .sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);font-size:11px;color:var(--text);background:rgba(255,255,255,.03)}
+  .chip.on{border-color:var(--tasks);color:var(--tasks);background:rgba(42,198,143,.12)}
+  .bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;border-radius:999px}
+  .pillnav{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;width:264px;height:50px;background:#101212;border:1px solid var(--line);border-radius:999px;display:flex;align-items:center;justify-content:space-around;color:var(--muted);font-size:18px}
+  .fab{width:42px;height:42px;border-radius:999px;background:var(--tasks);color:#06231a;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+  .hero{border-radius:22px;padding:16px;position:relative;overflow:hidden;color:#fff}
+  .hero .greet{font-size:30px;font-weight:900;letter-spacing:-1px;text-transform:uppercase}
+  .seg{display:flex;background:#101212;border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+  .seg > div{flex:1;text-align:center;padding:8px;border-radius:9px;font-size:12px;font-weight:600;color:var(--muted)}
+  .seg > div.on{background:rgba(255,255,255,.06);color:#fff}
+  .list-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+  .list-row:first-child{border-top:0}
+  .dot{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto}
+  .amt{margin-left:auto;font-weight:700;font-size:13px}
+  .muted{color:var(--muted)} .green{color:var(--tasks)} .red{color:var(--fin)} .pink{color:var(--mood)} .amberc{color:var(--amber)}
+  .h-title{font-size:18px;font-weight:800;color:#fff;padding:6px 4px 12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+  .wave{height:60px;border-radius:10px;background:linear-gradient(180deg,rgba(42,198,143,.22),rgba(42,198,143,0));margin-top:8px;position:relative}
+  .wave::after{content:"";position:absolute;left:0;right:0;top:18px;height:2px;background:var(--tasks);border-radius:2px;
+    clip-path:polygon(0 60%,15% 30%,30% 55%,45% 20%,60% 45%,75% 15%,90% 40%,100% 25%,100% 100%,0 100%)}
+</style>
+</head>
+<body>
+  <h1 class="page">Sapp — makiety ekranów</h1>
+  <p class="page">Edytuj kolory w <code>:root</code>, układaj karty, zmieniaj treść. Odeślij plik — przerobię apkę 1:1. To scaffoldy obecnego UI, punkt startu do Twojego redesignu.</p>
+
+  <div class="gallery">
+
+  <!-- ════════ DASHBOARD ════════ -->
+  <div class="phone"><h2>Dashboard <small>· (tabs)/index</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>▮▮▮ 100%</span></div>
+      <div class="scroll">
+        <div class="hero" style="background:linear-gradient(135deg,var(--day-dim),#0e1f27);border:1px solid rgba(70,176,222,.3)">
+          <div class="between"><span class="sub" style="color:#bfe3f2">śr · 12 cze</span><span class="sub">☁ 18°</span></div>
+          <div class="greet" style="margin:10px 0 6px">Good morning</div>
+          <div class="sub" style="color:#dfeef6">Masz 3 zadania na dziś · 1 zaległe</div>
+        </div>
+        <div class="card"><div class="label">⚡ W toku</div>
+          <div class="between"><span>Pomodoro / zarobek na żywo</span><span class="green">+24,80 zł</span></div>
+          <div class="bar"><i style="width:42%;background:var(--tasks)"></i></div>
+        </div>
+        <div class="card"><div class="label">🍬 Limit: słodycze + przekąski</div>
+          <div class="between"><span class="sub">82 / 150 zł · miesiąc</span><span class="amberc">55%</span></div>
+          <div class="bar"><i style="width:55%;background:var(--amber)"></i></div>
+        </div>
+        <div class="card"><div class="label">📊 Przegląd tygodnia</div>
+          <div class="row" style="flex-wrap:wrap;gap:6px">
+            <span class="chip">Wydatki: 420 zł (+12%)</span>
+            <span class="chip">Tempo: ~1 600 zł/mies</span>
+            <span class="chip green">Nastrój: 4,1/5 ↑</span>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="tile"><div class="label">Zadania</div><div class="big">3</div><div class="sub">na dziś</div></div>
+          <div class="tile"><div class="label">Praca</div><div class="big">12<small style="font-size:14px">h</small></div><div class="sub">ostatnia zmiana 360 zł</div></div>
+        </div>
+        <div class="card"><div class="label">📈 Słodycze + przekąski vs jedzenie</div><div class="wave"></div></div>
+      </div>
+      <div class="pillnav"><span>▦</span><span>✓</span><span class="fab">+</span><span>▤</span><span>$</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ FINANSE ════════ -->
+  <div class="phone"><h2>Finanse <small>· (tabs)/finances</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="h-title">Finanse</div>
+        <div class="seg" style="margin-bottom:12px"><div class="on">Tydzień</div><div>Miesiąc</div></div>
+        <div class="card dark">
+          <div class="between"><div><div class="sub">Wydatki</div><div class="big red">−420 zł</div></div>
+            <div style="text-align:right"><div class="sub">Przychód</div><div class="big green">+5 000</div></div></div>
+          <div class="wave" style="background:linear-gradient(180deg,rgba(228,52,52,.22),transparent)"></div>
+          <div class="between sub" style="margin-top:6px"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>Sb</span><span>Nd</span></div>
+        </div>
+        <div class="card">
+          <div class="label">Dziś · 12 cze</div>
+          <div class="list-row"><span class="dot" style="background:var(--fin-dim);color:#fff">🛒</span><div><div>Biedronka</div><div class="sub">Zakupy · Ja</div></div><span class="amt red">−86,40</span></div>
+          <div class="list-row"><span class="dot" style="background:var(--day-dim);color:#fff">⛽</span><div><div>Orlen</div><div class="sub">Paliwo</div></div><span class="amt red">−210,00</span></div>
+          <div class="list-row"><span class="dot" style="background:var(--tasks-dim);color:#fff">💸</span><div><div>Wypłata [JD]</div><div class="sub">Przychód</div></div><span class="amt green">+5 000</span></div>
+        </div>
+      </div>
+      <div class="pillnav"><span>▦</span><span>✓</span><span class="fab">+</span><span>▤</span><span style="color:#fff">$</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ ZADANIA ════════ -->
+  <div class="phone"><h2>Zadania <small>· (tabs)/tasks</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="h-title">Zadania</div>
+        <div class="grid2" style="margin-bottom:12px">
+          <div class="tile"><div class="big green">3</div><div class="sub">na dziś</div></div>
+          <div class="tile"><div class="big">1</div><div class="sub muted">zaległe</div></div>
+        </div>
+        <div class="card">
+          <div class="label">Dziś</div>
+          <div class="list-row"><span class="chip on">✓</span><div><div>Trening nóg</div><div class="sub">15:00 · ●●○ trudność</div></div></div>
+          <div class="list-row"><span class="chip">○</span><div><div>Zakupy spożywcze</div><div class="sub">#dom</div></div></div>
+          <div class="list-row"><span class="chip">○</span><div><div>Mail do JD</div><div class="sub red">zaległe · wczoraj</div></div></div>
+        </div>
+        <div class="card"><div class="label">Statystyki (miesiąc)</div>
+          <div class="between"><span class="sub">Ukończone</span><span class="green">28</span></div>
+          <div class="bar"><i style="width:70%;background:var(--tasks)"></i></div></div>
+      </div>
+      <div class="pillnav"><span>▦</span><span style="color:#fff">✓</span><span class="fab">+</span><span>▤</span><span>$</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ STATYSTYKI ════════ -->
+  <div class="phone"><h2>Statystyki <small>· (tabs)/stats</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="h-title">Statystyki</div>
+        <div class="seg" style="margin-bottom:12px"><div class="on">Ja</div><div>Wspólne</div><div>Wszystko</div></div>
+        <div class="card"><div class="label">Top 3 kupowane</div>
+          <div class="list-row"><span>1.</span><div style="flex:1">Jeżyki</div><span class="muted">×12</span></div>
+          <div class="list-row"><span>2.</span><div style="flex:1">Mleko</div><span class="muted">×9</span></div>
+          <div class="list-row"><span>3.</span><div style="flex:1">Lay's</div><span class="muted">×7</span></div>
+        </div>
+        <div class="card"><div class="label">Wydatki wg kategorii</div>
+          <div class="between sub"><span>Jedzenie</span><span>1 240 zł</span></div><div class="bar"><i style="width:80%;background:var(--day)"></i></div>
+          <div class="between sub" style="margin-top:8px"><span>Paliwo</span><span>420 zł</span></div><div class="bar"><i style="width:35%;background:var(--fin)"></i></div>
+        </div>
+        <div class="card"><div class="label">Ciekawostka</div><div class="sub">Ten miesiąc: 10 kg sera 🧀 — 4 kg gouda, 6 kg cesarski.</div></div>
+      </div>
+      <div class="pillnav"><span>▦</span><span>✓</span><span class="fab">+</span><span style="color:#fff">▤</span><span>$</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ NASTRÓJ ════════ -->
+  <div class="phone"><h2>Nastrój <small>· (tabs)/mood</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="hero" style="background:linear-gradient(135deg,var(--mood-dim),#0d0608);border:1px solid rgba(244,114,182,.25)">
+          <div class="label" style="color:var(--mood)">Dziś</div>
+          <div class="big" style="color:#fff">Dobrze 😊</div>
+          <div class="sub">energia: ⚡⚡⚡</div>
+        </div>
+        <div class="card"><div class="label" style="color:var(--mood)">📈 Nastrój · energia (30 dni)</div><div class="wave" style="background:linear-gradient(180deg,rgba(244,114,182,.22),transparent)"></div></div>
+        <div class="card"><div class="label" style="color:var(--mood)">✨ Wnioski</div>
+          <div class="list-row"><span class="pink">•</span><div class="sub">W dni wolne masz lepszy humor (4,3 vs 3,6 w pracy).</div></div>
+          <div class="list-row"><span class="pink">•</span><div class="sub">Po dobrym śnie (7h+) masz więcej energii (4,2 vs 3,1).</div></div>
+          <div class="list-row"><span class="pink">•</span><div class="sub">W gorsze dni wydajesz więcej (85 vs 40 zł).</div></div>
+        </div>
+        <div class="card"><div class="label">Co Cię cieszy</div>
+          <div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip" style="border-color:var(--mood);color:var(--mood)">trening</span><span class="chip" style="border-color:var(--mood);color:var(--mood)">spacer</span></div></div>
+      </div>
+      <div class="pillnav"><span>▦</span><span>✓</span><span class="fab">+</span><span>▤</span><span>$</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ ZDROWIE ════════ -->
+  <div class="phone"><h2>Zdrowie <small>· (tabs)/health</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="h-title">Zdrowie <span class="sub">Dzisiaj</span></div>
+        <div class="card" style="border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.08);text-align:center;color:var(--health);font-weight:700">↻ Synchronizuj z zegarka (Health Connect)</div>
+        <div class="card" style="border-color:rgba(52,211,153,.25)">
+          <div class="label" style="color:var(--health)">👟 Kroki dzisiaj</div>
+          <div class="big">8 420</div><div class="sub">cel 10 000 · 6,3 km · 84%</div>
+          <div class="bar"><i style="width:84%;background:var(--health)"></i></div>
+        </div>
+        <div class="grid2">
+          <div class="tile"><div class="label">😴 Sen</div><div class="big">7<small style="font-size:14px">h</small> 20</div><div class="sub">dobry</div></div>
+          <div class="tile"><div class="label">⚖ Waga</div><div class="big">78,4</div><div class="sub">kg</div></div>
+        </div>
+        <div class="card"><div class="label">💧 Nawodnienie</div><div class="between"><span class="sub">5 / 8 szklanek</span><span>+</span></div><div class="bar"><i style="width:62%;background:var(--day)"></i></div></div>
+      </div>
+      <div class="pillnav"><span>▦</span><span>✓</span><span class="fab">+</span><span>▤</span><span>$</span></div>
+    </div>
+  </div>
+
+  <!-- ════════ DODAJ WYDATEK ════════ -->
+  <div class="phone"><h2>Dodaj wydatek/przychód <small>· expenses/add</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="between" style="padding:4px 2px 12px"><span style="font-size:18px">✕</span><b>Nowy wydatek</b><span>▤</span></div>
+        <div class="seg" style="margin-bottom:14px"><div class="on" style="background:var(--fin);color:#fff">▾ Wydatek</div><div>▴ Przychód</div></div>
+        <div class="card" style="text-align:center;padding:22px"><div class="big" style="font-size:40px;color:var(--fin)">0,00<span style="font-size:20px"> zł</span></div></div>
+        <div class="card"><div class="label">Kategoria</div>
+          <div class="row" style="flex-wrap:wrap;gap:6px"><span class="chip on" style="border-color:var(--day);color:var(--day);background:rgba(70,176,222,.12)">🛒 Jedzenie</span><span class="chip">⛽ Paliwo</span><span class="chip">🏠 Dom</span></div></div>
+        <div class="card"><div class="label">Opis</div><div class="sub">Biedronka…</div></div>
+        <div class="card" style="background:var(--tasks);color:#06231a;text-align:center;font-weight:800">✓ Zapisz wydatek</div>
+        <div class="sub" style="text-align:center">📋 Zapisz jako szablon</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ USTAWIENIA ════════ -->
+  <div class="phone"><h2>Ustawienia <small>· settings</small></h2>
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><span>100%</span></div>
+      <div class="scroll">
+        <div class="h-title">Ustawienia</div>
+        <div class="label">Personalizacja</div>
+        <div class="card"><div class="row"><span class="dot" style="background:rgba(244,114,182,.15);color:var(--mood)">T</span><div><div>Czcionka powitania</div><div class="sub">Blackout · rozmiar 110% · pozycja</div></div></div></div>
+        <div class="label">Kopia zapasowa (chmura)</div>
+        <div class="card">
+          <div class="card" style="background:rgba(42,198,143,.08);border-color:rgba(42,198,143,.27);color:var(--tasks);font-size:12px;margin:0 0 10px">🛡 Chronione kontem Google — przetrwa reinstal.</div>
+          <div class="card" style="background:rgba(70,176,222,.10);border-color:rgba(70,176,222,.25);color:var(--day);text-align:center;font-weight:700;margin:0">☁ Utwórz kopię teraz</div>
+        </div>
+        <div class="label">Dane</div>
+        <div class="card"><div class="between"><span class="sub">Transakcje</span><b>312</b></div></div>
+        <div class="sub" style="text-align:center;margin-top:8px">V2 · BUILD #229</div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+</body>
+</html>
