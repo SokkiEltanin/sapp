@@ -48,7 +48,10 @@ GoogleSignin.configure({
 });
 
 const APP_VERSION = 'V2';
-const APP_BUILD = 230; // bump on each meaningful build
+// Build number injected from the GitHub Actions run (EXPO_PUBLIC_BUILD_NUMBER =
+// github.run_number) so the in-app number MATCHES the "Build #N" GitHub release.
+// Falls back to 'dev' for local runs.
+const APP_BUILD: string = process.env.EXPO_PUBLIC_BUILD_NUMBER || 'dev';
 
 function HeroStepper({ label, value, onDec, onInc }: { label: string; value: string; onDec: () => void; onInc: () => void }) {
   return (
@@ -1020,7 +1023,7 @@ export default function SettingsScreen() {
 
         {/* Cloud backup */}
         <View>
-          <BackupSection appBuild={APP_BUILD} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
+          <BackupSection appBuild={Number(APP_BUILD) || undefined} googleUser={googleUser} onConnectGoogle={handleGoogleSignIn} />
         </View>
 
         {/* Account */}

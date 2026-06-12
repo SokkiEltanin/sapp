@@ -128,6 +128,7 @@ jobs:
         run: cd android && ./gradlew assembleRelease --no-daemon -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease
         env:
           GRADLE_OPTS: "-Xmx6g -XX:MaxMetaspaceSize=512m -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+          EXPO_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
           EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
           EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: sokkisapp.firebaseapp.com
           EXPO_PUBLIC_FIREBASE_PROJECT_ID: sokkisapp
