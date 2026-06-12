@@ -15,6 +15,34 @@ export function isHealthConnectAvailable(): boolean {
   return !!mod();
 }
 
+// Opens the Health Connect app/settings so the user can grant Sapp access by
+// hand — a crash-proof fallback when the in-app permission request misbehaves.
+export async function openHealthConnect(): Promise<boolean> {
+  const hc = mod();
+  if (!hc) return false;
+  try {
+    if (typeof hc.openHealthConnectSettings === 'function') { await hc.openHealthConnectSettings(); return true; }
+    if (typeof hc.openHealthConnectDataManagement === 'function') { await hc.openHealthConnectDataManagement(); return true; }
+    return false;
+  } catch { return false; }
+}
+
+// Lightweight probe: returns the raw SDK status string (or an error label) so the
+// UI can show exactly where things stand without ever throwing.
+export async function probeHealthConnect(): Promise<string> {
+  const hc = mod();
+  if (!hc) return 'brak-modułu';
+  try {
+    const status = await hc.getSdkStatus();
+    const A = hc.SdkAvailabilityStatus ?? {};
+    if (status === A.SDK_AVAILABLE) return 'dostępne';
+    if (status === A.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) return 'wymaga-aktualizacji';
+    return `niedostępne (${status})`;
+  } catch (e: any) {
+    return `błąd: ${e?.message ?? 'native'}`;
+  }
+}
+
 const READ_PERMS = [
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'SleepSession' },

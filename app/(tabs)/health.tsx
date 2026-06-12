@@ -15,7 +15,7 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { MOOD_COLORS } from '@/types';
 import { getHealthGoals } from '@/utils/healthGoals';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
@@ -201,13 +201,16 @@ export default function HealthScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* Sync from the watch via Health Connect (Samsung Health → Health Connect) */}
-        <PressableScale onPress={syncHealthConnect} disabled={syncing}>
+        <PressableScale onPress={syncHealthConnect} onLongPress={async () => { const s = await probeHealthConnect(); toast.info(`Health Connect: ${s}`); }} disabled={syncing}>
           <View style={styles.syncBtn}>
             <RefreshCw size={14} color={T.accent} />
             <Text style={[styles.syncText, { color: T.accent }]}>
               {syncing ? 'Synchronizuję…' : 'Synchronizuj z zegarka (Health Connect)'}
             </Text>
           </View>
+        </PressableScale>
+        <PressableScale onPress={async () => { const ok = await openHealthConnect(); if (!ok) toast.error('Nie można otworzyć Health Connect'); }}>
+          <Text style={styles.syncFallback}>Nie działa? Otwórz Health Connect i włącz dostęp dla „Sapp"</Text>
         </PressableScale>
 
         {/* Steps hero */}
@@ -594,6 +597,7 @@ const styles = StyleSheet.create({
     backgroundColor: T.accent + '14', borderWidth: 1, borderColor: T.accent + '33',
   },
   syncText: { fontSize: 13, fontWeight: '700' },
+  syncFallback: { fontSize: 11, color: colors.text.muted, textAlign: 'center', textDecorationLine: 'underline', marginTop: -spacing[1] },
 
   card: { gap: spacing[3] },
   tealCard: { gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },
