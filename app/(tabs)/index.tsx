@@ -569,6 +569,7 @@ export default function DashboardScreen() {
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
+  const [tagModal, setTagModal]     = useState<any>(null);  // open tag-limit's item list
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [workHoursChart, setWorkHoursChart] = useState(false);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
@@ -747,6 +748,19 @@ export default function DashboardScreen() {
   const today     = todayStr();
   const isLoading = finLoading || tasksLoading;
   const onRefresh = () => { reloadFin(); reloadTasks(); loadPomSessions(); };
+
+  // Remove a wrongly-added product from a tag limit: mark it excluded (drops out
+  // of the limit + consumption stats, stays in the money total).
+  const removeTagItem = useCallback(async (expenseId: string, idx: number) => {
+    const e = expenses.find(x => x.id === expenseId);
+    if (!e?.receiptItems) return;
+    const newItems = e.receiptItems.map((it, i) => i === idx ? { ...it, excluded: true } : it);
+    setExpenses(expenses.map(x => x.id === expenseId ? { ...x, receiptItems: newItems } : x));
+    setTagModal((m: any) => m ? { ...m, items: m.items.filter((it: any) => !(it.expenseId === expenseId && it.idx === idx)) } : m);
+    haptic.medium();
+    try { await expensesService.update(expenseId, { receiptItems: newItems }); }
+    catch { haptic.error(); toast.error('Nie usunięto — sprawdź połączenie'); }
+  }, [expenses, setExpenses]);
 
   // Render a user-added custom tile (a pinned note, or a quick link).
   // Data context for stat widgets (custom tiles of type 'stat').
@@ -1236,6 +1250,7 @@ export default function DashboardScreen() {
         const tags = ruleTags(rule);                    // one or more tags combined
         const hasAny = (arr?: string[]) => !!arr && tags.some(t => arr.includes(t));
         let spend = 0;
+        const items: { expenseId: string; idx: number; name: string; price: number; date: string }[] = [];
         for (const e of scopedExpenses) {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
@@ -1244,12 +1259,16 @@ export default function DashboardScreen() {
           if (hasAny(e.tags)) {
             if (!rule.person || e.payer === rule.person) spend += e.amount;
           } else if (e.receiptItems?.some(it => countsForConsumption(it) && hasAny(it.tags))) {
-            spend += e.receiptItems
-              .filter(it => countsForConsumption(it) && hasAny(it.tags))
-              .reduce((s, it) => s + attributedPrice(it, rule.person, payers), 0);
+            e.receiptItems.forEach((it, idx) => {
+              if (countsForConsumption(it) && hasAny(it.tags)) {
+                spend += attributedPrice(it, rule.person, payers);
+                items.push({ expenseId: e.id, idx, name: it.name, price: it.price, date: e.date });
+              }
+            });
           }
         }
-        return { ...rule, spend, pct: spend / rule.limit, label: ruleLabel(rule) };
+        items.sort((a, b) => (a.date < b.date ? 1 : -1));   // newest first
+        return { ...rule, spend, pct: spend / rule.limit, label: ruleLabel(rule), items, lastName: items[0]?.name ?? null };
       })
       .sort((a, b) => b.pct - a.pct);
   }, [tagRules, scopedExpenses, today, weekDates, payers]);
@@ -1531,7 +1550,7 @@ export default function DashboardScreen() {
                 <TouchableOpacity
                   key={t.id}
                   style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
-                  onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
+                  onPress={() => { haptic.tap(); setTagModal(t); }}
                   activeOpacity={0.8}
                 >
                   <Text style={s.budgetWarnText}>
@@ -1550,6 +1569,11 @@ export default function DashboardScreen() {
                       backgroundColor: over ? colors.accent.red : accentColor,
                     }]} />
                   </View>
+                  {t.lastName && (
+                    <Text style={s.tagLastItem} numberOfLines={1}>
+                      ostatnio: {t.lastName} · dotknij, by zobaczyć/usunąć
+                    </Text>
+                  )}
                 </TouchableOpacity>
               );
             });
@@ -2338,6 +2362,38 @@ export default function DashboardScreen() {
       {/* Mood check-in modal */}
       <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={todayEntry ?? null} />
 
+      {/* Tag-limit item list — see/remove what counts toward a limit */}
+      <Modal visible={!!tagModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setTagModal(null)}>
+        <View style={s.npOverlay}>
+          <View style={[s.npCard, { maxHeight: '78%' }]}>
+            {tagModal && (
+              <>
+                <Text style={s.tagModalTitle}>{tagModal.label}</Text>
+                <Text style={s.tagModalSub}>{Math.round(tagModal.spend)}/{Math.round(tagModal.limit)} zł · {tagModal.items.length} pozycji · {tagModal.period === 'week' ? 'tydzień' : 'miesiąc'}</Text>
+                <ScrollView style={{ marginTop: spacing[2] }}>
+                  {tagModal.items.length === 0
+                    ? <Text style={s.tagModalEmpty}>Brak pozycji.</Text>
+                    : tagModal.items.map((it: any) => (
+                      <View key={`${it.expenseId}-${it.idx}`} style={s.tagItemRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.tagItemName} numberOfLines={1}>{it.name}</Text>
+                          <Text style={s.tagItemMeta}>{new Date(it.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {it.price.toFixed(2)} zł</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => removeTagItem(it.expenseId, it.idx)} style={s.tagItemDel} activeOpacity={0.7}>
+                          <Trash2 size={16} color={colors.accent.red} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                </ScrollView>
+                <TouchableOpacity onPress={() => setTagModal(null)} style={s.tagModalClose} activeOpacity={0.8}>
+                  <Text style={s.tagModalCloseText}>Zamknij</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Note picker — add a note as a dashboard tile */}
       <Modal visible={notePickerOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNotePickerOpen(false)}>
         <View style={s.npOverlay}>
@@ -2508,6 +2564,16 @@ const s = StyleSheet.create({
   budgetWarnText: {
     fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.55)',
   },
+  tagLastItem: { fontSize: 11, color: colors.text.muted, marginTop: -spacing[1] },
+  tagModalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
+  tagModalSub: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  tagModalEmpty: { fontSize: 13, color: colors.text.muted, textAlign: 'center', paddingVertical: spacing[3] },
+  tagItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  tagItemName: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
+  tagItemMeta: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  tagItemDel: { padding: spacing[2], borderRadius: radius.md, backgroundColor: 'rgba(228,52,52,0.10)' },
+  tagModalClose: { marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: colors.bg.elevated, alignItems: 'center' },
+  tagModalCloseText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
   budgetWarnBold: { fontWeight: '800', color: '#FFFFFF' },
   budgetWarnPeriod: { fontWeight: '700', color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
   budgetWarnPct: { fontWeight: '700', color: '#FFFFFF' },
