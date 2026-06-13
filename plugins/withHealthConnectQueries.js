@@ -29,6 +29,37 @@ function withQueries(config) {
   });
 }
 
+// Android 14+ (where Health Connect is in the system) requires an activity that
+// handles VIEW_PERMISSION_USAGE with the HEALTH_PERMISSIONS category, otherwise
+// the app never appears in Health Connect's app list and no permission screen
+// shows. The library's plugin only adds the old Android-13 rationale action.
+function withViewPermissionUsage(config) {
+  return withAndroidManifest(config, (cfg) => {
+    const app = cfg.modResults.manifest.application[0];
+    if (!Array.isArray(app['activity-alias'])) app['activity-alias'] = [];
+    const exists = app['activity-alias'].some(
+      (a) => a && a.$ && a.$['android:name'] === 'ViewPermissionUsageActivity',
+    );
+    if (!exists) {
+      app['activity-alias'].push({
+        $: {
+          'android:name': 'ViewPermissionUsageActivity',
+          'android:exported': 'true',
+          'android:targetActivity': '.MainActivity',
+          'android:permission': 'android.permission.START_VIEW_PERMISSION_USAGE',
+        },
+        'intent-filter': [
+          {
+            action: [{ $: { 'android:name': 'android.intent.action.VIEW_PERMISSION_USAGE' } }],
+            category: [{ $: { 'android:name': 'android.intent.category.HEALTH_PERMISSIONS' } }],
+          },
+        ],
+      });
+    }
+    return cfg;
+  });
+}
+
 function withPermissionDelegate(config) {
   return withMainActivity(config, (cfg) => {
     if (cfg.modResults.language !== 'kt') return cfg; // expects Kotlin MainActivity
@@ -46,5 +77,5 @@ function withPermissionDelegate(config) {
 }
 
 module.exports = function withHealthConnect(config) {
-  return withPermissionDelegate(withQueries(config));
+  return withPermissionDelegate(withViewPermissionUsage(withQueries(config)));
 };
