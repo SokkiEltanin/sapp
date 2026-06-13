@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw } from 'lucide-react-native';
+import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
@@ -61,6 +61,7 @@ export default function HealthScreen() {
   const [weightInput, setWeightInput]   = useState('');
   const [loaded, setLoaded]             = useState(false);
   const [syncing, setSyncing]           = useState(false);
+  const [hcExtra, setHcExtra]           = useState<Record<string, number | null>>({});
   const [weekSteps, setWeekSteps]       = useState<number[]>(Array(7).fill(0));
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
@@ -101,6 +102,7 @@ export default function HealthScreen() {
           if (d.sleepM != null)       setSleepM(d.sleepM);
           if (d.sleepQuality != null) setSleepQuality(d.sleepQuality);
           if (d.weight != null)       setWeight(d.weight);
+          if (d.hc) setHcExtra(d.hc);
         }
 
         const today = new Date();
@@ -138,7 +140,7 @@ export default function HealthScreen() {
 
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(todayKey(), JSON.stringify({ water, steps, sleepH, sleepM, sleepQuality, weight })).catch(() => {});
+    AsyncStorage.setItem(todayKey(), JSON.stringify({ water, steps, sleepH, sleepM, sleepQuality, weight, hc: hcExtra })).catch(() => {});
     const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     setWeekSteps(prev => { const n = [...prev]; n[todayIdx] = steps; return n; });
     setWeekWeight(prev => { const n = [...prev]; n[todayIdx] = weight; return n; });
@@ -148,7 +150,7 @@ export default function HealthScreen() {
       n[todayIdx] = { h: sleepH, m: sleepM, quality: sleepQuality };
       return n;
     });
-  }, [water, steps, sleepH, sleepM, sleepQuality, weight, loaded]);
+  }, [water, steps, sleepH, sleepM, sleepQuality, weight, hcExtra, loaded]);
 
   const updateWater = (v: number) => {
     const next = Math.max(0, Math.min(waterGoal, v));
@@ -191,8 +193,13 @@ export default function HealthScreen() {
         if (d.steps > 0) setSteps(d.steps);
         if (d.sleepMinutes > 0) { setSleepH(Math.floor(d.sleepMinutes / 60)); setSleepM(d.sleepMinutes % 60); }
         if (d.weightKg != null) setWeight(d.weightKg);
+        setHcExtra({
+          heartRateAvg: d.heartRateAvg, restingHeartRate: d.restingHeartRate, distanceKm: d.distanceKm,
+          activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
+          oxygenPct: d.oxygenPct, vo2max: d.vo2max,
+        });
         haptic.success();
-        toast.success('Zsynchronizowano z Health Connect');
+        toast.success('Zsynchronizowano z zegarka');
       } else {
         toast.info('Brak danych w Health Connect');
       }
@@ -351,6 +358,35 @@ export default function HealthScreen() {
             })}
           </View>
         </GlassCard>
+
+        {/* From the watch — extra Health Connect metrics (only those with data) */}
+        {(() => {
+          const cards = ([
+            { k: 'heartRateAvg',     Icon: Heart,    label: 'Tętno śr.',    unit: 'bpm',  color: '#FF6B6B' },
+            { k: 'restingHeartRate', Icon: Heart,    label: 'Spocz. tętno', unit: 'bpm',  color: '#FF8FA3' },
+            { k: 'distanceKm',       Icon: MapPin,   label: 'Dystans',      unit: 'km',   color: '#46B0DE' },
+            { k: 'activeCalories',   Icon: Flame,    label: 'Kalorie akt.', unit: 'kcal', color: '#FB923C' },
+            { k: 'totalCalories',    Icon: Flame,    label: 'Kalorie',      unit: 'kcal', color: '#F87171' },
+            { k: 'exerciseMinutes',  Icon: Dumbbell, label: 'Trening',      unit: 'min',  color: T.accent },
+            { k: 'oxygenPct',        Icon: Wind,     label: 'SpO₂',         unit: '%',    color: '#60A5FA' },
+            { k: 'vo2max',           Icon: Activity, label: 'VO₂max',       unit: '',     color: '#A78BFA' },
+          ] as const).filter(c => { const v = hcExtra[c.k]; return v != null && v !== 0; });
+          if (cards.length === 0) return null;
+          return (
+            <GlassCard padding={spacing[4]}>
+              <View style={styles.cardRow}><Activity size={13} color={colors.text.muted} /><Text style={styles.cardLabel}>Z ZEGARKA</Text></View>
+              <View style={styles.hcGrid}>
+                {cards.map(c => (
+                  <View key={c.k} style={styles.hcTile}>
+                    <c.Icon size={15} color={c.color} />
+                    <Text style={styles.hcVal}>{hcExtra[c.k]}{c.unit ? <Text style={styles.hcUnit}> {c.unit}</Text> : null}</Text>
+                    <Text style={styles.hcLabel}>{c.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </GlassCard>
+          );
+        })()}
 
         {/* Pomodoro */}
         <GlassCard padding={spacing[4]} style={styles.tealPomRow}>
@@ -603,6 +639,14 @@ const styles = StyleSheet.create({
     backgroundColor: T.accent + '14', borderWidth: 1, borderColor: T.accent + '33',
   },
   syncText: { fontSize: 13, fontWeight: '700' },
+  hcGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
+  hcTile: {
+    width: '31%', flexGrow: 1, gap: 3, paddingVertical: spacing[2], paddingHorizontal: spacing[2],
+    borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  hcVal: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
+  hcUnit: { fontSize: 10, fontWeight: '600', color: colors.text.muted },
+  hcLabel: { fontSize: 10, color: colors.text.muted },
   syncFallback: { fontSize: 11, color: colors.text.muted, textAlign: 'center', textDecorationLine: 'underline', marginTop: -spacing[1] },
 
   card: { gap: spacing[3] },

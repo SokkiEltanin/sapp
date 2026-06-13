@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet, Plus, SlidersHorizontal, ScanLine, Settings,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, Plus, SlidersHorizontal, ScanLine, Settings,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -18,13 +18,14 @@ import { haptic } from '@/utils/haptics';
 
 type Props = { currentIndex: number };
 
-const TAB_PATHS = ['/', '/tasks', '/stats', '/finances'] as const;
+const TAB_PATHS = ['/', '/tasks', '/stats', '/finances', '/health'] as const;
 
 const TABS = [
   { Icon: LayoutDashboard },
   { Icon: ListTodo        },
   { Icon: CalendarDays    },
   { Icon: Wallet          },
+  { Icon: HeartPulse      },
 ];
 
 const TAB_ACCENTS = [
@@ -32,6 +33,7 @@ const TAB_ACCENTS = [
   colors.tabs.tasks,
   colors.tabs.calendar,
   colors.tabs.finances,
+  '#34D399',
 ] as const;
 
 const QUICK_ACTIONS = [

@@ -9,7 +9,7 @@ import TabBar from '@/components/ui/TabBar';
 import TopPill from '@/components/ui/TopPill';
 
 const W = Dimensions.get('window').width;
-const TABS = ['/', '/tasks', '/stats', '/finances'] as const;
+const TABS = ['/', '/tasks', '/stats', '/finances', '/health'] as const;
 
 function tabIdx(path: string): number {
   const i = (TABS as readonly string[]).indexOf(path);

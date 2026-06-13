@@ -47,15 +47,23 @@ const READ_PERMS = [
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'SleepSession' },
   { accessType: 'read', recordType: 'Weight' },
+  { accessType: 'read', recordType: 'HeartRate' },
+  { accessType: 'read', recordType: 'RestingHeartRate' },
+  { accessType: 'read', recordType: 'Distance' },
+  { accessType: 'read', recordType: 'TotalCaloriesBurned' },
+  { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
+  { accessType: 'read', recordType: 'ExerciseSession' },
+  { accessType: 'read', recordType: 'OxygenSaturation' },
+  { accessType: 'read', recordType: 'Vo2Max' },
 ] as const;
 
 export type HCResult = { ok: boolean; reason?: 'no-module' | 'unavailable' | 'update' | 'init' | 'denied' | 'error' };
 
 // Initialise + ensure read permission. requestPermission() launches Health
 // Connect's permission screen (which also REGISTERS the app so it appears in HC's
-// app list). It crashes on the New Architecture (known library bug: lateinit
-// launcher), so the app is built with newArchEnabled:false for this to work.
-// If anything throws we report a reason and the UI falls back to opening HC.
+// app list). The launcher only works because plugins/withHealthConnectQueries.js
+// injects setPermissionDelegate(this) into MainActivity. If anything throws we
+// report a reason and the UI falls back to opening HC settings.
 export async function ensureHealthConnect(): Promise<HCResult> {
   const hc = mod();
   if (!hc) return { ok: false, reason: 'no-module' };
@@ -96,44 +104,87 @@ export interface HealthConnectDay {
   steps: number;
   sleepMinutes: number;
   weightKg: number | null;
+  heartRateAvg: number | null;     // bpm, day average
+  restingHeartRate: number | null; // bpm
+  distanceKm: number | null;       // km
+  activeCalories: number | null;   // kcal
+  totalCalories: number | null;    // kcal
+  exerciseMinutes: number;         // sum of workout sessions
+  oxygenPct: number | null;        // SpO2 %
+  vo2max: number | null;
 }
 
-// Read one day's steps + sleep + latest weight. Returns null if HC unavailable.
+// Read one day of everything we support from Health Connect. Each metric is read
+// independently and guarded, so a missing/denied type just stays null.
 export async function readHealthDay(date: Date = new Date()): Promise<HealthConnectDay | null> {
   const hc = mod();
   if (!hc) return null;
   const filter = dayFilter(date);
+  const r1 = (v: number | null) => (typeof v === 'number' ? Math.round(v * 10) / 10 : null);
+
+  // Latest record of a type within the last `days` (for things logged sporadically).
+  const latest = async (type: string, days: number): Promise<any | null> => {
+    try {
+      const wide = { operator: 'between', startTime: new Date(date.getTime() - days * 864e5).toISOString(), endTime: filter.endTime };
+      const recs = await read(hc, type, wide);
+      return recs.length ? recs[recs.length - 1] : null;
+    } catch { return null; }
+  };
+  const sum = async (type: string, pick: (r: any) => number): Promise<number | null> => {
+    try {
+      const recs = await read(hc, type, filter);
+      if (!recs.length) return null;
+      return recs.reduce((s, r) => s + (pick(r) || 0), 0);
+    } catch { return null; }
+  };
 
   let steps = 0;
-  try {
-    const recs = await read(hc, 'Steps', filter);
-    steps = recs.reduce((s, r) => s + (r.count ?? 0), 0);
-  } catch {}
+  try { steps = (await read(hc, 'Steps', filter)).reduce((s, r) => s + (r.count ?? 0), 0); } catch {}
 
   let sleepMinutes = 0;
   try {
-    const recs = await read(hc, 'SleepSession', filter);
-    for (const r of recs) {
-      const st = new Date(r.startTime).getTime();
-      const en = new Date(r.endTime).getTime();
+    for (const r of await read(hc, 'SleepSession', filter)) {
+      const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
       if (en > st) sleepMinutes += Math.round((en - st) / 60000);
     }
   } catch {}
 
-  let weightKg: number | null = null;
+  let exerciseMinutes = 0;
   try {
-    let recs = await read(hc, 'Weight', filter);
-    if (recs.length === 0) {
-      // No weigh-in today → take the most recent from the last 30 days.
-      const wide = { operator: 'between', startTime: new Date(date.getTime() - 30 * 864e5).toISOString(), endTime: filter.endTime };
-      recs = await read(hc, 'Weight', wide);
-    }
-    if (recs.length) {
-      const last = recs[recs.length - 1];
-      const kg = last?.weight?.inKilograms ?? last?.weight?.value ?? null;
-      weightKg = typeof kg === 'number' ? Math.round(kg * 10) / 10 : null;
+    for (const r of await read(hc, 'ExerciseSession', filter)) {
+      const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
+      if (en > st) exerciseMinutes += Math.round((en - st) / 60000);
     }
   } catch {}
 
-  return { steps, sleepMinutes, weightKg };
+  // Heart rate: average of all bpm samples across the day.
+  let heartRateAvg: number | null = null;
+  try {
+    const recs = await read(hc, 'HeartRate', filter);
+    const bpms: number[] = [];
+    for (const r of recs) for (const s of (r.samples ?? [])) if (s.beatsPerMinute) bpms.push(s.beatsPerMinute);
+    if (bpms.length) heartRateAvg = Math.round(bpms.reduce((a, b) => a + b, 0) / bpms.length);
+  } catch {}
+
+  const wt = await latest('Weight', 30);
+  const rhr = await latest('RestingHeartRate', 7);
+  const spo2 = await latest('OxygenSaturation', 7);
+  const vo2 = await latest('Vo2Max', 60);
+  const distM = await sum('Distance', r => r.distance?.inMeters ?? 0);
+  const active = await sum('ActiveCaloriesBurned', r => r.energy?.inKilocalories ?? 0);
+  const total = await sum('TotalCaloriesBurned', r => r.energy?.inKilocalories ?? 0);
+
+  return {
+    steps,
+    sleepMinutes,
+    weightKg: r1(wt?.weight?.inKilograms ?? wt?.weight?.value ?? null),
+    heartRateAvg,
+    restingHeartRate: rhr?.beatsPerMinute ?? null,
+    distanceKm: distM != null ? r1(distM / 1000) : null,
+    activeCalories: active != null ? Math.round(active) : null,
+    totalCalories: total != null ? Math.round(total) : null,
+    exerciseMinutes,
+    oxygenPct: r1(spo2?.percentage ?? null),
+    vo2max: r1(vo2?.vo2MillilitersPerMinuteKilogram ?? null),
+  };
 }
