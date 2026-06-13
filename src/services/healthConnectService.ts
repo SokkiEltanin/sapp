@@ -51,11 +51,11 @@ const READ_PERMS = [
 
 export type HCResult = { ok: boolean; reason?: 'no-module' | 'unavailable' | 'update' | 'init' | 'denied' | 'error' };
 
-// Prepare Health Connect WITHOUT ever calling requestPermission() — that call
-// launches a system activity-for-result which is the most common native crash on
-// single-Activity Expo apps. We only do read-only calls (getSdkStatus, initialize,
-// getGrantedPermissions). If permissions are missing we report 'denied' and the UI
-// opens Health Connect settings so the user grants access by hand (crash-proof).
+// Initialise + ensure read permission. requestPermission() launches Health
+// Connect's permission screen (which also REGISTERS the app so it appears in HC's
+// app list). It crashes on the New Architecture (known library bug: lateinit
+// launcher), so the app is built with newArchEnabled:false for this to work.
+// If anything throws we report a reason and the UI falls back to opening HC.
 export async function ensureHealthConnect(): Promise<HCResult> {
   const hc = mod();
   if (!hc) return { ok: false, reason: 'no-module' };
@@ -71,8 +71,11 @@ export async function ensureHealthConnect(): Promise<HCResult> {
     let granted: any[] = [];
     try { granted = await hc.getGrantedPermissions(); } catch { granted = []; }
     const have = new Set((granted ?? []).map((p: any) => p.recordType));
-    const hasAll = READ_PERMS.every(p => have.has(p.recordType));
-    return hasAll ? { ok: true } : { ok: false, reason: 'denied' };
+    if (READ_PERMS.every(p => have.has(p.recordType))) return { ok: true };
+
+    const res = await hc.requestPermission(READ_PERMS as any);
+    const arr = Array.isArray(res) ? res : [];
+    return arr.length > 0 ? { ok: true } : { ok: false, reason: 'denied' };
   } catch {
     return { ok: false, reason: 'error' };
   }
