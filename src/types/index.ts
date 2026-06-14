@@ -243,6 +243,10 @@ export interface WorkSettings {
   monthRateOverride?: Record<string, number>; // YYYY-MM → fixed zł/h for that month only
   hoursOverride?: number;     // manual override of the previous-month hours used
   salaryOverride?: number;    // manual override of the last-paycheck amount used
+  // Months the user has personally CONFIRMED (salary + hours). When any exist, the
+  // estimated hourly rate = Σsalary / Σhours over them (averaged across the months
+  // you trust), instead of guessing from the last paycheck alone.
+  confirmedMonths?: Record<string, { salary: number; hours: number }>; // YYYY-MM
 }
 
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {

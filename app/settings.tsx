@@ -28,6 +28,7 @@ import { getBudgets, saveBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, ruleLabel } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import BackupSection from '@/components/settings/BackupSection';
+import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -628,6 +629,8 @@ export default function SettingsScreen() {
                 </View>
               </View>
             )}
+
+            <ConfirmedMonths />
           </View>
         </View>
 

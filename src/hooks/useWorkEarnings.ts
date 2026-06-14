@@ -107,6 +107,15 @@ export function useWorkEarnings(
     if (mOver && mOver > 0) return mOver / 3600;
     if (settings.rateOverride && settings.rateOverride > 0) return settings.rateOverride / 3600;
 
+    // Confirmed months win over auto-detection: average rate = Σsalary / Σhours
+    // across the months the user personally verified (most trustworthy).
+    const confirmed = Object.values(settings.confirmedMonths ?? {});
+    if (confirmed.length > 0) {
+      const totSalary = confirmed.reduce((s, m) => s + (m.salary || 0), 0);
+      const totHours = confirmed.reduce((s, m) => s + (m.hours || 0), 0);
+      if (totHours > 0) return totSalary / (totHours * 3600);
+    }
+
     // Manual hours override wins over the calendar.
     const hoursOverride = (settings.hoursOverride && settings.hoursOverride > 0) ? settings.hoursOverride : 0;
 
@@ -139,7 +148,7 @@ export function useWorkEarnings(
       else if (colorMode.monthWorkHours > 0) hours = colorMode.monthWorkHours;
     }
     return hours > 0 ? salaryUsed / (hours * 3600) : 0;
-  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.hoursOverride, settings.rateOverride, settings.monthRateOverride, salaryUsed]);
+  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.hoursOverride, settings.rateOverride, settings.monthRateOverride, settings.confirmedMonths, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {
