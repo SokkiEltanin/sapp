@@ -17,6 +17,10 @@ const P = {
   accentDim:  'rgba(244,114,182,0.12)',
   muted:      'rgba(244,114,182,0.45)',
 };
+// Reactive palette: pink accent stays both themes, dark card flips.
+function pFor(c: any) {
+  return { card: c.bg.card, cardBorder: 'rgba(244,114,182,0.20)', accent: '#F472B6', accentDim: 'rgba(244,114,182,0.12)', muted: 'rgba(244,114,182,0.50)' };
+}
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
@@ -27,6 +31,7 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { moodService } from '@/services/moodService';
 import { MoodEntry, MOOD_LABELS, MOOD_COLORS, MoodLevel, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -101,6 +106,9 @@ function extractKeywords(entries: MoodEntry[]): { positive: KeywordStat[]; negat
 }
 
 function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const kw = useMemo(() => makeKw(colors, P), [colors, P]);
   const withNotes = entries.filter(e => e.note?.trim() && (e.mood >= 4 || e.mood <= 2));
   if (withNotes.length < 4) return null;
 
@@ -150,17 +158,17 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const kw = StyleSheet.create({
+const makeKw = (c: any, p: any) => StyleSheet.create({
   card: {
-    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder,
+    backgroundColor: p.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: p.cardBorder,
   },
   header:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: {
-    fontSize: 10, fontWeight: '700', color: colors.text.muted,
+    fontSize: 10, fontWeight: '700', color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
-  subtitle: { fontSize: 11, color: colors.text.muted, marginTop: -spacing[1] },
+  subtitle: { fontSize: 11, color: c.text.muted, marginTop: -spacing[1] },
   section:  { gap: spacing[2] },
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
@@ -177,6 +185,9 @@ const MOOD_EMOJIS: Record<MoodLevel, string> = { 1: '😩', 2: '😕', 3: '😐'
 const ENERGY_EMOJIS: Record<MoodLevel, string> = { 1: '😴', 2: '😌', 3: '⚡', 4: '✨', 5: '🚀' };
 
 function MoodInsights({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const ins = useMemo(() => makeIns(colors, P), [colors, P]);
   if (entries.length < 5) return null;
 
   const now = new Date();
@@ -301,26 +312,26 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const ins = StyleSheet.create({
+const makeIns = (c: any, p: any) => StyleSheet.create({
   card: {
-    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder,
+    backgroundColor: p.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: p.cardBorder,
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: {
-    fontSize: 10, fontWeight: '700', color: colors.text.muted,
+    fontSize: 10, fontWeight: '700', color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
   grid: { flexDirection: 'row', gap: spacing[3] },
   tile: {
-    flex: 1, backgroundColor: colors.bg.elevated, borderRadius: radius.lg,
+    flex: 1, backgroundColor: c.bg.elevated, borderRadius: radius.lg,
     padding: spacing[3], gap: 3,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
-  tileLabel: { fontSize: 9, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
+  tileLabel: { fontSize: 9, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
   tileRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  tileVal: { fontSize: 18, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  tileSub: { fontSize: 10, color: colors.text.muted },
+  tileVal: { fontSize: 18, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  tileSub: { fontSize: 10, color: c.text.muted },
   tagSection: { gap: spacing[2] },
   tagHeader: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   tagSectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
@@ -364,6 +375,10 @@ function buildSmoothPath(pts: { x: number; y: number }[]): string {
 }
 
 function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const wv = useMemo(() => makeWv(colors, P), [colors, P]);
+  const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   const days = useMemo(() => {
     const byDate: Record<string, MoodEntry> = {};
     for (const e of entries) byDate[e.date] = e;
@@ -414,17 +429,21 @@ function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const wv = StyleSheet.create({
+const makeWv = (c: any, p: any) => StyleSheet.create({
   legend: { flexDirection: 'row', gap: spacing[4], justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   dash: { width: 14, height: 3, borderRadius: 2 },
-  legendText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  legendText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
 });
 
 // ─── Mood distribution (how often each level, last 30d) ───────────────────────
 
 function MoodDistribution({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const dist = useMemo(() => makeDist(colors, P), [colors, P]);
+  const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   const recent = entries.filter(e => e.date >= dateMinusDays(30));
   if (recent.length < 4) return null;
   const counts: Record<MoodLevel, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -464,19 +483,23 @@ function MoodDistribution({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const dist = StyleSheet.create({
+const makeDist = (c: any, p: any) => StyleSheet.create({
   bar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   emo: { fontSize: 14, width: 20 },
   lvlLabel: { fontSize: 11, fontWeight: '700', width: 64 },
   track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
   fill: { height: 7, borderRadius: 4 },
-  pct: { fontSize: 11, fontWeight: '700', color: colors.text.secondary, width: 34, textAlign: 'right' },
+  pct: { fontSize: 11, fontWeight: '700', color: c.text.secondary, width: 34, textAlign: 'right' },
 });
 
 // ─── Weekday pattern (avg mood per weekday) ───────────────────────────────────
 
 function WeekdayPattern({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const wd = useMemo(() => makeWd(colors, P), [colors, P]);
+  const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   if (entries.length < 5) return null;
   const buckets = Array.from({ length: 7 }, () => ({ total: 0, count: 0 })); // Mon..Sun
   for (const e of entries) {
@@ -515,13 +538,13 @@ function WeekdayPattern({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const wd = StyleSheet.create({
+const makeWd = (c: any, p: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: 5 },
   col: { flex: 1, alignItems: 'center', gap: 5 },
   cell: { width: '100%', aspectRatio: 1, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   cellBest: { borderWidth: 2, borderColor: '#FFFFFF' },
   cellVal: { fontSize: 13, fontWeight: '800' },
-  dow: { fontSize: 9, fontWeight: '700', color: colors.text.muted },
+  dow: { fontSize: 9, fontWeight: '700', color: c.text.muted },
 });
 
 // ─── Time-of-day pattern (from createdAt) ─────────────────────────────────────
@@ -534,6 +557,10 @@ const TOD_BUCKETS = [
 ];
 
 function TimeOfDayPattern({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const tod = useMemo(() => makeTod(colors, P), [colors, P]);
+  const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   const withTime = entries.filter(e => e.createdAt);
   if (withTime.length < 5) return null;
   const stats = TOD_BUCKETS.map(b => {
@@ -571,21 +598,25 @@ function TimeOfDayPattern({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const tod = StyleSheet.create({
+const makeTod = (c: any, p: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing[2] },
   tile: {
-    flex: 1, backgroundColor: colors.bg.elevated, borderRadius: radius.lg,
+    flex: 1, backgroundColor: c.bg.elevated, borderRadius: radius.lg,
     paddingVertical: spacing[3], gap: 3, alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
   val: { fontSize: 17, fontWeight: '800', letterSpacing: -0.5 },
-  label: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
-  count: { fontSize: 9, color: colors.text.muted, opacity: 0.7 },
+  label: { fontSize: 9, fontWeight: '600', color: c.text.muted },
+  count: { fontSize: 9, color: c.text.muted, opacity: 0.7 },
 });
 
 // ─── Month heatmap (calendar of mood colours) ─────────────────────────────────
 
 function MonthHeatmap({ entries }: { entries: MoodEntry[] }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const hm = useMemo(() => makeHm(colors, P), [colors, P]);
+  const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   const byDate = useMemo(() => {
     const m: Record<string, MoodEntry> = {};
     for (const e of entries) m[e.date] = e;
@@ -651,8 +682,8 @@ function MonthHeatmap({ entries }: { entries: MoodEntry[] }) {
   );
 }
 
-const hm = StyleSheet.create({
-  dow: { fontSize: 8, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.4 },
+const makeHm = (c: any, p: any) => StyleSheet.create({
+  dow: { fontSize: 8, fontWeight: '700', color: c.text.muted, letterSpacing: 0.4 },
   cellWrap: { flex: 1, alignItems: 'center', paddingVertical: 2 },
   cell: { width: '88%', aspectRatio: 1, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   cellToday: { borderWidth: 1.5, borderColor: '#FFFFFF' },
@@ -805,6 +836,9 @@ function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleep
   doneTasksByDate: Record<string, number>;
   sleepMinByDate: Record<string, number>;
 }) {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const pat = useMemo(() => makePat(colors, P), [colors, P]);
   const lines = useMemo(
     () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate),
     [entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate],
@@ -828,16 +862,19 @@ function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleep
   );
 }
 
-const pat = StyleSheet.create({
-  card: { backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder },
+const makePat = (c: any, p: any) => StyleSheet.create({
+  card: { backgroundColor: p.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: p.cardBorder },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { fontSize: 10, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
   row: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start' },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: P.accent, marginTop: 6 },
-  text: { flex: 1, fontSize: 12.5, color: colors.text.secondary, lineHeight: 18 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: p.accent, marginTop: 6 },
+  text: { flex: 1, fontSize: 12.5, color: c.text.secondary, lineHeight: 18 },
 });
 
 export default function MoodScreen() {
+  const colors = useColors();
+  const P = useMemo(() => pFor(colors), [colors]);
+  const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   const { entries, setEntries, setLoading, deleteEntry } = useMoodStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
@@ -1085,17 +1122,17 @@ export default function MoodScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any, p: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
   addBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: P.accent, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: P.accent,
+    backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: p.accent,
   },
   heroCard: {
-    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: P.cardBorder,
+    backgroundColor: p.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: p.cardBorder,
   },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   moodBubble: {
@@ -1105,39 +1142,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
   moodNum: { fontSize: 22, fontWeight: '900' },
-  heroMeta: { ...typography.caption, color: colors.text.muted, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
+  heroMeta: { ...typography.caption, color: c.text.muted, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
   heroMood: { ...typography.h3, fontWeight: '700', marginTop: 2 },
   energyBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: P.accent + '18',
+    backgroundColor: p.accent + '18',
     paddingHorizontal: spacing[2], paddingVertical: spacing[1], borderRadius: radius.sm,
   },
   energyEmoji: { fontSize: 14 },
-  energyText: { ...typography.caption, color: P.accent, fontWeight: '700', fontSize: 11 },
-  heroNote: { ...typography.bodySmall, color: colors.text.secondary, lineHeight: 18 },
-  cta: { ...typography.caption, color: colors.text.muted },
+  energyText: { ...typography.caption, color: p.accent, fontWeight: '700', fontSize: 11 },
+  heroNote: { ...typography.bodySmall, color: c.text.secondary, lineHeight: 18 },
+  cta: { ...typography.caption, color: c.text.muted },
 
   statsRow: { flexDirection: 'row', gap: spacing[2] },
   statCard: {
-    flex: 1, backgroundColor: P.card, borderRadius: radius.lg,
+    flex: 1, backgroundColor: p.card, borderRadius: radius.lg,
     padding: spacing[3], gap: 4, alignItems: 'center',
-    borderWidth: 1, borderColor: P.cardBorder,
+    borderWidth: 1, borderColor: p.cardBorder,
   },
-  statVal: { fontSize: 18, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  statLabel: { ...typography.caption, color: colors.text.muted, fontSize: 9, textAlign: 'center' },
+  statVal: { fontSize: 18, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  statLabel: { ...typography.caption, color: c.text.muted, fontSize: 9, textAlign: 'center' },
 
   card: {
-    backgroundColor: P.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3],
-    borderWidth: 1, borderColor: P.cardBorder,
+    backgroundColor: p.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3],
+    borderWidth: 1, borderColor: p.cardBorder,
   },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { ...typography.label, color: P.muted, fontWeight: '600' },
+  cardLabel: { ...typography.label, color: p.muted, fontWeight: '600' },
 
   chartWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
   chartCol: { flex: 1, alignItems: 'center', gap: 3 },
   chartBarWrap: { height: 60, justifyContent: 'flex-end' },
   chartBar: { borderRadius: 3 },
-  chartLabel: { ...typography.caption, color: colors.text.muted, fontSize: 8, textAlign: 'center' },
+  chartLabel: { ...typography.caption, color: c.text.muted, fontSize: 8, textAlign: 'center' },
 
   entryRow: {
     flexDirection: 'row', gap: spacing[3], alignItems: 'flex-start',
@@ -1149,10 +1186,10 @@ const styles = StyleSheet.create({
   entryTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   entryMoodLabel: { ...typography.label, fontWeight: '700', fontSize: 13 },
   entryEnergy: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  entryEnergyText: { ...typography.caption, color: colors.text.muted, fontSize: 10 },
+  entryEnergyText: { ...typography.caption, color: c.text.muted, fontSize: 10 },
   entryEnergyEmoji: { fontSize: 12 },
-  entryDate: { ...typography.caption, color: colors.text.muted, marginLeft: 'auto' },
-  entryNote: { ...typography.caption, color: colors.text.secondary, lineHeight: 16 },
+  entryDate: { ...typography.caption, color: c.text.muted, marginLeft: 'auto' },
+  entryNote: { ...typography.caption, color: c.text.secondary, lineHeight: 16 },
 
   entryTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginTop: 2 },
   entryTagChip: {
@@ -1161,9 +1198,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(244,114,182,0.08)',
     borderWidth: 1, borderColor: 'rgba(244,114,182,0.22)',
   },
-  entryTagText: { fontSize: 9, fontWeight: '600', color: P.muted },
+  entryTagText: { fontSize: 9, fontWeight: '600', color: p.muted },
 
   empty: { alignItems: 'center', paddingVertical: spacing[12], gap: spacing[2] },
-  emptyTitle: { ...typography.h3, color: colors.text.secondary },
-  emptySub: { ...typography.body, color: colors.text.muted, textAlign: 'center' },
+  emptyTitle: { ...typography.h3, color: c.text.secondary },
+  emptySub: { ...typography.body, color: c.text.muted, textAlign: 'center' },
 });
