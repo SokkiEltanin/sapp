@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Pressable, Text, View, StyleSheet, Animated, ViewStyle } from 'react-native';
-import { colors, radius, typography, spacing } from '@/theme';
+import { radius, typography, spacing } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -13,7 +14,9 @@ interface Props {
   count?: number; // usage frequency badge (shows when >= 2)
 }
 
-export default function Chip({ label, selected = false, onPress, color = colors.text.primary, style, count }: Props) {
+export default function Chip({ label, selected = false, onPress, color, style, count }: Props) {
+  const c = useColors();
+  const accent = color ?? c.text.primary;
   const scale = useRef(new Animated.Value(1)).current;
 
   return (
@@ -24,14 +27,16 @@ export default function Chip({ label, selected = false, onPress, color = colors.
       style={[
         { transform: [{ scale }] },
         styles.chip,
-        selected ? { backgroundColor: color + '33', borderColor: color } : styles.unselected,
+        selected
+          ? { backgroundColor: accent + '33', borderColor: accent }
+          : { backgroundColor: c.bg.card, borderColor: c.border.default },
         style,
       ]}
     >
-      <Text style={[styles.label, selected ? { color } : styles.unselectedLabel]}>{label}</Text>
+      <Text style={[styles.label, { color: selected ? accent : c.text.secondary }]}>{label}</Text>
       {count != null && count >= 2 && (
-        <View style={[styles.badge, selected && { backgroundColor: color + '44' }]}>
-          <Text style={[styles.badgeText, selected && { color }]}>{count}</Text>
+        <View style={[styles.badge, { backgroundColor: c.border.glass }, selected && { backgroundColor: accent + '44' }]}>
+          <Text style={[styles.badgeText, { color: selected ? accent : c.text.muted }]}>{count}</Text>
         </View>
       )}
     </AnimatedPressable>
@@ -40,35 +45,11 @@ export default function Chip({ label, selected = false, onPress, color = colors.
 
 const styles = StyleSheet.create({
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[1],
-    borderRadius: radius.full,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[1],
+    borderRadius: radius.full, borderWidth: 1, alignSelf: 'flex-start',
   },
-  unselected: {
-    backgroundColor: colors.bg.card,
-    borderColor: colors.border.default,
-  },
-  label: {
-    ...typography.label,
-    fontSize: 12,
-  },
-  unselectedLabel: {
-    color: colors.text.secondary,
-  },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  badgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.text.muted,
-  },
+  label: { ...typography.label, fontSize: 12 },
+  badge: { borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 },
+  badgeText: { fontSize: 9, fontWeight: '700' },
 });

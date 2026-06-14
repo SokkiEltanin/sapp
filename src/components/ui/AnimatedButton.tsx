@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Pressable, StyleSheet, View, Text, Animated } from 'react-native';
-import { colors, radius, typography, spacing } from '@/theme';
+import { radius, typography, spacing } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -15,13 +16,6 @@ interface Props {
   fullWidth?: boolean;
 }
 
-const CONFIG = {
-  primary:   { bg: colors.text.primary,    text: colors.bg.primary,    border: 'transparent' },
-  secondary: { bg: colors.bg.card,         text: colors.text.primary,  border: 'rgba(255,255,255,0.08)' },
-  ghost:     { bg: 'transparent',          text: colors.text.secondary, border: 'rgba(255,255,255,0.12)' },
-  danger:    { bg: colors.accent.danger,   text: colors.white,         border: 'transparent' },
-};
-
 const SIZES = {
   sm: { paddingVertical: spacing[2],  paddingHorizontal: spacing[3],  fontSize: 13 },
   md: { paddingVertical: spacing[3],  paddingHorizontal: spacing[5],  fontSize: 15 },
@@ -32,9 +26,16 @@ export default function AnimatedButton({
   onPress, label, variant = 'primary', size = 'md',
   icon, disabled = false, style, fullWidth = false,
 }: Props) {
+  const c = useColors();
   const scale   = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
 
+  const CONFIG = {
+    primary:   { bg: c.text.primary,    text: c.bg.primary,     border: 'transparent' },
+    secondary: { bg: c.bg.card,         text: c.text.primary,   border: c.border.default },
+    ghost:     { bg: 'transparent',     text: c.text.secondary, border: c.border.glass },
+    danger:    { bg: c.accent.danger,   text: '#FFFFFF',        border: 'transparent' },
+  };
   const cfg = CONFIG[variant];
   const s   = SIZES[size];
 
