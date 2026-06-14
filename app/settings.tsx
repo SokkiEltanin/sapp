@@ -158,6 +158,34 @@ export default function SettingsScreen() {
     };
   }, [events, gcalEvents, expenses, workSettings]);
 
+  // Ask (once per detected month) to confirm the auto-detected paycheck + hours.
+  // "Tak" saves it as a confirmed month → it joins the averaged rate forever.
+  useEffect(() => {
+    if (!workDiag) return;
+    const m = workDiag.basisMonth;
+    const sal = workDiag.salaryUsed, hrs = workDiag.hoursUsed;
+    if (!m || !(sal > 0) || !(hrs > 0)) return;
+    if (workSettings.confirmedMonths?.[m]) return;
+    (async () => {
+      try {
+        if (await AsyncStorage.getItem('work_confirm_asked') === m) return;
+        await AsyncStorage.setItem('work_confirm_asked', m);
+        Alert.alert(
+          'Potwierdź miesiąc pracy',
+          `Za ${m}: wypłata ${Math.round(sal)} zł, ${Math.round(hrs)} h = ${(sal / hrs).toFixed(2)} zł/h.\n\nZgadza się? Zapiszę go do średniej stawki.`,
+          [
+            { text: 'Nie', style: 'cancel' },
+            { text: 'Tak, zapisz', onPress: () => {
+                const s = { ...workSettings, confirmedMonths: { ...(workSettings.confirmedMonths ?? {}), [m]: { salary: Math.round(sal), hours: Math.round(hrs) } } };
+                setWorkSettings(s); workService.saveSettings(s).catch(() => {});
+                toast.success('Zapisano do średniej stawki');
+              } },
+          ],
+        );
+      } catch {}
+    })();
+  }, [workDiag, workSettings]);
+
   const [workPrefix, setWorkPrefix] = useState(workSettings.workPrefix ?? '');
   // Editable overrides for the two inputs the rate is built from. Empty = use the
   // value the app reads (previous-month calendar hours / last [JD] paycheck).
@@ -630,7 +658,11 @@ export default function SettingsScreen() {
               </View>
             )}
 
-            <ConfirmedMonths />
+            <ConfirmedMonths
+              detectedMonth={workDiag?.basisMonth}
+              detectedSalary={workDiag?.salaryUsed}
+              detectedHours={workDiag?.hoursUsed}
+            />
           </View>
         </View>
 
