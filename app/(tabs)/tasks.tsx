@@ -18,10 +18,12 @@ import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { Task } from '@/types';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { notificationsService } from '@/services/notificationsService';
 import { useUiActions } from '@/store/uiActions';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
+// Green/red accents stay both themes; the dark surfaces flip via gFor(c).
 
 const G = {
   card:         '#28443A',
@@ -31,6 +33,16 @@ const G = {
   overdueCard:  '#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
 };
+function gFor(c: any) {
+  return {
+    card: c.bg.card,
+    cardBorder: 'rgba(42,198,143,0.22)',
+    accent: '#2AC68F',
+    accentDim: 'rgba(42,198,143,0.18)',
+    overdueCard: c.bg.card,
+    overdueBorder: 'rgba(255,107,107,0.30)',
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -164,6 +176,9 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
   onEdit: (task: Task) => void;
   onEditDirect: (task: Task) => void;
 }) {
+  const colors = useColors();
+  const G = useMemo(() => gFor(colors), [colors]);
+  const s = useMemo(() => makeS(colors, G), [colors, G]);
   const overdue  = task.status !== 'done' && task.status !== 'snoozed' && !!task.deadline && task.deadline.split('T')[0] < todayStr();
   const isDone   = task.status === 'done';
   const subtitle = taskSubtitle(task, pomodoroTaskId);
@@ -259,6 +274,9 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   onAddSubtask: (taskId: string, title: string) => void; onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onSnooze: (id: string, until: Date) => void; onPomodoro: (task: Task) => void;
 }) {
+  const colors = useColors();
+  const G = useMemo(() => gFor(colors), [colors]);
+  const dm = useMemo(() => makeDm(colors, G), [colors, G]);
   const [newMilestone, setNewMilestone] = useState('');
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -353,40 +371,42 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
   );
 }
 
-const dm = StyleSheet.create({
+const makeDm = (c: any, g: any) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   kav: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: G.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: G.cardBorder, maxHeight: '85%', paddingBottom: 32 },
-  header: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing[5], gap: spacing[3], borderBottomWidth: 1, borderBottomColor: G.cardBorder },
+  sheet: { backgroundColor: g.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: g.cardBorder, maxHeight: '85%', paddingBottom: 32 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', padding: spacing[5], gap: spacing[3], borderBottomWidth: 1, borderBottomColor: g.cardBorder },
   headerLeft: { flex: 1, gap: 4 },
-  dateLabel: { fontSize: 10, color: G.accent, fontWeight: '700', letterSpacing: 1.5 },
-  titleText: { fontSize: 20, fontWeight: '800', color: colors.white, letterSpacing: 0.5, lineHeight: 26 },
-  descText:  { fontSize: 13, color: colors.text.secondary, lineHeight: 19, marginTop: 4 },
+  dateLabel: { fontSize: 10, color: g.accent, fontWeight: '700', letterSpacing: 1.5 },
+  titleText: { fontSize: 20, fontWeight: '800', color: c.white, letterSpacing: 0.5, lineHeight: 26 },
+  descText:  { fontSize: 13, color: c.text.secondary, lineHeight: 19, marginTop: 4 },
   closeBtn:  { padding: 4 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  tagChip: { fontSize: 10, fontWeight: '600', color: G.accent + '80' },
+  tagChip: { fontSize: 10, fontWeight: '600', color: g.accent + '80' },
   body: { paddingHorizontal: spacing[5], paddingTop: spacing[4] },
   milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: 'rgba(46,222,160,0.08)' },
-  milestoneText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
-  milestoneDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  milestoneText: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '500' },
+  milestoneDone: { textDecorationLine: 'line-through', color: c.text.muted },
   addMilestoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3] },
-  milestoneInput: { flex: 1, fontSize: 12, color: colors.text.primary, fontWeight: '700', letterSpacing: 1 },
-  footer: { flexDirection: 'row', gap: spacing[3], paddingHorizontal: spacing[5], paddingTop: spacing[4], borderTopWidth: 1, borderTopColor: G.cardBorder },
-  footerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: spacing[3], backgroundColor: G.accentDim, borderRadius: radius.lg, borderWidth: 1, borderColor: G.cardBorder },
-  footerBtnDanger: { backgroundColor: colors.accent.red + '15', borderColor: colors.accent.red + '30' },
-  footerBtnSnooze: { backgroundColor: colors.accent.amber + '15', borderColor: colors.accent.amber + '30' },
+  milestoneInput: { flex: 1, fontSize: 12, color: c.text.primary, fontWeight: '700', letterSpacing: 1 },
+  footer: { flexDirection: 'row', gap: spacing[3], paddingHorizontal: spacing[5], paddingTop: spacing[4], borderTopWidth: 1, borderTopColor: g.cardBorder },
+  footerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: spacing[3], backgroundColor: g.accentDim, borderRadius: radius.lg, borderWidth: 1, borderColor: g.cardBorder },
+  footerBtnDanger: { backgroundColor: c.accent.red + '15', borderColor: c.accent.red + '30' },
+  footerBtnSnooze: { backgroundColor: c.accent.amber + '15', borderColor: c.accent.amber + '30' },
   footerBtnPom: { backgroundColor: 'rgba(43,200,224,0.12)', borderColor: 'rgba(43,200,224,0.30)' },
-  footerBtnText: { fontSize: 13, fontWeight: '700', color: G.accent },
-  snoozeSheet: { borderTopWidth: 1, borderTopColor: G.cardBorder, paddingHorizontal: spacing[5], paddingTop: spacing[3], paddingBottom: spacing[2], gap: 0 },
+  footerBtnText: { fontSize: 13, fontWeight: '700', color: g.accent },
+  snoozeSheet: { borderTopWidth: 1, borderTopColor: g.cardBorder, paddingHorizontal: spacing[5], paddingTop: spacing[3], paddingBottom: spacing[2], gap: 0 },
   snoozeHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingBottom: spacing[3] },
-  snoozeTitle: { flex: 1, fontSize: 11, fontWeight: '700', color: colors.accent.amber, letterSpacing: 1.2, textTransform: 'uppercase' },
+  snoozeTitle: { flex: 1, fontSize: 11, fontWeight: '700', color: c.accent.amber, letterSpacing: 1.2, textTransform: 'uppercase' },
   snoozeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderTopWidth: 1, borderTopColor: 'rgba(46,222,160,0.06)' },
-  snoozeRowText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text.secondary },
+  snoozeRowText: { flex: 1, fontSize: 14, fontWeight: '600', color: c.text.secondary },
 });
 
 // ─── Sort sheet ───────────────────────────────────────────────────────────────
 
 function SortSheet({ sort, onSelect, onClose, visible }: { sort: SortKey; onSelect: (k: SortKey) => void; onClose: () => void; visible: boolean }) {
+  const colors = useColors();
+  const ss = useMemo(() => makeSs(colors, null), [colors]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={ss.overlay} onPress={onClose} />
@@ -407,16 +427,16 @@ function SortSheet({ sort, onSelect, onClose, visible }: { sort: SortKey; onSele
   );
 }
 
-const ss = StyleSheet.create({
+const makeSs = (c: any, g: any) => StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#0A1A10', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing[5], paddingBottom: 40, borderWidth: 1, borderBottomWidth: 0, borderColor: G.cardBorder, gap: spacing[1] },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: G.accentDim, alignSelf: 'center', marginBottom: spacing[3] },
-  heading: { fontSize: 13, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.2, marginBottom: spacing[2] },
+  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#0A1A10', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing[5], paddingBottom: 40, borderWidth: 1, borderBottomWidth: 0, borderColor: g.cardBorder, gap: spacing[1] },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: g.accentDim, alignSelf: 'center', marginBottom: spacing[3] },
+  heading: { fontSize: 13, fontWeight: '700', color: c.text.muted, letterSpacing: 1.2, marginBottom: spacing[2] },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], paddingHorizontal: spacing[3], borderRadius: radius.lg, gap: spacing[3] },
-  rowActive: { backgroundColor: G.accentDim },
-  label: { fontSize: 15, fontWeight: '600', color: colors.text.secondary },
-  labelActive: { color: G.accent },
-  sub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  rowActive: { backgroundColor: g.accentDim },
+  label: { fontSize: 15, fontWeight: '600', color: c.text.secondary },
+  labelActive: { color: g.accent },
+  sub: { fontSize: 11, color: c.text.muted, marginTop: 2 },
 });
 
 // ─── Swipe row ────────────────────────────────────────────────────────────────
@@ -426,6 +446,9 @@ function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQu
   onComplete: (task: Task) => void; onEdit: (task: Task) => void;
   onEditDirect: (task: Task) => void; onQuickSnooze: (id: string) => void;
 }) {
+  const colors = useColors();
+  const G = useMemo(() => gFor(colors), [colors]);
+  const sw = useMemo(() => makeSw(colors, G), [colors, G]);
   const swRef = useRef<SwipeableMethods>(null);
   const isDone = task.status === 'done';
   return (
@@ -454,17 +477,20 @@ function SwipeRow({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect, onQu
   );
 }
 
-const sw = StyleSheet.create({
-  leftReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 8, backgroundColor: G.accent, borderRadius: 18 },
-  leftRevealDone: { backgroundColor: G.accentDim },
-  rightReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 20, gap: 8, backgroundColor: colors.accent.amber, borderRadius: 18 },
-  revealText: { fontSize: 10, fontWeight: '800', color: G.card, letterSpacing: 0.8 },
-  revealTextDone: { color: G.accent },
+const makeSw = (c: any, g: any) => StyleSheet.create({
+  leftReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 8, backgroundColor: g.accent, borderRadius: 18 },
+  leftRevealDone: { backgroundColor: g.accentDim },
+  rightReveal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 20, gap: 8, backgroundColor: c.accent.amber, borderRadius: 18 },
+  revealText: { fontSize: 10, fontWeight: '800', color: g.card, letterSpacing: 0.8 },
+  revealTextDone: { color: g.accent },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TasksScreen() {
+  const colors = useColors();
+  const G = useMemo(() => gFor(colors), [colors]);
+  const s = useMemo(() => makeS(colors, G), [colors, G]);
   const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
   const pomodoroTaskId = usePomodoroStore(s => s.taskId ?? undefined);
   const startPomodoro  = usePomodoroStore(s => s.startFor);
@@ -587,14 +613,14 @@ export default function TasksScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any, g: any) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[3],
   },
-  title:    { fontSize: 28, fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  title:    { fontSize: 28, fontWeight: '800', color: c.white, letterSpacing: -0.5 },
+  subtitle: { fontSize: 12, color: c.text.muted, marginTop: 2 },
 
   list: { paddingHorizontal: spacing[4], paddingBottom: 180, gap: spacing[2] },
 
@@ -618,21 +644,21 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
   },
   doneBtnActive: {
-    backgroundColor: G.accentDim,
-    borderColor: G.accent + '70',
+    backgroundColor: g.accentDim,
+    borderColor: g.accent + '70',
   },
   toggleTrack: {
     width: 54, height: 28, borderRadius: 14,
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 7, justifyContent: 'space-between',
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: G.cardBorder,
+    borderWidth: 1, borderColor: g.cardBorder,
   },
-  toggleTrackDone: { backgroundColor: 'rgba(46,222,160,0.18)', borderColor: G.accent + '70' },
+  toggleTrackDone: { backgroundColor: 'rgba(46,222,160,0.18)', borderColor: g.accent + '70' },
   toggleDot: { width: 12, height: 12, borderRadius: 6 },
   toggleDotLeft:   { backgroundColor: 'rgba(255,255,255,0.22)' },
   toggleDotRight:  { backgroundColor: 'rgba(255,255,255,0.10)' },
-  toggleDotActive: { backgroundColor: G.accent },
+  toggleDotActive: { backgroundColor: g.accent },
 
   editBtn: {
     width: 28, height: 28, borderRadius: 8,
@@ -643,35 +669,35 @@ const s = StyleSheet.create({
 
   cardContent: { flex: 1, gap: 3 },
   cardTitle: {
-    fontSize: 13, fontWeight: '800', color: colors.white,
+    fontSize: 13, fontWeight: '800', color: c.white,
     letterSpacing: 0.3, lineHeight: 18,
   },
-  cardTitleDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  cardTitleDone: { textDecorationLine: 'line-through', color: c.text.muted },
   cardSub: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
-  cardMilestones: { fontSize: 9, color: colors.text.muted },
+  cardMilestones: { fontSize: 9, color: c.text.muted },
   pomoPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(77,217,245,0.10)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
   pomoPillText: { fontSize: 9, fontWeight: '700', color: '#4DD9F5' },
   recurPill: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },
   tagPill: { backgroundColor: 'rgba(108,158,255,0.10)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(108,158,255,0.20)' },
-  tagPillText: { fontSize: 8, fontWeight: '600', color: colors.accent.blue + 'CC' },
+  tagPillText: { fontSize: 8, fontWeight: '600', color: c.accent.blue + 'CC' },
 
   // ── Section headers ────────────────────────────────────────────────────────
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginVertical: spacing[3] },
   sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
   sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  sectionLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5 },
+  sectionLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
   sectionBadge: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
-  sectionBadgeText: { fontSize: 9, fontWeight: '700', color: colors.text.muted },
+  sectionBadgeText: { fontSize: 9, fontWeight: '700', color: c.text.muted },
 
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[4], marginBottom: spacing[1], paddingHorizontal: spacing[1] },
   groupDot: { width: 6, height: 6, borderRadius: 3 },
   groupLabel: { flex: 1, fontSize: 9, fontWeight: '800', letterSpacing: 1.6 },
-  groupCount: { fontSize: 9, fontWeight: '700', color: colors.text.muted, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  groupCount: { fontSize: 9, fontWeight: '700', color: c.text.muted, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
 
   // ── Empty ──────────────────────────────────────────────────────────────────
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text.secondary },
-  emptySub:   { fontSize: 13, color: colors.text.muted },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: c.text.secondary },
+  emptySub:   { fontSize: 13, color: c.text.muted },
 
 });
