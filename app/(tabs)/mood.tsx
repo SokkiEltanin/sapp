@@ -847,12 +847,13 @@ export default function MoodScreen() {
 
   const today = todayStr();
   const todayEntry = useMemo(() => entries.find(e => e.date === today) ?? null, [entries, today]);
+  const todayCount = useMemo(() => entries.filter(e => e.date === today).length, [entries, today]);
 
   // Auto-open check-in modal when navigated from notification.
   useFocusEffect(
     useCallback(() => {
       if (openCheckIn === 'true') {
-        setEditingEntry(todayEntry);
+        setEditingEntry(null);   // notification → log a NEW entry (mood is multi/day)
         setModalOpen(true);
       }
     }, [openCheckIn, todayEntry]),
@@ -945,7 +946,7 @@ export default function MoodScreen() {
         subtitle="Twoje samopoczucie"
         accentColor={P.accent}
         rightSlot={
-          <PressableScale onPress={() => { haptic.tap(); setModalOpen(true); }} style={styles.addBtn}>
+          <PressableScale onPress={() => { haptic.tap(); openCheckin(null); }} style={styles.addBtn}>
             <Plus size={17} color={colors.bg.primary} />
           </PressableScale>
         }
@@ -958,7 +959,7 @@ export default function MoodScreen() {
       >
         {/* Today hero */}
         <View>
-          <PressableScale onPress={() => { haptic.tap(); openCheckin(todayEntry); }}>
+          <PressableScale onPress={() => { haptic.tap(); openCheckin(null); }}>
             <View style={styles.heroCard}>
               <View style={styles.heroRow}>
                 <View style={[styles.moodBubble, { borderColor: todayColor + '44' }]}>
@@ -969,7 +970,7 @@ export default function MoodScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.heroMeta}>
-                    {todayEntry ? 'Dzisiaj' : 'Check-in'}
+                    {todayCount > 1 ? `Dzisiaj · ${todayCount} wpisy` : todayEntry ? 'Dzisiaj · dotknij, by dodać' : 'Check-in'}
                   </Text>
                   <Text style={[styles.heroMood, { color: todayEntry ? todayColor : colors.text.secondary }]}>
                     {todayEntry ? MOOD_LABELS[todayEntry.mood] : 'Jak się czujesz?'}

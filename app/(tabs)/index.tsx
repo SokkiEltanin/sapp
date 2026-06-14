@@ -696,15 +696,16 @@ export default function DashboardScreen() {
   // ── Quick mood handler ────────────────────────────────────────────────────
   const handleQuickMood = useCallback(async (level: MoodLevel) => {
     haptic.tap();
-    if (todayEntry) { openCheckIn(); return; }
     try {
       const entry = await moodService.add({ date: todayStr(), mood: level, energy: 3, tags: [] });
       addEntry(entry);
+      const n = moodEntries.filter(e => e.date === todayStr()).length + 1; // +1 = the one just added
+      toast.success(n > 1 ? `Zapisano nastrój · ${n}. raz dziś` : 'Zapisano nastrój');
     } catch {
       haptic.error();
       toast.error('Nie zapisano nastroju — spróbuj ponownie');
     }
-  }, [todayEntry, openCheckIn, addEntry]);
+  }, [addEntry, moodEntries]);
 
   // ── Pomodoro history ──────────────────────────────────────────────────────
   const loadPomSessions = useCallback(async () => {

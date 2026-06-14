@@ -58,6 +58,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const { addEntry, updateEntry, entries: allEntries } = useMoodStore();
   const chipColor = mood ? MOOD_COLORS[mood] : undefined;
 
+  // You can log mood several times a day. Show which check-in of the day this is.
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayCount = useMemo(() => allEntries.filter(e => e.date === todayStr).length, [allEntries, todayStr]);
+  const ordinal = existingEntry ? null : todayCount + 1;
+
   // Tag usage frequency across all past entries
   const tagFrequency = useMemo(() => {
     const map = new Map<string, number>();
@@ -186,10 +191,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>
-                {existingEntry ? 'Edytuj check-in' : 'Jak się czujesz?'}
+                {existingEntry ? 'Edytuj check-in' : ordinal === 1 ? 'Jak się czujesz?' : `Humor ${ordinal}. raz dziś`}
               </Text>
               <Text style={styles.subtitle}>
                 {new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                {!existingEntry && todayCount > 0 ? ` · masz już ${todayCount} dziś` : ''}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>

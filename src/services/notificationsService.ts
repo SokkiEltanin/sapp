@@ -116,8 +116,8 @@ export const notificationsService = {
     return Notifications.scheduleNotificationAsync({
       identifier: 'daily-mood',
       content: {
-        title: 'Codzienny check-in',
-        body: 'Jak minął dzień? Zaloguj swój nastrój.',
+        title: 'Nie zapisałeś dziś humoru',
+        body: 'Zarejestruj nastrój za dziś. Jedno tapnięcie.',
         data: { screen: 'mood' },
       },
       trigger: {
@@ -132,8 +132,8 @@ export const notificationsService = {
     return Notifications.scheduleNotificationAsync({
       identifier: 'morning-mood',
       content: {
-        title: 'Dzień dobry',
-        body: 'Jak się czujesz z rana? Zaloguj energię i nastrój.',
+        title: 'Zarejestruj poranny nastrój',
+        body: 'Zapisz energię i humor na start dnia.',
         data: { screen: 'mood' },
       },
       trigger: {
@@ -182,8 +182,8 @@ export const notificationsService = {
     return Notifications.scheduleNotificationAsync({
       identifier: 'daily-habits',
       content: {
-        title: 'Nawyki na dziś',
-        body: 'Nie zapomnij o codziennych nawykach!',
+        title: 'Nie odhaczyłeś dziś nawyków',
+        body: 'Masz nawyki do zrobienia na dziś.',
         data: { screen: 'habits' },
       },
       trigger: {
