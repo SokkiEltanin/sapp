@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -15,6 +15,7 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { MOOD_COLORS } from '@/types';
 import { getHealthGoals } from '@/utils/healthGoals';
+import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
 import { colors, spacing, radius, typography } from '@/theme';
 
@@ -49,6 +50,19 @@ function dateKey(d: Date) {
 function todayKey() { return dateKey(new Date()); }
 
 export default function HealthScreen() {
+  // Theme-reactive: shadow the module `colors`/`T` so the whole screen (incl. its
+  // StyleSheet via makeStyles) flips with light/dark. Teal accent stays both ways.
+  const colors = useColors();
+  const T = useMemo(() => ({
+    card: colors.bg.card,
+    cardBorder: 'rgba(78,203,168,0.22)',
+    accent: '#4ECBA8',
+    accentDim: 'rgba(78,203,168,0.14)',
+    muted: 'rgba(78,203,168,0.55)',
+  }), [colors]);
+  const styles = useMemo(() => makeStyles(colors, T), [colors, T]);
+  const wm = useMemo(() => makeWm(colors, T), [colors, T]);
+
   const [stepGoal, setStepGoal]         = useState(10_000);
   const [waterGoal, setWaterGoal]       = useState(8);
   const [water, setWater]               = useState(0);
@@ -630,13 +644,13 @@ export default function HealthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any, t: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
   syncBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.lg,
-    backgroundColor: T.accent + '14', borderWidth: 1, borderColor: T.accent + '33',
+    backgroundColor: t.accent + '14', borderWidth: 1, borderColor: t.accent + '33',
   },
   syncText: { fontSize: 13, fontWeight: '700' },
   hcGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
@@ -644,19 +658,19 @@ const styles = StyleSheet.create({
     width: '31%', flexGrow: 1, gap: 3, paddingVertical: spacing[2], paddingHorizontal: spacing[2],
     borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  hcVal: { fontSize: 17, fontWeight: '800', color: colors.text.primary },
-  hcUnit: { fontSize: 10, fontWeight: '600', color: colors.text.muted },
-  hcLabel: { fontSize: 10, color: colors.text.muted },
-  syncFallback: { fontSize: 11, color: colors.text.muted, textAlign: 'center', textDecorationLine: 'underline', marginTop: -spacing[1] },
+  hcVal: { fontSize: 17, fontWeight: '800', color: c.text.primary },
+  hcUnit: { fontSize: 10, fontWeight: '600', color: c.text.muted },
+  hcLabel: { fontSize: 10, color: c.text.muted },
+  syncFallback: { fontSize: 11, color: c.text.muted, textAlign: 'center', textDecorationLine: 'underline', marginTop: -spacing[1] },
 
   card: { gap: spacing[3] },
-  tealCard: { gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },
-  tealPomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: T.card, borderColor: T.cardBorder },
+  tealCard: { gap: spacing[3], backgroundColor: t.card, borderColor: t.cardBorder },
+  tealPomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: t.card, borderColor: t.cardBorder },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { fontSize: 10, fontWeight: '600', color: T.muted, letterSpacing: 1.2 },
+  cardLabel: { fontSize: 10, fontWeight: '600', color: t.muted, letterSpacing: 1.2 },
 
   heroNum: { fontSize: 44, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
-  heroSub: { ...typography.caption, color: colors.text.muted },
+  heroSub: { ...typography.caption, color: c.text.muted },
 
   progressTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.full },
@@ -678,9 +692,9 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   sleepDurCenter: { flex: 1, alignItems: 'center', gap: 2 },
-  sleepDurNum: { fontSize: 32, fontWeight: '900', color: colors.text.primary, letterSpacing: -1 },
-  sleepDurUnit: { fontSize: 13, fontWeight: '400', color: colors.text.muted },
-  sleepDurSub: { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
+  sleepDurNum: { fontSize: 32, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
+  sleepDurUnit: { fontSize: 13, fontWeight: '400', color: c.text.muted },
+  sleepDurSub: { fontSize: 11, color: c.text.muted, fontWeight: '500' },
 
   minuteRow: { flexDirection: 'row', gap: spacing[2] },
   minutePill: {
@@ -690,11 +704,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   minutePillActive: {
-    backgroundColor: T.accentDim,
-    borderColor: T.cardBorder,
+    backgroundColor: t.accentDim,
+    borderColor: t.cardBorder,
   },
-  minuteText: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
-  minuteTextActive: { color: T.accent, fontWeight: '700' },
+  minuteText: { fontSize: 12, color: c.text.muted, fontWeight: '500' },
+  minuteTextActive: { color: t.accent, fontWeight: '700' },
 
   microBar: { height: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
   microFill: { height: '100%', borderRadius: radius.full },
@@ -712,51 +726,51 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
   },
-  qualityText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  qualityText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
 
   sleepChartRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1] },
   sleepChartCol: { flex: 1, alignItems: 'center', gap: 3 },
   sleepBarWrap: { height: 60, justifyContent: 'flex-end', alignItems: 'center' },
   sleepBar: { borderRadius: 3, minHeight: 3 },
-  sleepBarLabel: { fontSize: 8, color: colors.text.muted },
+  sleepBarLabel: { fontSize: 8, color: c.text.muted },
 
   // Pomodoro row (base — overridden by tealPomRow inline)
   pomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   pomLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flex: 1 },
-  pomNum: { fontSize: 22, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  pomUnit: { fontSize: 11, fontWeight: '400', color: colors.text.muted },
+  pomNum: { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  pomUnit: { fontSize: 11, fontWeight: '400', color: c.text.muted },
   pomCta: {
     paddingHorizontal: spacing[4], paddingVertical: 8,
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: radius.sm, borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
-  pomCtaText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+  pomCtaText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
 
   chartRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1] },
   chartCol: { flex: 1, alignItems: 'center', gap: 4 },
   chartBarWrap: { height: 84, justifyContent: 'flex-end', alignItems: 'center' },
   chartBar: { borderRadius: 3, minHeight: 4 },
-  chartDay: { ...typography.caption, color: colors.text.muted, fontSize: 9 },
-  chartDayToday: { color: colors.text.primary, fontWeight: '700' },
-  chartNum: { ...typography.caption, color: colors.text.muted, fontSize: 8 },
+  chartDay: { ...typography.caption, color: c.text.muted, fontSize: 9 },
+  chartDayToday: { color: c.text.primary, fontWeight: '700' },
+  chartNum: { ...typography.caption, color: c.text.muted, fontSize: 8 },
 
-  waterCount: { ...typography.label, color: colors.text.secondary, fontWeight: '600', marginLeft: 'auto', fontSize: 10 },
+  waterCount: { ...typography.label, color: c.text.secondary, fontWeight: '600', marginLeft: 'auto', fontSize: 10 },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center',
   },
-  glassFilled: { backgroundColor: T.accentDim, borderColor: T.cardBorder },
+  glassFilled: { backgroundColor: t.accentDim, borderColor: t.cardBorder },
   waterCtrl: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[1] },
   ctrlBtn: {
     width: 42, height: 42, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center',
   },
-  waterNum: { fontSize: 26, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  waterSub: { fontSize: 12, fontWeight: '400', color: colors.text.muted },
+  waterNum: { fontSize: 26, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  waterSub: { fontSize: 12, fontWeight: '400', color: c.text.muted },
 
   // Weight
   weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
@@ -773,53 +787,53 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
     alignItems: 'center',
   },
-  weightBtnSmText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  weightBtnSmText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
   weightCenter: { flex: 1, alignItems: 'center', gap: 1 },
-  weightNum: { fontSize: 36, fontWeight: '900', color: colors.text.primary, letterSpacing: -1 },
-  weightUnit: { fontSize: 11, color: colors.text.muted, fontWeight: '500', marginTop: -2 },
+  weightNum: { fontSize: 36, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
+  weightUnit: { fontSize: 11, color: c.text.muted, fontWeight: '500', marginTop: -2 },
   weightChartRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1] },
   weightChartCol: { flex: 1, alignItems: 'center', gap: 3 },
   weightBarWrap: { height: 60, justifyContent: 'flex-end', alignItems: 'center' },
   weightBar: { borderRadius: 3, minHeight: 3 },
-  weightBarLabel: { fontSize: 7, color: colors.text.muted },
+  weightBarLabel: { fontSize: 7, color: c.text.muted },
 
   moodRow: { flexDirection: 'row', gap: spacing[3], alignItems: 'flex-end' },
   moodCol: { flex: 1, alignItems: 'center', gap: 4 },
   moodBar: { width: 10, borderRadius: 5, minHeight: 8 },
   moodNum: { ...typography.caption, fontWeight: '800', fontSize: 11 },
-  moodDate: { ...typography.caption, color: colors.text.muted, fontSize: 9 },
+  moodDate: { ...typography.caption, color: c.text.muted, fontSize: 9 },
 
   note: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[2] },
   noteDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' },
-  noteText: { ...typography.caption, color: colors.text.muted },
+  noteText: { ...typography.caption, color: c.text.muted },
 });
 
-const wm = StyleSheet.create({
+const makeWm = (c: any, t: any) => StyleSheet.create({
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.65)',
   },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: c.bg.secondary,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: spacing[6], paddingBottom: spacing[10],
-    borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border.default,
+    borderWidth: 1, borderBottomWidth: 0, borderColor: c.border.default,
     alignItems: 'center', gap: spacing[3],
   },
-  title: { fontSize: 17, fontWeight: '800', color: colors.text.primary, alignSelf: 'flex-start' },
+  title: { fontSize: 17, fontWeight: '800', color: c.text.primary, alignSelf: 'flex-start' },
   input: {
-    width: '100%', fontSize: 42, fontWeight: '900', color: colors.text.primary,
+    width: '100%', fontSize: 42, fontWeight: '900', color: c.text.primary,
     textAlign: 'center', letterSpacing: -1,
     paddingVertical: spacing[3],
-    borderBottomWidth: 2, borderBottomColor: T.accent + '60',
+    borderBottomWidth: 2, borderBottomColor: t.accent + '60',
   },
-  unit: { fontSize: 13, color: colors.text.muted, fontWeight: '600', alignSelf: 'flex-end', marginTop: -spacing[2] },
+  unit: { fontSize: 13, color: c.text.muted, fontWeight: '600', alignSelf: 'flex-end', marginTop: -spacing[2] },
   saveBtn: {
     width: '100%', paddingVertical: spacing[4],
-    backgroundColor: T.accentDim,
-    borderRadius: radius.lg, borderWidth: 1, borderColor: T.cardBorder,
+    backgroundColor: t.accentDim,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: t.cardBorder,
     alignItems: 'center',
   },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: T.accent },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: t.accent },
 });
