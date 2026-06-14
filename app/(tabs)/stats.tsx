@@ -25,6 +25,7 @@ import { CalendarEvent, Task } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 const VP = {
@@ -71,6 +72,9 @@ interface DayModalProps {
 }
 
 function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps) {
+  const colors = useColors();
+  const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(58,76,156,0.24)', accent: '#3A4C9C', accentDim: 'rgba(58,76,156,0.18)', muted: 'rgba(58,76,156,0.55)' }), [colors]);
+  const dm = useMemo(() => makeDm(colors, VP), [colors, VP]);
   const insets = useSafeAreaInsets();
   const isToday = date === todayStr();
 
@@ -173,7 +177,7 @@ function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps)
   );
 }
 
-const dm = StyleSheet.create({
+const makeDm = (c: any, vp: any) => StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -197,8 +201,8 @@ const dm = StyleSheet.create({
     paddingHorizontal: spacing[4], marginBottom: spacing[4],
   },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dayLabel: { fontSize: 18, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
-  monthLabel: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
+  dayLabel: { fontSize: 18, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
+  monthLabel: { fontSize: 12, color: c.text.muted, marginTop: 2 },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: spacing[3], paddingVertical: 7,
@@ -207,27 +211,27 @@ const dm = StyleSheet.create({
   addBtnText: { fontSize: 12, fontWeight: '700' },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: colors.bg.card,
+    backgroundColor: c.bg.card,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   scrollContent: { paddingHorizontal: spacing[4], paddingBottom: spacing[4], gap: spacing[3] },
   section: { gap: spacing[2] },
   sectionLabel: {
-    fontSize: 9, fontWeight: '700', color: colors.text.muted,
+    fontSize: 9, fontWeight: '700', color: c.text.muted,
     letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 2,
   },
   eventRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
     borderLeftWidth: 3,
   },
   eventInfo: { flex: 1, gap: 3 },
-  eventTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
+  eventTitle: { fontSize: 14, fontWeight: '700', color: c.text.primary },
   eventTime: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  eventTimeText: { fontSize: 11, color: colors.text.muted },
+  eventTimeText: { fontSize: 11, color: c.text.muted },
   gcalBadge: {
     fontSize: 9, fontWeight: '700', color: '#039BE5',
     backgroundColor: '#039BE520', borderRadius: 4,
@@ -239,13 +243,16 @@ const dm = StyleSheet.create({
     borderWidth: 1,
   },
   empty: { alignItems: 'center', paddingVertical: spacing[8], gap: spacing[2] },
-  emptyText: { fontSize: 15, fontWeight: '600', color: colors.text.secondary },
-  emptyHint: { fontSize: 12, color: colors.text.muted },
+  emptyText: { fontSize: 15, fontWeight: '600', color: c.text.secondary },
+  emptyHint: { fontSize: 12, color: c.text.muted },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function CalendarTabScreen() {
+  const colors = useColors();
+  const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(58,76,156,0.24)', accent: '#3A4C9C', accentDim: 'rgba(58,76,156,0.18)', muted: 'rgba(58,76,156,0.55)' }), [colors]);
+  const styles = useMemo(() => makeStyles(colors, VP), [colors, VP]);
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
@@ -614,19 +621,19 @@ export default function CalendarTabScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any, vp: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
 
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   todayBtn: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, borderColor: VP.cardBorder,
-    backgroundColor: VP.accentDim,
+    borderRadius: radius.md, borderWidth: 1, borderColor: vp.cardBorder,
+    backgroundColor: vp.accentDim,
   },
-  todayBtnText: { ...typography.caption, color: VP.accent, fontWeight: '700', fontSize: 11 },
+  todayBtnText: { ...typography.caption, color: vp.accent, fontWeight: '700', fontSize: 11 },
   iconBtn: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: VP.card, borderWidth: 1, borderColor: VP.cardBorder,
+    backgroundColor: vp.card, borderWidth: 1, borderColor: vp.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -637,8 +644,8 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: VP.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: VP.cardBorder,
+    backgroundColor: vp.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: vp.cardBorder,
   },
   monthTitleBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -646,9 +653,9 @@ const styles = StyleSheet.create({
   },
   modeToggle: {
     flexDirection: 'row', gap: 2,
-    backgroundColor: VP.card,
+    backgroundColor: vp.card,
     borderRadius: radius.md, padding: 2,
-    borderWidth: 1, borderColor: VP.cardBorder,
+    borderWidth: 1, borderColor: vp.cardBorder,
   },
   modeBtn: {
     width: 28, height: 26, borderRadius: radius.sm,
@@ -657,43 +664,43 @@ const styles = StyleSheet.create({
   modeBtnActive: {
     backgroundColor: V + '20',
   },
-  monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
-  yearLabel:  { ...typography.caption, color: VP.accent, marginTop: 2, fontWeight: '700' },
+  monthLabel: { ...typography.h3, color: c.text.primary, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  yearLabel:  { ...typography.caption, color: vp.accent, marginTop: 2, fontWeight: '700' },
 
   swipeHint: {
-    fontSize: 9, color: colors.text.muted, textAlign: 'center',
+    fontSize: 9, color: c.text.muted, textAlign: 'center',
     letterSpacing: 0.5, marginTop: spacing[1], marginBottom: spacing[2],
     opacity: 0.6,
   },
 
   gridWrap: {
     marginHorizontal: spacing[2],
-    backgroundColor: VP.card,
+    backgroundColor: vp.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: VP.cardBorder,
+    borderColor: vp.cardBorder,
     paddingTop: spacing[3],
   },
 
   weekCard: {
     marginHorizontal: spacing[2],
-    backgroundColor: VP.card,
+    backgroundColor: vp.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: VP.cardBorder,
+    borderColor: vp.cardBorder,
   },
 
   daySection: { paddingHorizontal: spacing[3], paddingTop: spacing[3], gap: spacing[3] },
   daySectionLabel: {
-    fontSize: 10, fontWeight: '700', color: VP.muted,
+    fontSize: 10, fontWeight: '700', color: vp.muted,
     letterSpacing: 1.4, textTransform: 'uppercase',
   },
 
   timelineWrap: {
-    backgroundColor: VP.card,
+    backgroundColor: vp.card,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: VP.cardBorder,
+    borderColor: vp.cardBorder,
     padding: spacing[3],
     overflow: 'hidden',
   },
@@ -701,7 +708,7 @@ const styles = StyleSheet.create({
   subSection: { gap: spacing[2] },
   subHeader:  { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginBottom: spacing[1] },
   subLabel: {
-    fontSize: 9, fontWeight: '700', color: VP.muted,
+    fontSize: 9, fontWeight: '700', color: vp.muted,
     letterSpacing: 1.2, textTransform: 'uppercase',
   },
 
@@ -710,19 +717,19 @@ const styles = StyleSheet.create({
 
   expenseRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: VP.card, borderRadius: radius.md,
+    backgroundColor: vp.card, borderRadius: radius.md,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
-    borderWidth: 1, borderColor: VP.cardBorder,
+    borderWidth: 1, borderColor: vp.cardBorder,
   },
   expenseDot:   { width: 8, height: 8, borderRadius: 4 },
   expenseInfo:  { flex: 1 },
-  expenseNote:  { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  expenseStore: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
+  expenseNote:  { fontSize: 13, fontWeight: '600', color: c.text.primary },
+  expenseStore: { fontSize: 10, color: c.text.muted, marginTop: 1 },
   expenseAmount: { fontSize: 13, fontWeight: '700' },
   expenseColor:  { color: '#F44336' },
   incomeColor:   { color: '#4CAF50' },
 
   emptyDay:  { alignItems: 'center', paddingVertical: spacing[4], gap: spacing[2] },
-  emptyText: { ...typography.label, color: colors.text.secondary },
-  emptyHint: { ...typography.caption, color: colors.text.muted },
+  emptyText: { ...typography.label, color: c.text.secondary },
+  emptyHint: { ...typography.caption, color: c.text.muted },
 });
