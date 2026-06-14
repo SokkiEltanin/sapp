@@ -25,6 +25,7 @@ import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
 import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 const F = {
@@ -101,6 +102,17 @@ function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
 }
 
 export default function FinancesScreen() {
+  // Theme-reactive: shadow module colors/F so the screen + its StyleSheet flip.
+  const colors = useColors();
+  const F = useMemo(() => ({
+    card: colors.bg.card,
+    cardBorder: 'rgba(228,52,52,0.24)',
+    accent: '#E43434',
+    accentDim: 'rgba(228,52,52,0.14)',
+    muted: 'rgba(228,52,52,0.55)',
+  }), [colors]);
+  const st = useMemo(() => makeStyles(colors, F), [colors, F]);
+
   const { timeOfDay } = useTimeAccent();
   const { grouped, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
@@ -487,12 +499,12 @@ export default function FinancesScreen() {
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any, f: any) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg.primary },
 
   hBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: F.card, borderWidth: 1, borderColor: F.cardBorder,
+    backgroundColor: f.card, borderWidth: 1, borderColor: f.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -519,10 +531,10 @@ const st = StyleSheet.create({
     padding: spacing[5],
     gap: spacing[2],
   },
-  heroDate:      { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5 },
+  heroDate:      { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
   heroAmount:    { fontSize: 42, fontWeight: '800', color: '#FFFFFF', letterSpacing: -2, lineHeight: 46 },
-  heroCurrency:  { fontSize: 20, fontWeight: '600', color: colors.text.muted, paddingBottom: 4 },
+  heroCurrency:  { fontSize: 20, fontWeight: '600', color: c.text.muted, paddingBottom: 4 },
   heroSub:       { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
   heroSub2:      { fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginTop: 2 },
   heroSubStrong: { color: '#FFFFFF', fontWeight: '800' },
@@ -533,57 +545,57 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginHorizontal: spacing[4], marginBottom: spacing[3],
   },
-  scopeLabel: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  scopeLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   scopeToggle: {
     flexDirection: 'row', gap: 2, marginLeft: 'auto',
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, padding: 2,
   },
   scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
-  scopeBtnOn: { backgroundColor: colors.accent.blue + '30' },
-  scopeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
-  scopeBtnTextOn: { color: colors.accent.blue },
+  scopeBtnOn: { backgroundColor: c.accent.blue + '30' },
+  scopeBtnText: { fontSize: 11, fontWeight: '700', color: c.text.muted },
+  scopeBtnTextOn: { color: c.accent.blue },
 
   // ── Chart card ──────────────────────────────────────────────────────────────
   chartCard: {
     marginHorizontal: spacing[4], marginBottom: spacing[3],
-    backgroundColor: F.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: F.cardBorder,
+    backgroundColor: f.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: f.cardBorder,
     padding: spacing[4], gap: spacing[2],
   },
   chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chartTitle: { fontSize: 11, fontWeight: '800', color: F.accent, letterSpacing: 1 },
+  chartTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
   toggle: {
     flexDirection: 'row', gap: 2, backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: radius.full, padding: 2,
   },
   toggleBtn: { paddingHorizontal: spacing[3], paddingVertical: 4, borderRadius: radius.full },
-  toggleBtnOn: { backgroundColor: F.accent + '25' },
-  toggleText: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
-  toggleTextOn: { color: F.accent },
+  toggleBtnOn: { backgroundColor: f.accent + '25' },
+  toggleText: { fontSize: 10, fontWeight: '700', color: c.text.muted },
+  toggleTextOn: { color: f.accent },
   chartTotalsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   chartTotal: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1 },
-  chartTotalUnit: { fontSize: 14, fontWeight: '600', color: colors.text.muted },
+  chartTotalUnit: { fontSize: 14, fontWeight: '600', color: c.text.muted },
   chartLegend: { gap: 3, alignItems: 'flex-end', paddingBottom: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendDash: { width: 10, height: 2, borderRadius: 1 },
-  legendText: { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
+  legendText: { fontSize: 10, color: c.text.muted, fontWeight: '500' },
   chartValues: { flexDirection: 'row', marginBottom: 2 },
   chartValue: { flex: 1, fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.55)', textAlign: 'center' },
   chartLabels: { flexDirection: 'row' },
-  chartLabel: { flex: 1, fontSize: 9, fontWeight: '600', color: colors.text.muted, textAlign: 'center' },
+  chartLabel: { flex: 1, fontSize: 9, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
 
   // ── Tag filters ───────────────────────────────────────────────────────────────
   tagRow: { paddingHorizontal: spacing[4], gap: spacing[2] },
   tagChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    backgroundColor: F.card, borderRadius: radius.full,
-    borderWidth: 1, borderColor: F.cardBorder,
+    backgroundColor: f.card, borderRadius: radius.full,
+    borderWidth: 1, borderColor: f.cardBorder,
   },
-  tagChipOn: { backgroundColor: F.accent + '18', borderColor: F.accent + '55' },
-  tagText:   { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  tagTextOn: { color: F.accent },
+  tagChipOn: { backgroundColor: f.accent + '18', borderColor: f.accent + '55' },
+  tagText:   { fontSize: 11, fontWeight: '600', color: c.text.muted },
+  tagTextOn: { color: f.accent },
 
   // ── Section header ────────────────────────────────────────────────────────────
   sectionHeader: {
@@ -591,14 +603,14 @@ const st = StyleSheet.create({
     paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[2],
   },
   sectionLine:  { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
-  sectionTitle: { fontSize: 11, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '700' },
+  sectionTitle: { fontSize: 11, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '700' },
   sectionTotal: { fontSize: 11, fontWeight: '700', color: 'rgba(228,52,52,0.55)', letterSpacing: 0.3 },
 
   itemPad: { paddingHorizontal: spacing[4] },
 
   // ── Empty state ───────────────────────────────────────────────────────────────
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },
-  emptyTitle: { fontSize: 17, fontWeight: '800', color: colors.text.secondary },
-  emptySub:   { fontSize: 13, color: colors.text.muted },
+  emptyTitle: { fontSize: 17, fontWeight: '800', color: c.text.secondary },
+  emptySub:   { fontSize: 13, color: c.text.muted },
 
 });
