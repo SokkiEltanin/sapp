@@ -29,6 +29,7 @@ import { getTagBudgetRules, saveTagBudgetRules, TagBudgetRule, SUGGESTED_TAGS, r
 import { getPayers } from '@/utils/payers';
 import BackupSection from '@/components/settings/BackupSection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
+import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -78,6 +79,8 @@ export default function SettingsScreen() {
   const { expenses } = useExpensesStore();
   const { tasks, events, gcalEvents } = useCalendarStore();
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
+  const themeMode = useThemeStore(s => s.mode);
+  const setThemeMode = useThemeStore(s => s.setMode);
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
   const heroSize = useHeroFont(s => s.sizeScale);
@@ -1102,9 +1105,37 @@ export default function SettingsScreen() {
         <View>
           <Text style={styles.sectionTitle}>Personalizacja</Text>
           <View style={styles.card}>
+            {/* Theme mode — engine is live; screens flip as they're migrated. */}
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#FBBF2418' }]}>
+                  <LucideIcons.SunMoon size={16} color="#FBBF24" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Motyw</Text>
+                  <Text style={styles.rowSub}>Jasny/ciemny — wdrażany ekran po ekranie</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {([['dark', 'Ciemny'], ['light', 'Jasny'], ['system', 'System']] as [ThemeMode, string][]).map(([m, lbl]) => {
+                  const on = themeMode === m;
+                  return (
+                    <PressableScale key={m} onPress={() => { haptic.tap(); setThemeMode(m); }} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#FBBF2422' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#FBBF24' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#FBBF24' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
             <PressableScale
               onPress={() => { useDashboardLayout.getState().requestEdit(); router.push('/(tabs)' as any); }}
-              style={styles.row}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
             >
               <View style={[styles.iconWrap, { backgroundColor: '#6C9EFF18' }]}>
                 <LucideIcons.LayoutDashboard size={16} color="#6C9EFF" />
