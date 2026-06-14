@@ -50,6 +50,7 @@ import { StatCtx, metricById, metricNumber, metricSeries, metricList } from '@/u
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { workService } from '@/services/workService';
@@ -484,6 +485,8 @@ function DashEditRow({
   onRemove: (id: string) => void;
   onEdit?: (id: string) => void;
 }) {
+  const colors = useColors();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const ty = useSharedValue(0);
   const lifted = useSharedValue(0);
 
@@ -547,7 +550,11 @@ function DashEditRow({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
-  const { color: accentColor, greeting, gradientTop, cardBg, cardBgDark, timeOfDay } = useTimeAccent();
+  const colors = useColors();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const { color: accentColor, greeting, gradientTop, cardBg, timeOfDay } = useTimeAccent();
+  // Stat cards flip with the theme; the hero stays immersive (cardBg/gradientTop).
+  const cardBgDark = colors.bg.card;
   const heroFont = heroFontById(useHeroFont(s => s.fontId));
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
@@ -2468,8 +2475,8 @@ export default function DashboardScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg.primary },
   safe: { flex: 1 },
 
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[5] },
@@ -2483,7 +2490,7 @@ const s = StyleSheet.create({
     height: 190,
     borderRadius: radius.xl,
     overflow: 'hidden',
-    backgroundColor: colors.bg.primary,
+    backgroundColor: c.bg.primary,
   },
   moodBlob: {
     position: 'absolute',
@@ -2511,7 +2518,7 @@ const s = StyleSheet.create({
   },
   mainWeatherInfo: { alignItems: 'flex-end' },
   mainWeatherTemp: {
-    fontSize: 18, fontWeight: '700', color: colors.white, lineHeight: 20,
+    fontSize: 18, fontWeight: '700', color: c.white, lineHeight: 20,
   },
   mainWeatherDesc: {
     fontSize: 8, fontWeight: '600', color: 'rgba(255,255,255,0.40)', letterSpacing: 0.6,
@@ -2521,7 +2528,7 @@ const s = StyleSheet.create({
     flex: 1, fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.8,
   },
   mainGreeting: {
-    fontSize: 40, fontWeight: '900', color: colors.white,
+    fontSize: 40, fontWeight: '900', color: c.white,
     letterSpacing: -2, lineHeight: 42,
     textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: { width: 0, height: 2 },
@@ -2530,7 +2537,7 @@ const s = StyleSheet.create({
   mainTaskLine: {
     fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.80)',
   },
-  mainTaskBold: { fontWeight: '900', color: colors.white },
+  mainTaskBold: { fontWeight: '900', color: c.white },
   moodStateRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
   },
@@ -2538,11 +2545,11 @@ const s = StyleSheet.create({
   moodStateName: { fontSize: 12, fontWeight: '700' },
   streakPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: colors.accent.amber + '20',
+    backgroundColor: c.accent.amber + '20',
     borderRadius: radius.full, paddingHorizontal: spacing[2], paddingVertical: 3,
-    borderWidth: 1, borderColor: colors.accent.amber + '40',
+    borderWidth: 1, borderColor: c.accent.amber + '40',
   },
-  streakText: { fontSize: 11, fontWeight: '700', color: colors.accent.amber },
+  streakText: { fontSize: 11, fontWeight: '700', color: c.accent.amber },
   humorText: { flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' },
 
   quickMoodRow: { flexDirection: 'row', gap: spacing[3] },
@@ -2556,7 +2563,7 @@ const s = StyleSheet.create({
 
   // ── Budget warning card ───────────────────────────────────────────────────
   budgetWarnCard: {
-    backgroundColor: colors.bg.card,
+    backgroundColor: c.bg.card,
     borderRadius: radius.xl,
     borderWidth: 1, borderColor: 'rgba(81,102,245,0.25)',
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
@@ -2565,16 +2572,16 @@ const s = StyleSheet.create({
   budgetWarnText: {
     fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.55)',
   },
-  tagLastItem: { fontSize: 11, color: colors.text.muted, marginTop: -spacing[1] },
-  tagModalTitle: { fontSize: 16, fontWeight: '800', color: colors.text.primary },
-  tagModalSub: { fontSize: 12, color: colors.text.muted, marginTop: 2 },
-  tagModalEmpty: { fontSize: 13, color: colors.text.muted, textAlign: 'center', paddingVertical: spacing[3] },
+  tagLastItem: { fontSize: 11, color: c.text.muted, marginTop: -spacing[1] },
+  tagModalTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  tagModalSub: { fontSize: 12, color: c.text.muted, marginTop: 2 },
+  tagModalEmpty: { fontSize: 13, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[3] },
   tagItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-  tagItemName: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  tagItemMeta: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  tagItemName: { fontSize: 13, fontWeight: '600', color: c.text.primary },
+  tagItemMeta: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   tagItemDel: { padding: spacing[2], borderRadius: radius.md, backgroundColor: 'rgba(228,52,52,0.10)' },
-  tagModalClose: { marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: colors.bg.elevated, alignItems: 'center' },
-  tagModalCloseText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  tagModalClose: { marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.elevated, alignItems: 'center' },
+  tagModalCloseText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   budgetWarnBold: { fontWeight: '800', color: '#FFFFFF' },
   budgetWarnPeriod: { fontWeight: '700', color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
   budgetWarnPct: { fontWeight: '700', color: '#FFFFFF' },
@@ -2607,7 +2614,7 @@ const s = StyleSheet.create({
     width: 38, height: 38, borderRadius: radius.lg,
     alignItems: 'center', justifyContent: 'center',
   },
-  toolLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
+  toolLabel: { fontSize: 10, fontWeight: '700', color: c.text.secondary, letterSpacing: 0.3 },
   toolSub: { fontSize: 11, fontWeight: '800', letterSpacing: -0.3 },
 
   // ── Evening habits nudge ──────────────────────────────────────────────────
@@ -2617,8 +2624,8 @@ const s = StyleSheet.create({
     borderRadius: radius.xl, padding: spacing[4],
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  habitsNudgeTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
-  habitsNudgeSub: { fontSize: 11, color: colors.text.muted },
+  habitsNudgeTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary, marginBottom: 2 },
+  habitsNudgeSub: { fontSize: 11, color: c.text.muted },
 
   // ── Habits today card ─────────────────────────────────────────────────────
   habitsCard: {
@@ -2628,8 +2635,8 @@ const s = StyleSheet.create({
   },
   habitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   habitsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  habitsTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  habitsBadge: { fontSize: 14, fontWeight: '800', color: colors.text.secondary },
+  habitsTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  habitsBadge: { fontSize: 14, fontWeight: '800', color: c.text.secondary },
   habitsTrack: {
     height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 4, overflow: 'hidden',
@@ -2647,17 +2654,17 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 2,
   },
-  habitCountText: { fontSize: 8, fontWeight: '800', color: colors.bg.primary },
+  habitCountText: { fontSize: 8, fontWeight: '800', color: c.bg.primary },
 
   // ── Stats scope toggle (everyone / only me) ─────────────────────────────────
   scopeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  scopeLabel: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  scopeLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   scopeToggle: {
     flexDirection: 'row', gap: 2, marginLeft: 'auto',
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, padding: 2,
   },
   scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
-  scopeBtnText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  scopeBtnText: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 
   // ── Fun facts ───────────────────────────────────────────────────────────────
   factRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
@@ -2665,7 +2672,7 @@ const s = StyleSheet.create({
     width: 26, height: 26, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  factText: { flex: 1, fontSize: 12.5, color: colors.text.secondary, fontWeight: '500' },
+  factText: { flex: 1, fontSize: 12.5, color: c.text.secondary, fontWeight: '500' },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   topRank: {
     width: 24, height: 24, borderRadius: 12, borderWidth: 1,
@@ -2673,24 +2680,24 @@ const s = StyleSheet.create({
   },
   topRankText: { fontSize: 12, fontWeight: '800' },
   topNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
-  topName: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '600' },
-  topCount: { fontSize: 12, color: colors.text.muted, fontWeight: '700' },
+  topName: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '600' },
+  topCount: { fontSize: 12, color: c.text.muted, fontWeight: '700' },
   topBarTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 5, overflow: 'hidden' },
   topBarFill: { height: 5, borderRadius: 3 },
-  habitsMore: { fontSize: 11, color: colors.text.muted, alignSelf: 'center' },
+  habitsMore: { fontSize: 11, color: c.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
   miniRow: { flexDirection: 'row', gap: spacing[3] },
   miniCard: {
-    flex: 1, backgroundColor: colors.bg.card,
+    flex: 1, backgroundColor: c.bg.card,
     borderRadius: radius.xl, padding: spacing[4],
-    borderWidth: 1, borderColor: colors.border.card,
+    borderWidth: 1, borderColor: c.border.card,
     gap: spacing[1],
   },
   miniCardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   miniCardNum: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  miniCardLabel: { fontSize: 11, fontWeight: '600', color: colors.text.secondary },
-  miniCardSub: { fontSize: 11, color: colors.text.secondary },
+  miniCardLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
+  miniCardSub: { fontSize: 11, color: c.text.secondary },
   miniWorkTrack: {
     height: 6, backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 3, overflow: 'hidden', marginTop: spacing[1],
@@ -2707,17 +2714,17 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  activityLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
+  activityLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted },
 
   // ── Humor tile ─────────────────────────────────────────────────────────────
   humorTile: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
   humorTileEmoji: { fontSize: 20 },
-  humorTileText: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.text.secondary, lineHeight: 18, fontStyle: 'italic' },
+  humorTileText: { flex: 1, fontSize: 13, fontWeight: '500', color: c.text.secondary, lineHeight: 18, fontStyle: 'italic' },
 
   // ── Standard card ──────────────────────────────────────────────────────────
   // ── Work hours widget ──────────────────────────────────────────────────────
@@ -2728,23 +2735,23 @@ const s = StyleSheet.create({
   workToggleText: { fontSize: 10, fontWeight: '700' },
   workHoursRow: { marginTop: spacing[1], gap: 2 },
   workHoursBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
-  workHoursUnit: { fontSize: 16, fontWeight: '700', color: colors.text.muted },
-  workHoursSub: { fontSize: 12, color: colors.text.secondary },
+  workHoursUnit: { fontSize: 16, fontWeight: '700', color: c.text.muted },
+  workHoursSub: { fontSize: 12, color: c.text.secondary },
 
   card: {
-    backgroundColor: colors.bg.card,
+    backgroundColor: c.bg.card,
     borderRadius: radius.xl,
     padding: spacing[4],
     borderWidth: 1,
-    borderColor: colors.border.card,
+    borderColor: c.border.card,
     gap: spacing[3],
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   cardTitle: { fontSize: 12, fontWeight: '800', color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.8 },
   pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
-  pinNoteTitle: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  pinNoteBody: { fontSize: 11.5, color: colors.text.secondary, lineHeight: 16, marginTop: 1 },
-  pinNoteTags: { fontSize: 10, color: colors.text.muted, marginTop: 2 },
+  pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
+  pinNoteTags: { fontSize: 10, color: c.text.muted, marginTop: 2 },
   pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
 
   // ── Stat widgets ──
@@ -2753,17 +2760,17 @@ const s = StyleSheet.create({
   statDelta: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
   statDeltaText: { fontSize: 11, fontWeight: '800' },
   statListRow2: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
-  statSub: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  statSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' },
   statTargetFill: { height: 6, borderRadius: 3 },
   insightDot: { width: 7, height: 7, borderRadius: 4, marginTop: 5 },
   statListRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
-  statListRank: { fontSize: 11, fontWeight: '800', color: colors.text.muted, width: 16 },
-  statListLabel: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '600' },
+  statListRank: { fontSize: 11, fontWeight: '800', color: c.text.muted, width: 16 },
+  statListLabel: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '600' },
   statListVal: { fontSize: 13, fontWeight: '800' },
   statCmpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: spacing[1] },
   statCmpVal: { fontSize: 19, fontWeight: '800', letterSpacing: -0.5 },
-  statCmpKey: { fontSize: 10, color: colors.text.muted },
+  statCmpKey: { fontSize: 10, color: c.text.muted },
   weatherTemp: { fontSize: 30, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
   weatherDesc: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.6 },
 
@@ -2772,29 +2779,29 @@ const s = StyleSheet.create({
   editCtrlBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 6, paddingHorizontal: spacing[3],
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.subtle,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle,
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  editCtrlText: { fontSize: 11, fontWeight: '700', color: colors.text.muted },
+  editCtrlText: { fontSize: 11, fontWeight: '700', color: c.text.muted },
   editBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     padding: spacing[3], borderRadius: radius.md,
     backgroundColor: 'rgba(108,158,255,0.08)', borderWidth: 1, borderColor: 'rgba(108,158,255,0.25)',
   },
-  editBannerText: { fontSize: 11.5, color: colors.text.secondary, lineHeight: 16 },
+  editBannerText: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
   editDoneBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: spacing[3], borderRadius: radius.full, borderWidth: 1 },
   editDoneText: { fontSize: 12, fontWeight: '800' },
   editRow: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingVertical: 8, paddingLeft: spacing[2], paddingRight: spacing[1],
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.subtle,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle,
   },
   editGrip: { paddingVertical: 4, paddingHorizontal: 2 },
   editCtrlBtn2: { width: 38, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
   editArrows: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   editArrowBtn: { padding: 2 },
   editArrowBtn2: { width: 32, height: 40, alignItems: 'center', justifyContent: 'center' },
-  editRowTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.primary },
+  editRowTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
   editAddBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 11, borderRadius: radius.md,
@@ -2802,19 +2809,19 @@ const s = StyleSheet.create({
   },
   editAddText: { fontSize: 12.5, fontWeight: '700' },
   editResetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
-  editResetText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  editResetText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
 
   // ── Note picker modal ──
   npOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing[4] },
-  npCard: { backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: colors.border.subtle },
+  npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  npTitle: { fontSize: 15, fontWeight: '800', color: colors.text.primary },
-  npEmpty: { fontSize: 12, color: colors.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
+  npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  npEmpty: { fontSize: 12, color: c.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
   npRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  npRowText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
+  npRowText: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '500' },
 
   // ── Period toggle ──────────────────────────────────────────────────────────
   periodToggle: { flexDirection: 'row', marginLeft: spacing[2], gap: 2, marginRight: 'auto' as any },
@@ -2822,18 +2829,18 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing[2], paddingVertical: 3,
     borderRadius: radius.sm, borderWidth: 1, borderColor: 'transparent',
   },
-  periodBtnActive: { borderColor: colors.accent.blue + '50', backgroundColor: colors.accent.blue + '15' },
-  periodBtnText: { fontSize: 10, fontWeight: '600', color: colors.text.muted },
+  periodBtnActive: { borderColor: c.accent.blue + '50', backgroundColor: c.accent.blue + '15' },
+  periodBtnText: { fontSize: 10, fontWeight: '600', color: c.text.muted },
   navArrow: { padding: 2 },
-  weekLabelText: { fontSize: 10, color: colors.text.muted },
+  weekLabelText: { fontSize: 10, color: c.text.muted },
 
   // ── Finance stats row ──────────────────────────────────────────────────────
   finRow: { flexDirection: 'row', alignItems: 'flex-start' },
   finStat: { flex: 1, alignItems: 'center', gap: 2 },
-  finVal: { fontSize: 20, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  finKey: { fontSize: 10, color: colors.text.muted },
-  finPct: { fontSize: 10, color: colors.accent.blue, fontWeight: '600' },
-  finDivider: { width: 1, height: 40, backgroundColor: colors.border.subtle, alignSelf: 'center' },
+  finVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  finKey: { fontSize: 10, color: c.text.muted },
+  finPct: { fontSize: 10, color: c.accent.blue, fontWeight: '600' },
+  finDivider: { width: 1, height: 40, backgroundColor: c.border.subtle, alignSelf: 'center' },
 
   // ── Wave chart labels ──────────────────────────────────────────────────────
   avgPill: {
@@ -2842,22 +2849,22 @@ const s = StyleSheet.create({
   },
   avgPillText: { fontSize: 11, fontWeight: '700' },
   waveLabels: { flexDirection: 'row' },
-  waveLabel: { flex: 1, fontSize: 8, color: colors.text.muted, textAlign: 'center' },
+  waveLabel: { flex: 1, fontSize: 8, color: c.text.muted, textAlign: 'center' },
   waveValues: { flexDirection: 'row', marginBottom: 2 },
-  waveValue: { flex: 1, fontSize: 9, fontWeight: '700', color: colors.text.secondary, textAlign: 'center' },
+  waveValue: { flex: 1, fontSize: 9, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
 
   // ── Google Calendar ────────────────────────────────────────────────────────
-  gcalDayLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  gcalDayLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
   gcalRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
   gcalDot:      { width: 6, height: 6, borderRadius: 3 },
-  gcalTime:     { fontSize: 10, color: colors.text.muted, width: 36, fontWeight: '600' },
-  gcalTitle:    { flex: 1, fontSize: 13, color: colors.text.secondary },
+  gcalTime:     { fontSize: 10, color: c.text.muted, width: 36, fontWeight: '600' },
+  gcalTitle:    { flex: 1, fontSize: 13, color: c.text.secondary },
 
   // ── Today tasks strip ─────────────────────────────────────────────────────
   todayCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     padding: spacing[4], borderWidth: 1,
-    borderColor: colors.accent.blue + '28',
+    borderColor: c.accent.blue + '28',
     gap: 0,
   },
   todayHeader: {
@@ -2865,45 +2872,45 @@ const s = StyleSheet.create({
     paddingBottom: spacing[2],
   },
   todayTitle: {
-    fontSize: 10, fontWeight: '800', color: colors.accent.blue, letterSpacing: 1.5,
+    fontSize: 10, fontWeight: '800', color: c.accent.blue, letterSpacing: 1.5,
   },
   todayBadge: {
-    backgroundColor: colors.accent.blue + '20', borderRadius: 10,
+    backgroundColor: c.accent.blue + '20', borderRadius: 10,
     paddingHorizontal: 7, paddingVertical: 2,
   },
-  todayBadgeText: { fontSize: 11, fontWeight: '800', color: colors.accent.blue },
+  todayBadgeText: { fontSize: 11, fontWeight: '800', color: c.accent.blue },
   todayMore: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 2 },
-  todayMoreText: { fontSize: 11, fontWeight: '600', color: colors.accent.blue },
+  todayMoreText: { fontSize: 11, fontWeight: '600', color: c.accent.blue },
   todayRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: 7,
-    borderTopWidth: 1, borderTopColor: colors.accent.blue + '12',
+    borderTopWidth: 1, borderTopColor: c.accent.blue + '12',
   },
   todayCheck: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: colors.accent.blue + '15',
-    borderWidth: 1.5, borderColor: colors.accent.blue + '45',
+    backgroundColor: c.accent.blue + '15',
+    borderWidth: 1.5, borderColor: c.accent.blue + '45',
     alignItems: 'center', justifyContent: 'center',
   },
   todayCheckUrgent: {
-    backgroundColor: colors.accent.red + '15',
-    borderColor: colors.accent.red + '45',
+    backgroundColor: c.accent.red + '15',
+    borderColor: c.accent.red + '45',
   },
   todayRowTitle: {
-    flex: 1, fontSize: 13, fontWeight: '700', color: colors.text.primary, letterSpacing: 0.1,
+    flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary, letterSpacing: 0.1,
   },
   urgentPill: {
-    backgroundColor: colors.accent.red + '15', borderRadius: radius.sm,
+    backgroundColor: c.accent.red + '15', borderRadius: radius.sm,
     paddingHorizontal: 6, paddingVertical: 2,
-    borderWidth: 1, borderColor: colors.accent.red + '30',
+    borderWidth: 1, borderColor: c.accent.red + '30',
   },
-  urgentPillText: { fontSize: 9, fontWeight: '800', color: colors.accent.red, letterSpacing: 0.8 },
+  urgentPillText: { fontSize: 9, fontWeight: '800', color: c.accent.red, letterSpacing: 0.8 },
   overduePill: {
-    backgroundColor: colors.accent.red + '20', borderRadius: radius.sm,
+    backgroundColor: c.accent.red + '20', borderRadius: radius.sm,
     paddingHorizontal: 6, paddingVertical: 2,
-    borderWidth: 1, borderColor: colors.accent.red + '45',
+    borderWidth: 1, borderColor: c.accent.red + '45',
   },
-  overduePillText: { fontSize: 9, fontWeight: '800', color: colors.accent.red, letterSpacing: 0.8 },
+  overduePillText: { fontSize: 9, fontWeight: '800', color: c.accent.red, letterSpacing: 0.8 },
   todayPomBtn: {
     width: 26, height: 26, borderRadius: 13,
     alignItems: 'center', justifyContent: 'center',
@@ -2919,43 +2926,43 @@ const s = StyleSheet.create({
     borderRadius: 4, overflow: 'hidden', justifyContent: 'flex-end',
   },
   dowFill: { width: '100%', borderRadius: 4 },
-  dowLabel:    { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+  dowLabel:    { fontSize: 9, fontWeight: '600', color: c.text.muted },
   dowAvgLabel: { fontSize: 8, fontWeight: '700', letterSpacing: -0.2, marginBottom: 2 },
 
   // ── Dual-wave legend ───────────────────────────────────────────────────────
   dualLegend:      { flexDirection: 'row', gap: 10, marginLeft: 'auto' as any },
   dualLegendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dualLegendLine:  { width: 10, height: 2, borderRadius: 1 },
-  dualLegendLabel: { fontSize: 9, color: colors.text.muted },
+  dualLegendLabel: { fontSize: 9, color: c.text.muted },
 
   // ── Subscription payment modal ─────────────────────────────────────────────
   payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
   payCard: {
-    width: '100%', backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    width: '100%', backgroundColor: c.bg.card, borderRadius: radius.xl,
     padding: spacing[6], alignItems: 'center', gap: spacing[3],
-    borderWidth: 1, borderColor: colors.border.default,
+    borderWidth: 1, borderColor: c.border.default,
   },
   payIconWrap: {
     width: 52, height: 52, borderRadius: radius.full,
-    backgroundColor: colors.accent.blue + '18',
+    backgroundColor: c.accent.blue + '18',
     alignItems: 'center', justifyContent: 'center',
   },
-  payTitle:  { fontSize: 10, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  payName:   { fontSize: 20, fontWeight: '800', color: colors.text.primary, textAlign: 'center' },
-  payAmount: { fontSize: 28, fontWeight: '800', color: colors.accent.blue },
-  payHint:   { fontSize: 14, color: colors.text.secondary, textAlign: 'center' },
-  payQueue:  { fontSize: 11, color: colors.text.muted },
+  payTitle:  { fontSize: 10, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  payName:   { fontSize: 20, fontWeight: '800', color: c.text.primary, textAlign: 'center' },
+  payAmount: { fontSize: 28, fontWeight: '800', color: c.accent.blue },
+  payHint:   { fontSize: 14, color: c.text.secondary, textAlign: 'center' },
+  payQueue:  { fontSize: 11, color: c.text.muted },
   payBtns:   { flexDirection: 'row', gap: spacing[3], width: '100%', marginTop: spacing[2] },
   payBtnNo: {
     flex: 1, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, alignItems: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, alignItems: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  payBtnNoText: { fontSize: 14, fontWeight: '600', color: colors.text.secondary },
+  payBtnNoText: { fontSize: 14, fontWeight: '600', color: c.text.secondary },
   payBtnYes: {
     flex: 2, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: colors.tabs.tasks, flexDirection: 'row',
+    backgroundColor: c.tabs.tasks, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: spacing[2],
   },
-  payBtnYesText: { fontSize: 14, fontWeight: '700', color: colors.bg.primary },
+  payBtnYesText: { fontSize: 14, fontWeight: '700', color: c.bg.primary },
 });
