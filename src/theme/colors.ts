@@ -1,16 +1,18 @@
 export const colors = {
   bg: {
-    primary:   '#1A1C1C',
-    secondary: '#1F2121',
-    card:      '#242626',
-    elevated:  '#2C2E2E',
-    overlay:   'rgba(0,0,0,0.85)',
+    // Deeper, cleaner ladder — a darker base makes cards "float" and reads more
+    // premium; clear elevation steps instead of 4 near-identical greys.
+    primary:   '#121414',
+    secondary: '#171A1A',
+    card:      '#1B1F1F',
+    elevated:  '#252A2A',
+    overlay:   'rgba(0,0,0,0.88)',
   },
   text: {
-    primary:   '#D9D9D9',
-    secondary: 'rgba(217,217,217,0.60)',
-    muted:     'rgba(217,217,217,0.32)',
-    inverse:   '#000000',
+    primary:   '#ECEEEE',
+    secondary: 'rgba(236,238,238,0.62)',
+    muted:     'rgba(236,238,238,0.36)',
+    inverse:   '#0A0C0C',
   },
 
   // ── Per-tab identity palette ─────────────────────────────────────
@@ -66,11 +68,11 @@ export const colors = {
   },
 
   border: {
-    default: 'rgba(217,217,217,0.10)',
-    subtle:  'rgba(217,217,217,0.05)',
-    focus:   'rgba(217,217,217,0.25)',
-    card:    'rgba(217,217,217,0.08)',
-    glass:   'rgba(217,217,217,0.12)',
+    default: 'rgba(255,255,255,0.07)',
+    subtle:  'rgba(255,255,255,0.045)',
+    focus:   'rgba(255,255,255,0.22)',
+    card:    'rgba(255,255,255,0.06)',
+    glass:   'rgba(255,255,255,0.10)',
   },
 
   brand: {
@@ -87,7 +89,7 @@ export const colors = {
   },
 
   transparent: 'transparent',
-  white:  '#D9D9D9',
+  white:  '#ECEEEE',
   black:  '#000000',
   // legacy aliases
   expenses: '#E43434',

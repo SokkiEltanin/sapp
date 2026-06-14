@@ -9,3 +9,14 @@ export const timing = {
   medium: { duration: 220 },
   slow:   { duration: 350 },
 } as const;
+
+// Motion tokens for the redesign — keep it short, fast, purposeful (no decoration).
+// Press feedback, value count-ups, height/opacity transitions, tab highlight.
+export const motion = {
+  pressScale: 0.97,
+  fast: 150,
+  base: 220,
+  slow: 300,
+  // standard ease-out (decelerate) — calm, premium
+  easeOut: [0.16, 1, 0.3, 1] as const,
+} as const;
