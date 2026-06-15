@@ -1462,9 +1462,14 @@ export default function DashboardScreen() {
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} />}
           >
 
-            {/* ══ MAIN GLASSMORPHISM CARD ══════════════════════════════════ */}
+            {/* ══ HERO — weather-reactive, contrast-safe (rebuilt) ═════════════
+                The live sky stays a loved feature, but text legibility no longer
+                depends on the weather or the theme: a dark scrim is layered OVER
+                the clouds beneath the copy, so the greeting + briefing are always
+                readable on a sunny light sky AND in light mode. The hero is an
+                intentional dark "cover" in both themes. */}
             <LinearGradient
-              colors={[accentColor + 'CC', accentColor + '40', 'rgba(255,255,255,0.12)']}
+              colors={[accentColor + 'CC', accentColor + '40', 'rgba(255,255,255,0.10)']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={s.mainCardBorder}
             >
@@ -1473,54 +1478,58 @@ export default function DashboardScreen() {
                 activeOpacity={0.92}
                 style={s.mainCard}
               >
+                {/* 1 · live weather sky */}
                 <AnimatedCardBg timeOfDay={timeOfDay} weatherCode={weather?.wmo} active={heroActive} />
 
-                <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill}>
-                  {/* Soft bottom-up gradient inside card */}
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.18)']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-                    pointerEvents="none"
-                  />
-                  {/* Accent wash from the LEFT */}
-                  <LinearGradient
-                    colors={[accentColor + '2A', 'transparent']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0.3 }} end={{ x: 0.8, y: 0.6 }}
-                    pointerEvents="none"
-                  />
-                  <View style={s.moodGlassBorder} />
+                {/* 2 · gentle frost so the sky reads as glass */}
+                <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
 
-                  <View style={s.mainCardInner}>
-                    {/* Top row: date/day on the LEFT, weather on the RIGHT */}
-                    <View style={s.mainTopRow}>
-                      <Text style={s.mainDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
-                      {weather && (
-                        <View style={s.mainWeatherRow}>
-                          <CloudSun size={20} color={accentColor} strokeWidth={1.7} />
-                          <View style={s.mainWeatherInfo}>
-                            <Text style={s.mainWeatherTemp}>{weather.temp}°C</Text>
-                            <Text style={s.mainWeatherDesc}>{weather.desc.toUpperCase()}</Text>
-                          </View>
-                        </View>
-                      )}
-                    </View>
+                {/* 3 · accent wash from the left */}
+                <LinearGradient
+                  colors={[accentColor + '33', 'transparent']}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0, y: 0.2 }} end={{ x: 0.9, y: 0.7 }}
+                  pointerEvents="none"
+                />
 
-                    {/* Greeting in the chosen font, accent washing in from the left */}
-                    <GradientGreeting text={greeting} baseColor={accentColor} font={heroFont} />
-
-                    {/* Bottom: dynamic contextual briefing — BOLD highlight */}
-                    <Text style={s.mainTaskLine}>
-                      {heroSummary.pre}
-                      <Text style={s.mainTaskBold}>{heroSummary.bold}</Text>
-                      {heroSummary.post}
-                    </Text>
-                  </View>
-                </BlurView>
-
-                {/* A couple of sharper clouds drifting OVER the glass */}
+                {/* 4 · sharp clouds drifting over the glass */}
                 <AnimatedCardBg timeOfDay={timeOfDay} layer="front" weatherCode={weather?.wmo} active={heroActive} />
+
+                {/* 5 · text-protection scrim — heaviest bottom-left under the copy,
+                       sits OVER the clouds so contrast is guaranteed everywhere */}
+                <LinearGradient
+                  colors={['rgba(6,8,10,0.04)', 'rgba(6,8,10,0.40)', 'rgba(6,8,10,0.82)']}
+                  locations={[0, 0.5, 1]}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0.75, y: 0 }} end={{ x: 0.1, y: 1 }}
+                  pointerEvents="none"
+                />
+
+                <View style={s.moodGlassBorder} pointerEvents="none" />
+
+                {/* 6 · content */}
+                <View style={s.mainCardInner}>
+                  <View style={s.mainTopRow}>
+                    <Text style={s.mainDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
+                    {weather && (
+                      <View style={s.weatherChip}>
+                        <CloudSun size={14} color={accentColor} strokeWidth={2} />
+                        <Text style={s.weatherChipTemp}>{weather.temp}°</Text>
+                        <Text style={s.weatherChipDesc} numberOfLines={1}>{weather.desc.toUpperCase()}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Greeting in the chosen font, accent washing in from the left */}
+                  <GradientGreeting text={greeting} baseColor={accentColor} font={heroFont} />
+
+                  {/* Dynamic contextual briefing — BOLD highlight */}
+                  <Text style={s.mainTaskLine} numberOfLines={2}>
+                    {heroSummary.pre}
+                    <Text style={s.mainTaskBold}>{heroSummary.bold}</Text>
+                    {heroSummary.post}
+                  </Text>
+                </View>
               </TouchableOpacity>
             </LinearGradient>
 
@@ -2515,19 +2524,20 @@ const makeStyles = (c: any) => StyleSheet.create({
   mainTopRow: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing[3],
   },
-  mainWeatherRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
+  // Weather as a self-contained legible pill (always readable on any sky).
+  weatherChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(8,10,12,0.42)',
+    borderRadius: radius.full,
+    paddingLeft: 8, paddingRight: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
   },
-  mainWeatherInfo: { alignItems: 'flex-end' },
-  mainWeatherTemp: {
-    fontSize: 18, fontWeight: '700', color: c.white, lineHeight: 20,
-  },
-  mainWeatherDesc: {
-    fontSize: 8, fontWeight: '600', color: 'rgba(255,255,255,0.40)', letterSpacing: 0.6,
-  },
+  weatherChipTemp: { fontSize: 13, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.2 },
+  weatherChipDesc: { fontSize: 8.5, fontWeight: '700', color: 'rgba(255,255,255,0.62)', letterSpacing: 0.5, maxWidth: 74 },
   mainGreetingBlock: { gap: 0 },
   mainDate: {
-    flex: 1, fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.8,
+    flex: 1, fontSize: 11.5, fontWeight: '700', color: 'rgba(255,255,255,0.72)', letterSpacing: 0.8,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
   },
   mainGreeting: {
     fontSize: 40, fontWeight: '900', color: c.white,
@@ -2537,7 +2547,8 @@ const makeStyles = (c: any) => StyleSheet.create({
     textShadowRadius: 8,
   },
   mainTaskLine: {
-    fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.80)',
+    fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.86)',
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
   },
   mainTaskBold: { fontWeight: '900', color: c.white },
   moodStateRow: {
