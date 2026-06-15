@@ -1646,7 +1646,7 @@ export default function DashboardScreen() {
               >
                 <View style={s.miniCardTop}>
                   <CheckCircle2 size={13} color={accentColor} />
-                  <Text style={[s.miniCardNum, { color: '#FFFFFF' }]}>{pendingTasks.length}</Text>
+                  <Text style={[s.miniCardNum, { color: colors.text.primary }]}>{pendingTasks.length}</Text>
                 </View>
                 <Text style={s.miniCardLabel}>{plTasks(pendingTasks.length)}</Text>
                 {todayTasks.length > 0 && (
@@ -1665,7 +1665,7 @@ export default function DashboardScreen() {
                 <View style={[s.miniCard, { backgroundColor: cardBgDark }]}>
                   <View style={s.miniCardTop}>
                     <Briefcase size={13} color={accentColor} />
-                    <Text style={[s.miniCardNum, { color: '#FFFFFF' }]}>
+                    <Text style={[s.miniCardNum, { color: colors.text.primary }]}>
                       {workEarnings.totalEarned.toFixed(2)}
                     </Text>
                   </View>
@@ -1686,7 +1686,7 @@ export default function DashboardScreen() {
                 >
                   <View style={s.miniCardTop}>
                     <Wallet size={13} color={accentColor} />
-                    <Text style={[s.miniCardNum, { color: '#FFFFFF' }]}>
+                    <Text style={[s.miniCardNum, { color: colors.text.primary }]}>
                       {budgetRemaining ? Math.abs(Math.round(budgetRemaining.remaining)) : Math.round(stats.monthExpenses)}
                     </Text>
                   </View>
@@ -2008,7 +2008,7 @@ export default function DashboardScreen() {
                     </View>
                     <View style={s.dualLegendItem}>
                       <View style={[s.dualLegendLine, { backgroundColor: accentColor, opacity: 0.4 }]} />
-                      <Text style={s.dualLegendLabel}>słodycze+przekąski</Text>
+                      <Text style={s.dualLegendLabel}>słodkie</Text>
                     </View>
                   </View>
                 </View>
@@ -2087,7 +2087,7 @@ export default function DashboardScreen() {
 
                 {!workHoursChart ? (
                   <View style={s.workHoursRow}>
-                    <Text style={[s.workHoursBig, { color: '#FFFFFF' }]}>
+                    <Text style={[s.workHoursBig, { color: colors.text.primary }]}>
                       {workMonthly.currentHours.toFixed(0)}
                       <Text style={s.workHoursUnit}> h</Text>
                     </Text>
@@ -2570,7 +2570,7 @@ const makeStyles = (c: any) => StyleSheet.create({
     gap: spacing[3],
   },
   budgetWarnText: {
-    fontSize: 13, fontWeight: '400', color: 'rgba(255,255,255,0.55)',
+    fontSize: 13, fontWeight: '400', color: c.text.secondary,
   },
   tagLastItem: { fontSize: 11, color: c.text.muted, marginTop: -spacing[1] },
   tagModalTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
@@ -2582,10 +2582,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   tagItemDel: { padding: spacing[2], borderRadius: radius.md, backgroundColor: 'rgba(228,52,52,0.10)' },
   tagModalClose: { marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.elevated, alignItems: 'center' },
   tagModalCloseText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
-  budgetWarnBold: { fontWeight: '800', color: '#FFFFFF' },
-  budgetWarnPeriod: { fontWeight: '700', color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
-  budgetWarnPct: { fontWeight: '700', color: '#FFFFFF' },
-  budgetWarnAmt: { fontWeight: '600', color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+  budgetWarnBold: { fontWeight: '800', color: c.text.primary },
+  budgetWarnPeriod: { fontWeight: '700', color: c.text.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
+  budgetWarnPct: { fontWeight: '700', color: c.text.primary },
+  budgetWarnAmt: { fontWeight: '600', color: c.text.muted, fontSize: 11 },
   budgetWarnTrack: {
     height: 10, backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 5, overflow: 'hidden',
@@ -2689,13 +2689,13 @@ const makeStyles = (c: any) => StyleSheet.create({
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────
   miniRow: { flexDirection: 'row', gap: spacing[3] },
   miniCard: {
-    flex: 1, backgroundColor: c.bg.card,
+    flex: 1, minWidth: 0, backgroundColor: c.bg.card,
     borderRadius: radius.xl, padding: spacing[4],
     borderWidth: 1, borderColor: c.border.card,
-    gap: spacing[1],
+    gap: spacing[1], overflow: 'hidden',
   },
   miniCardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  miniCardNum: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  miniCardNum: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5, flexShrink: 1 },
   miniCardLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
   miniCardSub: { fontSize: 11, color: c.text.secondary },
   miniWorkTrack: {
@@ -2746,8 +2746,8 @@ const makeStyles = (c: any) => StyleSheet.create({
     borderColor: c.border.card,
     gap: spacing[3],
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardTitle: { fontSize: 12, fontWeight: '800', color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 0.8 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
+  cardTitle: { fontSize: 12, fontWeight: '800', color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 1 },
   pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
   pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },

@@ -402,21 +402,6 @@ export default function HealthScreen() {
           );
         })()}
 
-        {/* Pomodoro */}
-        <GlassCard padding={spacing[4]} style={styles.tealPomRow}>
-          <View style={styles.pomLeft}>
-            <Timer size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>POMODORO DZISIAJ</Text>
-          </View>
-          <Text style={styles.pomNum}>
-            {todayPomCount}
-            <Text style={styles.pomUnit}> sesji</Text>
-          </Text>
-          <PressableScale onPress={() => router.push('/pomodoro' as any)} style={[styles.pomCta, { backgroundColor: T.accentDim, borderColor: T.cardBorder }]}>
-            <Text style={[styles.pomCtaText, { color: T.accent }]}>{pomodoroIsRunning ? 'Trwa...' : 'Start'}</Text>
-          </PressableScale>
-        </GlassCard>
-
         {/* Weekly steps chart */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
