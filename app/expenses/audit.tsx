@@ -7,11 +7,14 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
 
 export default function FinanceAuditScreen() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const { expenses, setExpenses } = useExpensesStore();
 
   useEffect(() => {
@@ -163,34 +166,34 @@ export default function FinanceAuditScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   backBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  title: { fontSize: 18, fontWeight: '800', color: c.text.primary },
 
   scroll: { padding: spacing[4], gap: spacing[3] },
 
   summaryCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.card,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.card,
     padding: spacing[4], gap: spacing[3],
   },
-  summaryMonth: { fontSize: 11, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5 },
+  summaryMonth: { fontSize: 11, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
   summaryRow: { flexDirection: 'row', alignItems: 'center' },
   summaryCol: { flex: 1, gap: 2 },
-  summaryLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1 },
+  summaryLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1 },
   summaryVal: { fontSize: 26, fontWeight: '800', letterSpacing: -1 },
-  summaryDivider: { width: 1, height: 40, backgroundColor: colors.border.subtle },
-  summaryHint: { fontSize: 11, color: colors.text.secondary, lineHeight: 16 },
+  summaryDivider: { width: 1, height: 40, backgroundColor: c.border.subtle },
+  summaryHint: { fontSize: 11, color: c.text.secondary, lineHeight: 16 },
 
   warnCard: {
     backgroundColor: 'rgba(251,191,36,0.08)', borderRadius: radius.xl,
@@ -199,37 +202,37 @@ const s = StyleSheet.create({
   },
   warnHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   warnTitle: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
-  warnDesc: { fontSize: 12, color: colors.text.secondary, lineHeight: 17, marginBottom: spacing[1] },
+  warnDesc: { fontSize: 12, color: c.text.secondary, lineHeight: 17, marginBottom: spacing[1] },
   warnRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: spacing[2], gap: spacing[2],
     borderTopWidth: 1, borderTopColor: 'rgba(251,191,36,0.15)',
   },
-  warnRowText: { flex: 1, fontSize: 11, color: colors.text.secondary },
+  warnRowText: { flex: 1, fontSize: 11, color: c.text.secondary },
   warnRowAmt: { fontSize: 12, fontWeight: '700', color: '#FBBF24' },
 
   sectionCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.card,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.card,
     padding: spacing[4], gap: spacing[1],
   },
   sectionTitle: {
-    fontSize: 10, fontWeight: '800', color: colors.text.muted,
+    fontSize: 10, fontWeight: '800', color: c.text.muted,
     letterSpacing: 1, marginBottom: spacing[2],
   },
   txRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: spacing[2],
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)',
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
   typeBadge: {
     width: 34, height: 22, borderRadius: 6,
     alignItems: 'center', justifyContent: 'center',
   },
   typeBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  txTitle: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  txMeta: { fontSize: 10, color: colors.text.muted, marginTop: 1 },
-  txAmt: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  txTitle: { fontSize: 13, fontWeight: '600', color: c.text.primary },
+  txMeta: { fontSize: 10, color: c.text.muted, marginTop: 1 },
+  txAmt: { fontSize: 13, fontWeight: '700', color: c.text.primary },
 
-  empty: { fontSize: 13, color: colors.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
+  empty: { fontSize: 13, color: c.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
 });

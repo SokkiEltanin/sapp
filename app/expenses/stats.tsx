@@ -16,6 +16,7 @@ import { getCategoryMeta } from '@/utils/categories';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { detectFixedCosts } from '@/utils/fixedCosts';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 const MONTHS_BACK = 6;
@@ -23,6 +24,8 @@ const MONTHS_BACK = 6;
 // ─── 30-day line chart component ──────────────────────────────────────────────
 
 function LineChart30Day({ data, width }: { data: { ds: string; exp: number; inc: number; day: number; month: number }[]; width: number }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const H = 72;
   const w = Math.max(width - 4, 100);
   const hasData = data.some(d => d.exp > 0 || d.inc > 0);
@@ -44,7 +47,7 @@ function LineChart30Day({ data, width }: { data: { ds: string; exp: number; inc:
       </View>
       {hasData ? (
         <Svg width={w} height={H + 4}>
-          <SvgLine x1={0} y1={H} x2={w} y2={H} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+          <SvgLine x1={0} y1={H} x2={w} y2={H} stroke={colors.border.default} strokeWidth={1} />
           <Polyline points={pts(data.map(d => d.exp))} fill="none" stroke={colors.accent.red} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           <Polyline points={pts(data.map(d => d.inc))} fill="none" stroke={colors.accent.green} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         </Svg>
@@ -88,6 +91,8 @@ function pctLabel(curr: number, prev: number): { text: string; color: string } |
 }
 
 export default function StatsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { expenses, setExpenses } = useExpensesStore();
   const today = new Date();
   const { width: screenW } = useWindowDimensions();
@@ -497,7 +502,7 @@ export default function StatsScreen() {
                         ? colors.accent.blue
                         : d.isToday
                         ? colors.accent.red
-                        : d.total > 0 ? colors.accent.red + '70' : 'rgba(255,255,255,0.05)',
+                        : d.total > 0 ? colors.accent.red + '70' : colors.border.subtle,
                       width: isSelected || d.isToday ? 5 : 3,
                     }]} />
                   </View>
@@ -864,187 +869,187 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   backBtn: {
     width: 40, height: 40, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
   monthPicker: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   monthArrow: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   monthLabel: { alignItems: 'center', minWidth: 100 },
-  headerTitle: { ...typography.h4, color: colors.text.primary, textAlign: 'center', textTransform: 'capitalize' },
-  headerSub:   { ...typography.caption, color: colors.text.muted, textAlign: 'center', marginTop: 1 },
+  headerTitle: { ...typography.h4, color: c.text.primary, textAlign: 'center', textTransform: 'capitalize' },
+  headerSub:   { ...typography.caption, color: c.text.muted, textAlign: 'center', marginTop: 1 },
   settingsBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
 
   heroCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[5],
-    gap: spacing[3], borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[5],
+    gap: spacing[3], borderWidth: 1, borderColor: c.border.default,
   },
   heroHeader:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  heroLabel:    { ...typography.caption, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 1, fontSize: 10, fontWeight: '600' },
+  heroLabel:    { ...typography.caption, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1, fontSize: 10, fontWeight: '600' },
   heroBalance:  { fontSize: 42, fontWeight: '800', letterSpacing: -1.5, lineHeight: 46 },
-  heroUnit:     { fontSize: 20, fontWeight: '400', color: colors.text.muted },
-  heroStatsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' },
+  heroUnit:     { fontSize: 20, fontWeight: '400', color: c.text.muted },
+  heroStatsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   heroStat:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   heroStatVal:  { ...typography.label, fontWeight: '700' },
-  heroStatLabel:{ ...typography.caption, color: colors.text.muted, fontSize: 10 },
-  heroSep:      { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.08)' },
+  heroStatLabel:{ ...typography.caption, color: c.text.muted, fontSize: 10 },
+  heroSep:      { width: 1, height: 20, backgroundColor: c.border.subtle },
 
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     padding: spacing[4], gap: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  alertCard: { borderColor: colors.accent.amber + '30', backgroundColor: colors.accent.amber + '08' },
-  velocityAlertCard: { borderColor: colors.accent.red + '30', backgroundColor: colors.accent.red + '06' },
+  alertCard: { borderColor: c.accent.amber + '30', backgroundColor: c.accent.amber + '08' },
+  velocityAlertCard: { borderColor: c.accent.red + '30', backgroundColor: c.accent.red + '06' },
   velAlertRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
-  velAlertTitle: { fontSize: 12, color: colors.text.secondary, fontWeight: '600', lineHeight: 17 },
-  velAlertSub:   { fontSize: 11, color: colors.accent.red, lineHeight: 16, marginTop: 2 },
+  velAlertTitle: { fontSize: 12, color: c.text.secondary, fontWeight: '600', lineHeight: 17 },
+  velAlertSub:   { fontSize: 11, color: c.accent.red, lineHeight: 16, marginTop: 2 },
   cardRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { ...typography.label, color: colors.text.secondary, flex: 1, fontWeight: '600' },
+  cardLabel: { ...typography.label, color: c.text.secondary, flex: 1, fontWeight: '600' },
   cardMeta:  { ...typography.label, fontWeight: '700' },
 
   alertRow:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   alertIcon: { width: 26, height: 26, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  alertText: { fontSize: 12, color: colors.text.secondary, lineHeight: 18 },
-  alertHint: { fontSize: 11, color: colors.accent.amber, lineHeight: 16, marginTop: 2 },
+  alertText: { fontSize: 12, color: c.text.secondary, lineHeight: 18 },
+  alertHint: { fontSize: 11, color: c.accent.amber, lineHeight: 16, marginTop: 2 },
   alertPct:  { fontSize: 12, fontWeight: '700', minWidth: 44, textAlign: 'right' },
 
   chartArea:  { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[1], height: 96 },
   monthCol:   { flex: 1, alignItems: 'center', gap: 4 },
   barsWrap:   { flex: 1, width: '100%', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 2 },
   bar:        { width: 8, borderRadius: 4, minHeight: 3 },
-  monthLbl:   { ...typography.caption, color: colors.text.muted, fontSize: 9 },
-  monthLblSelected: { color: colors.text.primary, fontWeight: '700' },
-  monthDot:   { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent.blue },
-  chartLegend:{ flexDirection: 'row', gap: spacing[3], alignItems: 'center', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', flexWrap: 'wrap' },
+  monthLbl:   { ...typography.caption, color: c.text.muted, fontSize: 9 },
+  monthLblSelected: { color: c.text.primary, fontWeight: '700' },
+  monthDot:   { width: 4, height: 4, borderRadius: 2, backgroundColor: c.accent.blue },
+  chartLegend:{ flexDirection: 'row', gap: spacing[3], alignItems: 'center', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle, flexWrap: 'wrap' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   legendDot:  { width: 8, height: 8, borderRadius: 4 },
-  legendText: { ...typography.caption, color: colors.text.muted },
-  legendHint: { ...typography.caption, color: colors.text.muted, fontSize: 9, flex: 1, textAlign: 'right' },
+  legendText: { ...typography.caption, color: c.text.muted },
+  legendHint: { ...typography.caption, color: c.text.muted, fontSize: 9, flex: 1, textAlign: 'right' },
 
   dailyChart:    { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   dailyCol:      { flex: 1, alignItems: 'center', gap: 2 },
   dailyBarWrap:  { height: 68, justifyContent: 'flex-end', alignItems: 'center' },
   dailyBar:      { borderRadius: 2, minHeight: 2 },
-  dailyLabel:    { fontSize: 7, color: colors.text.muted, textAlign: 'center' },
-  dailyLegendRow:{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-  dailyLegend:   { fontSize: 10, color: colors.text.muted },
+  dailyLabel:    { fontSize: 7, color: c.text.muted, textAlign: 'center' },
+  dailyLegendRow:{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  dailyLegend:   { fontSize: 10, color: c.text.muted },
 
   catRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], paddingVertical: spacing[1] },
-  catRowExpanded: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: radius.md, padding: spacing[2] },
-  catIcon:     { width: 30, height: 30, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', marginTop: 2, backgroundColor: 'rgba(255,255,255,0.05)' },
+  catRowExpanded: { backgroundColor: c.border.subtle, borderRadius: radius.md, padding: spacing[2] },
+  catIcon:     { width: 30, height: 30, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', marginTop: 2, backgroundColor: c.border.subtle },
   catInfo:     { flex: 1, gap: 4 },
   catTopRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   catRight:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  catLabel:    { ...typography.bodySmall, color: colors.text.primary, fontWeight: '500' },
-  catAmount:   { ...typography.label, fontWeight: '700', fontSize: 13, color: colors.text.primary },
+  catLabel:    { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
+  catAmount:   { ...typography.label, fontWeight: '700', fontSize: 13, color: c.text.primary },
   changeBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
   changeBadgeText: { fontSize: 10, fontWeight: '700' },
-  catBarTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  catBarTrack: { height: 8, backgroundColor: c.border.subtle, borderRadius: radius.full, overflow: 'hidden' },
   catBarFill:  { height: '100%', borderRadius: radius.full },
-  budgetBarTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden', marginTop: 2 },
+  budgetBarTrack: { height: 8, backgroundColor: c.border.subtle, borderRadius: radius.full, overflow: 'hidden', marginTop: 2 },
   budgetBarFill:  { height: '100%', borderRadius: radius.full },
-  catPct:      { ...typography.caption, color: colors.text.muted, fontSize: 9 },
+  catPct:      { ...typography.caption, color: c.text.muted, fontSize: 9 },
 
   txList:      { marginLeft: 46, marginTop: spacing[1], marginBottom: spacing[2], gap: 4 },
   txRow:       { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
-  txDate:      { fontSize: 10, color: colors.text.muted, width: 36 },
-  txNote:      { flex: 1, fontSize: 12, color: colors.text.secondary },
-  txAmt:       { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  txDate:      { fontSize: 10, color: c.text.muted, width: 36 },
+  txNote:      { flex: 1, fontSize: 12, color: c.text.secondary },
+  txAmt:       { fontSize: 12, fontWeight: '700', color: c.text.primary },
 
   // Daily filter
   filterRow:         { flexDirection: 'row', gap: 4, marginLeft: 'auto' },
-  filterBtn:         { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default },
-  filterBtnActive:   { backgroundColor: colors.accent.green + '20', borderColor: colors.accent.green + '60' },
-  filterBtnText:     { fontSize: 10, fontWeight: '500', color: colors.text.muted },
-  filterBtnTextActive: { color: colors.accent.green, fontWeight: '700' },
+  filterBtn:         { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
+  filterBtnActive:   { backgroundColor: c.accent.green + '20', borderColor: c.accent.green + '60' },
+  filterBtnText:     { fontSize: 10, fontWeight: '500', color: c.text.muted },
+  filterBtnTextActive: { color: c.accent.green, fontWeight: '700' },
 
   // Food velocity
-  velocityRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[1], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: spacing[2] },
+  velocityRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[1], borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[2] },
   velocityStat:  { alignItems: 'center', gap: 2 },
-  velocityVal:   { fontSize: 16, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
-  velocityUnit:  { fontSize: 10, fontWeight: '400', color: colors.text.muted },
-  velocityLabel: { fontSize: 10, color: colors.text.muted },
+  velocityVal:   { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
+  velocityUnit:  { fontSize: 10, fontWeight: '400', color: c.text.muted },
+  velocityLabel: { fontSize: 10, color: c.text.muted },
 
   // Food stats
-  foodWeekLabel:     { fontSize: 10, color: colors.text.muted },
+  foodWeekLabel:     { fontSize: 10, color: c.text.muted },
   foodMonthRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   foodMonthStat:     { alignItems: 'center', gap: 2 },
-  foodMonthVal:      { fontSize: 22, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5 },
-  foodMonthUnit:     { fontSize: 12, fontWeight: '400', color: colors.text.muted },
-  foodMonthLabel:    { fontSize: 10, color: colors.text.muted },
-  foodSep:           { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.07)' },
+  foodMonthVal:      { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  foodMonthUnit:     { fontSize: 12, fontWeight: '400', color: c.text.muted },
+  foodMonthLabel:    { fontSize: 10, color: c.text.muted },
+  foodSep:           { width: 1, height: 32, backgroundColor: c.border.subtle },
   foodChangeBadge:   { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full },
   foodChangeBadgeText:{ fontSize: 13, fontWeight: '800' },
   foodTagRow:        { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  foodTagName:       { fontSize: 11, color: colors.text.secondary, width: 68, fontWeight: '500' },
-  foodTagBarTrack:   { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
-  foodTagBarFill:    { height: '100%', borderRadius: radius.full, backgroundColor: colors.accent.green },
-  foodTagAmt:        { fontSize: 11, fontWeight: '700', color: colors.text.primary, width: 46, textAlign: 'right' },
-  foodTagChange:     { fontSize: 10, width: 38, textAlign: 'right', color: colors.text.muted },
+  foodTagName:       { fontSize: 11, color: c.text.secondary, width: 68, fontWeight: '500' },
+  foodTagBarTrack:   { flex: 1, height: 7, backgroundColor: c.border.subtle, borderRadius: radius.full, overflow: 'hidden' },
+  foodTagBarFill:    { height: '100%', borderRadius: radius.full, backgroundColor: c.accent.green },
+  foodTagAmt:        { fontSize: 11, fontWeight: '700', color: c.text.primary, width: 46, textAlign: 'right' },
+  foodTagChange:     { fontSize: 10, width: 38, textAlign: 'right', color: c.text.muted },
 
   // Fixed costs
   fixedRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4 },
   fixedConfDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
-  fixedName:    { flex: 1, fontSize: 13, color: colors.text.secondary },
-  fixedOcc:     { fontSize: 10, color: colors.text.muted, width: 22, textAlign: 'right' },
-  fixedAmt:     { fontSize: 13, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
-  fixedHint:    { fontSize: 10, color: colors.text.muted, lineHeight: 15, marginTop: spacing[1] },
+  fixedName:    { flex: 1, fontSize: 13, color: c.text.secondary },
+  fixedOcc:     { fontSize: 10, color: c.text.muted, width: 22, textAlign: 'right' },
+  fixedAmt:     { fontSize: 13, fontWeight: '700', color: c.text.primary, width: 52, textAlign: 'right' },
+  fixedHint:    { fontSize: 10, color: c.text.muted, lineHeight: 15, marginTop: spacing[1] },
 
   // 30-day line chart
   lineChartFooter:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[2] },
-  lineChartDate:       { fontSize: 9, color: colors.text.muted },
+  lineChartDate:       { fontSize: 9, color: c.text.muted },
   lineChartLegend:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   lineChartDot:        { width: 8, height: 8, borderRadius: 4 },
-  lineChartLegendText: { fontSize: 10, color: colors.text.muted },
+  lineChartLegendText: { fontSize: 10, color: c.text.muted },
 
   // Daily drill-down
-  drillDown:    { backgroundColor: colors.bg.elevated, borderRadius: radius.md, padding: spacing[3], gap: spacing[2], borderWidth: 1, borderColor: colors.accent.blue + '30' },
-  drillDownLabel: { fontSize: 11, fontWeight: '700', color: colors.accent.blue, marginBottom: 4 },
+  drillDown:    { backgroundColor: c.bg.elevated, borderRadius: radius.md, padding: spacing[3], gap: spacing[2], borderWidth: 1, borderColor: c.accent.blue + '30' },
+  drillDownLabel: { fontSize: 11, fontWeight: '700', color: c.accent.blue, marginBottom: 4 },
   drillRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  drillNote:    { flex: 1, fontSize: 12, color: colors.text.secondary },
-  drillAmt:     { fontSize: 12, fontWeight: '700', color: colors.text.primary },
-  drillEmpty:   { fontSize: 11, color: colors.text.muted, textAlign: 'center', paddingVertical: 4 },
+  drillNote:    { flex: 1, fontSize: 12, color: c.text.secondary },
+  drillAmt:     { fontSize: 12, fontWeight: '700', color: c.text.primary },
+  drillEmpty:   { fontSize: 11, color: c.text.muted, textAlign: 'center', paddingVertical: 4 },
 
   // Top products
-  topProdSection: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  topProdSection: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
   topProdRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4 },
-  topProdRank:    { fontSize: 11, fontWeight: '800', color: colors.accent.amber, width: 14 },
-  topProdName:    { flex: 1, fontSize: 13, color: colors.text.secondary },
-  topProdDate:    { fontSize: 10, color: colors.text.muted, width: 36 },
-  topProdPrice:   { fontSize: 13, fontWeight: '800', color: colors.text.primary, width: 60, textAlign: 'right' },
+  topProdRank:    { fontSize: 11, fontWeight: '800', color: c.accent.amber, width: 14 },
+  topProdName:    { flex: 1, fontSize: 13, color: c.text.secondary },
+  topProdDate:    { fontSize: 10, color: c.text.muted, width: 36 },
+  topProdPrice:   { fontSize: 13, fontWeight: '800', color: c.text.primary, width: 60, textAlign: 'right' },
 
   // Spostrzeżenia
   insightsList: { gap: spacing[2] },
   insightItem:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   insightDot:   { width: 7, height: 7, borderRadius: 4, marginTop: 4, flexShrink: 0 },
-  insightText:  { flex: 1, fontSize: 13, color: colors.text.secondary, lineHeight: 19 },
-  insightNote:  { fontSize: 10, color: colors.text.muted, lineHeight: 15, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', marginTop: spacing[1] },
+  insightText:  { flex: 1, fontSize: 13, color: c.text.secondary, lineHeight: 19 },
+  insightNote:  { fontSize: 10, color: c.text.muted, lineHeight: 15, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle, marginTop: spacing[1] },
 
   tagRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
-  tagName:     { fontSize: 12, color: colors.text.secondary, fontWeight: '600', width: 100 },
-  tagBarTrack: { flex: 1, height: 7, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
-  tagBarFill:  { height: '100%', borderRadius: radius.full, backgroundColor: colors.accent.blue },
-  tagAmount:   { fontSize: 12, fontWeight: '700', color: colors.text.primary, width: 52, textAlign: 'right' },
+  tagName:     { fontSize: 12, color: c.text.secondary, fontWeight: '600', width: 100 },
+  tagBarTrack: { flex: 1, height: 7, backgroundColor: c.border.subtle, borderRadius: radius.full, overflow: 'hidden' },
+  tagBarFill:  { height: '100%', borderRadius: radius.full, backgroundColor: c.accent.blue },
+  tagAmount:   { fontSize: 12, fontWeight: '700', color: c.text.primary, width: 52, textAlign: 'right' },
 
   empty:     { alignItems: 'center', paddingVertical: spacing[12], gap: spacing[2] },
-  emptyTitle:{ ...typography.h3, color: colors.text.secondary },
-  emptySub:  { ...typography.body, color: colors.text.muted, textAlign: 'center' },
+  emptyTitle:{ ...typography.h3, color: c.text.secondary },
+  emptySub:  { ...typography.body, color: c.text.muted, textAlign: 'center' },
 });

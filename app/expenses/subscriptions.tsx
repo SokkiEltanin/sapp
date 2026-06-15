@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert,
   TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform,
@@ -18,6 +18,7 @@ import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -124,6 +125,8 @@ function parseDate(str: string): string | null {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SubscriptionsScreen() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const { subscriptions, isLoading, add, update, remove, stats } = useSubscriptions();
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<Subscription | null>(null);
@@ -504,6 +507,8 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
   onDelete: (s: Subscription) => void;
   onToggle: (id: string) => void;
 }) {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const meta  = getCategoryMeta(sub.category);
   const Icon  = (LucideIcons as any)[meta.icon];
   const cycle = CYCLES.find((c) => c.value === sub.billingCycle);
@@ -559,49 +564,49 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  title: { ...typography.h4, color: colors.text.primary },
+  title: { ...typography.h4, color: c.text.primary },
 
   summaryCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden',
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: c.border.default, overflow: 'hidden',
   },
   summaryRow: { flexDirection: 'row', padding: spacing[4] },
   summaryItem: { flex: 1, alignItems: 'center', gap: spacing[1] },
-  summaryDivider: { width: 1, backgroundColor: colors.border.default },
-  summaryVal: { ...typography.h3, color: colors.text.primary },
-  summaryLabel: { ...typography.caption, color: colors.text.muted },
+  summaryDivider: { width: 1, backgroundColor: c.border.default },
+  summaryVal: { ...typography.h3, color: c.text.primary },
+  summaryLabel: { ...typography.caption, color: c.text.muted },
 
   section: { gap: spacing[2] },
   sectionTitle: {
-    ...typography.caption, color: colors.text.muted,
+    ...typography.caption, color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing[1],
   },
 
   item: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[3],
   },
   itemInactive: { opacity: 0.5 },
   itemIcon: { width: 36, height: 36, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   itemBody: { flex: 1, gap: 3 },
-  itemName: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '600' },
-  itemCycle: { fontSize: 11, color: colors.text.muted },
+  itemName: { ...typography.bodySmall, color: c.text.primary, fontWeight: '600' },
+  itemCycle: { fontSize: 11, color: c.text.muted },
   itemBell: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  itemBellText: { fontSize: 10, color: colors.accent.amber },
+  itemBellText: { fontSize: 10, color: c.accent.amber },
   itemActions: { alignItems: 'flex-end', gap: spacing[2] },
   daysBadge: {
     paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: radius.sm,
@@ -610,12 +615,12 @@ const s = StyleSheet.create({
   actionBtns: { flexDirection: 'row', gap: spacing[1] },
   iconBtn: {
     width: 28, height: 28, borderRadius: radius.sm,
-    backgroundColor: colors.bg.elevated, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.bg.elevated, alignItems: 'center', justifyContent: 'center',
   },
 
   empty: { alignItems: 'center', paddingTop: spacing[12], gap: spacing[4] },
-  emptyTitle: { ...typography.h3, color: colors.text.secondary },
-  emptyText: { ...typography.body, color: colors.text.muted, textAlign: 'center', lineHeight: 22 },
+  emptyTitle: { ...typography.h3, color: c.text.secondary },
+  emptyText: { ...typography.body, color: c.text.muted, textAlign: 'center', lineHeight: 22 },
 
   // ── Payment confirmation overlay ──────────────────────────────────────────
   payOverlay: {
@@ -624,69 +629,69 @@ const s = StyleSheet.create({
     paddingHorizontal: spacing[6],
   },
   payCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[6], alignItems: 'center', gap: spacing[2], width: '100%',
   },
   payIconWrap: {
     width: 52, height: 52, borderRadius: radius.full,
-    backgroundColor: colors.accent.blue + '18',
+    backgroundColor: c.accent.blue + '18',
     alignItems: 'center', justifyContent: 'center', marginBottom: spacing[1],
   },
-  payTitle: { ...typography.caption, color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  payName: { ...typography.h3, color: colors.text.primary, textAlign: 'center' },
-  payAmount: { fontSize: 28, fontWeight: '800', color: colors.accent.blue },
-  payHint: { ...typography.body, color: colors.text.secondary, textAlign: 'center', marginTop: spacing[1] },
-  payQueue: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  payTitle: { ...typography.caption, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  payName: { ...typography.h3, color: c.text.primary, textAlign: 'center' },
+  payAmount: { fontSize: 28, fontWeight: '800', color: c.accent.blue },
+  payHint: { ...typography.body, color: c.text.secondary, textAlign: 'center', marginTop: spacing[1] },
+  payQueue: { fontSize: 11, color: c.text.muted, marginTop: 2 },
   payBtns: { flexDirection: 'row', gap: spacing[3], marginTop: spacing[3], width: '100%' },
   payBtnNo: {
     flex: 1, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center',
   },
-  payBtnNoText: { ...typography.bodySmall, color: colors.text.secondary, fontWeight: '600' },
+  payBtnNoText: { ...typography.bodySmall, color: c.text.secondary, fontWeight: '600' },
   payBtnYes: {
     flex: 2, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: colors.accent.blue, flexDirection: 'row',
+    backgroundColor: c.accent.blue, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'center', gap: spacing[2],
   },
-  payBtnYesText: { ...typography.bodySmall, color: colors.bg.primary, fontWeight: '700' },
+  payBtnYesText: { ...typography.bodySmall, color: c.bg.primary, fontWeight: '700' },
 
   // ── Modal / form ──────────────────────────────────────────────────────────
-  modal: { flex: 1, backgroundColor: colors.bg.secondary },
+  modal: { flex: 1, backgroundColor: c.bg.secondary },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   formScroll: { padding: spacing[4], gap: spacing[1], paddingBottom: 40 },
-  fieldLabel: { ...typography.caption, color: colors.text.muted, marginBottom: spacing[2], marginTop: spacing[3] },
+  fieldLabel: { ...typography.caption, color: c.text.muted, marginBottom: spacing[2], marginTop: spacing[3] },
   input: {
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
-    color: colors.text.primary, fontSize: 14, marginBottom: spacing[1],
+    color: c.text.primary, fontSize: 14, marginBottom: spacing[1],
   },
   inputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], marginBottom: spacing[1],
   },
   row: { flexDirection: 'row', gap: spacing[3] },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginBottom: spacing[1] },
   pill: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
   },
-  pillActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue },
-  pillText: { fontSize: 12, fontWeight: '500', color: colors.text.muted },
-  pillTextActive: { color: colors.accent.blue, fontWeight: '700' },
+  pillActive: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue },
+  pillText: { fontSize: 12, fontWeight: '500', color: c.text.muted },
+  pillTextActive: { color: c.accent.blue, fontWeight: '700' },
   catBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
   catBtnText: { fontSize: 13, fontWeight: '600' },
@@ -694,8 +699,8 @@ const s = StyleSheet.create({
   catItem: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.elevated,
   },
-  catItemText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  catItemText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
 });

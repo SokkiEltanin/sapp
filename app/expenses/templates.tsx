@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert, TextInput, Modal, TouchableOpacity,
 } from 'react-native';
@@ -19,12 +19,15 @@ import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { ExpenseTemplate, ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, any][];
 const INCOME_CATS  = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, any][];
 
 export default function TemplatesScreen() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const [templates, setTemplates] = useState<ExpenseTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -295,83 +298,83 @@ export default function TemplatesScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
     gap: spacing[3],
   },
-  title: { flex: 1, ...typography.h3, color: colors.text.primary, fontWeight: '700' },
+  title: { flex: 1, ...typography.h3, color: c.text.primary, fontWeight: '700' },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   addBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   list: { padding: spacing[4], gap: spacing[2], paddingBottom: 40 },
-  hint: { color: colors.text.muted, fontSize: 13, textAlign: 'center', marginTop: spacing[6] },
+  hint: { color: c.text.muted, fontSize: 13, textAlign: 'center', marginTop: spacing[6] },
   empty: { alignItems: 'center', gap: spacing[3], paddingTop: spacing[8], paddingHorizontal: spacing[4] },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
-  emptyHint: { fontSize: 13, color: colors.text.muted, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: c.text.primary },
+  emptyHint: { fontSize: 13, color: c.text.muted, textAlign: 'center', lineHeight: 20 },
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[4],
   },
   iconWrap: { width: 36, height: 36, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   rowInfo: { flex: 1 },
-  rowName: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
-  rowSub: { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  rowName: { fontSize: 14, fontWeight: '600', color: c.text.primary },
+  rowSub: { fontSize: 11, color: c.text.muted, marginTop: 2 },
   rowAmount: { fontSize: 14, fontWeight: '700' },
   iconBtn: { padding: spacing[1] },
-  hintBar: { fontSize: 11, color: colors.text.muted, textAlign: 'center', paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
+  hintBar: { fontSize: 11, color: c.text.muted, textAlign: 'center', paddingHorizontal: spacing[4], paddingBottom: spacing[2] },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalSheet: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: c.bg.secondary,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingTop: spacing[5], paddingBottom: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: c.text.primary },
   modalBody: { padding: spacing[4], gap: spacing[3], paddingBottom: 40 },
 
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
   input: {
-    backgroundColor: colors.bg.elevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    color: colors.text.primary, fontSize: 15,
+    color: c.text.primary, fontSize: 15,
   },
   typeRow: { flexDirection: 'row', gap: spacing[2] },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: spacing[3], borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.elevated,
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.elevated,
   },
-  typeBtnActive: { borderColor: 'rgba(255,255,255,0.2)', backgroundColor: colors.bg.card },
-  typeBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  typeBtnActive: { borderColor: c.border.default, backgroundColor: c.bg.card },
+  typeBtnText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
 
   catScroll: { marginBottom: spacing[1] },
   catChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.elevated, marginRight: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.elevated, marginRight: spacing[2],
   },
-  catChipText: { fontSize: 11, fontWeight: '600', color: colors.text.secondary },
+  catChipText: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
 });
