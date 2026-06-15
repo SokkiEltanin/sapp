@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -11,7 +11,11 @@ interface Props extends TextInputProps {
   containerStyle?: ViewStyle;
 }
 
-export default function InputField({ label, error, leftSlot, rightSlot, containerStyle, ...props }: Props) {
+// forwardRef so callers can imperatively focus the inner TextInput (e.g. open
+// the keyboard reliably AFTER a screen transition, which plain autoFocus misses).
+const InputField = forwardRef<TextInput, Props>(function InputField(
+  { label, error, leftSlot, rightSlot, containerStyle, ...props }, ref,
+) {
   const c = useColors();
   const [focused, setFocused] = useState(false);
 
@@ -24,6 +28,7 @@ export default function InputField({ label, error, leftSlot, rightSlot, containe
       ]}>
         {leftSlot && <View style={styles.slot}>{leftSlot}</View>}
         <TextInput
+          ref={ref}
           placeholderTextColor={c.text.muted}
           {...props}
           style={[styles.input, { color: c.text.primary }, props.style]}
@@ -35,7 +40,9 @@ export default function InputField({ label, error, leftSlot, rightSlot, containe
       {error && <Text style={[typography.caption, { color: c.accent.danger }]}>{error}</Text>}
     </View>
   );
-}
+});
+
+export default InputField;
 
 const styles = StyleSheet.create({
   wrapper: { gap: spacing[1] },

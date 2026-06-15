@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
   Platform, Alert, InteractionManager, TextInput,
@@ -63,6 +63,20 @@ export default function AddExpenseModal() {
   const expenses    = useExpensesStore((s) => s.expenses);
   const [balanceOffset, setBalanceOffset] = useState(0);
   const kb = useKeyboardHeight();
+  const amountRef = useRef<TextInput>(null);
+
+  // Open the keyboard on the amount field, but only AFTER the quick-add menu
+  // close + the screen's fade transition have settled. Plain `autoFocus` fires
+  // mid-animation and the keyboard often fails to appear on Android — hence the
+  // "sometimes it doesn't open". runAfterInteractions + a short delay is the
+  // reliable pattern. Skipped when an amount was prefilled (e.g. from a template).
+  useEffect(() => {
+    if (prefillAmount) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => amountRef.current?.focus(), 80);
+    });
+    return () => task.cancel();
+  }, []);
 
   useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
@@ -224,6 +238,7 @@ export default function AddExpenseModal() {
             <View style={styles.amountRow}>
               <Text style={[styles.currencySymbol, { color: colors.text.muted }]}>PLN</Text>
               <InputField
+                ref={amountRef}
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="0,00"
