@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, Alert, InteractionManager,
@@ -16,6 +16,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 type FormType = 'task' | 'event';
@@ -29,6 +30,8 @@ const PRIORITY_OPTIONS: { value: EventPriority; label: string; color: string }[]
 const EVENT_COLORS = ['#6C63FF', '#43D98F', '#FF6584', '#FFBE55', '#55B4FF', '#A78BFA'];
 
 export default function AddCalendarModal() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const params = useLocalSearchParams<{ startTime?: string; type?: string; date?: string }>();
   const [type, setType] = useState<FormType>(params.type === 'event' ? 'event' : 'task');
   const [title, setTitle] = useState('');
@@ -229,7 +232,7 @@ export default function AddCalendarModal() {
                       styles.priorityBtn,
                       active && (isHigh
                         ? { backgroundColor: colors.accent.danger + '18', borderColor: colors.accent.danger }
-                        : { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.35)' }
+                        : { backgroundColor: colors.border.subtle, borderColor: colors.border.focus }
                       ),
                     ]}
                   >
@@ -279,55 +282,55 @@ export default function AddCalendarModal() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.secondary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.secondary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  headerTitle: { ...typography.h4, color: colors.text.primary },
+  headerTitle: { ...typography.h4, color: c.text.primary },
   typeToggle: {
     flexDirection: 'row', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing[2], paddingVertical: spacing[2], borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card,
   },
   typeBtnActive: {
-    backgroundColor: colors.text.primary,
-    borderColor: colors.text.primary,
+    backgroundColor: c.text.primary,
+    borderColor: c.text.primary,
   },
-  typeBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '600' },
-  typeBtnTextActive: { color: colors.bg.primary },
+  typeBtnText: { ...typography.label, color: c.text.muted, fontWeight: '600' },
+  typeBtnTextActive: { color: c.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: spacing[6] },
   timeRow: { flexDirection: 'row', gap: spacing[3] },
   section: { gap: spacing[3] },
   sectionLabel: {
-    ...typography.label, color: colors.text.secondary,
+    ...typography.label, color: c.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
   },
   priorityRow: { flexDirection: 'row', gap: spacing[2] },
   priorityBtn: {
     flex: 1, alignItems: 'center', paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
   },
-  priorityBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '600' },
+  priorityBtnText: { ...typography.label, color: c.text.muted, fontWeight: '600' },
   colorRow: { flexDirection: 'row', gap: spacing[3], flexWrap: 'wrap' },
   colorDot: {
     width: 32, height: 32, borderRadius: radius.full,
     borderWidth: 2, borderColor: 'transparent',
   },
-  colorDotSelected: { borderColor: colors.white, transform: [{ scale: 1.15 }] },
-  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  colorDotSelected: { borderColor: c.white, transform: [{ scale: 1.15 }] },
+  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: c.border.subtle },
 });
 

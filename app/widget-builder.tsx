@@ -8,6 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import { useDashboardLayout, WidgetViz } from '@/store/dashboardLayout';
 import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS } from '@/utils/statWidgets';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 const GROUPS: MetricGroup[] = ['Finanse', 'Konsumpcja', 'Nastrój i zdrowie', 'Praca i zadania'];
@@ -23,6 +24,8 @@ const VIZ_META: { id: WidgetViz; label: string; Icon: any }[] = [
 ];
 
 export default function WidgetBuilder() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const addCustomTile = useDashboardLayout(s => s.addCustomTile);
   const updateCustomTile = useDashboardLayout(s => s.updateCustomTile);
   const accent = '#6C9EFF';
@@ -289,47 +292,47 @@ export default function WidgetBuilder() {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: colors.text.primary },
+  headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   scroll: { padding: spacing[4], gap: spacing[2] },
-  step: { fontSize: 11, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[1] },
-  rowSubLabel: { fontSize: 11, color: colors.text.muted, marginBottom: spacing[1] },
+  step: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[1] },
+  rowSubLabel: { fontSize: 11, color: c.text.muted, marginBottom: spacing[1] },
   group: { marginBottom: spacing[2] },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing[1] },
-  groupTitle: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
+  groupTitle: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   chip: {
     paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card,
   },
-  chipText: { fontSize: 12.5, fontWeight: '600', color: colors.text.secondary },
+  chipText: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },
   vizRow: { flexDirection: 'row', gap: spacing[2] },
   vizTile: {
     alignItems: 'center', gap: 5, paddingVertical: spacing[3], borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card,
   },
-  vizLabel: { fontSize: 10.5, fontWeight: '600', color: colors.text.muted, textAlign: 'center' },
+  vizLabel: { fontSize: 10.5, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
   periodRow: { flexDirection: 'row', gap: spacing[2] },
   periodBtn: {
     alignItems: 'center', paddingVertical: 10, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card,
   },
-  periodText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
+  periodText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   titleInput: {
-    backgroundColor: colors.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
-    paddingHorizontal: spacing[3], paddingVertical: 11, fontSize: 14, color: colors.text.primary,
+    backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: 11, fontSize: 14, color: c.text.primary,
   },
   calcRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
   calcInput: {
-    flex: 1, backgroundColor: colors.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
-    paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 14, color: colors.text.primary, textAlign: 'center',
+    flex: 1, backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 14, color: c.text.primary, textAlign: 'center',
   },
-  calcX: { fontSize: 15, fontWeight: '700', color: colors.text.muted },
+  calcX: { fontSize: 15, fontWeight: '700', color: c.text.muted },
   calcEq: { fontSize: 12, fontWeight: '700', color: '#6C9EFF', minWidth: 60, textAlign: 'right' },
-  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: c.border.subtle },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg },
-  saveText: { fontSize: 15, fontWeight: '800', color: colors.bg.primary },
+  saveText: { fontSize: 15, fontWeight: '800', color: c.bg.primary },
 });

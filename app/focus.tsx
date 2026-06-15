@@ -12,6 +12,7 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const G = {
   card:       '#0C2218',
@@ -44,6 +45,8 @@ function deadlineSub(iso: string): { label: string; color: string } {
 const PRIORITY_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 };
 
 export default function FocusScreen() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const { tasks, toggle, toggleSubtask, create } = useTasks();
   const startPomodoro = usePomodoroStore(s => s.startFor);
   const [skipSet, setSkipSet] = useState<Set<string>>(new Set());
@@ -170,7 +173,7 @@ export default function FocusScreen() {
                   >
                     {sub.done
                       ? <CheckSquare size={16} color={G.accent} strokeWidth={2} />
-                      : <Square size={16} color='rgba(255,255,255,0.25)' strokeWidth={1.5} />
+                      : <Square size={16} color={colors.text.muted} strokeWidth={1.5} />
                     }
                     <Text style={[s.subText, sub.done && s.subTextDone]}>
                       {sub.title}
@@ -291,8 +294,8 @@ export default function FocusScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: c.bg.primary },
 
   // ── Header ───────────────────────────────────────────────────────────────────
   header: {
@@ -306,7 +309,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
-    flex: 1, fontSize: 13, fontWeight: '800', color: colors.text.muted,
+    flex: 1, fontSize: 13, fontWeight: '800', color: c.text.muted,
     letterSpacing: 1.4,
   },
   queuePill: {
@@ -335,17 +338,17 @@ const s = StyleSheet.create({
     color: G.muted,
   },
   cardTitle: {
-    fontSize: 20, fontWeight: '800', color: colors.white,
+    fontSize: 20, fontWeight: '800', color: c.white,
     letterSpacing: 0.3, lineHeight: 28,
   },
   cardDesc: {
-    fontSize: 13, color: colors.text.secondary, lineHeight: 20,
+    fontSize: 13, color: c.text.secondary, lineHeight: 20,
   },
 
   // Subtasks
   subList: { flex: 1 },
   subProgressTrack: {
-    height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 8, backgroundColor: c.border.subtle,
     borderRadius: 4, overflow: 'hidden', marginBottom: spacing[3],
   },
   subProgressFill: { height: '100%', borderRadius: 4 },
@@ -354,8 +357,8 @@ const s = StyleSheet.create({
     paddingVertical: spacing[2],
     borderBottomWidth: 1, borderBottomColor: 'rgba(46,222,160,0.08)',
   },
-  subText: { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
-  subTextDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  subText: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '500' },
+  subTextDone: { textDecorationLine: 'line-through', color: c.text.muted },
 
   // Card bottom row
   cardBottom: { flexDirection: 'row', alignItems: 'center' },
@@ -367,12 +370,12 @@ const s = StyleSheet.create({
     width: 54, height: 28, borderRadius: 14,
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 7, justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.border.subtle,
     borderWidth: 1, borderColor: G.cardBorder,
   },
   toggleDot: { width: 12, height: 12, borderRadius: 6 },
-  toggleDotLeft:  { backgroundColor: 'rgba(255,255,255,0.22)' },
-  toggleDotRight: { backgroundColor: 'rgba(255,255,255,0.10)' },
+  toggleDotLeft:  { backgroundColor: c.border.subtle },
+  toggleDotRight: { backgroundColor: c.border.subtle },
 
   // ── Below card ────────────────────────────────────────────────────────────────
   belowCard: {
@@ -392,15 +395,15 @@ const s = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  pomCtaGhostText: { fontSize: 12, color: colors.text.muted },
+  pomCtaGhostText: { fontSize: 12, color: c.text.muted },
 
   nextRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingTop: spacing[2],
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
-  nextLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8 },
-  nextTitle: { flex: 1, fontSize: 11, color: colors.text.secondary, fontWeight: '600' },
+  nextLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 0.8 },
+  nextTitle: { flex: 1, fontSize: 11, color: c.text.secondary, fontWeight: '600' },
 
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   skipBtn: {
@@ -425,7 +428,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  captureInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 4 },
+  captureInput: { flex: 1, fontSize: 14, color: c.text.primary, paddingVertical: 4 },
 
   // ── Empty state ───────────────────────────────────────────────────────────────
   emptyBody: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
@@ -435,8 +438,8 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   emptyEmoji: { fontSize: 36, fontWeight: '800', color: G.accent },
-  emptyTitle: { fontSize: 20, fontWeight: '900', color: colors.text.primary, letterSpacing: 1 },
-  emptySub: { fontSize: 13, color: colors.text.muted, textAlign: 'center' },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: c.text.primary, letterSpacing: 1 },
+  emptySub: { fontSize: 13, color: c.text.muted, textAlign: 'center' },
   backBtn: {
     paddingHorizontal: spacing[6], paddingVertical: spacing[4],
     backgroundColor: G.accentDim, borderRadius: radius.xl,

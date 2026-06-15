@@ -12,7 +12,10 @@
       "Bash(perl -i -pe 'if \\($. >= 617\\) { s/backgroundColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./backgroundColor: c.border.subtle/g; s/borderColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./borderColor: c.border.default/g; }' \"app/\\(tabs\\)/tasks.tsx\")",
       "Bash(sed -n '749,775p' app/expenses/scan.tsx)",
       "Bash(sed -n '949,975p' app/expenses/scan.tsx)",
-      "Bash(awk 'NR>=775 && NR<=830 && /^\\\\}\\\\\\) \\\\{/{print NR\": \"$0; getline; print NR\": \"$0; exit}' app/expenses/scan.tsx)"
+      "Bash(awk 'NR>=775 && NR<=830 && /^\\\\}\\\\\\) \\\\{/{print NR\": \"$0; getline; print NR\": \"$0; exit}' app/expenses/scan.tsx)",
+      "Bash(sed -n '25,27p' app/widget-builder.tsx)",
+      "Bash(sed -n '46,48p' app/focus.tsx)",
+      "Bash(sed -n '31,33p' app/calendar/add.tsx)"
     ]
   }
 }
