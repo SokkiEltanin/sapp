@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -15,6 +15,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
 import { EventPriority } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 const EVENT_COLORS = [
@@ -28,6 +29,8 @@ const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
 ];
 
 function Row({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  const colors = useColors();
+  const rw = useMemo(() => makeRw(colors), [colors]);
   return (
     <View style={rw.wrap}>
       <View style={rw.head}>
@@ -38,14 +41,16 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
     </View>
   );
 }
-const rw = StyleSheet.create({
-  wrap: { gap: spacing[2], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: colors.border.subtle },
+const makeRw = (c: any) => StyleSheet.create({
+  wrap: { gap: spacing[2], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  label: { fontSize: 10, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  label: { fontSize: 10, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
 });
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const { events, gcalEvents, updateEvent, deleteEvent, setEvents } = useCalendarStore();
   const event = [...events, ...gcalEvents].find(e => e.id === id);
 
@@ -314,19 +319,19 @@ export default function EventDetailScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  saveBtn: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  saveBtn: { backgroundColor: c.text.primary, borderColor: c.text.primary },
   colorPill: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: spacing[3], paddingVertical: 6,
@@ -338,44 +343,44 @@ const s = StyleSheet.create({
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[10] },
 
   titleCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     borderLeftWidth: 3, padding: spacing[4], gap: spacing[2],
   },
-  titleText: { fontSize: 22, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3, lineHeight: 28 },
-  titleInput: { fontSize: 22, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3, lineHeight: 28, padding: 0 },
-  descText: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
-  descInput: { fontSize: 14, color: colors.text.secondary, lineHeight: 20, padding: 0 },
+  titleText: { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3, lineHeight: 28 },
+  titleInput: { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3, lineHeight: 28, padding: 0 },
+  descText: { fontSize: 14, color: c.text.secondary, lineHeight: 20 },
+  descInput: { fontSize: 14, color: c.text.secondary, lineHeight: 20, padding: 0 },
 
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[4],
   },
 
-  fieldValue: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
+  fieldValue: { fontSize: 14, color: c.text.secondary, lineHeight: 20 },
   fieldInput: {
-    fontSize: 14, color: colors.text.primary,
-    backgroundColor: colors.bg.elevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    fontSize: 14, color: c.text.primary,
+    backgroundColor: c.bg.elevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  timeSep: { color: colors.text.muted, fontSize: 14 },
+  timeSep: { color: c.text.muted, fontSize: 14 },
 
   pillRow: { flexDirection: 'row', gap: spacing[2] },
   pill: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.elevated,
   },
-  pillText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  pillText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
 
   colorRow: { flexDirection: 'row', gap: spacing[3], flexWrap: 'wrap' },
   colorDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 0, borderColor: 'transparent' },
 
-  meta: { fontSize: 11, color: colors.text.muted, paddingHorizontal: spacing[1] },
+  meta: { fontSize: 11, color: c.text.muted, paddingHorizontal: spacing[1] },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  notFoundText: { color: colors.text.secondary, fontSize: 16 },
+  notFoundText: { color: c.text.secondary, fontSize: 16 },
 });

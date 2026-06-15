@@ -17,6 +17,7 @@ import { blocksToPlainText, deserializeBlocks } from '@/utils/richText';
 import { expensesService } from '@/services/expensesService';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 function highlight(text: string, query: string): { part: string; match: boolean }[] {
@@ -31,6 +32,8 @@ function highlight(text: string, query: string): { part: string; match: boolean 
 }
 
 function Highlighted({ text, query }: { text: string; query: string }) {
+  const colors = useColors();
+  const hl = useMemo(() => makeHl(colors), [colors]);
   const parts = highlight(text, query);
   return (
     <Text style={hl.base} numberOfLines={1}>
@@ -40,12 +43,15 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     </Text>
   );
 }
-const hl = StyleSheet.create({
-  base: { fontSize: 14, fontWeight: '500', color: colors.text.primary },
-  match: { color: colors.accent.amber, fontWeight: '700' },
+const makeHl = (c: any) => StyleSheet.create({
+  base: { fontSize: 14, fontWeight: '500', color: c.text.primary },
+  match: { color: c.accent.amber, fontWeight: '700' },
 });
 
 export default function SearchScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const hl = useMemo(() => makeHl(colors), [colors]);
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
@@ -435,49 +441,49 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  input: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 0 },
+  input: { flex: 1, fontSize: 14, color: c.text.primary, paddingVertical: 0 },
   clearBtn: {
     width: 20, height: 20, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle,
     alignItems: 'center', justifyContent: 'center',
   },
   cancelBtn: { paddingVertical: spacing[2] },
-  cancelText: { ...typography.label, color: colors.text.secondary, fontWeight: '600' },
+  cancelText: { ...typography.label, color: c.text.secondary, fontWeight: '600' },
 
   resultCount: {
-    ...typography.caption, color: colors.text.muted,
+    ...typography.caption, color: c.text.muted,
     paddingHorizontal: spacing[4], paddingTop: spacing[2],
   },
 
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: 100 },
 
   empty: { alignItems: 'center', paddingVertical: 64, gap: spacing[3] },
-  emptyTitle: { ...typography.h3, color: colors.text.secondary, fontWeight: '700' },
-  emptySub: { ...typography.body, color: colors.text.muted, textAlign: 'center' },
+  emptyTitle: { ...typography.h3, color: c.text.secondary, fontWeight: '700' },
+  emptySub: { ...typography.body, color: c.text.muted, textAlign: 'center' },
 
   section: { gap: spacing[2] },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[1] },
   sectionTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', flex: 1 },
-  sectionCount: { fontSize: 10, fontWeight: '600', color: colors.text.muted },
+  sectionCount: { fontSize: 10, fontWeight: '600', color: c.text.muted },
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
   rowIcon: {
@@ -485,7 +491,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   rowInfo: { flex: 1, gap: 3 },
-  rowMeta: { ...typography.caption, color: colors.text.muted, fontSize: 11 },
+  rowMeta: { ...typography.caption, color: c.text.muted, fontSize: 11 },
   rowAmount: { ...typography.label, fontWeight: '700', fontSize: 13 },
-  urgentDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.accent.red },
+  urgentDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: c.accent.red },
 });

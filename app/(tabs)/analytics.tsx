@@ -14,6 +14,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MoodLevel, MOOD_COLORS } from '@/types';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Habit icon map ───────────────────────────────────────────────────────────
@@ -70,6 +71,8 @@ function StatCard({ label, value, sub, icon, accent }: {
   label: string; value: string; sub?: string;
   icon: React.ReactNode; accent: string;
 }) {
+  const colors = useColors();
+  const sc = useMemo(() => makeSc(colors), [colors]);
   return (
     <View style={[sc.card, { borderColor: accent + '30' }]}>
       <View style={[sc.iconWrap, { backgroundColor: accent + '18' }]}>
@@ -82,18 +85,18 @@ function StatCard({ label, value, sub, icon, accent }: {
   );
 }
 
-const sc = StyleSheet.create({
+const makeSc = (c: any) => StyleSheet.create({
   card: {
-    flex: 1, backgroundColor: O.card, borderRadius: radius.xl,
+    flex: 1, backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, padding: spacing[3], gap: 4,
   },
   iconWrap: {
     width: 28, height: 28, borderRadius: radius.md,
     alignItems: 'center', justifyContent: 'center', marginBottom: 2,
   },
-  value: { fontSize: 28, fontWeight: '900', color: colors.text.primary, letterSpacing: -1.2 },
+  value: { fontSize: 28, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
   label: { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.9 },
-  sub:   { fontSize: 10, color: colors.text.muted, marginTop: 1 },
+  sub:   { fontSize: 10, color: c.text.muted, marginTop: 1 },
 });
 
 // ─── Mini bar chart ───────────────────────────────────────────────────────────
@@ -101,6 +104,7 @@ const sc = StyleSheet.create({
 function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
   values: number[]; barColors: string[]; labels: string[]; maxH?: number;
 }) {
+  const colors = useColors();
   const max = Math.max(...values, 1);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5 }}>
@@ -110,7 +114,7 @@ function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
             <View style={{
               width: '75%', borderRadius: 3,
               height: v > 0 ? Math.max(4, (v / max) * maxH) : 3,
-              backgroundColor: v > 0 ? barColors[i] : 'rgba(255,255,255,0.07)',
+              backgroundColor: v > 0 ? barColors[i] : colors.border.subtle,
             }} />
           </View>
           <Text style={{ fontSize: 8, color: colors.text.muted, fontWeight: '600' }}>{labels[i]}</Text>
@@ -124,6 +128,8 @@ function MiniBarChart({ values, barColors, labels, maxH = 56 }: {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnalyticsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { tasks }    = useCalendarStore();
   const { habits, completions, getLast30, getStreak, todayDone } = useHabits();
   const { entries: moodEntries }                   = useMoodStore();
@@ -393,7 +399,7 @@ export default function AnalyticsScreen() {
                             key={i}
                             style={[
                               styles.heatmapCell,
-                              { backgroundColor: done ? habit.color + 'DD' : 'rgba(255,255,255,0.05)' },
+                              { backgroundColor: done ? habit.color + 'DD' : colors.border.subtle },
                             ]}
                           />
                         ))}
@@ -457,15 +463,15 @@ export default function AnalyticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  root:   { flex: 1, backgroundColor: c.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
 
   header: {
     paddingTop: spacing[2], paddingBottom: spacing[1],
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  title:     { fontSize: 28, fontWeight: '900', color: colors.text.primary, letterSpacing: -0.5 },
+  title:     { fontSize: 28, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
   weekNav:   { flexDirection: 'row', alignItems: 'center', gap: 2 },
   weekLabel: { fontSize: 11, color: O.muted, fontWeight: '700' },
   navArrow:  { width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
@@ -473,7 +479,7 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', gap: spacing[3] },
 
   card: {
-    backgroundColor: O.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: O.cardBorder,
     padding: spacing[4], gap: spacing[3],
   },
@@ -506,19 +512,19 @@ const styles = StyleSheet.create({
   heatmapGrid: { flex: 1, flexDirection: 'row', flexWrap: 'nowrap', gap: 2 },
   heatmapCell: { width: 7, height: 7, borderRadius: 1.5 },
   heatmapCount: { fontSize: 10, fontWeight: '700', minWidth: 20, textAlign: 'right' },
-  habitName:     { flex: 1, fontSize: 13, color: colors.text.primary, fontWeight: '500' },
+  habitName:     { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '500' },
   habitDots:     { flexDirection: 'row', gap: 3 },
   habitMiniDot: {
     width: 7, height: 7, borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle,
   },
   streakBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: colors.accent.amber + '18',
+    backgroundColor: c.accent.amber + '18',
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
     minWidth: 32, justifyContent: 'center',
   },
-  streakText: { fontSize: 10, fontWeight: '700', color: colors.accent.amber },
+  streakText: { fontSize: 10, fontWeight: '700', color: c.accent.amber },
 
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[4] },
   emptyIcon: {
@@ -526,9 +532,9 @@ const styles = StyleSheet.create({
     backgroundColor: O.accentDim, borderWidth: 1, borderColor: O.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: c.text.primary },
   emptySub: {
-    fontSize: 14, color: colors.text.muted, textAlign: 'center',
+    fontSize: 14, color: c.text.muted, textAlign: 'center',
     lineHeight: 22, paddingHorizontal: spacing[4],
   },
 });

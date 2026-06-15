@@ -15,7 +15,10 @@
       "Bash(awk 'NR>=775 && NR<=830 && /^\\\\}\\\\\\) \\\\{/{print NR\": \"$0; getline; print NR\": \"$0; exit}' app/expenses/scan.tsx)",
       "Bash(sed -n '25,27p' app/widget-builder.tsx)",
       "Bash(sed -n '46,48p' app/focus.tsx)",
-      "Bash(sed -n '31,33p' app/calendar/add.tsx)"
+      "Bash(sed -n '31,33p' app/calendar/add.tsx)",
+      "Bash(sed -n '33,47p' app/search.tsx)",
+      "Bash(sed -n '30,46p' \"app/calendar/[id].tsx\")",
+      "Bash(perl -i -pe 's/backgroundColor: O\\\\.card,/backgroundColor: c.bg.card,/g' \"app/\\(tabs\\)/analytics.tsx\")"
     ]
   }
 }
