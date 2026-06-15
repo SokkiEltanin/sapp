@@ -35,6 +35,7 @@ import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
 import { appSettings } from '@/utils/appSettings';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -56,6 +57,11 @@ const APP_VERSION = 'V2';
 const APP_BUILD: string = process.env.EXPO_PUBLIC_BUILD_NUMBER || 'dev';
 
 function HeroStepper({ label, value, onDec, onInc }: { label: string; value: string; onDec: () => void; onInc: () => void }) {
+  const colors = useColors();
+  const stepStyle = {
+    width: 34, height: 34, borderRadius: radius.md, alignItems: 'center' as const, justifyContent: 'center' as const,
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+  };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
       <Text style={{ flex: 1, fontSize: 12, color: colors.text.secondary }}>{label}</Text>
@@ -69,12 +75,10 @@ function HeroStepper({ label, value, onDec, onInc }: { label: string; value: str
     </View>
   );
 }
-const stepStyle = {
-  width: 34, height: 34, borderRadius: radius.md, alignItems: 'center' as const, justifyContent: 'center' as const,
-  backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
-};
 
 export default function SettingsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
   const { tasks, events, gcalEvents } = useCalendarStore();
@@ -1254,27 +1258,27 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   backBtn: {
     width: 40, height: 40, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  headerTitle: { ...typography.h3, color: colors.text.primary },
+  headerTitle: { ...typography.h3, color: c.text.primary },
   scroll: { padding: spacing[4], gap: spacing[2], paddingBottom: spacing[10] },
   sectionTitle: {
-    ...typography.label, color: colors.text.muted,
+    ...typography.label, color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
     marginBottom: spacing[2], marginTop: spacing[2],
   },
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
     overflow: 'hidden',
   },
@@ -1288,17 +1292,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   rowText: { flex: 1 },
-  rowLabel: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '500' },
-  rowSub: { ...typography.caption, color: colors.text.muted, marginTop: 1 },
+  rowLabel: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
+  rowSub: { ...typography.caption, color: c.text.muted, marginTop: 1 },
   diagBox: {
     marginTop: spacing[2], paddingTop: spacing[3],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[2],
+    borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2],
   },
-  diagTitle: { fontSize: 9, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.8 },
+  diagTitle: { fontSize: 9, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8 },
   diagItem: { gap: 1 },
-  diagItemLabel: { fontSize: 10.5, color: colors.text.muted, fontWeight: '500' },
-  diagItemVal: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  diagHint: { fontSize: 11, color: colors.accent.amber, lineHeight: 15, marginTop: 2 },
+  diagItemLabel: { fontSize: 10.5, color: c.text.muted, fontWeight: '500' },
+  diagItemVal: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  diagHint: { fontSize: 11, color: c.accent.amber, lineHeight: 15, marginTop: 2 },
   rateResultRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: spacing[2], paddingHorizontal: spacing[3],
@@ -1307,47 +1311,47 @@ const styles = StyleSheet.create({
   },
   rateResultRate: { fontSize: 24, fontWeight: '900', color: '#FBBF24', letterSpacing: -0.5 },
   rateResultUnit: { fontSize: 14, fontWeight: '700', color: '#FBBF24' },
-  rateResultSub: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  rateResultSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   rateResultDay: { alignItems: 'flex-end' },
-  rateResultDayVal: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
-  rateResultDayKey: { fontSize: 9.5, color: colors.text.muted },
+  rateResultDayVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
+  rateResultDayKey: { fontSize: 9.5, color: c.text.muted },
   workStatsRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
   workStatTile: {
     flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.md,
     paddingVertical: 8, paddingHorizontal: 6, alignItems: 'center', gap: 2,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
-  workStatVal: { fontSize: 14, fontWeight: '800', color: colors.text.primary },
-  workStatKey: { fontSize: 8.5, color: colors.text.muted, textAlign: 'center' },
+  workStatVal: { fontSize: 14, fontWeight: '800', color: c.text.primary },
+  workStatKey: { fontSize: 8.5, color: c.text.muted, textAlign: 'center' },
   rateOvrBox: {
     marginTop: spacing[2], padding: spacing[3], borderRadius: radius.md,
     backgroundColor: 'rgba(96,165,250,0.06)', borderWidth: 1, borderColor: 'rgba(96,165,250,0.2)', gap: spacing[2],
   },
-  rateOvrLabel: { fontSize: 10.5, fontWeight: '700', color: colors.text.secondary, letterSpacing: 0.3 },
+  rateOvrLabel: { fontSize: 10.5, fontWeight: '700', color: c.text.secondary, letterSpacing: 0.3 },
   rateOvrRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   rateOvrInput: {
     width: 72, height: 34, borderRadius: radius.sm, textAlign: 'center',
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
-    color: colors.text.primary, fontSize: 14, fontWeight: '700',
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
+    color: c.text.primary, fontSize: 14, fontWeight: '700',
   },
   rateOvrBtn: { flex: 1, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   rateOvrBtnText: { fontSize: 11.5, fontWeight: '700' },
   rateOvrClear: { alignSelf: 'flex-start' },
-  rateOvrClearText: { fontSize: 10.5, color: colors.accent.red, fontWeight: '600' },
+  rateOvrClearText: { fontSize: 10.5, color: c.accent.red, fontWeight: '600' },
   shiftList: {
     marginTop: spacing[2], paddingTop: spacing[3],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[1],
+    borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[1],
   },
   shiftListTitle: { fontSize: 9, fontWeight: '800', color: '#60A5FA', letterSpacing: 0.8, marginBottom: spacing[1] },
-  shiftEmpty: { fontSize: 11, color: colors.text.muted, fontStyle: 'italic' },
+  shiftEmpty: { fontSize: 11, color: c.text.muted, fontStyle: 'italic' },
   shiftRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: 7, paddingHorizontal: spacing[2],
     backgroundColor: 'rgba(96,165,250,0.07)', borderRadius: radius.md,
   },
   shiftDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#60A5FA' },
-  shiftTitle: { fontSize: 12.5, fontWeight: '600', color: colors.text.primary },
-  shiftMeta: { fontSize: 10.5, color: colors.text.muted, marginTop: 1 },
+  shiftTitle: { fontSize: 12.5, fontWeight: '600', color: c.text.primary },
+  shiftMeta: { fontSize: 10.5, color: c.text.muted, marginTop: 1 },
   shiftHours: { fontSize: 12, fontWeight: '700', color: '#60A5FA' },
   timeRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
@@ -1355,17 +1359,17 @@ const styles = StyleSheet.create({
   },
   timeField: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.elevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[1],
   },
-  timeSep: { ...typography.h4, color: colors.text.muted },
+  timeSep: { ...typography.h4, color: c.text.muted },
   timeInput: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
   notifLabel: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingBottom: spacing[1],
   },
-  notifLabelText: { ...typography.caption, color: colors.text.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 },
+  notifLabelText: { ...typography.caption, color: c.text.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6 },
   saveRow: { paddingHorizontal: spacing[4], paddingBottom: spacing[3] },
   saveTimeBtn: {
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
@@ -1374,7 +1378,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
   },
-  saveTimeBtnText: { ...typography.label, fontWeight: '700', color: colors.text.primary },
+  saveTimeBtnText: { ...typography.label, fontWeight: '700', color: c.text.primary },
   dangerRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
@@ -1386,25 +1390,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: spacing[3], paddingVertical: 5,
     borderRadius: radius.full,
-    backgroundColor: colors.accent.success + '18',
-    borderWidth: 1, borderColor: colors.accent.success + '35',
+    backgroundColor: c.accent.success + '18',
+    borderWidth: 1, borderColor: c.accent.success + '35',
   },
-  saveBudgetText: { fontSize: 11, fontWeight: '700', color: colors.accent.success },
+  saveBudgetText: { fontSize: 11, fontWeight: '700', color: c.accent.success },
   budgetRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
   },
   budgetInput: {
     flex: 1, textAlign: 'right',
-    fontSize: 15, fontWeight: '700', color: colors.text.primary,
+    fontSize: 15, fontWeight: '700', color: c.text.primary,
     paddingHorizontal: spacing[2], paddingVertical: 4,
   },
-  budgetCur: { ...typography.caption, color: colors.text.muted, fontWeight: '600', fontSize: 11 },
+  budgetCur: { ...typography.caption, color: c.text.muted, fontWeight: '600', fontSize: 11 },
   dataRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
   },
-  dataVal: { ...typography.h4, fontWeight: '800', color: colors.text.primary },
+  dataVal: { ...typography.h4, fontWeight: '800', color: c.text.primary },
   googleBtn: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
     borderRadius: radius.full,
@@ -1423,11 +1427,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  appIconText: { fontSize: 26, fontWeight: '900', color: colors.text.primary },
-  appName: { ...typography.h3, color: colors.text.primary, fontWeight: '800' },
-  appVersion: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  appIconText: { fontSize: 26, fontWeight: '900', color: c.text.primary },
+  appName: { ...typography.h3, color: c.text.primary, fontWeight: '800' },
+  appVersion: { ...typography.caption, color: c.text.muted, marginTop: 2 },
   aboutDesc: {
-    ...typography.bodySmall, color: colors.text.secondary, lineHeight: 20,
+    ...typography.bodySmall, color: c.text.secondary, lineHeight: 20,
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },

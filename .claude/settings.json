@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -nA4 \"topArea:\" app/_layout.tsx)",
+      "Bash(grep -nA5 \"topArea:\" \"app/\\(tabs\\)/_layout.tsx\")"
+    ]
+  }
+}
