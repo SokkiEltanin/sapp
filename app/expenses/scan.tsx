@@ -19,6 +19,7 @@ import {
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { getPayers, addPayer } from '@/utils/payers';
 import * as LucideIcons from 'lucide-react-native';
@@ -44,6 +45,8 @@ function todayIso() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ScanReceiptModal() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [receipt, setReceipt]       = useState<ParsedReceipt | null>(null);
   const [selected, setSelected]     = useState<Set<number>>(new Set());
   const [saving, setSaving]         = useState(false);
@@ -663,6 +666,8 @@ function CategoryPicker({ current, onSelect }: {
   current: ExpenseCategory;
   onSelect: (cat: ExpenseCategory) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <ScrollView
       horizontal
@@ -695,6 +700,8 @@ function TagPicker({ activeTags, onToggle, freq = {} }: {
   onToggle: (tag: string) => void;
   freq?: Record<string, number>;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // Built-in tags + any previously-used custom tags (from tag memory), by frequency.
   const sorted = useMemo(() => {
     const all = new Set<string>([...ITEM_TAGS, ...Object.keys(freq), ...activeTags]);
@@ -779,6 +786,8 @@ function ProductRow({
   eaters?: string[];
   onEatersChange?: (eaters: string[]) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const meta    = getCategoryMeta(category);
   const IconComp = (LucideIcons as any)[meta.icon];
 
@@ -963,6 +972,8 @@ function CustomProductRow({
   onTagsChange: (tags: string[]) => void;
   tagFreq?: Record<string, number>;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const meta     = getCategoryMeta(product.category);
   const IconComp = (LucideIcons as any)[meta.icon];
 
@@ -1063,27 +1074,27 @@ function CustomProductRow({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.secondary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.secondary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  title: { ...typography.h4, color: colors.text.primary },
+  title: { ...typography.h4, color: c.text.primary },
 
   // ── Text paste input ────────────────────────────────────────────────────────
   pasteInput: {
     flex: 1,
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
-    padding: spacing[4], color: colors.text.primary,
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: c.border.default,
+    padding: spacing[4], color: c.text.primary,
     fontSize: 12, lineHeight: 18,
     fontFamily: 'monospace',
   },
@@ -1091,57 +1102,57 @@ const styles = StyleSheet.create({
   manualBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
   },
-  manualBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  manualBtnText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
 
   // ── Receipt meta ───────────────────────────────────────────────────────────
   receiptMeta: {
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle, gap: spacing[2],
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle, gap: spacing[2],
   },
-  storeName: { ...typography.h4, color: colors.text.primary },
+  storeName: { ...typography.h4, color: c.text.primary },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   discountBadge: {
-    backgroundColor: colors.accent.success + '22',
+    backgroundColor: c.accent.success + '22',
     paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.sm,
   },
-  discountText: { ...typography.caption, color: colors.accent.success, fontWeight: '600' },
-  total: { ...typography.label, color: colors.text.primary, fontWeight: '700' },
+  discountText: { ...typography.caption, color: c.accent.success, fontWeight: '600' },
+  total: { ...typography.label, color: c.text.primary, fontWeight: '700' },
   mismatchBadge: {
-    backgroundColor: colors.accent.warning + '18',
+    backgroundColor: c.accent.warning + '18',
     borderRadius: radius.sm,
     paddingHorizontal: spacing[2], paddingVertical: 4,
-    borderLeftWidth: 2, borderLeftColor: colors.accent.warning,
+    borderLeftWidth: 2, borderLeftColor: c.accent.warning,
   },
-  mismatchText: { fontSize: 10, color: colors.accent.warning, fontWeight: '500', lineHeight: 15 },
+  mismatchText: { fontSize: 10, color: c.accent.warning, fontWeight: '500', lineHeight: 15 },
 
   // ── Sort bar ───────────────────────────────────────────────────────────────
   sortBar: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   sortPill: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
   },
-  sortPillActive: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
-  sortText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  sortTextActive: { color: colors.text.inverse },
+  sortPillActive: { backgroundColor: c.text.primary, borderColor: c.text.primary },
+  sortText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
+  sortTextActive: { color: c.text.inverse },
   toggleAllBtn: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: c.border.default,
   },
-  toggleAllText: { fontSize: 10, fontWeight: '500', color: colors.text.muted },
+  toggleAllText: { fontSize: 10, fontWeight: '500', color: c.text.muted },
 
   // ── Product list ───────────────────────────────────────────────────────────
   productList: { padding: spacing[4], gap: spacing[2], paddingBottom: 100 },
   sectionLabel: {
-    ...typography.caption, color: colors.text.muted,
+    ...typography.caption, color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing[1],
   },
 
@@ -1156,78 +1167,78 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   groupName: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
-  groupCount: { fontSize: 10, color: colors.text.muted, marginLeft: 2 },
-  groupTotal: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  groupCount: { fontSize: 10, color: c.text.muted, marginLeft: 2 },
+  groupTotal: { fontSize: 12, fontWeight: '700', color: c.text.primary },
 
   // ── Product row ────────────────────────────────────────────────────────────
   productWrap: { marginBottom: spacing[2] },
   productRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    padding: spacing[3], backgroundColor: colors.bg.card,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.subtle,
+    padding: spacing[3], backgroundColor: c.bg.card,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle,
   },
-  productRowSelected: { borderColor: 'rgba(255,255,255,0.25)', backgroundColor: 'rgba(255,255,255,0.04)' },
+  productRowSelected: { borderColor: c.border.focus, backgroundColor: c.border.subtle },
   productRowInactive: { opacity: 0.5 },
   productRowSuspect: { opacity: 0.92, borderColor: 'rgba(251,191,36,0.45)', backgroundColor: 'rgba(251,191,36,0.06)' },
   suspectBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
   suspectText: { flex: 1, fontSize: 10, color: '#FBBF24', fontWeight: '600', lineHeight: 13 },
   depositBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
-  depositText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  depositText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
   reconRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: 8, paddingHorizontal: spacing[3], borderRadius: radius.md, borderWidth: 1,
   },
   reconOk: { backgroundColor: 'rgba(42,198,143,0.08)', borderColor: 'rgba(42,198,143,0.35)' },
   reconWarn: { backgroundColor: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.4)' },
-  reconText: { flex: 1, fontSize: 11.5, color: colors.text.secondary },
-  reconStrong: { color: colors.text.primary, fontWeight: '700' },
+  reconText: { flex: 1, fontSize: 11.5, color: c.text.secondary },
+  reconStrong: { color: c.text.primary, fontWeight: '700' },
   reconDelta: { color: '#FBBF24', fontWeight: '700' },
   checkbox: {
     width: 20, height: 20, borderRadius: 5, borderWidth: 2,
-    borderColor: colors.border.default, alignItems: 'center', justifyContent: 'center',
+    borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
   },
-  checkboxDone: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  checkboxDone: { backgroundColor: c.text.primary, borderColor: c.text.primary },
   catIconWrap: {
     width: 32, height: 32, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
   },
   productInfo: { flex: 1, gap: 4 },
-  productName: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '500' },
+  productName: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
   productMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
-  productMetaText: { ...typography.caption, color: colors.text.muted },
+  productMetaText: { ...typography.caption, color: c.text.muted },
 
   catChip: {
     paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  catChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  catChipText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
 
   promoBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: colors.accent.success + '22',
+    backgroundColor: c.accent.success + '22',
     paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
   },
-  promoText: { ...typography.caption, color: colors.accent.success, fontWeight: '600', fontSize: 10 },
+  promoText: { ...typography.caption, color: c.accent.success, fontWeight: '600', fontSize: 10 },
 
   priceCol: { alignItems: 'flex-end', gap: 1 },
-  originalPrice: { ...typography.caption, color: colors.text.muted, textDecorationLine: 'line-through' },
-  price: { ...typography.label, fontWeight: '700', color: colors.text.primary },
+  originalPrice: { ...typography.caption, color: c.text.muted, textDecorationLine: 'line-through' },
+  price: { ...typography.label, fontWeight: '700', color: c.text.primary },
   priceInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   priceInput: {
-    fontSize: 13, fontWeight: '700', color: colors.text.primary,
+    fontSize: 13, fontWeight: '700', color: c.text.primary,
     minWidth: 44, textAlign: 'right', paddingVertical: 0,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.15)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
-  priceCur: { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
+  priceCur: { fontSize: 11, color: c.text.muted, fontWeight: '500' },
 
   // ── Category picker ────────────────────────────────────────────────────────
   pickerScroll: {
-    backgroundColor: colors.bg.elevated,
+    backgroundColor: c.bg.elevated,
     borderBottomLeftRadius: radius.md,
     borderBottomRightRadius: radius.md,
-    borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderTopWidth: 0, borderColor: c.border.default,
   },
   pickerRow: {
     flexDirection: 'row', gap: spacing[2],
@@ -1236,37 +1247,37 @@ const styles = StyleSheet.create({
   pickerItem: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: spacing[3], paddingVertical: 7,
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  pickerLabel: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  pickerLabel: { fontSize: 11, fontWeight: '600', color: c.text.muted },
 
   // ── Footer ─────────────────────────────────────────────────────────────────
-  footer: { padding: spacing[4], gap: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  footer: { padding: spacing[4], gap: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   payerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   payerChip: {
     paddingHorizontal: spacing[3], height: 32, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated,
   },
-  payerChipActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue },
-  payerChipText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
-  payerChipTextActive: { color: colors.accent.blue },
+  payerChipActive: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue },
+  payerChipText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  payerChipTextActive: { color: c.accent.blue },
   payerInput: {
     paddingHorizontal: spacing[3], height: 32, minWidth: 90, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
-    fontSize: 13, color: colors.text.primary,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated,
+    fontSize: 13, color: c.text.primary,
   },
   payerAddChip: {
     paddingHorizontal: spacing[3], height: 32, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.subtle, borderStyle: 'dashed',
+    borderWidth: 1, borderColor: c.border.subtle, borderStyle: 'dashed',
   },
-  payerAddText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  payerAddText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
 
   // ── Editable product name ─────────────────────────────────────────────────
   productNameInput: {
-    fontSize: 13, fontWeight: '500', color: colors.text.primary,
+    fontSize: 13, fontWeight: '500', color: c.text.primary,
     padding: 0, flex: 1,
   },
 
@@ -1274,20 +1285,20 @@ const styles = StyleSheet.create({
   customPriceCol: { alignItems: 'flex-end', gap: 3 },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   qtyInput: {
-    fontSize: 10, fontWeight: '600', color: colors.text.muted,
+    fontSize: 10, fontWeight: '600', color: c.text.muted,
     minWidth: 32, textAlign: 'right', paddingVertical: 0,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
-  qtySuffix: { fontSize: 9, color: colors.text.muted },
+  qtySuffix: { fontSize: 9, color: c.text.muted },
 
   // ── Custom product row ────────────────────────────────────────────────────
   customRow: {
-    borderColor: colors.accent.green + '30',
-    backgroundColor: colors.accent.green + '06',
+    borderColor: c.accent.green + '30',
+    backgroundColor: c.accent.green + '06',
   },
   deleteCustomBtn: {
     width: 28, height: 28, borderRadius: radius.sm,
-    backgroundColor: colors.accent.red + '15', borderWidth: 1, borderColor: colors.accent.red + '30',
+    backgroundColor: c.accent.red + '15', borderWidth: 1, borderColor: c.accent.red + '30',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -1295,45 +1306,45 @@ const styles = StyleSheet.create({
   addProductBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.accent.green + '40', borderStyle: 'dashed',
-    backgroundColor: colors.accent.green + '08', marginTop: spacing[1],
+    borderWidth: 1, borderColor: c.accent.green + '40', borderStyle: 'dashed',
+    backgroundColor: c.accent.green + '08', marginTop: spacing[1],
   },
-  addProductBtnText: { fontSize: 13, fontWeight: '600', color: colors.accent.green },
+  addProductBtnText: { fontSize: 13, fontWeight: '600', color: c.accent.green },
 
   // ── Tag chips & picker ────────────────────────────────────────────────────
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
   tagChip: {
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-    backgroundColor: colors.accent.blue + '18',
-    borderWidth: 1, borderColor: colors.accent.blue + '35',
+    backgroundColor: c.accent.blue + '18',
+    borderWidth: 1, borderColor: c.accent.blue + '35',
   },
-  tagChipText: { fontSize: 9, fontWeight: '600', color: colors.accent.blue },
+  tagChipText: { fontSize: 9, fontWeight: '600', color: c.accent.blue },
   tagEditBtn: {
     paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
     flexDirection: 'row', alignItems: 'center', gap: 2,
   },
-  tagEditBtnActive: { borderColor: colors.accent.blue + '60', backgroundColor: colors.accent.blue + '12' },
-  tagEditBtnText: { fontSize: 9, color: colors.text.muted },
+  tagEditBtnActive: { borderColor: c.accent.blue + '60', backgroundColor: c.accent.blue + '12' },
+  tagEditBtnText: { fontSize: 9, color: c.text.muted },
   exclBtn: {
     paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
     flexDirection: 'row', alignItems: 'center', gap: 2,
   },
   exclBtnActive: { borderColor: 'rgba(251,191,36,0.5)', backgroundColor: 'rgba(251,191,36,0.12)' },
-  exclBtnText: { fontSize: 9, color: colors.text.muted },
+  exclBtnText: { fontSize: 9, color: c.text.muted },
   eaterRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
-  eaterLabel: { fontSize: 9, color: colors.text.muted, fontWeight: '600' },
+  eaterLabel: { fontSize: 9, color: c.text.muted, fontWeight: '600' },
   eaterChip: {
     paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.border.subtle,
   },
   eaterChipOn: { borderColor: 'rgba(74,203,168,0.6)', backgroundColor: 'rgba(74,203,168,0.15)' },
-  eaterChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  eaterChipText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
   eaterChipTextOn: { color: '#4ECBA8' },
-  eaterHint: { fontSize: 9, color: colors.text.muted, fontStyle: 'italic' },
+  eaterHint: { fontSize: 9, color: c.text.muted, fontStyle: 'italic' },
   weighChip: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
     paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4,
@@ -1343,10 +1354,10 @@ const styles = StyleSheet.create({
   weighUnit: { fontSize: 9, color: '#60A5FA', fontWeight: '600' },
   tagPickerItem: {
     paddingHorizontal: spacing[3], paddingVertical: 7,
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  tagPickerItemActive: { borderColor: colors.accent.blue, backgroundColor: colors.accent.blue + '18' },
-  tagPickerItemText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  tagPickerItemTextActive: { color: colors.accent.blue },
+  tagPickerItemActive: { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' },
+  tagPickerItemText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
+  tagPickerItemTextActive: { color: c.accent.blue },
 });

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, KeyboardAvoidingView, Platform,
@@ -19,6 +19,7 @@ import { getFoodTags, categorize } from '@/utils/receiptParser';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 interface Item {
@@ -37,6 +38,8 @@ function CategoryPicker({ current, onSelect }: {
   current: ExpenseCategory;
   onSelect: (cat: ExpenseCategory) => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <ScrollView
       horizontal
@@ -69,6 +72,8 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
   onUpdate: (updates: Partial<Item>) => void;
   onDelete: () => void;
 }) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [catOpen, setCatOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [newTag, setNewTag] = useState('');
@@ -123,7 +128,7 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
             returnKeyType="next"
           />
           <TouchableOpacity onPress={onDelete} style={styles.deleteBtn} hitSlop={8}>
-            <Trash2 size={15} color="rgba(255,255,255,0.2)" />
+            <Trash2 size={15} color={colors.text.muted} />
           </TouchableOpacity>
         </View>
 
@@ -260,6 +265,8 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
 }
 
 export default function ManualReceiptScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [storeName, setStoreName] = useState('');
   const [items, setItems] = useState<Item[]>([makeItem()]);
   const [saving, setSaving] = useState(false);
@@ -470,137 +477,137 @@ export default function ManualReceiptScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.secondary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.secondary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
   headerCenter: { alignItems: 'center' },
-  title: { ...typography.h4, color: colors.text.primary },
-  subtitle: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  title: { ...typography.h4, color: c.text.primary },
+  subtitle: { ...typography.caption, color: c.text.muted, marginTop: 2 },
 
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[6] },
 
   storeWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
-  storeInput: { flex: 1, fontSize: 15, color: colors.text.primary, paddingVertical: 0 },
+  storeInput: { flex: 1, fontSize: 15, color: c.text.primary, paddingVertical: 0 },
 
   itemsLabel: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[1],
   },
-  labelText: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
-  labelCount: { fontSize: 10, color: colors.text.muted },
+  labelText: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  labelCount: { fontSize: 10, color: c.text.muted },
 
   // ── Item card ────────────────────────────────────────────────────────────────
   itemWrap: { gap: 0 },
   itemCard: {
-    backgroundColor: colors.bg.card, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[3], gap: spacing[2],
   },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   itemNumWrap: {
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.border.subtle,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  itemNum: { fontSize: 10, fontWeight: '700', color: colors.text.muted },
-  nameInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 0 },
+  itemNum: { fontSize: 10, fontWeight: '700', color: c.text.muted },
+  nameInput: { flex: 1, fontSize: 14, color: c.text.primary, paddingVertical: 0 },
   deleteBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   // qty × price row
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   qtyWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: colors.bg.elevated, borderRadius: radius.sm,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: 4, paddingVertical: 3,
   },
   qtyStep: {
     width: 26, height: 26, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.border.subtle,
   },
-  qtyStepText: { fontSize: 18, fontWeight: '700', color: colors.accent.blue, lineHeight: 20 },
-  qtyLabel: { fontSize: 9, color: colors.text.muted, fontWeight: '500' },
+  qtyStepText: { fontSize: 18, fontWeight: '700', color: c.accent.blue, lineHeight: 20 },
+  qtyLabel: { fontSize: 9, color: c.text.muted, fontWeight: '500' },
   qtyInput: {
-    fontSize: 14, fontWeight: '700', color: colors.text.primary,
+    fontSize: 14, fontWeight: '700', color: c.text.primary,
     width: 34, textAlign: 'center', paddingVertical: 0,
   },
-  timesSign: { fontSize: 13, color: colors.text.muted },
+  timesSign: { fontSize: 13, color: c.text.muted },
   unitPriceInput: {
-    flex: 1, fontSize: 16, fontWeight: '700', color: colors.text.primary,
+    flex: 1, fontSize: 16, fontWeight: '700', color: c.text.primary,
     textAlign: 'right', paddingVertical: 0,
   },
-  priceSuffix: { fontSize: 12, color: colors.text.muted, fontWeight: '500' },
-  eqSign: { fontSize: 12, color: colors.text.muted },
-  lineTotalText: { fontSize: 13, fontWeight: '800', color: colors.accent.green, letterSpacing: -0.3 },
+  priceSuffix: { fontSize: 12, color: c.text.muted, fontWeight: '500' },
+  eqSign: { fontSize: 12, color: c.text.muted },
+  lineTotalText: { fontSize: 13, fontWeight: '800', color: c.accent.green, letterSpacing: -0.3 },
 
   // category & tags row
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   catChip: {
     paddingHorizontal: spacing[2], paddingVertical: 5, borderRadius: radius.sm,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  catChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '600' },
+  catChipText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
   tagsToggleBtn: {
     flex: 1, paddingHorizontal: spacing[2], paddingVertical: 5,
     borderRadius: radius.sm, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   tagsToggleBtnActive: {
-    borderColor: colors.accent.blue + '60',
-    backgroundColor: colors.accent.blue + '0C',
+    borderColor: c.accent.blue + '60',
+    backgroundColor: c.accent.blue + '0C',
   },
-  tagsToggleBtnFilled: { borderColor: colors.accent.blue + '40' },
-  tagsToggleText: { fontSize: 10, color: colors.accent.blue, fontWeight: '600' },
-  tagsTogglePlaceholder: { fontSize: 10, color: colors.text.muted },
+  tagsToggleBtnFilled: { borderColor: c.accent.blue + '40' },
+  tagsToggleText: { fontSize: 10, color: c.accent.blue, fontWeight: '600' },
+  tagsTogglePlaceholder: { fontSize: 10, color: c.text.muted },
 
   tagPicker: {
     flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2],
-    backgroundColor: colors.bg.elevated,
+    backgroundColor: c.bg.elevated,
     borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md,
-    borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderTopWidth: 0, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
   tagPickerItem: {
     paddingHorizontal: spacing[3], paddingVertical: 7,
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   tagPickerItemActive: {
-    borderColor: colors.accent.blue + '60',
-    backgroundColor: colors.accent.blue + '18',
+    borderColor: c.accent.blue + '60',
+    backgroundColor: c.accent.blue + '18',
   },
-  tagPickerText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  tagPickerText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
   customTagRow: { width: '100%', marginTop: 6 },
   customTagInput: {
-    fontSize: 12, color: colors.text.primary,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.md,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    fontSize: 12, color: c.text.primary,
+    backgroundColor: c.border.subtle, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: 10, paddingVertical: 6,
   },
 
   pickerScroll: {
-    backgroundColor: colors.bg.elevated,
+    backgroundColor: c.bg.elevated,
     borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md,
-    borderWidth: 1, borderTopWidth: 0, borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1, borderTopWidth: 0, borderColor: c.border.default,
   },
   pickerRow: {
     flexDirection: 'row', gap: spacing[2],
@@ -609,35 +616,35 @@ const styles = StyleSheet.create({
   pickerItem: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: spacing[3], paddingVertical: 7,
-    borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  pickerLabel: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  pickerLabel: { fontSize: 11, fontWeight: '600', color: c.text.muted },
 
   catSugg: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing[2], paddingVertical: 4,
     borderRadius: radius.sm,
-    backgroundColor: colors.accent.blue + '18',
-    borderWidth: 1, borderColor: colors.accent.blue + '40',
+    backgroundColor: c.accent.blue + '18',
+    borderWidth: 1, borderColor: c.accent.blue + '40',
   },
-  catSuggText: { fontSize: 10, fontWeight: '600', color: colors.accent.blue },
+  catSuggText: { fontSize: 10, fontWeight: '600', color: c.accent.blue },
 
   addItemBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.accent.blue + '30',
+    borderWidth: 1, borderColor: c.accent.blue + '30',
     borderStyle: 'dashed',
-    backgroundColor: colors.accent.blue + '08',
+    backgroundColor: c.accent.blue + '08',
   },
-  addItemText: { fontSize: 13, fontWeight: '600', color: colors.accent.blue },
+  addItemText: { fontSize: 13, fontWeight: '600', color: c.accent.blue },
 
   footer: {
     padding: spacing[4], gap: spacing[2],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
-    backgroundColor: colors.bg.secondary,
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+    backgroundColor: c.bg.secondary,
   },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing[1] },
-  totalLabel: { ...typography.label, color: colors.text.secondary },
-  totalAmount: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
+  totalLabel: { ...typography.label, color: c.text.secondary },
+  totalAmount: { fontSize: 20, fontWeight: '800', color: c.text.primary },
 });
