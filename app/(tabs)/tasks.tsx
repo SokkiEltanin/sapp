@@ -208,7 +208,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
           hitSlop={6}
           activeOpacity={0.8}
         >
-          <Check size={15} color={isDone ? G.accent : 'rgba(255,255,255,0.22)'} strokeWidth={2.8} />
+          <Check size={15} color={isDone ? G.accent : colors.text.muted} strokeWidth={2.8} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -217,7 +217,7 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
           hitSlop={6}
           activeOpacity={0.8}
         >
-          <Pencil size={11} color={isDone ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.30)'} strokeWidth={2} />
+          <Pencil size={11} color={isDone ? colors.text.muted : colors.text.secondary} strokeWidth={2} />
         </TouchableOpacity>
       </View>
 
@@ -641,8 +641,8 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   doneBtn: {
     width: 34, height: 34, borderRadius: 17,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: c.border.subtle,
+    borderWidth: 1.5, borderColor: c.border.default,
   },
   doneBtnActive: {
     backgroundColor: g.accentDim,
@@ -652,19 +652,19 @@ const makeS = (c: any, g: any) => StyleSheet.create({
     width: 54, height: 28, borderRadius: 14,
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 7, justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.border.subtle,
     borderWidth: 1, borderColor: g.cardBorder,
   },
   toggleTrackDone: { backgroundColor: 'rgba(46,222,160,0.18)', borderColor: g.accent + '70' },
   toggleDot: { width: 12, height: 12, borderRadius: 6 },
-  toggleDotLeft:   { backgroundColor: 'rgba(255,255,255,0.22)' },
-  toggleDotRight:  { backgroundColor: 'rgba(255,255,255,0.10)' },
+  toggleDotLeft:   { backgroundColor: c.border.subtle },
+  toggleDotRight:  { backgroundColor: c.border.subtle },
   toggleDotActive: { backgroundColor: g.accent },
 
   editBtn: {
     width: 28, height: 28, borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: c.border.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -679,22 +679,22 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   cardMilestones: { fontSize: 9, color: c.text.muted },
   pomoPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(77,217,245,0.10)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
   pomoPillText: { fontSize: 9, fontWeight: '700', color: '#4DD9F5' },
-  recurPill: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },
+  recurPill: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.border.subtle },
   tagPill: { backgroundColor: 'rgba(108,158,255,0.10)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, borderWidth: 1, borderColor: 'rgba(108,158,255,0.20)' },
   tagPillText: { fontSize: 8, fontWeight: '600', color: c.accent.blue + 'CC' },
 
   // ── Section headers ────────────────────────────────────────────────────────
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginVertical: spacing[3] },
-  sectionLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
+  sectionLine: { flex: 1, height: 1, backgroundColor: c.border.subtle },
   sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   sectionLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
-  sectionBadge: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
+  sectionBadge: { backgroundColor: c.border.subtle, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
   sectionBadgeText: { fontSize: 9, fontWeight: '700', color: c.text.muted },
 
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[4], marginBottom: spacing[1], paddingHorizontal: spacing[1] },
   groupDot: { width: 6, height: 6, borderRadius: 3 },
   groupLabel: { flex: 1, fontSize: 9, fontWeight: '800', letterSpacing: 1.6 },
-  groupCount: { fontSize: 9, fontWeight: '700', color: c.text.muted, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  groupCount: { fontSize: 9, fontWeight: '700', color: c.text.muted, backgroundColor: c.border.subtle, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
 
   // ── Empty ──────────────────────────────────────────────────────────────────
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },

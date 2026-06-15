@@ -565,7 +565,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chartTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
   toggle: {
-    flexDirection: 'row', gap: 2, backgroundColor: 'rgba(255,255,255,0.05)',
+    flexDirection: 'row', gap: 2, backgroundColor: c.border.subtle,
     borderRadius: radius.full, padding: 2,
   },
   toggleBtn: { paddingHorizontal: spacing[3], paddingVertical: 4, borderRadius: radius.full },
@@ -573,7 +573,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   toggleText: { fontSize: 10, fontWeight: '700', color: c.text.muted },
   toggleTextOn: { color: f.accent },
   chartTotalsRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  chartTotal: { fontSize: 26, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1 },
+  chartTotal: { fontSize: 26, fontWeight: '800', color: c.text.primary, letterSpacing: -1 },
   chartTotalUnit: { fontSize: 14, fontWeight: '600', color: c.text.muted },
   chartLegend: { gap: 3, alignItems: 'flex-end', paddingBottom: 2 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -581,7 +581,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   legendDash: { width: 10, height: 2, borderRadius: 1 },
   legendText: { fontSize: 10, color: c.text.muted, fontWeight: '500' },
   chartValues: { flexDirection: 'row', marginBottom: 2 },
-  chartValue: { flex: 1, fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.55)', textAlign: 'center' },
+  chartValue: { flex: 1, fontSize: 9, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
   chartLabels: { flexDirection: 'row' },
   chartLabel: { flex: 1, fontSize: 9, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
 

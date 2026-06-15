@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(grep -nA4 \"topArea:\" app/_layout.tsx)",
-      "Bash(grep -nA5 \"topArea:\" \"app/\\(tabs\\)/_layout.tsx\")"
+      "Bash(grep -nA5 \"topArea:\" \"app/\\(tabs\\)/_layout.tsx\")",
+      "Bash(grep -cE \"colors\\\\.|useColors|#[0-9A-Fa-f]{6}|rgba\\\\\\(255,255,255\" src/components/expenses/ExpenseItem.tsx)",
+      "Bash(perl -i -pe 'if \\($. >= 2620 && $. <= 2770\\) { s/backgroundColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./backgroundColor: c.border.subtle/g; s/borderColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./borderColor: c.border.default/g; s/borderBottomColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./borderBottomColor: c.border.subtle/g; }' \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(awk -F: '$1>=2620 && $1<=2770')",
+      "Bash(perl -i -pe 's/backgroundColor: .rgba\\\\\\(255,255,255,0\\\\.04\\\\\\)./backgroundColor: c.border.subtle/ if $. == 2784; s/borderBottomColor: .rgba\\\\\\(255,255,255,0\\\\.05\\\\\\)./borderBottomColor: c.border.subtle/ if $. == 2823; s/backgroundColor: .rgba\\\\\\(255,255,255,0\\\\.05\\\\\\)./backgroundColor: c.border.subtle/ if $. == 2926;' \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(awk -F: '$1>=2700')",
+      "Bash(awk -F: '$1<1500')",
+      "Bash(perl -i -pe 'if \\($. >= 617\\) { s/backgroundColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./backgroundColor: c.border.subtle/g; s/borderColor: .rgba\\\\\\(255,255,255,0\\\\.\\\\d+\\\\\\)./borderColor: c.border.default/g; }' \"app/\\(tabs\\)/tasks.tsx\")"
     ]
   }
 }

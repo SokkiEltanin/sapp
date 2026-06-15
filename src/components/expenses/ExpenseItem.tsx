@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { useColors } from '@/theme/useColors';
 import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
@@ -27,11 +28,13 @@ interface Props {
 
 export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const isIncome  = expense.type === 'income';
   const isReceipt = !isIncome && (expense.receiptItems?.length ?? 0) > 0;
   const meta      = getCategoryMeta(expense.category);
-  const accentColor = isIncome ? colors.accent.green : isReceipt ? colors.accent.blue : 'rgba(255,255,255,0.07)';
+  const accentColor = isIncome ? colors.accent.green : isReceipt ? colors.accent.blue : colors.border.default;
 
   const title = expense.storeName || expense.note || meta.label;
   const subtitle = isReceipt
@@ -130,15 +133,15 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: any) => StyleSheet.create({
   wrap: {
-    backgroundColor: colors.bg.card,
+    backgroundColor: c.bg.card,
     borderRadius: radius.md, marginBottom: spacing[2],
-    borderWidth: 1, borderColor: colors.border.default,
+    borderWidth: 1, borderColor: c.border.default,
     overflow: 'hidden',
   },
   wrapReceipt: {
-    borderColor: colors.accent.blue + '25',
+    borderColor: c.accent.blue + '25',
   },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
@@ -148,11 +151,11 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 32, height: 32, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
   },
   info: { flex: 1, gap: 2 },
-  note: { ...typography.bodySmall, color: colors.text.primary, fontWeight: '500' },
-  meta: { ...typography.caption, color: colors.text.muted },
+  note: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
+  meta: { ...typography.caption, color: c.text.muted },
   amount: { ...typography.label, fontWeight: '700', fontSize: 14 },
   chevronBtn: {
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
@@ -160,7 +163,7 @@ const styles = StyleSheet.create({
 
   // Expanded items list
   itemList: {
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
     paddingBottom: spacing[1],
   },
   itemRowFirst: {
@@ -169,7 +172,7 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)',
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
   itemDot: {
     width: 20, height: 20, borderRadius: 10,
@@ -177,26 +180,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   itemInfo: { flex: 1 },
-  itemName: { fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
+  itemName: { fontSize: 12, color: c.text.secondary, fontWeight: '500' },
   itemTagsRow: { flexDirection: 'row', gap: 4, marginTop: 2 },
   itemTag: {
     paddingHorizontal: 5, paddingVertical: 1,
-    backgroundColor: colors.accent.blue + '15',
+    backgroundColor: c.accent.blue + '15',
     borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.accent.blue + '25',
+    borderWidth: 1, borderColor: c.accent.blue + '25',
   },
-  itemTagText: { fontSize: 8, color: colors.accent.blue, fontWeight: '600' },
+  itemTagText: { fontSize: 8, color: c.accent.blue, fontWeight: '600' },
   itemAmtCol: { alignItems: 'flex-end', gap: 1 },
-  itemQty: { fontSize: 9, color: colors.text.muted },
-  itemPrice: { fontSize: 12, fontWeight: '700', color: colors.text.primary },
+  itemQty: { fontSize: 9, color: c.text.muted },
+  itemPrice: { fontSize: 12, fontWeight: '700', color: c.text.primary },
 
   detailBtn: {
     marginHorizontal: spacing[4], marginTop: spacing[1], marginBottom: spacing[3],
     paddingVertical: spacing[2],
-    backgroundColor: colors.accent.blue + '12',
+    backgroundColor: c.accent.blue + '12',
     borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.accent.blue + '30',
+    borderWidth: 1, borderColor: c.accent.blue + '30',
     alignItems: 'center',
   },
-  detailBtnText: { fontSize: 11, fontWeight: '600', color: colors.accent.blue },
+  detailBtnText: { fontSize: 11, fontWeight: '600', color: c.accent.blue },
 });

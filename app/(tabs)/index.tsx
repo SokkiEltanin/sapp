@@ -333,6 +333,7 @@ function WaveChart({ data, color, dotColors, target }: { data: number[]; color: 
 const DONUT_COLORS = ['#6C9EFF', '#4ECBA8', '#FBBF24', '#F472B6', '#A78BFA', '#FB923C', '#9CA3AF'];
 
 function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: string }[]; fmt: (v: number, u: string) => string }) {
+  const colors = useColors();
   const total = rows.reduce((s, r) => s + r.value, 0) || 1;
   const R = 30, SW = 12, C = 2 * Math.PI * R;
   let acc = 0;
@@ -342,7 +343,7 @@ function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: 
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
       <View style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center' }}>
         <Svg width={84} height={84} viewBox="0 0 84 84" style={{ position: 'absolute' }}>
-          <SvgCircle cx={42} cy={42} r={R} stroke="rgba(255,255,255,0.06)" strokeWidth={SW} fill="none" />
+          <SvgCircle cx={42} cy={42} r={R} stroke={colors.border.default} strokeWidth={SW} fill="none" />
           {rows.map((r, i) => {
             const frac = r.value / total;
             const dash = `${(frac * C).toFixed(2)} ${C.toFixed(2)}`;
@@ -355,8 +356,8 @@ function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: 
             );
           })}
         </Svg>
-        <Text style={{ fontSize: 15, fontWeight: '900', color: '#FFFFFF' }}>{totalLabel}</Text>
-        <Text style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', fontWeight: '700' }}>{unit === 'zł' ? 'zł' : 'razem'}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '900', color: colors.text.primary }}>{totalLabel}</Text>
+        <Text style={{ fontSize: 8, color: colors.text.muted, fontWeight: '700' }}>{unit === 'zł' ? 'zł' : 'razem'}</Text>
       </View>
       <View style={{ flex: 1, gap: 4 }}>
         {rows.map((r, i) => (
@@ -376,6 +377,7 @@ function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: 
 const MINI_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
 
 function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) {
+  const colors = useColors();
   const now = new Date();
   const year  = now.getFullYear();
   const month = now.getMonth();
@@ -415,10 +417,10 @@ function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) 
               <View key={ci} style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
                 <View style={{
                   width: 14, height: 14, borderRadius: 7,
-                  backgroundColor: mc ? mc : 'rgba(255,255,255,0.05)',
+                  backgroundColor: mc ? mc : colors.border.subtle,
                   opacity: mc ? 0.88 : 1,
                   borderWidth: isT ? 1.5 : 0,
-                  borderColor: isT ? 'rgba(255,255,255,0.45)' : 'transparent',
+                  borderColor: isT ? colors.border.focus : 'transparent',
                 }} />
               </View>
             );
@@ -2576,7 +2578,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   tagModalTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   tagModalSub: { fontSize: 12, color: c.text.muted, marginTop: 2 },
   tagModalEmpty: { fontSize: 13, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[3] },
-  tagItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
+  tagItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   tagItemName: { fontSize: 13, fontWeight: '600', color: c.text.primary },
   tagItemMeta: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   tagItemDel: { padding: spacing[2], borderRadius: radius.md, backgroundColor: 'rgba(228,52,52,0.10)' },
@@ -2587,7 +2589,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   budgetWarnPct: { fontWeight: '700', color: c.text.primary },
   budgetWarnAmt: { fontWeight: '600', color: c.text.muted, fontSize: 11 },
   budgetWarnTrack: {
-    height: 10, backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 10, backgroundColor: c.border.subtle,
     borderRadius: 5, overflow: 'hidden',
   },
   budgetWarnFill: {
@@ -2598,7 +2600,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   // ── Humor line (below main card) ──────────────────────────────────────────
   humorLine: {
     fontSize: 12, fontStyle: 'italic',
-    color: 'rgba(255,255,255,0.32)',
+    color: c.text.muted,
     textAlign: 'center',
     paddingHorizontal: spacing[2],
   },
@@ -2620,9 +2622,9 @@ const makeStyles = (c: any) => StyleSheet.create({
   // ── Evening habits nudge ──────────────────────────────────────────────────
   habitsNudge: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: c.border.subtle,
     borderRadius: radius.xl, padding: spacing[4],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: c.border.default,
   },
   habitsNudgeTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary, marginBottom: 2 },
   habitsNudgeSub: { fontSize: 11, color: c.text.muted },
@@ -2630,7 +2632,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   // ── Habits today card ─────────────────────────────────────────────────────
   habitsCard: {
     borderRadius: radius.xl,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[4], gap: spacing[3],
   },
   habitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -2638,7 +2640,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   habitsTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   habitsBadge: { fontSize: 14, fontWeight: '800', color: c.text.secondary },
   habitsTrack: {
-    height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 8, backgroundColor: c.border.subtle,
     borderRadius: 4, overflow: 'hidden',
   },
   habitsFill: { height: '100%', borderRadius: 4 },
@@ -2661,7 +2663,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   scopeLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   scopeToggle: {
     flexDirection: 'row', gap: 2, marginLeft: 'auto',
-    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, padding: 2,
+    backgroundColor: c.border.subtle, borderRadius: radius.full, padding: 2,
   },
   scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
   scopeBtnText: { fontSize: 11, fontWeight: '700', color: c.text.muted },
@@ -2682,7 +2684,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   topNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
   topName: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '600' },
   topCount: { fontSize: 12, color: c.text.muted, fontWeight: '700' },
-  topBarTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 5, overflow: 'hidden' },
+  topBarTrack: { height: 5, borderRadius: 3, backgroundColor: c.border.subtle, marginTop: 5, overflow: 'hidden' },
   topBarFill: { height: 5, borderRadius: 3 },
   habitsMore: { fontSize: 11, color: c.text.muted, alignSelf: 'center' },
 
@@ -2699,7 +2701,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   miniCardLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
   miniCardSub: { fontSize: 11, color: c.text.secondary },
   miniWorkTrack: {
-    height: 6, backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 6, backgroundColor: c.border.subtle,
     borderRadius: 3, overflow: 'hidden', marginTop: spacing[1],
   },
   miniWorkFill: { height: '100%', borderRadius: 3 },
@@ -2711,8 +2713,8 @@ const makeStyles = (c: any) => StyleSheet.create({
   activityBadge: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
     paddingVertical: spacing[2], paddingHorizontal: spacing[2],
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: radius.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
   },
   activityLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted },
 
@@ -2721,7 +2723,7 @@ const makeStyles = (c: any) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     backgroundColor: c.bg.card, borderRadius: radius.xl,
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: c.border.default,
   },
   humorTileEmoji: { fontSize: 20 },
   humorTileText: { flex: 1, fontSize: 13, fontWeight: '500', color: c.text.secondary, lineHeight: 18, fontStyle: 'italic' },
@@ -2730,7 +2732,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   // ── Work hours widget ──────────────────────────────────────────────────────
   workToggle: {
     marginLeft: 'auto', paddingHorizontal: spacing[3], paddingVertical: 4,
-    borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.full, backgroundColor: c.border.subtle,
   },
   workToggleText: { fontSize: 10, fontWeight: '700' },
   workHoursRow: { marginTop: spacing[1], gap: 2 },
@@ -2761,7 +2763,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   statDeltaText: { fontSize: 11, fontWeight: '800' },
   statListRow2: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
   statSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
-  statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' },
+  statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, marginTop: 8, overflow: 'hidden' },
   statTargetFill: { height: 6, borderRadius: 3 },
   insightDot: { width: 7, height: 7, borderRadius: 4, marginTop: 5 },
   statListRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 5 },
@@ -2780,7 +2782,7 @@ const makeStyles = (c: any) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 6, paddingHorizontal: spacing[3],
     borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: c.border.subtle,
   },
   editCtrlText: { fontSize: 11, fontWeight: '700', color: c.text.muted },
   editBanner: {
@@ -2819,7 +2821,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   npEmpty: { fontSize: 12, color: c.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
   npRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   npRowText: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '500' },
 
@@ -2922,7 +2924,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   dowCol: { flex: 1, alignItems: 'center', gap: 4 },
   dowBar: {
     width: '100%', height: 48,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
     borderRadius: 4, overflow: 'hidden', justifyContent: 'flex-end',
   },
   dowFill: { width: '100%', borderRadius: 4 },

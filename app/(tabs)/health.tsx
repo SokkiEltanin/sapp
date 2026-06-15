@@ -345,7 +345,7 @@ export default function HealthScreen() {
 
           {/* 7-day sleep chart */}
           <View style={[styles.cardRow, { marginTop: spacing[3] }]}>
-            <Text style={[styles.cardLabel, { color: 'rgba(255,255,255,0.25)' }]}>TYDZIEŃ</Text>
+            <Text style={[styles.cardLabel, { color: colors.text.muted }]}>TYDZIEŃ</Text>
           </View>
           <View style={styles.sleepChartRow}>
             {weekSleep.map((s, i) => {
@@ -475,7 +475,7 @@ export default function HealthScreen() {
 
           {/* 7-day water chart */}
           <View style={[styles.cardRow, { marginTop: spacing[2] }]}>
-            <Text style={[styles.cardLabel, { color: 'rgba(255,255,255,0.25)' }]}>TYDZIEŃ</Text>
+            <Text style={[styles.cardLabel, { color: colors.text.muted }]}>TYDZIEŃ</Text>
           </View>
           <View style={styles.sleepChartRow}>
             {weekWater.map((w, i) => {

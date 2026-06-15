@@ -184,7 +184,7 @@ const makeDm = (c: any, vp: any) => StyleSheet.create({
   },
   sheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#131016',
+    backgroundColor: c.bg.elevated,
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     borderWidth: 1, borderBottomWidth: 0,
     borderColor: V + '30',
@@ -193,7 +193,7 @@ const makeDm = (c: any, vp: any) => StyleSheet.create({
   },
   handle: {
     width: 36, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: c.border.focus,
     alignSelf: 'center', marginBottom: 16,
   },
   header: {
@@ -213,7 +213,7 @@ const makeDm = (c: any, vp: any) => StyleSheet.create({
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: c.bg.card,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: c.border.default,
   },
   scrollContent: { paddingHorizontal: spacing[4], paddingBottom: spacing[4], gap: spacing[3] },
   section: { gap: spacing[2] },
@@ -225,7 +225,7 @@ const makeDm = (c: any, vp: any) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     backgroundColor: c.bg.card, borderRadius: radius.lg,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: c.border.subtle,
     borderLeftWidth: 3,
   },
   eventInfo: { flex: 1, gap: 3 },
