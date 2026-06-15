@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { colors } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import TabBar from '@/components/ui/TabBar';
 import TopPill from '@/components/ui/TopPill';
 
@@ -19,6 +20,7 @@ function tabIdx(path: string): number {
 export default function TabsLayout() {
   const pathname = usePathname();
   const currentIdx = tabIdx(pathname);
+  const c = useColors();
 
   const goTo = useCallback((idx: number) => {
     if (idx < 0 || idx >= TABS.length) return;
@@ -45,7 +47,7 @@ export default function TabsLayout() {
   [currentIdx, goTo]);
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: c.bg.primary }]}>
       {/* Global TopPill — fixed */}
       <SafeAreaView style={s.topArea} edges={['top']}>
         <TopPill />
@@ -65,7 +67,7 @@ export default function TabsLayout() {
               lazy: false,
               animation: 'none',
               freezeOnBlur: true,
-              sceneStyle: { backgroundColor: colors.bg.primary },
+              sceneStyle: { backgroundColor: c.bg.primary },
             }}
           >
             <Tabs.Screen name="index"    />

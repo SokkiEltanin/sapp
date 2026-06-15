@@ -12,6 +12,7 @@ import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,6 +65,8 @@ export default function TopPill() {
   const weekEnd  = weekEndIso();
   const hour     = new Date().getHours();
   const { color: timeAccent } = useTimeAccent(); // cyan by day, blue by night
+  const theme    = useColors();
+  const s        = useMemo(() => makeS(theme), [theme]);
 
   // ── Store selectors ────────────────────────────────────────────────────────
   const pomRunning   = usePomodoroStore(s => s.isRunning);
@@ -354,7 +357,7 @@ export default function TopPill() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeS = (t: any) => StyleSheet.create({
   pillGradient: {
     marginHorizontal: 16,
     marginTop: 6,
@@ -371,7 +374,9 @@ const s = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(14,16,20,0.92)',
+    // Elevated surface that lifts off the page in BOTH themes (near-black on
+    // dark, white on light) — paired with the shadow it reads as floating.
+    backgroundColor: t.bg.elevated,
     borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 5,
@@ -388,14 +393,14 @@ const s = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.white,
+    color: '#FFFFFF',
     letterSpacing: 0.4,
   },
   text: {
     flex: 1,
     fontSize: 12,
     fontWeight: '500',
-    color: colors.white,
+    color: t.text.primary,
     letterSpacing: 0.2,
   },
 });
