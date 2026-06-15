@@ -267,6 +267,29 @@ export default function ExpenseDetailScreen() {
 
   const isInc = expense?.type === 'income';
 
+  // Re-hydrate the editable state once the expense is actually available — e.g.
+  // when this screen is opened (deep-linked / cold start) before the store has
+  // finished loading, the useState initializers above run with `expense` still
+  // undefined and capture empty values. Without this sync the receipt breakdown
+  // would never appear and a save could wipe it. Guarded by `!editing` so it
+  // never clobbers input while the user is mid-edit; re-runs after saves
+  // (updatedAt changes) to keep the view in sync with persisted data.
+  useEffect(() => {
+    if (!expense || editing) return;
+    const inc = expense.type === 'income';
+    setAmount(expense.amount.toString());
+    setNote(expense.note ?? '');
+    setTxType(expense.type ?? 'expense');
+    setExpCat((inc ? 'other' : expense.category ?? 'other') as ExpenseCategory);
+    setIncCat((inc ? expense.category ?? 'salary' : 'salary') as IncomeCategory);
+    setTags(expense.tags ?? []);
+    setEditedItems(expense.receiptItems ?? []);
+    const d = new Date(expense.date ?? Date.now());
+    const p = (n: number) => String(n).padStart(2, '0');
+    setDateInput(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expense?.id, expense?.updatedAt]);
+
   const [editing, setEditing]   = useState(false);
   const [amount, setAmount]     = useState(expense?.amount.toString() ?? '');
   const [note, setNote]         = useState(expense?.note ?? '');
@@ -322,6 +345,29 @@ export default function ExpenseDetailScreen() {
     const next = editedItems.map((it, i) => i === idx ? updated : it);
     setEditedItems(next);
     setEditingItemIdx(null);
+
+    // Persist the product edit IMMEDIATELY. The receipt list is tappable even
+    // outside global edit mode, so a single-product change must stick on its own
+    // without also requiring the header Save (the previous behaviour silently
+    // dropped these edits).
+    const oldSum = editedItems.reduce((sum, it) => sum + (it.price ?? 0), 0);
+    const newSum = next.reduce((sum, it) => sum + (it.price ?? 0), 0);
+    // Realign the receipt total only when it was actually tracking the item sum.
+    // If they already diverge (per-item discounts, deposit, non-itemised lines),
+    // leave the stored total alone so an edit never silently rewrites it.
+    const totalTracksItems = Math.abs(expense.amount - oldSum) <= 0.05;
+    const nextAmount = totalTracksItems ? Math.round(newSum * 100) / 100 : expense.amount;
+    const itemUpdates = {
+      receiptItems: next,
+      amount: nextAmount,
+      updatedAt: new Date().toISOString(),
+    };
+    updateExpense(id!, itemUpdates);
+    setAmount(nextAmount.toString());
+    expensesService.update(id!, itemUpdates)
+      .then(() => toast.success('Zapisano produkt'))
+      .catch(() => toast.error('Nie zapisano produktu'));
+
     // Save to shared product memory so future receipt scans auto-apply corrections
     const tagsChanged = JSON.stringify(orig.tags) !== JSON.stringify(updated.tags);
     const changed = orig.category !== updated.category || tagsChanged || orig.name !== updated.name;

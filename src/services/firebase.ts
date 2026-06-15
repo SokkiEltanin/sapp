@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore, collection, doc } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, Firestore, collection, doc } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import * as firebaseAuth from 'firebase/auth';
 import { initializeAuth, getAuth, Auth, indexedDBLocalPersistence } from 'firebase/auth';
@@ -17,7 +17,19 @@ const firebaseConfig = {
 
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const db: Firestore = getFirestore(app);
+// `ignoreUndefinedProperties` makes Firestore silently drop `undefined` fields
+// instead of throwing. Without it, writing an object that contains a nested
+// `undefined` (e.g. a receipt item with `eaters: undefined`) makes updateDoc()
+// reject — which is exactly why editing receipt products failed to save. The
+// setting applies to ALL writes, so it fixes this whole class of bug at once.
+let _db: Firestore;
+try {
+  _db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+} catch {
+  // Firestore was already initialised (e.g. dev fast-refresh) — reuse it.
+  _db = getFirestore(app);
+}
+export const db: Firestore = _db;
 export const storage: FirebaseStorage = getStorage(app);
 
 // CRITICAL: on React Native, auth state must persist via AsyncStorage. The web
