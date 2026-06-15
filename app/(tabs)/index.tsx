@@ -2011,7 +2011,7 @@ export default function DashboardScreen() {
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={accentColor} />
-                  <Text style={[s.cardTitle]}>Słodycze + przekąski vs jedzenie</Text>
+                  <Text style={[s.cardTitle]} numberOfLines={1}>Słodkie vs jedzenie</Text>
                   <View style={s.dualLegend}>
                     <View style={s.dualLegendItem}>
                       <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
