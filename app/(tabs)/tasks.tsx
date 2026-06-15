@@ -406,7 +406,8 @@ const makeDm = (c: any, g: any) => StyleSheet.create({
 
 function SortSheet({ sort, onSelect, onClose, visible }: { sort: SortKey; onSelect: (k: SortKey) => void; onClose: () => void; visible: boolean }) {
   const colors = useColors();
-  const ss = useMemo(() => makeSs(colors, null), [colors]);
+  const G = useMemo(() => gFor(colors), [colors]);
+  const ss = useMemo(() => makeSs(colors, G), [colors, G]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={ss.overlay} onPress={onClose} />
