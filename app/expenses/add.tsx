@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, KeyboardAvoidingView,
   Platform, Alert, InteractionManager, TextInput,
@@ -27,6 +27,7 @@ import { getBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
 const INCOME_CATS = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, typeof INCOME_CATEGORY_META[IncomeCategory]][];
@@ -63,6 +64,8 @@ export default function AddExpenseModal() {
   const expenses    = useExpensesStore((s) => s.expenses);
   const [balanceOffset, setBalanceOffset] = useState(0);
   const kb = useKeyboardHeight();
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const amountRef = useRef<TextInput>(null);
 
   // Open the keyboard on the amount field, but only AFTER the quick-add menu
@@ -415,36 +418,36 @@ export default function AddExpenseModal() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.secondary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.secondary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  headerTitle: { ...typography.h4, color: colors.text.primary },
+  headerTitle: { ...typography.h4, color: c.text.primary },
   typeToggle: {
     flexDirection: 'row', gap: 4,
     marginHorizontal: spacing[4], marginVertical: spacing[3],
     padding: 4, borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle,
+    borderWidth: 1, borderColor: c.border.default,
   },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing[2], paddingVertical: spacing[3], borderRadius: radius.full,
     backgroundColor: 'transparent',
   },
-  typeBtnText: { ...typography.label, color: colors.text.muted, fontWeight: '700' },
+  typeBtnText: { ...typography.label, color: c.text.muted, fontWeight: '700' },
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: spacing[6] },
   amountWrap: {
-    borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: colors.bg.card,
+    borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
     paddingHorizontal: spacing[5], paddingTop: spacing[5], paddingBottom: spacing[4],
     gap: spacing[1],
   },
@@ -454,73 +457,73 @@ const styles = StyleSheet.create({
     fontSize: 38, fontWeight: '800', letterSpacing: -1,
     lineHeight: 46, paddingVertical: 2, includeFontPadding: false as any, textAlignVertical: 'center',
   },
-  amountDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginTop: spacing[1] },
-  amountHint: { ...typography.caption, fontSize: 11, letterSpacing: 0.5, color: colors.text.muted },
+  amountDivider: { height: 1, backgroundColor: c.border.subtle, marginTop: spacing[1] },
+  amountHint: { ...typography.caption, fontSize: 11, letterSpacing: 0.5, color: c.text.muted },
   amountFootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
-  amountProjected: { fontSize: 11.5, color: colors.text.muted, fontWeight: '600' },
+  amountProjected: { fontSize: 11.5, color: c.text.muted, fontWeight: '600' },
   section: { gap: spacing[3] },
   payerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   payerChip: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
   },
-  payerChipActive: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue },
-  payerChipText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
-  payerChipTextActive: { color: colors.accent.blue },
+  payerChipActive: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue },
+  payerChipText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  payerChipTextActive: { color: c.accent.blue },
   payerInput: {
     minWidth: 90, paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue + '60',
-    backgroundColor: 'rgba(255,255,255,0.04)', fontSize: 13, color: colors.text.primary,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.accent.blue + '60',
+    backgroundColor: c.border.subtle, fontSize: 13, color: c.text.primary,
   },
   payerAddChip: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.full, borderWidth: 1, borderStyle: 'dashed',
-    borderColor: colors.border.focus,
+    borderColor: c.border.focus,
   },
-  payerAddText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  payerAddText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
   sectionLabel: {
-    ...typography.label, color: colors.text.secondary,
+    ...typography.label, color: c.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
   },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   categoryItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     width: '48%',
   },
   categoryItemSelected: {
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   categoryIcon: {
     width: 26, height: 26, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
   },
-  categoryLabel: { ...typography.bodySmall, color: colors.text.secondary, fontWeight: '500' },
-  categoryLabelSelected: { color: colors.text.primary, fontWeight: '700' },
-  budgetHint: { fontSize: 9, color: colors.text.muted, fontWeight: '500', marginTop: 1 },
+  categoryLabel: { ...typography.bodySmall, color: c.text.secondary, fontWeight: '500' },
+  categoryLabelSelected: { color: c.text.primary, fontWeight: '700' },
+  budgetHint: { fontSize: 9, color: c.text.muted, fontWeight: '500', marginTop: 1 },
   checkDot: {
     width: 15, height: 15, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center', marginLeft: 1,
-    backgroundColor: colors.text.primary,
+    backgroundColor: c.text.primary,
   },
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   customTagRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[2] },
   addTagBtn: {
     width: 48, height: 48, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1,
-    borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1,
+    borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: colors.border.subtle, gap: spacing[2] },
+  footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2] },
   saveTplBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[2],
   },
-  saveTplText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+  saveTplText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
 });
 

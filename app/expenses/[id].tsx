@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -25,6 +25,7 @@ import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/ca
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
 import { getPayers } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
 const INCOME_CATS  = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, typeof INCOME_CATEGORY_META[IncomeCategory]][];
@@ -46,6 +47,8 @@ interface ItemEditorProps {
 }
 
 function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
+  const colors = useColors();
+  const ie = useMemo(() => makeIe(colors), [colors]);
   const [name, setName]         = useState(item.name);
   const [price, setPrice]       = useState(item.price.toFixed(2));
   const [qty, setQty]           = useState(item.quantity.toString());
@@ -197,59 +200,59 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
   );
 }
 
-const ie = StyleSheet.create({
+const makeIe = (c: any) => StyleSheet.create({
   wrap: {
     marginTop: spacing[2], padding: spacing[3],
-    backgroundColor: colors.bg.elevated,
+    backgroundColor: c.bg.elevated,
     borderRadius: radius.lg, gap: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: c.border.default,
   },
   nameInput: {
-    fontSize: 14, fontWeight: '600', color: colors.text.primary,
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    fontSize: 14, fontWeight: '600', color: c.text.primary,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   row: { flexDirection: 'row', gap: spacing[3] },
   field: { flex: 1, gap: 4 },
-  fieldLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  fieldLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
   fieldInput: {
-    fontSize: 15, fontWeight: '700', color: colors.text.primary,
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    fontSize: 15, fontWeight: '700', color: c.text.primary,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  sectionLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
   catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   catChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[2], paddingVertical: 5,
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
   },
-  catChipText: { fontSize: 10, color: colors.text.muted, fontWeight: '500' },
+  catChipText: { fontSize: 10, color: c.text.muted, fontWeight: '500' },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1] },
   tagChip: {
     paddingHorizontal: spacing[2], paddingVertical: 4,
-    backgroundColor: colors.bg.card, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default,
   },
-  tagChipSel: { backgroundColor: colors.accent.blue + '20', borderColor: colors.accent.blue + '60' },
-  tagChipText: { fontSize: 10, color: colors.text.muted },
-  tagChipTextSel: { color: colors.accent.blue, fontWeight: '600' },
+  tagChipSel: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue + '60' },
+  tagChipText: { fontSize: 10, color: c.text.muted },
+  tagChipTextSel: { color: c.accent.blue, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: spacing[2], justifyContent: 'flex-end' },
   cancelBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
   },
-  cancelText: { fontSize: 12, color: colors.text.muted },
+  cancelText: { fontSize: 12, color: c.text.muted },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    backgroundColor: colors.text.primary, borderRadius: radius.md,
+    backgroundColor: c.text.primary, borderRadius: radius.md,
   },
-  saveText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary },
+  saveText: { fontSize: 12, fontWeight: '700', color: c.bg.primary },
 });
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
@@ -258,6 +261,8 @@ export default function ExpenseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { expenses, updateExpense, deleteExpense, setExpenses } = useExpensesStore();
   const expense = expenses.find(e => e.id === id);
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
 
   useEffect(() => {
     if (expenses.length === 0) {
@@ -739,20 +744,20 @@ export default function ExpenseDetailScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  saveBtn: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
+  saveBtn: { backgroundColor: c.text.primary, borderColor: c.text.primary },
   typePill: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: spacing[3], paddingVertical: 6,
@@ -793,41 +798,41 @@ const s = StyleSheet.create({
 
   // ── Cards ──────────────────────────────────────────────────────────────────
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[4], gap: spacing[3],
   },
   cardLabel: {
-    fontSize: 10, fontWeight: '600', color: colors.text.muted,
+    fontSize: 10, fontWeight: '600', color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 0.8,
   },
 
   typeToggle: {
     flexDirection: 'row', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default, padding: spacing[2],
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default, padding: spacing[2],
   },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing[2], paddingVertical: spacing[2], borderRadius: radius.md,
   },
-  typeBtnActive: { backgroundColor: colors.text.primary },
-  typeBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
-  typeBtnTextActive: { color: colors.bg.primary },
+  typeBtnActive: { backgroundColor: c.text.primary },
+  typeBtnText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  typeBtnTextActive: { color: c.bg.primary },
 
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   catItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    backgroundColor: colors.bg.elevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
   },
   catIcon: {
     width: 24, height: 24, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
   },
-  catLabel: { fontSize: 12, fontWeight: '500', color: colors.text.secondary },
+  catLabel: { fontSize: 12, fontWeight: '500', color: c.text.secondary },
   checkDot: {
     width: 14, height: 14, borderRadius: 7,
     alignItems: 'center', justifyContent: 'center',
@@ -836,35 +841,35 @@ const s = StyleSheet.create({
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   customTagRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   tagInput: {
-    flex: 1, fontSize: 14, color: colors.text.primary,
-    backgroundColor: colors.bg.elevated, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    flex: 1, fontSize: 14, color: c.text.primary,
+    backgroundColor: c.bg.elevated, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
   addTagBtn: {
     width: 40, height: 40, borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, borderWidth: 1,
-    borderColor: colors.border.default, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.bg.elevated, borderWidth: 1,
+    borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
   },
   tagBadge: {
     paddingHorizontal: spacing[3], paddingVertical: 5,
-    backgroundColor: colors.bg.elevated, borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default,
   },
-  tagBadgeText: { fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
-  emptyTags: { fontSize: 13, color: colors.text.muted },
+  tagBadgeText: { fontSize: 12, color: c.text.secondary, fontWeight: '500' },
+  emptyTags: { fontSize: 13, color: c.text.muted },
 
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dateTxt: { fontSize: 14, color: colors.text.secondary },
+  dateTxt: { fontSize: 14, color: c.text.secondary },
 
-  meta: { fontSize: 11, color: colors.text.muted, paddingHorizontal: spacing[1], lineHeight: 18 },
+  meta: { fontSize: 11, color: c.text.muted, paddingHorizontal: spacing[1], lineHeight: 18 },
 
   // ── Receipt items ──────────────────────────────────────────────────────────
   receiptHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   receiptItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: spacing[2],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
   itemCatDot: {
     width: 22, height: 22, borderRadius: 11,
@@ -872,26 +877,26 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   receiptItemLeft: { flex: 1, gap: 2 },
-  receiptItemName: { fontSize: 13, fontWeight: '500', color: colors.text.primary },
-  receiptItemMeta: { fontSize: 10, color: colors.text.muted },
+  receiptItemName: { fontSize: 13, fontWeight: '500', color: c.text.primary },
+  receiptItemMeta: { fontSize: 10, color: c.text.muted },
   itemRight: { alignItems: 'flex-end', gap: 3 },
-  receiptItemPrice: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
+  receiptItemPrice: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   itemTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
   itemTagBadge: {
     paddingHorizontal: 6, paddingVertical: 2,
-    backgroundColor: colors.accent.blue + '18', borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.accent.blue + '30',
+    backgroundColor: c.accent.blue + '18', borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.accent.blue + '30',
   },
-  itemTagText: { fontSize: 9, color: colors.accent.blue, fontWeight: '600' },
+  itemTagText: { fontSize: 9, color: c.accent.blue, fontWeight: '600' },
 
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[4], borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.accent.red + '40',
-    backgroundColor: colors.accent.red + '0E',
+    borderWidth: 1, borderColor: c.accent.red + '40',
+    backgroundColor: c.accent.red + '0E',
   },
-  deleteBtnText: { fontSize: 14, fontWeight: '600', color: colors.accent.red },
+  deleteBtnText: { fontSize: 14, fontWeight: '600', color: c.accent.red },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  notFoundText: { color: colors.text.secondary, fontSize: 16 },
+  notFoundText: { color: c.text.secondary, fontSize: 16 },
 });
