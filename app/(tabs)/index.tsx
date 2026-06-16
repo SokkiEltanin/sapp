@@ -842,6 +842,26 @@ export default function DashboardScreen() {
     const td = wk('tasksDone');
     if (td.now > 0) out.push({ tone: 'good', text: `Ukończone zadania: ${Math.round(td.now)}` });
 
+    // ── "Days without junk" streak (sweets/snacks) ───────────────────────────
+    const lastJunk = (() => {
+      let last: string | null = null;
+      for (const e of scopedExpenses) {
+        if (e.type === 'income') continue;
+        const items = e.receiptItems ?? [];
+        const hasJunk = items.length > 0
+          ? items.some(it => countsForConsumption(it) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t)))
+          : (e.tags ?? []).some(t => SWEETS_TAGS.includes(t));
+        if (hasJunk) { const d = e.date.slice(0, 10); if (!last || d > last) last = d; }
+      }
+      return last;
+    })();
+    if (lastJunk) {
+      const days = Math.floor((Date.now() - new Date(lastJunk + 'T00:00:00').getTime()) / 86_400_000);
+      if (days >= 2) out.push({ tone: 'good', text: `${days} dni bez słodyczy i przekąsek — tak trzymaj!` });
+    } else if (scopedExpenses.length > 5) {
+      out.push({ tone: 'good', text: 'Brak słodyczy/przekąsek w historii — mocne!' });
+    }
+
     // ── Health (from the watch) ──────────────────────────────────────────────
     const st = wk('steps');
     if (st.now > 0) {
@@ -877,7 +897,7 @@ export default function DashboardScreen() {
 
     if (habits.length > 0 && habitsDoneIds.length === habits.length) out.push({ tone: 'good', text: 'Wszystkie dzisiejsze nawyki odhaczone' });
     return out;
-  }, [statCtx, habits.length, habitsDoneIds.length]);
+  }, [statCtx, scopedExpenses, habits.length, habitsDoneIds.length]);
 
   const fmtStat = (v: number, unit: string): string => {
     if (unit === 'zł')   return `${Math.round(v)} zł`;
