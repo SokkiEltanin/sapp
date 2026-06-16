@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, KeyboardAvoidingView, Platform,
@@ -16,6 +16,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { getBudgets } from '@/utils/budgets';
 import { getFoodTags, categorize } from '@/utils/receiptParser';
+import { getPayers, addPayer } from '@/utils/payers';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -270,12 +271,17 @@ export default function ManualReceiptScreen() {
   const [storeName, setStoreName] = useState('');
   const [items, setItems] = useState<Item[]>([makeItem()]);
   const [saving, setSaving] = useState(false);
+  const [payer, setPayer]   = useState<string>('');
+  const [payers, setPayers] = useState<string[]>([]);
+  const [addingPayer, setAddingPayer] = useState(false);
+  const [newPayer, setNewPayer] = useState('');
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date();
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   });
   const addExpense = useExpensesStore(s => s.addExpense);
+  useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0] || ''); }).catch(() => {}); }, []);
 
   function makeItem(): Item {
     return {
@@ -358,6 +364,7 @@ export default function ManualReceiptScreen() {
         tags,
         note: store || 'Paragon ręczny',
         date: dateParsed,
+        payer: payer || undefined,
         ...(store ? { storeName: store } : {}),
         receiptItems,
       });
@@ -432,6 +439,42 @@ export default function ManualReceiptScreen() {
             onChange={setDateInput}
             placeholder="Data zakupu"
           />
+
+          {/* Who paid */}
+          <View style={styles.payerSection}>
+            <Text style={styles.labelText}>KTO ZAPŁACIŁ</Text>
+            <View style={styles.payerRow}>
+              {payers.map(p => {
+                const active = payer === p;
+                return (
+                  <PressableScale key={p} onPress={() => { haptic.tap(); setPayer(p); }} style={[styles.payerChip, active && styles.payerChipActive]}>
+                    <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>{p}</Text>
+                  </PressableScale>
+                );
+              })}
+              {addingPayer ? (
+                <TextInput
+                  value={newPayer}
+                  onChangeText={setNewPayer}
+                  placeholder="Imię…"
+                  placeholderTextColor={colors.text.muted}
+                  style={styles.payerInput}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={async () => {
+                    const name = newPayer.trim();
+                    if (name) { const list = await addPayer(name); setPayers(list); setPayer(name); }
+                    setNewPayer(''); setAddingPayer(false);
+                  }}
+                  onBlur={() => { setNewPayer(''); setAddingPayer(false); }}
+                />
+              ) : (
+                <PressableScale onPress={() => { haptic.tap(); setAddingPayer(true); }} style={styles.payerAddChip}>
+                  <Text style={styles.payerAddText}>+ osoba</Text>
+                </PressableScale>
+              )}
+            </View>
+          </View>
 
           <View style={styles.itemsLabel}>
             <Text style={styles.labelText}>PRODUKTY</Text>
@@ -509,6 +552,28 @@ const makeStyles = (c: any) => StyleSheet.create({
     paddingHorizontal: spacing[1],
   },
   labelText: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+
+  payerSection: { gap: spacing[2] },
+  payerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  payerChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    backgroundColor: c.bg.card, borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default,
+  },
+  payerChipActive: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue },
+  payerChipText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  payerChipTextActive: { color: c.accent.blue },
+  payerInput: {
+    minWidth: 90, fontSize: 13, color: c.text.primary,
+    backgroundColor: c.bg.card, borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  payerAddChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, borderStyle: 'dashed',
+  },
+  payerAddText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
   labelCount: { fontSize: 10, color: c.text.muted },
 
   // ── Item card ────────────────────────────────────────────────────────────────

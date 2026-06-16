@@ -23,7 +23,7 @@ import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem } from '@/types';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
-import { getPayers } from '@/utils/payers';
+import { getPayers, addPayer } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 
@@ -269,6 +269,7 @@ export default function ExpenseDetailScreen() {
       expensesService.getAll().then(setExpenses).catch(() => {});
     }
   }, []);
+  useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
 
   const isInc = expense?.type === 'income';
 
@@ -288,6 +289,7 @@ export default function ExpenseDetailScreen() {
     setExpCat((inc ? 'other' : expense.category ?? 'other') as ExpenseCategory);
     setIncCat((inc ? expense.category ?? 'salary' : 'salary') as IncomeCategory);
     setTags(expense.tags ?? []);
+    setPayer(expense.payer ?? '');
     setEditedItems(expense.receiptItems ?? []);
     const d = new Date(expense.date ?? Date.now());
     const p = (n: number) => String(n).padStart(2, '0');
@@ -304,6 +306,10 @@ export default function ExpenseDetailScreen() {
   const [tags, setTags]         = useState<string[]>(expense?.tags ?? []);
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving]     = useState(false);
+  const [payer, setPayer]       = useState<string>(expense?.payer ?? '');
+  const [payers, setPayers]     = useState<string[]>([]);
+  const [addingPayer, setAddingPayer] = useState(false);
+  const [newPayer, setNewPayer] = useState('');
   const [itemsExpanded, setItemsExpanded] = useState(true);
   const [editedItems, setEditedItems] = useState<ReceiptItem[]>(expense?.receiptItems ?? []);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
@@ -422,6 +428,7 @@ export default function ExpenseDetailScreen() {
         note: note.trim(),
         category: editIsIncome ? incCat : expCat,
         tags,
+        payer: payer || undefined,
         date: dateParsed,
         receiptItems: editedItems,
         updatedAt: new Date().toISOString(),
@@ -726,6 +733,46 @@ export default function ExpenseDetailScreen() {
             )}
           </View>
 
+          {/* Who paid */}
+          <View style={s.card}>
+            <Text style={s.cardLabel}>{editIsIncome ? 'Kto otrzymał' : 'Kto zapłacił'}</Text>
+            {editing ? (
+              <View style={s.tagsWrap}>
+                {payers.map(p => {
+                  const active = payer === p;
+                  return (
+                    <PressableScale key={p} onPress={() => { haptic.tap(); setPayer(active ? '' : p); }} style={[s.payerChip, active && s.payerChipActive]}>
+                      <Text style={[s.payerChipText, active && s.payerChipTextActive]}>{p}</Text>
+                    </PressableScale>
+                  );
+                })}
+                {addingPayer ? (
+                  <TextInput
+                    value={newPayer}
+                    onChangeText={setNewPayer}
+                    placeholder="Imię…"
+                    placeholderTextColor={colors.text.muted}
+                    style={s.payerInput}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={async () => {
+                      const name = newPayer.trim();
+                      if (name) { const list = await addPayer(name); setPayers(list); setPayer(name); }
+                      setNewPayer(''); setAddingPayer(false);
+                    }}
+                    onBlur={() => { setNewPayer(''); setAddingPayer(false); }}
+                  />
+                ) : (
+                  <PressableScale onPress={() => { haptic.tap(); setAddingPayer(true); }} style={s.payerAddChip}>
+                    <Text style={s.payerAddText}>+ osoba</Text>
+                  </PressableScale>
+                )}
+              </View>
+            ) : (
+              <Text style={s.payerValue}>{payer || 'Nie określono'}</Text>
+            )}
+          </View>
+
           {/* Meta */}
           <Text style={s.meta}>
             Dodano: {new Date(expense.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -858,6 +905,28 @@ const makeS = (c: any) => StyleSheet.create({
   },
   tagBadgeText: { fontSize: 12, color: c.text.secondary, fontWeight: '500' },
   emptyTags: { fontSize: 13, color: c.text.muted },
+
+  payerChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    backgroundColor: c.bg.elevated, borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default,
+  },
+  payerChipActive: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue },
+  payerChipText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  payerChipTextActive: { color: c.accent.blue },
+  payerInput: {
+    minWidth: 90, fontSize: 13, color: c.text.primary,
+    backgroundColor: c.bg.elevated, borderRadius: radius.full,
+    borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+  },
+  payerAddChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    borderStyle: 'dashed',
+  },
+  payerAddText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
+  payerValue: { fontSize: 14, color: c.text.primary, fontWeight: '500' },
 
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   dateTxt: { fontSize: 14, color: c.text.secondary },
