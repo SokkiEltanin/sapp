@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TextInput,
@@ -11,6 +11,7 @@ import {
   ChevronUp, ChevronDown, Palette,
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { workService } from '@/services/workService';
 import { useWorkStore } from '@/store/workStore';
@@ -36,6 +37,8 @@ function fmtDate(s: string): string {
 function TimePicker({
   label, value, onChange,
 }: { label: string; value: string; onChange: (v: string) => void }) {
+  const colors = useColors();
+  const tp = useMemo(() => makeTp(colors), [colors]);
   const [h, m] = value.split(':').map(Number);
   const inc = (delta: number, part: 'h' | 'm') => {
     haptic.tap();
@@ -75,19 +78,21 @@ function TimePicker({
   );
 }
 
-const tp = StyleSheet.create({
+const makeTp = (c: any) => StyleSheet.create({
   wrap:  { flex: 1, alignItems: 'center', gap: spacing[2] },
-  label: { fontSize: 10, fontWeight: '600', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  label: { fontSize: 10, fontWeight: '600', color: c.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   unit:  { alignItems: 'center', gap: 2 },
-  colon: { fontSize: 24, fontWeight: '800', color: colors.text.primary, marginTop: -4 },
-  digit: { fontSize: 28, fontWeight: '900', color: colors.text.primary, letterSpacing: -1, minWidth: 44, textAlign: 'center' },
+  colon: { fontSize: 24, fontWeight: '800', color: c.text.primary, marginTop: -4 },
+  digit: { fontSize: 28, fontWeight: '900', color: c.text.primary, letterSpacing: -1, minWidth: 44, textAlign: 'center' },
   btn:   { width: 36, height: 26, alignItems: 'center', justifyContent: 'center' },
 });
 
 // ─── Date picker (simple +/- day) ────────────────────────────────────────────
 
 function DatePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const colors = useColors();
+  const dp = useMemo(() => makeDp(colors), [colors]);
   const shift = (delta: number) => {
     haptic.tap();
     const d = new Date(value);
@@ -115,16 +120,18 @@ function DatePicker({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
-const dp = StyleSheet.create({
-  wrap:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[3], backgroundColor: colors.bg.elevated, borderRadius: radius.lg, paddingVertical: spacing[3], borderWidth: 1, borderColor: colors.border.default },
+const makeDp = (c: any) => StyleSheet.create({
+  wrap:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[3], backgroundColor: c.bg.elevated, borderRadius: radius.lg, paddingVertical: spacing[3], borderWidth: 1, borderColor: c.border.default },
   arrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   mid:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], minWidth: 90, justifyContent: 'center' },
-  label: { fontSize: 16, fontWeight: '700', color: colors.text.primary },
+  label: { fontSize: 16, fontWeight: '700', color: c.text.primary },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AddWorkShift() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const { settings, addShift: storeAdd, setSettings } = useWorkStore();
 
   const [date, setDate]         = useState(todayStr());
@@ -349,7 +356,7 @@ export default function AddWorkShift() {
                     s.colorSwatch,
                     { backgroundColor: c },
                     workColor === c && s.colorSwatchSelected,
-                    c === '#FFFFFF' && { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+                    c === '#FFFFFF' && { borderWidth: 1, borderColor: colors.border.default },
                   ]}
                   onPress={() => saveWorkColor(c)}
                   activeOpacity={0.7}
@@ -382,71 +389,71 @@ export default function AddWorkShift() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: c.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: 60 },
 
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   saveBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: colors.text.primary },
+  title: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary },
 
   section:      { gap: spacing[2] },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5, textTransform: 'uppercase', paddingLeft: 2 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5, textTransform: 'uppercase', paddingLeft: 2 },
 
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: colors.border.default, padding: spacing[4],
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default, padding: spacing[4],
   },
 
   timesRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  timeSep:  { width: 1, height: 60, backgroundColor: colors.border.subtle },
+  timeSep:  { width: 1, height: 60, backgroundColor: c.border.subtle },
 
   durationRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: 2 },
-  durationText:{ fontSize: 12, color: colors.text.muted },
+  durationText:{ fontSize: 12, color: c.text.muted },
 
   inputRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  inputLabel: { flex: 1, fontSize: 14, color: colors.text.secondary, fontWeight: '500' },
+  inputLabel: { flex: 1, fontSize: 14, color: c.text.secondary, fontWeight: '500' },
   numInput: {
-    fontSize: 16, fontWeight: '700', color: colors.text.primary,
+    fontSize: 16, fontWeight: '700', color: c.text.primary,
     textAlign: 'right', minWidth: 80, paddingVertical: 4,
   },
-  divider: { height: 1, backgroundColor: colors.border.subtle, marginVertical: spacing[3] },
+  divider: { height: 1, backgroundColor: c.border.subtle, marginVertical: spacing[3] },
 
   previewCard: {
     alignItems: 'center', gap: spacing[1],
-    backgroundColor: colors.accent.green + '10',
-    borderColor: colors.accent.green + '30',
+    backgroundColor: c.accent.green + '10',
+    borderColor: c.accent.green + '30',
   },
-  previewLabel:  { fontSize: 10, fontWeight: '600', color: colors.accent.green, letterSpacing: 0.8, textTransform: 'uppercase' },
-  previewAmount: { fontSize: 32, fontWeight: '900', color: colors.accent.green, letterSpacing: -1 },
-  previewSub:    { fontSize: 11, color: colors.accent.green + 'AA' },
+  previewLabel:  { fontSize: 10, fontWeight: '600', color: c.accent.green, letterSpacing: 0.8, textTransform: 'uppercase' },
+  previewAmount: { fontSize: 32, fontWeight: '900', color: c.accent.green, letterSpacing: -1 },
+  previewSub:    { fontSize: 11, color: c.accent.green + 'AA' },
 
   noteWrap: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
-  noteInput: { flex: 1, fontSize: 14, color: colors.text.primary, lineHeight: 20, minHeight: 60 },
+  noteInput: { flex: 1, fontSize: 14, color: c.text.primary, lineHeight: 20, minHeight: 60 },
 
   saveFullBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
-    backgroundColor: colors.accent.green, borderRadius: radius.xl, paddingVertical: spacing[4],
+    backgroundColor: c.accent.green, borderRadius: radius.xl, paddingVertical: spacing[4],
   },
   saveBtnText: { fontSize: 16, fontWeight: '800', color: '#000' },
 
   // Work color picker
   colorHeader:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  colorHint:      { backgroundColor: colors.bg.elevated, borderRadius: radius.md, padding: spacing[3] },
-  colorHintText:  { fontSize: 12, color: colors.text.muted, lineHeight: 18 },
+  colorHint:      { backgroundColor: c.bg.elevated, borderRadius: radius.md, padding: spacing[3] },
+  colorHintText:  { fontSize: 12, color: c.text.muted, lineHeight: 18 },
   colorRow:       { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' },
   colorSwatch: {
     width: 38, height: 38, borderRadius: 19,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 2, borderColor: 'transparent',
   },
-  colorSwatchSelected: { borderColor: colors.text.primary },
-  colorSwatchOff:      { fontSize: 9, fontWeight: '700', color: colors.text.muted, textAlign: 'center' },
+  colorSwatchSelected: { borderColor: c.text.primary },
+  colorSwatchOff:      { fontSize: 9, fontWeight: '700', color: c.text.muted, textAlign: 'center' },
   colorActive: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     borderRadius: radius.md, borderWidth: 1, padding: spacing[3],
