@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Vibration, ScrollView, TextInput,
 } from 'react-native';
@@ -15,6 +15,7 @@ import { getTodaySessions, PomodoroSession } from '@/utils/pomodoroHistory';
 import { useFocusSound, FocusSound, FOCUS_SOUND_LABELS } from '@/hooks/useFocusSound';
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const C = {
   accent: '#2BC8E0',
@@ -39,9 +40,11 @@ const MODE_META: Record<PomodoroMode, { label: string; color: string; hint: stri
 
 // ─── Ring progress (two-half technique) ──────────────────────────────────────
 
-function RingProgress({ pct, size = 200, stroke = 8, color = colors.text.primary }: {
+function RingProgress({ pct, size = 200, stroke = 8, color }: {
   pct: number; size?: number; stroke?: number; color?: string;
 }) {
+  const c = useColors();
+  const ringColor = color ?? c.text.primary;
   const half = size / 2;
   const prog = Math.max(0, Math.min(1, pct));
 
@@ -57,11 +60,11 @@ function RingProgress({ pct, size = 200, stroke = 8, color = colors.text.primary
 
   return (
     <View style={{ width: size, height: size }}>
-      <View style={[arcBase, { borderColor: 'rgba(255,255,255,0.07)' }]} />
+      <View style={[arcBase, { borderColor: c.border.default }]} />
       <View style={{ position: 'absolute', top: 0, right: 0, width: half, height: size, overflow: 'hidden' }}>
         <View style={[arcBase, {
           left: -half,
-          borderColor: color,
+          borderColor: ringColor,
           transform: [{ rotate: `${rightRotation}deg` }],
         }]} />
       </View>
@@ -69,7 +72,7 @@ function RingProgress({ pct, size = 200, stroke = 8, color = colors.text.primary
         <View style={{ position: 'absolute', top: 0, left: 0, width: half, height: size, overflow: 'hidden' }}>
           <View style={[arcBase, {
             left: 0,
-            borderColor: color,
+            borderColor: ringColor,
             transform: [{ rotate: `${leftRotation}deg` }],
           }]} />
         </View>
@@ -81,6 +84,8 @@ function RingProgress({ pct, size = 200, stroke = 8, color = colors.text.primary
 // ─── Round dots ───────────────────────────────────────────────────────────────
 
 function RoundDots({ completed }: { completed: number }) {
+  const colors = useColors();
+  const dots = useMemo(() => makeDots(colors), [colors]);
   return (
     <View style={dots.row}>
       {[0, 1, 2, 3].map((i) => (
@@ -89,15 +94,17 @@ function RoundDots({ completed }: { completed: number }) {
     </View>
   );
 }
-const dots = StyleSheet.create({
+const makeDots = (c: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.12)' },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.border.subtle },
   dotFilled: { backgroundColor: C.accent },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PomodoroScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
     taskId, taskTitle, mode, remaining, isRunning,
     workMins, completedRounds,
@@ -374,20 +381,20 @@ export default function PomodoroScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  headerTitle: { ...typography.h4, color: colors.text.primary },
+  headerTitle: { ...typography.h4, color: c.text.primary },
 
   scroll: {
     alignItems: 'center', paddingHorizontal: spacing[4],
@@ -405,22 +412,22 @@ const styles = StyleSheet.create({
   },
   modeText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   timeText: {
-    fontSize: 52, fontWeight: '800', color: colors.text.primary,
+    fontSize: 52, fontWeight: '800', color: c.text.primary,
     letterSpacing: -2, lineHeight: 58,
   },
   taskName: {
-    ...typography.caption, color: colors.text.muted,
+    ...typography.caption, color: c.text.muted,
     fontSize: 11, textAlign: 'center',
   },
 
   hintRow: { flexDirection: 'column', alignItems: 'center', gap: spacing[3] },
-  hint: { ...typography.caption, color: colors.text.muted, fontSize: 12 },
+  hint: { ...typography.caption, color: c.text.muted, fontSize: 12 },
 
   controls: { flexDirection: 'row', alignItems: 'center', gap: spacing[5] },
   iconBtn: {
     width: 48, height: 48, borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   mainBtn: {
@@ -431,49 +438,49 @@ const styles = StyleSheet.create({
 
   milestoneCard: { width: '100%' },
   milestoneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[2] },
-  milestoneText: { flex: 1, fontSize: 14, color: colors.text.primary },
-  milestoneDone: { color: colors.text.muted, textDecorationLine: 'line-through' },
+  milestoneText: { flex: 1, fontSize: 14, color: c.text.primary },
+  milestoneDone: { color: c.text.muted, textDecorationLine: 'line-through' },
   milestoneInput: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    marginTop: spacing[2], borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: spacing[3],
+    marginTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[3],
   },
   milestoneInputField: {
-    flex: 1, fontSize: 13, color: colors.text.primary,
+    flex: 1, fontSize: 13, color: c.text.primary,
     paddingVertical: spacing[1],
   },
 
   settingsCard: { width: '100%' },
-  settingsLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: spacing[3] },
+  settingsLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: spacing[3] },
   settingsRow: { flexDirection: 'row', gap: spacing[2] },
   minBtn: {
     flex: 1, alignItems: 'center', paddingVertical: spacing[3],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   minBtnActive: { backgroundColor: C.dim, borderColor: C.border },
-  minText: { fontSize: 16, fontWeight: '700', color: colors.text.secondary },
+  minText: { fontSize: 16, fontWeight: '700', color: c.text.secondary },
   minTextActive: { color: C.accent },
-  minUnit: { fontSize: 8, color: colors.text.muted, marginTop: 1 },
+  minUnit: { fontSize: 8, color: c.text.muted, marginTop: 1 },
 
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4], marginBottom: spacing[2] },
-  soundRowLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  soundRowLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
   soundBtns: { flexDirection: 'row', gap: spacing[2] },
   soundBtn: {
     flex: 1, alignItems: 'center', paddingVertical: spacing[2],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   soundBtnActive: { backgroundColor: C.dim, borderColor: C.border },
-  soundBtnText: { fontSize: 11, fontWeight: '500', color: colors.text.muted },
+  soundBtnText: { fontSize: 11, fontWeight: '500', color: c.text.muted },
   soundBtnTextActive: { color: C.accent, fontWeight: '700' },
 
   historyCard: { width: '100%' },
   historyRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingVertical: spacing[2],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   historyIndex: {
     width: 18, height: 18, borderRadius: 9,
@@ -481,7 +488,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   historyIndexText: { fontSize: 9, fontWeight: '800', color: C.accent },
-  historyTask: { flex: 1, fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
+  historyTask: { flex: 1, fontSize: 12, color: c.text.secondary, fontWeight: '500' },
   historyDur: { fontSize: 11, fontWeight: '700', color: C.muted },
 
   taskDoneCard: {
@@ -491,7 +498,7 @@ const styles = StyleSheet.create({
     padding: spacing[4], gap: spacing[3],
   },
   taskDoneHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  taskDoneTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  taskDoneTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: c.text.primary },
   taskDoneQuestion: { fontSize: 12, color: C.muted, fontWeight: '600', letterSpacing: 0.5 },
   taskDoneBtns: { flexDirection: 'row', gap: spacing[2] },
   taskDoneYes: {
@@ -499,12 +506,12 @@ const styles = StyleSheet.create({
     gap: spacing[1], backgroundColor: C.accent,
     borderRadius: radius.lg, paddingVertical: spacing[3],
   },
-  taskDoneYesText: { fontSize: 14, fontWeight: '800', color: colors.bg.primary },
+  taskDoneYesText: { fontSize: 14, fontWeight: '800', color: c.bg.primary },
   taskDoneNo: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     borderRadius: radius.lg, paddingVertical: spacing[3],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  taskDoneNoText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  taskDoneNoText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
 });

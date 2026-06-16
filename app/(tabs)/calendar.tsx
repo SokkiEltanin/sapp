@@ -20,6 +20,7 @@ import { calendarService, tasksService } from '@/services/calendarService';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { CalendarEvent, Task, MoodEntry } from '@/types';
 
@@ -73,6 +74,8 @@ function MonthModal({
   events, tasks, moodEntries,
   workColor, onEventPress, onAddEvent,
 }: MonthModalProps) {
+  const colors = useColors();
+  const m = useMemo(() => makeM(colors), [colors]);
   const monthEvents = useMemo(() => {
     const prefix = `${viewYear}-${pad(viewMonth + 1)}`;
     const filtered = events
@@ -220,42 +223,44 @@ function MonthModal({
   );
 }
 
-const m = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: colors.bg.primary },
-  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', gap: spacing[1] },
-  navBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+const makeM = (c: any) => StyleSheet.create({
+  safe:       { flex: 1, backgroundColor: c.bg.primary },
+  header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle, gap: spacing[1] },
+  navBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default },
   titleWrap:  { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], paddingHorizontal: spacing[2] },
-  monthLabel: { fontSize: 20, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.3 },
-  yearLabel:  { fontSize: 13, color: colors.text.muted, fontWeight: '500' },
+  monthLabel: { fontSize: 20, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
+  yearLabel:  { fontSize: 13, color: c.text.muted, fontWeight: '500' },
   headerRight:{ flexDirection: 'row', gap: spacing[2], marginLeft: spacing[1] },
-  addBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.bg.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  addBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  closeBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default },
   scroll:     { paddingBottom: 40 },
   gridWrap:   { paddingHorizontal: spacing[2], paddingTop: spacing[3], paddingBottom: spacing[3] },
   eventList:  { paddingHorizontal: spacing[4], gap: spacing[2] },
-  listHeader: { fontSize: 10, fontWeight: '700', color: colors.text.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: spacing[1], marginTop: spacing[2] },
+  listHeader: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: spacing[1], marginTop: spacing[2] },
   dayGroup:   { gap: spacing[1] },
   dayLabel:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4, paddingHorizontal: spacing[2], borderRadius: radius.md },
-  dayLabelSel:{ backgroundColor: 'rgba(255,255,255,0.04)' },
-  dayLabelText:{ fontSize: 11, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  todayDot:   { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent.blue },
-  eventRow:   { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.card, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', minHeight: 52, gap: 0 },
+  dayLabelSel:{ backgroundColor: c.border.subtle },
+  dayLabelText:{ fontSize: 11, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
+  todayDot:   { width: 5, height: 5, borderRadius: 3, backgroundColor: c.accent.blue },
+  eventRow:   { flexDirection: 'row', alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: c.border.default, minHeight: 52, gap: 0 },
   colorBar:   { width: 3, alignSelf: 'stretch' },
   eventMeta:  { width: 68, paddingVertical: spacing[3], paddingLeft: spacing[3], gap: 2 },
-  eventTime:  { fontSize: 10, fontWeight: '700', color: colors.text.secondary },
-  eventDuration:{ fontSize: 9, color: colors.text.muted },
+  eventTime:  { fontSize: 10, fontWeight: '700', color: c.text.secondary },
+  eventDuration:{ fontSize: 9, color: c.text.muted },
   eventBody:  { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3] },
-  eventTitle: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  eventDesc:  { fontSize: 11, color: colors.text.muted, marginTop: 2 },
+  eventTitle: { fontSize: 13, fontWeight: '600', color: c.text.primary },
+  eventDesc:  { fontSize: 11, color: c.text.muted, marginTop: 2 },
   workBadge:  { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, marginRight: spacing[3] },
   workBadgeText:{ fontSize: 9, fontWeight: '700' },
   emptyMonth: { alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] },
-  emptyMonthText:{ fontSize: 14, color: colors.text.muted, fontWeight: '500' },
+  emptyMonthText:{ fontSize: 14, color: c.text.muted, fontWeight: '500' },
 });
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function CalendarScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { events, gcalEvents, tasks, selectedDate, setEvents, setGcalEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();
   const { entries: moodEntries } = useMoodStore();
@@ -608,19 +613,19 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
 
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   todayBtn: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: c.border.default,
   },
-  todayBtnText: { ...typography.caption, color: colors.text.secondary, fontWeight: '600', fontSize: 11 },
+  todayBtnText: { ...typography.caption, color: c.text.secondary, fontWeight: '600', fontSize: 11 },
   addBtn: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -630,7 +635,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: c.border.subtle,
     gap: spacing[1],
   },
   modeTab: {
@@ -640,11 +645,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'transparent',
   },
   modeTabActive: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: c.border.subtle,
+    borderColor: c.border.default,
   },
-  modeTabText: { fontSize: 11, color: colors.text.muted, fontWeight: '500' },
-  modeTabTextActive: { color: colors.text.primary, fontWeight: '700' },
+  modeTabText: { fontSize: 11, color: c.text.muted, fontWeight: '500' },
+  modeTabTextActive: { color: c.text.primary, fontWeight: '700' },
 
   // Month nav
   monthNav: {
@@ -653,67 +658,67 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
   monthTitleBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    borderRadius: radius.md, backgroundColor: colors.bg.card,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.md, backgroundColor: c.bg.card,
+    borderWidth: 1, borderColor: c.border.default,
   },
   expandBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: colors.accent.blue + '18',
-    borderWidth: 1, borderColor: colors.accent.blue + '40',
+    backgroundColor: c.accent.blue + '18',
+    borderWidth: 1, borderColor: c.accent.blue + '40',
     alignItems: 'center', justifyContent: 'center',
   },
-  monthLabel: { ...typography.h3, color: colors.text.primary, fontWeight: '700' },
-  yearLabel:  { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  monthLabel: { ...typography.h3, color: c.text.primary, fontWeight: '700' },
+  yearLabel:  { ...typography.caption, color: c.text.muted, marginTop: 2 },
   expandHint: { marginLeft: 2, opacity: 0.5 },
 
   gridCard: {
     marginHorizontal: spacing[2], marginTop: spacing[1],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     overflow: 'hidden',
   },
   detailedGridWrap: {
     marginTop: spacing[1],
     borderTopWidth: 0.5,
-    borderTopColor: 'rgba(255,255,255,0.07)',
+    borderTopColor: c.border.subtle,
   },
 
   // Week view
   weekCard: {
     marginHorizontal: spacing[2], marginTop: spacing[3],
-    backgroundColor: colors.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
   },
   weekNavRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[1] },
   weekNavBtn: { width: 28, height: 48, alignItems: 'center', justifyContent: 'center' },
 
   section: { paddingHorizontal: spacing[4], paddingTop: spacing[4], gap: spacing[2] },
   sectionLabel: {
-    fontSize: 10, fontWeight: '600', color: colors.text.muted,
+    fontSize: 10, fontWeight: '600', color: c.text.muted,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing[1],
   },
 
   eventRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
     overflow: 'hidden', marginBottom: spacing[2],
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', minHeight: 52,
+    borderWidth: 1, borderColor: c.border.default, minHeight: 52,
   },
   evColorBar: { width: 3, alignSelf: 'stretch' },
   evTime:     { width: 48, alignItems: 'center', paddingVertical: spacing[3] },
-  evTimeText: { ...typography.caption, color: colors.text.secondary, fontWeight: '700', fontSize: 11 },
-  evTimeSub:  { ...typography.caption, color: colors.text.muted, fontSize: 9, marginTop: 1 },
+  evTimeText: { ...typography.caption, color: c.text.secondary, fontWeight: '700', fontSize: 11 },
+  evTimeSub:  { ...typography.caption, color: c.text.muted, fontSize: 9, marginTop: 1 },
   evInfo:     { flex: 1, paddingVertical: spacing[3], paddingRight: spacing[3] },
-  evTitle:    { ...typography.bodySmall, color: colors.text.primary, fontWeight: '600' },
-  evDesc:     { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  evTitle:    { ...typography.bodySmall, color: c.text.primary, fontWeight: '600' },
+  evDesc:     { ...typography.caption, color: c.text.muted, marginTop: 2 },
 
   empty: { alignItems: 'center', paddingVertical: spacing[8], gap: spacing[2] },
-  emptyText: { ...typography.label, color: colors.text.secondary },
-  emptyHint: { ...typography.caption, color: colors.text.muted },
+  emptyText: { ...typography.label, color: c.text.secondary },
+  emptyHint: { ...typography.caption, color: c.text.muted },
 });
