@@ -759,16 +759,31 @@ export default function DashboardScreen() {
   const isLoading = finLoading || tasksLoading;
   const onRefresh = () => { reloadFin(); reloadTasks(); loadPomSessions(); };
 
-  // Remove a wrongly-added product from a tag limit: mark it excluded (drops out
-  // of the limit + consumption stats, stays in the money total).
-  const removeTagItem = useCallback(async (expenseId: string, idx: number) => {
-    const e = expenses.find(x => x.id === expenseId);
-    if (!e?.receiptItems) return;
-    const newItems = e.receiptItems.map((it, i) => i === idx ? { ...it, excluded: true } : it);
-    setExpenses(expenses.map(x => x.id === expenseId ? { ...x, receiptItems: newItems } : x));
-    setTagModal((m: any) => m ? { ...m, items: m.items.filter((it: any) => !(it.expenseId === expenseId && it.idx === idx)) } : m);
+  // Remove a wrongly-counted entry from a tag limit. Two cases:
+  //  • receipt item (kind 'item') → mark it excluded (drops out of the limit +
+  //    consumption stats, the money still counts in the spend total).
+  //  • whole expense (kind 'expense', idx -1) → strip the rule's tags so it stops
+  //    counting toward this bar (the expense itself stays).
+  const removeTagItem = useCallback(async (
+    item: { expenseId: string; idx: number; kind: 'expense' | 'item' },
+    ruleTagList: string[],
+  ) => {
+    const e = expenses.find(x => x.id === item.expenseId);
+    if (!e) return;
+    let updates: Partial<Expense>;
+    if (item.kind === 'expense') {
+      const newTags = (e.tags ?? []).filter(t => !ruleTagList.includes(t));
+      updates = { tags: newTags };
+      setExpenses(expenses.map(x => x.id === item.expenseId ? { ...x, tags: newTags } : x));
+    } else {
+      if (!e.receiptItems) return;
+      const newItems = e.receiptItems.map((it, i) => i === item.idx ? { ...it, excluded: true } : it);
+      updates = { receiptItems: newItems };
+      setExpenses(expenses.map(x => x.id === item.expenseId ? { ...x, receiptItems: newItems } : x));
+    }
+    setTagModal((m: any) => m ? { ...m, items: m.items.filter((it: any) => !(it.expenseId === item.expenseId && it.idx === item.idx)) } : m);
     haptic.medium();
-    try { await expensesService.update(expenseId, { receiptItems: newItems }); }
+    try { await expensesService.update(item.expenseId, updates); }
     catch { haptic.error(); toast.error('Nie usunięto — sprawdź połączenie'); }
   }, [expenses, setExpenses]);
 
@@ -1260,19 +1275,24 @@ export default function DashboardScreen() {
         const tags = ruleTags(rule);                    // one or more tags combined
         const hasAny = (arr?: string[]) => !!arr && tags.some(t => arr.includes(t));
         let spend = 0;
-        const items: { expenseId: string; idx: number; name: string; price: number; date: string }[] = [];
+        const items: { expenseId: string; idx: number; kind: 'expense' | 'item'; name: string; price: number; date: string }[] = [];
         for (const e of scopedExpenses) {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
           // Expense-level tag (no item breakdown): a person-scoped bar can't split
-          // it, so it only counts when that person was the payer.
+          // it, so it only counts when that person was the payer. These ALSO get
+          // listed (idx -1) so the breakdown shows every contributor — not just
+          // itemised receipts — and they can be removed/recategorised.
           if (hasAny(e.tags)) {
-            if (!rule.person || e.payer === rule.person) spend += e.amount;
+            if (!rule.person || e.payer === rule.person) {
+              spend += e.amount;
+              items.push({ expenseId: e.id, idx: -1, kind: 'expense', name: e.storeName || e.note || 'Wydatek', price: e.amount, date: e.date });
+            }
           } else if (e.receiptItems?.some(it => countsForConsumption(it) && hasAny(it.tags))) {
             e.receiptItems.forEach((it, idx) => {
               if (countsForConsumption(it) && hasAny(it.tags)) {
                 spend += attributedPrice(it, rule.person, payers);
-                items.push({ expenseId: e.id, idx, name: it.name, price: it.price, date: e.date });
+                items.push({ expenseId: e.id, idx, kind: 'item', name: it.name, price: it.price, date: e.date });
               }
             });
           }
@@ -2389,16 +2409,26 @@ export default function DashboardScreen() {
               <>
                 <Text style={s.tagModalTitle}>{tagModal.label}</Text>
                 <Text style={s.tagModalSub}>{Math.round(tagModal.spend)}/{Math.round(tagModal.limit)} zł · {tagModal.items.length} pozycji · {tagModal.period === 'week' ? 'tydzień' : 'miesiąc'}</Text>
+                <Text style={s.tagModalHint}>Dotknij pozycję, by edytować kategorię/tagi · kosz usuwa z tego licznika</Text>
                 <ScrollView style={{ marginTop: spacing[2] }}>
                   {tagModal.items.length === 0
                     ? <Text style={s.tagModalEmpty}>Brak pozycji.</Text>
                     : tagModal.items.map((it: any) => (
                       <View key={`${it.expenseId}-${it.idx}`} style={s.tagItemRow}>
-                        <View style={{ flex: 1 }}>
+                        <TouchableOpacity
+                          style={{ flex: 1 }}
+                          onPress={() => { setTagModal(null); router.push(`/expenses/${it.expenseId}` as any); }}
+                          activeOpacity={0.6}
+                        >
                           <Text style={s.tagItemName} numberOfLines={1}>{it.name}</Text>
-                          <Text style={s.tagItemMeta}>{new Date(it.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {it.price.toFixed(2)} zł</Text>
-                        </View>
-                        <TouchableOpacity onPress={() => removeTagItem(it.expenseId, it.idx)} style={s.tagItemDel} activeOpacity={0.7}>
+                          <Text style={s.tagItemMeta}>
+                            {new Date(it.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {it.price.toFixed(2)} zł{it.kind === 'expense' ? ' · cały wydatek' : ''}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => { setTagModal(null); router.push(`/expenses/${it.expenseId}` as any); }} style={s.tagItemEdit} activeOpacity={0.7}>
+                          <Pencil size={15} color={colors.text.muted} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => removeTagItem(it, ruleTags(tagModal))} style={s.tagItemDel} activeOpacity={0.7}>
                           <Trash2 size={16} color={colors.accent.red} />
                         </TouchableOpacity>
                       </View>
@@ -2588,10 +2618,12 @@ const makeStyles = (c: any) => StyleSheet.create({
   tagLastItem: { fontSize: 11, color: c.text.muted, marginTop: -spacing[1] },
   tagModalTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   tagModalSub: { fontSize: 12, color: c.text.muted, marginTop: 2 },
+  tagModalHint: { fontSize: 10.5, color: c.text.muted, marginTop: spacing[2], lineHeight: 15, fontStyle: 'italic' },
   tagModalEmpty: { fontSize: 13, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[3] },
   tagItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   tagItemName: { fontSize: 13, fontWeight: '600', color: c.text.primary },
   tagItemMeta: { fontSize: 11, color: c.text.muted, marginTop: 1 },
+  tagItemEdit: { padding: spacing[2], borderRadius: radius.md, backgroundColor: c.border.subtle },
   tagItemDel: { padding: spacing[2], borderRadius: radius.md, backgroundColor: 'rgba(228,52,52,0.10)' },
   tagModalClose: { marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.elevated, alignItems: 'center' },
   tagModalCloseText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
