@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -27,6 +27,7 @@ import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
 import { haptic } from '@/utils/haptics';
 
@@ -56,6 +57,8 @@ function addDays(n: number) {
 // ─── Difficulty bar ───────────────────────────────────────────────────────────
 
 function DiffPicker({ value, onChange }: { value?: TaskDifficulty; onChange: (v: TaskDifficulty) => void }) {
+  const colors = useColors();
+  const dp = useMemo(() => makeDp(colors), [colors]);
   const col = (v?: TaskDifficulty) => !v ? colors.text.muted : v <= 2 ? G.accent : v === 3 ? colors.accent.amber : colors.accent.red;
   const labels = ['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'] as const;
   return (
@@ -63,7 +66,7 @@ function DiffPicker({ value, onChange }: { value?: TaskDifficulty; onChange: (v:
       {([1,2,3,4,5] as TaskDifficulty[]).map(d => (
         <PressableScale key={d} onPress={() => onChange(d)} style={dp.dotWrap}>
           <View style={[dp.dot,
-            { backgroundColor: value && d <= value ? col(value) : 'rgba(255,255,255,0.08)' },
+            { backgroundColor: value && d <= value ? col(value) : colors.border.subtle },
             value === d && { width: 20, height: 20 },
           ]} />
         </PressableScale>
@@ -72,7 +75,7 @@ function DiffPicker({ value, onChange }: { value?: TaskDifficulty; onChange: (v:
     </View>
   );
 }
-const dp = StyleSheet.create({
+const makeDp = (c: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   dotWrap: { padding: 4 },
   dot: { width: 16, height: 16, borderRadius: 8 },
@@ -90,6 +93,8 @@ const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
 // ─── Pomodoro ring (simple arc) ───────────────────────────────────────────────
 
 function PomRing({ done, total }: { done: number; total: number }) {
+  const colors = useColors();
+  const pr = useMemo(() => makePr(colors), [colors]);
   if (total === 0) return null;
   const pct = Math.min(1, done / total);
   const col = pct >= 1 ? colors.accent.green : colors.accent.purple;
@@ -104,16 +109,18 @@ function PomRing({ done, total }: { done: number; total: number }) {
     </View>
   );
 }
-const pr = StyleSheet.create({
+const makePr = (c: any) => StyleSheet.create({
   wrap: { gap: 6 },
-  track: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' },
+  track: { height: 8, backgroundColor: c.border.subtle, borderRadius: 4, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 4 },
-  text: { fontSize: 12, color: colors.text.secondary },
+  text: { fontSize: 12, color: c.text.secondary },
 });
 
 // ─── Section row ──────────────────────────────────────────────────────────────
 
 function Row({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+  const colors = useColors();
+  const rw = useMemo(() => makeRw(colors), [colors]);
   return (
     <View style={rw.wrap}>
       <View style={rw.labelRow}>
@@ -124,7 +131,7 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
     </View>
   );
 }
-const rw = StyleSheet.create({
+const makeRw = (c: any) => StyleSheet.create({
   wrap: {
     gap: spacing[2], paddingVertical: spacing[3],
     borderBottomWidth: 1, borderBottomColor: G.cardBorder,
@@ -136,6 +143,8 @@ const rw = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TaskDetailScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
   const { tasks, update, remove, toggle, unsnooze, addSubtask, toggleSubtask, removeSubtask } = useTasks();
   const startPomodoro = usePomodoroStore(s => s.startFor);
@@ -400,7 +409,7 @@ export default function TaskDetailScreen() {
                 >
                   {sub.done
                     ? <CheckSquare size={16} color={G.accent} />
-                    : <Square size={16} color='rgba(255,255,255,0.25)' />
+                    : <Square size={16} color={colors.text.muted} />
                   }
                   <Text style={[styles.subTitle, sub.done && styles.subTitleDone]} numberOfLines={2}>
                     {sub.title}
@@ -411,7 +420,7 @@ export default function TaskDetailScreen() {
                       hitSlop={8}
                       style={styles.subDelete}
                     >
-                      <XIcon size={12} color='rgba(255,255,255,0.2)' />
+                      <XIcon size={12} color={colors.text.muted} />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -665,17 +674,17 @@ export default function TaskDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: G.card, borderWidth: 1, borderColor: G.cardBorder,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: G.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   saveBtn: { backgroundColor: G.accent, borderColor: G.accent },
@@ -683,17 +692,17 @@ const styles = StyleSheet.create({
 
   scroll: { padding: spacing[4], gap: spacing[4], paddingBottom: spacing[10] },
 
-  titleText: { fontSize: 24, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5, lineHeight: 30 },
-  titleDone: { textDecorationLine: 'line-through', color: colors.text.secondary },
+  titleText: { fontSize: 24, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5, lineHeight: 30 },
+  titleDone: { textDecorationLine: 'line-through', color: c.text.secondary },
   titleInput: {
-    fontSize: 24, fontWeight: '800', color: colors.text.primary, letterSpacing: -0.5,
+    fontSize: 24, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5,
     lineHeight: 30, padding: 0,
   },
 
   statusRow: { flexDirection: 'row', gap: spacing[2] },
   statusBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: G.card, borderRadius: radius.full,
+    backgroundColor: c.bg.card, borderRadius: radius.full,
     borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
   },
@@ -701,17 +710,17 @@ const styles = StyleSheet.create({
     backgroundColor: G.accent,
     borderColor: G.accent,
   },
-  statusText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  statusText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
   pomStartBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.accent.purple + '15',
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.purple + '40',
+    backgroundColor: c.accent.purple + '15',
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.accent.purple + '40',
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  pomStartText: { fontSize: 13, fontWeight: '600', color: colors.accent.purple },
+  pomStartText: { fontSize: 13, fontWeight: '600', color: c.accent.purple },
 
   sectionCard: {
-    backgroundColor: G.card,
+    backgroundColor: c.bg.card,
     borderRadius: radius.xl, borderWidth: 1, borderColor: G.cardBorder,
     padding: spacing[4], gap: spacing[1],
   },
@@ -719,7 +728,7 @@ const styles = StyleSheet.create({
   sectionCardLabel: { fontSize: 10, fontWeight: '700', color: G.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   pomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[2] },
-  fieldLabel: { fontSize: 12, color: colors.text.secondary },
+  fieldLabel: { fontSize: 12, color: c.text.secondary },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   stepBtn: {
     width: 28, height: 28, borderRadius: radius.sm,
@@ -729,9 +738,9 @@ const styles = StyleSheet.create({
   stepBtnText: { fontSize: 16, color: G.accent, lineHeight: 18 },
   stepVal: { fontSize: 18, fontWeight: '700', color: G.accent, minWidth: 24, textAlign: 'center' },
 
-  fieldValue: { fontSize: 14, color: colors.text.secondary, lineHeight: 20 },
+  fieldValue: { fontSize: 14, color: c.text.secondary, lineHeight: 20 },
   fieldInput: {
-    fontSize: 14, color: colors.text.primary, lineHeight: 20,
+    fontSize: 14, color: c.text.primary, lineHeight: 20,
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
@@ -740,10 +749,10 @@ const styles = StyleSheet.create({
   priorityRow: { flexDirection: 'row', gap: spacing[2] },
   priorityPill: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  priorityText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  priorityText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
 
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   tagChip: {
@@ -759,78 +768,78 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  tagInput: { fontSize: 13, color: colors.text.primary },
+  tagInput: { fontSize: 13, color: c.text.primary },
 
   metaCard: {
     gap: spacing[1],
     paddingHorizontal: spacing[1],
   },
-  metaText: { fontSize: 11, color: colors.text.muted },
+  metaText: { fontSize: 11, color: c.text.muted },
 
   subtaskProgress: { fontSize: 11, fontWeight: '700', color: G.accent, marginLeft: 'auto' },
-  subProgressTrack: { height: 7, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  subProgressTrack: { height: 7, backgroundColor: c.border.subtle, borderRadius: radius.full, overflow: 'hidden' },
   subProgressFill: { height: '100%', borderRadius: radius.full },
   subRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingVertical: spacing[2],
     borderBottomWidth: 1, borderBottomColor: G.cardBorder,
   },
-  subTitle: { flex: 1, fontSize: 14, color: colors.text.primary, lineHeight: 19 },
-  subTitleDone: { textDecorationLine: 'line-through', color: colors.text.muted },
+  subTitle: { flex: 1, fontSize: 14, color: c.text.primary, lineHeight: 19 },
+  subTitleDone: { textDecorationLine: 'line-through', color: c.text.muted },
   subDelete: { padding: 4 },
   subInputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginTop: spacing[1], paddingTop: spacing[2],
     borderTopWidth: 1, borderTopColor: G.cardBorder,
   },
-  subInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: spacing[1] },
+  subInput: { flex: 1, fontSize: 14, color: c.text.primary, paddingVertical: spacing[1] },
   subAddBtn: { padding: 4 },
 
   recurRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   recurPill: {
     paddingHorizontal: spacing[3], paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default, backgroundColor: c.border.subtle,
   },
   recurPillActive: { borderColor: G.accent, backgroundColor: G.accentDim },
-  recurText: { fontSize: 12, fontWeight: '500', color: colors.text.muted },
+  recurText: { fontSize: 12, fontWeight: '500', color: c.text.muted },
   recurTextActive: { color: G.accent, fontWeight: '700' },
 
   quickDateRow: { flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' },
   quickDateBtn: {
     paddingHorizontal: spacing[3], paddingVertical: 5,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default, backgroundColor: c.border.subtle,
   },
   quickDateBtnActive: { borderColor: G.accent, backgroundColor: G.accentDim },
-  quickDateText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
+  quickDateText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
   quickDateTextActive: { color: G.accent },
 
   reminderBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default, backgroundColor: c.border.subtle,
   },
   reminderBtnOn: {
     borderColor: G.accent + '55',
     backgroundColor: G.accentDim,
   },
-  reminderBtnText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  reminderBtnText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
 
   snoozedBanner: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.accent.amber + '15',
+    backgroundColor: c.accent.amber + '15',
     borderRadius: radius.lg, borderWidth: 1,
-    borderColor: colors.accent.amber + '30',
+    borderColor: c.accent.amber + '30',
     padding: spacing[3],
   },
-  snoozedText: { flex: 1, fontSize: 12, color: colors.accent.amber, lineHeight: 16 },
+  snoozedText: { flex: 1, fontSize: 12, color: c.accent.amber, lineHeight: 16 },
 
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
-  notFoundText: { fontSize: 16, color: colors.text.secondary },
+  notFoundText: { fontSize: 16, color: c.text.secondary },
   backBtn: {
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
   },
 });

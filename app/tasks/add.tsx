@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   KeyboardAvoidingView, Platform, TextInput,
@@ -17,6 +17,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Green palette ────────────────────────────────────────────────────────────
@@ -63,6 +64,8 @@ const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
 function TimePicker({ hour, minute, onChange }: {
   hour: number; minute: number; onChange: (h: number, m: number) => void;
 }) {
+  const colors = useColors();
+  const tp = useMemo(() => makeTp(colors), [colors]);
   return (
     <View style={tp.row}>
       <View style={tp.unit}>
@@ -88,7 +91,7 @@ function TimePicker({ hour, minute, onChange }: {
   );
 }
 
-const tp = StyleSheet.create({
+const makeTp = (c: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   unit: { alignItems: 'center', gap: 2 },
   arrow: {
@@ -105,6 +108,8 @@ const tp = StyleSheet.create({
 function SectionCard({ label, icon, children }: {
   label: string; icon: React.ReactNode; children: React.ReactNode;
 }) {
+  const colors = useColors();
+  const sc = useMemo(() => makeSc(colors), [colors]);
   return (
     <View style={sc.card}>
       <View style={sc.header}>
@@ -116,9 +121,9 @@ function SectionCard({ label, icon, children }: {
   );
 }
 
-const sc = StyleSheet.create({
+const makeSc = (c: any) => StyleSheet.create({
   card: {
-    backgroundColor: G.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: G.cardBorder, padding: spacing[4], gap: spacing[3],
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
@@ -128,6 +133,8 @@ const sc = StyleSheet.create({
 // ─── Screen ───────────────────────────��──────────────────────────────��────────
 
 export default function AddTaskScreen() {
+  const colors = useColors();
+  const s = useMemo(() => makeS(colors), [colors]);
   const [title, setTitle]             = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline]       = useState('');
@@ -412,7 +419,7 @@ export default function AddTaskScreen() {
                         <View style={[
                           s.diffDot,
                           active && { backgroundColor: col, width: 18, height: 18 },
-                          !active && { backgroundColor: 'rgba(255,255,255,0.07)' },
+                          !active && { backgroundColor: colors.border.subtle },
                         ]} />
                       </TouchableOpacity>
                     );
@@ -532,38 +539,38 @@ export default function AddTaskScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg.primary },
+const makeS = (c: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   closeBtn: {
     width: 34, height: 34, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: c.border.default,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.text.primary, letterSpacing: -0.2 },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: c.text.primary, letterSpacing: -0.2 },
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: G.accent, borderRadius: radius.full,
     paddingHorizontal: spacing[3], paddingVertical: 7,
   },
   saveBtnDisabled: { backgroundColor: 'rgba(46,222,160,0.12)', borderWidth: 1, borderColor: G.cardBorder },
-  saveBtnText: { fontSize: 12, fontWeight: '700', color: colors.bg.primary },
+  saveBtnText: { fontSize: 12, fontWeight: '700', color: c.bg.primary },
 
   scroll: { paddingHorizontal: spacing[4], paddingTop: spacing[3], gap: spacing[3] },
 
   titleCard: {
-    backgroundColor: G.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: G.cardBorder,
     padding: spacing[4], minHeight: 96,
   },
   titleInput: {
-    fontSize: 20, fontWeight: '700', color: colors.text.primary,
+    fontSize: 20, fontWeight: '700', color: c.text.primary,
     lineHeight: 28, letterSpacing: -0.3, padding: 0,
   },
 
@@ -571,14 +578,14 @@ const s = StyleSheet.create({
   deadlineChip: {
     paddingHorizontal: spacing[3], paddingVertical: 7,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   deadlineChipActive: {
     borderColor: G.accent,
     backgroundColor: G.accentDim,
   },
-  deadlineChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  deadlineChipText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   deadlineChipTextActive: { color: G.accent, fontWeight: '700' },
   deadlineDate: { fontSize: 11, color: G.muted, marginTop: -spacing[1] },
 
@@ -586,35 +593,35 @@ const s = StyleSheet.create({
   priorityChip: {
     flex: 1, alignItems: 'center', paddingVertical: spacing[3],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
-  priorityChipText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  priorityChipText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
 
   reminderToggle: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     borderRadius: radius.md, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: c.border.default,
+    backgroundColor: c.border.subtle,
   },
   reminderToggleOn: {
     borderColor: G.accent + '55',
     backgroundColor: G.accentDim,
   },
-  reminderToggleText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.muted },
+  reminderToggleText: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.muted },
   reminderClear: { padding: 4 },
   reminderMsgInput: {
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: radius.md, borderWidth: 1,
     borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
-    fontSize: 13, color: colors.text.primary, lineHeight: 18,
+    fontSize: 13, color: c.text.primary, lineHeight: 18,
     minHeight: 60, textAlignVertical: 'top',
   },
 
   descInput: {
-    fontSize: 14, color: colors.text.secondary, lineHeight: 21,
+    fontSize: 14, color: c.text.secondary, lineHeight: 21,
     minHeight: 72, padding: 0, textAlignVertical: 'top',
   },
 
@@ -625,7 +632,7 @@ const s = StyleSheet.create({
   advancedToggleText: { flex: 1, fontSize: 12, color: G.muted, fontWeight: '600' },
 
   advCard: {
-    backgroundColor: G.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: G.cardBorder,
     padding: spacing[4], gap: spacing[3],
   },
@@ -663,12 +670,12 @@ const s = StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
     paddingHorizontal: spacing[3], minHeight: 40,
   },
-  tagInput: { flex: 1, fontSize: 13, color: colors.text.primary },
+  tagInput: { flex: 1, fontSize: 13, color: c.text.primary },
   tagAddBtn: { padding: 4 },
 
   footer: {
     padding: spacing[4],
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
   cta: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
@@ -676,5 +683,5 @@ const s = StyleSheet.create({
     paddingVertical: 15, width: '100%',
   },
   ctaDisabled: { backgroundColor: 'rgba(46,222,160,0.15)' },
-  ctaText: { fontSize: 15, fontWeight: '800', color: colors.bg.primary, letterSpacing: -0.2 },
+  ctaText: { fontSize: 15, fontWeight: '800', color: c.bg.primary, letterSpacing: -0.2 },
 });

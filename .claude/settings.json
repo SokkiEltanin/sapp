@@ -18,7 +18,8 @@
       "Bash(sed -n '31,33p' app/calendar/add.tsx)",
       "Bash(sed -n '33,47p' app/search.tsx)",
       "Bash(sed -n '30,46p' \"app/calendar/[id].tsx\")",
-      "Bash(perl -i -pe 's/backgroundColor: O\\\\.card,/backgroundColor: c.bg.card,/g' \"app/\\(tabs\\)/analytics.tsx\")"
+      "Bash(perl -i -pe 's/backgroundColor: O\\\\.card,/backgroundColor: c.bg.card,/g' \"app/\\(tabs\\)/analytics.tsx\")",
+      "Bash(perl -i -pe 's/backgroundColor: G\\\\.card,/backgroundColor: c.bg.card,/g; s/borderBottomColor: .rgba\\\\\\(255,255,255,0\\\\.05\\\\\\)./borderBottomColor: c.border.subtle/g;' app/tasks/add.tsx)"
     ]
   }
 }
