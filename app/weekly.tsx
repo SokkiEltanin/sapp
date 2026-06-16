@@ -22,6 +22,7 @@ import { moodService } from '@/services/moodService';
 import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, Habit, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -60,6 +61,8 @@ function weekLabel(dates: string[]) {
 function SCard({ icon, label, children, accent }: {
   icon: React.ReactNode; label: string; children: React.ReactNode; accent?: string;
 }) {
+  const colors = useColors();
+  const sc = useMemo(() => makeSc(colors), [colors]);
   return (
     <View style={[sc.card, accent && {
       borderLeftWidth: 3, borderLeftColor: accent,
@@ -75,15 +78,15 @@ function SCard({ icon, label, children, accent }: {
   );
 }
 
-const sc = StyleSheet.create({
+const makeSc = (c: any) => StyleSheet.create({
   card: {
-    backgroundColor: colors.bg.secondary, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.bg.secondary, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.border.default,
     padding: spacing[4], gap: spacing[3],
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   label: {
-    fontSize: 10, fontWeight: '700', color: colors.text.muted,
+    fontSize: 10, fontWeight: '700', color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 1,
   },
 });
@@ -93,6 +96,8 @@ const sc = StyleSheet.create({
 function WeekBars({ values, max, color, dates }: {
   values: number[]; max: number; color: string; dates: string[];
 }) {
+  const colors = useColors();
+  const wb = useMemo(() => makeWb(colors), [colors]);
   const todayStr = dateStr(new Date());
   return (
     <View style={wb.row}>
@@ -104,7 +109,7 @@ function WeekBars({ values, max, color, dates }: {
             <View style={wb.barWrap}>
               <View style={[
                 wb.bar,
-                { height: h, backgroundColor: v > 0 ? color : 'rgba(255,255,255,0.07)' },
+                { height: h, backgroundColor: v > 0 ? color : colors.border.subtle },
                 isToday && { width: 12 },
               ]} />
             </View>
@@ -116,18 +121,21 @@ function WeekBars({ values, max, color, dates }: {
   );
 }
 
-const wb = StyleSheet.create({
+const makeWb = (c: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   col: { flex: 1, alignItems: 'center', gap: 4 },
   barWrap: { height: 52, justifyContent: 'flex-end', alignItems: 'center' },
   bar: { width: 8, borderRadius: 4, minHeight: 2 },
-  day: { fontSize: 8, color: colors.text.muted },
-  dayToday: { color: colors.text.secondary, fontWeight: '700' },
+  day: { fontSize: 8, color: c.text.muted },
+  dayToday: { color: c.text.secondary, fontWeight: '700' },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function WeeklyScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const wb = useMemo(() => makeWb(colors), [colors]);
   const [weekOffset, setWeekOffset]     = useState(0);
   const [sleepData, setSleepData]       = useState<{ h: number; quality?: string }[]>(Array(7).fill({ h: 0 }));
   const [pomodoroData, setPomodoroData] = useState<Record<string, PomodoroSession[]>>({});
@@ -456,7 +464,7 @@ export default function WeeklyScreen() {
                         styles.moodDayBox,
                         col
                           ? { backgroundColor: col + '22', borderColor: col + (isBest ? 'CC' : isWorst ? '88' : '55') }
-                          : { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' },
+                          : { backgroundColor: colors.border.subtle, borderColor: colors.border.default },
                         isToday && { borderWidth: 1.5 },
                       ]}>
                         {avg ? (
@@ -487,8 +495,8 @@ export default function WeeklyScreen() {
               <View style={styles.moodMetaRow}>
                 {moodTrend && (
                   <View style={[styles.moodTrendBadge, {
-                    backgroundColor: moodTrend === 'up' ? colors.accent.green + '18' : moodTrend === 'down' ? colors.accent.red + '18' : 'rgba(255,255,255,0.06)',
-                    borderColor:     moodTrend === 'up' ? colors.accent.green + '40' : moodTrend === 'down' ? colors.accent.red + '40' : 'rgba(255,255,255,0.1)',
+                    backgroundColor: moodTrend === 'up' ? colors.accent.green + '18' : moodTrend === 'down' ? colors.accent.red + '18' : colors.border.subtle,
+                    borderColor:     moodTrend === 'up' ? colors.accent.green + '40' : moodTrend === 'down' ? colors.accent.red + '40' : colors.border.default,
                   }]}>
                     <Text style={[styles.moodTrendText, {
                       color: moodTrend === 'up' ? colors.accent.green : moodTrend === 'down' ? colors.accent.red : colors.text.muted,
@@ -709,7 +717,7 @@ export default function WeeklyScreen() {
               {sleepData.map((s, i) => {
                 const h = s.h > 0 ? Math.max(4, (s.h / maxSleepH) * 48) : 2;
                 const isToday = dates[i] === dateStr(new Date());
-                const barCol = s.quality ? SLEEP_Q_COLORS[s.quality] : (s.h > 0 ? colors.text.secondary : 'rgba(255,255,255,0.07)');
+                const barCol = s.quality ? SLEEP_Q_COLORS[s.quality] : (s.h > 0 ? colors.text.secondary : colors.border.subtle);
                 return (
                   <View key={i} style={wb.col}>
                     <View style={wb.barWrap}>
@@ -730,37 +738,37 @@ export default function WeeklyScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.bg.secondary, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   weekNav: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginHorizontal: spacing[2] },
   navBtn: {
     width: 32, height: 32, borderRadius: radius.md,
-    backgroundColor: colors.bg.secondary, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.bg.secondary, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   navBtnDisabled: { opacity: 0.3 },
   weekLabelWrap: { flex: 1, alignItems: 'center', gap: 2 },
-  weekTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary },
-  weekDates: { fontSize: 10, color: colors.text.muted },
+  weekTitle: { fontSize: 14, fontWeight: '700', color: c.text.primary },
+  weekDates: { fontSize: 10, color: c.text.muted },
 
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 60 },
 
   statRow: { flexDirection: 'row', alignItems: 'center' },
   statBox: { flex: 1, alignItems: 'center', gap: 3 },
   statBig: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, lineHeight: 26 },
-  statSub: { fontSize: 9, color: colors.text.muted, fontWeight: '500', textAlign: 'center' },
-  statDivider: { width: 1, height: 32, backgroundColor: colors.border.default },
+  statSub: { fontSize: 9, color: c.text.muted, fontWeight: '500', textAlign: 'center' },
+  statDivider: { width: 1, height: 32, backgroundColor: c.border.default },
   energyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
 
   habitsGrid: { gap: spacing[2] },
@@ -769,45 +777,45 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14,
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
-  habitName: { flex: 1, fontSize: 12, color: colors.text.primary, fontWeight: '500' },
+  habitName: { flex: 1, fontSize: 12, color: c.text.primary, fontWeight: '500' },
   habitBarTrack: {
     width: 60, height: 7, borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+    backgroundColor: c.border.subtle, overflow: 'hidden',
   },
   habitBarFill: { height: '100%', borderRadius: radius.full },
   habitPct: { fontSize: 10, fontWeight: '700', width: 24, textAlign: 'right' },
 
-  empty: { fontSize: 13, color: colors.text.muted, paddingVertical: spacing[1] },
+  empty: { fontSize: 13, color: c.text.muted, paddingVertical: spacing[1] },
 
-  divider: { height: 1, backgroundColor: colors.border.subtle, marginVertical: spacing[1] },
-  statsSubLabel: { fontSize: 9, fontWeight: '700', color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
+  divider: { height: 1, backgroundColor: c.border.subtle, marginVertical: spacing[1] },
+  statsSubLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 1, textTransform: 'uppercase' },
 
   diffRow: { flexDirection: 'row', gap: spacing[2] },
   diffTile: {
     flex: 1, alignItems: 'center', gap: 1, paddingVertical: spacing[2],
-    borderRadius: radius.md, borderWidth: 1, backgroundColor: colors.bg.secondary,
+    borderRadius: radius.md, borderWidth: 1, backgroundColor: c.bg.secondary,
   },
   diffLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
-  diffDays: { fontSize: 16, fontWeight: '900', color: colors.text.primary, letterSpacing: -0.5 },
-  diffUnit: { fontSize: 8, color: colors.text.muted },
+  diffDays: { fontSize: 16, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
+  diffUnit: { fontSize: 8, color: c.text.muted },
 
   adherenceRow: { alignItems: 'flex-start' },
   adherencePill: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   adherenceVal: { fontSize: 15, fontWeight: '900', letterSpacing: -0.3 },
-  adherenceLabel: { fontSize: 10, color: colors.text.secondary, fontWeight: '500' },
+  adherenceLabel: { fontSize: 10, color: c.text.secondary, fontWeight: '500' },
 
   // ── Mood grid ──────────────────────────────────────────────────────────────
   moodGrid: { flexDirection: 'row', gap: 5 },
   moodDayCol: { flex: 1, alignItems: 'center', gap: 4 },
-  moodDayLabel: { fontSize: 8, color: colors.text.muted, fontWeight: '500' },
-  moodDayLabelToday: { color: colors.text.secondary, fontWeight: '700' },
+  moodDayLabel: { fontSize: 8, color: c.text.muted, fontWeight: '500' },
+  moodDayLabelToday: { color: c.text.secondary, fontWeight: '700' },
   moodDayBox: {
     width: '100%', aspectRatio: 1, borderRadius: 7,
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
   moodDayNum: { fontSize: 14, fontWeight: '900', letterSpacing: -0.5 },
   moodDayCount: { fontSize: 7, fontWeight: '700', opacity: 0.7, lineHeight: 8 },
-  moodDayEmpty: { fontSize: 9, color: colors.text.muted },
+  moodDayEmpty: { fontSize: 9, color: c.text.muted },
   moodEnergyRow: { flexDirection: 'row', alignItems: 'center', gap: 1 },
   moodEnergyVal: { fontSize: 8, fontWeight: '700' },
 
@@ -818,26 +826,26 @@ const styles = StyleSheet.create({
   },
   moodTrendText: { fontSize: 11, fontWeight: '700' },
   moodBestWorst: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  moodBWLabel: { fontSize: 9, color: colors.text.muted },
+  moodBWLabel: { fontSize: 9, color: c.text.muted },
   moodBWDay: { fontSize: 12, fontWeight: '800' },
 
   moodNoteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   moodNoteDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
-  moodNoteDate: { fontSize: 10, fontWeight: '700', color: colors.text.muted, width: 16, marginTop: 2 },
-  moodNoteText: { flex: 1, fontSize: 12, color: colors.text.secondary, lineHeight: 17 },
+  moodNoteDate: { fontSize: 10, fontWeight: '700', color: c.text.muted, width: 16, marginTop: 2 },
+  moodNoteText: { flex: 1, fontSize: 12, color: c.text.secondary, lineHeight: 17 },
 
   moodLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   moodLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   moodLegendDot: { width: 7, height: 7, borderRadius: 2 },
-  moodLegendText: { fontSize: 9, color: colors.text.muted, fontWeight: '500' },
+  moodLegendText: { fontSize: 9, color: c.text.muted, fontWeight: '500' },
 
   moodTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   moodTagBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.sm,
-    backgroundColor: colors.accent.pink + '15',
-    borderWidth: 1, borderColor: colors.accent.pink + '30',
+    backgroundColor: c.accent.pink + '15',
+    borderWidth: 1, borderColor: c.accent.pink + '30',
   },
-  moodTagText: { fontSize: 10, color: colors.accent.pink, fontWeight: '600' },
-  moodTagCount: { fontSize: 9, color: colors.accent.pink + 'AA', fontWeight: '700' },
+  moodTagText: { fontSize: 10, color: c.accent.pink, fontWeight: '600' },
+  moodTagCount: { fontSize: 9, color: c.accent.pink + 'AA', fontWeight: '700' },
 });

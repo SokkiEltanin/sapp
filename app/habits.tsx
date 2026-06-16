@@ -15,6 +15,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import { useHabits } from '@/hooks/useHabits';
 import { HABIT_COLORS, HABIT_ICONS, Habit, HabitType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -41,6 +42,8 @@ function HabitIcon({ name, size, color }: { name: string; size: number; color: s
 const DAY_LABELS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 
 function HistoryDots({ days, color }: { days: boolean[]; color: string }) {
+  const colors = useColors();
+  const hd = useMemo(() => makeHd(colors), [colors]);
   const today = new Date();
   return (
     <View style={hd.row}>
@@ -60,13 +63,13 @@ function HistoryDots({ days, color }: { days: boolean[]; color: string }) {
   );
 }
 
-const hd = StyleSheet.create({
+const makeHd = (c: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: 6 },
   col: { alignItems: 'center', gap: 3 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' },
-  dotToday: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  label: { fontSize: 8, color: colors.text.muted },
-  labelToday: { color: colors.text.secondary, fontWeight: '700' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.border.subtle },
+  dotToday: { borderWidth: 1, borderColor: c.border.default },
+  label: { fontSize: 8, color: c.text.muted },
+  labelToday: { color: c.text.secondary, fontWeight: '700' },
 });
 
 // ─── Habit row ────────────────────────────────────────────────────────────────
@@ -83,6 +86,8 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   onDelete: () => void;
   onEdit: () => void;
 }) {
+  const colors = useColors();
+  const hr = useMemo(() => makeHr(colors), [colors]);
   const isCount = habit.type === 'count';
   const goal    = habit.dailyGoal ?? 1;
   const pct     = isCount ? Math.min(count / goal, 1) : (done ? 1 : 0);
@@ -144,7 +149,7 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
       </View>
 
       <TouchableOpacity onPress={() => { haptic.tap(); onDelete(); }} style={hr.deleteBtn} hitSlop={8}>
-        <Trash2 size={13} color="rgba(255,255,255,0.15)" />
+        <Trash2 size={13} color={colors.text.muted} />
       </TouchableOpacity>
 
       {isCount ? (
@@ -169,11 +174,11 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   );
 }
 
-const hr = StyleSheet.create({
+const makeHr = (c: any) => StyleSheet.create({
   wrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card,
+    borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default,
     padding: spacing[3],
   },
   iconCircle: {
@@ -182,42 +187,42 @@ const hr = StyleSheet.create({
   },
   body: { flex: 1, gap: 5 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
+  title: { fontSize: 14, fontWeight: '600', color: c.text.primary },
   streak: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: colors.accent.amber + '18',
+    backgroundColor: c.accent.amber + '18',
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
-    borderWidth: 1, borderColor: colors.accent.amber + '30',
+    borderWidth: 1, borderColor: c.accent.amber + '30',
   },
-  streakText: { fontSize: 10, fontWeight: '700', color: colors.accent.amber },
+  streakText: { fontSize: 10, fontWeight: '700', color: c.accent.amber },
   freqBadge: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle,
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
     borderWidth: 1, borderColor: 'transparent',
   },
-  freqText: { fontSize: 9, fontWeight: '600', color: colors.text.muted },
+  freqText: { fontSize: 9, fontWeight: '600', color: c.text.muted },
 
   reminderBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: colors.accent.purple + '18',
+    backgroundColor: c.accent.purple + '18',
     borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
   },
-  reminderText: { fontSize: 9, fontWeight: '600', color: colors.accent.purple },
+  reminderText: { fontSize: 9, fontWeight: '600', color: c.accent.purple },
 
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   progressTrack: {
     flex: 1, height: 8, borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+    backgroundColor: c.border.subtle, overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 4 },
-  countLabel: { fontSize: 10, fontWeight: '700', color: colors.text.secondary, minWidth: 40, textAlign: 'right' },
+  countLabel: { fontSize: 10, fontWeight: '700', color: c.text.secondary, minWidth: 40, textAlign: 'right' },
 
   deleteBtn: { padding: spacing[1] },
 
   check: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: c.border.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   checkInner: { width: 18, height: 18, borderRadius: 9, borderWidth: 2 },
@@ -225,11 +230,11 @@ const hr = StyleSheet.create({
   countControls: { alignItems: 'center', gap: 2 },
   countBtn: {
     width: 28, height: 28, borderRadius: radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: c.border.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  countNum: { fontSize: 13, fontWeight: '800', color: colors.text.primary, minWidth: 20, textAlign: 'center' },
+  countNum: { fontSize: 13, fontWeight: '800', color: c.text.primary, minWidth: 20, textAlign: 'center' },
 });
 
 // ─── 30-day month heatmap ─────────────────────────────────────────────────────
@@ -239,6 +244,8 @@ const GAP  = 2;
 const ROW_H = CELL + GAP;
 
 function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: string) => boolean[] }) {
+  const colors = useColors();
+  const mg = useMemo(() => makeMg(colors), [colors]);
   const scrollRef = useRef<ScrollView>(null);
   const data = useMemo(() => habits.map((h) => getLast30(h.id)), [habits, getLast30]);
   const days = useMemo(() => {
@@ -277,7 +284,7 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
               {habits.map((h, hi) => (
                 <View key={h.id} style={[
                   mg.cell,
-                  { backgroundColor: data[hi][di] ? h.color + 'CC' : 'rgba(255,255,255,0.06)' },
+                  { backgroundColor: data[hi][di] ? h.color + 'CC' : colors.border.subtle },
                   day.isToday && mg.cellToday,
                 ]} />
               ))}
@@ -289,15 +296,15 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
   );
 }
 
-const mg = StyleSheet.create({
-  wrap: { backgroundColor: colors.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border.default, padding: spacing[3], overflow: 'hidden' },
-  title: { fontSize: 10, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing[2] },
+const makeMg = (c: any) => StyleSheet.create({
+  wrap: { backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], overflow: 'hidden' },
+  title: { fontSize: 10, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing[2] },
   iconCell: { width: 20, alignItems: 'center', justifyContent: 'center' },
-  dayNum: { fontSize: 8, color: 'rgba(255,255,255,0.25)', fontWeight: '500', textAlign: 'center' },
-  dayNumWeekend: { color: 'rgba(255,255,255,0.15)' },
-  dayNumToday: { color: colors.text.primary, fontWeight: '800' },
+  dayNum: { fontSize: 8, color: c.text.muted, fontWeight: '500', textAlign: 'center' },
+  dayNumWeekend: { color: c.text.muted },
+  dayNumToday: { color: c.text.primary, fontWeight: '800' },
   cell: { width: CELL, height: CELL, borderRadius: 4 },
-  cellToday: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  cellToday: { borderWidth: 1, borderColor: c.border.default },
 });
 
 // ─── Habit form modal ────────────────────────────────────────────────────────
@@ -335,6 +342,8 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   onSave: (data: HabitFormData) => void;
   editing?: Habit | null;
 }) {
+  const colors = useColors();
+  const am = useMemo(() => makeAm(colors), [colors]);
   const [title, setTitle]             = useState('');
   const [selColor, setSelColor]       = useState<string>(HABIT_COLORS[0]);
   const [selIcon, setSelIcon]         = useState<string>(HABIT_ICONS[0]);
@@ -561,20 +570,20 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   );
 }
 
-const am = StyleSheet.create({
+const makeAm = (c: any) => StyleSheet.create({
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheetScroll: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '92%' },
   sheet: {
-    backgroundColor: colors.bg.secondary, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    backgroundColor: c.bg.secondary, borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: spacing[5], paddingBottom: spacing[10], gap: spacing[3],
-    borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border.default,
+    borderWidth: 1, borderBottomWidth: 0, borderColor: c.border.default,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.12)', alignSelf: 'center', marginBottom: spacing[1] },
-  heading: { fontSize: 18, fontWeight: '800', color: colors.text.primary, marginBottom: spacing[1] },
-  sectionLabel: { fontSize: 10, fontWeight: '600', color: colors.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: spacing[1] },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.border.subtle, alignSelf: 'center', marginBottom: spacing[1] },
+  heading: { fontSize: 18, fontWeight: '800', color: c.text.primary, marginBottom: spacing[1] },
+  sectionLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: spacing[1] },
   input: {
-    backgroundColor: colors.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
-    paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontSize: 15, color: colors.text.primary,
+    backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontSize: 15, color: c.text.primary,
   },
 
   presetsSection: { gap: spacing[2] },
@@ -583,7 +592,7 @@ const am = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.full, borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: c.border.subtle,
   },
   presetIconWrap: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   presetLabel: { fontSize: 12, fontWeight: '700' },
@@ -592,60 +601,62 @@ const am = StyleSheet.create({
   freqChip: {
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     borderRadius: radius.full,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
   },
-  freqChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  freqChipText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
 
   typeRow: { flexDirection: 'row', gap: spacing[3] },
   typePill: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.lg,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
   },
-  typePillActive: { backgroundColor: colors.text.primary, borderColor: colors.text.primary },
-  typePillText: { fontSize: 13, fontWeight: '600', color: colors.text.muted },
-  typePillTextActive: { color: colors.bg.primary },
+  typePillActive: { backgroundColor: c.text.primary, borderColor: c.text.primary },
+  typePillText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  typePillTextActive: { color: c.bg.primary },
 
-  countBox: { backgroundColor: colors.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default, padding: spacing[3] },
+  countBox: { backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
   unitPresets: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], marginTop: spacing[1] },
   unitChip: {
     paddingHorizontal: spacing[2], paddingVertical: 4, borderRadius: radius.sm,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
   },
-  unitChipActive: { backgroundColor: colors.accent.amber + '20', borderColor: colors.accent.amber },
-  unitChipText: { fontSize: 11, fontWeight: '600', color: colors.text.muted },
-  unitChipTextActive: { color: colors.accent.amber },
+  unitChipActive: { backgroundColor: c.accent.amber + '20', borderColor: c.accent.amber },
+  unitChipText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
+  unitChipTextActive: { color: c.accent.amber },
 
   iconRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   iconBtn: {
     width: 44, height: 44, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.border.subtle, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   colorRow: { flexDirection: 'row', gap: spacing[2] },
   colorBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  colorBtnActive: { borderWidth: 2, borderColor: colors.text.primary, transform: [{ scale: 1.15 }] },
-  addBtn: { backgroundColor: colors.accent.amber, borderRadius: radius.full, paddingVertical: spacing[4], alignItems: 'center', marginTop: spacing[2] },
+  colorBtnActive: { borderWidth: 2, borderColor: c.text.primary, transform: [{ scale: 1.15 }] },
+  addBtn: { backgroundColor: c.accent.amber, borderRadius: radius.full, paddingVertical: spacing[4], alignItems: 'center', marginTop: spacing[2] },
   addBtnDisabled: { opacity: 0.35 },
-  addBtnText: { fontSize: 15, fontWeight: '700', color: colors.bg.primary },
+  addBtnText: { fontSize: 15, fontWeight: '700', color: c.bg.primary },
 
-  reminderWrap: { backgroundColor: colors.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden' },
+  reminderWrap: { backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, overflow: 'hidden' },
   reminderToggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[3], paddingVertical: spacing[3] },
-  reminderLabel: { flex: 1, fontSize: 13, fontWeight: '500', color: colors.text.secondary },
-  toggleTrack: { width: 38, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', paddingHorizontal: 3 },
-  toggleTrackOn: { backgroundColor: colors.accent.purple },
-  toggleThumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.4)' },
+  reminderLabel: { flex: 1, fontSize: 13, fontWeight: '500', color: c.text.secondary },
+  toggleTrack: { width: 38, height: 22, borderRadius: 11, backgroundColor: c.border.subtle, justifyContent: 'center', paddingHorizontal: 3 },
+  toggleTrackOn: { backgroundColor: c.accent.purple },
+  toggleThumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: c.border.subtle },
   toggleThumbOn: { backgroundColor: '#fff', transform: [{ translateX: 16 }] },
-  timePickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingBottom: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3] },
+  timePickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingBottom: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[3] },
   timeUnit: { alignItems: 'center', gap: 4 },
-  timeArrow: { width: 36, height: 28, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
-  timeDigit: { fontSize: 28, fontWeight: '800', color: colors.text.primary, letterSpacing: 1, minWidth: 44, textAlign: 'center' },
-  timeSep: { fontSize: 28, fontWeight: '800', color: colors.text.muted, marginBottom: 4 },
+  timeArrow: { width: 36, height: 28, borderRadius: radius.md, backgroundColor: c.border.subtle, alignItems: 'center', justifyContent: 'center' },
+  timeDigit: { fontSize: 28, fontWeight: '800', color: c.text.primary, letterSpacing: 1, minWidth: 44, textAlign: 'center' },
+  timeSep: { fontSize: 28, fontWeight: '800', color: c.text.muted, marginBottom: 4 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HabitsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { habits, todayDone, isLoading, toggle, increment, decrement, add, remove, update, getStreak, getLast7, getLast30, getTodayCount } = useHabits();
   const [showAdd, setShowAdd]      = useState(false);
   const [showMonth, setShowMonth]  = useState(false);
@@ -789,54 +800,54 @@ export default function HabitsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
-  title: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
-  subtitle: { fontSize: 11, color: colors.text.secondary },
+  title: { fontSize: 18, fontWeight: '800', color: c.text.primary },
+  subtitle: { fontSize: 11, color: c.text.secondary },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  iconBtnActive: { backgroundColor: colors.accent.purple + '18', borderColor: colors.accent.purple + '40' },
-  addBtn: { backgroundColor: colors.accent.amber, borderColor: colors.accent.amber },
-  progressTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' },
+  iconBtnActive: { backgroundColor: c.accent.purple + '18', borderColor: c.accent.purple + '40' },
+  addBtn: { backgroundColor: c.accent.amber, borderColor: c.accent.amber },
+  progressTrack: { height: 8, backgroundColor: c.border.subtle, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: 60 },
 
   allDoneCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.accent.green + '12',
-    borderRadius: radius.xl, borderWidth: 1, borderColor: colors.accent.green + '35',
+    backgroundColor: c.accent.green + '12',
+    borderRadius: radius.xl, borderWidth: 1, borderColor: c.accent.green + '35',
     padding: spacing[4],
   },
   allDoneIconWrap: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: colors.accent.green + '20',
-    borderWidth: 1, borderColor: colors.accent.green + '40',
+    backgroundColor: c.accent.green + '20',
+    borderWidth: 1, borderColor: c.accent.green + '40',
     alignItems: 'center', justifyContent: 'center',
   },
-  allDoneTitle: { fontSize: 14, fontWeight: '800', color: colors.accent.green, lineHeight: 20 },
-  allDoneSub: { fontSize: 12, color: colors.text.secondary, marginTop: 2 },
+  allDoneTitle: { fontSize: 14, fontWeight: '800', color: c.accent.green, lineHeight: 20 },
+  allDoneSub: { fontSize: 12, color: c.text.secondary, marginTop: 2 },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[4] },
   emptyIcon: {
     width: 72, height: 72, borderRadius: 36,
-    backgroundColor: colors.accent.amber + '15', borderWidth: 1, borderColor: colors.accent.amber + '30',
+    backgroundColor: c.accent.amber + '15', borderWidth: 1, borderColor: c.accent.amber + '30',
     alignItems: 'center', justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
-  emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 21, paddingHorizontal: spacing[6] },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: c.text.primary },
+  emptySub: { fontSize: 14, color: c.text.muted, textAlign: 'center', lineHeight: 21, paddingHorizontal: spacing[6] },
   emptyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.accent.amber, borderRadius: radius.full,
+    backgroundColor: c.accent.amber, borderRadius: radius.full,
     paddingHorizontal: spacing[5], paddingVertical: spacing[3], marginTop: spacing[2],
   },
-  emptyBtnText: { fontSize: 14, fontWeight: '700', color: colors.bg.primary },
+  emptyBtnText: { fontSize: 14, fontWeight: '700', color: c.bg.primary },
 });
