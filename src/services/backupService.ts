@@ -10,6 +10,7 @@ import { subscriptionsService } from './subscriptionsService';
 import { templatesService } from './templatesService';
 import { workService } from './workService';
 import { vehiclesService } from './vehiclesService';
+import { maintenanceService } from './maintenanceService';
 
 // ─── Cloud backup ─────────────────────────────────────────────────────────────
 // A backup is ONE snapshot of everything the app owns: all local config/data in
@@ -52,7 +53,7 @@ interface Snapshot {
   cloud: Record<string, any[]>;
 }
 
-const CLOUD_COLS = ['expenses', 'mood', 'events', 'tasks', 'subscriptions', 'expenseTemplates', 'workShifts', 'vehicles'] as const;
+const CLOUD_COLS = ['expenses', 'mood', 'events', 'tasks', 'subscriptions', 'expenseTemplates', 'workShifts', 'vehicles', 'maintenanceItems'] as const;
 
 async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
   // Local: every AsyncStorage key except Firebase auth + our own throttle marker.
@@ -63,7 +64,7 @@ async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
   const local: Record<string, string> = {};
   for (const [k, v] of pairs) if (v != null) local[k] = v;
 
-  const [expenses, mood, events, tasks, subscriptions, expenseTemplates, workShifts, vehicles] = await Promise.all([
+  const [expenses, mood, events, tasks, subscriptions, expenseTemplates, workShifts, vehicles, maintenanceItems] = await Promise.all([
     expensesService.getAll(),
     moodService.getAll(),
     calendarService.getAllEvents(),
@@ -72,6 +73,7 @@ async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
     templatesService.getAll(),
     workService.getShifts(),
     vehiclesService.getAll(),
+    maintenanceService.getAll(),
   ]);
 
   return {
@@ -79,7 +81,7 @@ async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
     createdAt: new Date().toISOString(),
     appBuild,
     local,
-    cloud: { expenses, mood, events, tasks, subscriptions, expenseTemplates, workShifts, vehicles },
+    cloud: { expenses, mood, events, tasks, subscriptions, expenseTemplates, workShifts, vehicles, maintenanceItems },
   };
 }
 
@@ -174,6 +176,7 @@ export async function restoreBackup(id: string): Promise<void> {
   await replaceCollection('expenseTemplates', map.expenseTemplates ?? []);
   await replaceCollection('workShifts',       map.workShifts ?? []);
   await replaceCollection('vehicles',         map.vehicles ?? []);
+  await replaceCollection('maintenanceItems', map.maintenanceItems ?? []);
 
   // 2) Local config/data — overwrite AsyncStorage keys from the snapshot.
   const entries = Object.entries(snap.local);

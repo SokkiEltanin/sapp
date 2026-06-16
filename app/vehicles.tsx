@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   ChevronLeft, Plus, X, Car, Bike, Trash2, Droplet, Snowflake, Sun,
-  Fuel, Wrench, ChevronDown, ChevronUp, Check, Link2, CalendarClock,
+  Fuel, Wrench, ChevronDown, ChevronUp, Check, Link2, CalendarClock, Package,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -156,6 +156,9 @@ export default function VehiclesScreen() {
           <ChevronLeft size={20} color={c.text.secondary} />
         </TouchableOpacity>
         <Text style={s.title}>Pojazdy</Text>
+        <PressableScale onPress={() => { haptic.tap(); router.push('/items' as any); }} style={s.addBtn}>
+          <Package size={18} color={c.text.secondary} />
+        </PressableScale>
         <PressableScale onPress={openAdd} style={s.addBtn}>
           <Plus size={20} color={c.text.primary} />
         </PressableScale>

@@ -74,6 +74,22 @@ export interface Vehicle {
   updatedAt: string;
 }
 
+// ─── Maintenance items (Przedmioty) ──────────────────────────────────────────
+// Things you replace on a schedule: air-purifier filter, vacuum bag, Dafi
+// pitcher cartridge, toothbrush head, …
+
+export interface MaintenanceItem {
+  id: string;
+  name: string;
+  icon?: string;            // lucide name
+  color: string;
+  lastChangedDate: string;  // ISO date of the last replacement
+  intervalDays: number;     // how often it should be replaced
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ExpenseTemplate {
   id: string;
   name: string;
