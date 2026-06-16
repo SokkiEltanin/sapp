@@ -51,6 +51,25 @@ export interface Expense {
   storeName?: string;       // for receipt expenses
   receiptItems?: ReceiptItem[];  // products when saved as single receipt
   payer?: string;           // who paid (e.g. "Ja", "Partnerka") — counts in totals, lets you split by person
+  vehicleId?: string;       // manual link to a vehicle (Pojazdy) — overrides tag/category auto-match
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Vehicles (Pojazdy) ───────────────────────────────────────────────────────
+
+export type VehicleKind = 'car' | 'bike' | 'motorcycle' | 'scooter' | 'other';
+
+export interface Vehicle {
+  id: string;
+  name: string;             // "Mój rower", "Octavia"
+  kind: VehicleKind;
+  tag: string;              // normalized tag that auto-links expenses (e.g. "rower")
+  color: string;
+  oilChangeDate?: string;   // ISO date of the last oil change
+  oilIntervalMonths?: number;
+  tireSeason?: 'summer' | 'winter' | 'allseason'; // what's mounted now (drives the weather reminder)
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

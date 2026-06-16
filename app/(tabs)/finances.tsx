@@ -10,7 +10,7 @@ import { getBalanceOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
-import { RefreshCcw, Tag } from 'lucide-react-native';
+import { RefreshCcw, Tag, Car } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -262,12 +262,20 @@ export default function FinancesScreen() {
           accentColor={colors.tabs.finances}
           style={{ borderBottomColor: F.cardBorder }}
           rightSlot={
-            <PressableScale
-              onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }}
-              style={st.hBtn}
-            >
-              <RefreshCcw size={17} color={colors.text.secondary} />
-            </PressableScale>
+            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+              <PressableScale
+                onPress={() => { haptic.tap(); router.push('/vehicles' as any); }}
+                style={st.hBtn}
+              >
+                <Car size={17} color={colors.text.secondary} />
+              </PressableScale>
+              <PressableScale
+                onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }}
+                style={st.hBtn}
+              >
+                <RefreshCcw size={17} color={colors.text.secondary} />
+              </PressableScale>
+            </View>
           }
         />
 
