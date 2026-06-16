@@ -16,7 +16,7 @@ import { toast } from '@/store/toastStore';
 import { MOOD_COLORS } from '@/types';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
@@ -49,6 +49,19 @@ function dateKey(d: Date) {
 }
 function todayKey() { return dateKey(new Date()); }
 
+// Sleep is read-only from the watch, so its "quality" is derived from duration
+// rather than tapped in by hand.
+function qualityFromMinutes(min: number): SleepQuality | undefined {
+  if (min <= 0) return undefined;
+  const h = min / 60;
+  if (h < 5) return 'poor';
+  if (h < 6.5) return 'fair';
+  if (h < 7) return 'good';
+  if (h <= 9) return 'excellent';
+  return 'good'; // oversleeping
+}
+function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+
 export default function HealthScreen() {
   // Theme-reactive: shadow the module `colors`/`T` so the whole screen (incl. its
   // StyleSheet via makeStyles) flips with light/dark. Teal accent stays both ways.
@@ -80,6 +93,8 @@ export default function HealthScreen() {
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
   const [weekWater, setWeekWater]       = useState<number[]>(Array(7).fill(0));
+  const [monthData, setMonthData]       = useState<HealthDayPoint[]>([]); // 30-day from watch
+  const [fromWatch, setFromWatch]       = useState(false);                // HC delivered data
 
   const { entries } = useMoodStore();
   const pomodoroIsRunning = usePomodoroStore(s => s.isRunning);
@@ -90,6 +105,63 @@ export default function HealthScreen() {
     getTodaySessions().then(s => setTodayPomCount(s.length)).catch(() => {});
   }, []));
 
+  // Derive the Mon–Sun week charts from a 30-day watch range and pull today's
+  // headline numbers. Steps/sleep are read-only from the watch; weight only
+  // fills when empty so a manual override is never clobbered.
+  const applyHealthRange = useCallback((range: HealthDayPoint[]) => {
+    if (!range.length) return;
+    setMonthData(range);
+    setFromWatch(true);
+    const byDate = new Map(range.map(p => [p.date, p]));
+    const today = new Date();
+    const todayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
+    const monday = new Date(today); monday.setDate(today.getDate() - todayIdx);
+    const wSteps = Array(7).fill(0);
+    const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      const p = byDate.get(ymd(d));
+      if (p) {
+        wSteps[i] = p.steps;
+        wSleep[i] = { h: Math.floor(p.sleepMinutes / 60), m: p.sleepMinutes % 60, quality: qualityFromMinutes(p.sleepMinutes) };
+      }
+    }
+    setWeekSteps(wSteps);
+    setWeekSleep(wSleep);
+    const todayPt = byDate.get(ymd(today));
+    if (todayPt) {
+      if (todayPt.steps > 0) setSteps(todayPt.steps);
+      if (todayPt.sleepMinutes > 0) { setSleepH(Math.floor(todayPt.sleepMinutes / 60)); setSleepM(todayPt.sleepMinutes % 60); setSleepQuality(qualityFromMinutes(todayPt.sleepMinutes)); }
+      if (todayPt.weightKg != null) setWeight(w => w || todayPt.weightKg!);
+    }
+  }, []);
+
+  // Auto-pull from the watch on focus — silent (no permission prompt; that's the
+  // Synchronizuj button's job). Does nothing gracefully when HC is unavailable.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    (async () => {
+      if (Platform.OS !== 'android' || !isHealthConnectAvailable()) return;
+      try {
+        const [day, range] = await Promise.all([readHealthDay(new Date()), readHealthRange(30)]);
+        if (!active) return;
+        if (range && range.some(p => p.steps > 0 || p.sleepMinutes > 0)) applyHealthRange(range);
+        if (day) {
+          if (day.steps > 0) setSteps(day.steps);
+          if (day.sleepMinutes > 0) { setSleepH(Math.floor(day.sleepMinutes / 60)); setSleepM(day.sleepMinutes % 60); setSleepQuality(qualityFromMinutes(day.sleepMinutes)); }
+          if (day.weightKg != null) setWeight(w => w || day.weightKg!);
+          setHcExtra({
+            heartRateAvg: day.heartRateAvg, restingHeartRate: day.restingHeartRate, distanceKm: day.distanceKm,
+            activeCalories: day.activeCalories, totalCalories: day.totalCalories, exerciseMinutes: day.exerciseMinutes,
+            oxygenPct: day.oxygenPct, vo2max: day.vo2max,
+          });
+          setFromWatch(true);
+        }
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, [applyHealthRange]));
+
   const maxBar = Math.max(...weekSteps, 1);
   const stepPct = Math.min(1, steps / stepGoal);
   const sleepSecs = sleepH * 3600 + sleepM * 60;
@@ -99,6 +171,26 @@ export default function HealthScreen() {
   const minW = loggedWeights.length ? Math.min(...loggedWeights) : 0;
   const maxW = loggedWeights.length ? Math.max(...loggedWeights) : 1;
   const weightRange = maxW - minW || 1;
+
+  // ── Deeper analysis over the 30-day watch range ─────────────────────────────
+  const healthStats = useMemo(() => {
+    const md = monthData;
+    if (md.length === 0) return null;
+    const avg = (arr: number[]) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0);
+    const stepDays = md.filter(p => p.steps > 0);
+    const last7  = md.slice(-7);
+    const prev7  = md.slice(-14, -7);
+    const avgSteps7    = avg(last7.filter(p => p.steps > 0).map(p => p.steps));
+    const avgStepsPrev = avg(prev7.filter(p => p.steps > 0).map(p => p.steps));
+    const avgSteps30   = avg(stepDays.map(p => p.steps));
+    const avgSleep7    = avg(last7.filter(p => p.sleepMinutes > 0).map(p => p.sleepMinutes));
+    const avgSleep30   = avg(md.filter(p => p.sleepMinutes > 0).map(p => p.sleepMinutes));
+    const goalHit = stepDays.length ? Math.round(stepDays.filter(p => p.steps >= stepGoal).length / stepDays.length * 100) : 0;
+    const best = md.reduce((m, p) => (p.steps > m.steps ? p : m), md[0]);
+    const trendPct = avgStepsPrev ? Math.round((avgSteps7 - avgStepsPrev) / avgStepsPrev * 100) : 0;
+    const maxMonth = Math.max(...md.map(p => p.steps), 1);
+    return { avgSteps7, avgSteps30, avgSleep7, avgSleep30, goalHit, best, trendPct, maxMonth };
+  }, [monthData, stepGoal]);
 
   useEffect(() => {
     const load = async () => {
@@ -173,12 +265,6 @@ export default function HealthScreen() {
     else haptic.tap();
   };
 
-  const updateSteps = (delta: number) => setSteps(s => {
-    const next = Math.max(0, s + delta);
-    if (next >= stepGoal && s < stepGoal) haptic.success();
-    else haptic.tap();
-    return next;
-  });
 
   const syncHealthConnect = async () => {
     if (Platform.OS !== 'android') { toast.info('Health Connect tylko na Androidzie'); return; }
@@ -202,16 +288,18 @@ export default function HealthScreen() {
         toast.error(msg);
         return;
       }
-      const d = await readHealthDay(new Date());
+      const [d, range] = await Promise.all([readHealthDay(new Date()), readHealthRange(30)]);
+      if (range && range.some(p => p.steps > 0 || p.sleepMinutes > 0)) applyHealthRange(range);
       if (d) {
         if (d.steps > 0) setSteps(d.steps);
-        if (d.sleepMinutes > 0) { setSleepH(Math.floor(d.sleepMinutes / 60)); setSleepM(d.sleepMinutes % 60); }
-        if (d.weightKg != null) setWeight(d.weightKg);
+        if (d.sleepMinutes > 0) { setSleepH(Math.floor(d.sleepMinutes / 60)); setSleepM(d.sleepMinutes % 60); setSleepQuality(qualityFromMinutes(d.sleepMinutes)); }
+        if (d.weightKg != null) setWeight(d.weightKg); // manual sync: take the watch's weight
         setHcExtra({
           heartRateAvg: d.heartRateAvg, restingHeartRate: d.restingHeartRate, distanceKm: d.distanceKm,
           activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
           oxygenPct: d.oxygenPct, vo2max: d.vo2max,
         });
+        setFromWatch(true);
         haptic.success();
         toast.success('Zsynchronizowano z zegarka');
       } else {
@@ -246,14 +334,12 @@ export default function HealthScreen() {
             <Footprints size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>KROKI DZISIAJ</Text>
             <View style={{ flex: 1 }} />
-            <View style={styles.stepControls}>
-              <PressableScale onPress={() => updateSteps(-500)} style={styles.stepBtn}>
-                <Minus size={12} color={colors.text.muted} />
-              </PressableScale>
-              <PressableScale onPress={() => updateSteps(500)} style={styles.stepBtn}>
-                <Plus size={12} color={colors.text.muted} />
-              </PressableScale>
-            </View>
+            {fromWatch && (
+              <View style={styles.watchChip}>
+                <Activity size={9} color={T.accent} />
+                <Text style={styles.watchChipText}>z zegarka</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.heroNum, {
             color: steps >= stepGoal ? T.accent : colors.text.primary,
@@ -285,12 +371,9 @@ export default function HealthScreen() {
             )}
           </View>
 
-          {/* Duration row */}
+          {/* Duration (read-only — from the watch) */}
           <View style={styles.sleepDurRow}>
-            <PressableScale onPress={() => { haptic.tap(); setSleepH(h => Math.max(0, h - 1)); }} style={styles.sleepBtn}>
-              <Minus size={13} color={colors.text.muted} />
-            </PressableScale>
-            <View style={styles.sleepDurCenter}>
+            <View style={[styles.sleepDurCenter, { flex: 1 }]}>
               <Text style={styles.sleepDurNum}>
                 {sleepH}<Text style={styles.sleepDurUnit}>h </Text>
                 {pad(sleepM)}<Text style={styles.sleepDurUnit}>m</Text>
@@ -299,23 +382,6 @@ export default function HealthScreen() {
                 {sleepH < 6 ? 'za mało' : sleepH >= 7 && sleepH <= 9 ? 'optymalny' : sleepH > 9 ? 'dużo' : 'minimalny'}
               </Text>
             </View>
-            <PressableScale onPress={() => { haptic.tap(); setSleepH(h => Math.min(14, h + 1)); }} style={styles.sleepBtn}>
-              <Plus size={13} color={colors.text.muted} />
-            </PressableScale>
-          </View>
-
-          {/* Minutes fine-tune */}
-          <View style={styles.minuteRow}>
-            {[0, 15, 30, 45].map(m => (
-              <PressableScale key={m} onPress={() => { haptic.tap(); setSleepM(m); }} style={[
-                styles.minutePill,
-                sleepM === m && styles.minutePillActive,
-              ]}>
-                <Text style={[styles.minuteText, sleepM === m && styles.minuteTextActive]}>
-                  :{pad(m)}
-                </Text>
-              </PressableScale>
-            ))}
           </View>
 
           <View style={styles.microBar}>
@@ -323,24 +389,6 @@ export default function HealthScreen() {
               width: `${sleepPct * 100}%`,
               backgroundColor: sleepQuality ? QUALITY_COLORS[sleepQuality] : colors.text.secondary,
             }]} />
-          </View>
-
-          {/* Quality selector */}
-          <View style={styles.qualityRow}>
-            {QUALITY_KEYS.map(q => {
-              const active = sleepQuality === q;
-              const col = QUALITY_COLORS[q];
-              return (
-                <PressableScale key={q} onPress={() => { haptic.tap(); setSleepQuality(active ? undefined : q); }} style={[
-                  styles.qualityPill,
-                  active && { backgroundColor: col + '20', borderColor: col + '60' },
-                ]}>
-                  <Text style={[styles.qualityText, active && { color: col, fontWeight: '700' }]}>
-                    {QUALITY_LABELS[q]}
-                  </Text>
-                </PressableScale>
-              );
-            })}
           </View>
 
           {/* 7-day sleep chart */}
@@ -432,6 +480,58 @@ export default function HealthScreen() {
             })}
           </View>
         </GlassCard>
+
+        {/* 30-day steps + analysis (from the watch) */}
+        {healthStats && monthData.length > 0 && (
+          <GlassCard padding={spacing[4]} style={styles.tealCard}>
+            <View style={styles.cardRow}>
+              <Activity size={13} color={colors.text.muted} />
+              <Text style={styles.cardLabel}>OSTATNIE 30 DNI — KROKI</Text>
+              <View style={{ flex: 1 }} />
+              {healthStats.trendPct !== 0 && (
+                <Text style={[styles.trendText, { color: healthStats.trendPct > 0 ? T.accent : colors.accent.red }]}>
+                  {healthStats.trendPct > 0 ? '↑' : '↓'} {Math.abs(healthStats.trendPct)}%
+                </Text>
+              )}
+            </View>
+            <View style={styles.monthChartRow}>
+              {monthData.map((p, i) => {
+                const h = p.steps > 0 ? Math.max(3, (p.steps / healthStats.maxMonth) * 60) : 2;
+                const goalMet = p.steps >= stepGoal;
+                return (
+                  <View key={p.date} style={[styles.monthBar, {
+                    height: h,
+                    backgroundColor: p.steps === 0 ? colors.border.subtle : goalMet ? T.accent : T.muted,
+                    opacity: p.steps === 0 ? 0.5 : (i === monthData.length - 1 ? 1 : 0.85),
+                  }]} />
+                );
+              })}
+            </View>
+            <View style={styles.analysisGrid}>
+              <View style={styles.analysisTile}>
+                <Text style={styles.analysisVal}>{healthStats.avgSteps7.toLocaleString()}</Text>
+                <Text style={styles.analysisLabel}>śr. kroki · 7 dni</Text>
+              </View>
+              <View style={styles.analysisTile}>
+                <Text style={styles.analysisVal}>{healthStats.avgSteps30.toLocaleString()}</Text>
+                <Text style={styles.analysisLabel}>śr. · 30 dni</Text>
+              </View>
+              <View style={styles.analysisTile}>
+                <Text style={styles.analysisVal}>{healthStats.goalHit}%</Text>
+                <Text style={styles.analysisLabel}>dni z celem</Text>
+              </View>
+              <View style={styles.analysisTile}>
+                <Text style={styles.analysisVal}>{Math.floor(healthStats.avgSleep7 / 60)}h {pad(healthStats.avgSleep7 % 60)}m</Text>
+                <Text style={styles.analysisLabel}>śr. sen · 7 dni</Text>
+              </View>
+            </View>
+            {healthStats.best.steps > 0 && (
+              <Text style={styles.analysisNote}>
+                Rekord 30 dni: {healthStats.best.steps.toLocaleString()} kroków · {new Date(healthStats.best.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+              </Text>
+            )}
+          </GlassCard>
+        )}
 
         {/* Water */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -739,6 +839,29 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   chartDay: { ...typography.caption, color: c.text.muted, fontSize: 9 },
   chartDayToday: { color: c.text.primary, fontWeight: '700' },
   chartNum: { ...typography.caption, color: c.text.muted, fontSize: 8 },
+
+  // "from the watch" chip + 30-day analysis
+  watchChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full,
+    backgroundColor: t.accentDim, borderWidth: 1, borderColor: t.cardBorder,
+  },
+  watchChipText: { fontSize: 8.5, fontWeight: '700', color: t.accent, letterSpacing: 0.3 },
+  trendText: { fontSize: 10, fontWeight: '800' },
+  monthChartRow: {
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+    height: 64, marginTop: spacing[3], gap: 1.5,
+  },
+  monthBar: { flex: 1, borderRadius: 2, minHeight: 2 },
+  analysisGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing[3] },
+  analysisTile: { width: '50%', paddingVertical: spacing[2], gap: 1 },
+  analysisVal: { fontSize: 20, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
+  analysisLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted },
+  analysisNote: {
+    fontSize: 11, color: c.text.secondary, fontStyle: 'italic',
+    marginTop: spacing[1], paddingTop: spacing[2],
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+  },
 
   waterCount: { ...typography.label, color: c.text.secondary, fontWeight: '600', marginLeft: 'auto', fontSize: 10 },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },

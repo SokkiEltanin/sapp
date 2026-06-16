@@ -15,6 +15,17 @@ export function isHealthConnectAvailable(): boolean {
   return !!mod();
 }
 
+// Initialise the SDK once (no permission prompt). Reads need this; calling it
+// from readHealthDay/readHealthRange lets background/auto syncs work silently
+// when access was already granted, while the "Synchronizuj" button still owns
+// the permission request via ensureHealthConnect().
+let _inited = false;
+async function ensureInit(hc: any): Promise<boolean> {
+  if (_inited) return true;
+  try { _inited = await hc.initialize(); } catch { _inited = false; }
+  return _inited;
+}
+
 // Opens the Health Connect app/settings so the user can grant Sapp access by
 // hand — a crash-proof fallback when the in-app permission request misbehaves.
 export async function openHealthConnect(): Promise<boolean> {
@@ -119,6 +130,7 @@ export interface HealthConnectDay {
 export async function readHealthDay(date: Date = new Date()): Promise<HealthConnectDay | null> {
   const hc = mod();
   if (!hc) return null;
+  if (!(await ensureInit(hc))) return null;
   const filter = dayFilter(date);
   const r1 = (v: number | null) => (typeof v === 'number' ? Math.round(v * 10) / 10 : null);
 
@@ -187,4 +199,67 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
     oxygenPct: r1(spo2?.percentage ?? null),
     vo2max: r1(vo2?.vo2MillilitersPerMinuteKilogram ?? null),
   };
+}
+
+export interface HealthDayPoint {
+  date: string;            // YYYY-MM-DD (local day)
+  steps: number;
+  sleepMinutes: number;
+  weightKg: number | null;
+}
+
+function localKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Read a back-window of daily steps + sleep (+ any logged weight) for the charts
+// and the weekly/monthly analysis. Each record type is read ONCE across the whole
+// window and bucketed locally — far fewer native calls than N per-day reads.
+// Returns oldest → newest, always `days` long (missing days = zeros / null weight).
+// Steps bucket by their own day; a sleep session counts on the day you WOKE (its
+// end), so "today" shows last night — matching the single-day card.
+export async function readHealthRange(days: number, end: Date = new Date()): Promise<HealthDayPoint[]> {
+  const start = new Date(end); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (days - 1));
+  const out: HealthDayPoint[] = [];
+  const byDay = new Map<string, HealthDayPoint>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const p: HealthDayPoint = { date: localKey(d), steps: 0, sleepMinutes: 0, weightKg: null };
+    byDay.set(p.date, p); out.push(p);
+  }
+
+  const hc = mod();
+  if (!hc) return out;                 // no native module → zeros (caller uses local cache)
+  if (!(await ensureInit(hc))) return out;
+
+  const endIso = new Date(end); endIso.setHours(23, 59, 59, 999);
+  const filter = { operator: 'between', startTime: start.toISOString(), endTime: endIso.toISOString() } as const;
+
+  try {
+    for (const r of await read(hc, 'Steps', filter)) {
+      const p = byDay.get(localKey(new Date(r.startTime)));
+      if (p) p.steps += r.count ?? 0;
+    }
+  } catch {}
+
+  try {
+    for (const r of await read(hc, 'SleepSession', filter)) {
+      const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
+      if (en <= st) continue;
+      const p = byDay.get(localKey(new Date(r.endTime)));   // wake day
+      if (p) p.sleepMinutes += Math.round((en - st) / 60000);
+    }
+  } catch {}
+
+  try {
+    const recs = await read(hc, 'Weight', filter);
+    recs.sort((a, b) => new Date(a.time ?? a.startTime).getTime() - new Date(b.time ?? b.startTime).getTime());
+    for (const r of recs) {
+      const p = byDay.get(localKey(new Date(r.time ?? r.startTime)));
+      const kg = r.weight?.inKilograms ?? r.weight?.value ?? null;
+      if (p && kg != null) p.weightKg = Math.round(kg * 10) / 10;   // last reading of the day wins
+    }
+  } catch {}
+
+  return out;
 }
