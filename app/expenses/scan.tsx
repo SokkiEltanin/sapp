@@ -15,7 +15,7 @@ import {
   loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory,
   loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
   loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
-  loadWeightMemory, saveWeightMemory, weightFor, WeightMemory, brandTag,
+  loadWeightMemory, saveWeightMemory, weightFor, parseWeightFromName, WeightMemory, brandTag,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -107,7 +107,10 @@ export default function ScanReceiptModal() {
   const isWeighable = (i: number) => getProductTags(i).some(t => WEIGH_TAGS.includes(t));
   const getWeight = (i: number): string => {
     if (editedWeight[i] !== undefined) return editedWeight[i];
-    const learned = weightFor(getProductName(i), weightMemory); // remembered for this product
+    const name = getProductName(i);
+    const fromName = parseWeightFromName(name);  // "Ogórki 700g" → 0.7 (ground truth for this line)
+    if (fromName) return String(fromName);
+    const learned = weightFor(name, weightMemory); // remembered for this product (e.g. XXL PIKOK = 0.25)
     if (learned) return String(learned);
     return getProductTags(i).includes('nabiał') ? '1' : ''; // dairy starts at 1 kg
   };
@@ -320,11 +323,16 @@ export default function ScanReceiptModal() {
       saveTagMemory(receipt.products, editedTags, editedNames).catch(() => {});
       // Learn renamed products → canonical name (unifies stats across OCR/stores).
       saveNameAliases(receipt.products, editedNames).catch(() => {});
-      // Learn per-product weights for the items being saved.
-      saveWeightMemory(Array.from(selected).map(i => {
-        const w = parseFloat(getWeight(i).replace(',', '.'));
-        return { name: getProductName(i), kg: isNaN(w) ? 0 : w };
-      })).catch(() => {});
+      // Learn per-product weights — only the ones the user TYPED (editedWeight),
+      // e.g. "XXL PIKOK PIERŚ Z KURCZAKA" = 0.25 kg. These persist and overwrite
+      // the old learned value. Weights written into the name ("Ogórki 700g") are
+      // re-parsed every time, so they're not stored (keeps memory clean).
+      saveWeightMemory(Array.from(selected)
+        .filter(i => editedWeight[i] !== undefined && getProductName(i).trim())
+        .map(i => {
+          const w = parseFloat((editedWeight[i] ?? '').replace(',', '.'));
+          return { name: getProductName(i), kg: isNaN(w) ? 0 : w };
+        })).catch(() => {});
       // Learn per-store verdicts on SUSPECT lines: kept = real product, dropped = junk.
       const verdicts = receipt.products
         .map((p, i) => ({ p, i }))

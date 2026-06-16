@@ -358,6 +358,31 @@ export function weightFor(name: string, mem: WeightMemory): number | undefined {
   return mem[key] ?? findFuzzyMatch(key, mem);
 }
 
+function unitToKg(n: number, unit: string): number | undefined {
+  if (!(n > 0)) return undefined;
+  // l/ml treated as kg-equivalent (density ~1) so volume products get a weight too.
+  const kg = unit === 'kg' || unit === 'l' ? n : n / 1000; // g / ml
+  if (kg <= 0 || kg > 50) return undefined;                // ignore absurd OCR values
+  return Math.round(kg * 1000) / 1000;
+}
+
+// Extract an explicit weight/volume written INTO the product name, in kg.
+// "Ogórki 700g" → 0.7, "Ser Gouda 0,5 kg" → 0.5, "Woda 1,5l" → 1.5,
+// "Chipsy 6x40g" → 0.24 (multiplier packs). Returns undefined when the name
+// carries no weight token — callers then fall back to learned/typed weight.
+export function parseWeightFromName(name: string): number | undefined {
+  if (!name) return undefined;
+  const s = name.toLowerCase().replace(/,/g, '.');
+  // multiplier pack: "6 x 40 g", "2x0.5l"
+  const mult = s.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b/);
+  if (mult) return unitToKg(parseFloat(mult[1]) * parseFloat(mult[2]), mult[3]);
+  // single token — take the last one (weight usually trails the name)
+  const all = [...s.matchAll(/(\d+(?:\.\d+)?)\s*(kg|g|ml|l)\b/g)];
+  if (all.length === 0) return undefined;
+  const m = all[all.length - 1];
+  return unitToKg(parseFloat(m[1]), m[2]);
+}
+
 // ─── Per-store line decisions (is this even a product?) ───────────────────────
 // When a suspect line comes up the UI asks; the user's verdict is remembered
 // PER STORE so next time the same junk line is auto-handled. 'ignore' = not a
