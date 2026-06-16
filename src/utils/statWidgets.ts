@@ -142,9 +142,12 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       for (const e of exp) {
         if (e.type && e.type !== 'expense') continue;
         if (!inScope(e, ctx.scope) || !pred(e)) continue;
-        if (e.tags?.includes(tag)) { total += e.amount; continue; }
-        for (const it of (e.receiptItems ?? [])) {
-          if (countsForConsumption(it) && (it.tags ?? []).includes(tag)) total += it.price;
+        // A receipt counts ONLY its matching items, never the whole shop.
+        const items = e.receiptItems ?? [];
+        if (items.length > 0) {
+          for (const it of items) if (countsForConsumption(it) && (it.tags ?? []).includes(tag)) total += it.price;
+        } else if (e.tags?.includes(tag)) {
+          total += e.amount;
         }
       }
       return total;
@@ -186,9 +189,11 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       for (const e of exp) {
         if (e.type && e.type !== 'expense') continue;
         if (!inScope(e, ctx.scope) || !pred(e)) continue;
-        if (e.tags?.includes('słodycze')) { total += e.amount; continue; }
-        for (const it of (e.receiptItems ?? [])) {
-          if (countsForConsumption(it) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+        const items = e.receiptItems ?? [];
+        if (items.length > 0) {
+          for (const it of items) if (countsForConsumption(it) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+        } else if (e.tags?.includes('słodycze')) {
+          total += e.amount;
         }
       }
       return total;

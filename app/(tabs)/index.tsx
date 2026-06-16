@@ -1321,22 +1321,24 @@ export default function DashboardScreen() {
         for (const e of scopedExpenses) {
           if (e.type === 'income') continue;
           if (!inPeriod(e.date, rule.period)) continue;
-          // Expense-level tag (no item breakdown): a person-scoped bar can't split
-          // it, so it only counts when that person was the payer. These ALSO get
-          // listed (idx -1) so the breakdown shows every contributor — not just
-          // itemised receipts — and they can be removed/recategorised.
-          if (hasAny(e.tags)) {
-            if (!rule.person || e.payer === rule.person) {
-              spend += e.amount;
-              items.push({ expenseId: e.id, idx: -1, kind: 'expense', name: e.storeName || e.note || 'Wydatek', price: e.amount, date: e.date });
-            }
-          } else if (e.receiptItems?.some(it => countsForConsumption(it) && hasAny(it.tags))) {
-            e.receiptItems.forEach((it, idx) => {
+          // A RECEIPT is always broken down by its items — only the matching
+          // products count, never the whole receipt (a 74 zł Lidl shop is not 74 zł
+          // of sweets just because it contains some). The expense-level tag only
+          // counts a PLAIN expense with no item breakdown (whole amount, listed at
+          // idx -1, person-scoped to the payer).
+          const hasItems = (e.receiptItems?.length ?? 0) > 0;
+          if (hasItems) {
+            e.receiptItems!.forEach((it, idx) => {
               if (countsForConsumption(it) && hasAny(it.tags)) {
                 spend += attributedPrice(it, rule.person, payers);
                 items.push({ expenseId: e.id, idx, kind: 'item', name: it.name, price: it.price, date: e.date });
               }
             });
+          } else if (hasAny(e.tags)) {
+            if (!rule.person || e.payer === rule.person) {
+              spend += e.amount;
+              items.push({ expenseId: e.id, idx: -1, kind: 'expense', name: e.storeName || e.note || 'Wydatek', price: e.amount, date: e.date });
+            }
           }
         }
         items.sort((a, b) => (a.date < b.date ? 1 : -1));   // newest first

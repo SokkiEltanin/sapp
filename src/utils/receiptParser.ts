@@ -437,6 +437,15 @@ const DISCOUNT_NEG_RE = /^[#*]?\s*[-–]\s*(\d+[.,]\d{2})\s*$/;
 const INLINE_DISC_RE = /^.+\s{2,}[-–]\s*(\d+[.,]\d{2})\s*$/;
 const PRICE_ONLY_RE = /^\s*(\d+[.,]\d{1,3})\s*$/;
 
+// Returnable-packaging / deposit REFUND section ("Opakowania zwrotne"). These
+// are money BACK (negative): "Zwrot kaucji 1 * 6,50 -6,50", "Opak bez kau …
+// -0,30", framed by "Opakowania zwrotne przyjęcia/suma". They must be caught
+// BEFORE the discount logic — "ZWROT" is a discount keyword, so otherwise the
+// −6,50 was wrongly subtracted from the previous product ("naliczyło śmiesznie").
+const DEPOSIT_RETURN_RE = /opakowan(?:ia|ie)?\s*zwrotn|zwrot\s*kaucj|\bopak\.?\s*bez\s*kau/i;
+const DEPOSIT_SECTION_TOTAL_RE = /przyj[ęe]|wydan|\bsuma\b|\brazem\b/i;
+const TRAIL_NEG_RE = /[-–]\s*(\d+[.,]\d{1,2})\s*$/;
+
 const SKIP_RE = /^(SUMA|RAZEM|DO ZAP[ŁL]ATY|[ŁL][AĄ]CZNIE|PTU|KWOTA|VAT\s+[A-E]|PARAGON|DZIE[NK]UJEMY|DZIE[NK]\.?|THANK|KOD\s|NIP|DATA\s|KASJER|ZAPRASZAMY|ZMIANA|GOT[ÓO]WKA|KARTA|P[ŁL]ATNO|FISKALNY|WYDRUK|POKWITOWANIE|ORYGINA[ŁL]|KOPIA|NUMER|TERMINAL|TRANSAKCJA|APPROVED|AUTORYZ|POWROT|POWRÓT|CASHBACK|SPRZEDAŻ|SPRZEDAZ|SALDO|ODBIÓR|ODBIORY|SERIA|KASY|KAS\s|CZĄSTK|CZASTK|SUMA\s+CZĄSTK|NADRUK|PARAGON FISKALN|KOPIĘ|NIEFISKALN)/i;
 
 const TOTAL_RE = /(?:SUMA(?:\s+PLN)?|RAZEM(?:\s+PLN)?|DO\s+ZAP[ŁL]ATY|[ŁL][AĄ]CZNIE|TOTAL|DO\s+ZAP[ŁL]ATY\s+PLN)\s*:?\s*(?:PLN\s*)?(\d+[.,]\d{2})/i;
@@ -826,6 +835,23 @@ function parseGeneric(text: string): ParsedReceipt {
     if (/^\d{8,}$/.test(line)) continue;
     if (/^\d{2}:\d{2}(:\d{2})?$/.test(line)) continue;
     if (/^\d+\s+\d+\s+nr:/i.test(line)) continue;
+
+    // Returnable-packaging / deposit refund — recognised BEFORE discounts so the
+    // negative amount isn't subtracted from the previous product.
+    if (DEPOSIT_RETURN_RE.test(line)) {
+      // section header/footer ("…przyjęcia", "…suma") → skip, don't double-count
+      if (DEPOSIT_SECTION_TOTAL_RE.test(line)) { pendingName = null; continue; }
+      const neg = line.match(TRAIL_NEG_RE);
+      if (neg) {
+        const amt = -parseFloat(neg[1].replace(',', '.'));
+        const depName = /zwrot|kaucj/i.test(line) ? 'Zwrot kaucji' : 'Opakowanie zwrotne';
+        products.push({ name: depName, quantity: 1, unitPrice: amt, finalPrice: amt, category: 'groceries', kind: 'deposit' });
+        lastProduct = null;
+        subtotal += amt;
+      }
+      pendingName = null;
+      continue;
+    }
 
     const promo = detectPromotion(line);
 

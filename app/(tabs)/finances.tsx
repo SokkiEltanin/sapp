@@ -174,10 +174,14 @@ export default function FinancesScreen() {
       // Consumption (food / sweets): everyone or only me, per the scope toggle.
       if (!inScope(e, scope)) continue;
       if (e.category === 'groceries') food += e.amount;
-      // sweets = items tagged "słodycze" (top-level tag or per-receipt-item tag)
-      if (e.tags?.includes('słodycze')) sweets += e.amount;
-      else if (e.receiptItems) {
-        for (const it of e.receiptItems) if (countsForConsumption(it) && it.tags.includes('słodycze')) sweets += it.price;
+      // sweets = ONLY the items tagged "słodycze". A receipt is summed by its
+      // items (never the whole shop); the top-level tag only counts a plain,
+      // non-itemised expense.
+      const sItems = e.receiptItems ?? [];
+      if (sItems.length > 0) {
+        for (const it of sItems) if (countsForConsumption(it) && it.tags.includes('słodycze')) sweets += it.price;
+      } else if (e.tags?.includes('słodycze')) {
+        sweets += e.amount;
       }
     }
     return { exp, inc, allExp, allInc, food, sweets };
