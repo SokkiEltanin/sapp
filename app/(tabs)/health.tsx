@@ -189,8 +189,20 @@ export default function HealthScreen() {
     const best = md.reduce((m, p) => (p.steps > m.steps ? p : m), md[0]);
     const trendPct = avgStepsPrev ? Math.round((avgSteps7 - avgStepsPrev) / avgStepsPrev * 100) : 0;
     const maxMonth = Math.max(...md.map(p => p.steps), 1);
-    return { avgSteps7, avgSteps30, avgSleep7, avgSleep30, goalHit, best, trendPct, maxMonth };
+    // Sleep, the deeper view: nights against the personal 30-day average + extremes.
+    const sleepNights = md.filter(p => p.sleepMinutes > 0);
+    const sleepBest  = sleepNights.reduce((m, p) => (p.sleepMinutes > m.sleepMinutes ? p : m), sleepNights[0] ?? md[0]);
+    const sleepWorst = sleepNights.reduce((m, p) => (p.sleepMinutes < m.sleepMinutes ? p : m), sleepNights[0] ?? md[0]);
+    const sleepConsistency = (() => {
+      if (sleepNights.length < 3) return 0;
+      const mean = avgSleep30;
+      const variance = sleepNights.reduce((s, p) => s + (p.sleepMinutes - mean) ** 2, 0) / sleepNights.length;
+      return Math.round(Math.sqrt(variance)); // stddev in minutes
+    })();
+    return { avgSteps7, avgSteps30, avgSleep7, avgSleep30, goalHit, best, trendPct, maxMonth, sleepBest, sleepWorst, sleepConsistency };
   }, [monthData, stepGoal]);
+
+  const [stepsRange, setStepsRange] = useState<7 | 30>(30);
 
   useEffect(() => {
     const load = async () => {
@@ -419,6 +431,25 @@ export default function HealthScreen() {
               );
             })}
           </View>
+
+          {/* Sleep vs your other nights (30-day) */}
+          {healthStats && healthStats.avgSleep30 > 0 && (() => {
+            const avgH = healthStats.avgSleep30 / 60;
+            const tIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+            const todayH = (weekSleep[tIdx]?.h ?? 0) + (weekSleep[tIdx]?.m ?? 0) / 60;
+            const diff = todayH > 0 ? +(todayH - avgH).toFixed(1) : null;
+            return (
+              <View style={styles.sleepInsight}>
+                <Text style={styles.sleepInsightMain}>
+                  Śr. {avgH.toFixed(1).replace('.0', '')} h/noc · 30 dni
+                  {diff != null && <Text style={{ color: diff >= 0 ? T.accent : colors.accent.red, fontWeight: '800' }}>{`   dziś ${diff >= 0 ? '+' : ''}${diff} h vs średnia`}</Text>}
+                </Text>
+                <Text style={styles.sleepInsightSub}>
+                  Najlepiej {(healthStats.sleepBest.sleepMinutes / 60).toFixed(1)} h · najgorzej {(healthStats.sleepWorst.sleepMinutes / 60).toFixed(1)} h · wahania ±{healthStats.sleepConsistency} min
+                </Text>
+              </View>
+            );
+          })()}
         </GlassCard>
 
         {/* From the watch — extra Health Connect metrics (only those with data) */}
@@ -486,50 +517,73 @@ export default function HealthScreen() {
           <GlassCard padding={spacing[4]} style={styles.tealCard}>
             <View style={styles.cardRow}>
               <Activity size={13} color={colors.text.muted} />
-              <Text style={styles.cardLabel}>OSTATNIE 30 DNI — KROKI</Text>
+              <Text style={styles.cardLabel}>KROKI</Text>
               <View style={{ flex: 1 }} />
-              {healthStats.trendPct !== 0 && (
-                <Text style={[styles.trendText, { color: healthStats.trendPct > 0 ? T.accent : colors.accent.red }]}>
-                  {healthStats.trendPct > 0 ? '↑' : '↓'} {Math.abs(healthStats.trendPct)}%
-                </Text>
-              )}
-            </View>
-            <View style={styles.monthChartRow}>
-              {monthData.map((p, i) => {
-                const h = p.steps > 0 ? Math.max(3, (p.steps / healthStats.maxMonth) * 60) : 2;
-                const goalMet = p.steps >= stepGoal;
-                return (
-                  <View key={p.date} style={[styles.monthBar, {
-                    height: h,
-                    backgroundColor: p.steps === 0 ? colors.border.subtle : goalMet ? T.accent : T.muted,
-                    opacity: p.steps === 0 ? 0.5 : (i === monthData.length - 1 ? 1 : 0.85),
-                  }]} />
-                );
-              })}
-            </View>
-            <View style={styles.analysisGrid}>
-              <View style={styles.analysisTile}>
-                <Text style={styles.analysisVal}>{healthStats.avgSteps7.toLocaleString()}</Text>
-                <Text style={styles.analysisLabel}>śr. kroki · 7 dni</Text>
-              </View>
-              <View style={styles.analysisTile}>
-                <Text style={styles.analysisVal}>{healthStats.avgSteps30.toLocaleString()}</Text>
-                <Text style={styles.analysisLabel}>śr. · 30 dni</Text>
-              </View>
-              <View style={styles.analysisTile}>
-                <Text style={styles.analysisVal}>{healthStats.goalHit}%</Text>
-                <Text style={styles.analysisLabel}>dni z celem</Text>
-              </View>
-              <View style={styles.analysisTile}>
-                <Text style={styles.analysisVal}>{Math.floor(healthStats.avgSleep7 / 60)}h {pad(healthStats.avgSleep7 % 60)}m</Text>
-                <Text style={styles.analysisLabel}>śr. sen · 7 dni</Text>
+              <View style={styles.rangeToggle}>
+                {([7, 30] as const).map(r => (
+                  <TouchableOpacity key={r} onPress={() => { haptic.tap(); setStepsRange(r); }} style={[styles.rangeBtn, stepsRange === r && styles.rangeBtnOn]}>
+                    <Text style={[styles.rangeBtnText, stepsRange === r && styles.rangeBtnTextOn]}>{r === 7 ? 'Tydzień' : 'Miesiąc'}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
-            {healthStats.best.steps > 0 && (
-              <Text style={styles.analysisNote}>
-                Rekord 30 dni: {healthStats.best.steps.toLocaleString()} kroków · {new Date(healthStats.best.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
-              </Text>
-            )}
+            {(() => {
+              const data = stepsRange === 7 ? monthData.slice(-7) : monthData;
+              const maxC = Math.max(...data.map(p => p.steps), 1);
+              const avgWin = stepsRange === 7 ? healthStats.avgSteps7 : healthStats.avgSteps30;
+              const DOW = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
+              return (
+                <>
+                  <View style={styles.monthChartRow}>
+                    {data.map((p, i) => {
+                      const h = p.steps > 0 ? Math.max(3, (p.steps / maxC) * 60) : 2;
+                      const goalMet = p.steps >= stepGoal;
+                      return (
+                        <View key={p.date} style={[styles.monthBar, {
+                          height: h,
+                          flex: stepsRange === 7 ? 0 : 1,
+                          width: stepsRange === 7 ? 28 : undefined,
+                          backgroundColor: p.steps === 0 ? colors.border.subtle : goalMet ? T.accent : T.muted,
+                          opacity: p.steps === 0 ? 0.5 : (i === data.length - 1 ? 1 : 0.85),
+                        }]} />
+                      );
+                    })}
+                  </View>
+                  {stepsRange === 7 && (
+                    <View style={styles.weekDayRow}>
+                      {data.map(p => (
+                        <Text key={p.date} style={styles.weekDayLabel}>{DOW[new Date(p.date + 'T00:00:00').getDay()]}</Text>
+                      ))}
+                    </View>
+                  )}
+                  <View style={styles.analysisGrid}>
+                    <View style={styles.analysisTile}>
+                      <Text style={styles.analysisVal}>{avgWin.toLocaleString()}</Text>
+                      <Text style={styles.analysisLabel}>śr. kroki · {stepsRange} dni</Text>
+                    </View>
+                    <View style={styles.analysisTile}>
+                      <Text style={styles.analysisVal}>{healthStats.goalHit}%</Text>
+                      <Text style={styles.analysisLabel}>dni z celem (30d)</Text>
+                    </View>
+                    <View style={styles.analysisTile}>
+                      <Text style={styles.analysisVal}>{Math.floor(healthStats.avgSleep7 / 60)}h {pad(healthStats.avgSleep7 % 60)}m</Text>
+                      <Text style={styles.analysisLabel}>śr. sen · 7 dni</Text>
+                    </View>
+                    <View style={styles.analysisTile}>
+                      <Text style={[styles.analysisVal, { color: healthStats.trendPct > 0 ? T.accent : healthStats.trendPct < 0 ? colors.accent.red : colors.text.primary }]}>
+                        {healthStats.trendPct > 0 ? '+' : ''}{healthStats.trendPct}%
+                      </Text>
+                      <Text style={styles.analysisLabel}>vs poprz. tydzień</Text>
+                    </View>
+                  </View>
+                  {healthStats.best.steps > 0 && (
+                    <Text style={styles.analysisNote}>
+                      Rekord 30 dni: {healthStats.best.steps.toLocaleString()} kroków · {new Date(healthStats.best.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}
+                    </Text>
+                  )}
+                </>
+              );
+            })()}
           </GlassCard>
         )}
 
@@ -848,6 +902,16 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   },
   watchChipText: { fontSize: 8.5, fontWeight: '700', color: t.accent, letterSpacing: 0.3 },
   trendText: { fontSize: 10, fontWeight: '800' },
+  rangeToggle: { flexDirection: 'row', gap: 2, backgroundColor: t.accentDim, borderRadius: radius.full, padding: 2 },
+  rangeBtn: { paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.full },
+  rangeBtnOn: { backgroundColor: t.accent + '30' },
+  rangeBtnText: { fontSize: 9.5, fontWeight: '700', color: c.text.muted },
+  rangeBtnTextOn: { color: t.accent },
+  weekDayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 2 },
+  weekDayLabel: { flex: 1, fontSize: 8, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
+  sleepInsight: { marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle, gap: 2 },
+  sleepInsightMain: { fontSize: 12, fontWeight: '700', color: c.text.primary },
+  sleepInsightSub: { fontSize: 10.5, color: c.text.muted },
   monthChartRow: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
     height: 64, marginTop: spacing[3], gap: 1.5,
