@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   Alert, KeyboardAvoidingView, Platform, Modal,
@@ -22,6 +22,7 @@ import {
   blocksToPlainText, RICH_COLORS, RICH_SIZES,
 } from '@/utils/richText';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -55,6 +56,8 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
   onSize: (size: number | undefined) => void;
   onAdd: () => void;
 }) {
+  const colors = useColors();
+  const tb = useMemo(() => makeTb(colors), [colors]);
   if (!block) return null;
 
   const activeSize = block.size ?? 15;
@@ -126,10 +129,10 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
   );
 }
 
-const tb = StyleSheet.create({
+const makeTb = (c: any) => StyleSheet.create({
   wrap: {
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
-    backgroundColor: colors.bg.elevated,
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+    backgroundColor: c.bg.elevated,
   },
   row: {
     flexDirection: 'row', alignItems: 'center',
@@ -138,23 +141,23 @@ const tb = StyleSheet.create({
   btn: {
     width: 32, height: 32, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
   },
-  btnActive: { backgroundColor: colors.text.primary },
-  sep: { width: 1, height: 18, backgroundColor: 'rgba(255,255,255,0.08)', marginHorizontal: spacing[1] },
+  btnActive: { backgroundColor: c.text.primary },
+  sep: { width: 1, height: 18, backgroundColor: c.border.subtle, marginHorizontal: spacing[1] },
   sizeBtn: {
     paddingHorizontal: spacing[2], height: 28, borderRadius: radius.sm,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: c.border.subtle,
   },
-  sizeBtnActive: { backgroundColor: colors.text.primary },
-  sizeTxt: { fontSize: 11, fontWeight: '700', color: colors.text.secondary },
-  sizeTxtActive: { color: colors.bg.primary },
+  sizeBtnActive: { backgroundColor: c.text.primary },
+  sizeTxt: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
+  sizeTxtActive: { color: c.bg.primary },
   dot: {
     width: 22, height: 22, borderRadius: 11,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 2, borderColor: c.border.default,
   },
-  dotActive: { borderWidth: 3, borderColor: colors.text.primary },
+  dotActive: { borderWidth: 3, borderColor: c.text.primary },
 });
 
 // ─── Folder picker (inline dropdown in editor) ────────────────────────────────
@@ -164,6 +167,8 @@ function FolderPicker({ folders, value, onChange }: {
   value: string | undefined;
   onChange: (f: string | undefined) => void;
 }) {
+  const colors = useColors();
+  const fp = useMemo(() => makeFp(colors), [colors]);
   const [open, setOpen] = useState(false);
 
   return (
@@ -206,20 +211,20 @@ function FolderPicker({ folders, value, onChange }: {
   );
 }
 
-const fp = StyleSheet.create({
+const makeFp = (c: any) => StyleSheet.create({
   wrap: { position: 'relative', zIndex: 10 },
   trigger: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     alignSelf: 'flex-start',
   },
-  triggerText: { fontSize: 12, color: colors.text.muted, fontWeight: '600' },
+  triggerText: { fontSize: 12, color: c.text.muted, fontWeight: '600' },
   dropdown: {
     position: 'absolute', top: 38, left: 0, right: 0, zIndex: 20,
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated,
+    borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
     overflow: 'hidden', minWidth: 160,
   },
   option: {
@@ -227,7 +232,7 @@ const fp = StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
   },
   optionActive: { backgroundColor: V.accentDim },
-  optionText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
+  optionText: { fontSize: 13, color: c.text.secondary, fontWeight: '500' },
   optionTextActive: { color: V.accent, fontWeight: '700' },
 });
 
@@ -240,6 +245,8 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   onSave: (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => void;
   folders: string[];
 }) {
+  const colors = useColors();
+  const em = useMemo(() => makeEm(colors), [colors]);
   const [title, setTitle]         = useState('');
   const [blocks, setBlocks]       = useState<RichBlock[]>([makeBlock()]);
   const [tagInput, setTagInput]   = useState('');
@@ -447,42 +454,42 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   );
 }
 
-const em = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeEm = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   backBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { ...typography.h4, color: colors.text.primary, flex: 1 },
+  headerTitle: { ...typography.h4, color: c.text.primary, flex: 1 },
   saveBtn: {
     backgroundColor: V.accent, borderRadius: radius.md,
     paddingHorizontal: spacing[4], paddingVertical: spacing[2],
   },
-  saveBtnText: { fontSize: 13, fontWeight: '700', color: colors.bg.primary },
+  saveBtnText: { fontSize: 13, fontWeight: '700', color: c.bg.primary },
   scroll: { padding: spacing[4], gap: spacing[2], paddingBottom: 24 },
   titleInput: {
-    fontSize: 22, fontWeight: '800', color: colors.text.primary,
+    fontSize: 22, fontWeight: '800', color: c.text.primary,
     paddingVertical: spacing[2], marginBottom: spacing[2],
   },
   blockInput: {
-    color: colors.text.primary,
+    color: c.text.primary,
     paddingVertical: spacing[1],
     minHeight: 28,
   },
   metaSection: { gap: spacing[2], marginTop: spacing[3] },
   tagInputRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  tagInput: { flex: 1, fontSize: 13, color: colors.text.primary, paddingVertical: 0 },
+  tagInput: { flex: 1, fontSize: 13, color: c.text.primary, paddingVertical: 0 },
   tagAddText: { fontSize: 12, fontWeight: '700', color: V.accent },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   tagChip: {
@@ -503,6 +510,8 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
   onDelete: () => void;
   onConvert: () => void;
 }) {
+  const colors = useColors();
+  const nc = useMemo(() => makeNc(colors), [colors]);
   const plainBody = note.bodyRich
     ? blocksToPlainText(deserializeBlocks(note.bodyRich))
     : note.body;
@@ -528,7 +537,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
             }
           </TouchableOpacity>
           <TouchableOpacity onPress={() => { haptic.medium(); onDelete(); }} hitSlop={8} style={nc.actionBtn}>
-            <Trash2 size={13} color='rgba(255,255,255,0.18)' />
+            <Trash2 size={13} color={colors.text.muted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -574,20 +583,20 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
   );
 }
 
-const nc = StyleSheet.create({
+const makeNc = (c: any) => StyleSheet.create({
   wrap: {
-    backgroundColor: V.card, borderRadius: radius.xl,
+    backgroundColor: c.bg.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: V.cardBorder,
     padding: spacing[4], gap: spacing[2],
   },
-  pinned: { borderColor: colors.accent.amber + '40', backgroundColor: colors.accent.amber + '08' },
+  pinned: { borderColor: c.accent.amber + '40', backgroundColor: c.accent.amber + '08' },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
-  title: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text.primary, lineHeight: 20 },
-  titleEmpty: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text.secondary, lineHeight: 20, fontStyle: 'italic' },
-  body: { fontSize: 13, color: colors.text.secondary, lineHeight: 20 },
+  title: { flex: 1, fontSize: 15, fontWeight: '700', color: c.text.primary, lineHeight: 20 },
+  titleEmpty: { flex: 1, fontSize: 14, fontWeight: '500', color: c.text.secondary, lineHeight: 20, fontStyle: 'italic' },
+  body: { fontSize: 13, color: c.text.secondary, lineHeight: 20 },
   richBadge: { position: 'absolute', top: spacing[3], right: 80 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1], flexWrap: 'wrap' },
-  time: { fontSize: 11, color: colors.text.muted },
+  time: { fontSize: 11, color: c.text.muted },
   wordCount: { fontSize: 10, color: V.muted, fontWeight: '500' },
   folderBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
@@ -606,6 +615,8 @@ const nc = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function NotesScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { noteId, new: newParam } = useLocalSearchParams<{ noteId?: string; new?: string }>();
   const [notes, setNotes]             = useState<Note[]>([]);
   const [folders, setFolders]         = useState<string[]>([]);
@@ -943,27 +954,27 @@ export default function NotesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+const makeStyles = (c: any) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   headerCenter: { flex: 1, paddingLeft: spacing[1] },
-  title: { fontSize: 18, fontWeight: '800', color: colors.text.primary },
-  subtitle: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  title: { fontSize: 18, fontWeight: '800', color: c.text.primary },
+  subtitle: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   iconBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   addBtn: { backgroundColor: V.accent, borderColor: V.accent },
 
   // ── Folder tabs ─────────────────────────────────────────────────────────────
   folderScroll: {
-    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
     maxHeight: 48,
   },
   folderRow: {
@@ -973,45 +984,45 @@ const styles = StyleSheet.create({
   folderChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: 6,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border.default,
-    backgroundColor: colors.bg.card,
+    borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
+    backgroundColor: c.bg.card,
   },
   folderChipActive: {
     backgroundColor: V.accent, borderColor: V.accent,
   },
-  folderChipText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
-  folderChipTextActive: { color: colors.bg.primary },
+  folderChipText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  folderChipTextActive: { color: c.bg.primary },
   folderChipNew: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: 6,
     borderRadius: radius.full, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed',
+    borderColor: c.border.default, borderStyle: 'dashed',
   },
-  folderChipNewText: { fontSize: 11, color: colors.text.muted },
+  folderChipNewText: { fontSize: 11, color: c.text.muted },
   newFolderInput: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: V.card,
+    backgroundColor: c.bg.card,
     borderRadius: radius.full, borderWidth: 1, borderColor: V.cardBorder,
     paddingHorizontal: spacing[3], paddingVertical: 5,
     minWidth: 140,
   },
-  newFolderText: { flex: 1, fontSize: 12, color: colors.text.primary, paddingVertical: 0 },
+  newFolderText: { flex: 1, fontSize: 12, color: c.text.primary, paddingVertical: 0 },
   newFolderConfirm: { fontSize: 12, fontWeight: '700', color: V.accent },
 
   // ── Search ──────────────────────────────────────────────────────────────────
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     marginHorizontal: spacing[4], marginBottom: spacing[2],
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
   },
-  searchInput: { flex: 1, fontSize: 14, color: colors.text.primary, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: c.text.primary, paddingVertical: 0 },
 
   list: { padding: spacing[4], gap: spacing[3], paddingBottom: 80 },
 
   groupLabel: {
-    fontSize: 10, fontWeight: '700', color: colors.text.muted,
+    fontSize: 10, fontWeight: '700', color: c.text.muted,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing[2],
   },
 
@@ -1022,13 +1033,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: V.cardBorder,
     alignItems: 'center', justifyContent: 'center',
   },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.text.primary },
-  emptySub: { fontSize: 14, color: colors.text.muted, textAlign: 'center', lineHeight: 21 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: c.text.primary },
+  emptySub: { fontSize: 14, color: c.text.muted, textAlign: 'center', lineHeight: 21 },
   emptyBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: V.accent, borderRadius: radius.full,
     paddingHorizontal: spacing[5], paddingVertical: spacing[3],
   },
-  emptyBtnText: { fontSize: 14, fontWeight: '700', color: colors.bg.primary },
+  emptyBtnText: { fontSize: 14, fontWeight: '700', color: c.bg.primary },
   emptyInline: { alignItems: 'center', paddingVertical: spacing[8], gap: spacing[2] },
 });
