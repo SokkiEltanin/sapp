@@ -46,6 +46,9 @@ export const WIDGET_METRICS: MetricDef[] = [
   { id: 'moodAvg',    label: 'Średni nastrój',     group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'energyAvg',  label: 'Średnia energia',    group: 'Nastrój i zdrowie', unit: '/5', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'moodStreak', label: 'Seria check-inów',   group: 'Nastrój i zdrowie', unit: 'dni', viz: ['number'], periodic: false },
+  { id: 'steps',      label: 'Kroki (śr/dzień)',   group: 'Nastrój i zdrowie', unit: 'kroki', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'sleepAvg',   label: 'Sen (śr)',           group: 'Nastrój i zdrowie', unit: 'h',  viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'weight',     label: 'Waga',               group: 'Nastrój i zdrowie', unit: 'kg', viz: ['number', 'wave', 'compare'], periodic: true },
   // Praca i zadania
   { id: 'workHours',  label: 'Godziny pracy',      group: 'Praca i zadania', unit: 'h',  viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'earnings',   label: 'Zarobek (szac.)',    group: 'Praca i zadania', unit: 'zł', viz: ['number', 'wave'], periodic: true },
@@ -72,6 +75,7 @@ export interface StatCtx {
   habitsDone: number;
   nameAliases: Record<string, string>;
   weightMemory: WeightMemory;
+  healthDays: Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>; // date → watch metrics
 }
 
 type Period = 'week' | 'month';
@@ -231,6 +235,24 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
     }
     case 'tasksDone':
       return ctx.tasks.filter(t => t.status === 'done' && moodPred((t.updatedAt ?? '').slice(0, 10))).length;
+    case 'steps': {
+      const rows = Object.entries(ctx.healthDays).filter(([d, v]) => moodPred(d) && v.steps > 0);
+      if (!rows.length) return 0;
+      return Math.round(rows.reduce((s, [, v]) => s + v.steps, 0) / rows.length);
+    }
+    case 'sleepAvg': {
+      const rows = Object.entries(ctx.healthDays).filter(([d, v]) => moodPred(d) && v.sleepMinutes > 0);
+      if (!rows.length) return 0;
+      const min = rows.reduce((s, [, v]) => s + v.sleepMinutes, 0) / rows.length;
+      return Math.round((min / 60) * 10) / 10; // hours, 1 dp
+    }
+    case 'weight': {
+      // latest logged weight within the bucket
+      const rows = Object.entries(ctx.healthDays)
+        .filter(([d, v]) => moodPred(d) && v.weightKg != null)
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1));
+      return rows.length ? (rows[0][1].weightKg as number) : 0;
+    }
     default:
       return 0;
   }

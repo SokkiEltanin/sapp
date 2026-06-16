@@ -45,6 +45,7 @@ import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
+import { getHealthHistory } from '@/utils/healthHistory';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
@@ -585,6 +586,7 @@ export default function DashboardScreen() {
   const [todayPomCount, setTodayPomCount] = useState(0);
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
+  const [healthDays, setHealthDays] = useState<StatCtx['healthDays']>({});
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [allNotes, setAllNotes] = useState<Note[]>([]);
 
@@ -724,6 +726,13 @@ export default function DashboardScreen() {
 
   useEffect(() => { loadPomSessions(); }, []);
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
+  useEffect(() => {
+    getHealthHistory(70).then(h => {
+      const m: StatCtx['healthDays'] = {};
+      for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
+      setHealthDays(m);
+    }).catch(() => {});
+  }, []);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useFocusEffect(useCallback(() => {
     loadPomSessions();
@@ -801,7 +810,8 @@ export default function DashboardScreen() {
     habitsDone: habitsDoneIds.length,
     nameAliases,
     weightMemory,
-  }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory]);
+    healthDays,
+  }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
 
   // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
   const weeklyInsights = useMemo(() => {
@@ -831,8 +841,40 @@ export default function DashboardScreen() {
     if (wh.now > 0) out.push({ tone: 'neutral', text: `Praca: ${wh.now.toFixed(1).replace('.0', '')} h w tym tygodniu` });
     const td = wk('tasksDone');
     if (td.now > 0) out.push({ tone: 'good', text: `Ukończone zadania: ${Math.round(td.now)}` });
-    // correlation nugget
+
+    // ── Health (from the watch) ──────────────────────────────────────────────
+    const st = wk('steps');
+    if (st.now > 0) {
+      const d = pct(st.now, st.prev);
+      out.push({ tone: st.now >= 8000 ? 'good' : st.now < 4000 ? 'warn' : 'neutral',
+        text: `Kroki: śr. ${Math.round(st.now).toLocaleString('pl-PL')}/dzień${d != null ? ` (${d >= 0 ? '+' : ''}${d}%)` : ''}` });
+    }
+    const sl = wk('sleepAvg');
+    if (sl.now > 0) {
+      const arrow = sl.prev > 0 ? (sl.now >= sl.prev ? '↑' : '↓') : '';
+      out.push({ tone: sl.now >= 7 ? 'good' : sl.now < 6 ? 'warn' : 'neutral',
+        text: `Sen: śr. ${sl.now.toFixed(1).replace('.0', '')} h/noc ${arrow}`.trim() });
+    }
+    const wt = wk('weight');
+    if (wt.now > 0 && wt.prev > 0) {
+      const diff = +(wt.now - wt.prev).toFixed(1);
+      if (Math.abs(diff) >= 0.3) out.push({ tone: 'neutral', text: `Waga: ${wt.now.toFixed(1)} kg (${diff >= 0 ? '+' : ''}${diff} kg vs tydz.)` });
+    }
+
+    // ── Weekly balance ───────────────────────────────────────────────────────
+    const inc = wk('income');
+    if (inc.now > 0 || sp.now > 0) {
+      const net = Math.round(inc.now - sp.now);
+      out.push({ tone: net >= 0 ? 'good' : 'warn', text: `Bilans tygodnia: ${net >= 0 ? '+' : ''}${net} zł` });
+    }
+
+    // ── Cross-domain correlations — the app actually reads the data together ──
     if (wh.now >= 30 && sw.prev > 0 && sw.now > sw.prev * 1.2) out.push({ tone: 'warn', text: `Pracowity tydzień (${wh.now.toFixed(0)} h) i więcej słodyczy niż zwykle` });
+    if (sl.now > 0 && sl.now < 6.5 && md.now > 0 && md.prev > 0 && md.now < md.prev) out.push({ tone: 'warn', text: `Mniej snu (${sl.now.toFixed(1)} h) i niższy nastrój — odespij` });
+    if (st.now >= 8000 && md.now >= 3.6) out.push({ tone: 'good', text: `Ruch robi swoje: ${Math.round(st.now / 1000)}k kroków i dobry nastrój` });
+    if (sl.now > 0 && sl.now < 6.5 && sw.prev > 0 && sw.now > sw.prev * 1.2) out.push({ tone: 'warn', text: 'Krótki sen i więcej słodyczy — klasyczny duet' });
+    if (wh.now >= 35 && sl.now > 0 && sl.now < 6.5) out.push({ tone: 'warn', text: `Dużo pracy (${wh.now.toFixed(0)} h) i mało snu — uważaj na wypalenie` });
+
     if (habits.length > 0 && habitsDoneIds.length === habits.length) out.push({ tone: 'good', text: 'Wszystkie dzisiejsze nawyki odhaczone' });
     return out;
   }, [statCtx, habits.length, habitsDoneIds.length]);
