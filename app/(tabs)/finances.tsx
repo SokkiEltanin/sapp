@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { getBalanceOffset } from '@/utils/accountBalance';
+import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
@@ -120,6 +120,7 @@ export default function FinancesScreen() {
   const [activePayer, setActivePayer] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
   const [balanceOffset, setBalanceOffset] = useState(0);
+  const [cashOffset, setCashOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
 
@@ -134,7 +135,10 @@ export default function FinancesScreen() {
     if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
   }, []);
   // Re-read the offset on focus so a value set in Settings shows immediately.
-  useFocusEffect(useCallback(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []));
+  useFocusEffect(useCallback(() => {
+    getBalanceOffset().then(setBalanceOffset).catch(() => {});
+    getCashOffset().then(setCashOffset).catch(() => {});
+  }, []));
 
   const availableTags = useMemo(() => {
     const freq: Record<string, number> = {};
@@ -157,15 +161,17 @@ export default function FinancesScreen() {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let exp = 0, inc = 0;          // current month
     let allExp = 0, allInc = 0;    // all-time (overall balance)
+    let cashExp = 0, cashInc = 0;  // all-time CASH-only (for the cash/card split)
     let food = 0, sweets = 0;      // current month: groceries + #słodycze items
     for (const e of unique) {
       const isIncome = e.type === 'income';
       const isExpense = isExp(e);
       const mine = isMine(e);
+      const isCash = e.paymentMethod === 'cash';
       // Money totals & balance: only what I paid / received.
       if (mine) {
-        if (isIncome) allInc += e.amount;
-        else if (isExpense) allExp += e.amount;
+        if (isIncome) { allInc += e.amount; if (isCash) cashInc += e.amount; }
+        else if (isExpense) { allExp += e.amount; if (isCash) cashExp += e.amount; }
       }
       if ((e.date ?? '').slice(0, 7) !== mk) continue;
       if (mine && isIncome) { inc += e.amount; continue; }
@@ -184,12 +190,15 @@ export default function FinancesScreen() {
         sweets += e.amount;
       }
     }
-    return { exp, inc, allExp, allInc, food, sweets };
+    return { exp, inc, allExp, allInc, cashExp, cashInc, food, sweets };
   }, [expenses, scope]);
 
   // Overall account balance = ALL income − ALL expenses (not just this month).
   // displayed balance = manual offset (money you had before tracking) + net flow
   const balance = balanceOffset + monthTotals.allInc - monthTotals.allExp;
+  // Cash on hand = cash offset + cash net; card balance = the rest of the total.
+  const cashBalance = cashOffset + monthTotals.cashInc - monthTotals.cashExp;
+  const cardBalance = balance - cashBalance;
 
   // Chart data: expenses AND income per day (week) or per week-of-month (month).
   // Expenses respect the scope toggle; income is always mine (my paychecks).
@@ -325,10 +334,17 @@ export default function FinancesScreen() {
                     {/* BILANS OGÓLNY = wszystkie przychody − wszystkie wydatki */}
                     <View style={st.heroAmountRow}>
                       <Text style={[st.heroAmount, { color: balance >= 0 ? '#FFFFFF' : '#FF8A8A' }]}>
-                        {balance >= 0 ? '+' : '−'}{Math.abs(balance).toFixed(0)}
+                        {balance >= 0 ? '+' : '−'}{Math.abs(balance).toFixed(2)}
                       </Text>
                       <Text style={st.heroCurrency}> PLN</Text>
                     </View>
+                    <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }}>
+                      <Text style={st.heroSplit}>
+                        Karta <Text style={st.heroSubStrong}>{cardBalance.toFixed(2)}</Text> zł
+                        {'   ·   '}
+                        Gotówka <Text style={st.heroSubStrong}>{cashBalance.toFixed(2)}</Text> zł
+                      </Text>
+                    </PressableScale>
                     <Text style={st.heroSub}>
                       W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
                       {'   ·   '}
@@ -547,6 +563,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
   heroAmount:    { fontSize: 42, fontWeight: '800', color: '#FFFFFF', letterSpacing: -2, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: c.text.muted, paddingBottom: 4 },
+  heroSplit:     { fontSize: 12, color: 'rgba(255,255,255,0.62)', fontWeight: '500', marginTop: 3, marginBottom: 2 },
   heroSub:       { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
   heroSub2:      { fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginTop: 2 },
   heroSubStrong: { color: '#FFFFFF', fontWeight: '800' },

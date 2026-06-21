@@ -14,7 +14,7 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
 import DatePickerField from '@/components/ui/DatePickerField';
-import { ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
+import { ExpenseCategory, IncomeCategory, TransactionType, PaymentMethod } from '@/types';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { expensesService } from '@/services/expensesService';
 import { templatesService } from '@/services/templatesService';
@@ -55,6 +55,7 @@ export default function AddExpenseModal() {
   const [payer, setPayer] = useState<string>('');
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -164,6 +165,7 @@ export default function AddExpenseModal() {
         note,
         date: dateParsed,
         payer: payer || undefined,
+        paymentMethod,
       });
       haptic.success();
       router.back();
@@ -311,6 +313,21 @@ export default function AddExpenseModal() {
                   <Text style={styles.payerAddText}>+ osoba</Text>
                 </PressableScale>
               )}
+            </View>
+          </View>
+
+          {/* Payment method */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Płatność</Text>
+            <View style={styles.payerRow}>
+              {(['card', 'cash'] as const).map(m => {
+                const active = paymentMethod === m;
+                return (
+                  <PressableScale key={m} onPress={() => { haptic.tap(); setPaymentMethod(m); }} style={[styles.payerChip, active && styles.payerChipActive]}>
+                    <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>{m === 'card' ? 'Karta' : 'Gotówka'}</Text>
+                  </PressableScale>
+                );
+              })}
             </View>
           </View>
 

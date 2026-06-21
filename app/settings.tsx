@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
+import { getBalanceOffset, setBalanceOffset, getCashOffset, setCashOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
@@ -235,28 +235,41 @@ export default function SettingsScreen() {
   // screen flags those.
   const accountNet = useMemo(() => {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
-    let inc = 0, exp = 0;
+    let inc = 0, exp = 0, cashInc = 0, cashExp = 0;
     for (const e of unique) {
       // MUST match the Finances balance: only MY transactions count toward my
       // money. Otherwise the saved offset is computed against a different net
       // and the displayed balance drifts.
       if (!isMine(e)) continue;
-      if (e.type === 'income') inc += e.amount;
-      else exp += e.amount;
+      const cash = e.paymentMethod === 'cash';
+      if (e.type === 'income') { inc += e.amount; if (cash) cashInc += e.amount; }
+      else { exp += e.amount; if (cash) cashExp += e.amount; }
     }
-    return inc - exp;
+    return { net: inc - exp, cashNet: cashInc - cashExp };
   }, [expenses]);
   const [balanceOffset, setBalanceOffsetState] = useState(0);
   const [balanceInput, setBalanceInput] = useState('');
+  const [cashOffset, setCashOffsetState] = useState(0);
+  const [cashInput, setCashInput] = useState('');
   useEffect(() => { getBalanceOffset().then(setBalanceOffsetState).catch(() => {}); }, []);
+  useEffect(() => { getCashOffset().then(setCashOffsetState).catch(() => {}); }, []);
   const saveAccountBalance = async () => {
     const real = parseFloat(balanceInput.replace(/\s/g, '').replace(',', '.'));
     if (isNaN(real)) return;
-    const offset = real - accountNet;
+    const offset = real - accountNet.net;
     setBalanceOffsetState(offset);
     await setBalanceOffset(offset);
     setBalanceInput('');
     toast.success('Zapisano saldo konta');
+  };
+  const saveCash = async () => {
+    const real = parseFloat(cashInput.replace(/\s/g, '').replace(',', '.'));
+    if (isNaN(real)) return;
+    const offset = real - accountNet.cashNet;
+    setCashOffsetState(offset);
+    await setCashOffset(offset);
+    setCashInput('');
+    toast.success('Zapisano stan gotówki');
   };
 
   const [hapticsOn, setHapticsOn]     = useState(appSettings.isHapticsEnabled());
@@ -684,7 +697,7 @@ export default function SettingsScreen() {
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Aktualne saldo konta</Text>
                 <Text style={styles.rowSub}>
-                  App liczy teraz: {(balanceOffset + accountNet).toFixed(2)} zł.{'\n'}
+                  App liczy teraz: {(balanceOffset + accountNet.net).toFixed(2)} zł.{'\n'}
                   Wpisz ile masz realnie — reszta policzy się sama.
                 </Text>
               </View>
@@ -701,6 +714,34 @@ export default function SettingsScreen() {
                   paddingVertical: 4, paddingHorizontal: spacing[2],
                   backgroundColor: '#5B7BE312', borderRadius: radius.md,
                   borderWidth: 1, borderColor: '#5B7BE330',
+                }}
+              />
+            </View>
+            {/* Cash on hand — card balance is then total − cash */}
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3], marginTop: spacing[1] }]}>
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                <Wallet size={16} color="#2AC68F" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Ile mam gotówki</Text>
+                <Text style={styles.rowSub}>
+                  App liczy teraz: {(cashOffset + accountNet.cashNet).toFixed(2)} zł.{'\n'}
+                  Reszta salda = karta. Wydatki gotówką ją zmniejszają.
+                </Text>
+              </View>
+              <TextInput
+                value={cashInput}
+                onChangeText={setCashInput}
+                onBlur={saveCash}
+                keyboardType="numeric"
+                placeholder="np. 120"
+                placeholderTextColor={colors.text.muted}
+                style={{
+                  fontSize: 14, fontWeight: '700', color: '#2AC68F',
+                  minWidth: 90, textAlign: 'right',
+                  paddingVertical: 4, paddingHorizontal: spacing[2],
+                  backgroundColor: '#2AC68F12', borderRadius: radius.md,
+                  borderWidth: 1, borderColor: '#2AC68F30',
                 }}
               />
             </View>

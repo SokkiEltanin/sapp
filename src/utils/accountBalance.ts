@@ -26,3 +26,22 @@ export async function setBalanceOffset(offset: number): Promise<void> {
   if (!isFinite(offset)) return;
   try { await AsyncStorage.setItem(KEY, String(offset)); } catch {}
 }
+
+// How much of the balance is CASH. The card balance is then (total − cash), so
+// the total stays consistent. cashBalance = cashOffset + (cashIncome − cashExpense).
+const CASH_KEY = 'account_cash_offset_v1';
+
+export async function getCashOffset(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(CASH_KEY);
+    const n = raw != null ? parseFloat(raw) : 0;
+    return isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function setCashOffset(offset: number): Promise<void> {
+  if (!isFinite(offset)) return;
+  try { await AsyncStorage.setItem(CASH_KEY, String(offset)); } catch {}
+}

@@ -18,7 +18,7 @@ import { getBudgets } from '@/utils/budgets';
 import { getFoodTags, categorize } from '@/utils/receiptParser';
 import { getPayers, addPayer } from '@/utils/payers';
 import { toast } from '@/store/toastStore';
-import { ExpenseCategory, ReceiptItem } from '@/types';
+import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -275,6 +275,7 @@ export default function ManualReceiptScreen() {
   const [payers, setPayers] = useState<string[]>([]);
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date();
     const p = (n: number) => String(n).padStart(2, '0');
@@ -365,6 +366,7 @@ export default function ManualReceiptScreen() {
         note: store || 'Paragon ręczny',
         date: dateParsed,
         payer: payer || undefined,
+        paymentMethod,
         ...(store ? { storeName: store } : {}),
         receiptItems,
       });
@@ -473,6 +475,21 @@ export default function ManualReceiptScreen() {
                   <Text style={styles.payerAddText}>+ osoba</Text>
                 </PressableScale>
               )}
+            </View>
+          </View>
+
+          {/* Payment method */}
+          <View style={styles.payerSection}>
+            <Text style={styles.labelText}>PŁATNOŚĆ</Text>
+            <View style={styles.payerRow}>
+              {(['card', 'cash'] as const).map(m => {
+                const active = paymentMethod === m;
+                return (
+                  <PressableScale key={m} onPress={() => { haptic.tap(); setPaymentMethod(m); }} style={[styles.payerChip, active && styles.payerChipActive]}>
+                    <Text style={[styles.payerChipText, active && styles.payerChipTextActive]}>{m === 'card' ? 'Karta' : 'Gotówka'}</Text>
+                  </PressableScale>
+                );
+              })}
             </View>
           </View>
 

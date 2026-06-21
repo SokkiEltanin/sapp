@@ -20,7 +20,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
-import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem } from '@/types';
+import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod } from '@/types';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
 import { getPayers, addPayer } from '@/utils/payers';
@@ -290,6 +290,7 @@ export default function ExpenseDetailScreen() {
     setIncCat((inc ? expense.category ?? 'salary' : 'salary') as IncomeCategory);
     setTags(expense.tags ?? []);
     setPayer(expense.payer ?? '');
+    setPaymentMethod(expense.paymentMethod ?? 'card');
     setEditedItems(expense.receiptItems ?? []);
     const d = new Date(expense.date ?? Date.now());
     const p = (n: number) => String(n).padStart(2, '0');
@@ -307,6 +308,7 @@ export default function ExpenseDetailScreen() {
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving]     = useState(false);
   const [payer, setPayer]       = useState<string>(expense?.payer ?? '');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(expense?.paymentMethod ?? 'card');
   const [payers, setPayers]     = useState<string[]>([]);
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer] = useState('');
@@ -429,6 +431,7 @@ export default function ExpenseDetailScreen() {
         category: editIsIncome ? incCat : expCat,
         tags,
         payer: payer || undefined,
+        paymentMethod,
         date: dateParsed,
         receiptItems: editedItems,
         updatedAt: new Date().toISOString(),
@@ -770,6 +773,22 @@ export default function ExpenseDetailScreen() {
               </View>
             ) : (
               <Text style={s.payerValue}>{payer || 'Nie określono'}</Text>
+            )}
+
+            <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Płatność</Text>
+            {editing ? (
+              <View style={s.tagsWrap}>
+                {(['card', 'cash'] as const).map(m => {
+                  const active = paymentMethod === m;
+                  return (
+                    <PressableScale key={m} onPress={() => { haptic.tap(); setPaymentMethod(m); }} style={[s.payerChip, active && s.payerChipActive]}>
+                      <Text style={[s.payerChipText, active && s.payerChipTextActive]}>{m === 'card' ? 'Karta' : 'Gotówka'}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={s.payerValue}>{paymentMethod === 'cash' ? 'Gotówka' : 'Karta'}</Text>
             )}
           </View>
 

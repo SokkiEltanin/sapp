@@ -1,4 +1,4 @@
-import { ExpenseCategory } from '@/types';
+import { ExpenseCategory, PaymentMethod } from '@/types';
 
 export interface ReceiptProduct {
   name: string;
@@ -20,7 +20,18 @@ export interface ParsedReceipt {
   subtotal: number;
   totalDiscount: number;
   total: number;
+  paymentMethod: PaymentMethod;   // detected from the receipt; defaults to 'card'
   raw: string;
+}
+
+// Card wins if any card/terminal marker is present; else cash only if a cash
+// marker shows up; otherwise default to card (most shopping is card).
+const CARD_RE = /karta|kart[ąa]\b|p[łl]atno[śs][ćc]\s*(?:kart|bezgot|elektron)|bezgot[óo]wkow|zbli[żz]eniow|visa|mastercard|maestro|\bblik\b|terminal|autoryzacj|p[łl]atno[śs][ćc]\s*mobiln|aps\b|płatność\s*kartą/i;
+const CASH_RE = /got[óo]wk|wp[łl]at[ay]\s*got|reszta\b|got[óo]wka\s*pln/i;
+export function detectPaymentMethod(text: string): PaymentMethod {
+  if (CARD_RE.test(text)) return 'card';
+  if (CASH_RE.test(text)) return 'cash';
+  return 'card';
 }
 
 // ─── Known store brands ───────────────────────────────────────────────────────
@@ -693,6 +704,7 @@ function parseKaufland(text: string): ParsedReceipt {
   return {
     storeName: detectStoreName(text, lines) ?? 'Kaufland',
     date: detectDate(text),
+    paymentMethod: detectPaymentMethod(text),
     products, subtotal, totalDiscount, total: total || subtotal, raw: text,
   };
 }
@@ -736,6 +748,7 @@ function parseBiedronka(text: string): ParsedReceipt {
   return {
     storeName: detectStoreName(text, lines) ?? 'Biedronka',
     date: detectDate(text),
+    paymentMethod: detectPaymentMethod(text),
     products, subtotal, totalDiscount: 0, total: total || subtotal, raw: text,
   };
 }
@@ -973,6 +986,7 @@ function parseGeneric(text: string): ParsedReceipt {
     subtotal: subtotal || total,
     totalDiscount,
     total: total || subtotal,
+    paymentMethod: detectPaymentMethod(text),
     raw: text,
   };
 }

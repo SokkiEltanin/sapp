@@ -17,7 +17,7 @@ import {
   loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
   loadWeightMemory, saveWeightMemory, weightFor, parseWeightFromName, WeightMemory, brandTag,
 } from '@/utils/productMemory';
-import { ExpenseCategory, ReceiptItem } from '@/types';
+import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -48,6 +48,7 @@ export default function ScanReceiptModal() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [receipt, setReceipt]       = useState<ParsedReceipt | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [selected, setSelected]     = useState<Set<number>>(new Set());
   const [saving, setSaving]         = useState(false);
   const [sortMode, setSortMode]     = useState<SortMode>('order');
@@ -152,6 +153,7 @@ export default function ScanReceiptModal() {
     const r: ParsedReceipt = { ...parsed, products };
 
     setReceipt(r);
+    setPaymentMethod(r.paymentMethod ?? 'card');
     // Select everything except the still-suspect lines (user confirms by ticking).
     setSelected(new Set(products.map((_, i) => i).filter(i => !products[i].suspect)));
     setCatPickerFor(null);
@@ -313,6 +315,7 @@ export default function ScanReceiptModal() {
         date: dateParsed,
         ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
         ...(payer ? { payer } : {}),
+        paymentMethod,
         receiptItems,
       });
       addExpense(expense);
@@ -649,6 +652,15 @@ export default function ScanReceiptModal() {
                 </Text>
               </View>
             )}
+            {/* Payment method — auto-detected from the receipt, default Karta */}
+            <View style={styles.payRow}>
+              <Text style={styles.payLabel}>Płatność</Text>
+              {(['card', 'cash'] as const).map(m => (
+                <PressableScale key={m} onPress={() => { haptic.tap(); setPaymentMethod(m); }} style={[styles.payChip, paymentMethod === m && styles.payChipOn]}>
+                  <Text style={[styles.payChipText, paymentMethod === m && styles.payChipTextOn]}>{m === 'card' ? 'Karta' : 'Gotówka'}</Text>
+                </PressableScale>
+              ))}
+            </View>
             <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Data paragonu" />
             <AnimatedButton
               onPress={saveSelected}
@@ -1282,6 +1294,17 @@ const makeStyles = (c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: c.border.subtle, borderStyle: 'dashed',
   },
   payerAddText: { fontSize: 13, fontWeight: '600', color: c.text.secondary },
+
+  payRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  payLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted, marginRight: spacing[1] },
+  payChip: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing[2],
+    backgroundColor: c.bg.card, borderRadius: radius.md,
+    borderWidth: 1, borderColor: c.border.default,
+  },
+  payChipOn: { backgroundColor: c.accent.blue + '20', borderColor: c.accent.blue },
+  payChipText: { fontSize: 13, fontWeight: '700', color: c.text.muted },
+  payChipTextOn: { color: c.accent.blue },
 
   // ── Editable product name ─────────────────────────────────────────────────
   productNameInput: {
