@@ -1,6 +1,17 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Subscription, Task } from '@/types';
+
+// Next clock time for hour:minute — today if it's still ahead and we're not
+// skipping today, otherwise tomorrow. Used so the mood reminder can SKIP today
+// once the mood has already been logged (instead of nagging anyway).
+function nextFireDate(hour: number, minute: number, skipToday: boolean): Date {
+  const now = new Date();
+  const d = new Date(); d.setHours(hour, minute, 0, 0);
+  if (skipToday || d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
+  return d;
+}
 
 // ─── Keyword detection ────────────────────────────────────────────────────────
 
@@ -111,8 +122,17 @@ export const notificationsService = {
     return res.status === 'granted';
   },
 
-  async scheduleDailyMoodReminder(hour = 20, minute = 0): Promise<string> {
+  // One-off (not a repeating DAILY) so it can be state-aware: when the mood is
+  // already logged today, pass skipToday=true and it fires tomorrow instead of
+  // nagging that you "didn't log" when you did. Re-armed on app foreground +
+  // after logging via refreshMoodReminder().
+  async scheduleDailyMoodReminder(hour = 20, minute = 0, skipToday = false): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-mood').catch(() => {});
+    await AsyncStorage.multiSet([
+      ['notif_mood_enabled', 'true'],
+      ['notif_mood_hour', String(hour)],
+      ['notif_mood_min', String(minute)],
+    ]).catch(() => {});
     return Notifications.scheduleNotificationAsync({
       identifier: 'daily-mood',
       content: {
@@ -120,11 +140,20 @@ export const notificationsService = {
         body: 'Zarejestruj nastrój za dziś. Jedno tapnięcie.',
         data: { screen: 'mood' },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour, minute,
-      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(hour, minute, skipToday) },
     });
+  },
+
+  // Re-arm the mood reminder for the right next time given today's state. Safe
+  // to call often (app foreground, after logging mood, after settings change).
+  async refreshMoodReminder(moodLoggedToday: boolean): Promise<void> {
+    try {
+      const enabled = await AsyncStorage.getItem('notif_mood_enabled');
+      if (enabled === 'false') return;
+      const h = parseInt((await AsyncStorage.getItem('notif_mood_hour')) ?? '20') || 20;
+      const m = parseInt((await AsyncStorage.getItem('notif_mood_min')) ?? '0') || 0;
+      await this.scheduleDailyMoodReminder(h, m, moodLoggedToday);
+    } catch {}
   },
 
   async scheduleMorningMoodReminder(hour = 8, minute = 0): Promise<string> {

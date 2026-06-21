@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MoodEntry } from '@/types';
+import { notificationsService } from '@/services/notificationsService';
 
 interface MoodState {
   entries: MoodEntry[];
@@ -33,9 +34,12 @@ export const useMoodStore = create<MoodState>()(
       addEntry: (entry) =>
         set((state) => {
           const today = todayStr();
+          const isToday = entry.date === today;
+          // Logged today → push the "didn't log mood" reminder to tomorrow.
+          if (isToday) notificationsService.refreshMoodReminder(true).catch(() => {});
           return {
             entries: [entry, ...state.entries],
-            todayEntry: entry.date === today ? entry : state.todayEntry,
+            todayEntry: isToday ? entry : state.todayEntry,
           };
         }),
       updateEntry: (id, updates) =>

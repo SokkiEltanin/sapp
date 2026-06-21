@@ -18,6 +18,7 @@ import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
+import { useMoodStore } from '@/store/moodStore';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
@@ -53,6 +54,11 @@ function AutoMoodPopup() {
 
   const check = async () => {
     try {
+      // Today's mood already logged? Then don't nag — neither the popup nor the
+      // scheduled reminder (re-arm it to fire tomorrow instead).
+      const logged = useMoodStore.getState().todayEntry != null;
+      notificationsService.refreshMoodReminder(logged).catch(() => {});
+      if (logged) return;
       const lastStr = await AsyncStorage.getItem(MOOD_POPUP_KEY);
       const now = Date.now();
       if (!lastStr || now - parseInt(lastStr) > SIX_HOURS_MS) {

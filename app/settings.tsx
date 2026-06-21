@@ -439,7 +439,7 @@ export default function SettingsScreen() {
         Alert.alert('Brak uprawnień', 'Włącz powiadomienia w ustawieniach systemu');
         return;
       }
-      await notificationsService.scheduleDailyMoodReminder(eh, em);
+      await notificationsService.scheduleDailyMoodReminder(eh, em, useMoodStore.getState().todayEntry != null);
       if (morningEnabled) {
         await notificationsService.scheduleMorningMoodReminder(mh, mm);
       } else {
@@ -469,11 +469,12 @@ export default function SettingsScreen() {
     setNotifEnabled(val);
     if (!val) {
       await notificationsService.cancelAll();
+      await AsyncStorage.setItem('notif_mood_enabled', 'false').catch(() => {});
     } else {
       const h = parseInt(eveningHour) || 20;
       const m = parseInt(eveningMin) || 0;
       const granted = await notificationsService.requestPermissions();
-      if (granted) await notificationsService.scheduleDailyMoodReminder(h, m);
+      if (granted) await notificationsService.scheduleDailyMoodReminder(h, m, useMoodStore.getState().todayEntry != null);
     }
   };
 
