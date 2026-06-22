@@ -52,6 +52,11 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
   const [name, setName]         = useState(item.name);
   const [price, setPrice]       = useState(item.price.toFixed(2));
   const [qty, setQty]           = useState(item.quantity.toString());
+  // Weight is PER PIECE in grams; total = per-piece × pieces.
+  const piecesOf = (q: number) => (Number.isInteger(q) && q > 1 ? q : 1);
+  const [weightG, setWeightG]   = useState(
+    item.weightKg && item.weightKg > 0 ? String(Math.round((item.weightKg / piecesOf(item.quantity)) * 1000)) : '',
+  );
   const [category, setCategory] = useState<ExpenseCategory>(item.category);
   const [tags, setTags]         = useState<string[]>(item.tags ?? []);
   const [eaters, setEaters]     = useState<string[]>(item.eaters ?? []);
@@ -73,7 +78,9 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
     const p = parseFloat(price.replace(',', '.'));
     const q = parseFloat(qty.replace(',', '.')) || 1;
     if (!name.trim() || isNaN(p) || p <= 0) return;
-    onSave({ ...item, name: name.trim(), price: p, quantity: q, category, tags, eaters: eaters.length ? eaters : undefined });
+    const wg = parseFloat(weightG.replace(',', '.'));
+    const weightKg = (!isNaN(wg) && wg > 0) ? Math.round((wg / 1000) * piecesOf(q) * 1000) / 1000 : undefined;
+    onSave({ ...item, name: name.trim(), price: p, quantity: q, weightKg, category, tags, eaters: eaters.length ? eaters : undefined });
   };
 
   return (
@@ -102,13 +109,24 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
           />
         </View>
         <View style={ie.field}>
-          <Text style={ie.fieldLabel}>ILOŚĆ / KG</Text>
+          <Text style={ie.fieldLabel}>ILOŚĆ szt</Text>
           <TextInput
             style={ie.fieldInput}
             value={qty}
             onChangeText={setQty}
             keyboardType="decimal-pad"
             placeholder="1"
+            placeholderTextColor={colors.text.muted}
+          />
+        </View>
+        <View style={ie.field}>
+          <Text style={ie.fieldLabel}>WAGA g/szt</Text>
+          <TextInput
+            style={ie.fieldInput}
+            value={weightG}
+            onChangeText={setWeightG}
+            keyboardType="decimal-pad"
+            placeholder="np. 200"
             placeholderTextColor={colors.text.muted}
           />
         </View>

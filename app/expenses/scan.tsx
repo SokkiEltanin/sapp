@@ -276,8 +276,16 @@ export default function ScanReceiptModal() {
         if (editedExcluded[i]) item.excluded = true;
         if (editedEaters[i]?.length) item.eaters = editedEaters[i];
         if (p.kind) item.kind = p.kind;
+        // Weight field is PER PIECE (kg/szt). weightKg stored = TOTAL of the line
+        // = per-piece × whole-piece count, so "2 serki · 0,2 kg/szt" = 0,4 kg in
+        // stats. Weighed loose goods use a fractional quantity, so don't scale.
         const w = parseFloat(getWeight(i).replace(',', '.'));
-        if (!isNaN(w) && w > 0) item.weightKg = w;
+        if (!isNaN(w) && w > 0) {
+          const pieces = p.quantity;
+          item.weightKg = (Number.isInteger(pieces) && pieces > 1)
+            ? Math.round(w * pieces * 1000) / 1000
+            : w;
+        }
         return item;
       });
 
@@ -891,7 +899,7 @@ function ProductRow({
                   style={styles.weighInput}
                   selectTextOnFocus
                 />
-                <Text style={styles.weighUnit}>kg</Text>
+                <Text style={styles.weighUnit}>{product.quantity > 1 ? 'kg/szt' : 'kg'}</Text>
               </View>
             )}
             {product.quantity > 1 && (
