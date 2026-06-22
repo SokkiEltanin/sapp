@@ -37,11 +37,12 @@ const EXPENSE_TAGS = ['słodycze', 'warzywa', 'mięso', 'napoje', 'fast food', '
 const INCOME_TAGS = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
 
 export default function AddExpenseModal() {
-  const { type, prefillAmount, prefillCategory, prefillNote } = useLocalSearchParams<{
+  const { type, prefillAmount, prefillCategory, prefillNote, prefillVehicleId } = useLocalSearchParams<{
     type?: TransactionType;
     prefillAmount?: string;
     prefillCategory?: string;
     prefillNote?: string;
+    prefillVehicleId?: string;
   }>();
   const [txType, setTxType] = useState<TransactionType>(type === 'income' ? 'income' : 'expense');
   const [amount, setAmount] = useState(prefillAmount ?? '');
@@ -57,7 +58,7 @@ export default function AddExpenseModal() {
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
-  const [vehicleId, setVehicleId] = useState<string | undefined>(undefined);
+  const [vehicleId, setVehicleId] = useState<string | undefined>(prefillVehicleId || undefined);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date();

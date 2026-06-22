@@ -455,7 +455,7 @@ export default function ExpenseDetailScreen() {
         tags,
         payer: payer || undefined,
         paymentMethod,
-        vehicleId: vehicleId || undefined,
+        vehicleId: editIsIncome ? undefined : (vehicleId || undefined),
         date: dateParsed,
         receiptItems: editedItems,
         updatedAt: new Date().toISOString(),
@@ -815,7 +815,7 @@ export default function ExpenseDetailScreen() {
               <Text style={s.payerValue}>{paymentMethod === 'cash' ? 'Gotówka' : 'Karta'}</Text>
             )}
 
-            {vehicles.length > 0 && (
+            {!editIsIncome && vehicles.length > 0 && (
               <>
                 <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Pojazd</Text>
                 {editing ? (

@@ -253,6 +253,7 @@ export default function SettingsScreen() {
   const [cashInput, setCashInput] = useState('');
   useEffect(() => { getBalanceOffset().then(setBalanceOffsetState).catch(() => {}); }, []);
   useEffect(() => { getCashOffset().then(setCashOffsetState).catch(() => {}); }, []);
+  useEffect(() => { AsyncStorage.getItem('notif_enabled').then(v => { if (v != null) setNotifEnabled(v === 'true'); }).catch(() => {}); }, []);
   const saveAccountBalance = async () => {
     const real = parseFloat(balanceInput.replace(/\s/g, '').replace(',', '.'));
     if (isNaN(real)) return;
@@ -439,6 +440,7 @@ export default function SettingsScreen() {
         Alert.alert('Brak uprawnień', 'Włącz powiadomienia w ustawieniach systemu');
         return;
       }
+      await AsyncStorage.setItem('notif_enabled', 'true').catch(() => {});
       await notificationsService.scheduleDailyMoodReminder(eh, em, useMoodStore.getState().todayEntry != null);
       if (morningEnabled) {
         await notificationsService.scheduleMorningMoodReminder(mh, mm);
@@ -467,6 +469,7 @@ export default function SettingsScreen() {
 
   const toggleNotifications = async (val: boolean) => {
     setNotifEnabled(val);
+    await AsyncStorage.setItem('notif_enabled', val ? 'true' : 'false').catch(() => {});
     if (!val) {
       await notificationsService.cancelAll();
       await AsyncStorage.setItem('notif_mood_enabled', 'false').catch(() => {});

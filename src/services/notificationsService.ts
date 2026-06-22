@@ -182,6 +182,7 @@ export const notificationsService = {
   async refreshMaintenanceReminder(dueLabels: string[]): Promise<void> {
     try {
       await Notifications.cancelScheduledNotificationAsync('maintenance-due').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
       if (dueLabels.length === 0) return;
       const body = dueLabels.slice(0, 3).join(' · ') + (dueLabels.length > 3 ? ` +${dueLabels.length - 3}` : '');
       await Notifications.scheduleNotificationAsync({

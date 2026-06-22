@@ -147,6 +147,12 @@ export default function VehiclesScreen() {
     setMFor(null);
     toast.success('Dodano serwis');
   };
+  const saveAndAddExpense = async () => {
+    if (!mFor || !mForm.label.trim()) { Alert.alert('Błąd', 'Podaj nazwę serwisu'); return; }
+    const v = mFor; const label = mForm.label.trim();
+    await saveMaintenance();
+    router.push({ pathname: '/expenses/add', params: { type: 'expense', prefillCategory: 'transport', prefillVehicleId: v.id, prefillNote: label } } as any);
+  };
   const redoMaintenance = async (v: Vehicle, m: VehicleMaintenance) => {
     haptic.tap();
     const today = new Date().toISOString().slice(0, 10);
@@ -414,9 +420,14 @@ export default function VehiclesScreen() {
                   <TouchableOpacity onPress={() => setMForm(f => ({ ...f, expenseId: undefined }))} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => mFor && setPicker({ mode: 'link', vehicle: mFor })} style={s.linkBtn} activeOpacity={0.75}>
-                  <Link2 size={13} color={ACCENT} /><Text style={s.detailBtnText}>Wybierz z istniejących</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                  <TouchableOpacity onPress={() => mFor && setPicker({ mode: 'link', vehicle: mFor })} style={s.linkBtn} activeOpacity={0.75}>
+                    <Link2 size={13} color={ACCENT} /><Text style={s.detailBtnText}>Z istniejących</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={saveAndAddExpense} style={s.linkBtn} activeOpacity={0.75}>
+                    <Plus size={13} color={ACCENT} /><Text style={s.detailBtnText}>Nowy wydatek</Text>
+                  </TouchableOpacity>
+                </View>
               )}
               <View style={{ height: spacing[3] }} />
               <AnimatedButton onPress={saveMaintenance} label="Zapisz serwis" icon={<Check size={16} color={c.bg.primary} />} size="md" />
