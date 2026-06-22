@@ -42,7 +42,7 @@ import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
-import { loadNameAliases, canonicalProductName, normalizeProductName, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
+import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
@@ -580,6 +580,7 @@ export default function DashboardScreen() {
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
   const [tagModal, setTagModal]     = useState<any>(null);  // open tag-limit's item list
+  const [expandedProduct, setExpandedProduct] = useState<string | null>(null); // top-products variant expand
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [workHoursChart, setWorkHoursChart] = useState(false);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
@@ -1502,7 +1503,8 @@ export default function DashboardScreen() {
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
-    const label: Record<string, string> = {};
+    const names: Record<string, string[]> = {};                    // original canon names per group
+    const variants: Record<string, Record<string, number>> = {};   // group → variant → count
     for (const e of expenses) {
       if (e.type === 'income') continue;
       for (const it of (e.receiptItems ?? [])) {
@@ -1510,18 +1512,26 @@ export default function DashboardScreen() {
         const name = it.name?.trim();
         if (!name) continue;
         const canon = canonicalProductName(name, nameAliases);
-        const key = normalizeProductName(canon);
+        const key = productGroupKey(canon);   // coarse group (serek wiejski* → "serek")
         if (!key) continue;
         count[key] = (count[key] ?? 0) + 1;
         spent[key] = (spent[key] ?? 0) + (it.price ?? 0);
-        if (!label[key]) label[key] = canon; // prettiest/canonical label
+        (names[key] ??= []).push(canon);
+        (variants[key] ??= {})[canon] = (variants[key][canon] ?? 0) + 1;
       }
     }
     return Object.entries(count)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
       .filter(([, c]) => c >= 2)
-      .map(([key, c]) => ({ name: label[key] ?? key, count: c, spent: spent[key] ?? 0 }));
+      .slice(0, 5)
+      .map(([key, c]) => ({
+        name: productGroupLabel(names[key] ?? [key]),
+        count: c,
+        spent: spent[key] ?? 0,
+        variants: Object.entries(variants[key] ?? {})
+          .sort((a, b) => b[1] - a[1])
+          .map(([n, cc]) => ({ name: n, count: cc })),
+      }));
   }, [expenses, nameAliases]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
@@ -2217,27 +2227,44 @@ export default function DashboardScreen() {
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <ShoppingCart size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Top 3 najczęściej kupowane</Text>
+                  <Text style={s.cardTitle}>Najczęściej kupowane</Text>
                 </View>
                 <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
                   {topProducts.map((p, i) => {
                     const max = topProducts[0].count || 1;
-                    const medals = ['#FBBF24', '#9CA3AF', '#B45309'];
+                    const medals = ['#FBBF24', '#9CA3AF', '#B45309', accentColor, accentColor];
+                    const hasVariants = p.variants.length > 1;
+                    const open = expandedProduct === p.name;
                     return (
-                      <View key={p.name} style={s.topRow}>
+                      <TouchableOpacity
+                        key={p.name}
+                        activeOpacity={hasVariants ? 0.7 : 1}
+                        onPress={() => { if (hasVariants) { haptic.tap(); setExpandedProduct(open ? null : p.name); } }}
+                        style={s.topRow}
+                      >
                         <View style={[s.topRank, { backgroundColor: medals[i] + '22', borderColor: medals[i] + '55' }]}>
                           <Text style={[s.topRankText, { color: medals[i] }]}>{i + 1}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
                           <View style={s.topNameRow}>
-                            <Text style={s.topName} numberOfLines={1}>{p.name}</Text>
+                            <Text style={s.topName} numberOfLines={1}>{p.name}{hasVariants ? ` · ${p.variants.length} rodz.` : ''}</Text>
                             <Text style={s.topCount}>×{p.count}</Text>
                           </View>
                           <View style={s.topBarTrack}>
                             <View style={[s.topBarFill, { width: `${Math.max(8, (p.count / max) * 100)}%`, backgroundColor: accentColor }]} />
                           </View>
+                          {open && (
+                            <View style={s.variantWrap}>
+                              {p.variants.map(v => (
+                                <View key={v.name} style={s.variantRow}>
+                                  <Text style={s.variantName} numberOfLines={1}>{v.name}</Text>
+                                  <Text style={s.variantCount}>×{v.count}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
@@ -2793,6 +2820,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   topCount: { fontSize: 12, color: c.text.muted, fontWeight: '700' },
   topBarTrack: { height: 5, borderRadius: 3, backgroundColor: c.border.subtle, marginTop: 5, overflow: 'hidden' },
   topBarFill: { height: 5, borderRadius: 3 },
+  variantWrap: { marginTop: spacing[2], gap: 3, paddingLeft: spacing[2], borderLeftWidth: 1, borderLeftColor: c.border.default },
+  variantRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
+  variantName: { flex: 1, fontSize: 11, color: c.text.muted },
+  variantCount: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
   habitsMore: { fontSize: 11, color: c.text.muted, alignSelf: 'center' },
 
   // ── Mini row: tasks + work/budget ──────────────────────────────────────────

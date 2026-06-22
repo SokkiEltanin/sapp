@@ -28,6 +28,41 @@ export function normalizeProductName(name: string): string {
   return s;
 }
 
+// ─── Coarse product grouping for STATS ────────────────────────────────────────
+// Collapse variants of the same product so stats aren't fragmented:
+// "Serek wiejski lekki" / "Serek wiejski Pilos" → group "serek"; "Bułka kajzerka"
+// / "Bułka grahamka" → group "bułka". Sizes/qualifiers (lekki, bio, XXL…) and
+// numbers are ignored. Receipts still show the full names; only the rollup groups.
+const GROUP_STOP = new Set([
+  'lekki', 'lekkie', 'light', 'bio', 'eko', 'duzy', 'duza', 'maly', 'mala', 'mini',
+  'maxi', 'xxl', 'xl', 'xxxl', 'classic', 'klasyczny', 'naturalny', 'naturalna',
+  'swiezy', 'swieza', 'czerwony', 'zielony', 'bezglutenowy',
+]);
+function groupTokens(name: string): string[] {
+  return normalizeProductName(name).split(' ').filter(t => t.length >= 2 && !/^\d/.test(t) && !GROUP_STOP.has(t));
+}
+export function productGroupKey(name: string): string {
+  const toks = groupTokens(name);
+  return toks[0] ?? normalizeProductName(name) ?? name.toLowerCase();
+}
+// Nicest label for a group = the longest shared word-prefix of its members,
+// taken from the shortest original name so diacritics/casing are preserved.
+export function productGroupLabel(names: string[]): string {
+  if (names.length === 0) return '';
+  const norm = names.map(groupTokens);
+  let plen = norm[0]?.length ?? 0;
+  for (const tl of norm.slice(1)) {
+    let i = 0;
+    while (i < plen && i < tl.length && norm[0][i] === tl[i]) i++;
+    plen = i;
+    if (plen === 0) break;
+  }
+  plen = Math.max(1, plen);
+  const base = [...names].sort((a, b) => a.length - b.length)[0];
+  const words = base.split(/\s+/).slice(0, plen).join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 // ─── Fuzzy matching (trigram similarity) ──────────────────────────────────────
 
 function trigrams(s: string): Set<string> {
