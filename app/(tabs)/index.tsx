@@ -763,6 +763,14 @@ export default function DashboardScreen() {
     }
     return out.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1)).slice(0, 5);
   }, [vehicles, maintItems]);
+
+  // Re-arm a real notification for due maintenance (so it nudges with the app closed).
+  useEffect(() => {
+    const labels = maintReminders.map(r => `${r.label}${r.overdue ? ' (zaległe)' : ''}`);
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshMaintenanceReminder(labels))
+      .catch(() => {});
+  }, [maintReminders]);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useFocusEffect(useCallback(() => {
     loadPomSessions();

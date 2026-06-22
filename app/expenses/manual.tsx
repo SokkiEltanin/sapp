@@ -28,6 +28,7 @@ interface Item {
   name: string;
   price: string;
   quantity: string;
+  weightG: string;        // grams PER PIECE (optional) — total weightKg = ×pieces
   category: ExpenseCategory;
   tags: string[];
 }
@@ -184,6 +185,16 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
               <Text style={styles.lineTotalText}>{lineTotal.toFixed(2)} zł</Text>
             </>
           )}
+          <View style={{ flex: 1 }} />
+          <TextInput
+            value={item.weightG}
+            onChangeText={weightG => onUpdate({ weightG })}
+            placeholder="g/szt"
+            placeholderTextColor={colors.text.muted}
+            style={styles.weightInput}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
         </View>
 
         {/* Category & tags row */}
@@ -290,6 +301,7 @@ export default function ManualReceiptScreen() {
       name: '',
       price: '',
       quantity: '1',
+      weightG: '',
       category: 'groceries',
       tags: [],
     };
@@ -343,6 +355,12 @@ export default function ManualReceiptScreen() {
           unitPrice,
           tags: it.tags.length > 0 ? it.tags : getFoodTags(it.name),
         };
+        // Weight per piece (g) → total weightKg = per-piece × whole-piece count.
+        const wg = parseFloat((it.weightG ?? '').replace(',', '.'));
+        if (!isNaN(wg) && wg > 0) {
+          const pieces = Number.isInteger(qty) && qty > 1 ? qty : 1;
+          item.weightKg = Math.round((wg / 1000) * pieces * 1000) / 1000;
+        }
         return item;
       });
 
@@ -635,6 +653,11 @@ const makeStyles = (c: any) => StyleSheet.create({
     textAlign: 'right', paddingVertical: 0,
   },
   priceSuffix: { fontSize: 12, color: c.text.muted, fontWeight: '500' },
+  weightInput: {
+    minWidth: 52, fontSize: 12, color: c.text.secondary, textAlign: 'right',
+    paddingVertical: 2, paddingHorizontal: spacing[2],
+    backgroundColor: c.border.subtle, borderRadius: radius.sm,
+  },
   eqSign: { fontSize: 12, color: c.text.muted },
   lineTotalText: { fontSize: 13, fontWeight: '800', color: c.accent.green, letterSpacing: -0.3 },
 

@@ -176,6 +176,22 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync('morning-mood').catch(() => {});
   },
 
+  // Vehicle service / maintenance-item due reminder. Re-armed on app foreground
+  // with the current due list (one-off DATE, next morning) so it actually nudges
+  // even when the app is closed; cancelled when nothing's due.
+  async refreshMaintenanceReminder(dueLabels: string[]): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('maintenance-due').catch(() => {});
+      if (dueLabels.length === 0) return;
+      const body = dueLabels.slice(0, 3).join(' · ') + (dueLabels.length > 3 ? ` +${dueLabels.length - 3}` : '');
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'maintenance-due',
+        content: { title: 'Serwis / wymiana', body, data: { screen: 'vehicles' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(9, 0, false) },
+      });
+    } catch {}
+  },
+
   async scheduleDailyTaskBriefing(
     hour = 8, minute = 0,
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },
