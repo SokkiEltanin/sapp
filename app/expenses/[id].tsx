@@ -20,7 +20,8 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
-import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod } from '@/types';
+import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod, Vehicle } from '@/types';
+import { vehiclesService } from '@/services/vehiclesService';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
 import { getPayers, addPayer } from '@/utils/payers';
@@ -288,6 +289,7 @@ export default function ExpenseDetailScreen() {
     }
   }, []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
+  useEffect(() => { vehiclesService.getAll().then(setVehicles).catch(() => {}); }, []);
 
   const isInc = expense?.type === 'income';
 
@@ -309,6 +311,7 @@ export default function ExpenseDetailScreen() {
     setTags(expense.tags ?? []);
     setPayer(expense.payer ?? '');
     setPaymentMethod(expense.paymentMethod ?? 'card');
+    setVehicleId(expense.vehicleId);
     setEditedItems(expense.receiptItems ?? []);
     const d = new Date(expense.date ?? Date.now());
     const p = (n: number) => String(n).padStart(2, '0');
@@ -327,6 +330,8 @@ export default function ExpenseDetailScreen() {
   const [saving, setSaving]     = useState(false);
   const [payer, setPayer]       = useState<string>(expense?.payer ?? '');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(expense?.paymentMethod ?? 'card');
+  const [vehicleId, setVehicleId] = useState<string | undefined>(expense?.vehicleId);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [payers, setPayers]     = useState<string[]>([]);
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer] = useState('');
@@ -450,6 +455,7 @@ export default function ExpenseDetailScreen() {
         tags,
         payer: payer || undefined,
         paymentMethod,
+        vehicleId: vehicleId || undefined,
         date: dateParsed,
         receiptItems: editedItems,
         updatedAt: new Date().toISOString(),
@@ -807,6 +813,29 @@ export default function ExpenseDetailScreen() {
               </View>
             ) : (
               <Text style={s.payerValue}>{paymentMethod === 'cash' ? 'Gotówka' : 'Karta'}</Text>
+            )}
+
+            {vehicles.length > 0 && (
+              <>
+                <Text style={[s.cardLabel, { marginTop: spacing[3] }]}>Pojazd</Text>
+                {editing ? (
+                  <View style={s.tagsWrap}>
+                    <PressableScale onPress={() => { haptic.tap(); setVehicleId(undefined); }} style={[s.payerChip, !vehicleId && s.payerChipActive]}>
+                      <Text style={[s.payerChipText, !vehicleId && s.payerChipTextActive]}>Brak</Text>
+                    </PressableScale>
+                    {vehicles.map(v => {
+                      const active = vehicleId === v.id;
+                      return (
+                        <PressableScale key={v.id} onPress={() => { haptic.tap(); setVehicleId(active ? undefined : v.id); }} style={[s.payerChip, active && { backgroundColor: v.color + '22', borderColor: v.color }]}>
+                          <Text style={[s.payerChipText, active && { color: v.color }]}>{v.name}</Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={s.payerValue}>{vehicles.find(v => v.id === vehicleId)?.name ?? 'Brak'}</Text>
+                )}
+              </>
             )}
           </View>
 

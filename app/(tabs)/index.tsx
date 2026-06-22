@@ -16,7 +16,7 @@ import {
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
-  ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin,
+  ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake,
 } from 'lucide-react-native';
@@ -46,6 +46,10 @@ import { loadNameAliases, canonicalProductName, normalizeProductName, productGro
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
+import { vehiclesService } from '@/services/vehiclesService';
+import { maintenanceService, dueInDays } from '@/services/maintenanceService';
+import { maintenanceDueMonths } from '@/utils/vehicleMatch';
+import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
@@ -588,6 +592,8 @@ export default function DashboardScreen() {
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [healthDays, setHealthDays] = useState<StatCtx['healthDays']>({});
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [maintItems, setMaintItems] = useState<MaintenanceItem[]>([]);
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [allNotes, setAllNotes] = useState<Note[]>([]);
 
@@ -734,6 +740,29 @@ export default function DashboardScreen() {
       setHealthDays(m);
     }).catch(() => {});
   }, []);
+  useFocusEffect(useCallback(() => {
+    vehiclesService.getAll().then(setVehicles).catch(() => {});
+    maintenanceService.getAll().then(setMaintItems).catch(() => {});
+  }, []));
+
+  // Maintenance reminders surfaced on the dashboard (vehicle service + items due/overdue).
+  const maintReminders = useMemo(() => {
+    type R = { key: string; label: string; sub: string; overdue: boolean; route: string };
+    const out: R[] = [];
+    for (const v of vehicles) {
+      for (const m of (v.maintenance ?? [])) {
+        const due = maintenanceDueMonths(m);
+        if (due == null || due > 1) continue;
+        out.push({ key: `v-${v.id}-${m.id}`, label: `${v.name}: ${m.label}`, sub: due <= 0 ? 'zaległe' : `za ~${Math.round(due)} mies.`, overdue: due <= 0, route: '/vehicles' });
+      }
+    }
+    for (const it of maintItems) {
+      const d = dueInDays(it);
+      if (d > 7) continue;
+      out.push({ key: `i-${it.id}`, label: it.name, sub: d < 0 ? `${-d} dni po terminie` : d === 0 ? 'dziś' : `za ${d} dni`, overdue: d < 0, route: '/items' });
+    }
+    return out.sort((a, b) => (a.overdue === b.overdue ? 0 : a.overdue ? -1 : 1)).slice(0, 5);
+  }, [vehicles, maintItems]);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useFocusEffect(useCallback(() => {
     loadPomSessions();
@@ -1650,6 +1679,27 @@ export default function DashboardScreen() {
                           <View style={[s.insightDot, { backgroundColor: c }]} />
                           <Text style={[s.factText, { color: c }]} numberOfLines={2}>{ins.text}</Text>
                         </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+
+              nodes['maintenance-reminders'] = maintReminders.length > 0 && (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Wrench size={13} color={accentColor} />
+                    <Text style={s.cardTitle}>Serwis i przypomnienia</Text>
+                  </View>
+                  <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                    {maintReminders.map(r => {
+                      const col = r.overdue ? colors.accent.red : colors.accent.amber;
+                      return (
+                        <TouchableOpacity key={r.key} style={s.factRow} activeOpacity={0.7} onPress={() => { haptic.tap(); router.push(r.route as any); }}>
+                          <View style={[s.insightDot, { backgroundColor: col }]} />
+                          <Text style={[s.factText, { flex: 1 }]} numberOfLines={1}>{r.label}</Text>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: col }}>{r.sub}</Text>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>
