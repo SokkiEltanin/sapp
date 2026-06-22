@@ -154,6 +154,8 @@ export default function HealthScreen() {
             heartRateAvg: day.heartRateAvg, restingHeartRate: day.restingHeartRate, distanceKm: day.distanceKm,
             activeCalories: day.activeCalories, totalCalories: day.totalCalories, exerciseMinutes: day.exerciseMinutes,
             oxygenPct: day.oxygenPct, vo2max: day.vo2max,
+            floors: day.floors, hrv: day.hrv, respiratoryRate: day.respiratoryRate, bodyFatPct: day.bodyFatPct, bmr: day.bmr,
+            sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin,
           });
           setFromWatch(true);
         }
@@ -310,6 +312,8 @@ export default function HealthScreen() {
           heartRateAvg: d.heartRateAvg, restingHeartRate: d.restingHeartRate, distanceKm: d.distanceKm,
           activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
           oxygenPct: d.oxygenPct, vo2max: d.vo2max,
+          floors: d.floors, hrv: d.hrv, respiratoryRate: d.respiratoryRate, bodyFatPct: d.bodyFatPct, bmr: d.bmr,
+          sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin,
         });
         setFromWatch(true);
         haptic.success();
@@ -463,6 +467,13 @@ export default function HealthScreen() {
             { k: 'exerciseMinutes',  Icon: Dumbbell, label: 'Trening',      unit: 'min',  color: T.accent },
             { k: 'oxygenPct',        Icon: Wind,     label: 'SpO₂',         unit: '%',    color: '#60A5FA' },
             { k: 'vo2max',           Icon: Activity, label: 'VO₂max',       unit: '',     color: '#A78BFA' },
+            { k: 'floors',           Icon: Activity, label: 'Piętra',       unit: '',     color: '#34D399' },
+            { k: 'hrv',              Icon: Heart,    label: 'HRV',          unit: 'ms',   color: '#F472B6' },
+            { k: 'respiratoryRate',  Icon: Wind,     label: 'Oddech',       unit: '/min', color: '#22D3EE' },
+            { k: 'bodyFatPct',       Icon: Activity, label: 'Tk. tłuszcz.', unit: '%',    color: '#FBBF24' },
+            { k: 'bmr',              Icon: Flame,    label: 'BMR',          unit: 'kcal', color: '#FB7185' },
+            { k: 'sleepDeepMin',     Icon: Moon,     label: 'Sen głęboki',  unit: 'min',  color: '#818CF8' },
+            { k: 'sleepRemMin',      Icon: Moon,     label: 'Sen REM',      unit: 'min',  color: '#A78BFA' },
           ] as const).filter(c => { const v = hcExtra[c.k]; return v != null && v !== 0; });
           if (cards.length === 0) return null;
           return (

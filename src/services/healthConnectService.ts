@@ -66,6 +66,13 @@ const READ_PERMS = [
   { accessType: 'read', recordType: 'ExerciseSession' },
   { accessType: 'read', recordType: 'OxygenSaturation' },
   { accessType: 'read', recordType: 'Vo2Max' },
+  // Richer Samsung-Health data (Galaxy Watch writes most of these):
+  { accessType: 'read', recordType: 'FloorsClimbed' },
+  { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
+  { accessType: 'read', recordType: 'RespiratoryRate' },
+  { accessType: 'read', recordType: 'BodyFat' },
+  { accessType: 'read', recordType: 'BasalMetabolicRate' },
+  { accessType: 'read', recordType: 'Hydration' },
 ] as const;
 
 export type HCResult = { ok: boolean; reason?: 'no-module' | 'unavailable' | 'update' | 'init' | 'denied' | 'error' };
@@ -114,6 +121,9 @@ async function read(hc: any, recordType: string, filter: any): Promise<any[]> {
 export interface HealthConnectDay {
   steps: number;
   sleepMinutes: number;
+  sleepDeepMin: number;            // sleep stages (Samsung writes them)
+  sleepRemMin: number;
+  sleepLightMin: number;
   weightKg: number | null;
   heartRateAvg: number | null;     // bpm, day average
   restingHeartRate: number | null; // bpm
@@ -123,6 +133,12 @@ export interface HealthConnectDay {
   exerciseMinutes: number;         // sum of workout sessions
   oxygenPct: number | null;        // SpO2 %
   vo2max: number | null;
+  floors: number | null;           // floors climbed
+  hrv: number | null;              // heart-rate variability (ms, RMSSD) — stress proxy
+  respiratoryRate: number | null;  // breaths/min
+  bodyFatPct: number | null;       // %
+  bmr: number | null;              // basal metabolic rate, kcal/day
+  hydrationMl: number | null;      // water logged, ml
 }
 
 // Read one day of everything we support from Health Connect. Each metric is read
@@ -153,11 +169,20 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
   let steps = 0;
   try { steps = (await read(hc, 'Steps', filter)).reduce((s, r) => s + (r.count ?? 0), 0); } catch {}
 
-  let sleepMinutes = 0;
+  let sleepMinutes = 0, sleepDeepMin = 0, sleepRemMin = 0, sleepLightMin = 0;
   try {
     for (const r of await read(hc, 'SleepSession', filter)) {
       const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
       if (en > st) sleepMinutes += Math.round((en - st) / 60000);
+      // Stage minutes (HC enum: 4=light, 5=deep, 6=REM). Samsung populates these.
+      for (const stg of (r.stages ?? [])) {
+        const ss = new Date(stg.startTime).getTime(), se = new Date(stg.endTime).getTime();
+        if (se <= ss) continue;
+        const mins = Math.round((se - ss) / 60000);
+        if (stg.stage === 5) sleepDeepMin += mins;
+        else if (stg.stage === 6) sleepRemMin += mins;
+        else if (stg.stage === 4) sleepLightMin += mins;
+      }
     }
   } catch {}
 
@@ -185,10 +210,19 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
   const distM = await sum('Distance', r => r.distance?.inMeters ?? 0);
   const active = await sum('ActiveCaloriesBurned', r => r.energy?.inKilocalories ?? 0);
   const total = await sum('TotalCaloriesBurned', r => r.energy?.inKilocalories ?? 0);
+  const floorsN = await sum('FloorsClimbed', r => r.floors ?? 0);
+  const hrvRec = await latest('HeartRateVariabilityRmssd', 2);
+  const rrRec = await latest('RespiratoryRate', 2);
+  const bfRec = await latest('BodyFat', 60);
+  const bmrRec = await latest('BasalMetabolicRate', 30);
+  const hydrationN = await sum('Hydration', r => r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0));
 
   return {
     steps,
     sleepMinutes,
+    sleepDeepMin,
+    sleepRemMin,
+    sleepLightMin,
     weightKg: r1(wt?.weight?.inKilograms ?? wt?.weight?.value ?? null),
     heartRateAvg,
     restingHeartRate: rhr?.beatsPerMinute ?? null,
@@ -198,6 +232,12 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
     exerciseMinutes,
     oxygenPct: r1(spo2?.percentage ?? null),
     vo2max: r1(vo2?.vo2MillilitersPerMinuteKilogram ?? null),
+    floors: floorsN != null ? Math.round(floorsN) : null,
+    hrv: r1(hrvRec?.heartRateVariabilityMillis ?? null),
+    respiratoryRate: r1(rrRec?.rate ?? null),
+    bodyFatPct: r1(bfRec?.percentage ?? null),
+    bmr: bmrRec ? Math.round(bmrRec?.basalMetabolicRate?.inKilocaloriesPerDay ?? bmrRec?.basalMetabolicRate?.inWatts ?? 0) || null : null,
+    hydrationMl: hydrationN != null ? Math.round(hydrationN) : null,
   };
 }
 
