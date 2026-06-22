@@ -4,7 +4,7 @@ import {
   PanResponder, Modal, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   Plus, ChevronLeft, ChevronRight, CalendarDays, RefreshCw,
   CheckSquare, Wallet, LayoutGrid, AlignJustify, Edit3, X, Clock,
@@ -299,6 +299,22 @@ export default function CalendarTabScreen() {
   ).current;
 
   useEffect(() => { load(); checkGcal(); }, []);
+
+  // Screens stay mounted (lazy:false), so a one-shot mount load goes stale once
+  // you add an event/task elsewhere and come back. Re-fetch silently on focus
+  // (no spinner — data is already on screen) so the calendar is always current.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        try {
+          const [evs, tks] = await Promise.all([calendarService.getAllEvents(), tasksService.getAllTasks()]);
+          if (alive) { setEvents(evs); setTasks(tks); }
+        } catch {}
+      })();
+      return () => { alive = false; };
+    }, [setEvents, setTasks]),
+  );
 
   const checkGcal = async () => {
     const token = await googleCalendarService.getStoredToken();

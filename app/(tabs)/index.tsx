@@ -1664,11 +1664,6 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </LinearGradient>
 
-            {/* ══ HUMOR LINE — after main card ════════════════════════════ */}
-            {todayEntry && (
-              <Text style={s.humorLine}>{humor}</Text>
-            )}
-
             {/* ══ DASHBOARD SECTIONS (reorderable registry) ═══════════════ */}
             {(() => {
               const nodes: Record<string, React.ReactNode> = {};

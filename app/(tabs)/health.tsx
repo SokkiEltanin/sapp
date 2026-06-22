@@ -566,24 +566,24 @@ export default function HealthScreen() {
                     {data.map((p, i) => {
                       const h = p.steps > 0 ? Math.max(3, (p.steps / maxC) * 60) : 2;
                       const goalMet = p.steps >= stepGoal;
+                      const isLast = i === data.length - 1;
                       return (
-                        <View key={p.date} style={[styles.monthBar, {
-                          height: h,
-                          flex: stepsRange === 7 ? 0 : 1,
-                          width: stepsRange === 7 ? 28 : undefined,
-                          backgroundColor: p.steps === 0 ? colors.border.subtle : goalMet ? T.accent : T.muted,
-                          opacity: p.steps === 0 ? 0.5 : (i === data.length - 1 ? 1 : 0.85),
-                        }]} />
+                        <View key={p.date} style={styles.stepCol}>
+                          <View style={styles.stepBarWrap}>
+                            <View style={{
+                              width: stepsRange === 7 ? '72%' : '100%',
+                              height: h, borderRadius: 2, minHeight: 2,
+                              backgroundColor: p.steps === 0 ? colors.border.subtle : goalMet ? T.accent : T.muted,
+                              opacity: p.steps === 0 ? 0.5 : (isLast ? 1 : 0.85),
+                            }} />
+                          </View>
+                          {stepsRange === 7 && (
+                            <Text style={styles.weekDayLabel}>{DOW[new Date(p.date + 'T00:00:00').getDay()]}</Text>
+                          )}
+                        </View>
                       );
                     })}
                   </View>
-                  {stepsRange === 7 && (
-                    <View style={styles.weekDayRow}>
-                      {data.map(p => (
-                        <Text key={p.date} style={styles.weekDayLabel}>{DOW[new Date(p.date + 'T00:00:00').getDay()]}</Text>
-                      ))}
-                    </View>
-                  )}
                   <View style={styles.analysisGrid}>
                     <View style={styles.analysisTile}>
                       <Text style={styles.analysisVal}>{avgWin.toLocaleString()}</Text>
@@ -956,16 +956,16 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   rangeBtnOn: { backgroundColor: t.accent + '30' },
   rangeBtnText: { fontSize: 9.5, fontWeight: '700', color: c.text.muted },
   rangeBtnTextOn: { color: t.accent },
-  weekDayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 2 },
-  weekDayLabel: { flex: 1, fontSize: 8, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
+  weekDayLabel: { fontSize: 8, fontWeight: '600', color: c.text.muted, textAlign: 'center', marginTop: 4 },
+  stepCol: { flex: 1, alignItems: 'center' },
+  stepBarWrap: { width: '100%', height: 60, justifyContent: 'flex-end', alignItems: 'center' },
   sleepInsight: { marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle, gap: 2 },
   sleepInsightMain: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   sleepInsightSub: { fontSize: 10.5, color: c.text.muted },
   monthChartRow: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
-    height: 64, marginTop: spacing[3], gap: 1.5,
+    marginTop: spacing[3], gap: 1.5,
   },
-  monthBar: { flex: 1, borderRadius: 2, minHeight: 2 },
   analysisGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing[3] },
   analysisTile: { width: '50%', paddingVertical: spacing[2], gap: 1 },
   analysisVal: { fontSize: 20, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },

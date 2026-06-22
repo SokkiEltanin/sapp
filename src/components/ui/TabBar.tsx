@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Pressable, Animated, Modal,
+  Pressable, Animated,
 } from 'react-native';
 import { router } from 'expo-router';
 import { BlurView } from 'expo-blur';
@@ -132,40 +132,37 @@ export default function TabBar({ currentIndex }: Props) {
 
   return (
     <>
-      {/* ── Quick actions menu ─────────────────────────────────────── */}
-      <Modal
-        visible={open}
-        transparent
-        statusBarTranslucent
-        animationType="none"
-        onRequestClose={() => closeMenu()}
-      >
-        <Animated.View style={[s.backdrop, { opacity: backdropAnim }]} pointerEvents="box-none">
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
-        </Animated.View>
+      {/* ── Quick actions menu — in-tree overlay (no native Modal, so it
+            opens instantly on Android instead of waiting on a modal window) ── */}
+      {open && (
+        <View style={s.overlayRoot} pointerEvents="box-none">
+          <Animated.View style={[s.backdrop, { opacity: backdropAnim }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
+          </Animated.View>
 
-        <View style={[s.quickMenu, { bottom: menuBase + 12 }]}>
-          {menuActions.map((action, i) => {
-            const translateY = itemAnims[i].interpolate({
-              inputRange: [0, 1], outputRange: [20, 0], extrapolate: 'clamp',
-            });
-            return (
-              <Animated.View key={action.label} style={{ opacity: itemAnims[i], transform: [{ translateY }] }}>
-                <TouchableOpacity
-                  style={s.quickItem}
-                  onPress={() => { haptic.tap(); closeMenu(() => router.push(action.route as any)); }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[s.quickPlus, { backgroundColor: action.color + '22' }]}>
-                    <Plus size={14} color={action.color} strokeWidth={2.8} />
-                  </View>
-                  <Text style={s.quickLabel}>{action.label}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          })}
+          <View style={[s.quickMenu, { bottom: menuBase + 12 }]}>
+            {menuActions.map((action, i) => {
+              const translateY = itemAnims[i].interpolate({
+                inputRange: [0, 1], outputRange: [20, 0], extrapolate: 'clamp',
+              });
+              return (
+                <Animated.View key={action.label} style={{ opacity: itemAnims[i], transform: [{ translateY }] }}>
+                  <TouchableOpacity
+                    style={s.quickItem}
+                    onPress={() => { haptic.tap(); closeMenu(() => router.push(action.route as any)); }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[s.quickPlus, { backgroundColor: action.color + '22' }]}>
+                      <Plus size={14} color={action.color} strokeWidth={2.8} />
+                    </View>
+                    <Text style={s.quickLabel}>{action.label}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </View>
         </View>
-      </Modal>
+      )}
 
       {/* ── Bar ────────────────────────────────────────────────────── */}
       {/* box-none: transparent areas pass touches through to the content
@@ -344,6 +341,10 @@ const s = StyleSheet.create({
   },
   badgeText: { fontSize: 8, fontWeight: '700', color: colors.white, lineHeight: 11 },
 
+  overlayRoot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999, elevation: 30,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.72)',
