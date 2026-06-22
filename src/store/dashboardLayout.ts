@@ -34,7 +34,7 @@ export type SectionId = typeof DEFAULT_DASHBOARD_SECTIONS[number];
 
 // Human labels shown in the "Edytuj dashboard" editor.
 export const SECTION_TITLES: Record<string, string> = {
-  'weekly-insights': 'Przegląd tygodnia',
+  'weekly-insights': 'Przegląd (kafelki + miesiące)',
   'maintenance-reminders': 'Serwis i przypomnienia',
   'tag-limits':     'Limity tagów (#słodycze…)',
   'budget-warning': 'Ostrzeżenie o budżecie',

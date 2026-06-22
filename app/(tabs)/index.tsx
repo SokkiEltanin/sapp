@@ -52,6 +52,7 @@ import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
+import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { colors, spacing, radius } from '@/theme';
@@ -852,16 +853,14 @@ export default function DashboardScreen() {
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
 
   // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
-  const weeklyInsights = useMemo(() => {
+  // Smart, qualitative notes only — the raw per-metric numbers now live in the
+  // interactive tile board (WeeklyBoard), so here we keep the forecast, balance,
+  // streaks and cross-domain correlations that a flat number can't express.
+  const weeklyNotes = useMemo<WeeklyNote[]>(() => {
     const wk = (metric: string) => { const sr = metricSeries(metric, statCtx, 'week', 2); return { now: sr.values[1] ?? 0, prev: sr.values[0] ?? 0 }; };
-    const pct = (now: number, prev: number) => prev > 0 ? Math.round(((now - prev) / prev) * 100) : null;
-    type Ins = { tone: 'good' | 'warn' | 'neutral'; text: string };
+    type Ins = WeeklyNote;
     const out: Ins[] = [];
     const sp = wk('spend');
-    if (sp.now > 0 || sp.prev > 0) {
-      const d = pct(sp.now, sp.prev);
-      out.push({ tone: d != null && d > 15 ? 'warn' : 'neutral', text: `Wydatki: ${Math.round(sp.now)} zł${d != null ? ` (${d >= 0 ? '+' : ''}${d}% vs poprzedni tydzień)` : ''}` });
-    }
     // Month-end spending forecast — project the current pace to the end of the month.
     const monthSpend = metricSeries('spend', statCtx, 'month', 1).values[0] ?? 0;
     const dnow = new Date();
@@ -872,13 +871,8 @@ export default function DashboardScreen() {
       out.push({ tone: 'neutral', text: `Tempo: ~${projected} zł do końca miesiąca (${Math.round(monthSpend)} zł dotąd)` });
     }
     const sw = wk('sweets');
-    if (sw.now > 0) { const d = pct(sw.now, sw.prev); out.push({ tone: d != null && d > 25 ? 'warn' : 'neutral', text: `Słodycze: ${Math.round(sw.now)} zł${d != null ? ` (${d >= 0 ? '+' : ''}${d}%)` : ''}` }); }
     const md = wk('moodAvg');
-    if (md.now > 0) { const arrow = md.prev > 0 ? (md.now >= md.prev ? '↑' : '↓') : ''; out.push({ tone: md.now >= 3.5 ? 'good' : md.now < 2.5 ? 'warn' : 'neutral', text: `Średni nastrój: ${md.now.toFixed(1)}/5 ${arrow}`.trim() }); }
     const wh = wk('workHours');
-    if (wh.now > 0) out.push({ tone: 'neutral', text: `Praca: ${wh.now.toFixed(1).replace('.0', '')} h w tym tygodniu` });
-    const td = wk('tasksDone');
-    if (td.now > 0) out.push({ tone: 'good', text: `Ukończone zadania: ${Math.round(td.now)}` });
 
     // ── "Days without junk" streak (sweets/snacks) ───────────────────────────
     const lastJunk = (() => {
@@ -900,31 +894,15 @@ export default function DashboardScreen() {
       out.push({ tone: 'good', text: 'Brak słodyczy/przekąsek w historii — mocne!' });
     }
 
-    // ── Health (from the watch) ──────────────────────────────────────────────
-    const st = wk('steps');
-    if (st.now > 0) {
-      const d = pct(st.now, st.prev);
-      out.push({ tone: st.now >= 8000 ? 'good' : st.now < 4000 ? 'warn' : 'neutral',
-        text: `Kroki: śr. ${Math.round(st.now).toLocaleString('pl-PL')}/dzień${d != null ? ` (${d >= 0 ? '+' : ''}${d}%)` : ''}` });
-    }
-    const sl = wk('sleepAvg');
-    if (sl.now > 0) {
-      const arrow = sl.prev > 0 ? (sl.now >= sl.prev ? '↑' : '↓') : '';
-      out.push({ tone: sl.now >= 7 ? 'good' : sl.now < 6 ? 'warn' : 'neutral',
-        text: `Sen: śr. ${sl.now.toFixed(1).replace('.0', '')} h/noc ${arrow}`.trim() });
-    }
-    const wt = wk('weight');
-    if (wt.now > 0 && wt.prev > 0) {
-      const diff = +(wt.now - wt.prev).toFixed(1);
-      if (Math.abs(diff) >= 0.3) out.push({ tone: 'neutral', text: `Waga: ${wt.now.toFixed(1)} kg (${diff >= 0 ? '+' : ''}${diff} kg vs tydz.)` });
-    }
-
     // ── Weekly balance ───────────────────────────────────────────────────────
     const inc = wk('income');
     if (inc.now > 0 || sp.now > 0) {
       const net = Math.round(inc.now - sp.now);
       out.push({ tone: net >= 0 ? 'good' : 'warn', text: `Bilans tygodnia: ${net >= 0 ? '+' : ''}${net} zł` });
     }
+
+    const sl = wk('sleepAvg');
+    const st = wk('steps');
 
     // ── Cross-domain correlations — the app actually reads the data together ──
     if (wh.now >= 30 && sw.prev > 0 && sw.now > sw.prev * 1.2) out.push({ tone: 'warn', text: `Pracowity tydzień (${wh.now.toFixed(0)} h) i więcej słodyczy niż zwykle` });
@@ -1668,24 +1646,11 @@ export default function DashboardScreen() {
             {(() => {
               const nodes: Record<string, React.ReactNode> = {};
 
-              nodes['weekly-insights'] = weeklyInsights.length > 0 && (
-                <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                  <View style={s.cardHeader}>
-                    <Sparkles size={13} color={accentColor} />
-                    <Text style={s.cardTitle}>Przegląd tygodnia</Text>
-                  </View>
-                  <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
-                    {weeklyInsights.map((ins, i) => {
-                      const c = ins.tone === 'good' ? '#2AC68F' : ins.tone === 'warn' ? '#FBBF24' : colors.text.secondary;
-                      return (
-                        <View key={i} style={s.factRow}>
-                          <View style={[s.insightDot, { backgroundColor: c }]} />
-                          <Text style={[s.factText, { color: c }]} numberOfLines={2}>{ins.text}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
+              nodes['weekly-insights'] = (
+                expenses.length > 0 || moodEntries.length > 0 || Object.keys(healthDays).length > 0 ||
+                allEvents.length > 0 || calTasks.length > 0 || weeklyNotes.length > 0
+              ) && (
+                <WeeklyBoard statCtx={statCtx} notes={weeklyNotes} accent={accentColor} />
               );
 
               nodes['maintenance-reminders'] = maintReminders.length > 0 && (
