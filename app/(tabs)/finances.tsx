@@ -118,6 +118,7 @@ export default function FinancesScreen() {
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [activePayer, setActivePayer] = useState<string | null>(null);
+  const [activePayment, setActivePayment] = useState<'all' | 'cash' | 'card'>('all');
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
   const [balanceOffset, setBalanceOffset] = useState(0);
   const [cashOffset, setCashOffset] = useState(0);
@@ -244,6 +245,7 @@ export default function FinancesScreen() {
   const sections = useMemo(() => {
     const matches = (e: Expense) => {
       if (activePayer && e.payer !== activePayer) return false;
+      if (activePayment !== 'all' && (e.paymentMethod ?? 'card') !== activePayment) return false;
       if (activeTagFilter) {
         if (e.tags.includes(activeTagFilter)) return true;
         if (e.receiptItems?.some(it => it.tags.includes(activeTagFilter))) return true;
@@ -251,7 +253,7 @@ export default function FinancesScreen() {
       }
       return true;
     };
-    const filtered = (activeTagFilter || activePayer)
+    const filtered = (activeTagFilter || activePayer || activePayment !== 'all')
       ? grouped.map(([date, items]) => [date, items.filter(matches)] as [string, typeof items])
           .filter(([, items]) => items.length > 0)
       : grouped;
@@ -260,7 +262,7 @@ export default function FinancesScreen() {
       data: items,
       total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
     }));
-  }, [grouped, activeTagFilter, activePayer]);
+  }, [grouped, activeTagFilter, activePayer, activePayment]);
 
   return (
     <SafeAreaView style={st.root} edges={[]}>
@@ -459,6 +461,21 @@ export default function FinancesScreen() {
                       activeOpacity={0.7}
                     >
                       <Text style={[st.tagText, activePayer === p && st.tagTextOn]}>{p}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+              {/* ── Payment-method filter (karta / gotówka) ─── */}
+              {expenses.some(e => e.paymentMethod === 'cash') && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tagRow} style={{ marginBottom: 8 }}>
+                  {([['all', 'Wszystko'], ['card', 'Karta'], ['cash', 'Gotówka']] as const).map(([val, lbl]) => (
+                    <TouchableOpacity
+                      key={val}
+                      onPress={() => { haptic.tap(); setActivePayment(val); }}
+                      style={[st.tagChip, activePayment === val && st.tagChipOn]}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[st.tagText, activePayment === val && st.tagTextOn]}>{lbl}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>

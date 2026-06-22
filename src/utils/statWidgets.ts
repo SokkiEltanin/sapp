@@ -1,6 +1,6 @@
 import { Expense, MoodEntry, CalendarEvent, WorkSettings, Task } from '@/types';
 import { countsForConsumption, inScope, StatsScope } from '@/store/statsScope';
-import { canonicalProductName, normalizeProductName, weightFor, WeightMemory } from '@/utils/productMemory';
+import { canonicalProductName, productGroupKey, productGroupLabel, weightFor, WeightMemory } from '@/utils/productMemory';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { WidgetViz } from '@/store/dashboardLayout';
 
@@ -330,8 +330,9 @@ export function metricList(metric: string, ctx: StatCtx, limit = 5): ListRow[] {
     return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, limit)
       .map(([label, value]) => ({ label, value: Math.round(value), unit: 'zł' }));
   }
-  // topProducts / favSweets — by count, canonical, consumption-only
-  const count: Record<string, number> = {}; const label: Record<string, string> = {};
+  // topProducts / favSweets — by count, grouped by product (variants collapse),
+  // consumption-only. Same grouping as the dashboard's "najczęściej kupowane".
+  const count: Record<string, number> = {}; const names: Record<string, string[]> = {};
   const sweetsOnly = metric === 'favSweets';
   for (const e of exp) {
     if (e.type === 'income' || !inScope(e, ctx.scope)) continue;
@@ -340,13 +341,13 @@ export function metricList(metric: string, ctx: StatCtx, limit = 5): ListRow[] {
       if (sweetsOnly && !(it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) continue;
       const name = it.name?.trim(); if (!name) continue;
       const canon = canonicalProductName(name, ctx.nameAliases);
-      const key = normalizeProductName(canon) || canon.toLowerCase();
+      const key = productGroupKey(canon);
       if (!key) continue;
       count[key] = (count[key] ?? 0) + 1;
-      if (!label[key]) label[key] = canon;
+      (names[key] ??= []).push(canon);
     }
   }
   return Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, limit)
     .filter(([, c]) => c >= 1)
-    .map(([key, c]) => ({ label: label[key] ?? key, value: c, unit: '×' }));
+    .map(([key, c]) => ({ label: productGroupLabel(names[key] ?? [key]), value: c, unit: '×' }));
 }

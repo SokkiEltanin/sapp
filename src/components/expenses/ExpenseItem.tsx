@@ -37,9 +37,11 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const accentColor = isIncome ? colors.accent.green : isReceipt ? colors.accent.blue : colors.border.default;
 
   const title = expense.storeName || expense.note || meta.label;
+  // Cash is the noteworthy one (card is the default) — show it inline.
+  const cashTag = expense.paymentMethod === 'cash' ? ' · gotówka' : '';
   const subtitle = isReceipt
-    ? `${expense.receiptItems!.length} produktów · ${timeStr(expense.date)}`
-    : `${timeStr(expense.date)}${expense.tags.length > 0 ? ` · ${expense.tags.slice(0, 2).join(', ')}` : ''}${!isIncome ? ` · ${meta.label}` : ''}`;
+    ? `${expense.receiptItems!.length} produktów · ${timeStr(expense.date)}${cashTag}`
+    : `${timeStr(expense.date)}${expense.tags.length > 0 ? ` · ${expense.tags.slice(0, 2).join(', ')}` : ''}${!isIncome ? ` · ${meta.label}` : ''}${cashTag}`;
 
   const toggle = () => {
     haptic.tap();
