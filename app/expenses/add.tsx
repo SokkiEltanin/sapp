@@ -14,7 +14,8 @@ import AnimatedButton from '@/components/ui/AnimatedButton';
 import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
 import DatePickerField from '@/components/ui/DatePickerField';
-import { ExpenseCategory, IncomeCategory, TransactionType, PaymentMethod } from '@/types';
+import { ExpenseCategory, IncomeCategory, TransactionType, PaymentMethod, Vehicle } from '@/types';
+import { vehiclesService } from '@/services/vehiclesService';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { expensesService } from '@/services/expensesService';
 import { templatesService } from '@/services/templatesService';
@@ -56,6 +57,8 @@ export default function AddExpenseModal() {
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
+  const [vehicleId, setVehicleId] = useState<string | undefined>(undefined);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [dateInput, setDateInput] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -83,6 +86,7 @@ export default function AddExpenseModal() {
   }, []);
 
   useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
+  useEffect(() => { vehiclesService.getAll().then(setVehicles).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
   useEffect(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []);
 
@@ -166,6 +170,7 @@ export default function AddExpenseModal() {
         date: dateParsed,
         payer: payer || undefined,
         paymentMethod,
+        vehicleId: !isIncome ? (vehicleId || undefined) : undefined,
       });
       haptic.success();
       router.back();
@@ -330,6 +335,26 @@ export default function AddExpenseModal() {
               })}
             </View>
           </View>
+
+          {/* Vehicle link (expenses only) */}
+          {!isIncome && vehicles.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Pojazd (opcjonalnie)</Text>
+              <View style={styles.payerRow}>
+                <PressableScale onPress={() => { haptic.tap(); setVehicleId(undefined); }} style={[styles.payerChip, !vehicleId && styles.payerChipActive]}>
+                  <Text style={[styles.payerChipText, !vehicleId && styles.payerChipTextActive]}>Brak</Text>
+                </PressableScale>
+                {vehicles.map(v => {
+                  const active = vehicleId === v.id;
+                  return (
+                    <PressableScale key={v.id} onPress={() => { haptic.tap(); setVehicleId(active ? undefined : v.id); }} style={[styles.payerChip, active && { backgroundColor: v.color + '22', borderColor: v.color }]}>
+                      <Text style={[styles.payerChipText, active && { color: v.color }]}>{v.name}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           {/* Category */}
           <View style={styles.section}>
