@@ -155,7 +155,7 @@ export default function HealthScreen() {
             activeCalories: day.activeCalories, totalCalories: day.totalCalories, exerciseMinutes: day.exerciseMinutes,
             oxygenPct: day.oxygenPct, vo2max: day.vo2max,
             floors: day.floors, hrv: day.hrv, respiratoryRate: day.respiratoryRate, bodyFatPct: day.bodyFatPct, bmr: day.bmr,
-            sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin,
+            sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin, sleepLightMin: day.sleepLightMin,
           });
           setFromWatch(true);
         }
@@ -313,7 +313,7 @@ export default function HealthScreen() {
           activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
           oxygenPct: d.oxygenPct, vo2max: d.vo2max,
           floors: d.floors, hrv: d.hrv, respiratoryRate: d.respiratoryRate, bodyFatPct: d.bodyFatPct, bmr: d.bmr,
-          sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin,
+          sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin, sleepLightMin: d.sleepLightMin,
         });
         setFromWatch(true);
         haptic.success();
@@ -343,6 +343,30 @@ export default function HealthScreen() {
         <PressableScale onPress={async () => { const ok = await openHealthConnect(); if (!ok) toast.error('Nie można otworzyć Health Connect'); }}>
           <Text style={styles.syncFallback}>Nie działa? Otwórz Health Connect i włącz dostęp dla „Sapp"</Text>
         </PressableScale>
+
+        {/* Today at a glance */}
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryTile}>
+            <Footprints size={15} color={T.accent} />
+            <Text style={styles.summaryVal}>{steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps}</Text>
+            <Text style={styles.summaryLabel}>kroki</Text>
+          </View>
+          <View style={styles.summaryTile}>
+            <Moon size={15} color="#A78BFA" />
+            <Text style={styles.summaryVal}>{sleepH}:{pad(sleepM)}</Text>
+            <Text style={styles.summaryLabel}>sen</Text>
+          </View>
+          <View style={styles.summaryTile}>
+            <Heart size={15} color="#FF6B6B" />
+            <Text style={styles.summaryVal}>{(hcExtra.heartRateAvg as number) > 0 ? hcExtra.heartRateAvg : '—'}</Text>
+            <Text style={styles.summaryLabel}>tętno</Text>
+          </View>
+          <View style={styles.summaryTile}>
+            <Flame size={15} color="#FB923C" />
+            <Text style={styles.summaryVal}>{(hcExtra.activeCalories as number) > 0 ? hcExtra.activeCalories : '—'}</Text>
+            <Text style={styles.summaryLabel}>kcal</Text>
+          </View>
+        </View>
 
         {/* Steps hero */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -407,6 +431,30 @@ export default function HealthScreen() {
             }]} />
           </View>
 
+          {/* Sleep stages (deep / REM / light) — when the watch reports them */}
+          {(() => {
+            const deep = (hcExtra.sleepDeepMin as number) || 0;
+            const rem = (hcExtra.sleepRemMin as number) || 0;
+            const light = (hcExtra.sleepLightMin as number) || 0;
+            const tot = deep + rem + light;
+            if (tot <= 0) return null;
+            const seg = (m: number) => `${Math.round((m / tot) * 100)}%` as any;
+            return (
+              <View style={{ marginTop: spacing[3], gap: 6 }}>
+                <View style={styles.stageBar}>
+                  <View style={{ width: seg(deep), backgroundColor: '#6366F1' }} />
+                  <View style={{ width: seg(rem), backgroundColor: '#A78BFA' }} />
+                  <View style={{ width: seg(light), backgroundColor: '#5EC8D8' }} />
+                </View>
+                <View style={styles.stageLegend}>
+                  <View style={styles.stageItem}><View style={[styles.stageDot, { backgroundColor: '#6366F1' }]} /><Text style={styles.stageText}>Głęboki {Math.round(deep)}m</Text></View>
+                  <View style={styles.stageItem}><View style={[styles.stageDot, { backgroundColor: '#A78BFA' }]} /><Text style={styles.stageText}>REM {Math.round(rem)}m</Text></View>
+                  <View style={styles.stageItem}><View style={[styles.stageDot, { backgroundColor: '#5EC8D8' }]} /><Text style={styles.stageText}>Lekki {Math.round(light)}m</Text></View>
+                </View>
+              </View>
+            );
+          })()}
+
           {/* 7-day sleep chart */}
           <View style={[styles.cardRow, { marginTop: spacing[3] }]}>
             <Text style={[styles.cardLabel, { color: colors.text.muted }]}>TYDZIEŃ</Text>
@@ -456,31 +504,31 @@ export default function HealthScreen() {
           })()}
         </GlassCard>
 
-        {/* From the watch — extra Health Connect metrics (only those with data) */}
-        {(() => {
-          const cards = ([
-            { k: 'heartRateAvg',     Icon: Heart,    label: 'Tętno śr.',    unit: 'bpm',  color: '#FF6B6B' },
-            { k: 'restingHeartRate', Icon: Heart,    label: 'Spocz. tętno', unit: 'bpm',  color: '#FF8FA3' },
-            { k: 'distanceKm',       Icon: MapPin,   label: 'Dystans',      unit: 'km',   color: '#46B0DE' },
-            { k: 'activeCalories',   Icon: Flame,    label: 'Kalorie akt.', unit: 'kcal', color: '#FB923C' },
-            { k: 'totalCalories',    Icon: Flame,    label: 'Kalorie',      unit: 'kcal', color: '#F87171' },
-            { k: 'exerciseMinutes',  Icon: Dumbbell, label: 'Trening',      unit: 'min',  color: T.accent },
-            { k: 'oxygenPct',        Icon: Wind,     label: 'SpO₂',         unit: '%',    color: '#60A5FA' },
-            { k: 'vo2max',           Icon: Activity, label: 'VO₂max',       unit: '',     color: '#A78BFA' },
-            { k: 'floors',           Icon: Activity, label: 'Piętra',       unit: '',     color: '#34D399' },
-            { k: 'hrv',              Icon: Heart,    label: 'HRV',          unit: 'ms',   color: '#F472B6' },
-            { k: 'respiratoryRate',  Icon: Wind,     label: 'Oddech',       unit: '/min', color: '#22D3EE' },
-            { k: 'bodyFatPct',       Icon: Activity, label: 'Tk. tłuszcz.', unit: '%',    color: '#FBBF24' },
-            { k: 'bmr',              Icon: Flame,    label: 'BMR',          unit: 'kcal', color: '#FB7185' },
-            { k: 'sleepDeepMin',     Icon: Moon,     label: 'Sen głęboki',  unit: 'min',  color: '#818CF8' },
-            { k: 'sleepRemMin',      Icon: Moon,     label: 'Sen REM',      unit: 'min',  color: '#A78BFA' },
-          ] as const).filter(c => { const v = hcExtra[c.k]; return v != null && v !== 0; });
-          if (cards.length === 0) return null;
+        {/* From the watch — grouped by theme (only metrics with data) */}
+        {([
+          { title: 'SERCE I REGENERACJA', Icon: Heart, keys: [
+            { k: 'heartRateAvg',     Icon: Heart,    label: 'Tętno śr.', unit: 'bpm',  color: '#FF6B6B' },
+            { k: 'restingHeartRate', Icon: Heart,    label: 'Spocz.',    unit: 'bpm',  color: '#FF8FA3' },
+            { k: 'hrv',              Icon: Activity,  label: 'HRV',       unit: 'ms',   color: '#F472B6' },
+            { k: 'oxygenPct',        Icon: Wind,     label: 'SpO₂',      unit: '%',    color: '#60A5FA' },
+            { k: 'respiratoryRate',  Icon: Wind,     label: 'Oddech',    unit: '/min', color: '#22D3EE' },
+            { k: 'vo2max',           Icon: Activity,  label: 'VO₂max',    unit: '',     color: '#A78BFA' },
+          ] },
+          { title: 'AKTYWNOŚĆ', Icon: Activity, keys: [
+            { k: 'distanceKm',      Icon: MapPin,   label: 'Dystans', unit: 'km',   color: '#46B0DE' },
+            { k: 'floors',          Icon: Activity, label: 'Piętra',  unit: '',     color: '#34D399' },
+            { k: 'exerciseMinutes', Icon: Dumbbell, label: 'Trening', unit: 'min',  color: T.accent },
+            { k: 'activeCalories',  Icon: Flame,    label: 'Kalorie akt.', unit: 'kcal', color: '#FB923C' },
+            { k: 'totalCalories',   Icon: Flame,    label: 'Kalorie', unit: 'kcal', color: '#F87171' },
+          ] },
+        ] as const).map(group => {
+          const items = group.keys.filter(c => { const v = hcExtra[c.k]; return v != null && v !== 0; });
+          if (items.length === 0) return null;
           return (
-            <GlassCard padding={spacing[4]}>
-              <View style={styles.cardRow}><Activity size={13} color={colors.text.muted} /><Text style={styles.cardLabel}>Z ZEGARKA</Text></View>
+            <GlassCard key={group.title} padding={spacing[4]}>
+              <View style={styles.cardRow}><group.Icon size={13} color={colors.text.muted} /><Text style={styles.cardLabel}>{group.title}</Text></View>
               <View style={styles.hcGrid}>
-                {cards.map(c => (
+                {items.map(c => (
                   <View key={c.k} style={styles.hcTile}>
                     <c.Icon size={15} color={c.color} />
                     <Text style={styles.hcVal}>{hcExtra[c.k]}{c.unit ? <Text style={styles.hcUnit}> {c.unit}</Text> : null}</Text>
@@ -490,38 +538,7 @@ export default function HealthScreen() {
               </View>
             </GlassCard>
           );
-        })()}
-
-        {/* Weekly steps chart */}
-        <GlassCard padding={spacing[4]} style={styles.tealCard}>
-          <View style={styles.cardRow}>
-            <Activity size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>TEN TYDZIEŃ — KROKI</Text>
-          </View>
-          <View style={styles.chartRow}>
-            {weekSteps.map((s, i) => {
-              const barH = s > 0 ? Math.max(8, (s / maxBar) * 80) : 4;
-              const isToday = i === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
-              const goalMet = s >= stepGoal;
-              return (
-                <View key={i} style={styles.chartCol}>
-                  <View style={styles.chartBarWrap}>
-                    <View style={[styles.chartBar, {
-                      height: barH,
-                      backgroundColor: s === 0
-                        ? 'rgba(255,255,255,0.07)'
-                        : goalMet ? T.accent : T.muted,
-                      width: isToday ? 14 : 9,
-                      opacity: s === 0 ? 0.4 : 1,
-                    }]} />
-                  </View>
-                  <Text style={[styles.chartDay, isToday && styles.chartDayToday]}>{WEEK_DAYS[i]}</Text>
-                  {s > 0 && <Text style={styles.chartNum}>{(s / 1000).toFixed(1)}k</Text>}
-                </View>
-              );
-            })}
-          </View>
-        </GlassCard>
+        })}
 
         {/* 30-day steps + analysis (from the watch) */}
         {healthStats && monthData.length > 0 && (
@@ -669,7 +686,7 @@ export default function HealthScreen() {
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
             <Activity size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>MASA CIAŁA</Text>
+            <Text style={styles.cardLabel}>CIAŁO</Text>
             {loggedWeights.length > 1 && (
               <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={{ fontSize: 10, color: (maxW - minW) > 0.5 ? colors.accent.amber : colors.accent.green, fontWeight: '600' }}>
@@ -678,6 +695,18 @@ export default function HealthScreen() {
               </View>
             )}
           </View>
+
+          {/* Body composition from the watch (when present) */}
+          {((hcExtra.bodyFatPct as number) > 0 || (hcExtra.bmr as number) > 0) && (
+            <View style={styles.bodyCompRow}>
+              {(hcExtra.bodyFatPct as number) > 0 && (
+                <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bodyFatPct}%</Text><Text style={styles.bodyCompLabel}>tk. tłuszczowa</Text></View>
+              )}
+              {(hcExtra.bmr as number) > 0 && (
+                <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bmr}</Text><Text style={styles.bodyCompLabel}>BMR kcal/dzień</Text></View>
+              )}
+            </View>
+          )}
 
           <View style={styles.weightRow}>
             <PressableScale onPress={() => { haptic.tap(); setWeight(w => Math.max(0, parseFloat((w - 1).toFixed(1)))); }} style={styles.weightBtn}>
@@ -862,6 +891,15 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
 
   microBar: { height: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
   microFill: { height: '100%', borderRadius: radius.full },
+  stageBar: { flexDirection: 'row', height: 12, borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.border.subtle },
+  stageLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
+  stageItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  stageDot: { width: 8, height: 8, borderRadius: 4 },
+  stageText: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
+  summaryRow: { flexDirection: 'row', gap: spacing[2] },
+  summaryTile: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: spacing[3], backgroundColor: t.card, borderRadius: radius.lg, borderWidth: 1, borderColor: t.cardBorder },
+  summaryVal: { fontSize: 17, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
+  summaryLabel: { fontSize: 9.5, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
 
   qualityBadge: {
     marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3,
@@ -956,6 +994,10 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   waterSub: { fontSize: 12, fontWeight: '400', color: c.text.muted },
 
   // Weight
+  bodyCompRow: { flexDirection: 'row', gap: spacing[2] },
+  bodyCompTile: { flex: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
+  bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
+  bodyCompLabel: { fontSize: 10, color: c.text.muted },
   weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
   weightBtn: {
     width: 36, height: 36, borderRadius: radius.md,
