@@ -63,16 +63,28 @@ export type PaymentMethod = 'cash' | 'card';
 
 export type VehicleKind = 'car' | 'bike' | 'motorcycle' | 'scooter' | 'other';
 
+// One service record (oil change, chain lube, tyre swap, custom part/fluid).
+export interface VehicleMaintenance {
+  id: string;
+  label: string;            // "Wymiana oleju", "Smarowanie łańcucha", custom
+  date: string;             // ISO date it was done
+  intervalMonths?: number;  // reminder interval (optional)
+  expenseId?: string;       // linked transaction (optional)
+}
+
 export interface Vehicle {
   id: string;
   name: string;             // "Mój rower", "Octavia"
   kind: VehicleKind;
   tag: string;              // normalized tag that auto-links expenses (e.g. "rower")
   color: string;
-  oilChangeDate?: string;   // ISO date of the last oil change
-  oilIntervalMonths?: number;
+  isMainCar?: boolean;      // the car that catches fuel expenses
   tireSeason?: 'summer' | 'winter' | 'allseason'; // what's mounted now (drives the weather reminder)
+  maintenance?: VehicleMaintenance[]; // service log + reminders
   notes?: string;
+  // legacy (pre-maintenance-log) — kept so old docs still read
+  oilChangeDate?: string;
+  oilIntervalMonths?: number;
   createdAt: string;
   updatedAt: string;
 }

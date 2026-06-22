@@ -112,7 +112,12 @@ export default function ItemsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
           <ChevronLeft size={20} color={c.text.secondary} />
         </TouchableOpacity>
-        <Text style={s.title}>Przedmioty / serwis</Text>
+        <View style={s.segment}>
+          <TouchableOpacity onPress={() => { haptic.tap(); router.replace('/vehicles' as any); }} style={s.segBtn} activeOpacity={0.7}>
+            <Text style={s.segText}>Pojazdy</Text>
+          </TouchableOpacity>
+          <View style={[s.segBtn, s.segBtnOn]}><Text style={[s.segText, s.segTextOn]}>Przedmioty</Text></View>
+        </View>
         <PressableScale onPress={() => openAdd()} style={s.addBtn}>
           <Plus size={20} color={c.text.primary} />
         </PressableScale>
@@ -218,6 +223,11 @@ const makeStyles = (c: any) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle },
   backBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 18, fontWeight: '800', color: c.text.primary },
+  segment: { flex: 1, flexDirection: 'row', backgroundColor: c.border.subtle, borderRadius: radius.full, padding: 2 },
+  segBtn: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: radius.full },
+  segBtnOn: { backgroundColor: c.bg.card },
+  segText: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  segTextOn: { color: c.text.primary },
   addBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: spacing[4], gap: spacing[3] },
   hint: { fontSize: 13, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[6] },
