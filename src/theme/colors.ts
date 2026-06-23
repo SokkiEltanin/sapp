@@ -75,6 +75,15 @@ export const colors = {
     glass:   'rgba(255,255,255,0.10)',
   },
 
+  // Subtle surface fills (tracks, pills, inactive tiles). These flip with the
+  // theme so they don't vanish on light backgrounds — use these instead of
+  // hardcoded rgba(255,255,255,…) for filled surfaces.
+  fill: {
+    subtle: 'rgba(255,255,255,0.04)',
+    medium: 'rgba(255,255,255,0.06)',
+    strong: 'rgba(255,255,255,0.09)',
+  },
+
   brand: {
     gcal: '#039BE5',
   },

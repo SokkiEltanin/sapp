@@ -26,7 +26,9 @@
       "Bash(awk '/onWeightChange/{found=1} found && /weight|kg|g\\\\b|szt|Waga|placeholder|onChangeText.*[Ww]eight/{print NR\": \"$0} /^const makeStyles|^}$/{if\\(found && NR>900\\)exit}' app/expenses/scan.tsx)",
       "Bash(grep -rln \"tabBar\\\\|TabBar\\\\|tabbar\" app/\\\\\\(tabs\\\\\\)/_layout.tsx src/components/)",
       "Bash(sed -n '1,40p' \"app/\\(tabs\\)/_layout.tsx\")",
-      "Bash(grep -vE \"npm notice|Changelog|To update|^$\")"
+      "Bash(grep -vE \"npm notice|Changelog|To update|^$\")",
+      "Bash(echo \"PUSH_EXIT=$?\")",
+      "Bash(grep -nE \"rgba\\\\\\(255,255,255|rgba\\\\\\(0,0,0|'#0[0-9A-Fa-f]{5}'|'#1[0-9A-Fa-f]{5}'|backgroundColor: '#|'rgba\\\\\\(78|'rgba\\\\\\(10,\" \"app/\\(tabs\\)/health.tsx\")"
     ]
   }
 }

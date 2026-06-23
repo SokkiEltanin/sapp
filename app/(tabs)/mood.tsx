@@ -144,7 +144,7 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
           <Text style={[kw.sectionLabel, { color: colors.text.muted }]}>Co Cię stresuje</Text>
           <View style={kw.chips}>
             {negative.map(k => (
-              <View key={k.word} style={[kw.chip, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.18)' }]}>
+              <View key={k.word} style={[kw.chip, { backgroundColor: 'transparent', borderColor: colors.border.glass }]}>
                 <Text style={[kw.chipWord, { color: colors.text.secondary }]}>{k.word}</Text>
                 {k.totalCount > 2 && (
                   <Text style={[kw.chipCount, { color: colors.text.muted }]}>{k.totalCount}×</Text>
@@ -301,7 +301,7 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
           </View>
           <View style={ins.tagRow}>
             {topBadTags.map(tag => (
-              <View key={tag} style={[ins.tagChip, { backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.18)' }]}>
+              <View key={tag} style={[ins.tagChip, { backgroundColor: 'transparent', borderColor: colors.border.glass }]}>
                 <Text style={[ins.tagText, { color: colors.text.secondary }]}>#{tag}</Text>
               </View>
             ))}
@@ -326,7 +326,7 @@ const makeIns = (c: any, p: any) => StyleSheet.create({
   tile: {
     flex: 1, backgroundColor: c.bg.elevated, borderRadius: radius.lg,
     padding: spacing[3], gap: 3,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: c.border.subtle,
   },
   tileLabel: { fontSize: 9, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
   tileRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -415,7 +415,7 @@ function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
           </SvgGrad>
         </Defs>
         <Path d={fillPath} fill="url(#moodFill)" />
-        <Path d={enPath} stroke="rgba(255,255,255,0.6)" strokeWidth={1.8} fill="none" strokeDasharray="4 4" strokeLinecap="round" opacity={0.8} />
+        <Path d={enPath} stroke={colors.text.secondary} strokeWidth={1.8} fill="none" strokeDasharray="4 4" strokeLinecap="round" opacity={0.8} />
         <Path d={moodPath} stroke={P.accent} strokeWidth={2.6} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         {moodPts.map((p, i) => (
           <Circle key={i} cx={p.x} cy={p.y} r={2.6} fill={MOOD_COLORS[present[i].entry!.mood]} />
@@ -423,7 +423,7 @@ function MoodEnergyWave({ entries }: { entries: MoodEntry[] }) {
       </Svg>
       <View style={wv.legend}>
         <View style={wv.legendItem}><View style={[wv.dot, { backgroundColor: P.accent }]} /><Text style={wv.legendText}>Nastrój</Text></View>
-        <View style={wv.legendItem}><View style={[wv.dash, { backgroundColor: 'rgba(255,255,255,0.6)' }]} /><Text style={wv.legendText}>Energia</Text></View>
+        <View style={wv.legendItem}><View style={[wv.dash, { backgroundColor: colors.text.secondary }]} /><Text style={wv.legendText}>Energia</Text></View>
       </View>
     </View>
   );
@@ -484,11 +484,11 @@ function MoodDistribution({ entries }: { entries: MoodEntry[] }) {
 }
 
 const makeDist = (c: any, p: any) => StyleSheet.create({
-  bar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' },
+  bar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', backgroundColor: c.fill.medium },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   emo: { fontSize: 14, width: 20 },
   lvlLabel: { fontSize: 11, fontWeight: '700', width: 64 },
-  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
+  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: c.fill.medium, overflow: 'hidden' },
   fill: { height: 7, borderRadius: 4 },
   pct: { fontSize: 11, fontWeight: '700', color: c.text.secondary, width: 34, textAlign: 'right' },
 });
@@ -523,7 +523,7 @@ function WeekdayPattern({ entries }: { entries: MoodEntry[] }) {
           <View key={i} style={wd.col}>
             <View style={[
               wd.cell,
-              { backgroundColor: a != null ? moodColorFor(a) + 'E6' : 'rgba(255,255,255,0.05)' },
+              { backgroundColor: a != null ? moodColorFor(a) + 'E6' : colors.fill.medium },
               a != null && a === best ? wd.cellBest : null,
             ]}>
               <Text style={[wd.cellVal, { color: a != null ? '#0B0B0B' : colors.text.muted }]}>
@@ -603,7 +603,7 @@ const makeTod = (c: any, p: any) => StyleSheet.create({
   tile: {
     flex: 1, backgroundColor: c.bg.elevated, borderRadius: radius.lg,
     paddingVertical: spacing[3], gap: 3, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: c.border.subtle,
   },
   val: { fontSize: 17, fontWeight: '800', letterSpacing: -0.5 },
   label: { fontSize: 9, fontWeight: '600', color: c.text.muted },
@@ -667,7 +667,7 @@ function MonthHeatmap({ entries }: { entries: MoodEntry[] }) {
                 <View key={ci} style={hm.cellWrap}>
                   <View style={[
                     hm.cell,
-                    { backgroundColor: mc ? mc + 'E6' : 'rgba(255,255,255,0.05)' },
+                    { backgroundColor: mc ? mc + 'E6' : colors.fill.medium },
                     isT ? hm.cellToday : null,
                   ]}>
                     <Text style={[hm.cellDay, { color: mc ? '#0B0B0B' : colors.text.muted }]}>{day}</Text>
@@ -1138,8 +1138,8 @@ const makeStyles = (c: any, p: any) => StyleSheet.create({
   moodBubble: {
     width: 48, height: 48, borderRadius: radius.lg,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: c.border.default,
+    backgroundColor: c.fill.subtle,
   },
   moodNum: { fontSize: 22, fontWeight: '900' },
   heroMeta: { ...typography.caption, color: c.text.muted, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
@@ -1179,7 +1179,7 @@ const makeStyles = (c: any, p: any) => StyleSheet.create({
   entryRow: {
     flexDirection: 'row', gap: spacing[3], alignItems: 'flex-start',
     paddingVertical: spacing[2],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
   entryDot: { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
   entryInfo: { flex: 1, gap: 3 },

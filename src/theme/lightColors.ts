@@ -25,5 +25,10 @@ export const lightColors = {
     card:    'rgba(20,24,24,0.08)',
     glass:   'rgba(20,24,24,0.12)',
   },
+  fill: {
+    subtle: 'rgba(20,24,24,0.04)',
+    medium: 'rgba(20,24,24,0.06)',
+    strong: 'rgba(20,24,24,0.10)',
+  },
   white: '#FFFFFF',
 } as const;

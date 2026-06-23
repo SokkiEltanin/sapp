@@ -469,7 +469,7 @@ export default function HealthScreen() {
               const totalH = s.h + s.m / 60;
               const barH = totalH > 0 ? Math.max(6, (totalH / maxSleep) * 56) : 3;
               const isToday = i === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
-              const barColor = s.quality ? QUALITY_COLORS[s.quality] : (totalH > 0 ? colors.text.secondary : 'rgba(255,255,255,0.08)');
+              const barColor = s.quality ? QUALITY_COLORS[s.quality] : (totalH > 0 ? colors.text.secondary : colors.fill.strong);
               return (
                 <View key={i} style={styles.sleepChartCol}>
                   <View style={styles.sleepBarWrap}>
@@ -698,7 +698,7 @@ export default function HealthScreen() {
                       <View style={styles.sleepBarWrap}>
                         <View style={[styles.sleepBar, {
                           height: barH,
-                          backgroundColor: w === 0 ? 'rgba(255,255,255,0.08)' : goalMet ? T.accent : T.muted,
+                          backgroundColor: w === 0 ? colors.fill.strong : goalMet ? T.accent : T.muted,
                           opacity: w === 0 ? 0.35 : 1,
                           width: isToday ? 12 : 8,
                         }]} />
@@ -775,7 +775,7 @@ export default function HealthScreen() {
                     <View style={styles.weightBarWrap}>
                       <View style={[styles.weightBar, {
                         height: h,
-                        backgroundColor: w > 0 ? T.accent : 'rgba(255,255,255,0.07)',
+                        backgroundColor: w > 0 ? T.accent : colors.fill.medium,
                         width: isToday ? 12 : 8,
                         opacity: w === 0 ? 0.3 : 1,
                       }]} />
@@ -866,7 +866,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   hcGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
   hcTile: {
     width: '31%', flexGrow: 1, gap: 3, paddingVertical: spacing[2], paddingHorizontal: spacing[2],
-    borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.md, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.card,
   },
   hcVal: { fontSize: 17, fontWeight: '800', color: c.text.primary },
   hcUnit: { fontSize: 10, fontWeight: '600', color: c.text.muted },
@@ -882,14 +882,14 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   heroNum: { fontSize: 44, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
   heroSub: { ...typography.caption, color: c.text.muted },
 
-  progressTrack: { height: 8, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  progressTrack: { height: 8, backgroundColor: c.fill.medium, borderRadius: radius.full, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: radius.full },
 
   stepControls: { flexDirection: 'row', gap: spacing[1] },
   stepBtn: {
     width: 26, height: 26, borderRadius: radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.fill.medium,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -897,8 +897,8 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   sleepDurRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   sleepBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.fill.medium,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   sleepDurCenter: { flex: 1, alignItems: 'center', gap: 2 },
@@ -909,8 +909,8 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   minuteRow: { flexDirection: 'row', gap: spacing[2] },
   minutePill: {
     flex: 1, paddingVertical: 6, borderRadius: radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.fill.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center',
   },
   minutePillActive: {
@@ -920,7 +920,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   minuteText: { fontSize: 12, color: c.text.muted, fontWeight: '500' },
   minuteTextActive: { color: t.accent, fontWeight: '700' },
 
-  microBar: { height: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.full, overflow: 'hidden' },
+  microBar: { height: 5, backgroundColor: c.fill.medium, borderRadius: radius.full, overflow: 'hidden' },
   microFill: { height: '100%', borderRadius: radius.full },
   stageBar: { flexDirection: 'row', height: 12, borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.border.subtle },
   stageLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
@@ -941,8 +941,8 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   qualityRow: { flexDirection: 'row', gap: spacing[2] },
   qualityPill: {
     flex: 1, paddingVertical: 7, borderRadius: radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.fill.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center',
   },
   qualityText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
@@ -960,9 +960,9 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   pomUnit: { fontSize: 11, fontWeight: '400', color: c.text.muted },
   pomCta: {
     paddingHorizontal: spacing[4], paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.fill.medium,
     borderRadius: radius.sm, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: c.border.default,
   },
   pomCtaText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
 
@@ -1025,15 +1025,15 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.fill.subtle, borderWidth: 1,
+    borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
   },
   glassFilled: { backgroundColor: t.accentDim, borderColor: t.cardBorder },
   waterCtrl: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[1] },
   ctrlBtn: {
     width: 42, height: 42, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: c.fill.medium, borderWidth: 1,
+    borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
   },
   waterNum: { fontSize: 26, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
   waterSub: { fontSize: 12, fontWeight: '400', color: c.text.muted },
@@ -1046,15 +1046,15 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
   weightBtn: {
     width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.fill.medium,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
   weightBtnSm: {
     paddingHorizontal: spacing[2], paddingVertical: 7,
     borderRadius: radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.fill.subtle,
+    borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center',
   },
   weightBtnSmText: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
@@ -1074,7 +1074,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   moodDate: { ...typography.caption, color: c.text.muted, fontSize: 9 },
 
   note: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[2] },
-  noteDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)' },
+  noteDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: c.text.muted },
   noteText: { ...typography.caption, color: c.text.muted },
 });
 

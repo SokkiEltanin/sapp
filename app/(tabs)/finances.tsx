@@ -594,7 +594,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   scopeLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   scopeToggle: {
     flexDirection: 'row', gap: 2, marginLeft: 'auto',
-    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.full, padding: 2,
+    backgroundColor: c.fill.medium, borderRadius: radius.full, padding: 2,
   },
   scopeBtn: { paddingHorizontal: spacing[3], paddingVertical: 5, borderRadius: radius.full },
   scopeBtnOn: { backgroundColor: c.accent.blue + '30' },
@@ -648,7 +648,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[2],
   },
-  sectionLine:  { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+  sectionLine:  { flex: 1, height: 1, backgroundColor: c.border.default },
   sectionTitle: { fontSize: 11, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: '700' },
   sectionTotal: { fontSize: 11, fontWeight: '700', color: 'rgba(228,52,52,0.55)', letterSpacing: 0.3 },
 
