@@ -30,6 +30,7 @@ const T = {
 };
 
 const WEEK_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+const GLASS_ML = 250; // one "szklanka" = 250 ml (for Health Connect hydration ⇄ glasses)
 
 type SleepQuality = 'poor' | 'fair' | 'good' | 'excellent';
 const QUALITY_LABELS: Record<SleepQuality, string> = {
@@ -150,12 +151,14 @@ export default function HealthScreen() {
           if (day.steps > 0) setSteps(day.steps);
           if (day.sleepMinutes > 0) { setSleepH(Math.floor(day.sleepMinutes / 60)); setSleepM(day.sleepMinutes % 60); setSleepQuality(qualityFromMinutes(day.sleepMinutes)); }
           if (day.weightKg != null) setWeight(w => w || day.weightKg!);
+          if (day.hydrationMl != null && day.hydrationMl > 0) setWater(Math.round(day.hydrationMl / GLASS_ML));
           setHcExtra({
             heartRateAvg: day.heartRateAvg, restingHeartRate: day.restingHeartRate, distanceKm: day.distanceKm,
             activeCalories: day.activeCalories, totalCalories: day.totalCalories, exerciseMinutes: day.exerciseMinutes,
             oxygenPct: day.oxygenPct, vo2max: day.vo2max,
             floors: day.floors, hrv: day.hrv, respiratoryRate: day.respiratoryRate, bodyFatPct: day.bodyFatPct, bmr: day.bmr,
             sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin, sleepLightMin: day.sleepLightMin,
+            hydrationMl: day.hydrationMl,
           });
           setFromWatch(true);
         }
@@ -308,12 +311,14 @@ export default function HealthScreen() {
         if (d.steps > 0) setSteps(d.steps);
         if (d.sleepMinutes > 0) { setSleepH(Math.floor(d.sleepMinutes / 60)); setSleepM(d.sleepMinutes % 60); setSleepQuality(qualityFromMinutes(d.sleepMinutes)); }
         if (d.weightKg != null) setWeight(d.weightKg); // manual sync: take the watch's weight
+        if (d.hydrationMl != null && d.hydrationMl > 0) setWater(Math.round(d.hydrationMl / GLASS_ML));
         setHcExtra({
           heartRateAvg: d.heartRateAvg, restingHeartRate: d.restingHeartRate, distanceKm: d.distanceKm,
           activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
           oxygenPct: d.oxygenPct, vo2max: d.vo2max,
           floors: d.floors, hrv: d.hrv, respiratoryRate: d.respiratoryRate, bodyFatPct: d.bodyFatPct, bmr: d.bmr,
           sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin, sleepLightMin: d.sleepLightMin,
+          hydrationMl: d.hydrationMl,
         });
         setFromWatch(true);
         haptic.success();
@@ -615,72 +620,86 @@ export default function HealthScreen() {
           </GlassCard>
         )}
 
-        {/* Water */}
-        <GlassCard padding={spacing[4]} style={styles.tealCard}>
-          <View style={styles.cardRow}>
-            <Droplets size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>NAWODNIENIE</Text>
-            <Text style={styles.waterCount}>{water}/{waterGoal} szklanek</Text>
-          </View>
-          <View style={styles.glassRow}>
-            {Array.from({ length: waterGoal }, (_, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => updateWater(i < water ? i : i + 1)}
-                style={[styles.glass, i < water && styles.glassFilled]}
-              >
-                <Droplets
-                  size={14}
-                  color={i < water ? T.accent : colors.text.muted}
-                  strokeWidth={i < water ? 2.5 : 1.5}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, {
-              width: `${(water / waterGoal) * 100}%`,
-              backgroundColor: water >= waterGoal ? T.accent : T.muted,
-            }]} />
-          </View>
-          <View style={styles.waterCtrl}>
-            <PressableScale onPress={() => updateWater(water - 1)} style={styles.ctrlBtn}>
-              <Minus size={15} color={colors.text.secondary} />
-            </PressableScale>
-            <Text style={styles.waterNum}>
-              {water} <Text style={styles.waterSub}>z {waterGoal}</Text>
-            </Text>
-            <PressableScale onPress={() => updateWater(water + 1)} style={styles.ctrlBtn}>
-              <Plus size={15} color={colors.text.secondary} />
-            </PressableScale>
-          </View>
-
-          {/* 7-day water chart */}
-          <View style={[styles.cardRow, { marginTop: spacing[2] }]}>
-            <Text style={[styles.cardLabel, { color: colors.text.muted }]}>TYDZIEŃ</Text>
-          </View>
-          <View style={styles.sleepChartRow}>
-            {weekWater.map((w, i) => {
-              const barH = w > 0 ? Math.max(5, Math.min(48, (w / waterGoal) * 48)) : 3;
-              const isToday = i === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
-              const goalMet = w >= waterGoal;
-              return (
-                <View key={i} style={styles.sleepChartCol}>
-                  <View style={styles.sleepBarWrap}>
-                    <View style={[styles.sleepBar, {
-                      height: barH,
-                      backgroundColor: w === 0 ? 'rgba(255,255,255,0.08)' : goalMet ? T.accent : T.muted,
-                      opacity: w === 0 ? 0.35 : 1,
-                      width: isToday ? 12 : 8,
-                    }]} />
+        {/* Water — synced from Health Connect hydration (Samsung Health) when present,
+            otherwise a clean manual glass log. One interaction, no clutter. */}
+        {(() => {
+          const watchMl = (hcExtra.hydrationMl as number) || 0;
+          const fromWatchWater = watchMl > 0;
+          const goalSafe = Math.max(1, waterGoal);
+          const ml = fromWatchWater ? watchMl : water * GLASS_ML;
+          const liters = (ml / 1000).toFixed(1).replace('.', ',');
+          const goalLiters = ((goalSafe * GLASS_ML) / 1000).toFixed(1).replace('.', ',');
+          const pct = Math.min(1, water / goalSafe);
+          const reached = water >= goalSafe;
+          return (
+            <GlassCard padding={spacing[4]} style={styles.tealCard}>
+              <View style={styles.cardRow}>
+                <Droplets size={13} color={colors.text.muted} />
+                <Text style={styles.cardLabel}>NAWODNIENIE</Text>
+                <View style={{ flex: 1 }} />
+                {fromWatchWater && (
+                  <View style={styles.watchTag}>
+                    <RefreshCw size={9} color={T.accent} />
+                    <Text style={styles.watchTagText}>z zegarka</Text>
                   </View>
-                  <Text style={[styles.chartDay, isToday && styles.chartDayToday]}>{WEEK_DAYS[i]}</Text>
-                  {w > 0 && <Text style={styles.sleepBarLabel}>{w}</Text>}
-                </View>
-              );
-            })}
-          </View>
-        </GlassCard>
+                )}
+              </View>
+
+              <View style={styles.waterHeadRow}>
+                <Text style={styles.waterLiters}>{liters}<Text style={styles.waterLitersUnit}> L</Text></Text>
+                <Text style={styles.waterGoalText}>z {goalLiters} L · {water}/{goalSafe} szkl.</Text>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${pct * 100}%`, backgroundColor: reached ? T.accent : T.muted }]} />
+              </View>
+
+              {/* Glass pips — tap to log manually; read-only when the watch is the source */}
+              <View style={styles.glassRow}>
+                {Array.from({ length: goalSafe }, (_, i) => {
+                  const filled = i < water;
+                  const pip = (
+                    <View style={[styles.glass, filled && styles.glassFilled]}>
+                      <Droplets size={14} color={filled ? T.accent : colors.text.muted} strokeWidth={filled ? 2.5 : 1.5} />
+                    </View>
+                  );
+                  return fromWatchWater
+                    ? <View key={i}>{pip}</View>
+                    : <TouchableOpacity key={i} activeOpacity={0.7} onPress={() => updateWater(i + 1 === water ? i : i + 1)}>{pip}</TouchableOpacity>;
+                })}
+              </View>
+              <Text style={styles.waterHint}>
+                {fromWatchWater ? 'Z Samsung Health / Health Connect — loguj wodę w zegarku' : 'Dotknij szklankę, by zaznaczyć ile wypiłeś'}
+              </Text>
+
+              {/* 7-day water chart */}
+              <View style={[styles.cardRow, { marginTop: spacing[3] }]}>
+                <Text style={[styles.cardLabel, { color: colors.text.muted }]}>TYDZIEŃ</Text>
+              </View>
+              <View style={styles.sleepChartRow}>
+                {weekWater.map((w, i) => {
+                  const barH = w > 0 ? Math.max(5, Math.min(48, (w / goalSafe) * 48)) : 3;
+                  const isToday = i === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
+                  const goalMet = w >= goalSafe;
+                  return (
+                    <View key={i} style={styles.sleepChartCol}>
+                      <View style={styles.sleepBarWrap}>
+                        <View style={[styles.sleepBar, {
+                          height: barH,
+                          backgroundColor: w === 0 ? 'rgba(255,255,255,0.08)' : goalMet ? T.accent : T.muted,
+                          opacity: w === 0 ? 0.35 : 1,
+                          width: isToday ? 12 : 8,
+                        }]} />
+                      </View>
+                      <Text style={[styles.chartDay, isToday && styles.chartDayToday]}>{WEEK_DAYS[i]}</Text>
+                      {w > 0 && <Text style={styles.sleepBarLabel}>{w}</Text>}
+                    </View>
+                  );
+                })}
+              </View>
+            </GlassCard>
+          );
+        })()}
 
         {/* Weight */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -977,7 +996,14 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   },
 
   waterCount: { ...typography.label, color: c.text.secondary, fontWeight: '600', marginLeft: 'auto', fontSize: 10 },
-  glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  watchTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: t.accentDim, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
+  watchTagText: { fontSize: 9, fontWeight: '800', color: t.accent, letterSpacing: 0.3 },
+  waterHeadRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], marginTop: spacing[2], marginBottom: spacing[2] },
+  waterLiters: { fontSize: 30, fontWeight: '800', color: c.text.primary, letterSpacing: -0.8 },
+  waterLitersUnit: { fontSize: 14, fontWeight: '700', color: c.text.muted, letterSpacing: 0 },
+  waterGoalText: { fontSize: 11.5, fontWeight: '600', color: c.text.muted },
+  waterHint: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic' },
+  glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1,
