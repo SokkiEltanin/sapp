@@ -668,8 +668,20 @@ export default function HealthScreen() {
                     : <TouchableOpacity key={i} activeOpacity={0.7} onPress={() => updateWater(i + 1 === water ? i : i + 1)}>{pip}</TouchableOpacity>;
                 })}
               </View>
+              {!fromWatchWater && (
+                <View style={styles.quickAddRow}>
+                  <TouchableOpacity style={styles.quickAddBtn} activeOpacity={0.8} onPress={() => updateWater(water + 1)}>
+                    <Plus size={13} color={T.accent} />
+                    <Text style={styles.quickAddText}>Szklanka · 250 ml</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.quickAddBtn} activeOpacity={0.8} onPress={() => updateWater(water + 2)}>
+                    <Plus size={13} color={T.accent} />
+                    <Text style={styles.quickAddText}>Duża · 500 ml</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               <Text style={styles.waterHint}>
-                {fromWatchWater ? 'Z Samsung Health / Health Connect — loguj wodę w zegarku' : 'Dotknij szklankę, by zaznaczyć ile wypiłeś'}
+                {fromWatchWater ? 'Z Samsung Health / Health Connect — loguj wodę w zegarku' : 'Dotknij szklankę, by ustawić poziom, lub dodaj szybko powyżej'}
               </Text>
 
               {/* 7-day water chart */}
@@ -1003,6 +1015,13 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   waterLitersUnit: { fontSize: 14, fontWeight: '700', color: c.text.muted, letterSpacing: 0 },
   waterGoalText: { fontSize: 11.5, fontWeight: '600', color: c.text.muted },
   waterHint: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic' },
+  quickAddRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
+  quickAddBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    paddingVertical: 10, borderRadius: radius.md,
+    backgroundColor: t.accentDim, borderWidth: 1, borderColor: t.cardBorder,
+  },
+  quickAddText: { fontSize: 12, fontWeight: '700', color: t.accent, letterSpacing: 0.2 },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,
