@@ -116,6 +116,62 @@ export default function WidgetBuilder() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        {/* Live layout preview — shape updates as you configure */}
+        <Text style={s.previewLabel}>PODGLĄD UKŁADU</Text>
+        <View style={s.previewCard}>
+          {!def ? (
+            <Text style={s.previewEmpty}>Wybierz metrykę poniżej, aby zobaczyć jak wyjdzie kafelek</Text>
+          ) : (
+            <>
+              <View style={s.previewHead}>
+                <BarChart3 size={13} color={accent} />
+                <Text style={s.previewTitle} numberOfLines={1}>{title.trim() || labelFor(def, tag)}</Text>
+                {showPeriod && <Text style={s.previewPeriod}>{period === 'week' ? 'tydz.' : 'mies.'}</Text>}
+              </View>
+              {viz === 'number' && (
+                <View style={s.pNumberRow}>
+                  <Text style={s.pNumber}>123</Text>
+                  {!!def.unit && <Text style={s.pUnit}>{def.unit}</Text>}
+                </View>
+              )}
+              {viz === 'wave' && (
+                <View style={s.pWave}>
+                  {[5, 9, 6, 12, 8, 14].map((h, i) => (
+                    <View key={i} style={[s.pWaveBar, { height: h * 3, backgroundColor: i === 5 ? accent : accent + '55' }]} />
+                  ))}
+                </View>
+              )}
+              {viz === 'compare' && (
+                <View style={s.pWave}>
+                  {[10, 7].map((h, i) => (
+                    <View key={i} style={[s.pCmpBar, { height: h * 3 + 12, backgroundColor: i === 0 ? accent : '#FBBF24' }]} />
+                  ))}
+                </View>
+              )}
+              {viz === 'list' && (
+                <View style={{ gap: 6, marginTop: 8 }}>
+                  {[1, 2, 3].map(i => (
+                    <View key={i} style={s.pListRow}>
+                      <View style={[s.pListBar, { width: `${90 - i * 22}%` }]} />
+                    </View>
+                  ))}
+                </View>
+              )}
+              {viz === 'donut' && (
+                <View style={s.pDonutRow}>
+                  <View style={[s.pDonut, { borderColor: accent }]} />
+                  <View style={{ gap: 5 }}>{[accent, '#FBBF24', '#2AC68F'].map((cc, i) => (
+                    <View key={i} style={[s.pLegend, { backgroundColor: cc }]} />
+                  ))}</View>
+                </View>
+              )}
+              {showTarget && targetInput.trim() !== '' && (
+                <Text style={s.pTarget}>cel: {targetInput} {def.unit}</Text>
+              )}
+            </>
+          )}
+        </View>
+
         {/* 1 — metric */}
         <Text style={s.step}>1 · Co pokazać?</Text>
         {GROUPS.map(g => {
@@ -299,6 +355,29 @@ const makeS = (c: any) => StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   scroll: { padding: spacing[4], gap: spacing[2] },
   step: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[1] },
+
+  // Live preview
+  previewLabel: { fontSize: 10, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8, marginBottom: spacing[2] },
+  previewCard: {
+    backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
+    padding: spacing[4], minHeight: 92, justifyContent: 'center', marginBottom: spacing[2],
+  },
+  previewEmpty: { fontSize: 12, color: c.text.muted, textAlign: 'center', fontStyle: 'italic' },
+  previewHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing[2] },
+  previewTitle: { flex: 1, fontSize: 12, fontWeight: '700', color: c.text.secondary, letterSpacing: 0.3 },
+  previewPeriod: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase' },
+  pNumberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  pNumber: { fontSize: 30, fontWeight: '800', color: c.text.primary, letterSpacing: -1 },
+  pUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted, marginBottom: 5 },
+  pWave: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 46, marginTop: 4 },
+  pWaveBar: { flex: 1, borderRadius: 3, minHeight: 4 },
+  pCmpBar: { flex: 1, borderRadius: 4, minHeight: 10 },
+  pListRow: { height: 12, justifyContent: 'center' },
+  pListBar: { height: 8, borderRadius: 4, backgroundColor: c.fill.strong },
+  pDonutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[4], marginTop: 2 },
+  pDonut: { width: 44, height: 44, borderRadius: 22, borderWidth: 7 },
+  pLegend: { width: 30, height: 5, borderRadius: 3 },
+  pTarget: { fontSize: 10.5, fontWeight: '600', color: c.text.muted, marginTop: spacing[2] },
   rowSubLabel: { fontSize: 11, color: c.text.muted, marginBottom: spacing[1] },
   group: { marginBottom: spacing[2] },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing[1] },
