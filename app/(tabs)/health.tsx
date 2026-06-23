@@ -22,11 +22,11 @@ import { colors, spacing, radius, typography } from '@/theme';
 // ─── Teal palette ─────────────────────────────────────────────────────────────
 
 const T = {
-  card:       '#041412',
-  cardBorder: 'rgba(78,203,168,0.18)',
-  accent:     '#4ECBA8',
-  accentDim:  'rgba(78,203,168,0.12)',
-  muted:      'rgba(78,203,168,0.45)',
+  card:       '#0E0A18',
+  cardBorder: 'rgba(139,92,246,0.18)',
+  accent:     '#8B5CF6',
+  accentDim:  'rgba(139,92,246,0.12)',
+  muted:      'rgba(139,92,246,0.45)',
 };
 
 const WEEK_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
@@ -69,10 +69,10 @@ export default function HealthScreen() {
   const colors = useColors();
   const T = useMemo(() => ({
     card: colors.bg.card,
-    cardBorder: 'rgba(78,203,168,0.22)',
-    accent: '#4ECBA8',
-    accentDim: 'rgba(78,203,168,0.14)',
-    muted: 'rgba(78,203,168,0.55)',
+    cardBorder: 'rgba(139,92,246,0.22)',
+    accent: '#8B5CF6',
+    accentDim: 'rgba(139,92,246,0.14)',
+    muted: 'rgba(139,92,246,0.55)',
   }), [colors]);
   const styles = useMemo(() => makeStyles(colors, T), [colors, T]);
   const wm = useMemo(() => makeWm(colors, T), [colors, T]);

@@ -41,12 +41,12 @@ function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function toStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
-// Current week dates (Mon→Sun)
-function weekDates(): string[] {
+// Rolling last 7 days (oldest → today). A fixed Mon→Sun week looks empty early
+// in the week (on Monday you'd see one bar), so we use a sliding 7-day window.
+const DOW_SHORT = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
+function last7Dates(): string[] {
   const today = new Date();
-  const dow = today.getDay() === 0 ? 6 : today.getDay() - 1;
-  const mon = new Date(today); mon.setDate(today.getDate() - dow);
-  return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return toStr(d); });
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(today); d.setDate(today.getDate() - (6 - i)); return toStr(d); });
 }
 // Current month dates (1..N)
 function monthDates(): string[] {
@@ -215,11 +215,11 @@ export default function FinancesScreen() {
       }
     }
     if (chartPeriod === 'week') {
-      const dates = weekDates();
+      const dates = last7Dates();
       return {
         values:    dates.map(d => expByDate[d] ?? 0),
         incValues: dates.map(d => incByDate[d] ?? 0),
-        labels: ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'],
+        labels:    dates.map(d => DOW_SHORT[new Date(d + 'T00:00:00').getDay()]),
         total:    dates.reduce((s, d) => s + (expByDate[d] ?? 0), 0),
         incTotal: dates.reduce((s, d) => s + (incByDate[d] ?? 0), 0),
       };
@@ -386,14 +386,14 @@ export default function FinancesScreen() {
               {/* ── Spending wave chart + period toggle ─── */}
               <View style={st.chartCard}>
                 <View style={st.chartHeader}>
-                  <Text style={st.chartTitle}>WYDATKI — {chartPeriod === 'week' ? 'TYDZIEŃ' : 'MIESIĄC'}</Text>
+                  <Text style={st.chartTitle}>WYDATKI — {chartPeriod === 'week' ? 'OSTATNIE 7 DNI' : 'MIESIĄC'}</Text>
                   <View style={st.toggle}>
                     <TouchableOpacity
                       style={[st.toggleBtn, chartPeriod === 'week' && st.toggleBtnOn]}
                       onPress={() => { haptic.tap(); setChartPeriod('week'); }}
                       activeOpacity={0.8}
                     >
-                      <Text style={[st.toggleText, chartPeriod === 'week' && st.toggleTextOn]}>Tydz.</Text>
+                      <Text style={[st.toggleText, chartPeriod === 'week' && st.toggleTextOn]}>7 dni</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[st.toggleBtn, chartPeriod === 'month' && st.toggleBtnOn]}

@@ -33,14 +33,14 @@ const TAB_ACCENTS = [
   colors.tabs.tasks,
   colors.tabs.calendar,
   colors.tabs.finances,
-  '#34D399',
+  '#8B5CF6',
 ] as const;
 
 const QUICK_ACTIONS = [
   { label: 'NOTATKA',     color: '#6C9EFF',            route: '/notes?new=1'   },
   { label: 'NAWYK',       color: '#F97316',            route: '/habits'        },
   { label: 'HUMOR',       color: colors.accent.purple, route: '/(tabs)/mood'   },
-  { label: 'ZDROWIE',     color: '#34D399',            route: '/(tabs)/health' },
+  { label: 'ZDROWIE',     color: '#8B5CF6',            route: '/(tabs)/health' },
   { label: 'WYD/PRZYCH',  color: colors.accent.red,    route: '/expenses/add'  },
   { label: 'ZADANIE',     color: colors.tabs.tasks,    route: '/tasks/add'     },
   { label: 'PARSER PAR.', color: colors.accent.blue,   route: '/expenses/scan' },
