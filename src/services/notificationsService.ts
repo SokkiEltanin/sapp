@@ -193,6 +193,33 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Budget / tag-limit reminder. Re-armed on app foreground with the current
+  // tag-limit state (one-off DATE, this evening) so it nudges even with the app
+  // closed; cancelled when nothing is near its limit. Threshold 80%.
+  async refreshBudgetReminder(
+    near: { label: string; pct: number; spend: number; limit: number; period: 'week' | 'month' }[],
+  ): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('budget-limit').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
+      const hot = near.filter(n => n.pct >= 0.8).sort((a, b) => b.pct - a.pct);
+      if (hot.length === 0) return;
+      const anyOver = hot.some(n => n.pct >= 1);
+      const body = hot.slice(0, 3)
+        .map(n => `${n.label} ${Math.round(n.pct * 100)}% (${Math.round(n.spend)}/${Math.round(n.limit)} zł)`)
+        .join(' · ');
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'budget-limit',
+        content: {
+          title: anyOver ? 'Przekroczono limit wydatków' : 'Zbliżasz się do limitu wydatków',
+          body,
+          data: { screen: 'finances' },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(18, 0, false) },
+      });
+    } catch {}
+  },
+
   async scheduleDailyTaskBriefing(
     hour = 8, minute = 0,
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },

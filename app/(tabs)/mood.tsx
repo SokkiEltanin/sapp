@@ -729,6 +729,7 @@ function buildPatterns(
   spendByDate: Record<string, number>,
   doneTasksByDate: Record<string, number>,
   sleepMinByDate: Record<string, number>,
+  stepsByDate: Record<string, number>,
 ): string[] {
   const out: string[] = [];
   const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
@@ -821,6 +822,28 @@ function buildPatterns(
       : `Po krótkim śnie humor bywa lepszy (${shortMd.toFixed(1)} vs ${wellMd.toFixed(1)}).`);
   }
 
+  // Steps ↔ mood / energy — active days (8k+) vs low-movement (<4k).
+  const activeMood: number[] = [], lazyMood: number[] = [];
+  const activeEn: number[] = [], lazyEn: number[] = [];
+  for (const e of entries) {
+    const st = stepsByDate[e.date];
+    if (st == null || st <= 0) continue;
+    if (st >= 8000) { activeMood.push(e.mood); activeEn.push(e.energy); }
+    else if (st < 4000) { lazyMood.push(e.mood); lazyEn.push(e.energy); }
+  }
+  const aMd = mean(activeMood), lMd = mean(lazyMood);
+  if (aMd != null && lMd != null && activeMood.length >= 3 && lazyMood.length >= 3 && Math.abs(aMd - lMd) >= 0.35 && out.length < 6) {
+    out.push(aMd > lMd
+      ? `W dni z ruchem (8k+ kroków) masz lepszy humor (${aMd.toFixed(1)} vs ${lMd.toFixed(1)} w mało aktywne).`
+      : `W mało aktywne dni humor bywa lepszy (${lMd.toFixed(1)} vs ${aMd.toFixed(1)}).`);
+  }
+  const aEn = mean(activeEn), lEn = mean(lazyEn);
+  if (aEn != null && lEn != null && activeEn.length >= 3 && lazyEn.length >= 3 && Math.abs(aEn - lEn) >= 0.35 && out.length < 6) {
+    out.push(aEn > lEn
+      ? `Więcej kroków = więcej energii (${aEn.toFixed(1)} vs ${lEn.toFixed(1)} w mało aktywne dni).`
+      : `Mniej kroków, a więcej energii (${lEn.toFixed(1)} vs ${aEn.toFixed(1)}) — ciekawe.`);
+  }
+
   // Most common stress keyword
   const { negative, positive } = extractKeywords(entries);
   if (negative.length > 0) out.push(`Najczęściej stresują Cię: ${negative.slice(0, 2).map(k => k.word).join(', ')}.`);
@@ -829,19 +852,20 @@ function buildPatterns(
   return out.slice(0, 6);
 }
 
-function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate }: {
+function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate }: {
   entries: MoodEntry[];
   workByDate: Record<string, number>;
   spendByDate: Record<string, number>;
   doneTasksByDate: Record<string, number>;
   sleepMinByDate: Record<string, number>;
+  stepsByDate: Record<string, number>;
 }) {
   const colors = useColors();
   const P = useMemo(() => pFor(colors), [colors]);
   const pat = useMemo(() => makePat(colors, P), [colors, P]);
   const lines = useMemo(
-    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate),
-    [entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate],
+    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate),
+    [entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate],
   );
   if (entries.length < 6 || lines.length === 0) return null;
   return (
@@ -942,13 +966,20 @@ export default function MoodScreen() {
     return map;
   }, [allTasks]);
 
-  // Sleep minutes per day (from the Zdrowie screen history) for sleep↔mood insights.
+  // Sleep minutes + steps per day (from the Zdrowie screen history) for
+  // sleep↔mood and steps↔mood insights.
   const [sleepMinByDate, setSleepMinByDate] = useState<Record<string, number>>({});
+  const [stepsByDate, setStepsByDate] = useState<Record<string, number>>({});
   useEffect(() => {
     getHealthHistory(60).then(h => {
-      const map: Record<string, number> = {};
-      for (const [date, v] of Object.entries(h)) if (v.sleepMinutes > 0) map[date] = v.sleepMinutes;
-      setSleepMinByDate(map);
+      const sl: Record<string, number> = {};
+      const st: Record<string, number> = {};
+      for (const [date, v] of Object.entries(h)) {
+        if (v.sleepMinutes > 0) sl[date] = v.sleepMinutes;
+        if (v.steps > 0) st[date] = v.steps;
+      }
+      setSleepMinByDate(sl);
+      setStepsByDate(st);
     }).catch(() => {});
   }, [entries.length]);
 
@@ -1049,7 +1080,7 @@ export default function MoodScreen() {
         <MoodEnergyWave entries={entries} />
 
         {/* Conclusions from notes + work/day context */}
-        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} sleepMinByDate={sleepMinByDate} />
+        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} sleepMinByDate={sleepMinByDate} stepsByDate={stepsByDate} />
 
         {/* Rich statistics */}
         <MoodDistribution entries={entries} />

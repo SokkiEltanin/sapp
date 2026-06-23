@@ -1383,6 +1383,14 @@ export default function DashboardScreen() {
       .sort((a, b) => b.pct - a.pct);
   }, [tagRules, scopedExpenses, today, weekDates, payers]);
 
+  // Re-arm a budget notification when a tag-limit is near/over (closed-app nudge).
+  useEffect(() => {
+    const near = tagLimits.map(t => ({ label: t.label, pct: t.pct, spend: t.spend, limit: t.limit, period: t.period }));
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshBudgetReminder(near))
+      .catch(() => {});
+  }, [tagLimits]);
+
   // ── Dynamic hero briefing ──────────────────────────────────────────────────
   // A contextual one-liner — complements the TopPill (which shows the single top
   // priority) by giving a broader daily summary. { pre, bold, post } parts.
