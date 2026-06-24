@@ -12,13 +12,6 @@ if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
 
-function timeStr(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  } catch { return ''; }
-}
-
 interface Props {
   expense: Expense;
   index: number;
@@ -37,11 +30,16 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const accentColor = isIncome ? colors.accent.green : isReceipt ? colors.accent.blue : colors.border.default;
 
   const title = expense.storeName || expense.note || meta.label;
-  // Cash is the noteworthy one (card is the default) — show it inline.
-  const cashTag = expense.paymentMethod === 'cash' ? ' · gotówka' : '';
-  const subtitle = isReceipt
-    ? `${expense.receiptItems!.length} produktów · ${timeStr(expense.date)}${cashTag}`
-    : `${timeStr(expense.date)}${expense.tags.length > 0 ? ` · ${expense.tags.slice(0, 2).join(', ')}` : ''}${!isIncome ? ` · ${meta.label}` : ''}${cashTag}`;
+  // No time in the list — every entry defaults to noon, so "12:00" was just noise.
+  // Subtitle = the meaningful parts (products / tags / category / cash).
+  const subParts: string[] = [];
+  if (isReceipt) subParts.push(`${expense.receiptItems!.length} produktów`);
+  if (!isIncome) {
+    if (expense.tags.length > 0) subParts.push(expense.tags.slice(0, 2).join(', '));
+    if (!isReceipt) subParts.push(meta.label);
+  }
+  if (expense.paymentMethod === 'cash') subParts.push('gotówka');
+  const subtitle = subParts.join('  ·  ');
 
   const toggle = () => {
     haptic.tap();
@@ -70,15 +68,16 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
 
         <View style={styles.info}>
           <Text style={styles.note} numberOfLines={1}>{title}</Text>
-          <Text style={styles.meta}>{subtitle}</Text>
+          {!!subtitle && <Text style={styles.meta} numberOfLines={1}>{subtitle}</Text>}
         </View>
 
         <Text style={[styles.amount, { color: isIncome ? colors.accent.green : colors.text.primary }]}>
           {isIncome ? '+' : '-'}{expense.amount.toFixed(2)} zł
         </Text>
 
-        {/* Expand toggle for receipts */}
-        {isReceipt && (
+        {/* Expand toggle for receipts. Non-receipts render an equal-width spacer so
+            every amount lines up at the same right edge (no indented prices). */}
+        {isReceipt ? (
           <TouchableOpacity
             onPress={toggle}
             hitSlop={12}
@@ -90,6 +89,8 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
               : <ChevronDown size={15} color={colors.text.muted} />
             }
           </TouchableOpacity>
+        ) : (
+          <View style={styles.chevronBtn} />
         )}
       </PressableScale>
 
