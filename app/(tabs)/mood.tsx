@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag, CalendarDays, Clock, BarChart3, Sunrise, Sun, Sunset, Moon, Sparkles } from 'lucide-react-native';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-native-svg';
 
@@ -928,14 +928,16 @@ export default function MoodScreen() {
   const todayEntry = useMemo(() => entries.find(e => e.date === today) ?? null, [entries, today]);
   const todayCount = useMemo(() => entries.filter(e => e.date === today).length, [entries, today]);
 
-  // Auto-open check-in modal when navigated from notification.
+  // Auto-open check-in modal when navigated from notification — consume the param
+  // ONCE (clear it) so refocus / new entries don't reopen it.
   useFocusEffect(
     useCallback(() => {
       if (openCheckIn === 'true') {
         setEditingEntry(null);   // notification → log a NEW entry (mood is multi/day)
         setModalOpen(true);
+        router.setParams({ openCheckIn: '' });
       }
-    }, [openCheckIn, todayEntry]),
+    }, [openCheckIn]),
   );
 
   useEffect(() => { load(); }, []);

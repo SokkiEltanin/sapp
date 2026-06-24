@@ -84,14 +84,16 @@ export default function TabBar({ currentIndex }: Props) {
 
   const openMenu = () => {
     setOpen(true);
+    // Snappy: tiny stagger + a stiff spring so the whole menu lands in ~120ms
+    // instead of cascading in over ~280ms (felt like "loading").
     Animated.parallel([
-      Animated.timing(backdropAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.timing(fabProgress,  { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.timing(backdropAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(fabProgress,  { toValue: 1, duration: 150, useNativeDriver: true }),
       ...menuActions.map((_, i) => {
         itemAnims[i].setValue(0);
         return Animated.spring(itemAnims[i], {
           toValue: 1, useNativeDriver: true,
-          damping: 16, stiffness: 220, delay: i * 40,
+          damping: 18, stiffness: 340, delay: i * 16,
         } as any);
       }),
     ]).start();

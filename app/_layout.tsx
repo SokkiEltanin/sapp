@@ -49,6 +49,15 @@ const eb = StyleSheet.create({
 const MOOD_POPUP_KEY = 'last_mood_auto_popup';
 const SIX_HOURS_MS  = 6 * 60 * 60 * 1000;
 
+// Cross-component guards (module scope, single app instance):
+// • lastHandledNotifKey — collapses the cold-start double delivery (the listener
+//   AND getLastNotificationResponseAsync hand over the same tap).
+// • suppressAutoMoodUntil — when a mood notification is being handled (it opens
+//   the mood screen's own check-in), keep the global AutoMoodPopup quiet so the
+//   modal doesn't appear twice.
+let lastHandledNotifKey: string | null = null;
+let suppressAutoMoodUntil = 0;
+
 function AutoMoodPopup() {
   const [visible, setVisible] = useState(false);
 
@@ -59,6 +68,9 @@ function AutoMoodPopup() {
       const logged = useMoodStore.getState().todayEntry != null;
       notificationsService.refreshMoodReminder(logged).catch(() => {});
       if (logged) return;
+      // A mood notification tap is opening the check-in on the mood screen — don't
+      // also pop the global modal (that was the "shows twice" bug).
+      if (Date.now() < suppressAutoMoodUntil) return;
       const lastStr = await AsyncStorage.getItem(MOOD_POPUP_KEY);
       const now = Date.now();
       if (!lastStr || now - parseInt(lastStr) > SIX_HOURS_MS) {
@@ -150,10 +162,17 @@ export default function RootLayout() {
 
   useEffect(() => {
     function handleNotifResponse(response: Notifications.NotificationResponse) {
+      // Cold-start delivers the SAME tap twice (listener + getLastNotificationResponse).
+      // Dedupe by identifier + delivery date so a real next-day tap still works.
+      const key = `${response.notification.request.identifier}:${(response.notification as any).date ?? 0}`;
+      if (key === lastHandledNotifKey) return;
+      lastHandledNotifKey = key;
+
       const data = (response.notification.request.content.data ?? {}) as Record<string, any>;
       const { screen, taskId, eventId } = data;
 
       if (screen === 'mood') {
+        suppressAutoMoodUntil = Date.now() + 8000; // the mood screen opens the check-in itself
         router.push({ pathname: '/(tabs)/mood', params: { openCheckIn: 'true' } } as any);
       } else if (screen === 'tasks') {
         if (taskId) router.push(`/tasks/${taskId}` as any);
