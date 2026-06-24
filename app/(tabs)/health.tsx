@@ -85,6 +85,7 @@ export default function HealthScreen() {
   const [sleepM, setSleepM]             = useState(30);
   const [sleepQuality, setSleepQuality] = useState<SleepQuality | undefined>(undefined);
   const [weight, setWeight]             = useState(0);
+  const [lastWeight, setLastWeight]     = useState(0); // most recent logged weight (any day) — seed for nudging
   const [weightModal, setWeightModal]   = useState(false);
   const [weightInput, setWeightInput]   = useState('');
   const [loaded, setLoaded]             = useState(false);
@@ -255,6 +256,12 @@ export default function HealthScreen() {
         setWeekSleep(wSleep);
         setWeekWeight(wWeight);
         setWeekWater(wWater);
+
+        // Most recent logged weight (survives gaps >7 days) — seed for nudging.
+        const storedLast = await AsyncStorage.getItem('health_last_weight');
+        let last = storedLast ? parseFloat(storedLast) : 0;
+        if (!(last > 0)) { for (let i = wWeight.length - 1; i >= 0; i--) if (wWeight[i] > 0) { last = wWeight[i]; break; } }
+        if (last > 0) setLastWeight(last);
       } catch {}
       setLoaded(true);
     };
@@ -264,6 +271,7 @@ export default function HealthScreen() {
   useEffect(() => {
     if (!loaded) return;
     AsyncStorage.setItem(todayKey(), JSON.stringify({ water, steps, sleepH, sleepM, sleepQuality, weight, hc: hcExtra })).catch(() => {});
+    if (weight > 0) AsyncStorage.setItem('health_last_weight', String(weight)).catch(() => {});
     const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     setWeekSteps(prev => { const n = [...prev]; n[todayIdx] = steps; return n; });
     setWeekWeight(prev => { const n = [...prev]; n[todayIdx] = weight; return n; });
@@ -280,6 +288,13 @@ export default function HealthScreen() {
     setWater(next);
     if (next === waterGoal) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
     else haptic.tap();
+  };
+
+  // Nudge weight. When today isn't logged yet, start from the last known weight
+  // (you don't weigh daily) instead of from 0.
+  const bumpWeight = (delta: number) => {
+    haptic.tap();
+    setWeight(w => { const base = w > 0 ? w : lastWeight; return Math.max(0, +(base + delta).toFixed(1)); });
   };
 
 
@@ -740,26 +755,28 @@ export default function HealthScreen() {
           )}
 
           <View style={styles.weightRow}>
-            <PressableScale onPress={() => { haptic.tap(); setWeight(w => Math.max(0, parseFloat((w - 1).toFixed(1)))); }} style={styles.weightBtn}>
+            <PressableScale onPress={() => bumpWeight(-1)} style={styles.weightBtn}>
               <Minus size={13} color={colors.text.muted} />
             </PressableScale>
-            <PressableScale onPress={() => { haptic.tap(); setWeight(w => Math.max(0, parseFloat((w - 0.1).toFixed(1)))); }} style={styles.weightBtnSm}>
+            <PressableScale onPress={() => bumpWeight(-0.1)} style={styles.weightBtnSm}>
               <Text style={styles.weightBtnSmText}>-0.1</Text>
             </PressableScale>
             <TouchableOpacity
               style={styles.weightCenter}
-              onPress={() => { setWeightInput(weight > 0 ? weight.toFixed(1) : ''); setWeightModal(true); }}
+              onPress={() => { setWeightInput((weight > 0 ? weight : lastWeight) > 0 ? (weight > 0 ? weight : lastWeight).toFixed(1) : ''); setWeightModal(true); }}
               activeOpacity={0.7}
             >
-              <Text style={styles.weightNum}>
-                {weight > 0 ? weight.toFixed(1) : '—'}
+              <Text style={[styles.weightNum, weight === 0 && lastWeight > 0 && { opacity: 0.45 }]}>
+                {weight > 0 ? weight.toFixed(1) : lastWeight > 0 ? lastWeight.toFixed(1) : '—'}
               </Text>
-              <Text style={styles.weightUnit}>{weight > 0 ? 'kg · dotknij' : 'kg · ustaw'}</Text>
+              <Text style={styles.weightUnit}>
+                {weight > 0 ? 'kg · dotknij' : lastWeight > 0 ? 'kg · ostatnia — zmień +/−' : 'kg · ustaw'}
+              </Text>
             </TouchableOpacity>
-            <PressableScale onPress={() => { haptic.tap(); setWeight(w => parseFloat((w + 0.1).toFixed(1))); }} style={styles.weightBtnSm}>
+            <PressableScale onPress={() => bumpWeight(0.1)} style={styles.weightBtnSm}>
               <Text style={styles.weightBtnSmText}>+0.1</Text>
             </PressableScale>
-            <PressableScale onPress={() => { haptic.tap(); setWeight(w => parseFloat((w + 1).toFixed(1))); }} style={styles.weightBtn}>
+            <PressableScale onPress={() => bumpWeight(1)} style={styles.weightBtn}>
               <Plus size={13} color={colors.text.muted} />
             </PressableScale>
           </View>
