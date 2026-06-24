@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Modal, Alert,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
+  TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -63,6 +64,7 @@ import { workService } from '@/services/workService';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { expensesService } from '@/services/expensesService';
+import { getPaydayConfig, getPaydayHandledMonth, setPaydayHandledMonth, paydayDue, currentMonth, PaydayConfig } from '@/utils/payday';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
@@ -627,6 +629,13 @@ export default function DashboardScreen() {
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
   const [paymentConfirming, setPaymentConfirming] = useState(false);
+
+  // Payday prompt — ask (on a configurable day) whether the paycheck arrived.
+  const [paydayCfg, setPaydayCfg] = useState<PaydayConfig>({ enabled: false, day: 10 });
+  const [paydayHandled, setPaydayHandled] = useState<string | null>(null);
+  const [paydayDismissed, setPaydayDismissed] = useState(false);
+  const [paydayModal, setPaydayModal] = useState(false);
+  const [paydayInput, setPaydayInput] = useState('');
   const checkedSubs = useRef(false);
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -679,7 +688,7 @@ export default function DashboardScreen() {
       const todayS = new Date().toISOString().split('T')[0];
       await expensesService.add({
         type: 'expense', amount: currentPayment.amount, currency: currentPayment.currency,
-        category: currentPayment.category, tags: [], note: `Subskrypcja: ${currentPayment.name}`, date: todayS,
+        category: currentPayment.category, tags: currentPayment.tags ?? [], note: `Subskrypcja: ${currentPayment.name}`, date: todayS,
       });
       const next = advanceNextBillingDate(currentPayment.nextBillingDate, currentPayment.billingCycle);
       await updateSub(currentPayment.id, { nextBillingDate: next });
@@ -691,6 +700,38 @@ export default function DashboardScreen() {
   }, [currentPayment, updateSub]);
 
   const handlePaymentNo = useCallback(() => { haptic.tap(); setPaymentQueue(q => q.slice(1)); }, []);
+
+  // Load payday config + handled-month on focus so the prompt is current.
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    Promise.all([getPaydayConfig(), getPaydayHandledMonth()]).then(([cfg, handled]) => {
+      if (!alive) return;
+      setPaydayCfg(cfg); setPaydayHandled(handled);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []));
+
+  const confirmPayday = useCallback(async () => {
+    const amt = parseFloat(paydayInput.replace(',', '.'));
+    if (isNaN(amt) || amt <= 0) { haptic.error(); toast.error('Podaj prawidłową kwotę'); return; }
+    haptic.success();
+    try {
+      const todayS = new Date().toISOString().split('T')[0];
+      // Tag with the work prefix so it becomes the "last paycheck" the rate is
+      // derived from; Settings then offers to add the month to the average.
+      const wp = workSettings.workPrefix?.trim().toLowerCase();
+      await expensesService.add({
+        type: 'income', amount: amt, currency: 'PLN', category: 'salary',
+        tags: wp ? [wp] : [], note: 'Wypłata', date: todayS,
+      });
+      const m = currentMonth();
+      await setPaydayHandledMonth(m);
+      setPaydayHandled(m);
+      expensesService.getAll().then(setExpenses).catch(() => {});
+      toast.success('Dodano wypłatę do przychodów');
+    } catch { haptic.error(); toast.error('Nie udało się zapisać — sprawdź połączenie'); }
+    finally { setPaydayModal(false); setPaydayInput(''); }
+  }, [paydayInput, workSettings.workPrefix, setExpenses]);
 
   // ── Work tracking ─────────────────────────────────────────────────────────
   const allEvents  = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
@@ -1682,6 +1723,26 @@ export default function DashboardScreen() {
                 </View>
               );
 
+              nodes['payday-prompt'] = (paydayDue(paydayCfg, paydayHandled) && !paydayDismissed) && (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Wallet size={13} color={colors.accent.green} />
+                    <Text style={s.cardTitle}>Wypłata</Text>
+                  </View>
+                  <Text style={[s.factText, { marginTop: spacing[1] }]}>Dostałeś już wypłatę w tym miesiącu?</Text>
+                  <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
+                    <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85}
+                      onPress={() => { haptic.tap(); setPaydayInput(''); setPaydayModal(true); }}>
+                      <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak — dodaj</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7}
+                      onPress={() => { haptic.tap(); setPaydayDismissed(true); }}>
+                      <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Jeszcze nie</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+
               nodes['tag-limits'] = tagLimits.map(t => {
               const pctClamped = Math.min(100, Math.round(t.pct * 100));
               const over = t.pct >= 1;
@@ -2560,6 +2621,34 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
+      {/* Payday — enter the paycheck amount */}
+      <Modal visible={paydayModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPaydayModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.npOverlay}>
+          <View style={s.npCard}>
+            <Text style={s.tagModalTitle}>Wypłata — kwota</Text>
+            <Text style={s.tagModalSub}>Dodam ją do przychodów i ustawię jako ostatnią wypłatę (wejdzie do średniej stawki).</Text>
+            <TextInput
+              style={s.paydayInput}
+              value={paydayInput}
+              onChangeText={setPaydayInput}
+              keyboardType="decimal-pad"
+              placeholder="np. 4200"
+              placeholderTextColor={colors.text.muted}
+              autoFocus
+              selectTextOnFocus
+            />
+            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+              <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} onPress={() => setPaydayModal(false)} activeOpacity={0.7}>
+                <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Anuluj</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} onPress={confirmPayday} activeOpacity={0.85}>
+                <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Dodaj wypłatę</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Note picker — add a note as a dashboard tile */}
       <Modal visible={notePickerOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setNotePickerOpen(false)}>
         <View style={s.npOverlay}>
@@ -2744,6 +2833,11 @@ const makeStyles = (c: any) => StyleSheet.create({
   tagItemDel: { padding: spacing[2], borderRadius: radius.md, backgroundColor: 'rgba(228,52,52,0.10)' },
   tagModalClose: { marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.elevated, alignItems: 'center' },
   tagModalCloseText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+
+  paydayBtn: { flex: 1, paddingVertical: 11, borderRadius: radius.md, alignItems: 'center' },
+  paydayBtnGhost: { backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  paydayBtnText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  paydayInput: { backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 12, fontSize: 18, fontWeight: '700', color: c.text.primary, textAlign: 'center' },
   budgetWarnBold: { fontWeight: '800', color: c.text.primary },
   budgetWarnPeriod: { fontWeight: '700', color: c.text.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
   budgetWarnPct: { fontWeight: '700', color: c.text.primary },

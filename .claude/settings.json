@@ -31,7 +31,8 @@
       "Bash(grep -nE \"rgba\\\\\\(255,255,255|rgba\\\\\\(0,0,0|'#0[0-9A-Fa-f]{5}'|'#1[0-9A-Fa-f]{5}'|backgroundColor: '#|'rgba\\\\\\(78|'rgba\\\\\\(10,\" \"app/\\(tabs\\)/health.tsx\")",
       "Bash(echo \"EXIT=$?\")",
       "Bash(grep -rnE \"name=\\\\\"work|'/work|/\\\\\\(tabs\\\\\\)/health|/\\\\\\(tabs\\\\\\)/mood|/\\\\\\(tabs\\\\\\)/finances|/\\\\\\(tabs\\\\\\)/analytics|/\\\\\\(tabs\\\\\\)/tasks\" app/_layout.tsx app/\\\\\\(tabs\\\\\\)/_layout.tsx)",
-      "Bash(grep -rnE \"paycheck|wypłat|lastPay|workPrefix|\\\\\\\\[JD\\\\\\\\]|JD|income.*work|isPaycheck|perSecond|ratePerHour|lastPaycheck\" src/hooks/useWorkEarnings.ts src/store/workStore.ts)"
+      "Bash(grep -rnE \"paycheck|wypłat|lastPay|workPrefix|\\\\\\\\[JD\\\\\\\\]|JD|income.*work|isPaycheck|perSecond|ratePerHour|lastPaycheck\" src/hooks/useWorkEarnings.ts src/store/workStore.ts)",
+      "Bash(grep -nE \"nodes\\\\['maintenance-reminders'\\\\]|nodes\\\\['weekly-insights'\\\\]|nodes\\\\['budget-warning'\\\\]|budgetWarnCard|s.card, \\\\{ backgroundColor: cardBgDark\" \"app/\\(tabs\\)/index.tsx\")"
     ]
   }
 }

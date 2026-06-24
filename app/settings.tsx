@@ -34,6 +34,7 @@ import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
+import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
@@ -346,6 +347,14 @@ export default function SettingsScreen() {
     } finally {
       setGoogleLinking(false);
     }
+  };
+
+  const [paydayEnabled, setPaydayEnabled] = useState(false);
+  const [paydayDay, setPaydayDay] = useState('10');
+  useEffect(() => { getPaydayConfig().then(c => { setPaydayEnabled(c.enabled); setPaydayDay(String(c.day)); }).catch(() => {}); }, []);
+  const savePayday = (enabled: boolean, dayStr: string) => {
+    const day = Math.min(28, Math.max(1, parseInt(dayStr, 10) || 10));
+    setPaydayConfig({ enabled, day }).catch(() => {});
   };
 
   const [notifEnabled, setNotifEnabled] = useState(true);
@@ -749,6 +758,55 @@ export default function SettingsScreen() {
                 }}
               />
             </View>
+          </View>
+        </View>
+
+        {/* Payday prompt */}
+        <View>
+          <Text style={styles.sectionTitle}>Wypłata</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                <Wallet size={16} color="#2AC68F" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Pytaj o wypłatę</Text>
+                <Text style={styles.rowSub}>Dashboard zapyta, czy dostałeś wypłatę — po potwierdzeniu doda przychód i ustawi ostatnią wypłatę.</Text>
+              </View>
+              <Switch
+                value={paydayEnabled}
+                onValueChange={(v) => { haptic.tap(); setPaydayEnabled(v); savePayday(v, paydayDay); }}
+                trackColor={{ false: colors.bg.elevated, true: '#2AC68F' }}
+                thumbColor={colors.white}
+              />
+            </View>
+            {paydayEnabled && (
+              <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3], marginTop: spacing[1] }]}>
+                <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                  <CalendarDays size={16} color="#2AC68F" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Którego dnia miesiąca</Text>
+                  <Text style={styles.rowSub}>Dzień 1–28, od którego dashboard zaczyna pytać.</Text>
+                </View>
+                <TextInput
+                  value={paydayDay}
+                  onChangeText={setPaydayDay}
+                  onBlur={() => { const d = String(Math.min(28, Math.max(1, parseInt(paydayDay, 10) || 10))); setPaydayDay(d); savePayday(paydayEnabled, d); }}
+                  keyboardType="numeric"
+                  placeholder="10"
+                  placeholderTextColor={colors.text.muted}
+                  maxLength={2}
+                  style={{
+                    fontSize: 14, fontWeight: '700', color: '#2AC68F',
+                    minWidth: 56, textAlign: 'center',
+                    paddingVertical: 4, paddingHorizontal: spacing[2],
+                    backgroundColor: '#2AC68F12', borderRadius: radius.md,
+                    borderWidth: 1, borderColor: '#2AC68F30',
+                  }}
+                />
+              </View>
+            )}
           </View>
         </View>
 

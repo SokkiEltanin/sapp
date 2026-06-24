@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // other section below is reorderable and identified by a stable id here.
 
 export const DEFAULT_DASHBOARD_SECTIONS = [
+  'payday-prompt',
   'weekly-insights',
   'maintenance-reminders',
   'tag-limits',
@@ -34,6 +35,7 @@ export type SectionId = typeof DEFAULT_DASHBOARD_SECTIONS[number];
 
 // Human labels shown in the "Edytuj dashboard" editor.
 export const SECTION_TITLES: Record<string, string> = {
+  'payday-prompt':  'Pytanie o wypłatę',
   'weekly-insights': 'Przegląd (kafelki + miesiące)',
   'maintenance-reminders': 'Serwis i przypomnienia',
   'tag-limits':     'Limity tagów (#słodycze…)',
