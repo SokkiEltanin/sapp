@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind } from 'lucide-react-native';
+import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, X, Award } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
@@ -209,6 +209,7 @@ export default function HealthScreen() {
   }, [monthData, stepGoal]);
 
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
+  const [detail, setDetail] = useState<null | 'steps' | 'sleep'>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -390,59 +391,66 @@ export default function HealthScreen() {
 
         {/* Steps hero */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
-          <View style={styles.cardRow}>
-            <Footprints size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>KROKI DZISIAJ</Text>
-            <View style={{ flex: 1 }} />
-            {fromWatch && (
-              <View style={styles.watchChip}>
-                <Activity size={9} color={T.accent} />
-                <Text style={styles.watchChipText}>z zegarka</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.heroNum, {
-            color: steps >= stepGoal ? T.accent : colors.text.primary,
-          }]}>
-            {steps.toLocaleString()}
-          </Text>
-          <Text style={styles.heroSub}>
-            cel {stepGoal.toLocaleString()} · {(steps * 0.00075).toFixed(1)} km · {Math.round(stepPct * 100)}%
-          </Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, {
-              width: `${stepPct * 100}%`,
-              backgroundColor: steps >= stepGoal ? T.accent : T.muted,
-            }]} />
-          </View>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setDetail('steps'); }}>
+            <View style={styles.cardRow}>
+              <Footprints size={13} color={colors.text.muted} />
+              <Text style={styles.cardLabel}>KROKI DZISIAJ</Text>
+              <View style={{ flex: 1 }} />
+              {fromWatch && (
+                <View style={styles.watchChip}>
+                  <Activity size={9} color={T.accent} />
+                  <Text style={styles.watchChipText}>z zegarka</Text>
+                </View>
+              )}
+              <ChevronRight size={15} color={colors.text.muted} style={{ marginLeft: 4 }} />
+            </View>
+            <Text style={[styles.heroNum, {
+              color: steps >= stepGoal ? T.accent : colors.text.primary,
+            }]}>
+              {steps.toLocaleString()}
+            </Text>
+            <Text style={styles.heroSub}>
+              cel {stepGoal.toLocaleString()} · {(steps * 0.00075).toFixed(1)} km · {Math.round(stepPct * 100)}% · szczegóły
+            </Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, {
+                width: `${stepPct * 100}%`,
+                backgroundColor: steps >= stepGoal ? T.accent : T.muted,
+              }]} />
+            </View>
+          </TouchableOpacity>
         </GlassCard>
 
         {/* Sleep card */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
-          <View style={styles.cardRow}>
-            <Moon size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>SEN</Text>
-            {sleepQuality && (
-              <View style={[styles.qualityBadge, { backgroundColor: QUALITY_COLORS[sleepQuality] + '22', borderColor: QUALITY_COLORS[sleepQuality] + '50' }]}>
-                <Text style={[styles.qualityBadgeText, { color: QUALITY_COLORS[sleepQuality] }]}>
-                  {QUALITY_LABELS[sleepQuality]}
+          <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setDetail('sleep'); }}>
+            <View style={styles.cardRow}>
+              <Moon size={13} color={colors.text.muted} />
+              <Text style={styles.cardLabel}>SEN</Text>
+              {sleepQuality && (
+                <View style={[styles.qualityBadge, { backgroundColor: QUALITY_COLORS[sleepQuality] + '22', borderColor: QUALITY_COLORS[sleepQuality] + '50' }]}>
+                  <Text style={[styles.qualityBadgeText, { color: QUALITY_COLORS[sleepQuality] }]}>
+                    {QUALITY_LABELS[sleepQuality]}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }} />
+              <ChevronRight size={15} color={colors.text.muted} />
+            </View>
+
+            {/* Duration (read-only — from the watch) */}
+            <View style={styles.sleepDurRow}>
+              <View style={[styles.sleepDurCenter, { flex: 1 }]}>
+                <Text style={styles.sleepDurNum}>
+                  {sleepH}<Text style={styles.sleepDurUnit}>h </Text>
+                  {pad(sleepM)}<Text style={styles.sleepDurUnit}>m</Text>
+                </Text>
+                <Text style={styles.sleepDurSub}>
+                  {sleepH < 6 ? 'za mało' : sleepH >= 7 && sleepH <= 9 ? 'optymalny' : sleepH > 9 ? 'dużo' : 'minimalny'} · szczegóły
                 </Text>
               </View>
-            )}
-          </View>
-
-          {/* Duration (read-only — from the watch) */}
-          <View style={styles.sleepDurRow}>
-            <View style={[styles.sleepDurCenter, { flex: 1 }]}>
-              <Text style={styles.sleepDurNum}>
-                {sleepH}<Text style={styles.sleepDurUnit}>h </Text>
-                {pad(sleepM)}<Text style={styles.sleepDurUnit}>m</Text>
-              </Text>
-              <Text style={styles.sleepDurSub}>
-                {sleepH < 6 ? 'za mało' : sleepH >= 7 && sleepH <= 9 ? 'optymalny' : sleepH > 9 ? 'dużo' : 'minimalny'}
-              </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.microBar}>
             <View style={[styles.microFill, {
@@ -867,6 +875,103 @@ export default function HealthScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Detail stats — tap the steps hero or the sleep card */}
+      <Modal visible={detail !== null} transparent animationType="slide" onRequestClose={() => setDetail(null)}>
+        <View style={styles.detailOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDetail(null)} />
+          <View style={styles.detailSheet}>
+            <View style={styles.detailHeader}>
+              {detail === 'steps' ? <Footprints size={16} color={T.accent} /> : <Moon size={16} color={T.accent} />}
+              <Text style={styles.detailTitle}>{detail === 'steps' ? 'Kroki' : 'Sen'} — szczegóły</Text>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity onPress={() => setDetail(null)} hitSlop={10}><X size={18} color={colors.text.muted} /></TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {detail === 'steps' && healthStats && (() => {
+                const tiles = [
+                  { v: steps.toLocaleString(), l: 'dziś' },
+                  { v: healthStats.avgSteps7.toLocaleString(), l: 'śr. 7 dni' },
+                  { v: healthStats.avgSteps30.toLocaleString(), l: 'śr. 30 dni' },
+                  { v: `${healthStats.goalHit}%`, l: 'dni z celem' },
+                  { v: `${healthStats.trendPct >= 0 ? '+' : ''}${healthStats.trendPct}%`, l: 'vs poprz. tydz.' },
+                  { v: `${(steps * 0.00075).toFixed(1)} km`, l: 'dziś dystans' },
+                ];
+                return (
+                  <>
+                    <View style={styles.detailGrid}>
+                      {tiles.map((t2, i) => (
+                        <View key={i} style={styles.detailTile}><Text style={styles.detailTileVal}>{t2.v}</Text><Text style={styles.detailTileLabel}>{t2.l}</Text></View>
+                      ))}
+                    </View>
+                    {healthStats.best.steps > 0 && (
+                      <View style={styles.detailRecord}>
+                        <Award size={14} color={T.accent} />
+                        <Text style={styles.detailRecordText}>Rekord 30 dni: {healthStats.best.steps.toLocaleString()} kroków · {new Date(healthStats.best.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.detailSectionLabel}>OSTATNIE 30 DNI</Text>
+                    <View style={styles.detailBars}>
+                      {monthData.map(p => {
+                        const h = p.steps > 0 ? Math.max(3, (p.steps / healthStats.maxMonth) * 70) : 2;
+                        return <View key={p.date} style={[styles.detailBar, { height: h, backgroundColor: p.steps >= stepGoal ? T.accent : T.muted, opacity: p.steps === 0 ? 0.4 : 1 }]} />;
+                      })}
+                    </View>
+                  </>
+                );
+              })()}
+
+              {detail === 'sleep' && healthStats && (() => {
+                const hm = (m: number) => `${Math.floor(m / 60)}h ${pad(m % 60)}m`;
+                const maxSleepMin = Math.max(...monthData.map(p => p.sleepMinutes), 1);
+                const deep = (hcExtra.sleepDeepMin as number) || 0;
+                const rem = (hcExtra.sleepRemMin as number) || 0;
+                const light = (hcExtra.sleepLightMin as number) || 0;
+                const tiles = [
+                  { v: `${sleepH}h ${pad(sleepM)}m`, l: 'dziś' },
+                  { v: hm(healthStats.avgSleep7), l: 'śr. 7 dni' },
+                  { v: hm(healthStats.avgSleep30), l: 'śr. 30 dni' },
+                  { v: `±${healthStats.sleepConsistency}m`, l: 'regularność' },
+                ];
+                return (
+                  <>
+                    <View style={styles.detailGrid}>
+                      {tiles.map((t2, i) => (
+                        <View key={i} style={styles.detailTile}><Text style={styles.detailTileVal}>{t2.v}</Text><Text style={styles.detailTileLabel}>{t2.l}</Text></View>
+                      ))}
+                    </View>
+                    {(deep > 0 || rem > 0 || light > 0) && (
+                      <>
+                        <Text style={styles.detailSectionLabel}>FAZY (DZIŚ)</Text>
+                        <View style={styles.detailGrid}>
+                          <View style={styles.detailTile}><Text style={[styles.detailTileVal, { color: '#6366F1' }]}>{Math.round(deep)}m</Text><Text style={styles.detailTileLabel}>głęboki</Text></View>
+                          <View style={styles.detailTile}><Text style={[styles.detailTileVal, { color: '#A78BFA' }]}>{Math.round(rem)}m</Text><Text style={styles.detailTileLabel}>REM</Text></View>
+                          <View style={styles.detailTile}><Text style={[styles.detailTileVal, { color: '#5EC8D8' }]}>{Math.round(light)}m</Text><Text style={styles.detailTileLabel}>lekki</Text></View>
+                        </View>
+                      </>
+                    )}
+                    {healthStats.sleepBest && healthStats.sleepBest.sleepMinutes > 0 && (
+                      <View style={styles.detailRecord}>
+                        <Award size={14} color={T.accent} />
+                        <Text style={styles.detailRecordText}>Najlepsza: {hm(healthStats.sleepBest.sleepMinutes)} · {new Date(healthStats.sleepBest.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}   ·   Najkrótsza: {hm(healthStats.sleepWorst.sleepMinutes)}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.detailSectionLabel}>OSTATNIE 30 DNI</Text>
+                    <View style={styles.detailBars}>
+                      {monthData.map(p => {
+                        const h = p.sleepMinutes > 0 ? Math.max(3, (p.sleepMinutes / maxSleepMin) * 70) : 2;
+                        return <View key={p.date} style={[styles.detailBar, { height: h, backgroundColor: p.sleepMinutes >= 420 ? T.accent : T.muted, opacity: p.sleepMinutes === 0 ? 0.4 : 1 }]} />;
+                      })}
+                    </View>
+                  </>
+                );
+              })()}
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1039,6 +1144,33 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
     backgroundColor: t.accentDim, borderWidth: 1, borderColor: t.cardBorder,
   },
   quickAddText: { fontSize: 12, fontWeight: '700', color: t.accent, letterSpacing: 0.2 },
+
+  // Detail stats modal
+  detailOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
+  detailSheet: {
+    backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[2],
+    maxHeight: '82%', borderTopWidth: 1, borderColor: t.cardBorder,
+  },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing[2] },
+  detailTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: 0.2 },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
+  detailTile: {
+    flexBasis: '30%', flexGrow: 1, minWidth: 92,
+    backgroundColor: c.fill.subtle, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle,
+    paddingVertical: spacing[3], paddingHorizontal: spacing[2], alignItems: 'center', gap: 3,
+  },
+  detailTileVal: { fontSize: 17, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
+  detailTileLabel: { fontSize: 9.5, color: c.text.muted, letterSpacing: 0.2 },
+  detailRecord: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[3],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    backgroundColor: t.accentDim, borderRadius: radius.md, borderWidth: 1, borderColor: t.cardBorder,
+  },
+  detailRecordText: { flex: 1, fontSize: 11, fontWeight: '600', color: c.text.secondary, lineHeight: 15 },
+  detailSectionLabel: { fontSize: 10, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, marginTop: spacing[4], marginBottom: spacing[1] },
+  detailBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 1.5, height: 74, marginTop: spacing[1] },
+  detailBar: { flex: 1, borderRadius: 2, minHeight: 2 },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,
