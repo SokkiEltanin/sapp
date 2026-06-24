@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import {
   Sparkles, Wallet, TrendingUp, Footprints, Moon, Smile, Briefcase, ListChecks, Cookie,
-  ArrowUpRight, ArrowDownRight, Minus, ChevronDown,
+  ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight,
 } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { StatCtx, metricSeries } from '@/utils/statWidgets';
@@ -36,6 +37,18 @@ const TILES: TileDef[] = [
   { id: 'tasksDone', label: 'Zadania',   Icon: ListChecks, unit: '',      betterHigh: true  },
   { id: 'sweets',    label: 'Słodycze',  Icon: Cookie,     unit: 'zł',    betterHigh: false },
 ];
+
+// Where each metric's full view lives — powers the "Zobacz w …" deep-link in the
+// expanded panel. Metrics with no dedicated screen (workHours) are omitted.
+const METRIC_HOME: Record<string, { route: string; label: string }> = {
+  spend:     { route: '/(tabs)/finances',  label: 'Finanse' },
+  income:    { route: '/(tabs)/finances',  label: 'Finanse' },
+  sweets:    { route: '/(tabs)/finances',  label: 'Finanse' },
+  steps:     { route: '/(tabs)/health',    label: 'Zdrowie' },
+  sleepAvg:  { route: '/(tabs)/health',    label: 'Zdrowie' },
+  moodAvg:   { route: '/(tabs)/mood',      label: 'Nastrój' },
+  tasksDone: { route: '/(tabs)/analytics', label: 'Analizy' },
+};
 
 function fmtVal(v: number, unit: string): string {
   if (unit === 'kroki') return Math.round(v).toLocaleString('pl-PL');
@@ -193,6 +206,17 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
                 <Text style={styles.statLabel}>vs poprz. mies.</Text>
               </View>
             </View>
+
+            {METRIC_HOME[sel.def.id] && (
+              <TouchableOpacity
+                style={styles.detailsBtn}
+                activeOpacity={0.8}
+                onPress={() => { haptic.tap(); router.push(METRIC_HOME[sel.def.id].route as any); }}
+              >
+                <Text style={[styles.detailsText, { color: accent }]}>Zobacz w: {METRIC_HOME[sel.def.id].label}</Text>
+                <ArrowRight size={14} color={accent} />
+              </TouchableOpacity>
+            )}
           </View>
         );
       })()}
@@ -256,6 +280,13 @@ const makeStyles = (c: any) => StyleSheet.create({
   statCell: { flex: 1, alignItems: 'center', gap: 1 },
   statVal: { fontSize: 14, fontWeight: '800', color: c.text.primary },
   statLabel: { fontSize: 9, color: c.text.muted, letterSpacing: 0.2 },
+
+  detailsBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: spacing[3], paddingVertical: 10, borderRadius: radius.md,
+    backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle,
+  },
+  detailsText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
 
   notes: { marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2] },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
