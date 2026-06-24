@@ -24,6 +24,7 @@ function pFor(c: any) {
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
+import { useHabits } from '@/hooks/useHabits';
 import { useExpensesStore } from '@/store/expensesStore';
 import { isMine } from '@/store/statsScope';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
@@ -730,6 +731,7 @@ function buildPatterns(
   doneTasksByDate: Record<string, number>,
   sleepMinByDate: Record<string, number>,
   stepsByDate: Record<string, number>,
+  habitRateByDate: Record<string, number>,
 ): string[] {
   const out: string[] = [];
   const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
@@ -844,6 +846,21 @@ function buildPatterns(
       : `Mniej kroków, a więcej energii (${lEn.toFixed(1)} vs ${aEn.toFixed(1)}) — ciekawe.`);
   }
 
+  // Habits ↔ mood — days with most habits done (≥80%) vs few (≤30%).
+  const habitfulMood: number[] = [], sparseMood: number[] = [];
+  for (const e of entries) {
+    const r = habitRateByDate[e.date];
+    if (r == null) continue;
+    if (r >= 0.8) habitfulMood.push(e.mood);
+    else if (r <= 0.3) sparseMood.push(e.mood);
+  }
+  const hfm = mean(habitfulMood), spm = mean(sparseMood);
+  if (hfm != null && spm != null && habitfulMood.length >= 3 && sparseMood.length >= 3 && Math.abs(hfm - spm) >= 0.35 && out.length < 6) {
+    out.push(hfm > spm
+      ? `W dni z odhaczonymi nawykami masz lepszy humor (${hfm.toFixed(1)} vs ${spm.toFixed(1)}).`
+      : `Więcej nawyków, a humor niższy (${hfm.toFixed(1)} vs ${spm.toFixed(1)}) — może presja?`);
+  }
+
   // Most common stress keyword
   const { negative, positive } = extractKeywords(entries);
   if (negative.length > 0) out.push(`Najczęściej stresują Cię: ${negative.slice(0, 2).map(k => k.word).join(', ')}.`);
@@ -852,20 +869,21 @@ function buildPatterns(
   return out.slice(0, 6);
 }
 
-function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate }: {
+function MoodPatterns({ entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate, habitRateByDate }: {
   entries: MoodEntry[];
   workByDate: Record<string, number>;
   spendByDate: Record<string, number>;
   doneTasksByDate: Record<string, number>;
   sleepMinByDate: Record<string, number>;
   stepsByDate: Record<string, number>;
+  habitRateByDate: Record<string, number>;
 }) {
   const colors = useColors();
   const P = useMemo(() => pFor(colors), [colors]);
   const pat = useMemo(() => makePat(colors, P), [colors, P]);
   const lines = useMemo(
-    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate),
-    [entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate],
+    () => buildPatterns(entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate, habitRateByDate),
+    [entries, workByDate, spendByDate, doneTasksByDate, sleepMinByDate, stepsByDate, habitRateByDate],
   );
   if (entries.length < 6 || lines.length === 0) return null;
   return (
@@ -965,6 +983,22 @@ export default function MoodScreen() {
     }
     return map;
   }, [allTasks]);
+
+  // Fraction of habits completed per day (0..1) for the habits↔mood insight.
+  const { habits, completions } = useHabits();
+  const habitRateByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (habits.length === 0) return map;
+    for (const [date, counts] of Object.entries(completions)) {
+      let done = 0;
+      for (const h of habits) {
+        const goal = h.type === 'count' ? (h.dailyGoal ?? 1) : 1;
+        if ((counts[h.id] ?? 0) >= goal) done++;
+      }
+      map[date] = done / habits.length;
+    }
+    return map;
+  }, [habits, completions]);
 
   // Sleep minutes + steps per day (from the Zdrowie screen history) for
   // sleep↔mood and steps↔mood insights.
@@ -1080,7 +1114,7 @@ export default function MoodScreen() {
         <MoodEnergyWave entries={entries} />
 
         {/* Conclusions from notes + work/day context */}
-        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} sleepMinByDate={sleepMinByDate} stepsByDate={stepsByDate} />
+        <MoodPatterns entries={entries} workByDate={workByDate} spendByDate={spendByDate} doneTasksByDate={doneTasksByDate} sleepMinByDate={sleepMinByDate} stepsByDate={stepsByDate} habitRateByDate={habitRateByDate} />
 
         {/* Rich statistics */}
         <MoodDistribution entries={entries} />
