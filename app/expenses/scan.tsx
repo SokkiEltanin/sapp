@@ -61,7 +61,8 @@ export default function ScanReceiptModal() {
   const [editedTags, setEditedTags]   = useState<Record<number, string[]>>({});
   const [editedExcluded, setEditedExcluded] = useState<Record<number, boolean>>({});
   const [editedEaters, setEditedEaters] = useState<Record<number, string[]>>({});
-  const [editedWeight, setEditedWeight] = useState<Record<number, string>>({});
+  const [editedWeight, setEditedWeight] = useState<Record<number, string>>({}); // GRAMS per piece (user-typed)
+  const [editedQty, setEditedQty]       = useState<Record<number, string>>({}); // pieces (user-edited)
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
   const [customTagPickerFor, setCustomTagPickerFor] = useState<number | null>(null);
@@ -105,15 +106,24 @@ export default function ScanReceiptModal() {
   // Weighable food groups get an editable weight (receipts rarely list grams).
   // Dairy (ser) defaults to 1 kg — the user's usual XXL pack.
   const WEIGH_TAGS = ['nabiał', 'mięso', 'ryby', 'owoce', 'warzywa'];
-  const isWeighable = (i: number) => getProductTags(i).some(t => WEIGH_TAGS.includes(t));
-  const getWeight = (i: number): string => {
+  // Weight is editable when the group is weighable OR a per-piece weight is
+  // detectable from the name ("Szynka 250g") or remembered for this product.
+  const isWeighable = (i: number) => {
+    const name = getProductName(i);
+    return getProductTags(i).some(t => WEIGH_TAGS.includes(t)) || !!parseWeightFromName(name) || !!weightFor(name, weightMemory);
+  };
+  // Editable pieces (defaults to the parsed quantity).
+  const getQuantity = (i: number): string => editedQty[i] ?? String(receipt?.products[i]?.quantity ?? 1);
+  // Per-piece weight in GRAMS for the UI — user-typed wins, else parsed from the
+  // name, else remembered per product, else dairy's usual 250 g pack.
+  const getWeightG = (i: number): string => {
     if (editedWeight[i] !== undefined) return editedWeight[i];
     const name = getProductName(i);
-    const fromName = parseWeightFromName(name);  // "Ogórki 700g" → 0.7 (ground truth for this line)
-    if (fromName) return String(fromName);
-    const learned = weightFor(name, weightMemory); // remembered for this product (e.g. XXL PIKOK = 0.25)
-    if (learned) return String(learned);
-    return getProductTags(i).includes('nabiał') ? '1' : ''; // dairy starts at 1 kg
+    const fromName = parseWeightFromName(name);  // kg, ground truth for this line
+    if (fromName) return String(Math.round(fromName * 1000));
+    const learned = weightFor(name, weightMemory); // kg, remembered (e.g. XXL PIKOK = 0.25)
+    if (learned) return String(Math.round(learned * 1000));
+    return getProductTags(i).includes('nabiał') ? '1000' : '';
   };
 
   const addCustomProduct = () => {
@@ -264,27 +274,29 @@ export default function ScanReceiptModal() {
         const p = receipt.products[i];
         const finalPrice = getPrice(i);
         const name = getProductName(i);
+        const qtyEdited = parseFloat(getQuantity(i).replace(',', '.'));
+        const qty = !isNaN(qtyEdited) && qtyEdited > 0 ? qtyEdited : p.quantity;
         const item: ReceiptItem = {
           name,
           price: finalPrice,
           category: getCategory(i),
-          quantity: p.quantity,
-          unitPrice: p.unitPrice,
+          quantity: qty,
+          unitPrice: qty !== 1 ? finalPrice / qty : finalPrice,
           tags: getProductTags(i),
         };
         if (p.discount != null) item.discount = p.discount;
         if (editedExcluded[i]) item.excluded = true;
         if (editedEaters[i]?.length) item.eaters = editedEaters[i];
         if (p.kind) item.kind = p.kind;
-        // Weight field is PER PIECE (kg/szt). weightKg stored = TOTAL of the line
-        // = per-piece × whole-piece count, so "2 serki · 0,2 kg/szt" = 0,4 kg in
-        // stats. Weighed loose goods use a fractional quantity, so don't scale.
-        const w = parseFloat(getWeight(i).replace(',', '.'));
-        if (!isNaN(w) && w > 0) {
-          const pieces = p.quantity;
-          item.weightKg = (Number.isInteger(pieces) && pieces > 1)
-            ? Math.round(w * pieces * 1000) / 1000
-            : w;
+        // Weight field is PER PIECE (g/szt). weightKg stored = TOTAL of the line
+        // = per-piece grams × whole-piece count, so "2 serki · 200 g/szt" = 0,4 kg
+        // in stats. Weighed loose goods use a fractional quantity, so don't scale.
+        const g = parseFloat(getWeightG(i).replace(',', '.'));
+        if (!isNaN(g) && g > 0) {
+          const wKg = g / 1000;
+          item.weightKg = (Number.isInteger(qty) && qty > 1)
+            ? Math.round(wKg * qty * 1000) / 1000
+            : wKg;
         }
         return item;
       });
@@ -341,8 +353,8 @@ export default function ScanReceiptModal() {
       saveWeightMemory(Array.from(selected)
         .filter(i => editedWeight[i] !== undefined && getProductName(i).trim())
         .map(i => {
-          const w = parseFloat((editedWeight[i] ?? '').replace(',', '.'));
-          return { name: getProductName(i), kg: isNaN(w) ? 0 : w };
+          const g = parseFloat((editedWeight[i] ?? '').replace(',', '.')); // grams
+          return { name: getProductName(i), kg: isNaN(g) ? 0 : g / 1000 };
         })).catch(() => {});
       // Learn per-store verdicts on SUSPECT lines: kept = real product, dropped = junk.
       const verdicts = receipt.products
@@ -538,7 +550,9 @@ export default function ScanReceiptModal() {
                         excluded={!!editedExcluded[i]}
                         onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
                         weighable={isWeighable(i)}
-                        weight={getWeight(i)}
+                        weight={getWeightG(i)}
+                        quantity={getQuantity(i)}
+                        onQuantityChange={v => setEditedQty(prev => ({ ...prev, [i]: v }))}
                         onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
                         payers={payers}
                         eaters={editedEaters[i]}
@@ -571,7 +585,9 @@ export default function ScanReceiptModal() {
                   excluded={!!editedExcluded[i]}
                   onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
                   weighable={isWeighable(i)}
-                  weight={getWeight(i)}
+                  weight={getWeightG(i)}
+                  quantity={getQuantity(i)}
+                  onQuantityChange={v => setEditedQty(prev => ({ ...prev, [i]: v }))}
                   onWeightChange={v => setEditedWeight(prev => ({ ...prev, [i]: v }))}
                   payers={payers}
                   eaters={editedEaters[i]}
@@ -787,6 +803,7 @@ function ProductRow({
   priceValue, onPriceChange, productName, onNameChange,
   productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
   excluded, onToggleExcluded, weighable, weight, onWeightChange,
+  quantity, onQuantityChange,
   payers, eaters, onEatersChange,
 }: {
   product: ReceiptProduct;
@@ -810,6 +827,8 @@ function ProductRow({
   weighable?: boolean;
   weight?: string;
   onWeightChange?: (v: string) => void;
+  quantity?: string;
+  onQuantityChange?: (v: string) => void;
   payers?: string[];
   eaters?: string[];
   onEatersChange?: (eaters: string[]) => void;
@@ -887,6 +906,20 @@ function ProductRow({
                 </View>
               </PressableScale>
             )}
+            {!isDeposit && onQuantityChange && (
+              <View style={styles.weighChip}>
+                <TextInput
+                  value={quantity}
+                  onChangeText={onQuantityChange}
+                  keyboardType="decimal-pad"
+                  placeholder={String(product.quantity)}
+                  placeholderTextColor={colors.text.muted}
+                  style={styles.weighInput}
+                  selectTextOnFocus
+                />
+                <Text style={styles.weighUnit}>szt</Text>
+              </View>
+            )}
             {!isDeposit && weighable && (
               <View style={styles.weighChip}>
                 <LucideIcons.Scale size={9} color="#60A5FA" />
@@ -894,16 +927,13 @@ function ProductRow({
                   value={weight}
                   onChangeText={onWeightChange}
                   keyboardType="decimal-pad"
-                  placeholder="1"
+                  placeholder="250"
                   placeholderTextColor={colors.text.muted}
                   style={styles.weighInput}
                   selectTextOnFocus
                 />
-                <Text style={styles.weighUnit}>{product.quantity > 1 ? 'kg/szt' : 'kg'}</Text>
+                <Text style={styles.weighUnit}>{(parseFloat((quantity ?? '').replace(',', '.')) || product.quantity) > 1 ? 'g/szt' : 'g'}</Text>
               </View>
-            )}
-            {product.quantity > 1 && (
-              <Text style={styles.productMetaText}>· {product.quantity} szt.</Text>
             )}
             {product.promotion && (
               <View style={styles.promoBadge}>
