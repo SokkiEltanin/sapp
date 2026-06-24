@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import WaterGauge from '@/components/health/WaterGauge';
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
 import { haptic } from '@/utils/haptics';
@@ -668,13 +669,15 @@ export default function HealthScreen() {
                 )}
               </View>
 
-              <View style={styles.waterHeadRow}>
-                <Text style={styles.waterLiters}>{liters}<Text style={styles.waterLitersUnit}> L</Text></Text>
+              <View style={styles.waterGaugeWrap}>
+                <WaterGauge
+                  ml={ml}
+                  goalMl={goalSafe * GLASS_ML}
+                  accent={T.accent}
+                  muted={colors.text.muted}
+                  textColor={colors.text.primary}
+                />
                 <Text style={styles.waterGoalText}>z {goalLiters} L · {water}/{goalSafe} szkl.</Text>
-              </View>
-
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${pct * 100}%`, backgroundColor: reached ? T.accent : T.muted }]} />
               </View>
 
               {/* Glass pips — tap to log manually; read-only when the watch is the source */}
@@ -1133,6 +1136,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   watchTag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: t.accentDim, paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full },
   watchTagText: { fontSize: 9, fontWeight: '800', color: t.accent, letterSpacing: 0.3 },
   waterHeadRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2], marginTop: spacing[2], marginBottom: spacing[2] },
+  waterGaugeWrap: { alignItems: 'center', gap: spacing[2], marginTop: spacing[3], marginBottom: spacing[1] },
   waterLiters: { fontSize: 30, fontWeight: '800', color: c.text.primary, letterSpacing: -0.8 },
   waterLitersUnit: { fontSize: 14, fontWeight: '700', color: c.text.muted, letterSpacing: 0 },
   waterGoalText: { fontSize: 11.5, fontWeight: '600', color: c.text.muted },

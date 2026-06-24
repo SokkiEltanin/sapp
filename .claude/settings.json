@@ -32,7 +32,8 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(grep -rnE \"name=\\\\\"work|'/work|/\\\\\\(tabs\\\\\\)/health|/\\\\\\(tabs\\\\\\)/mood|/\\\\\\(tabs\\\\\\)/finances|/\\\\\\(tabs\\\\\\)/analytics|/\\\\\\(tabs\\\\\\)/tasks\" app/_layout.tsx app/\\\\\\(tabs\\\\\\)/_layout.tsx)",
       "Bash(grep -rnE \"paycheck|wypłat|lastPay|workPrefix|\\\\\\\\[JD\\\\\\\\]|JD|income.*work|isPaycheck|perSecond|ratePerHour|lastPaycheck\" src/hooks/useWorkEarnings.ts src/store/workStore.ts)",
-      "Bash(grep -nE \"nodes\\\\['maintenance-reminders'\\\\]|nodes\\\\['weekly-insights'\\\\]|nodes\\\\['budget-warning'\\\\]|budgetWarnCard|s.card, \\\\{ backgroundColor: cardBgDark\" \"app/\\(tabs\\)/index.tsx\")"
+      "Bash(grep -nE \"nodes\\\\['maintenance-reminders'\\\\]|nodes\\\\['weekly-insights'\\\\]|nodes\\\\['budget-warning'\\\\]|budgetWarnCard|s.card, \\\\{ backgroundColor: cardBgDark\" \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(grep -nE \"waterHeadRow|waterLiters|import.*ScreenHeader|fromWatchWater|const ml = |goalLiters|progressTrack, \\\\{ width: \\\\`\\\\\\\\$\\\\{pct\" \"app/\\(tabs\\)/health.tsx\")"
     ]
   }
 }
