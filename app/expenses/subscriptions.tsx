@@ -93,6 +93,7 @@ interface FormState {
   category: ExpenseCategory;
   note: string;
   durationMonths: number;
+  tags: string; // comma-separated input
 }
 
 const emptyForm = (): FormState => {
@@ -100,16 +101,20 @@ const emptyForm = (): FormState => {
   return {
     name: '', amount: '', billingCycle: 'monthly',
     nextBillingDate: d.toISOString().split('T')[0].split('-').reverse().join('.'),
-    reminderDaysBefore: 3, category: 'subscriptions', note: '', durationMonths: 0,
+    reminderDaysBefore: 3, category: 'subscriptions', note: '', durationMonths: 0, tags: '',
   };
 };
+
+// "prąd, dom" → ["prąd","dom"]
+const parseTags = (s: string): string[] =>
+  s.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
 
 function subToForm(s: Subscription): FormState {
   return {
     name: s.name, amount: String(s.amount), billingCycle: s.billingCycle,
     nextBillingDate: s.nextBillingDate.split('-').reverse().join('.'),
     reminderDaysBefore: s.reminderDaysBefore, category: s.category, note: s.note ?? '',
-    durationMonths: s.durationMonths ?? 0,
+    durationMonths: s.durationMonths ?? 0, tags: (s.tags ?? []).join(', '),
   };
 }
 
@@ -178,7 +183,7 @@ export default function SubscriptionsScreen() {
         amount: currentPayment.amount,
         currency: currentPayment.currency,
         category: currentPayment.category,
-        tags: [],
+        tags: currentPayment.tags ?? [],
         note: `Subskrypcja: ${currentPayment.name}`,
         date: today,
       });
@@ -198,7 +203,8 @@ export default function SubscriptionsScreen() {
   }, []);
 
   const saveForm = useCallback(async () => {
-    const { name, amount, billingCycle, nextBillingDate, reminderDaysBefore, category, note, durationMonths } = form;
+    const { name, amount, billingCycle, nextBillingDate, reminderDaysBefore, category, note, durationMonths, tags } = form;
+    const tagArr = parseTags(tags);
     if (!name.trim()) { Alert.alert('Brak nazwy', 'Podaj nazwę subskrypcji'); return; }
     const amt = parseFloat(amount.replace(',', '.'));
     if (isNaN(amt) || amt <= 0) { Alert.alert('Błędna kwota', 'Podaj prawidłową kwotę'); return; }
@@ -213,12 +219,13 @@ export default function SubscriptionsScreen() {
         await update(editing.id, {
           name: name.trim(), amount: amt, billingCycle, nextBillingDate: dateIso,
           reminderDaysBefore, category, note: note.trim() || undefined, durationMonths,
+          tags: tagArr,
         });
       } else {
         await add({
           name: name.trim(), amount: amt, currency: 'PLN', billingCycle,
           nextBillingDate: dateIso, reminderDaysBefore, category, active: true,
-          note: note.trim() || undefined, durationMonths,
+          note: note.trim() || undefined, durationMonths, tags: tagArr,
           startDate: durationMonths > 0 ? today : undefined,
         });
       }
@@ -472,6 +479,16 @@ export default function SubscriptionsScreen() {
               )}
 
               {/* Note */}
+              <Text style={s.fieldLabel}>Tagi (opcjonalnie)</Text>
+              <TextInput
+                style={s.input}
+                value={form.tags}
+                onChangeText={(v) => setF('tags', v)}
+                placeholder="np. prąd, dom — trafią na wydatek przy płatności"
+                placeholderTextColor={colors.text.muted}
+                autoCapitalize="none"
+              />
+
               <Text style={s.fieldLabel}>Notatka (opcjonalnie)</Text>
               <TextInput
                 style={[s.input, { height: 60, textAlignVertical: 'top' }]}

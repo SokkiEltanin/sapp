@@ -142,6 +142,7 @@ export interface Subscription {
   nextBillingDate: string; // ISO date YYYY-MM-DD
   reminderDaysBefore: number; // 0 = off
   active: boolean;
+  tags?: string[]; // applied to the expense created when this recurring bill is paid
   note?: string;
   durationMonths?: number; // 0 = forever, N = auto-deactivate after N months
   startDate?: string; // ISO date YYYY-MM-DD, set on creation when durationMonths > 0
