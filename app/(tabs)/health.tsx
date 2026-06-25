@@ -33,6 +33,18 @@ const T = {
 const WEEK_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
 const GLASS_ML = 250; // one "szklanka" = 250 ml (for Health Connect hydration ⇄ glasses)
 
+const DOW_LABELS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
+const DOW_FULL = ['poniedziałki', 'wtorki', 'środy', 'czwartki', 'piątki', 'soboty', 'niedziele'];
+// Average a metric by weekday over a date series, returned Mon..Sun (ignores 0s).
+function dowAverage<T extends { date: string }>(data: T[], sel: (p: T) => number): number[] {
+  const sums = Array(7).fill(0), cnt = Array(7).fill(0);
+  for (const p of data) {
+    const v = sel(p);
+    if (v > 0) { const d = new Date(p.date + 'T00:00:00').getDay(); sums[d] += v; cnt[d]++; }
+  }
+  return [1, 2, 3, 4, 5, 6, 0].map(d => (cnt[d] ? Math.round(sums[d] / cnt[d]) : 0));
+}
+
 type SleepQuality = 'poor' | 'fair' | 'good' | 'excellent';
 const QUALITY_LABELS: Record<SleepQuality, string> = {
   poor: 'Słabo', fair: 'Ujdzie', good: 'Dobrze', excellent: 'Świetnie',
@@ -623,8 +635,8 @@ export default function HealthScreen() {
                       <Text style={styles.analysisLabel}>dni z celem (30d)</Text>
                     </View>
                     <View style={styles.analysisTile}>
-                      <Text style={styles.analysisVal}>{Math.floor(healthStats.avgSleep7 / 60)}h {pad(healthStats.avgSleep7 % 60)}m</Text>
-                      <Text style={styles.analysisLabel}>śr. sen · 7 dni</Text>
+                      <Text style={styles.analysisVal}>{(avgWin * 0.00075).toFixed(1)} km</Text>
+                      <Text style={styles.analysisLabel}>śr. dystans · {stepsRange} dni</Text>
                     </View>
                     <View style={styles.analysisTile}>
                       <Text style={[styles.analysisVal, { color: healthStats.trendPct > 0 ? T.accent : healthStats.trendPct < 0 ? colors.accent.red : colors.text.primary }]}>
@@ -893,6 +905,11 @@ export default function HealthScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {detail === 'steps' && healthStats && (() => {
+                const activeDays = monthData.filter(p => p.steps > 0).length;
+                const totalKm = Math.round(monthData.reduce((s, p) => s + p.steps, 0) * 0.00075);
+                const dowAvg = dowAverage(monthData, p => p.steps);
+                const bestDow = dowAvg.indexOf(Math.max(...dowAvg));
+                const maxDow = Math.max(...dowAvg, 1);
                 const tiles = [
                   { v: steps.toLocaleString(), l: 'dziś' },
                   { v: healthStats.avgSteps7.toLocaleString(), l: 'śr. 7 dni' },
@@ -900,6 +917,8 @@ export default function HealthScreen() {
                   { v: `${healthStats.goalHit}%`, l: 'dni z celem' },
                   { v: `${healthStats.trendPct >= 0 ? '+' : ''}${healthStats.trendPct}%`, l: 'vs poprz. tydz.' },
                   { v: `${(steps * 0.00075).toFixed(1)} km`, l: 'dziś dystans' },
+                  { v: `${activeDays}`, l: 'aktywne dni (30d)' },
+                  { v: `${totalKm} km`, l: 'suma 30 dni' },
                 ];
                 return (
                   <>
@@ -913,6 +932,20 @@ export default function HealthScreen() {
                         <Award size={14} color={T.accent} />
                         <Text style={styles.detailRecordText}>Rekord 30 dni: {healthStats.best.steps.toLocaleString()} kroków · {new Date(healthStats.best.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</Text>
                       </View>
+                    )}
+                    <Text style={styles.detailSectionLabel}>ŚREDNIO WG DNIA TYGODNIA</Text>
+                    <View style={styles.detailDowRow}>
+                      {dowAvg.map((v, i) => (
+                        <View key={i} style={styles.detailDowCol}>
+                          <View style={styles.detailDowBarWrap}>
+                            <View style={[styles.detailDowBar, { height: v > 0 ? Math.max(3, (v / maxDow) * 52) : 2, backgroundColor: i === bestDow ? T.accent : T.muted, opacity: v === 0 ? 0.4 : 1 }]} />
+                          </View>
+                          <Text style={styles.detailDowLabel}>{DOW_LABELS[i]}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    {dowAvg[bestDow] > 0 && (
+                      <Text style={styles.detailInsight}>Najwięcej chodzisz w: {DOW_FULL[bestDow]} (śr. {dowAvg[bestDow].toLocaleString()} kroków).</Text>
                     )}
                     <Text style={styles.detailSectionLabel}>OSTATNIE 30 DNI</Text>
                     <View style={styles.detailBars}>
@@ -931,11 +964,20 @@ export default function HealthScreen() {
                 const deep = (hcExtra.sleepDeepMin as number) || 0;
                 const rem = (hcExtra.sleepRemMin as number) || 0;
                 const light = (hcExtra.sleepLightMin as number) || 0;
+                const nights = monthData.filter(p => p.sleepMinutes > 0);
+                const pct7h = nights.length ? Math.round(nights.filter(p => p.sleepMinutes >= 420).length / nights.length * 100) : 0;
+                const last7n = monthData.slice(-7).filter(p => p.sleepMinutes > 0);
+                const debtMin = last7n.reduce((s, p) => s + Math.max(0, 420 - p.sleepMinutes), 0);
+                const dowAvg = dowAverage(monthData, p => p.sleepMinutes);
+                const worstDow = (() => { let wi = -1, wv = Infinity; dowAvg.forEach((v, i) => { if (v > 0 && v < wv) { wv = v; wi = i; } }); return wi; })();
+                const maxDow = Math.max(...dowAvg, 1);
                 const tiles = [
                   { v: `${sleepH}h ${pad(sleepM)}m`, l: 'dziś' },
                   { v: hm(healthStats.avgSleep7), l: 'śr. 7 dni' },
                   { v: hm(healthStats.avgSleep30), l: 'śr. 30 dni' },
                   { v: `±${healthStats.sleepConsistency}m`, l: 'regularność' },
+                  { v: `${pct7h}%`, l: 'nocy 7h+' },
+                  { v: `${(debtMin / 60).toFixed(1)}h`, l: 'dług snu (7d)' },
                 ];
                 return (
                   <>
@@ -959,6 +1001,20 @@ export default function HealthScreen() {
                         <Award size={14} color={T.accent} />
                         <Text style={styles.detailRecordText}>Najlepsza: {hm(healthStats.sleepBest.sleepMinutes)} · {new Date(healthStats.sleepBest.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}   ·   Najkrótsza: {hm(healthStats.sleepWorst.sleepMinutes)}</Text>
                       </View>
+                    )}
+                    <Text style={styles.detailSectionLabel}>ŚREDNIO WG DNIA TYGODNIA</Text>
+                    <View style={styles.detailDowRow}>
+                      {dowAvg.map((v, i) => (
+                        <View key={i} style={styles.detailDowCol}>
+                          <View style={styles.detailDowBarWrap}>
+                            <View style={[styles.detailDowBar, { height: v > 0 ? Math.max(3, (v / maxDow) * 52) : 2, backgroundColor: v >= 420 ? T.accent : T.muted, opacity: v === 0 ? 0.4 : 1 }]} />
+                          </View>
+                          <Text style={styles.detailDowLabel}>{DOW_LABELS[i]}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    {worstDow >= 0 && dowAvg[worstDow] > 0 && (
+                      <Text style={styles.detailInsight}>Najmniej śpisz w: {DOW_FULL[worstDow]} (śr. {hm(dowAvg[worstDow])}).</Text>
                     )}
                     <Text style={styles.detailSectionLabel}>OSTATNIE 30 DNI</Text>
                     <View style={styles.detailBars}>
@@ -1175,6 +1231,12 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   detailSectionLabel: { fontSize: 10, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, marginTop: spacing[4], marginBottom: spacing[1] },
   detailBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 1.5, height: 74, marginTop: spacing[1] },
   detailBar: { flex: 1, borderRadius: 2, minHeight: 2 },
+  detailDowRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: spacing[1] },
+  detailDowCol: { flex: 1, alignItems: 'center', gap: 3 },
+  detailDowBarWrap: { width: '100%', height: 52, justifyContent: 'flex-end', alignItems: 'center' },
+  detailDowBar: { width: '66%', borderRadius: 3, minHeight: 2 },
+  detailDowLabel: { fontSize: 8.5, color: c.text.muted, fontWeight: '600' },
+  detailInsight: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[2], lineHeight: 16 },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,
