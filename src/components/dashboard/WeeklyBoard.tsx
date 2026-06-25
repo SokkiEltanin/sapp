@@ -1,18 +1,14 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import {
   Sparkles, Wallet, TrendingUp, Footprints, Moon, Smile, Briefcase, ListChecks, Cookie,
-  ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight,
+  ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight, X,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { StatCtx, metricSeries } from '@/utils/statWidgets';
 import { haptic } from '@/utils/haptics';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 export type WeeklyNote = { tone: 'good' | 'warn' | 'neutral'; text: string };
 
@@ -79,7 +75,6 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
 
   const toggle = (id: string) => {
     haptic.tap();
-    LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity'));
     setSelected(s => (s === id ? null : id));
   };
 
@@ -155,21 +150,29 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
         })}
       </View>
 
-      {/* ── Expanded month comparison ─────────────────────────────────── */}
-      {sel && (() => {
-        const vals = sel.months;
-        const max = Math.max(...vals, 1);
-        const nonZero = vals.filter(v => v > 0);
-        const avg = nonZero.length ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0;
-        const best = Math.max(...vals);
-        const bestIdx = vals.indexOf(best);
-        const curM = vals[vals.length - 1] ?? 0;
-        const prevM = vals[vals.length - 2] ?? 0;
-        const mPct = prevM > 0 ? Math.round(((curM - prevM) / prevM) * 100) : null;
-        return (
-          <View style={styles.expand}>
-            <Text style={styles.expandTitle}>{sel.def.label} — ostatnie miesiące</Text>
-            <View style={styles.monthRow}>
+      {/* ── Month comparison popup ─────────────────────────────────── */}
+      <Modal visible={!!sel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSelected(null)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSelected(null)} />
+          {sel && (() => {
+            const vals = sel.months;
+            const max = Math.max(...vals, 1);
+            const nonZero = vals.filter(v => v > 0);
+            const avg = nonZero.length ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0;
+            const best = Math.max(...vals);
+            const bestIdx = vals.indexOf(best);
+            const curM = vals[vals.length - 1] ?? 0;
+            const prevM = vals[vals.length - 2] ?? 0;
+            const mPct = prevM > 0 ? Math.round(((curM - prevM) / prevM) * 100) : null;
+            return (
+              <View style={styles.modalSheet}>
+                <View style={styles.modalHeader}>
+                  <sel.def.Icon size={15} color={accent} />
+                  <Text style={styles.modalTitle}>{sel.def.label} — miesiące</Text>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={() => setSelected(null)} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
+                </View>
+                <View style={styles.monthRow}>
               {vals.map((v, i) => {
                 const isCur = i === vals.length - 1;
                 const isBest = i === bestIdx && best > 0;
@@ -217,9 +220,11 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
                 <ArrowRight size={14} color={accent} />
               </TouchableOpacity>
             )}
-          </View>
-        );
-      })()}
+              </View>
+            );
+          })()}
+        </View>
+      </Modal>
 
       {/* ── Smart notes (correlations, streaks) ───────────────────────── */}
       {notes.length > 0 && (
@@ -268,8 +273,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   sparkBar: { width: 3, borderRadius: 1.5 },
   chev: { position: 'absolute', top: 6, right: 6, opacity: 0.5 },
 
-  expand: { marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
-  expandTitle: { fontSize: 11, fontWeight: '700', color: c.text.secondary, marginBottom: spacing[2], letterSpacing: 0.3 },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: spacing[4] },
+  modalSheet: { width: '100%', maxWidth: 420, backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
+  modalTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary, letterSpacing: 0.2 },
   monthRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   monthCol: { flex: 1, alignItems: 'center', gap: 3 },
   monthVal: { fontSize: 9, fontWeight: '600', color: c.text.muted },
