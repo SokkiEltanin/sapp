@@ -1254,55 +1254,6 @@ export default function SettingsScreen() {
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
 
-            {/* Hero greeting font */}
-            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-                <View style={[styles.iconWrap, { backgroundColor: '#F472B618' }]}>
-                  <LucideIcons.Type size={16} color="#F472B6" />
-                </View>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowLabel}>Czcionka powitania</Text>
-                  <Text style={styles.rowSub}>Napis „DZIEŃ DOBRY" na dashboardzie</Text>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                {HERO_FONTS.map(f => {
-                  const active = heroFontId === f.id;
-                  return (
-                    <PressableScale key={f.id} onPress={() => { haptic.tap(); setHeroFont(f.id); }}>
-                      <View style={{
-                        paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md,
-                        borderWidth: 1, borderColor: active ? '#F472B6' : colors.border.default,
-                        backgroundColor: active ? '#F472B622' : colors.bg.elevated,
-                      }}>
-                        <Text style={{ fontFamily: f.family, fontWeight: f.weight as any, fontStyle: f.italic ? 'italic' : 'normal', fontSize: 16, color: active ? '#F472B6' : colors.text.primary }}>
-                          {f.upper ? 'DZIEŃ DOBRY' : 'Dzień dobry'}
-                        </Text>
-                        <Text style={{ fontSize: 9, color: colors.text.muted, marginTop: 2 }}>{f.label}</Text>
-                      </View>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-
-              {/* Size + position fine-tuning */}
-              <View style={{ gap: spacing[2], marginTop: spacing[2] }}>
-                <HeroStepper label="Rozmiar" value={`${Math.round(heroSize * 100)}%`}
-                  onDec={() => { haptic.tap(); setHeroSize(heroSize - 0.1); }}
-                  onInc={() => { haptic.tap(); setHeroSize(heroSize + 0.1); }} />
-                <HeroStepper label="Pozycja ↔" value={`${heroOffX} px`}
-                  onDec={() => { haptic.tap(); setHeroOffX(heroOffX - 4); }}
-                  onInc={() => { haptic.tap(); setHeroOffX(heroOffX + 4); }} />
-                <HeroStepper label="Pozycja ↕" value={`${heroOffY} px`}
-                  onDec={() => { haptic.tap(); setHeroOffY(heroOffY - 4); }}
-                  onInc={() => { haptic.tap(); setHeroOffY(heroOffY + 4); }} />
-                {(heroSize !== 1 || heroOffX !== 0 || heroOffY !== 0) && (
-                  <PressableScale onPress={() => { haptic.tap(); setHeroSize(1); setHeroOffX(0); setHeroOffY(0); }}>
-                    <Text style={{ fontSize: 11, color: colors.text.muted, textAlign: 'right' }}>Resetuj rozmiar i pozycję</Text>
-                  </PressableScale>
-                )}
-              </View>
-            </View>
           </View>
         </View>
 

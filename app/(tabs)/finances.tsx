@@ -305,32 +305,20 @@ export default function FinancesScreen() {
                 style={st.heroBorder}
               >
                 <View style={st.heroInner}>
-                  {/* Very subtle warm-dark base — low contrast so the frost reads
-                      as glass (stars showing through), NOT a visible red panel. */}
+                  {/* Clean dark gradient — premium, theme-independent (no clouds) */}
                   <LinearGradient
-                    colors={['#1C1517', '#161113', '#121011']}
-                    start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }}
+                    colors={['#1A1316', '#0E0B0D']}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
-                  <AnimatedCardBg timeOfDay={timeOfDay} />
-                  <BlurView intensity={26} tint="dark" style={StyleSheet.absoluteFill} />
-                  {/* soft bottom shade, same as dashboard glass */}
+                  {/* accent glow from the left */}
                   <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.18)']}
+                    colors={[F.accent + '40', 'transparent']}
                     style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-                    pointerEvents="none"
-                  />
-                  {/* accent wash from the LEFT, like the dashboard hero */}
-                  <LinearGradient
-                    colors={[F.accent + '2A', 'transparent']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0.3 }} end={{ x: 0.8, y: 0.6 }}
+                    start={{ x: 0, y: 0 }} end={{ x: 0.85, y: 0.7 }}
                     pointerEvents="none"
                   />
                   <View style={st.heroGlassBorder} pointerEvents="none" />
-                  {/* sharper clouds drifting over the glass */}
-                  <AnimatedCardBg timeOfDay={timeOfDay} layer="front" />
                   <View style={st.heroContent}>
                     <Text style={st.heroDate}>SALDO KONTA</Text>
                     {/* BILANS OGÓLNY = wszystkie przychody − wszystkie wydatki */}

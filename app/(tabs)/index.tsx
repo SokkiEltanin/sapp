@@ -451,7 +451,9 @@ function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: 
   const customFamily = useHeroFont(s => s.customFamily);
 
   const label = font.upper ? text.toUpperCase() : text;
-  const size = font.size * scale;
+  // Shrink long greetings so they never clip (e.g. "DOBRY WIECZÓR" vs "DOBRANOC").
+  const fit = label.length > 11 ? 11 / label.length : 1;
+  const size = font.size * scale * fit;
   const baseY = font.baseY * scale + offsetY;
   const height = Math.ceil(font.height * scale) + Math.max(0, offsetY) + 6;
   return (
@@ -565,7 +567,7 @@ export default function DashboardScreen() {
   const { color: accentColor, greeting, gradientTop, cardBg, timeOfDay } = useTimeAccent();
   // Stat cards flip with the theme; the hero stays immersive (cardBg/gradientTop).
   const cardBgDark = colors.bg.card;
-  const heroFont = heroFontById(useHeroFont(s => s.fontId));
+  const heroFont = heroFontById('black'); // single, fixed greeting font (picker removed)
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
   const pomodoro = usePomodoroStore();
@@ -1603,9 +1605,10 @@ export default function DashboardScreen() {
 
   return (
     <View style={s.root}>
-      {/* Time-of-day gradient background */}
+      {/* Subtle accent wash → base bg. A faint accent tint (not a dark band) so it
+          works in light mode too. */}
       <LinearGradient
-        colors={[gradientTop, colors.bg.primary] as [string, string]}
+        colors={[accentColor + '14', colors.bg.primary] as [string, string]}
         style={StyleSheet.absoluteFill}
         start={{ x: 0.4, y: 0 }}
         end={{ x: 0.6, y: 0.52 }}
@@ -1636,30 +1639,19 @@ export default function DashboardScreen() {
                 activeOpacity={0.92}
                 style={s.mainCard}
               >
-                {/* 1 · live weather sky */}
-                <AnimatedCardBg timeOfDay={timeOfDay} weatherCode={weather?.wmo} active={heroActive} />
-
-                {/* 2 · gentle frost so the sky reads as glass */}
-                <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
-
-                {/* 3 · accent wash from the left */}
+                {/* 1 · clean dark gradient — premium, theme-independent (no clouds) */}
                 <LinearGradient
-                  colors={[accentColor + '33', 'transparent']}
+                  colors={[gradientTop, '#0B0D11']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0.2 }} end={{ x: 0.9, y: 0.7 }}
                   pointerEvents="none"
                 />
 
-                {/* 4 · sharp clouds drifting over the glass */}
-                <AnimatedCardBg timeOfDay={timeOfDay} layer="front" weatherCode={weather?.wmo} active={heroActive} />
-
-                {/* 5 · text-protection scrim — heaviest bottom-left under the copy,
-                       sits OVER the clouds so contrast is guaranteed everywhere */}
+                {/* 2 · accent glow from the top-left for a bit of life */}
                 <LinearGradient
-                  colors={['rgba(6,8,10,0.04)', 'rgba(6,8,10,0.40)', 'rgba(6,8,10,0.82)']}
-                  locations={[0, 0.5, 1]}
+                  colors={[accentColor + '4D', 'transparent']}
+                  start={{ x: 0, y: 0 }} end={{ x: 0.85, y: 0.85 }}
                   style={StyleSheet.absoluteFill}
-                  start={{ x: 0.75, y: 0 }} end={{ x: 0.1, y: 1 }}
                   pointerEvents="none"
                 />
 
