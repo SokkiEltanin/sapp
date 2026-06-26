@@ -159,10 +159,21 @@ export default function SettingsScreen() {
     const avgShiftH = basisShifts.length > 0 ? basisHours / basisShifts.length
                     : monthCount > 0 ? monthHours / monthCount : 0;
     const perDay = rate * avgShiftH;
+    // Sanity check: does the latest paycheck's implied rate match the rate
+    // averaged over the months the user has CONFIRMED? A big gap = likely a data
+    // slip (wrong amount typed, or wrong hours that month).
+    const confirmed = Object.values(workSettings.confirmedMonths ?? {});
+    const totS = confirmed.reduce((s, m) => s + m.salary, 0);
+    const totH = confirmed.reduce((s, m) => s + m.hours, 0);
+    const confirmedAvgRate = totH > 0 ? totS / totH : 0;
+    const latestImpliedRate = (lastPaycheck && basisHours > 0) ? lastPaycheck.amount / basisHours : 0;
+    const rateWarn = (confirmed.length >= 1 && confirmedAvgRate > 0 && latestImpliedRate > 0 && !hasSalaryOvr
+      && Math.abs(latestImpliedRate - confirmedAvgRate) / confirmedAvgRate > 0.25)
+      ? { confirmedAvgRate, latestImpliedRate } : null;
     return {
       eventCount: monthCount, monthHours, basisShifts, lastPaycheck, payMonth,
       basisMonth, basisHours, basisFromPaycheck: !!lastPaycheck,
-      hoursUsed, salaryUsed, rate, avgShiftH, perDay, hasHoursOvr, hasSalaryOvr,
+      hoursUsed, salaryUsed, rate, avgShiftH, perDay, hasHoursOvr, hasSalaryOvr, rateWarn,
     };
   }, [events, gcalEvents, expenses, workSettings]);
 
@@ -661,6 +672,15 @@ export default function SettingsScreen() {
                     <Text style={styles.rateResultDayKey}>śr. na dzień{workDiag.avgShiftH > 0 ? ` (${workDiag.avgShiftH.toFixed(1)} h)` : ''}</Text>
                   </View>
                 </View>
+
+                {workDiag.rateWarn && (
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle }}>
+                    <LucideIcons.AlertTriangle size={13} color={colors.accent.amber} style={{ marginTop: 1 }} />
+                    <Text style={{ flex: 1, fontSize: 11, color: colors.accent.amber, lineHeight: 15, fontWeight: '600' }}>
+                      Ostatnia wypłata daje {workDiag.rateWarn.latestImpliedRate.toFixed(2)} zł/h, a Twoja średnia z potwierdzonych miesięcy to {workDiag.rateWarn.confirmedAvgRate.toFixed(2)} zł/h — sprawdź kwotę wypłaty lub godziny ({workDiag.basisMonth}).
+                    </Text>
+                  </View>
+                )}
 
                 <Text style={styles.diagHint}>
                   {workDiag.basisFromPaycheck
