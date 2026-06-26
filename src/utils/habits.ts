@@ -32,3 +32,19 @@ export async function getCounts(date: string): Promise<Record<string, number>> {
 export async function setCounts(date: string, counts: Record<string, number>): Promise<void> {
   await AsyncStorage.setItem(cntKey(date), JSON.stringify(counts));
 }
+
+// The single water habit (kind 'water') fed by Health Connect hydration.
+export async function getWaterHabit(): Promise<Habit | null> {
+  return (await getHabits()).find((h) => h.kind === 'water') ?? null;
+}
+
+// Set today's count for the water habit (no-op if there's no water habit).
+// Used by the Health screen to feed it from Health Connect hydration.
+export async function feedWaterHabit(glasses: number, date: string): Promise<void> {
+  const w = await getWaterHabit();
+  if (!w) return;
+  const counts = await getCounts(date);
+  if ((counts[w.id] ?? 0) === glasses) return;
+  counts[w.id] = Math.max(0, glasses);
+  await setCounts(date, counts);
+}

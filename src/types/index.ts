@@ -329,6 +329,7 @@ export interface Habit {
   color: string;
   icon: HabitIcon | string;
   type?: HabitType;        // default 'check'
+  kind?: 'water';          // special habit fed by Health Connect hydration
   dailyGoal?: number;      // for count type (e.g. 8 glasses)
   unit?: string;           // e.g. 'szkl.', 'ml', 'min'
   weeklyTarget?: number;   // 1-7, default 7 = every day

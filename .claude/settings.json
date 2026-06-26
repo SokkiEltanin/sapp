@@ -37,7 +37,9 @@
       "Bash(grep -nE \"events=\\\\{|events,|setEvents|gcalEvents|CalendarGrid|DayTimeline|WeekStrip|allEvents|markers|eventsForDay|\\\\.filter\\\\\\(.*date|CalendarEvent\" \"app/\\(tabs\\)/stats.tsx\")",
       "Bash(grep -nA6 \"interface VehicleMaintenance|interface MaintenanceItem|interface Vehicle \" src/types/index.ts)",
       "Bash(grep -nE \"onEventPress|router.push\\\\\\(.*calendar|/calendar/\\\\$\\\\{|import.*Service|import.*from '@/services\" \"app/\\(tabs\\)/stats.tsx\")",
-      "Bash(grep -nE \"router.push\\\\\\(\\\\`/calendar/\\\\\\\\\\\\$\\\\{\\(ev.id|id\\)\\\\}\" \"app/\\(tabs\\)/stats.tsx\")"
+      "Bash(grep -nE \"router.push\\\\\\(\\\\`/calendar/\\\\\\\\\\\\$\\\\{\\(ev.id|id\\)\\\\}\" \"app/\\(tabs\\)/stats.tsx\")",
+      "Bash(grep -nA14 \"interface Habit\" src/types/index.ts)",
+      "Bash(grep -nE \"\\\\{/\\\\* Weight \\\\*/\\\\}|\\\\{/\\\\* Water\" \"app/\\(tabs\\)/health.tsx\")"
     ]
   }
 }

@@ -322,9 +322,9 @@ const FREQ_OPTIONS: { label: string; value: number }[] = [
 
 const HABIT_PRESETS: Array<{
   title: string; type: HabitType; icon: string; color: string;
-  dailyGoal?: number; unit?: string; reminderHour?: number; reminderMin?: number;
+  dailyGoal?: number; unit?: string; reminderHour?: number; reminderMin?: number; kind?: 'water';
 }> = [
-  { title: 'Woda',       type: 'count', icon: 'droplets',  color: '#60A5FA', dailyGoal: 8, unit: 'szkl.' },
+  { title: 'Woda',       type: 'count', icon: 'droplets',  color: '#60A5FA', dailyGoal: 8, unit: 'szkl.', kind: 'water' },
   { title: 'Ruch',       type: 'check', icon: 'dumbbell',  color: '#34D399' },
   { title: 'Czytanie',   type: 'check', icon: 'book-open', color: '#FBBF24' },
   { title: 'Sen',        type: 'check', icon: 'moon',      color: '#C084FC', reminderHour: 22, reminderMin: 0 },
@@ -333,7 +333,7 @@ const HABIT_PRESETS: Array<{
 
 interface HabitFormData {
   title: string; color: string; icon: string; reminderTime?: string;
-  type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number;
+  type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number; kind?: 'water';
 }
 
 function HabitFormModal({ visible, onClose, onSave, editing }: {
@@ -356,6 +356,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   const [reminderHour, setRemH]       = useState(20);
   const [reminderMin, setRemM]        = useState(0);
   const [weeklyTarget, setWeeklyTarget] = useState(7);
+  const [kind, setKind]               = useState<'water' | undefined>(undefined);
 
   const applyPreset = (p: typeof HABIT_PRESETS[number]) => {
     haptic.tap();
@@ -363,6 +364,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     setType(p.type);
     setSelIcon(p.icon);
     setSelColor(p.color);
+    setKind(p.kind);
     if (p.type === 'count') {
       setGoal(String(p.dailyGoal ?? 8));
       setUnit(p.unit ?? 'szkl.');
@@ -391,6 +393,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
       setGoal('8'); setUnit('szkl.'); setUnitCustom(false);
     }
     setWeeklyTarget(editing?.weeklyTarget ?? 7);
+    setKind(editing?.kind);
     const rt = editing?.reminderTime;
     if (rt) {
       const [h, m] = rt.split(':').map(Number);
@@ -406,7 +409,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     const rt = reminderOn ? `${pad2(reminderHour)}:${pad2(reminderMin)}` : undefined;
     const goalN = type === 'count' ? (parseInt(goal) || 1) : undefined;
     const unitVal = type === 'count' ? (unitCustom ? customUnit.trim() : unit) : undefined;
-    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined });
+    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined, kind });
     onClose();
   };
 
@@ -785,6 +788,11 @@ export default function HabitsScreen() {
         editing={editingHabit}
         onClose={() => { setShowAdd(false); setEditing(null); }}
         onSave={(data) => {
+          if (!editingHabit && data.kind === 'water' && habits.some(h => h.kind === 'water')) {
+            toast.info('Masz już nawyk „Woda" — zasilany z Health Connect');
+            setShowAdd(false);
+            return;
+          }
           if (editingHabit) {
             update(editingHabit.id, data);
             toast.success('Nawyk zaktualizowany');
