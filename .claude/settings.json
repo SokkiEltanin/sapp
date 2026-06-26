@@ -33,7 +33,11 @@
       "Bash(grep -rnE \"name=\\\\\"work|'/work|/\\\\\\(tabs\\\\\\)/health|/\\\\\\(tabs\\\\\\)/mood|/\\\\\\(tabs\\\\\\)/finances|/\\\\\\(tabs\\\\\\)/analytics|/\\\\\\(tabs\\\\\\)/tasks\" app/_layout.tsx app/\\\\\\(tabs\\\\\\)/_layout.tsx)",
       "Bash(grep -rnE \"paycheck|wypłat|lastPay|workPrefix|\\\\\\\\[JD\\\\\\\\]|JD|income.*work|isPaycheck|perSecond|ratePerHour|lastPaycheck\" src/hooks/useWorkEarnings.ts src/store/workStore.ts)",
       "Bash(grep -nE \"nodes\\\\['maintenance-reminders'\\\\]|nodes\\\\['weekly-insights'\\\\]|nodes\\\\['budget-warning'\\\\]|budgetWarnCard|s.card, \\\\{ backgroundColor: cardBgDark\" \"app/\\(tabs\\)/index.tsx\")",
-      "Bash(grep -nE \"waterHeadRow|waterLiters|import.*ScreenHeader|fromWatchWater|const ml = |goalLiters|progressTrack, \\\\{ width: \\\\`\\\\\\\\$\\\\{pct\" \"app/\\(tabs\\)/health.tsx\")"
+      "Bash(grep -nE \"waterHeadRow|waterLiters|import.*ScreenHeader|fromWatchWater|const ml = |goalLiters|progressTrack, \\\\{ width: \\\\`\\\\\\\\$\\\\{pct\" \"app/\\(tabs\\)/health.tsx\")",
+      "Bash(grep -nE \"events=\\\\{|events,|setEvents|gcalEvents|CalendarGrid|DayTimeline|WeekStrip|allEvents|markers|eventsForDay|\\\\.filter\\\\\\(.*date|CalendarEvent\" \"app/\\(tabs\\)/stats.tsx\")",
+      "Bash(grep -nA6 \"interface VehicleMaintenance|interface MaintenanceItem|interface Vehicle \" src/types/index.ts)",
+      "Bash(grep -nE \"onEventPress|router.push\\\\\\(.*calendar|/calendar/\\\\$\\\\{|import.*Service|import.*from '@/services\" \"app/\\(tabs\\)/stats.tsx\")",
+      "Bash(grep -nE \"router.push\\\\\\(\\\\`/calendar/\\\\\\\\\\\\$\\\\{\\(ev.id|id\\)\\\\}\" \"app/\\(tabs\\)/stats.tsx\")"
     ]
   }
 }

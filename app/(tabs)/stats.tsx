@@ -20,6 +20,10 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { calendarService, tasksService } from '@/services/calendarService';
+import { vehiclesService } from '@/services/vehiclesService';
+import { maintenanceService } from '@/services/maintenanceService';
+import { maintenanceDueEvents } from '@/utils/maintenanceCalendar';
+import { Vehicle, MaintenanceItem } from '@/types';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { CalendarEvent, Task } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
@@ -47,6 +51,13 @@ const DAY_FULL = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 
 type CalMode = 'month-detailed' | 'month-mini' | 'week';
 // Only two styles, per design: full month grid ↔ compact week agenda.
 const MODE_ORDER: CalMode[] = ['month-detailed', 'week'];
+
+// Derived "service due" events route to vehicles/items, not /calendar/:id.
+function openCalEntry(id: string) {
+  if (id.startsWith('maint:i:')) { router.push('/items' as any); return; }
+  if (id.startsWith('maint:v:')) { router.push('/vehicles' as any); return; }
+  router.push(`/calendar/${id}` as any);
+}
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -130,7 +141,7 @@ function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps)
                   <TouchableOpacity
                     key={ev.id}
                     style={[dm.eventRow, { borderLeftColor: evColor }]}
-                    onPress={() => { onClose(); router.push(`/calendar/${ev.id}` as any); }}
+                    onPress={() => { onClose(); openCalEntry(ev.id); }}
                     activeOpacity={0.8}
                   >
                     <View style={dm.eventInfo}>
@@ -266,6 +277,8 @@ export default function CalendarTabScreen() {
   const calModeRef                      = useRef<CalMode>('month-detailed');
   const [weekOffset, setWeekOffset]     = useState(0);
   const [gcalEvents, setGcalEvents]     = useState<CalendarEvent[]>([]);
+  const [vehicles, setVehicles]         = useState<Vehicle[]>([]);
+  const [maintItems, setMaintItems]     = useState<MaintenanceItem[]>([]);
   const [gcalSyncing, setGcalSyncing]   = useState(false);
   const [gcalAvailable, setGcalAvailable] = useState(false);
   const [dayModalDate, setDayModalDate] = useState<string | null>(null);
@@ -311,6 +324,10 @@ export default function CalendarTabScreen() {
           const [evs, tks] = await Promise.all([calendarService.getAllEvents(), tasksService.getAllTasks()]);
           if (alive) { setEvents(evs); setTasks(tks); }
         } catch {}
+        // Service-due markers (vehicles / maintenance items) — non-blocking.
+        Promise.all([vehiclesService.getAll(), maintenanceService.getAll()])
+          .then(([vs, its]) => { if (alive) { setVehicles(vs); setMaintItems(its); } })
+          .catch(() => {});
       })();
       return () => { alive = false; };
     }, [setEvents, setTasks]),
@@ -367,9 +384,11 @@ export default function CalendarTabScreen() {
     setDayModalDate(date);
   };
 
+  const maintEvents = useMemo(() => maintenanceDueEvents(vehicles, maintItems), [vehicles, maintItems]);
+
   const allEvents = useMemo(
-    () => [...events, ...gcalEvents.filter(g => !events.some(e => e.id === g.id))],
-    [events, gcalEvents],
+    () => [...events, ...gcalEvents.filter(g => !events.some(e => e.id === g.id)), ...maintEvents],
+    [events, gcalEvents, maintEvents],
   );
 
   const selectedEvents = useMemo(
@@ -505,7 +524,7 @@ export default function CalendarTabScreen() {
                 tasks={tasks}
                 moodEntries={moodEntries}
                 onSelectDate={handleSelectDate}
-                onEventPress={(id) => router.push(`/calendar/${id}` as any)}
+                onEventPress={(id) => openCalEntry(id)}
                 onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
                 detailed
               />
@@ -556,7 +575,7 @@ export default function CalendarTabScreen() {
               <DayTimeline
                 events={selectedEvents}
                 date={selectedDate}
-                onPress={(id) => router.push(`/calendar/${id}` as any)}
+                onPress={(id) => openCalEntry(id)}
                 onAddAtTime={(time) => router.push(`/calendar/add?startTime=${time}&type=event` as any)}
               />
             </View>
