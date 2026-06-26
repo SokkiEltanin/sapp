@@ -193,6 +193,28 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Payday reminder. Fires on the configured day-of-month (10:00) so it nudges
+  // even with the app closed; re-armed on foreground and cancelled once the month
+  // is confirmed (handledMonth === this month).
+  async refreshPaydayReminder(enabled: boolean, day: number, handledMonth: string | null): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('payday').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+      if (!enabled) return;
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      if (handledMonth === thisMonth) return; // already got the paycheck this month
+      // This month's payday at 10:00; if already past and still unhandled, nudge tomorrow.
+      let date = new Date(now.getFullYear(), now.getMonth(), day, 10, 0, 0);
+      if (date.getTime() <= now.getTime()) date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0, 0);
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'payday',
+        content: { title: 'Wypłata?', body: 'Czy dostałeś już wypłatę? Dotknij, by dodać do przychodów.', data: { screen: 'index' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+      });
+    } catch {}
+  },
+
   // Budget / tag-limit reminder. Re-armed on app foreground with the current
   // tag-limit state (one-off DATE, this evening) so it nudges even with the app
   // closed; cancelled when nothing is near its limit. Threshold 80%.
@@ -202,7 +224,9 @@ export const notificationsService = {
     try {
       await Notifications.cancelScheduledNotificationAsync('budget-limit').catch(() => {});
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
-      const hot = near.filter(n => n.pct >= 0.8).sort((a, b) => b.pct - a.pct);
+      const thrRaw = parseInt((await AsyncStorage.getItem('budget_alert_threshold')) ?? '80', 10);
+      const threshold = (isNaN(thrRaw) ? 80 : Math.min(100, Math.max(50, thrRaw))) / 100;
+      const hot = near.filter(n => n.pct >= threshold).sort((a, b) => b.pct - a.pct);
       if (hot.length === 0) return;
       const anyOver = hot.some(n => n.pct >= 1);
       const body = hot.slice(0, 3)

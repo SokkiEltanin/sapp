@@ -357,6 +357,10 @@ export default function SettingsScreen() {
     setPaydayConfig({ enabled, day }).catch(() => {});
   };
 
+  const [budgetThr, setBudgetThr] = useState(80);
+  useEffect(() => { AsyncStorage.getItem('budget_alert_threshold').then(v => { if (v) setBudgetThr(parseInt(v, 10) || 80); }).catch(() => {}); }, []);
+  const saveBudgetThr = (v: number) => { setBudgetThr(v); AsyncStorage.setItem('budget_alert_threshold', String(v)).catch(() => {}); };
+
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [eveningHour, setEveningHour] = useState('20');
   const [eveningMin, setEveningMin]   = useState('00');
@@ -832,6 +836,24 @@ export default function SettingsScreen() {
 
             {notifEnabled && (
               <>
+                {/* Budget alert threshold */}
+                <View style={styles.notifLabel}>
+                  <Wallet size={12} color={colors.text.muted} />
+                  <Text style={styles.notifLabelText}>Alert limitu wydatków od</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: spacing[2], paddingHorizontal: spacing[1], marginBottom: spacing[2] }}>
+                  {[75, 80, 85, 90, 100].map(v => {
+                    const active = budgetThr === v;
+                    return (
+                      <PressableScale key={v} onPress={() => { haptic.tap(); saveBudgetThr(v); }} style={{ flex: 1 }}>
+                        <View style={{ alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: active ? colors.accent.amber : colors.border.default, backgroundColor: active ? colors.accent.amber + '22' : colors.bg.elevated }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: active ? colors.accent.amber : colors.text.secondary }}>{v}%</Text>
+                        </View>
+                      </PressableScale>
+                    );
+                  })}
+                </View>
+
                 {/* Evening */}
                 <View style={styles.notifLabel}>
                   <Moon size={12} color={colors.text.muted} />

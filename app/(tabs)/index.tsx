@@ -709,6 +709,9 @@ export default function DashboardScreen() {
     Promise.all([getPaydayConfig(), getPaydayHandledMonth()]).then(([cfg, handled]) => {
       if (!alive) return;
       setPaydayCfg(cfg); setPaydayHandled(handled);
+      import('@/services/notificationsService')
+        .then(({ notificationsService }) => notificationsService.refreshPaydayReminder(cfg.enabled, cfg.day, handled))
+        .catch(() => {});
     }).catch(() => {});
     return () => { alive = false; };
   }, []));
@@ -729,11 +732,14 @@ export default function DashboardScreen() {
       const m = currentMonth();
       await setPaydayHandledMonth(m);
       setPaydayHandled(m);
+      import('@/services/notificationsService')
+        .then(({ notificationsService }) => notificationsService.refreshPaydayReminder(paydayCfg.enabled, paydayCfg.day, m))
+        .catch(() => {});
       expensesService.getAll().then(setExpenses).catch(() => {});
       toast.success('Dodano wypłatę do przychodów');
     } catch { haptic.error(); toast.error('Nie udało się zapisać — sprawdź połączenie'); }
     finally { setPaydayModal(false); setPaydayInput(''); }
-  }, [paydayInput, workSettings.workPrefix, setExpenses]);
+  }, [paydayInput, workSettings.workPrefix, setExpenses, paydayCfg.enabled, paydayCfg.day]);
 
   // ── Work tracking ─────────────────────────────────────────────────────────
   const allEvents  = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
