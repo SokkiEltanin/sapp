@@ -248,6 +248,7 @@ export default function RootLayout() {
           <Stack.Screen name="vehicles" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="items" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="products" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="debts" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="work/add" options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
         </Stack>
         <PomodoroIndicator />

@@ -150,6 +150,22 @@ export interface Subscription {
   updatedAt: string;
 }
 
+// Money someone owes me (a loan/IOU). On `askDate` the dashboard asks whether it
+// was returned; confirming logs an income (cash/card) and settles it.
+export interface Debt {
+  id: string;
+  person: string;          // who owes me
+  amount: number;
+  currency: string;        // PLN
+  askDate: string;         // YYYY-MM-DD — when to start asking "did they return it?"
+  note?: string;
+  settled?: boolean;       // returned + logged
+  settledMethod?: PaymentMethod; // cash / card when settled
+  settledDate?: string;    // YYYY-MM-DD
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Calendar / Tasks ─────────────────────────────────────────────────────────
 
 export type EventPriority = 'high' | 'normal' | 'low';

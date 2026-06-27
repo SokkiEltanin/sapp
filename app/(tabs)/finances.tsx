@@ -10,7 +10,7 @@ import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
-import { RefreshCcw, Tag, Car, Package } from 'lucide-react-native';
+import { RefreshCcw, Tag, Car, Package, HandCoins } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -279,6 +279,12 @@ export default function FinancesScreen() {
                 style={st.hBtn}
               >
                 <Package size={17} color={colors.text.secondary} />
+              </PressableScale>
+              <PressableScale
+                onPress={() => { haptic.tap(); router.push('/debts' as any); }}
+                style={st.hBtn}
+              >
+                <HandCoins size={17} color={colors.text.secondary} />
               </PressableScale>
               <PressableScale
                 onPress={() => { haptic.tap(); router.push('/vehicles' as any); }}
