@@ -462,6 +462,11 @@ export default function HealthScreen() {
             <Text style={styles.summaryVal}>{(hcExtra.activeCalories as number) > 0 ? hcExtra.activeCalories : '—'}</Text>
             <Text style={styles.summaryLabel}>kcal</Text>
           </View>
+          <View style={styles.summaryTile}>
+            <Activity size={15} color="#34D399" />
+            <Text style={styles.summaryVal}>{(weight > 0 ? weight : lastWeight) > 0 ? (weight > 0 ? weight : lastWeight).toFixed(1) : '—'}</Text>
+            <Text style={styles.summaryLabel}>waga</Text>
+          </View>
         </View>
 
         {/* Steps hero */}
