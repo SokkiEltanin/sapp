@@ -72,6 +72,8 @@ const READ_PERMS = [
   { accessType: 'read', recordType: 'RespiratoryRate' },
   { accessType: 'read', recordType: 'BodyFat' },
   { accessType: 'read', recordType: 'BasalMetabolicRate' },
+  { accessType: 'read', recordType: 'LeanBodyMass' },
+  { accessType: 'read', recordType: 'BodyWaterMass' },
   { accessType: 'read', recordType: 'Hydration' },
 ] as const;
 
@@ -138,6 +140,8 @@ export interface HealthConnectDay {
   respiratoryRate: number | null;  // breaths/min
   bodyFatPct: number | null;       // %
   bmr: number | null;              // basal metabolic rate, kcal/day
+  leanMassKg: number | null;       // lean / skeletal mass, kg (BIA)
+  bodyWaterKg: number | null;      // body water, kg (BIA)
   hydrationMl: number | null;      // water logged, ml
 }
 
@@ -215,6 +219,8 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
   const rrRec = await latest('RespiratoryRate', 2);
   const bfRec = await latest('BodyFat', 60);
   const bmrRec = await latest('BasalMetabolicRate', 30);
+  const leanRec = await latest('LeanBodyMass', 60);
+  const waterRec = await latest('BodyWaterMass', 60);
   const hydrationN = await sum('Hydration', r => r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0));
 
   return {
@@ -237,6 +243,8 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
     respiratoryRate: r1(rrRec?.rate ?? null),
     bodyFatPct: r1(bfRec?.percentage ?? null),
     bmr: bmrRec ? Math.round(bmrRec?.basalMetabolicRate?.inKilocaloriesPerDay ?? bmrRec?.basalMetabolicRate?.inWatts ?? 0) || null : null,
+    leanMassKg: r1(leanRec?.mass?.inKilograms ?? leanRec?.mass?.value ?? null),
+    bodyWaterKg: r1(waterRec?.mass?.inKilograms ?? waterRec?.mass?.value ?? null),
     hydrationMl: hydrationN != null ? Math.round(hydrationN) : null,
   };
 }

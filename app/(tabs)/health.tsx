@@ -178,6 +178,7 @@ export default function HealthScreen() {
             activeCalories: day.activeCalories, totalCalories: day.totalCalories, exerciseMinutes: day.exerciseMinutes,
             oxygenPct: day.oxygenPct, vo2max: day.vo2max,
             floors: day.floors, hrv: day.hrv, respiratoryRate: day.respiratoryRate, bodyFatPct: day.bodyFatPct, bmr: day.bmr,
+            leanMassKg: day.leanMassKg, bodyWaterKg: day.bodyWaterKg,
             sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin, sleepLightMin: day.sleepLightMin,
             hydrationMl: day.hydrationMl,
           });
@@ -398,6 +399,7 @@ export default function HealthScreen() {
           activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
           oxygenPct: d.oxygenPct, vo2max: d.vo2max,
           floors: d.floors, hrv: d.hrv, respiratoryRate: d.respiratoryRate, bodyFatPct: d.bodyFatPct, bmr: d.bmr,
+          leanMassKg: d.leanMassKg, bodyWaterKg: d.bodyWaterKg,
           sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin, sleepLightMin: d.sleepLightMin,
           hydrationMl: d.hydrationMl,
         });
@@ -725,11 +727,18 @@ export default function HealthScreen() {
             )}
           </View>
 
-          {/* Body composition from the watch (when present) */}
-          {((hcExtra.bodyFatPct as number) > 0 || (hcExtra.bmr as number) > 0) && (
+          {/* Body composition from the watch BIA (when present) — the trend, not a
+              single reading, is what's reliable (measure consistently, fasted). */}
+          {((hcExtra.bodyFatPct as number) > 0 || (hcExtra.leanMassKg as number) > 0 || (hcExtra.bodyWaterKg as number) > 0 || (hcExtra.bmr as number) > 0) && (
             <View style={styles.bodyCompRow}>
               {(hcExtra.bodyFatPct as number) > 0 && (
                 <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bodyFatPct}%</Text><Text style={styles.bodyCompLabel}>tk. tłuszczowa</Text></View>
+              )}
+              {(hcExtra.leanMassKg as number) > 0 && (
+                <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.leanMassKg} kg</Text><Text style={styles.bodyCompLabel}>masa mięśniowa</Text></View>
+              )}
+              {(hcExtra.bodyWaterKg as number) > 0 && (
+                <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bodyWaterKg} kg</Text><Text style={styles.bodyCompLabel}>woda w ciele</Text></View>
               )}
               {(hcExtra.bmr as number) > 0 && (
                 <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bmr}</Text><Text style={styles.bodyCompLabel}>BMR kcal/dzień</Text></View>
@@ -1326,8 +1335,8 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   energyWeekBar: { width: '62%', borderRadius: 3, minHeight: 2 },
   energyWeekLabel: { fontSize: 8.5, color: c.text.muted, fontWeight: '600' },
   energyNote: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic', lineHeight: 14 },
-  bodyCompRow: { flexDirection: 'row', gap: spacing[2] },
-  bodyCompTile: { flex: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
+  bodyCompRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  bodyCompTile: { flexBasis: '47%', flexGrow: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
   bodyCompLabel: { fontSize: 10, color: c.text.muted },
   weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
