@@ -18,7 +18,7 @@ import { MOOD_COLORS, Expense } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
-import { getHealthGoals } from '@/utils/healthGoals';
+import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -95,6 +95,9 @@ export default function HealthScreen() {
 
   const [stepGoal, setStepGoal]         = useState(10_000);
   const [waterGoal, setWaterGoal]       = useState(8);
+  const [weightGoal, setWeightGoal]     = useState(0); // target weight kg, 0 = unset
+  const [goalModal, setGoalModal]       = useState(false);
+  const [goalInput, setGoalInput]       = useState('');
   const [water, setWater]               = useState(0);
   const [steps, setSteps]               = useState(0);
   const [sleepH, setSleepH]             = useState(7);
@@ -274,6 +277,7 @@ export default function HealthScreen() {
         const goals = await getHealthGoals();
         setStepGoal(goals.stepGoal);
         setWaterGoal(goals.waterGoal);
+        setWeightGoal(goals.weightGoal);
 
         const raw = await AsyncStorage.getItem(todayKey());
         if (raw) {
@@ -718,14 +722,40 @@ export default function HealthScreen() {
           <View style={styles.cardRow}>
             <Activity size={13} color={colors.text.muted} />
             <Text style={styles.cardLabel}>CIAŁO</Text>
+            <View style={{ flex: 1 }} />
             {loggedWeights.length > 1 && (
-              <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={{ fontSize: 10, color: (maxW - minW) > 0.5 ? colors.accent.amber : colors.accent.green, fontWeight: '600' }}>
-                  Δ {(maxW - minW).toFixed(1)} kg
+              <Text style={{ fontSize: 10, color: (maxW - minW) > 0.5 ? colors.accent.amber : colors.accent.green, fontWeight: '600', marginRight: spacing[2] }}>
+                Δ {(maxW - minW).toFixed(1)} kg
+              </Text>
+            )}
+            <TouchableOpacity
+              onPress={() => { haptic.tap(); setGoalInput(weightGoal > 0 ? String(weightGoal) : ''); setGoalModal(true); }}
+              style={styles.goalChip}
+            >
+              <Text style={styles.goalChipText}>{weightGoal > 0 ? `cel ${weightGoal} kg` : 'ustaw cel'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Weight-goal progress + ETA from the weekly trend */}
+          {weightGoal > 0 && (weight > 0 || lastWeight > 0) && (() => {
+            const cur = weight > 0 ? weight : lastWeight;
+            const remaining = +(cur - weightGoal).toFixed(1);
+            const done = Math.abs(remaining) < 0.1;
+            // weekly rate from this week's logged weights
+            let first = 0, last = 0;
+            for (const w of weekWeight) { if (w > 0) { if (first === 0) first = w; last = w; } }
+            const rate = (first > 0 && last > 0) ? +(last - first).toFixed(2) : 0;
+            const towardGoal = (remaining > 0 && rate < 0) || (remaining < 0 && rate > 0);
+            const weeksEta = towardGoal && Math.abs(rate) > 0.05 ? Math.ceil(Math.abs(remaining) / Math.abs(rate)) : null;
+            return (
+              <View style={styles.goalProg}>
+                <Text style={[styles.goalProgText, done && { color: T.accent }]}>
+                  {done ? 'Cel osiągnięty! 🎯' : `${Math.abs(remaining)} kg ${remaining > 0 ? 'do celu' : 'poniżej celu'} (${cur.toFixed(1)} → ${weightGoal})`}
+                  {weeksEta != null ? `  ·  ~${weeksEta} tyg. w tym tempie` : ''}
                 </Text>
               </View>
-            )}
-          </View>
+            );
+          })()}
 
           {/* Body composition from the watch BIA (when present) — the trend, not a
               single reading, is what's reliable (measure consistently, fasted). */}
@@ -942,6 +972,40 @@ export default function HealthScreen() {
                   setWeight(parseFloat(v.toFixed(1)));
                 }
                 setWeightModal(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={wm.saveBtnText}>Zapisz</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Weight-goal modal */}
+      <Modal visible={goalModal} transparent animationType="fade" onRequestClose={() => setGoalModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <Pressable style={wm.overlay} onPress={() => setGoalModal(false)} />
+          <View style={wm.sheet}>
+            <Text style={wm.title}>Cel wagi</Text>
+            <TextInput
+              style={wm.input}
+              value={goalInput}
+              onChangeText={setGoalInput}
+              keyboardType="decimal-pad"
+              placeholder="np. 72"
+              placeholderTextColor={colors.text.muted}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={wm.unit}>kg{weightGoal > 0 ? ' · puste pole usuwa cel' : ''}</Text>
+            <TouchableOpacity
+              style={wm.saveBtn}
+              onPress={() => {
+                const v = parseFloat(goalInput.replace(',', '.'));
+                const goal = (!isNaN(v) && v > 0 && v < 400) ? parseFloat(v.toFixed(1)) : 0;
+                setWeightGoal(goal);
+                saveHealthGoals({ weightGoal: goal }).catch(() => {});
+                setGoalModal(false);
               }}
               activeOpacity={0.8}
             >
@@ -1335,7 +1399,11 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   energyWeekBar: { width: '62%', borderRadius: 3, minHeight: 2 },
   energyWeekLabel: { fontSize: 8.5, color: c.text.muted, fontWeight: '600' },
   energyNote: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic', lineHeight: 14 },
-  bodyCompRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  goalChip: { paddingHorizontal: spacing[2] + 2, paddingVertical: 5, borderRadius: radius.full, backgroundColor: t.accentDim, borderWidth: 1, borderColor: t.cardBorder },
+  goalChipText: { fontSize: 10, fontWeight: '700', color: t.accent, letterSpacing: 0.2 },
+  goalProg: { marginTop: spacing[3] },
+  goalProgText: { fontSize: 12, fontWeight: '600', color: c.text.secondary, textAlign: 'center' },
+  bodyCompRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   bodyCompTile: { flexBasis: '47%', flexGrow: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
   bodyCompLabel: { fontSize: 10, color: c.text.muted },
