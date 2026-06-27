@@ -1,5 +1,5 @@
 import { useEffect, useState, Component, ReactNode } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -60,9 +60,16 @@ let suppressAutoMoodUntil = 0;
 
 function AutoMoodPopup() {
   const [visible, setVisible] = useState(false);
+  const pathname = usePathname();
+  // Only nag while actually sitting on the dashboard ('/'). If the app opens and
+  // you immediately tap "+" to add a receipt, you're off the dashboard before the
+  // delay elapses — so the popup never interrupts that quick action; it waits
+  // until you come back.
+  const onDashboard = pathname === '/' || pathname === '/index';
 
   const check = async () => {
     try {
+      if (!onDashboard) return;
       // Today's mood already logged? Then don't nag — neither the popup nor the
       // scheduled reminder (re-arm it to fire tomorrow instead).
       const logged = useMoodStore.getState().todayEntry != null;
@@ -80,14 +87,21 @@ function AutoMoodPopup() {
     } catch {}
   };
 
+  // (Re)arm whenever we land on the dashboard. Leaving it (e.g. → scan) clears the
+  // pending timer, so the popup is cancelled mid-navigation and re-armed on return.
   useEffect(() => {
-    // Slight delay so app finishes loading before showing modal
-    const timer = setTimeout(check, 2000);
+    if (!onDashboard) return;
+    const timer = setTimeout(check, 3500);
+    return () => clearTimeout(timer);
+  }, [onDashboard]);
+
+  // Returning to the foreground also re-checks, but still only if on the dashboard.
+  useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') check();
     });
-    return () => { clearTimeout(timer); sub.remove(); };
-  }, []);
+    return () => sub.remove();
+  }, [onDashboard]);
 
   if (!visible) return null;
   return <MoodCheckInModal visible={visible} onClose={() => setVisible(false)} existingEntry={null} />;
