@@ -1,5 +1,5 @@
 import { View, Text, ViewStyle } from 'react-native';
-import { typography, spacing } from '@/theme';
+import { spacing } from '@/theme';
 import { useColors } from '@/theme/useColors';
 
 interface Props {
@@ -10,18 +10,26 @@ interface Props {
   style?: ViewStyle;
 }
 
+// Minimal screen header. The big tab-name title is gone (the nav bar already
+// tells you where you are) — only the contextual subtitle (month / date /
+// "dzisiaj") shows as a small label, plus any actions. Theme-adaptive.
 export default function ScreenHeader({ title, subtitle, rightSlot, style }: Props) {
   const c = useColors();
+  const label = subtitle || title;
   return (
     <View style={[{
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[3],
-      borderBottomWidth: 1, borderBottomColor: c.border.subtle,
+      paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[3],
+      minHeight: 48,
     }, style]}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={[typography.h2, { color: c.text.primary, fontWeight: '700' }]}>{title}</Text>
-        {subtitle && <Text style={[typography.caption, { color: c.text.muted, marginTop: 1 }]}>{subtitle}</Text>}
-      </View>
+      {!!label && (
+        <Text
+          style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.8, color: c.text.muted, textTransform: 'uppercase', flex: 1 }}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      )}
       {rightSlot && <View>{rightSlot}</View>}
     </View>
   );

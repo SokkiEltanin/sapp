@@ -1629,65 +1629,25 @@ export default function DashboardScreen() {
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} />}
           >
 
-            {/* ══ HERO — weather-reactive, contrast-safe (rebuilt) ═════════════
-                The live sky stays a loved feature, but text legibility no longer
-                depends on the weather or the theme: a dark scrim is layered OVER
-                the clouds beneath the copy, so the greeting + briefing are always
-                readable on a sunny light sky AND in light mode. The hero is an
-                intentional dark "cover" in both themes. */}
-            <LinearGradient
-              colors={[accentColor + 'CC', accentColor + '40', 'rgba(255,255,255,0.10)']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.mainCardBorder}
+            {/* ══ HEADER — minimal: date + weather (taps to log mood). No big
+                greeting / preachy briefing; the cards below carry the content. */}
+            <TouchableOpacity
+              onPress={() => { haptic.tap(); openCheckIn(); }}
+              activeOpacity={0.6}
+              style={s.headerMin}
             >
-              <TouchableOpacity
-                onPress={() => { haptic.tap(); openCheckIn(); }}
-                activeOpacity={0.92}
-                style={s.mainCard}
-              >
-                {/* 1 · clean dark gradient — premium, theme-independent (no clouds) */}
-                <LinearGradient
-                  colors={[gradientTop, '#0B0D11']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-
-                {/* 2 · accent glow from the top-left for a bit of life */}
-                <LinearGradient
-                  colors={[accentColor + '4D', 'transparent']}
-                  start={{ x: 0, y: 0 }} end={{ x: 0.85, y: 0.85 }}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-
-                <View style={s.moodGlassBorder} pointerEvents="none" />
-
-                {/* 6 · content */}
-                <View style={s.mainCardInner}>
-                  <View style={s.mainTopRow}>
-                    <Text style={s.mainDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
-                    {weather && (
-                      <View style={s.weatherChip}>
-                        <CloudSun size={14} color={accentColor} strokeWidth={2} />
-                        <Text style={s.weatherChipTemp}>{weather.temp}°</Text>
-                        <Text style={s.weatherChipDesc} numberOfLines={1}>{weather.desc.toUpperCase()}</Text>
-                      </View>
-                    )}
+              <View style={s.headerMinRow}>
+                <Text style={s.headerMinDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
+                {weather && (
+                  <View style={s.headerMinWeather}>
+                    <CloudSun size={14} color={accentColor} strokeWidth={2} />
+                    <Text style={s.headerMinTemp}>{weather.temp}°</Text>
+                    <Text style={s.headerMinDesc} numberOfLines={1}>{weather.desc.toLowerCase()}</Text>
                   </View>
-
-                  {/* Greeting in the chosen font, accent washing in from the left */}
-                  <GradientGreeting text={greeting} baseColor={accentColor} font={heroFont} />
-
-                  {/* Dynamic contextual briefing — BOLD highlight */}
-                  <Text style={s.mainTaskLine} numberOfLines={2}>
-                    {heroSummary.pre}
-                    <Text style={s.mainTaskBold}>{heroSummary.bold}</Text>
-                    {heroSummary.post}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </LinearGradient>
+                )}
+              </View>
+              <View style={s.headerMinRule} />
+            </TouchableOpacity>
 
             {/* ══ DASHBOARD SECTIONS (reorderable registry) ═══════════════ */}
             {(() => {
@@ -2725,6 +2685,15 @@ const makeStyles = (c: any) => StyleSheet.create({
   safe: { flex: 1 },
 
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[5] },
+
+  // ── Minimal header (date + weather) ───────────────────────────────────────
+  headerMin: { paddingTop: spacing[1], marginBottom: spacing[3] },
+  headerMinRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerMinDate: { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: c.text.primary, flexShrink: 1 },
+  headerMinWeather: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: spacing[2] },
+  headerMinTemp: { fontSize: 13, fontWeight: '800', color: c.text.primary },
+  headerMinDesc: { fontSize: 11, fontWeight: '600', color: c.text.muted, textTransform: 'capitalize', maxWidth: 110 },
+  headerMinRule: { height: 1, backgroundColor: c.border.subtle, marginTop: spacing[2] },
 
   // ── Main glassmorphism card (Figma) ───────────────────────────────────────
   mainCardBorder: {
