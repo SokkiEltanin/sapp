@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import {
   Sparkles, Wallet, TrendingUp, Footprints, Moon, Smile, Briefcase, ListChecks, Cookie, Scale,
-  ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight, X,
+  ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight, X, SlidersHorizontal, Check,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { StatCtx, metricSeries } from '@/utils/statWidgets';
 import { haptic } from '@/utils/haptics';
+import { useWeeklyBoard } from '@/store/weeklyBoardStore';
 
 export type WeeklyNote = { tone: 'good' | 'warn' | 'neutral'; text: string };
 
@@ -60,6 +61,9 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
   const styles = useMemo(() => makeStyles(c), [c]);
   const [period, setPeriod] = useState<Period>('week');
   const [selected, setSelected] = useState<string | null>(null);
+  const [editTiles, setEditTiles] = useState(false);
+  const hidden = useWeeklyBoard(s => s.hidden);
+  const toggleTile = useWeeklyBoard(s => s.toggle);
 
   // One pass: per tile, the selected-period mini series (now/prev/spark) plus the
   // always-monthly 6-bucket series that powers the "vs other months" expand.
@@ -75,6 +79,8 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
     }).filter(d => d.hasData);
   }, [statCtx, period]);
 
+  const visible = useMemo(() => data.filter(d => !hidden.includes(d.def.id)), [data, hidden]);
+
   const toggle = (id: string) => {
     haptic.tap();
     setSelected(s => (s === id ? null : id));
@@ -82,7 +88,7 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
 
   const switchPeriod = (p: Period) => { haptic.tap(); setPeriod(p); };
 
-  if (data.length === 0 && notes.length === 0) return null;
+  if (visible.length === 0 && notes.length === 0) return null;
 
   const sel = data.find(d => d.def.id === selected) || null;
 
@@ -99,11 +105,14 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
             </TouchableOpacity>
           ))}
         </View>
+        <TouchableOpacity onPress={() => { haptic.tap(); setEditTiles(true); }} hitSlop={8} style={styles.editBtn}>
+          <SlidersHorizontal size={14} color={c.text.muted} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Tile grid ─────────────────────────────────────────────────── */}
       <View style={styles.grid}>
-        {data.map(d => {
+        {visible.map(d => {
           const { def, now, pct } = d;
           const isSel = selected === def.id;
           const improving = def.betterHigh == null || pct == null || pct === 0
@@ -242,6 +251,35 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
           })}
         </View>
       )}
+
+      {/* ── Tile picker ───────────────────────────────────────────────── */}
+      <Modal visible={editTiles} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setEditTiles(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditTiles(false)} />
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <SlidersHorizontal size={15} color={accent} />
+              <Text style={styles.modalTitle}>Kafelki przeglądu</Text>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity onPress={() => setEditTiles(false)} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
+            </View>
+            <Text style={styles.pickerHint}>Wybierz, które kafelki pokazywać (jeśli mają dane).</Text>
+            {TILES.map(t => {
+              const on = !hidden.includes(t.id);
+              return (
+                <TouchableOpacity key={t.id} activeOpacity={0.8} onPress={() => { haptic.tap(); toggleTile(t.id); }} style={styles.pickerRow}>
+                  <t.Icon size={15} color={on ? accent : c.text.muted} />
+                  <Text style={[styles.pickerLabel, { color: on ? c.text.primary : c.text.muted }]}>{t.label}</Text>
+                  <View style={{ flex: 1 }} />
+                  <View style={[styles.pickerCheck, on && { backgroundColor: accent, borderColor: accent }]}>
+                    {on && <Check size={12} color={c.bg.card} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -254,6 +292,11 @@ const makeStyles = (c: any) => StyleSheet.create({
   periodToggle: { flexDirection: 'row', backgroundColor: c.bg.primary, borderRadius: radius.full, padding: 2 },
   periodBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
   periodText: { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
+  editBtn: { width: 28, height: 28, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg.primary },
+  pickerHint: { fontSize: 11, color: c.text.muted, marginBottom: spacing[2] },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 9 },
+  pickerLabel: { fontSize: 14, fontWeight: '600' },
+  pickerCheck: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   tile: {
