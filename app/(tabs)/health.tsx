@@ -235,6 +235,7 @@ export default function HealthScreen() {
 
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
   const [detail, setDetail] = useState<null | 'steps' | 'sleep' | 'body'>(null);
+  const [energyOpen, setEnergyOpen] = useState(false); // calorie card is collapsed by default (de-emphasised)
   const [expenses, setExpenses] = useState<Expense[]>([]); // for the energy-balance estimate
   const [kcalMem, setKcalMem] = useState<KcalMemory>({});
   useFocusEffect(useCallback(() => {
@@ -855,13 +856,20 @@ export default function HealthScreen() {
         {/* Energy balance (estimate) */}
         {(energy.burned > 0 || energy.intakeAvg > 0) && (
           <GlassCard padding={spacing[4]} style={styles.tealCard}>
-            <View style={styles.cardRow}>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setEnergyOpen(o => !o); }} style={styles.cardRow}>
               <Flame size={13} color={colors.text.muted} />
               <Text style={styles.cardLabel}>BILANS ENERGII</Text>
               <View style={{ flex: 1 }} />
-              <Text style={styles.energyTag}>szacunek</Text>
-            </View>
+              {!energyOpen && energy.burned > 0 && energy.intakeAvg > 0 && (
+                <Text style={[styles.energyTag, { color: energy.balance >= 0 ? T.accent : colors.accent.red, fontStyle: 'normal', fontWeight: '800' }]}>
+                  {energy.balance >= 0 ? '−' : '+'}{Math.abs(energy.balance).toLocaleString('pl-PL')} kcal
+                </Text>
+              )}
+              <Text style={[styles.energyTag, { marginLeft: spacing[2] }]}>szacunek</Text>
+              <ChevronRight size={13} color={colors.text.muted} style={[{ marginLeft: 4 }, energyOpen && { transform: [{ rotate: '90deg' }] }]} />
+            </TouchableOpacity>
 
+            {energyOpen && (<>
             <View style={styles.energyRow}>
               <View style={styles.energyTile}>
                 <Text style={styles.energyVal}>{energy.burned > 0 ? energy.burned.toLocaleString('pl-PL') : '—'}</Text>
@@ -940,6 +948,7 @@ export default function HealthScreen() {
                 : energy.intakeAvg === 0 ? 'Brak danych o jedzeniu — skanuj paragony, by oszacować.'
                 : 'Spalanie z zegarka · jedzenie szacowane z paragonów (nie liczy dokładnych posiłków).'}
             </Text>
+            </>)}
           </GlassCard>
         )}
 
