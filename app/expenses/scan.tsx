@@ -16,6 +16,7 @@ import {
   loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
   loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
   loadWeightMemory, saveWeightMemory, weightFor, parseWeightFromName, WeightMemory, brandTag,
+  loadNameAliases, suggestSimilarName,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -64,6 +65,8 @@ export default function ScanReceiptModal() {
   const [editedWeight, setEditedWeight] = useState<Record<number, string>>({}); // GRAMS per piece (user-typed)
   const [editedQty, setEditedQty]       = useState<Record<number, string>>({}); // pieces (user-edited)
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
+  const [knownNames, setKnownNames] = useState<string[]>([]); // confirmed canonical names (alias values)
+  const [dismissedSug, setDismissedSug] = useState<Set<number>>(new Set()); // "to samo?" suggestions the user waved off
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
   const [customTagPickerFor, setCustomTagPickerFor] = useState<number | null>(null);
   const [pastedText, setPastedText] = useState('');
@@ -78,6 +81,18 @@ export default function ScanReceiptModal() {
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
+  useEffect(() => { loadNameAliases().then(a => setKnownNames([...new Set(Object.values(a))])).catch(() => {}); }, []);
+
+  // "To samo?" merge suggestion for a row: a known product name that's similar but
+  // below the auto-merge threshold, so the user confirms it. Hidden once the row's
+  // name already equals it, or the user dismissed it.
+  const getMergeSuggestion = (i: number): string | null => {
+    if (dismissedSug.has(i)) return null;
+    const name = getProductName(i);
+    if (!name.trim()) return null;
+    const s = suggestSimilarName(name, knownNames);
+    return s && s.toLowerCase() !== name.trim().toLowerCase() ? s : null;
+  };
 
   const getCategory = (i: number): ExpenseCategory =>
     editedCats[i] ?? (receipt?.products[i].category ?? 'other');
@@ -542,6 +557,9 @@ export default function ScanReceiptModal() {
                         onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
                         productName={getProductName(i)}
                         onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
+                        mergeSuggestion={getMergeSuggestion(i)}
+                        onMerge={name => { setEditedNames(prev => ({ ...prev, [i]: name })); setDismissedSug(prev => new Set(prev).add(i)); }}
+                        onDismissMerge={() => setDismissedSug(prev => new Set(prev).add(i))}
                         productTags={getProductTags(i)}
                         onTagsChange={tags => setEditedTags(prev => ({ ...prev, [i]: tags }))}
                         tagPickerOpen={tagPickerFor === i}
@@ -577,6 +595,9 @@ export default function ScanReceiptModal() {
                   onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
                   productName={getProductName(i)}
                   onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
+                  mergeSuggestion={getMergeSuggestion(i)}
+                  onMerge={name => { setEditedNames(prev => ({ ...prev, [i]: name })); setDismissedSug(prev => new Set(prev).add(i)); }}
+                  onDismissMerge={() => setDismissedSug(prev => new Set(prev).add(i))}
                   productTags={getProductTags(i)}
                   onTagsChange={tags => setEditedTags(prev => ({ ...prev, [i]: tags }))}
                   tagPickerOpen={tagPickerFor === i}
@@ -801,6 +822,7 @@ function ProductRow({
   product, category, selected, onToggle,
   catPickerOpen, onCategoryPress, onCategoryChange,
   priceValue, onPriceChange, productName, onNameChange,
+  mergeSuggestion, onMerge, onDismissMerge,
   productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
   excluded, onToggleExcluded, weighable, weight, onWeightChange,
   quantity, onQuantityChange,
@@ -817,6 +839,9 @@ function ProductRow({
   onPriceChange: (v: string) => void;
   productName: string;
   onNameChange: (v: string) => void;
+  mergeSuggestion?: string | null;
+  onMerge?: (name: string) => void;
+  onDismissMerge?: () => void;
   productTags: string[];
   onTagsChange: (tags: string[]) => void;
   tagPickerOpen: boolean;
@@ -877,6 +902,18 @@ function ProductRow({
             placeholder={product.name}
             placeholderTextColor={colors.text.muted}
           />
+          {mergeSuggestion && (
+            <View style={styles.mergeSugRow}>
+              <LucideIcons.GitMerge size={11} color="#46B0DE" />
+              <Text style={styles.mergeSugText} numberOfLines={1}>To samo co „{mergeSuggestion}"?</Text>
+              <PressableScale onPress={() => onMerge?.(mergeSuggestion)} style={styles.mergeSugBtn}>
+                <Text style={styles.mergeSugBtnText}>Scal</Text>
+              </PressableScale>
+              <PressableScale onPress={() => onDismissMerge?.()} style={styles.mergeSugX}>
+                <LucideIcons.X size={13} color={colors.text.muted} />
+              </PressableScale>
+            </View>
+          )}
           <View style={styles.productMeta}>
             <PressableScale onPress={onCategoryPress}>
               <View style={[
@@ -1349,6 +1386,11 @@ const makeStyles = (c: any) => StyleSheet.create({
     fontSize: 13, fontWeight: '500', color: c.text.primary,
     padding: 0, flex: 1,
   },
+  mergeSugRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  mergeSugText: { flex: 1, fontSize: 10.5, color: '#46B0DE', fontWeight: '600' },
+  mergeSugBtn: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#46B0DE22', borderWidth: 1, borderColor: '#46B0DE55' },
+  mergeSugBtnText: { fontSize: 10.5, fontWeight: '800', color: '#46B0DE' },
+  mergeSugX: { padding: 2 },
 
   // ── Custom product qty/price column ──────────────────────────────────────
   customPriceCol: { alignItems: 'flex-end', gap: 3 },

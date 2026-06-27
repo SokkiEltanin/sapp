@@ -98,6 +98,24 @@ function findFuzzyMatch<V>(key: string, memory: Record<string, V>): V | undefine
   return bestVal;
 }
 
+// "Is this the same as X?" — finds a known name SIMILAR to `name` but in the
+// uncertain band [lo, FUZZY_THRESHOLD): too close to ignore, too far to auto-merge.
+// Used by the scanner to gently suggest a merge the user can confirm. Returns the
+// best known name, or null. Exact / already-auto-merged (>=threshold) names are skipped.
+export function suggestSimilarName(name: string, knownNames: string[], lo = 0.45): string | null {
+  const key = normalizeProductName(name);
+  if (!key) return null;
+  let best: string | null = null;
+  let bestScore = lo;
+  for (const kn of knownNames) {
+    const nk = normalizeProductName(kn);
+    if (nk === key) return null; // exact match — nothing to suggest
+    const score = trigramSimilarity(key, nk);
+    if (score >= bestScore && score < FUZZY_THRESHOLD) { bestScore = score; best = kn; }
+  }
+  return best;
+}
+
 export async function loadProductMemory(): Promise<ProductMemory> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
