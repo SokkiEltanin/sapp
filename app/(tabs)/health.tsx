@@ -234,7 +234,7 @@ export default function HealthScreen() {
   }, [monthData, stepGoal]);
 
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
-  const [detail, setDetail] = useState<null | 'steps' | 'sleep'>(null);
+  const [detail, setDetail] = useState<null | 'steps' | 'sleep' | 'body'>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]); // for the energy-balance estimate
   const [kcalMem, setKcalMem] = useState<KcalMemory>({});
   useFocusEffect(useCallback(() => {
@@ -729,8 +729,11 @@ export default function HealthScreen() {
         {/* Weight */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
           <View style={styles.cardRow}>
-            <Activity size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>CIAŁO</Text>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setDetail('body'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+              <Activity size={13} color={colors.text.muted} />
+              <Text style={styles.cardLabel}>CIAŁO</Text>
+              <ChevronRight size={13} color={colors.text.muted} />
+            </TouchableOpacity>
             <View style={{ flex: 1 }} />
             {loggedWeights.length > 1 && (
               <Text style={{ fontSize: 10, color: (maxW - minW) > 0.5 ? colors.accent.amber : colors.accent.green, fontWeight: '600', marginRight: spacing[2] }}>
@@ -1042,8 +1045,8 @@ export default function HealthScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setDetail(null)} />
           <View style={styles.detailSheet}>
             <View style={styles.detailHeader}>
-              {detail === 'steps' ? <Footprints size={16} color={T.accent} /> : <Moon size={16} color={T.accent} />}
-              <Text style={styles.detailTitle}>{detail === 'steps' ? 'Kroki' : 'Sen'} — szczegóły</Text>
+              {detail === 'steps' ? <Footprints size={16} color={T.accent} /> : detail === 'sleep' ? <Moon size={16} color={T.accent} /> : <Activity size={16} color={T.accent} />}
+              <Text style={styles.detailTitle}>{detail === 'steps' ? 'Kroki' : detail === 'sleep' ? 'Sen' : 'Ciało'} — szczegóły</Text>
               <View style={{ flex: 1 }} />
               <TouchableOpacity onPress={() => setDetail(null)} hitSlop={10}><X size={18} color={colors.text.muted} /></TouchableOpacity>
             </View>
@@ -1168,6 +1171,55 @@ export default function HealthScreen() {
                         return <View key={p.date} style={[styles.detailBar, { height: h, backgroundColor: p.sleepMinutes >= 420 ? T.accent : T.muted, opacity: p.sleepMinutes === 0 ? 0.4 : 1 }]} />;
                       })}
                     </View>
+                  </>
+                );
+              })()}
+
+              {detail === 'body' && (() => {
+                const cur = weight > 0 ? weight : lastWeight;
+                const fats = weekFat.filter(f => f > 0);
+                const fatDelta = (fats.length >= 2 && fats[0] !== fats[fats.length - 1]) ? +(fats[fats.length - 1] - fats[0]).toFixed(1) : null;
+                const ws = weekWeight.filter(w => w > 0);
+                const maxW2 = ws.length ? Math.max(...ws) : 1;
+                const minW2 = ws.length ? Math.min(...ws) : 0;
+                const rangeW = maxW2 - minW2 || 1;
+                const tiles = [
+                  { v: cur > 0 ? `${cur.toFixed(1)} kg` : '—', l: 'waga' },
+                  ...(weightGoal > 0 ? [{ v: `${weightGoal} kg`, l: 'cel' }] : []),
+                  ...((hcExtra.bodyFatPct as number) > 0 ? [{ v: `${hcExtra.bodyFatPct}%`, l: 'tk. tłuszczowa' }] : []),
+                  ...((hcExtra.leanMassKg as number) > 0 ? [{ v: `${hcExtra.leanMassKg} kg`, l: 'mięśnie' }] : []),
+                  ...((hcExtra.bodyWaterKg as number) > 0 ? [{ v: `${hcExtra.bodyWaterKg} kg`, l: 'woda' }] : []),
+                  ...((hcExtra.bmr as number) > 0 ? [{ v: `${hcExtra.bmr}`, l: 'BMR' }] : []),
+                ];
+                return (
+                  <>
+                    <View style={styles.detailGrid}>
+                      {tiles.map((t2, i) => (
+                        <View key={i} style={styles.detailTile}><Text style={styles.detailTileVal}>{t2.v}</Text><Text style={styles.detailTileLabel}>{t2.l}</Text></View>
+                      ))}
+                    </View>
+                    {fatDelta != null && (
+                      <View style={styles.detailRecord}>
+                        <Award size={14} color={T.accent} />
+                        <Text style={styles.detailRecordText}>Tkanka tłuszczowa: {fatDelta > 0 ? '+' : ''}{fatDelta}% w tym tygodniu</Text>
+                      </View>
+                    )}
+                    {ws.length >= 1 && (
+                      <>
+                        <Text style={styles.detailSectionLabel}>WAGA · 7 DNI</Text>
+                        <View style={styles.detailDowRow}>
+                          {weekWeight.map((w, i) => (
+                            <View key={i} style={styles.detailDowCol}>
+                              <View style={styles.detailDowBarWrap}>
+                                <View style={[styles.detailDowBar, { height: w > 0 ? 6 + ((w - minW2) / rangeW) * 44 : 2, backgroundColor: w > 0 ? T.accent : colors.fill.medium, opacity: w > 0 ? 1 : 0.4 }]} />
+                              </View>
+                              <Text style={styles.detailDowLabel}>{WEEK_DAYS[i]}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </>
+                    )}
+                    <Text style={styles.detailInsight}>Wartości z BIA zegarka są wiarygodne w trendzie — mierz konsekwentnie (rano, na czczo).</Text>
                   </>
                 );
               })()}
