@@ -15,10 +15,12 @@ import {
   loadKcalMemory, saveKcalMemory, kcalFor, KcalMemory,
   loadWeightMemory, saveWeightMemory, weightFor, WeightMemory,
   saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases,
+  productNameSimilarity,
 } from '@/utils/productMemory';
 import { kcalPer100g, looksLikeFood } from '@/utils/calories';
 import { ExpenseCategory } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
+import { GitMerge } from 'lucide-react-native';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
@@ -41,6 +43,7 @@ export default function ProductsScreen() {
   const [editWeightG, setEditWeightG] = useState('');
   const [editTags, setEditTags] = useState('');
   const [editCat, setEditCat]   = useState<ExpenseCategory>('groceries');
+  const [dismissedDup, setDismissedDup] = useState<Set<string>>(new Set());
 
   const reload = useCallback(() => {
     expensesService.getAll().then(setExpenses).catch(() => {});
@@ -72,6 +75,36 @@ export default function ProductsScreen() {
     const q = query.trim().toLowerCase();
     return q ? products.filter(p => p.name.toLowerCase().includes(q)) : products;
   }, [products, query]);
+
+  // Likely OCR duplicates: highly-similar product names that aren't yet merged
+  // (e.g. "HAŁWA STOŁECZNA" ≈ "HAŁWA SŁONECZNA"). High band so we don't nag on
+  // genuinely-different products; the user confirms each. Merge = alias loser→winner.
+  const duplicatePairs = useMemo(() => {
+    const out: { a: Product; b: Product; id: string }[] = [];
+    for (let i = 0; i < products.length; i++) {
+      for (let j = i + 1; j < products.length; j++) {
+        const sim = productNameSimilarity(products[i].name, products[j].name);
+        if (sim >= 0.62 && sim < 0.99) {
+          // higher count is the "winner" the other folds into
+          const [a, b] = products[i].count >= products[j].count ? [products[i], products[j]] : [products[j], products[i]];
+          const id = `${a.key}|${b.key}`;
+          if (!dismissedDup.has(id)) out.push({ a, b, id });
+        }
+      }
+    }
+    return out.slice(0, 6);
+  }, [products, dismissedDup]);
+
+  const mergePair = async (a: Product, b: Product, id: string) => {
+    haptic.success();
+    try {
+      await saveNameAliases([{ name: b.name }], { 0: a.name }); // b folds into a
+      setDismissedDup(prev => new Set(prev).add(id));
+      await loadNameAliases().then(setAliases);
+      reload();
+      toast.success(`Scalono „${b.name}" → „${a.name}"`);
+    } catch { haptic.error(); toast.error('Nie udało się scalić'); }
+  };
 
   const kcalOf = (p: Product): { value: number; learned: boolean } => {
     const learned = kcalFor(p.name, kcalMem);
@@ -140,6 +173,27 @@ export default function ProductsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing[4], paddingBottom: 120, gap: spacing[2] }} showsVerticalScrollIndicator={false}>
+        {!query && duplicatePairs.length > 0 && (
+          <View style={s.dupCard}>
+            <View style={s.dupHead}>
+              <GitMerge size={13} color="#46B0DE" />
+              <Text style={s.dupTitle}>Możliwe duplikaty</Text>
+            </View>
+            {duplicatePairs.map(({ a, b, id }) => (
+              <View key={id} style={s.dupRow}>
+                <Text style={s.dupText} numberOfLines={2}>
+                  „{a.name}" <Text style={{ color: c.text.muted }}>≈</Text> „{b.name}"?
+                </Text>
+                <TouchableOpacity onPress={() => mergePair(a, b, id)} style={s.dupMergeBtn}>
+                  <Text style={s.dupMergeText}>Scal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.tap(); setDismissedDup(prev => new Set(prev).add(id)); }} style={{ padding: 3 }}>
+                  <X size={14} color={c.text.muted} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
         {filtered.length === 0 ? (
           <Text style={s.empty}>{products.length === 0 ? 'Brak produktów — zeskanuj paragony, by je tu zobaczyć.' : 'Nic nie pasuje.'}</Text>
         ) : filtered.map(p => {
@@ -228,6 +282,13 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: c.text.primary, padding: 0 },
   empty: { fontSize: 13, color: c.text.muted, textAlign: 'center', marginTop: spacing[6], lineHeight: 19 },
+  dupCard: { backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: '#46B0DE44', padding: spacing[3], gap: spacing[2] },
+  dupHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dupTitle: { fontSize: 12, fontWeight: '800', color: '#46B0DE', letterSpacing: 0.3 },
+  dupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dupText: { flex: 1, fontSize: 12, color: c.text.primary, lineHeight: 16 },
+  dupMergeBtn: { paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.full, backgroundColor: '#46B0DE22', borderWidth: 1, borderColor: '#46B0DE55' },
+  dupMergeText: { fontSize: 11, fontWeight: '800', color: '#46B0DE' },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,

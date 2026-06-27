@@ -98,6 +98,12 @@ function findFuzzyMatch<V>(key: string, memory: Record<string, V>): V | undefine
   return bestVal;
 }
 
+// Normalized trigram similarity between two product names (0..1). Used to flag
+// likely OCR duplicates ("HAŁWA STOŁECZNA" vs "HAŁWA SŁONECZNA") in the library.
+export function productNameSimilarity(a: string, b: string): number {
+  return trigramSimilarity(normalizeProductName(a), normalizeProductName(b));
+}
+
 // "Is this the same as X?" — finds a known name SIMILAR to `name` but in the
 // uncertain band [lo, FUZZY_THRESHOLD): too close to ignore, too far to auto-merge.
 // Used by the scanner to gently suggest a merge the user can confirm. Returns the
