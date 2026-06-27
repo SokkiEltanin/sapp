@@ -1,6 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -334,23 +333,16 @@ export default function TopPill() {
 
   return (
     <Animated.View style={{ opacity }}>
-      <LinearGradient
-        colors={[item.color + 'EE', item.color + '30', item.color + '00']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={s.pillGradient}
+      <TouchableOpacity
+        style={s.row}
+        onPress={() => { haptic.tap(); router.push(item.route as any); }}
+        activeOpacity={0.7}
       >
-        <TouchableOpacity
-          style={s.pill}
-          onPress={() => { haptic.tap(); router.push(item.route as any); }}
-          activeOpacity={0.75}
-        >
-          <View style={[s.badge, { backgroundColor: item.color }]}>
-            <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
-          </View>
-          <Text style={s.text} numberOfLines={1}>{item.text}</Text>
-        </TouchableOpacity>
-      </LinearGradient>
+        <View style={[s.badge, { backgroundColor: item.color, shadowColor: item.color }]}>
+          <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
+        </View>
+        <Text style={s.text} numberOfLines={1}>{item.text}</Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -358,37 +350,29 @@ export default function TopPill() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeS = (t: any) => StyleSheet.create({
-  pillGradient: {
+  // No card/band behind it — just the floating colored badge + label.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 6,
     marginBottom: 4,
-    borderRadius: 999,
-    padding: 1.5,
-    // Shadow so the pill visibly floats above the page (no solid band behind).
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    // Elevated surface that lifts off the page in BOTH themes (near-black on
-    // dark, white on light) — paired with the shadow it reads as floating.
-    backgroundColor: t.bg.elevated,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 5,
-    gap: 8,
+    paddingVertical: 4,
+    gap: 10,
   },
   badge: {
     borderRadius: 999,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     minWidth: 58,
     alignItems: 'center',
     justifyContent: 'center',
+    // A soft colored glow so the badge itself reads as floating (shadowColor is
+    // set per-item to the badge colour in the render).
+    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 7,
   },
   badgeText: {
     fontSize: 11,
@@ -398,9 +382,13 @@ const makeS = (t: any) => StyleSheet.create({
   },
   text: {
     flex: 1,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 12.5,
+    fontWeight: '600',
     color: t.text.primary,
     letterSpacing: 0.2,
+    // Subtle shadow keeps the label legible now that there's no surface behind it.
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
