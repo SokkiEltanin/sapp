@@ -17,7 +17,7 @@ import {
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
-  ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench,
+  ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake,
 } from 'lucide-react-native';
@@ -47,6 +47,7 @@ import { loadNameAliases, canonicalProductName, normalizeProductName, productGro
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
+import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -1597,6 +1598,29 @@ export default function DashboardScreen() {
     return out;
   }, [scopedExpenses, nameAliases, weightMemory]);
 
+  // ── Cross-metric correlations (#16): sleep / steps / mood / daily spend ──────
+  const correlations = useMemo(() => {
+    const spendByDay: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type === 'income') continue;
+      const d = (e.date ?? '').slice(0, 10);
+      if (d) spendByDay[d] = (spendByDay[d] ?? 0) + (e.amount ?? 0);
+    }
+    const dates = new Set<string>([...Object.keys(healthDays), ...Object.keys(moodByDay)]);
+    const points: DailyPoint[] = [];
+    dates.forEach(d => {
+      const hd = healthDays[d];
+      const md = moodByDay[d];
+      points.push({
+        sleepH: hd && hd.sleepMinutes > 0 ? hd.sleepMinutes / 60 : undefined,
+        steps:  hd && hd.steps > 0 ? hd.steps : undefined,
+        mood:   md && md.length ? md.reduce((a, b) => a + b.mood, 0) / md.length : undefined,
+        spend:  spendByDay[d], // undefined on no-spend days → excluded from spend pairs
+      });
+    });
+    return correlationInsights(points);
+  }, [expenses, healthDays, moodByDay]);
+
   // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
   // Grouped by CANONICAL identity so OCR variants / cross-store spellings of the
   // same product merge (learned via name aliases when you rename in the scanner).
@@ -2398,6 +2422,28 @@ export default function DashboardScreen() {
                     );
                   })}
                 </View>
+              </View>
+            );
+
+            nodes['correlations'] = correlations.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Link2 size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Zależności</Text>
+                </View>
+                <View style={{ gap: spacing[2], marginTop: spacing[1] }}>
+                  {correlations.map((co, i) => (
+                    <View key={i} style={s.factRow}>
+                      <View style={[s.factIcon, { backgroundColor: accentColor + '18' }]}>
+                        <Link2 size={13} color={accentColor} />
+                      </View>
+                      <Text style={s.factText} numberOfLines={2}>{co.text}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={[s.factText, { color: colors.text.muted, fontSize: 10, marginTop: spacing[2] }]}>
+                  Obserwacja z Twoich dni — nie musi oznaczać przyczyny.
+                </Text>
               </View>
             );
 
