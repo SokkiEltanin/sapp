@@ -1,10 +1,10 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, Modal, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft, Plus, Minus, Droplets, Dumbbell, BookOpen,
   Moon, Zap, Heart, Sun, Bike, Check, Trash2, Flame,
@@ -660,7 +660,9 @@ const makeAm = (c: any) => StyleSheet.create({
 export default function HabitsScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { habits, todayDone, isLoading, toggle, increment, decrement, add, remove, update, getStreak, getLast7, getLast30, getTodayCount } = useHabits();
+  const { habits, todayDone, isLoading, toggle, increment, decrement, add, remove, update, getStreak, getLast7, getLast30, getTodayCount, reload } = useHabits();
+  // Refresh on focus so HC-fed water (and edits made elsewhere) show up live.
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
   const [showAdd, setShowAdd]      = useState(false);
   const [showMonth, setShowMonth]  = useState(false);
   const [editingHabit, setEditing] = useState<Habit | null>(null);

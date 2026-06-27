@@ -33,9 +33,13 @@ export async function setCounts(date: string, counts: Record<string, number>): P
   await AsyncStorage.setItem(cntKey(date), JSON.stringify(counts));
 }
 
-// The single water habit (kind 'water') fed by Health Connect hydration.
+// The single water habit fed by Health Connect hydration: the kind:'water' one,
+// or (fallback for habits created before the merge) a count habit named "Woda".
 export async function getWaterHabit(): Promise<Habit | null> {
-  return (await getHabits()).find((h) => h.kind === 'water') ?? null;
+  const list = await getHabits();
+  return list.find((h) => h.kind === 'water')
+    ?? list.find((h) => h.type === 'count' && h.title.trim().toLowerCase() === 'woda')
+    ?? null;
 }
 
 // Set today's count for the water habit (no-op if there's no water habit).

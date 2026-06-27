@@ -39,7 +39,8 @@
       "Bash(grep -nE \"onEventPress|router.push\\\\\\(.*calendar|/calendar/\\\\$\\\\{|import.*Service|import.*from '@/services\" \"app/\\(tabs\\)/stats.tsx\")",
       "Bash(grep -nE \"router.push\\\\\\(\\\\`/calendar/\\\\\\\\\\\\$\\\\{\\(ev.id|id\\)\\\\}\" \"app/\\(tabs\\)/stats.tsx\")",
       "Bash(grep -nA14 \"interface Habit\" src/types/index.ts)",
-      "Bash(grep -nE \"\\\\{/\\\\* Weight \\\\*/\\\\}|\\\\{/\\\\* Water\" \"app/\\(tabs\\)/health.tsx\")"
+      "Bash(grep -nE \"\\\\{/\\\\* Weight \\\\*/\\\\}|\\\\{/\\\\* Water\" \"app/\\(tabs\\)/health.tsx\")",
+      "Bash(grep -nE \"return \\\\{|reload|load,|load }|useFocusEffect\" src/hooks/useHabits.ts)"
     ]
   }
 }
