@@ -13,8 +13,12 @@ import { countsForConsumption } from '@/store/statsScope';
 import {
   canonicalProductName, normalizeProductName, loadNameAliases,
   loadKcalMemory, saveKcalMemory, kcalFor, KcalMemory,
+  loadWeightMemory, saveWeightMemory, weightFor, WeightMemory,
+  saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases,
 } from '@/utils/productMemory';
 import { kcalPer100g, looksLikeFood } from '@/utils/calories';
+import { ExpenseCategory } from '@/types';
+import { getCategoryMeta } from '@/utils/categories';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
@@ -29,14 +33,20 @@ export default function ProductsScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [aliases, setAliases]   = useState<Record<string, string>>({});
   const [kcalMem, setKcalMem]   = useState<KcalMemory>({});
+  const [weightMem, setWeightMem] = useState<WeightMemory>({});
   const [query, setQuery]       = useState('');
   const [editing, setEditing]   = useState<Product | null>(null);
-  const [kcalInput, setKcalInput] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editKcal, setEditKcal] = useState('');
+  const [editWeightG, setEditWeightG] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [editCat, setEditCat]   = useState<ExpenseCategory>('groceries');
 
   const reload = useCallback(() => {
     expensesService.getAll().then(setExpenses).catch(() => {});
     loadNameAliases().then(setAliases).catch(() => {});
     loadKcalMemory().then(setKcalMem).catch(() => {});
+    loadWeightMemory().then(setWeightMem).catch(() => {});
   }, []);
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
@@ -72,19 +82,39 @@ export default function ProductsScreen() {
   const openEdit = (p: Product) => {
     haptic.tap();
     const k = kcalOf(p);
-    setKcalInput(k.value > 0 ? String(k.value) : '');
+    setEditName(p.name);
+    setEditKcal(k.value > 0 ? String(k.value) : '');
+    const w = weightFor(p.name, weightMem);
+    setEditWeightG(w ? String(Math.round(w * 1000)) : '');
+    setEditTags((p.tags ?? []).join(', '));
+    setEditCat((p.category as ExpenseCategory) || 'groceries');
     setEditing(p);
   };
 
-  const saveKcal = async () => {
+  const saveEdit = async () => {
     if (!editing) return;
-    const v = parseInt(kcalInput.replace(',', '.'), 10);
-    if (isNaN(v) || v <= 0) { haptic.error(); toast.error('Podaj kcal na 100 g'); return; }
     haptic.success();
-    await saveKcalMemory([{ name: editing.name, kcal: v }]);
-    await loadKcalMemory().then(setKcalMem);
-    setEditing(null);
-    toast.success('Zapisano kalorie produktu');
+    const newName = editName.trim() || editing.name;
+    const kcal = parseInt(editKcal.replace(',', '.'), 10);
+    const wG = parseFloat(editWeightG.replace(',', '.'));
+    const tags = editTags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    try {
+      // Rename → alias: the old name folds into the new one (a manual MERGE).
+      if (newName.toLowerCase() !== editing.name.toLowerCase()) {
+        await saveNameAliases([{ name: editing.name }], { 0: newName });
+      }
+      if (!isNaN(kcal) && kcal > 0) await saveKcalMemory([{ name: newName, kcal }]);
+      if (!isNaN(wG) && wG > 0) await saveWeightMemory([{ name: newName, kg: wG / 1000 }]);
+      await saveCustomProductsToMemory([{ name: newName, category: editCat }]);
+      if (tags.length > 0) await saveCustomTagsToMemory([{ name: newName, tags }]);
+      await Promise.all([
+        loadKcalMemory().then(setKcalMem),
+        loadWeightMemory().then(setWeightMem),
+        loadNameAliases().then(setAliases),
+      ]);
+      setEditing(null);
+      toast.success('Zapisano produkt');
+    } catch { haptic.error(); toast.error('Nie udało się zapisać'); }
   };
 
   return (
@@ -93,7 +123,7 @@ export default function ProductsScreen() {
         <PressableBack onPress={() => router.back()} color={c.text.primary} />
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Produkty</Text>
-          <Text style={s.subtitle}>{products.length} produktów · ustaw kcal/100 g</Text>
+          <Text style={s.subtitle}>{products.length} produktów · kcal, tagi, scalanie</Text>
         </View>
       </View>
 
@@ -139,22 +169,36 @@ export default function ProductsScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditing(null)} />
           <View style={s.sheet}>
             <View style={s.sheetHead}>
-              <Text style={s.sheetTitle} numberOfLines={2}>{editing?.name}</Text>
+              <Text style={s.sheetTitle} numberOfLines={1}>Edytuj produkt</Text>
               <TouchableOpacity onPress={() => setEditing(null)} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
             </View>
-            <Text style={s.sheetLabel}>Kalorie na 100 g</Text>
-            <TextInput
-              value={kcalInput}
-              onChangeText={setKcalInput}
-              keyboardType="number-pad"
-              placeholder="np. 350"
-              placeholderTextColor={c.text.muted}
-              style={s.sheetInput}
-              autoFocus
-              selectTextOnFocus
-            />
-            <Text style={s.sheetHint}>Ustawione tutaj kcal zastąpią zgadywanie z kategorii w „Bilansie energii".</Text>
-            <TouchableOpacity style={s.saveBtn} onPress={saveKcal} activeOpacity={0.85}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 400 }}>
+              <Text style={s.sheetLabel}>Nazwa  ·  zmiana = scalenie z istniejącym</Text>
+              <TextInput value={editName} onChangeText={setEditName} placeholder="Nazwa produktu" placeholderTextColor={c.text.muted} style={s.fieldInput} />
+
+              <Text style={s.sheetLabel}>Kalorie na 100 g</Text>
+              <TextInput value={editKcal} onChangeText={setEditKcal} keyboardType="number-pad" placeholder="np. 350" placeholderTextColor={c.text.muted} style={s.fieldInput} />
+
+              <Text style={s.sheetLabel}>Waga domyślna (g/szt, opcjonalnie)</Text>
+              <TextInput value={editWeightG} onChangeText={setEditWeightG} keyboardType="number-pad" placeholder="np. 250" placeholderTextColor={c.text.muted} style={s.fieldInput} />
+
+              <Text style={s.sheetLabel}>Tagi (przecinek)</Text>
+              <TextInput value={editTags} onChangeText={setEditTags} placeholder="np. ser, nabiał" placeholderTextColor={c.text.muted} style={s.fieldInput} autoCapitalize="none" />
+
+              <Text style={s.sheetLabel}>Kategoria</Text>
+              <View style={s.catRow}>
+                {(['groceries', 'health', 'entertainment', 'clothing', 'housing', 'other'] as ExpenseCategory[]).map(cat => {
+                  const meta = getCategoryMeta(cat);
+                  const active = editCat === cat;
+                  return (
+                    <TouchableOpacity key={cat} onPress={() => { haptic.tap(); setEditCat(cat); }} style={[s.catChip, active && { borderColor: meta.color, backgroundColor: meta.color + '22' }]}>
+                      <Text style={[s.catChipText, active && { color: meta.color }]}>{meta.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <TouchableOpacity style={s.saveBtn} onPress={saveEdit} activeOpacity={0.85}>
               <Text style={s.saveBtnText}>Zapisz</Text>
             </TouchableOpacity>
           </View>
@@ -206,6 +250,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   sheetLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing[2] },
   sheetInput: { backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 12, fontSize: 18, fontWeight: '700', color: c.text.primary, textAlign: 'center' },
   sheetHint: { fontSize: 10.5, color: c.text.muted, lineHeight: 14 },
+  fieldInput: { backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 14, color: c.text.primary, marginTop: 4 },
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: 4 },
+  catChip: { paddingHorizontal: spacing[3], paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
+  catChipText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
   saveBtn: { backgroundColor: '#FB923C', paddingVertical: 13, borderRadius: radius.md, alignItems: 'center', marginTop: spacing[1] },
   saveBtnText: { fontSize: 14, fontWeight: '800', color: c.bg.primary },
 });
