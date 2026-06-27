@@ -14,7 +14,9 @@ import { haptic } from '@/utils/haptics';
 import { useMoodStore } from '@/store/moodStore';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
-import { MOOD_COLORS } from '@/types';
+import { MOOD_COLORS, Expense } from '@/types';
+import { expensesService } from '@/services/expensesService';
+import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
@@ -226,6 +228,20 @@ export default function HealthScreen() {
 
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
   const [detail, setDetail] = useState<null | 'steps' | 'sleep'>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]); // for the energy-balance estimate
+  useFocusEffect(useCallback(() => { expensesService.getAll().then(setExpenses).catch(() => {}); }, []));
+
+  // ── Energy balance (estimate) ───────────────────────────────────────────────
+  // OUT = the watch's burn (total, or BMR + active). IN = estimated food energy
+  // bought (from receipts) — a 7-day average smooths the buy≠eat noise.
+  const energy = useMemo(() => {
+    const bmr = (hcExtra.bmr as number) || 0;
+    const active = (hcExtra.activeCalories as number) || 0;
+    const totalC = (hcExtra.totalCalories as number) || 0;
+    const burned = totalC > 0 ? totalC : (bmr > 0 ? bmr + active : 0);
+    const intakeAvg = avgFoodKcal(expenses, 7);
+    return { burned, intakeAvg, balance: burned - intakeAvg };
+  }, [hcExtra, expenses]);
 
   useEffect(() => {
     const load = async () => {
@@ -743,6 +759,47 @@ export default function HealthScreen() {
           )}
         </GlassCard>
 
+        {/* Energy balance (estimate) */}
+        {(energy.burned > 0 || energy.intakeAvg > 0) && (
+          <GlassCard padding={spacing[4]} style={styles.tealCard}>
+            <View style={styles.cardRow}>
+              <Flame size={13} color={colors.text.muted} />
+              <Text style={styles.cardLabel}>BILANS ENERGII</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={styles.energyTag}>szacunek</Text>
+            </View>
+
+            <View style={styles.energyRow}>
+              <View style={styles.energyTile}>
+                <Text style={styles.energyVal}>{energy.burned > 0 ? energy.burned.toLocaleString('pl-PL') : '—'}</Text>
+                <Text style={styles.energyLabel}>spalono dziś</Text>
+              </View>
+              <View style={styles.energyOp}><Text style={styles.energyOpText}>−</Text></View>
+              <View style={styles.energyTile}>
+                <Text style={styles.energyVal}>{energy.intakeAvg > 0 ? energy.intakeAvg.toLocaleString('pl-PL') : '—'}</Text>
+                <Text style={styles.energyLabel}>jedzenie śr./dzień</Text>
+              </View>
+            </View>
+
+            {energy.burned > 0 && energy.intakeAvg > 0 && (
+              <View style={[styles.energyBalance, { borderColor: energy.balance >= 0 ? T.cardBorder : colors.accent.red + '40' }]}>
+                <Text style={[styles.energyBalanceVal, { color: energy.balance >= 0 ? T.accent : colors.accent.red }]}>
+                  {energy.balance >= 0 ? '−' : '+'}{Math.abs(energy.balance).toLocaleString('pl-PL')} kcal
+                </Text>
+                <Text style={styles.energyBalanceLabel}>
+                  {energy.balance >= 0 ? 'deficyt — sprzyja spadkowi wagi' : 'nadwyżka — sprzyja przyrostowi'}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.energyNote}>
+              {energy.burned === 0 ? 'Brak danych spalania z zegarka (Health Connect).'
+                : energy.intakeAvg === 0 ? 'Brak danych o jedzeniu — skanuj paragony, by oszacować.'
+                : 'Spalanie z zegarka · jedzenie szacowane z paragonów (nie liczy dokładnych posiłków).'}
+            </Text>
+          </GlassCard>
+        )}
+
         {/* Mood trend */}
         {recentMood.length > 0 && (
           <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -1168,6 +1225,17 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   waterSub: { fontSize: 12, fontWeight: '400', color: c.text.muted },
 
   // Weight
+  energyTag: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 0.4, fontStyle: 'italic' },
+  energyRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3] },
+  energyTile: { flex: 1, alignItems: 'center', gap: 2 },
+  energyVal: { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  energyLabel: { fontSize: 10, color: c.text.muted, textAlign: 'center' },
+  energyOp: { paddingHorizontal: spacing[2] },
+  energyOpText: { fontSize: 20, fontWeight: '700', color: c.text.muted },
+  energyBalance: { alignItems: 'center', gap: 2, marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.lg, borderWidth: 1, backgroundColor: t.accentDim },
+  energyBalanceVal: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  energyBalanceLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
+  energyNote: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic', lineHeight: 14 },
   bodyCompRow: { flexDirection: 'row', gap: spacing[2] },
   bodyCompTile: { flex: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
