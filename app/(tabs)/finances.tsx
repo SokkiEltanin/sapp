@@ -307,7 +307,7 @@ export default function FinancesScreen() {
                 <View style={st.heroInner}>
                   {/* Clean dark gradient — premium, theme-independent (no clouds) */}
                   <LinearGradient
-                    colors={['#1A1316', '#0E0B0D']}
+                    colors={[colors.bg.card, colors.bg.secondary]}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
@@ -323,7 +323,7 @@ export default function FinancesScreen() {
                     <Text style={st.heroDate}>SALDO KONTA</Text>
                     {/* BILANS OGÓLNY = wszystkie przychody − wszystkie wydatki */}
                     <View style={st.heroAmountRow}>
-                      <Text style={[st.heroAmount, { color: balance >= 0 ? '#FFFFFF' : '#FF8A8A' }]}>
+                      <Text style={[st.heroAmount, { color: balance >= 0 ? colors.text.primary : colors.accent.red }]}>
                         {balance >= 0 ? '+' : '−'}{Math.abs(balance).toFixed(2)}
                       </Text>
                       <Text style={st.heroCurrency}> PLN</Text>
@@ -558,7 +558,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: c.border.glass,
   },
   heroContent: {
     padding: spacing[5],
@@ -566,13 +566,13 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   },
   heroDate:      { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  heroAmount:    { fontSize: 42, fontWeight: '800', color: '#FFFFFF', letterSpacing: -2, lineHeight: 46 },
+  heroAmount:    { fontSize: 42, fontWeight: '800', color: c.text.primary, letterSpacing: -2, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: c.text.muted, paddingBottom: 4 },
-  heroSplit:     { fontSize: 12, color: 'rgba(255,255,255,0.62)', fontWeight: '500', marginTop: 3, marginBottom: 2 },
-  heroSub:       { fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
-  heroSub2:      { fontSize: 12, color: 'rgba(255,255,255,0.45)', fontWeight: '500', marginTop: 2 },
-  heroSubStrong: { color: '#FFFFFF', fontWeight: '800' },
-  heroScopeTag:  { color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontStyle: 'italic' },
+  heroSplit:     { fontSize: 12, color: c.text.secondary, fontWeight: '500', marginTop: 3, marginBottom: 2 },
+  heroSub:       { fontSize: 12, color: c.text.secondary, fontWeight: '500' },
+  heroSub2:      { fontSize: 12, color: c.text.muted, fontWeight: '500', marginTop: 2 },
+  heroSubStrong: { color: c.text.primary, fontWeight: '800' },
+  heroScopeTag:  { color: c.text.muted, fontWeight: '600', fontStyle: 'italic' },
 
   // ── Stats scope toggle ──────────────────────────────────────────────────────
   scopeRow: {
