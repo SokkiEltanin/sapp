@@ -188,12 +188,14 @@ export async function getLastBackup(): Promise<BackupMeta | null> {
   return all[0] ?? null;
 }
 
-// Create an automatic backup at most once per AUTO_EVERY_MS. Safe to call on
-// every app launch — cheap no-op when a recent backup already exists.
-export async function maybeAutoBackup(appBuild?: number): Promise<void> {
+// Create an automatic backup at most once per `minIntervalMs` (default 24h).
+// Safe to call on every launch — cheap no-op when a recent backup exists. Called
+// on app-background with a shorter interval too, so recent changes (e.g. product
+// kcal) are captured before a possible reinstall.
+export async function maybeAutoBackup(appBuild?: number, minIntervalMs: number = AUTO_EVERY_MS): Promise<void> {
   try {
     const last = await AsyncStorage.getItem(LAST_AUTO_KEY);
-    if (last && Date.now() - new Date(last).getTime() < AUTO_EVERY_MS) return;
+    if (last && Date.now() - new Date(last).getTime() < minIntervalMs) return;
     await createBackup(true, appBuild);
   } catch {
     // Offline / not signed in yet — try again next launch.

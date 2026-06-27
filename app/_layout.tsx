@@ -127,10 +127,17 @@ export default function RootLayout() {
   }, []);
 
   // Daily cloud backup — runs shortly after launch (throttled to once/24h inside).
+  // Also backs up when the app goes to background (shorter 2h throttle) so recent
+  // changes — e.g. product kcal you just set — are captured before a reinstall.
   useEffect(() => {
     if (!authReady) return;
     const t = setTimeout(() => { maybeAutoBackup().catch(() => {}); }, 8000);
-    return () => clearTimeout(t);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        maybeAutoBackup(undefined, 2 * 60 * 60 * 1000).catch(() => {});
+      }
+    });
+    return () => { clearTimeout(t); sub.remove(); };
   }, [authReady]);
 
   // After signing into a pre-existing Google account (e.g. on a fresh install),
