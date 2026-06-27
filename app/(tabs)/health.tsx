@@ -880,14 +880,14 @@ export default function HealthScreen() {
           <GlassCard padding={spacing[4]} style={styles.tealCard}>
             <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setEnergyOpen(o => !o); }} style={styles.cardRow}>
               <Flame size={13} color={colors.text.muted} />
-              <Text style={styles.cardLabel}>BILANS ENERGII</Text>
-              <View style={{ flex: 1 }} />
+              <Text style={[styles.cardLabel, { flexShrink: 1 }]} numberOfLines={1}>BILANS ENERGII</Text>
+              <View style={{ flex: 1, minWidth: spacing[2] }} />
               {!energyOpen && energy.burned > 0 && energy.intakeAvg > 0 && (
-                <Text style={[styles.energyTag, { color: energy.balance >= 0 ? T.accent : colors.accent.red, fontStyle: 'normal', fontWeight: '800' }]}>
-                  {energy.balance >= 0 ? '−' : '+'}{Math.abs(energy.balance).toLocaleString('pl-PL')} kcal
+                <Text style={{ fontSize: 12, fontWeight: '800', color: energy.balance >= 0 ? T.accent : colors.accent.red, marginRight: spacing[2] }} numberOfLines={1}>
+                  {energy.balance >= 0 ? 'deficyt ' : 'nadwyżka '}{Math.abs(energy.balance).toLocaleString('pl-PL')}
                 </Text>
               )}
-              <Text style={[styles.energyTag, { marginLeft: spacing[2] }]}>szacunek</Text>
+              <Text style={styles.energyTag} numberOfLines={1}>szacunek</Text>
               <ChevronRight size={13} color={colors.text.muted} style={[{ marginLeft: 4 }, energyOpen && { transform: [{ rotate: '90deg' }] }]} />
             </TouchableOpacity>
 
@@ -966,7 +966,7 @@ export default function HealthScreen() {
             })()}
 
             <Text style={styles.energyNote}>
-              {energy.burned === 0 ? 'Brak danych spalania z zegarka (Health Connect).'
+              {energy.burned === 0 ? 'Brak spalania z zegarka. W Samsung Health → Ustawienia → Health Connect włącz udostępnianie „Spalone kalorie" (aktywne + całkowite), potem odśwież tutaj.'
                 : energy.intakeAvg === 0 ? 'Brak danych o jedzeniu — skanuj paragony, by oszacować.'
                 : 'Spalanie z zegarka · jedzenie szacowane z paragonów (nie liczy dokładnych posiłków).'}
             </Text>
