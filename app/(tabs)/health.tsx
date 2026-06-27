@@ -114,6 +114,7 @@ export default function HealthScreen() {
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
   const [weekBurn, setWeekBurn]         = useState<number[]>(Array(7).fill(0)); // kcal burned per day (from cache)
+  const [weekFat, setWeekFat]           = useState<number[]>(Array(7).fill(0)); // body fat % per day (from cache)
   const [weekWater, setWeekWater]       = useState<number[]>(Array(7).fill(0));
   const [monthData, setMonthData]       = useState<HealthDayPoint[]>([]); // 30-day from watch
   const [fromWatch, setFromWatch]       = useState(false);                // HC delivered data
@@ -297,6 +298,7 @@ export default function HealthScreen() {
         const wWeight = Array(7).fill(0);
         const wWater  = Array(7).fill(0);
         const wBurn   = Array(7).fill(0);
+        const wFat    = Array(7).fill(0);
         const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
 
         for (let i = 0; i <= todayIdx; i++) {
@@ -311,6 +313,7 @@ export default function HealthScreen() {
             if (parsed.hc) {
               const hc = parsed.hc;
               wBurn[i] = (hc.totalCalories > 0 ? hc.totalCalories : ((hc.bmr || 0) + (hc.activeCalories || 0)));
+              if (hc.bodyFatPct > 0) wFat[i] = hc.bodyFatPct;
             }
             wSleep[i] = {
               h: parsed.sleepH ?? 0,
@@ -324,6 +327,7 @@ export default function HealthScreen() {
         setWeekWeight(wWeight);
         setWeekWater(wWater);
         setWeekBurn(wBurn);
+        setWeekFat(wFat);
 
         // Most recent logged weight (survives gaps >7 days) — seed for nudging.
         const storedLast = await AsyncStorage.getItem('health_last_weight');
@@ -775,6 +779,18 @@ export default function HealthScreen() {
               )}
             </View>
           )}
+
+          {(() => {
+            let first = 0, last = 0;
+            for (const f of weekFat) { if (f > 0) { if (first === 0) first = f; last = f; } }
+            if (first === 0 || last === 0 || first === last) return null;
+            const d = +(last - first).toFixed(1);
+            return (
+              <Text style={styles.fatTrend}>
+                Tkanka tłuszczowa: <Text style={{ color: d <= 0 ? T.accent : colors.accent.amber, fontWeight: '800' }}>{d > 0 ? '+' : ''}{d}%</Text> w tym tygodniu
+              </Text>
+            );
+          })()}
 
           <View style={styles.weightRow}>
             <PressableScale onPress={() => bumpWeight(-1)} style={styles.weightBtn}>
@@ -1403,6 +1419,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   goalChipText: { fontSize: 10, fontWeight: '700', color: t.accent, letterSpacing: 0.2 },
   goalProg: { marginTop: spacing[3] },
   goalProgText: { fontSize: 12, fontWeight: '600', color: c.text.secondary, textAlign: 'center' },
+  fatTrend: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, textAlign: 'center', marginTop: spacing[2] },
   bodyCompRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   bodyCompTile: { flexBasis: '47%', flexGrow: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
