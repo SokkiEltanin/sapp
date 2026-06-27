@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import {
-  Sparkles, Wallet, TrendingUp, Footprints, Moon, Smile, Briefcase, ListChecks, Cookie,
+  Sparkles, Wallet, TrendingUp, Footprints, Moon, Smile, Briefcase, ListChecks, Cookie, Scale,
   ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight, X,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -31,6 +31,7 @@ const TILES: TileDef[] = [
   { id: 'moodAvg',   label: 'Nastrój',   Icon: Smile,      unit: '/5',    betterHigh: true  },
   { id: 'workHours', label: 'Praca',     Icon: Briefcase,  unit: 'h',     betterHigh: null  },
   { id: 'tasksDone', label: 'Zadania',   Icon: ListChecks, unit: '',      betterHigh: true  },
+  { id: 'weight',    label: 'Waga',      Icon: Scale,      unit: 'kg',    betterHigh: null  },
   { id: 'sweets',    label: 'Słodycze',  Icon: Cookie,     unit: 'zł',    betterHigh: false },
 ];
 
@@ -43,6 +44,7 @@ const METRIC_HOME: Record<string, { route: string; label: string }> = {
   steps:     { route: '/(tabs)/health',    label: 'Zdrowie' },
   sleepAvg:  { route: '/(tabs)/health',    label: 'Zdrowie' },
   moodAvg:   { route: '/(tabs)/mood',      label: 'Nastrój' },
+  weight:    { route: '/(tabs)/health',    label: 'Zdrowie' },
   tasksDone: { route: '/(tabs)/analytics', label: 'Analizy' },
 };
 
