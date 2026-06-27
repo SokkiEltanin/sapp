@@ -17,6 +17,7 @@ import { toast } from '@/store/toastStore';
 import { MOOD_COLORS, Expense } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
+import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
@@ -230,7 +231,11 @@ export default function HealthScreen() {
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
   const [detail, setDetail] = useState<null | 'steps' | 'sleep'>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]); // for the energy-balance estimate
-  useFocusEffect(useCallback(() => { expensesService.getAll().then(setExpenses).catch(() => {}); }, []));
+  const [kcalMem, setKcalMem] = useState<KcalMemory>({});
+  useFocusEffect(useCallback(() => {
+    expensesService.getAll().then(setExpenses).catch(() => {});
+    loadKcalMemory().then(setKcalMem).catch(() => {});
+  }, []));
 
   // ── Energy balance (estimate) ───────────────────────────────────────────────
   // OUT = the watch's burn (total, or BMR + active). IN = estimated food energy
@@ -240,7 +245,7 @@ export default function HealthScreen() {
     const active = (hcExtra.activeCalories as number) || 0;
     const totalC = (hcExtra.totalCalories as number) || 0;
     const burned = totalC > 0 ? totalC : (bmr > 0 ? bmr + active : 0);
-    const intakeAvg = avgFoodKcal(expenses, 7);
+    const intakeAvg = avgFoodKcal(expenses, 7, kcalMem);
     // This week's weight change (first → last logged) to sanity-check the balance.
     let first = 0, last = 0;
     for (const w of weekWeight) { if (w > 0) { if (first === 0) first = w; last = w; } }
@@ -251,7 +256,7 @@ export default function HealthScreen() {
     const week = weekBurn.map((burn, i) => {
       const d = new Date(td.getFullYear(), td.getMonth(), td.getDate() - (tIdx - i));
       const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      const intake = i <= tIdx ? foodKcalForDate(expenses, ds) : 0;
+      const intake = i <= tIdx ? foodKcalForDate(expenses, ds, kcalMem) : 0;
       return { burn, intake, balance: burn - intake };
     });
     // TDEE ≈ average daily burn over logged days → maintenance + a cut target.
@@ -260,7 +265,7 @@ export default function HealthScreen() {
     const maintain = avgBurn;
     const cut = maintain > 1200 ? maintain - 500 : 0; // ~0.5 kg/tydz. deficyt
     return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta, week, maintain, cut };
-  }, [hcExtra, expenses, weekWeight, weekBurn]);
+  }, [hcExtra, expenses, weekWeight, weekBurn, kcalMem]);
 
   useEffect(() => {
     const load = async () => {

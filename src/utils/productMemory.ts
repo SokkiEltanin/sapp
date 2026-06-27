@@ -393,6 +393,39 @@ export function weightFor(name: string, mem: WeightMemory): number | undefined {
   return mem[key] ?? findFuzzyMatch(key, mem);
 }
 
+// ─── Per-product kcal memory (kcal per 100 g) ─────────────────────────────────
+// You set a product's energy density once (on the Produkty screen); the calorie
+// estimate then uses it for that product instead of the coarse category guess.
+
+const KCAL_KEY = 'product_kcal_memory';
+export type KcalMemory = Record<string, number>; // normalizedName → kcal/100g
+
+export async function loadKcalMemory(): Promise<KcalMemory> {
+  try {
+    const raw = await AsyncStorage.getItem(KCAL_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveKcalMemory(items: { name: string; kcal: number }[]): Promise<void> {
+  const valid = items.filter(i => i.name.trim() && i.kcal > 0);
+  if (valid.length === 0) return;
+  try {
+    const mem = await loadKcalMemory();
+    for (const i of valid) mem[normalize(i.name)] = Math.round(i.kcal);
+    const entries = Object.entries(mem);
+    await AsyncStorage.setItem(KCAL_KEY, JSON.stringify(entries.length > MAX_ENTRIES ? Object.fromEntries(entries.slice(-MAX_ENTRIES)) : mem));
+  } catch {}
+}
+
+// Learned kcal/100g for a product name (exact then fuzzy).
+export function kcalFor(name: string, mem: KcalMemory): number | undefined {
+  const key = normalize(name);
+  return mem[key] ?? findFuzzyMatch(key, mem);
+}
+
 function unitToKg(n: number, unit: string): number | undefined {
   if (!(n > 0)) return undefined;
   // l/ml treated as kg-equivalent (density ~1) so volume products get a weight too.
