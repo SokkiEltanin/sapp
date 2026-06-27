@@ -1469,6 +1469,31 @@ export default function DashboardScreen() {
       .catch(() => {});
   }, [tagLimits]);
 
+  // ── Weekly summary (#17): Sunday-evening recap, re-armed on open ─────────────
+  const weeklySummary = useMemo(() => {
+    const wd = new Set(getWeekDates(0)); // always the CURRENT week, regardless of UI offset
+    let spend = 0;
+    for (const e of expenses) { if (e.type !== 'income' && wd.has((e.date ?? '').slice(0, 10))) spend += e.amount ?? 0; }
+    const moods = moodEntries.filter(e => wd.has(e.date)).map(e => e.mood);
+    const moodAvg = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : null;
+    const sleeps = [...wd].map(d => healthDays[d]?.sleepMinutes ?? 0).filter(m => m > 0);
+    const sleepAvg = sleeps.length ? sleeps.reduce((a, b) => a + b, 0) / sleeps.length : null;
+    const steps = [...wd].map(d => healthDays[d]?.steps ?? 0).filter(srx => srx > 0);
+    const stepsAvg = steps.length ? Math.round(steps.reduce((a, b) => a + b, 0) / steps.length) : null;
+    const parts: string[] = [];
+    if (spend > 0) parts.push(`Wydatki: ${spend.toFixed(0)} zł`);
+    if (moodAvg != null) parts.push(`Nastrój: ${moodAvg.toFixed(1)}/5`);
+    if (sleepAvg != null) parts.push(`Sen śr.: ${Math.floor(sleepAvg / 60)}h ${pad(Math.round(sleepAvg % 60))}m`);
+    if (stepsAvg != null) parts.push(`Kroki śr.: ${stepsAvg.toLocaleString('pl-PL')}`);
+    return parts;
+  }, [expenses, moodEntries, healthDays]);
+
+  useEffect(() => {
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshWeeklySummary(weeklySummary))
+      .catch(() => {});
+  }, [weeklySummary]);
+
   // ── Dynamic hero briefing ──────────────────────────────────────────────────
   // A contextual one-liner — complements the TopPill (which shows the single top
   // priority) by giving a broader daily summary. { pre, bold, post } parts.

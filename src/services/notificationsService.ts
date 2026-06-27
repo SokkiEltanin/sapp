@@ -246,6 +246,27 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Weekly recap — a one-off DATE for the upcoming Sunday 19:00, re-armed on app
+  // open so the content reflects the latest week. Gated by its own flag.
+  async refreshWeeklySummary(parts: string[]): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('weekly-summary').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+      if (await AsyncStorage.getItem('notif_weekly_enabled') === 'false') return;
+      if (parts.length === 0) return;
+      const now = new Date();
+      const date = new Date(now);
+      date.setDate(now.getDate() + ((7 - now.getDay()) % 7)); // upcoming Sunday (getDay 0 = today)
+      date.setHours(19, 0, 0, 0);
+      if (date.getTime() <= now.getTime()) date.setDate(date.getDate() + 7);
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'weekly-summary',
+        content: { title: 'Podsumowanie tygodnia', body: parts.join(' · '), data: { screen: 'index' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+      });
+    } catch {}
+  },
+
   async scheduleDailyTaskBriefing(
     hour = 8, minute = 0,
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },

@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  Bell, Smile, ListChecks, Repeat, Wrench, Wallet, Briefcase, CreditCard, ChevronLeft,
+  Bell, Smile, ListChecks, Repeat, Wrench, Wallet, Briefcase, CreditCard, ChevronLeft, CalendarDays,
 } from 'lucide-react-native';
 
 import { notificationsService } from '@/services/notificationsService';
@@ -32,6 +32,7 @@ const TYPES: NotifType[] = [
   { flag: 'notif_budget_enabled',      label: 'Budżet / limity',  desc: 'Zbliżanie się i przekroczenie limitów wydatków', Icon: Wallet,     color: '#E43434', ids: ['budget-limit'] },
   { flag: 'notif_work_enabled',        label: 'Zmiany w pracy',   desc: 'Początek i koniec zmiany (+ ile zarobiono)',    Icon: Briefcase,  color: '#5B7BE3', prefixes: ['work-start-', 'work-end-'] },
   { flag: 'notif_subs_enabled',        label: 'Subskrypcje',      desc: 'Przypomnienie przed odnowieniem subskrypcji',    Icon: CreditCard, color: '#A78BFA', prefixes: ['sub-'] },
+  { flag: 'notif_weekly_enabled',      label: 'Podsumowanie tyg.', desc: 'Niedziela 19:00 — wydatki, nastrój, sen, kroki', Icon: CalendarDays, color: '#46B0DE', ids: ['weekly-summary'] },
 ];
 
 async function cancelType(t: NotifType) {
