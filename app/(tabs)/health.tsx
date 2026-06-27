@@ -177,15 +177,17 @@ export default function HealthScreen() {
             const ds = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
             feedWaterHabit(Math.round(day.hydrationMl / GLASS_ML), ds).catch(() => {});
           }
-          setHcExtra({
+          setHcExtra(prev => ({
+            ...prev, // keep manually-entered body composition the watch doesn't report
             heartRateAvg: day.heartRateAvg, restingHeartRate: day.restingHeartRate, distanceKm: day.distanceKm,
             activeCalories: day.activeCalories, totalCalories: day.totalCalories, exerciseMinutes: day.exerciseMinutes,
             oxygenPct: day.oxygenPct, vo2max: day.vo2max,
-            floors: day.floors, hrv: day.hrv, respiratoryRate: day.respiratoryRate, bodyFatPct: day.bodyFatPct, bmr: day.bmr,
-            leanMassKg: day.leanMassKg, bodyWaterKg: day.bodyWaterKg,
+            floors: day.floors, hrv: day.hrv, respiratoryRate: day.respiratoryRate,
+            bodyFatPct: day.bodyFatPct ?? prev.bodyFatPct, bmr: day.bmr ?? prev.bmr,
+            leanMassKg: day.leanMassKg ?? prev.leanMassKg, bodyWaterKg: day.bodyWaterKg ?? prev.bodyWaterKg,
             sleepDeepMin: day.sleepDeepMin, sleepRemMin: day.sleepRemMin, sleepLightMin: day.sleepLightMin,
             hydrationMl: day.hydrationMl,
-          });
+          }));
           setFromWatch(true);
         }
       } catch {}
@@ -236,6 +238,13 @@ export default function HealthScreen() {
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
   const [detail, setDetail] = useState<null | 'steps' | 'sleep' | 'body'>(null);
   const [energyOpen, setEnergyOpen] = useState(false); // calorie card is collapsed by default (de-emphasised)
+  const [bodyEdit, setBodyEdit] = useState(false); // manual body-composition entry open in the body sheet
+  // Manually set a body-composition field; '' / invalid clears it. Persisted via the
+  // today-cache save effect, and preserved across watch syncs (sync uses ?? prev).
+  const setBodyField = (key: string, raw: string) => {
+    const v = parseFloat(raw.replace(',', '.'));
+    setHcExtra(prev => ({ ...prev, [key]: !raw.trim() || isNaN(v) || v <= 0 ? null : v }));
+  };
   const [expenses, setExpenses] = useState<Expense[]>([]); // for the energy-balance estimate
   const [kcalMem, setKcalMem] = useState<KcalMemory>({});
   useFocusEffect(useCallback(() => {
@@ -403,15 +412,17 @@ export default function HealthScreen() {
           const ds = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
           feedWaterHabit(Math.round(d.hydrationMl / GLASS_ML), ds).catch(() => {});
         }
-        setHcExtra({
+        setHcExtra(prev => ({
+          ...prev, // keep manually-entered body composition the watch doesn't report
           heartRateAvg: d.heartRateAvg, restingHeartRate: d.restingHeartRate, distanceKm: d.distanceKm,
           activeCalories: d.activeCalories, totalCalories: d.totalCalories, exerciseMinutes: d.exerciseMinutes,
           oxygenPct: d.oxygenPct, vo2max: d.vo2max,
-          floors: d.floors, hrv: d.hrv, respiratoryRate: d.respiratoryRate, bodyFatPct: d.bodyFatPct, bmr: d.bmr,
-          leanMassKg: d.leanMassKg, bodyWaterKg: d.bodyWaterKg,
+          floors: d.floors, hrv: d.hrv, respiratoryRate: d.respiratoryRate,
+          bodyFatPct: d.bodyFatPct ?? prev.bodyFatPct, bmr: d.bmr ?? prev.bmr,
+          leanMassKg: d.leanMassKg ?? prev.leanMassKg, bodyWaterKg: d.bodyWaterKg ?? prev.bodyWaterKg,
           sleepDeepMin: d.sleepDeepMin, sleepRemMin: d.sleepRemMin, sleepLightMin: d.sleepLightMin,
           hydrationMl: d.hydrationMl,
-        });
+        }));
         setFromWatch(true);
         haptic.success();
         toast.success('Zsynchronizowano z zegarka');
@@ -1243,6 +1254,32 @@ export default function HealthScreen() {
                         <View key={i} style={styles.detailTile}><Text style={styles.detailTileVal}>{t2.v}</Text><Text style={styles.detailTileLabel}>{t2.l}</Text></View>
                       ))}
                     </View>
+
+                    <TouchableOpacity onPress={() => { haptic.tap(); setBodyEdit(e => !e); }} style={styles.bodyEditToggle}>
+                      <Text style={styles.bodyEditToggleText}>{bodyEdit ? 'Ukryj ręczny wpis' : 'Wpisz ręcznie (gdy zegarek nie podał)'}</Text>
+                    </TouchableOpacity>
+                    {bodyEdit && (
+                      <View style={styles.bodyEditRow}>
+                        {[
+                          { k: 'bodyFatPct', l: 'Tłuszcz %' },
+                          { k: 'leanMassKg', l: 'Mięśnie kg' },
+                          { k: 'bodyWaterKg', l: 'Woda kg' },
+                        ].map(f => (
+                          <View key={f.k} style={styles.bodyEditField}>
+                            <Text style={styles.bodyEditLabel}>{f.l}</Text>
+                            <TextInput
+                              key={`${f.k}-${bodyEdit}`}
+                              defaultValue={(hcExtra[f.k] as number) > 0 ? String(hcExtra[f.k]) : ''}
+                              onChangeText={t => setBodyField(f.k, t)}
+                              keyboardType="decimal-pad"
+                              placeholder="—"
+                              placeholderTextColor={T.muted}
+                              style={styles.bodyEditInput}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    )}
                     {fatDelta != null && (
                       <View style={styles.detailRecord}>
                         <Award size={14} color={T.accent} />
@@ -1337,6 +1374,12 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   qualityPickRow: { flexDirection: 'row', gap: spacing[1] },
   qualityPick: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
   qualityPickText: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
+  bodyEditToggle: { alignSelf: 'flex-start', marginTop: spacing[2] },
+  bodyEditToggleText: { fontSize: 11.5, fontWeight: '700', color: '#8B5CF6' },
+  bodyEditRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] },
+  bodyEditField: { flex: 1 },
+  bodyEditLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted, marginBottom: 3 },
+  bodyEditInput: { backgroundColor: c.fill.subtle, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[2], paddingVertical: 9, fontSize: 15, fontWeight: '700', color: c.text.primary, textAlign: 'center' },
 
   minuteRow: { flexDirection: 'row', gap: spacing[2] },
   minutePill: {
