@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp } from '
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
+import { estimateItemKcal } from '@/utils/calories';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -99,6 +100,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
         <View style={styles.itemList}>
           {expense.receiptItems!.map((it, i) => {
             const itMeta = getCategoryMeta(it.category);
+            const kcal = estimateItemKcal(it);
             return (
               <View key={i} style={[styles.itemRow, i === 0 && styles.itemRowFirst]}>
                 <View style={[styles.itemDot, { backgroundColor: itMeta.color + '30', borderColor: itMeta.color + '50' }]} />
@@ -119,6 +121,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
                     <Text style={styles.itemQty}>{it.quantity}×</Text>
                   )}
                   <Text style={styles.itemPrice}>{it.price.toFixed(2)} zł</Text>
+                  {kcal > 0 && <Text style={styles.itemKcal}>~{kcal} kcal</Text>}
                 </View>
               </View>
             );
@@ -195,6 +198,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   itemAmtCol: { alignItems: 'flex-end', gap: 1 },
   itemQty: { fontSize: 9, color: c.text.muted },
   itemPrice: { fontSize: 12, fontWeight: '700', color: c.text.primary },
+  itemKcal: { fontSize: 9, color: c.text.muted, marginTop: 1 },
 
   detailBtn: {
     marginHorizontal: spacing[4], marginTop: spacing[1], marginBottom: spacing[3],

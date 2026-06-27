@@ -240,8 +240,12 @@ export default function HealthScreen() {
     const totalC = (hcExtra.totalCalories as number) || 0;
     const burned = totalC > 0 ? totalC : (bmr > 0 ? bmr + active : 0);
     const intakeAvg = avgFoodKcal(expenses, 7);
-    return { burned, intakeAvg, balance: burned - intakeAvg };
-  }, [hcExtra, expenses]);
+    // This week's weight change (first → last logged) to sanity-check the balance.
+    let first = 0, last = 0;
+    for (const w of weekWeight) { if (w > 0) { if (first === 0) first = w; last = w; } }
+    const weightDelta = (first > 0 && last > 0 && first !== last) ? +(last - first).toFixed(1) : null;
+    return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta };
+  }, [hcExtra, expenses, weekWeight]);
 
   useEffect(() => {
     const load = async () => {
@@ -792,6 +796,15 @@ export default function HealthScreen() {
               </View>
             )}
 
+            {energy.weightDelta != null && (
+              <Text style={styles.energyWeight}>
+                Waga w tym tyg.: <Text style={{ color: energy.weightDelta <= 0 ? T.accent : colors.accent.red, fontWeight: '800' }}>{energy.weightDelta > 0 ? '+' : ''}{energy.weightDelta} kg</Text>
+                {energy.burned > 0 && energy.intakeAvg > 0
+                  ? ((energy.balance >= 0) === (energy.weightDelta <= 0) ? '  ·  zgodne z bilansem' : '  ·  rozjazd z bilansem — popraw szacunek')
+                  : ''}
+              </Text>
+            )}
+
             <Text style={styles.energyNote}>
               {energy.burned === 0 ? 'Brak danych spalania z zegarka (Health Connect).'
                 : energy.intakeAvg === 0 ? 'Brak danych o jedzeniu — skanuj paragony, by oszacować.'
@@ -1235,6 +1248,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   energyBalance: { alignItems: 'center', gap: 2, marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.lg, borderWidth: 1, backgroundColor: t.accentDim },
   energyBalanceVal: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   energyBalanceLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
+  energyWeight: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[3], textAlign: 'center' },
   energyNote: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic', lineHeight: 14 },
   bodyCompRow: { flexDirection: 'row', gap: spacing[2] },
   bodyCompTile: { flex: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
