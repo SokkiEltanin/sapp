@@ -100,8 +100,8 @@ export default function HealthScreen() {
   const [goalInput, setGoalInput]       = useState('');
   const [water, setWater]               = useState(0);
   const [steps, setSteps]               = useState(0);
-  const [sleepH, setSleepH]             = useState(7);
-  const [sleepM, setSleepM]             = useState(30);
+  const [sleepH, setSleepH]             = useState(0);
+  const [sleepM, setSleepM]             = useState(0);
   const [sleepQuality, setSleepQuality] = useState<SleepQuality | undefined>(undefined);
   const [weight, setWeight]             = useState(0);
   const [lastWeight, setLastWeight]     = useState(0); // most recent logged weight (any day) — seed for nudging
@@ -450,7 +450,7 @@ export default function HealthScreen() {
           </View>
           <View style={styles.summaryTile}>
             <Moon size={15} color="#A78BFA" />
-            <Text style={styles.summaryVal}>{sleepH}:{pad(sleepM)}</Text>
+            <Text style={styles.summaryVal}>{sleepH === 0 && sleepM === 0 ? '—' : `${sleepH}:${pad(sleepM)}`}</Text>
             <Text style={styles.summaryLabel}>sen</Text>
           </View>
           <View style={styles.summaryTile}>
@@ -519,26 +519,37 @@ export default function HealthScreen() {
               <ChevronRight size={15} color={colors.text.muted} />
             </View>
 
-            {/* Duration (read-only — from the watch) */}
+            {/* Duration — from the watch, or entered by hand in the detail sheet */}
             <View style={styles.sleepDurRow}>
               <View style={[styles.sleepDurCenter, { flex: 1 }]}>
-                <Text style={styles.sleepDurNum}>
-                  {sleepH}<Text style={styles.sleepDurUnit}>h </Text>
-                  {pad(sleepM)}<Text style={styles.sleepDurUnit}>m</Text>
-                </Text>
-                <Text style={styles.sleepDurSub}>
-                  {sleepH < 6 ? 'za mało' : sleepH >= 7 && sleepH <= 9 ? 'optymalny' : sleepH > 9 ? 'dużo' : 'minimalny'} · szczegóły
-                </Text>
+                {sleepH === 0 && sleepM === 0 ? (
+                  <>
+                    <Text style={[styles.sleepDurNum, { color: colors.text.muted }]}>—</Text>
+                    <Text style={styles.sleepDurSub}>brak danych · dotknij, by wpisać</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.sleepDurNum}>
+                      {sleepH}<Text style={styles.sleepDurUnit}>h </Text>
+                      {pad(sleepM)}<Text style={styles.sleepDurUnit}>m</Text>
+                    </Text>
+                    <Text style={styles.sleepDurSub}>
+                      {sleepH < 6 ? 'za mało' : sleepH >= 7 && sleepH <= 9 ? 'optymalny' : sleepH > 9 ? 'dużo' : 'minimalny'} · szczegóły
+                    </Text>
+                  </>
+                )}
               </View>
             </View>
           </TouchableOpacity>
 
-          <View style={styles.microBar}>
-            <View style={[styles.microFill, {
-              width: `${sleepPct * 100}%`,
-              backgroundColor: sleepQuality ? QUALITY_COLORS[sleepQuality] : colors.text.secondary,
-            }]} />
-          </View>
+          {!(sleepH === 0 && sleepM === 0) && (
+            <View style={styles.microBar}>
+              <View style={[styles.microFill, {
+                width: `${sleepPct * 100}%`,
+                backgroundColor: sleepQuality ? QUALITY_COLORS[sleepQuality] : colors.text.secondary,
+              }]} />
+            </View>
+          )}
 
           {/* Sleep stages (deep / REM / light) — when the watch reports them */}
           {(() => {
@@ -1115,6 +1126,31 @@ export default function HealthScreen() {
                 );
               })()}
 
+              {detail === 'sleep' && (
+                <View style={{ marginBottom: spacing[2] }}>
+                  <Text style={styles.detailSectionLabel}>WPISZ RĘCZNIE (gdy zegarek nie podał)</Text>
+                  <View style={styles.sleepStepRow}>
+                    <View style={styles.sleepStepper}>
+                      <TouchableOpacity onPress={() => { haptic.tap(); setSleepH(h => Math.max(0, h - 1)); }} style={styles.slStepBtn}><Text style={styles.stepBtnText}>−</Text></TouchableOpacity>
+                      <Text style={styles.stepVal}>{sleepH}<Text style={styles.stepUnit}>h</Text></Text>
+                      <TouchableOpacity onPress={() => { haptic.tap(); setSleepH(h => Math.min(16, h + 1)); }} style={styles.slStepBtn}><Text style={styles.stepBtnText}>+</Text></TouchableOpacity>
+                    </View>
+                    <View style={styles.sleepStepper}>
+                      <TouchableOpacity onPress={() => { haptic.tap(); setSleepM(m => (m + 45) % 60); }} style={styles.slStepBtn}><Text style={styles.stepBtnText}>−</Text></TouchableOpacity>
+                      <Text style={styles.stepVal}>{pad(sleepM)}<Text style={styles.stepUnit}>m</Text></Text>
+                      <TouchableOpacity onPress={() => { haptic.tap(); setSleepM(m => (m + 15) % 60); }} style={styles.slStepBtn}><Text style={styles.stepBtnText}>+</Text></TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={styles.qualityPickRow}>
+                    {QUALITY_KEYS.map(q => (
+                      <TouchableOpacity key={q} onPress={() => { haptic.tap(); setSleepQuality(q); }} style={[styles.qualityPick, sleepQuality === q && { backgroundColor: QUALITY_COLORS[q] + '22', borderColor: QUALITY_COLORS[q] }]}>
+                        <Text style={[styles.qualityPickText, sleepQuality === q && { color: QUALITY_COLORS[q] }]}>{QUALITY_LABELS[q]}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               {detail === 'sleep' && healthStats && (() => {
                 const hm = (m: number) => `${Math.floor(m / 60)}h ${pad(m % 60)}m`;
                 const maxSleepMin = Math.max(...monthData.map(p => p.sleepMinutes), 1);
@@ -1292,6 +1328,15 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   sleepDurNum: { fontSize: 32, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
   sleepDurUnit: { fontSize: 13, fontWeight: '400', color: c.text.muted },
   sleepDurSub: { fontSize: 11, color: c.text.muted, fontWeight: '500' },
+  sleepStepRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[2] },
+  sleepStepper: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: c.fill.subtle, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[2], paddingVertical: 6 },
+  slStepBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: c.fill.medium },
+  stepBtnText: { fontSize: 20, fontWeight: '800', color: c.text.primary, lineHeight: 22 },
+  stepVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
+  stepUnit: { fontSize: 12, fontWeight: '500', color: c.text.muted },
+  qualityPickRow: { flexDirection: 'row', gap: spacing[1] },
+  qualityPick: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  qualityPickText: { fontSize: 11, fontWeight: '700', color: c.text.secondary },
 
   minuteRow: { flexDirection: 'row', gap: spacing[2] },
   minutePill: {
