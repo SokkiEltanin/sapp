@@ -1,4 +1,4 @@
-import { useEffect, useState, Component, ReactNode } from 'react';
+import { useEffect, useState, useRef, Component, ReactNode } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -47,7 +47,10 @@ const eb = StyleSheet.create({
 });
 
 const MOOD_POPUP_KEY = 'last_mood_auto_popup';
-const SIX_HOURS_MS  = 6 * 60 * 60 * 1000;
+// Short cooldown only to suppress rapid re-foreground spam — the real gate is
+// "once per foreground session" (shownThisFg), so coming back to the dashboard
+// later actually re-asks (the old 6h throttle made it never re-appear).
+const MOOD_COOLDOWN_MS = 20 * 60 * 1000;
 
 // Cross-component guards (module scope, single app instance):
 // • lastHandledNotifKey — collapses the cold-start double delivery (the listener
@@ -60,6 +63,7 @@ let suppressAutoMoodUntil = 0;
 
 function AutoMoodPopup() {
   const [visible, setVisible] = useState(false);
+  const shownThisFg = useRef(false); // shown once this foreground session; reset on resume
   const pathname = usePathname();
   // Only nag while actually sitting on the dashboard ('/'). If the app opens and
   // you immediately tap "+" to add a receipt, you're off the dashboard before the
@@ -78,10 +82,12 @@ function AutoMoodPopup() {
       // A mood notification tap is opening the check-in on the mood screen — don't
       // also pop the global modal (that was the "shows twice" bug).
       if (Date.now() < suppressAutoMoodUntil) return;
+      if (shownThisFg.current) return; // already asked this foreground session
       const lastStr = await AsyncStorage.getItem(MOOD_POPUP_KEY);
       const now = Date.now();
-      if (!lastStr || now - parseInt(lastStr) > SIX_HOURS_MS) {
+      if (!lastStr || now - parseInt(lastStr) > MOOD_COOLDOWN_MS) {
         await AsyncStorage.setItem(MOOD_POPUP_KEY, String(now));
+        shownThisFg.current = true;
         setVisible(true);
       }
     } catch {}
@@ -95,10 +101,11 @@ function AutoMoodPopup() {
     return () => clearTimeout(timer);
   }, [onDashboard]);
 
-  // Returning to the foreground also re-checks, but still only if on the dashboard.
+  // Returning to the foreground is a fresh session: allow the prompt again, then
+  // re-check (still only fires if on the dashboard + mood unlogged + cooldown).
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') check();
+      if (state === 'active') { shownThisFg.current = false; check(); }
     });
     return () => sub.remove();
   }, [onDashboard]);
