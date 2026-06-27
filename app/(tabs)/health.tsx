@@ -254,7 +254,12 @@ export default function HealthScreen() {
       const intake = i <= tIdx ? foodKcalForDate(expenses, ds) : 0;
       return { burn, intake, balance: burn - intake };
     });
-    return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta, week };
+    // TDEE ≈ average daily burn over logged days → maintenance + a cut target.
+    const burnDays = weekBurn.filter(b => b > 0);
+    const avgBurn = burnDays.length ? Math.round(burnDays.reduce((a, b) => a + b, 0) / burnDays.length) : burned;
+    const maintain = avgBurn;
+    const cut = maintain > 1200 ? maintain - 500 : 0; // ~0.5 kg/tydz. deficyt
+    return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta, week, maintain, cut };
   }, [hcExtra, expenses, weekWeight, weekBurn]);
 
   useEffect(() => {
@@ -812,6 +817,21 @@ export default function HealthScreen() {
               </View>
             )}
 
+            {energy.maintain > 0 && (
+              <View style={styles.energyTargetRow}>
+                <View style={styles.energyTarget}>
+                  <Text style={styles.energyTargetVal}>~{energy.maintain.toLocaleString('pl-PL')}</Text>
+                  <Text style={styles.energyTargetLabel}>utrzymanie /dzień</Text>
+                </View>
+                {energy.cut > 0 && (
+                  <View style={styles.energyTarget}>
+                    <Text style={[styles.energyTargetVal, { color: T.accent }]}>~{energy.cut.toLocaleString('pl-PL')}</Text>
+                    <Text style={styles.energyTargetLabel}>cel na spadek (≈0,5 kg/tydz.)</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {energy.weightDelta != null && (
               <Text style={styles.energyWeight}>
                 Waga w tym tyg.: <Text style={{ color: energy.weightDelta <= 0 ? T.accent : colors.accent.red, fontWeight: '800' }}>{energy.weightDelta > 0 ? '+' : ''}{energy.weightDelta} kg</Text>
@@ -1290,6 +1310,10 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   energyBalance: { alignItems: 'center', gap: 2, marginTop: spacing[3], paddingVertical: spacing[3], borderRadius: radius.lg, borderWidth: 1, backgroundColor: t.accentDim },
   energyBalanceVal: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   energyBalanceLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
+  energyTargetRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
+  energyTarget: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: spacing[2], backgroundColor: c.fill.subtle, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle },
+  energyTargetVal: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  energyTargetLabel: { fontSize: 9, color: c.text.muted, textAlign: 'center' },
   energyWeight: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[3], textAlign: 'center' },
   energyWeekRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: spacing[1] },
   energyWeekCol: { flex: 1, alignItems: 'center', gap: 3 },
