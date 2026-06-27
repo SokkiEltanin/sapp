@@ -14,7 +14,7 @@ import {
   canonicalProductName, normalizeProductName, loadNameAliases,
   loadKcalMemory, saveKcalMemory, kcalFor, KcalMemory,
 } from '@/utils/productMemory';
-import { kcalPer100g } from '@/utils/calories';
+import { kcalPer100g, looksLikeFood } from '@/utils/calories';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
@@ -47,7 +47,7 @@ export default function ProductsScreen() {
       if (e.type === 'income') continue;
       for (const it of e.receiptItems ?? []) {
         if (!countsForConsumption(it)) continue;
-        if (kcalPer100g({ name: it.name, tags: it.tags, category: it.category }) <= 0) continue; // non-food
+        if (!looksLikeFood({ name: it.name, tags: it.tags, category: it.category })) continue; // skip non-food
         const name = canonicalProductName(it.name, aliases);
         const key = normalizeProductName(name);
         const cur = map.get(key) ?? { name, key, count: 0, category: it.category, tags: it.tags ?? [] };
