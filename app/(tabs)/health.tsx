@@ -109,6 +109,7 @@ export default function HealthScreen() {
   const [weekSteps, setWeekSteps]       = useState<number[]>(Array(7).fill(0));
   const [weekSleep, setWeekSleep]       = useState<WeekSleep[]>(Array(7).fill({ h: 0, m: 0 }));
   const [weekWeight, setWeekWeight]     = useState<number[]>(Array(7).fill(0));
+  const [weekBurn, setWeekBurn]         = useState<number[]>(Array(7).fill(0)); // kcal burned per day (from cache)
   const [weekWater, setWeekWater]       = useState<number[]>(Array(7).fill(0));
   const [monthData, setMonthData]       = useState<HealthDayPoint[]>([]); // 30-day from watch
   const [fromWatch, setFromWatch]       = useState(false);                // HC delivered data
@@ -244,8 +245,17 @@ export default function HealthScreen() {
     let first = 0, last = 0;
     for (const w of weekWeight) { if (w > 0) { if (first === 0) first = w; last = w; } }
     const weightDelta = (first > 0 && last > 0 && first !== last) ? +(last - first).toFixed(1) : null;
-    return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta };
-  }, [hcExtra, expenses, weekWeight]);
+    // 7-day burn (cache) vs estimated food intake per day.
+    const td = new Date();
+    const tIdx = td.getDay() === 0 ? 6 : td.getDay() - 1;
+    const week = weekBurn.map((burn, i) => {
+      const d = new Date(td.getFullYear(), td.getMonth(), td.getDate() - (tIdx - i));
+      const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const intake = i <= tIdx ? foodKcalForDate(expenses, ds) : 0;
+      return { burn, intake, balance: burn - intake };
+    });
+    return { burned, intakeAvg, balance: burned - intakeAvg, weightDelta, week };
+  }, [hcExtra, expenses, weekWeight, weekBurn]);
 
   useEffect(() => {
     const load = async () => {
@@ -271,6 +281,7 @@ export default function HealthScreen() {
         const wSteps  = Array(7).fill(0);
         const wWeight = Array(7).fill(0);
         const wWater  = Array(7).fill(0);
+        const wBurn   = Array(7).fill(0);
         const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
 
         for (let i = 0; i <= todayIdx; i++) {
@@ -282,6 +293,10 @@ export default function HealthScreen() {
             if (parsed.steps != null)  wSteps[i] = parsed.steps;
             if (parsed.weight != null) wWeight[i] = parsed.weight;
             if (parsed.water != null)  wWater[i]  = parsed.water;
+            if (parsed.hc) {
+              const hc = parsed.hc;
+              wBurn[i] = (hc.totalCalories > 0 ? hc.totalCalories : ((hc.bmr || 0) + (hc.activeCalories || 0)));
+            }
             wSleep[i] = {
               h: parsed.sleepH ?? 0,
               m: parsed.sleepM ?? 0,
@@ -293,6 +308,7 @@ export default function HealthScreen() {
         setWeekSleep(wSleep);
         setWeekWeight(wWeight);
         setWeekWater(wWater);
+        setWeekBurn(wBurn);
 
         // Most recent logged weight (survives gaps >7 days) — seed for nudging.
         const storedLast = await AsyncStorage.getItem('health_last_weight');
@@ -805,6 +821,32 @@ export default function HealthScreen() {
               </Text>
             )}
 
+            {(() => {
+              const tIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+              const days = energy.week.map(d => (d.burn > 0 && d.intake > 0) ? d.balance : null);
+              if (!days.some(b => b != null)) return null;
+              const maxAbs = Math.max(...days.map(b => (b == null ? 0 : Math.abs(b))), 1);
+              return (
+                <>
+                  <Text style={styles.detailSectionLabel}>BILANS · 7 DNI</Text>
+                  <View style={styles.energyWeekRow}>
+                    {days.map((b, i) => (
+                      <View key={i} style={styles.energyWeekCol}>
+                        <View style={styles.energyWeekBarWrap}>
+                          <View style={[styles.energyWeekBar, {
+                            height: b == null ? 2 : Math.max(3, (Math.abs(b) / maxAbs) * 40),
+                            backgroundColor: b == null ? colors.fill.medium : b >= 0 ? T.accent : colors.accent.red,
+                            opacity: b == null ? 0.4 : 1,
+                          }]} />
+                        </View>
+                        <Text style={[styles.energyWeekLabel, i === tIdx && { color: T.accent, fontWeight: '700' }]}>{WEEK_DAYS[i]}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              );
+            })()}
+
             <Text style={styles.energyNote}>
               {energy.burned === 0 ? 'Brak danych spalania z zegarka (Health Connect).'
                 : energy.intakeAvg === 0 ? 'Brak danych o jedzeniu — skanuj paragony, by oszacować.'
@@ -1249,6 +1291,11 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   energyBalanceVal: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   energyBalanceLabel: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
   energyWeight: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[3], textAlign: 'center' },
+  energyWeekRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: spacing[1] },
+  energyWeekCol: { flex: 1, alignItems: 'center', gap: 3 },
+  energyWeekBarWrap: { width: '100%', height: 42, justifyContent: 'flex-end', alignItems: 'center' },
+  energyWeekBar: { width: '62%', borderRadius: 3, minHeight: 2 },
+  energyWeekLabel: { fontSize: 8.5, color: c.text.muted, fontWeight: '600' },
   energyNote: { fontSize: 10, color: c.text.muted, marginTop: spacing[2], fontStyle: 'italic', lineHeight: 14 },
   bodyCompRow: { flexDirection: 'row', gap: spacing[2] },
   bodyCompTile: { flex: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
