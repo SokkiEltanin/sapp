@@ -65,6 +65,8 @@ import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { expensesService } from '@/services/expensesService';
 import { getPaydayConfig, getPaydayHandledMonth, setPaydayHandledMonth, paydayDue, currentMonth, PaydayConfig } from '@/utils/payday';
+import { debtsService } from '@/services/debtsService';
+import { Debt, PaymentMethod } from '@/types';
 import { moodService } from '@/services/moodService';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
@@ -638,6 +640,10 @@ export default function DashboardScreen() {
   const [paydayDismissed, setPaydayDismissed] = useState(false);
   const [paydayModal, setPaydayModal] = useState(false);
   const [paydayInput, setPaydayInput] = useState('');
+
+  // Debts — ask on the due day whether someone returned the money.
+  const [debts, setDebts] = useState<Debt[]>([]);
+  const [debtDismissed, setDebtDismissed] = useState<Set<string>>(new Set());
   const checkedSubs = useRef(false);
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -703,6 +709,27 @@ export default function DashboardScreen() {
 
   const handlePaymentNo = useCallback(() => { haptic.tap(); setPaymentQueue(q => q.slice(1)); }, []);
 
+  // First open, due, not-yet-dismissed debt → the dashboard asks about it.
+  const dueDebt = useMemo(() => {
+    const t = new Date().toISOString().slice(0, 10);
+    return debts.find(d => !d.settled && d.askDate <= t && !debtDismissed.has(d.id)) ?? null;
+  }, [debts, debtDismissed]);
+
+  const settleDebt = useCallback(async (d: Debt, method: PaymentMethod) => {
+    haptic.success();
+    try {
+      const todayS = new Date().toISOString().slice(0, 10);
+      await expensesService.add({
+        type: 'income', amount: d.amount, currency: 'PLN', category: 'transfer' as any,
+        tags: [], note: `Zwrot: ${d.person}`, date: todayS, paymentMethod: method,
+      });
+      await debtsService.update(d.id, { settled: true, settledMethod: method, settledDate: todayS });
+      setDebts(prev => prev.map(x => x.id === d.id ? { ...x, settled: true } : x));
+      expensesService.getAll().then(setExpenses).catch(() => {});
+      toast.success(`Zwrot dodany (${method === 'cash' ? 'gotówka' : 'karta'})`);
+    } catch { haptic.error(); toast.error('Nie udało się zapisać — sprawdź połączenie'); }
+  }, [setExpenses]);
+
   // Load payday config + handled-month on focus so the prompt is current.
   useFocusEffect(useCallback(() => {
     let alive = true;
@@ -713,6 +740,7 @@ export default function DashboardScreen() {
         .then(({ notificationsService }) => notificationsService.refreshPaydayReminder(cfg.enabled, cfg.day, handled))
         .catch(() => {});
     }).catch(() => {});
+    debtsService.getAll().then(ds => { if (alive) setDebts(ds); }).catch(() => {});
     return () => { alive = false; };
   }, []));
 
@@ -1696,6 +1724,30 @@ export default function DashboardScreen() {
                     <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7}
                       onPress={() => { haptic.tap(); setPaydayDismissed(true); }}>
                       <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Jeszcze nie</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+
+              nodes['debt-prompt'] = dueDebt && (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Wallet size={13} color={colors.accent.amber} />
+                    <Text style={s.cardTitle}>Dług</Text>
+                  </View>
+                  <Text style={[s.factText, { marginTop: spacing[1] }]}>Czy {dueDebt.person} oddał Ci {dueDebt.amount.toFixed(2)} zł?</Text>
+                  <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
+                    <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85}
+                      onPress={() => settleDebt(dueDebt, 'cash')}>
+                      <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Gotówka</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.blue }]} activeOpacity={0.85}
+                      onPress={() => settleDebt(dueDebt, 'card')}>
+                      <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Karta</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7}
+                      onPress={() => { haptic.tap(); setDebtDismissed(prev => new Set(prev).add(dueDebt.id)); }}>
+                      <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Nie</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
