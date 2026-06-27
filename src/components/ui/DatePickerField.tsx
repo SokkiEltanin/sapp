@@ -112,12 +112,14 @@ export default function DatePickerField({ value, onChange, placeholder, style }:
                 const isToday = iso === today;
                 return (
                   <TouchableOpacity
-                    key={i} style={[dp.cell, isSelected && dp.cellSel, isToday && !isSelected && dp.cellToday]}
+                    key={i} style={dp.cell}
                     onPress={() => selectDay(day)} activeOpacity={0.75}
                   >
-                    <Text style={[dp.cellText, isSelected && dp.cellTextSel, isToday && !isSelected && { color: colors.accent.blue }]}>
-                      {day}
-                    </Text>
+                    <View style={[dp.dayCircle, isSelected && dp.cellSel, isToday && !isSelected && dp.cellToday]}>
+                      <Text style={[dp.cellText, isSelected && dp.cellTextSel, isToday && !isSelected && { color: colors.accent.blue }]}>
+                        {day}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -166,8 +168,11 @@ const dp = StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%` as any, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  cellSel: { backgroundColor: colors.text.primary, borderRadius: radius.full },
-  cellToday: { borderRadius: radius.full, borderWidth: 1, borderColor: colors.accent.blue },
+  // Fixed-size circle centered inside the square cell — guarantees a perfect,
+  // centered highlight regardless of cell-width rounding.
+  dayCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  cellSel: { backgroundColor: colors.text.primary },
+  cellToday: { borderWidth: 1, borderColor: colors.accent.blue },
   cellText: { fontSize: 13, fontWeight: '500', color: colors.text.primary },
   cellTextSel: { color: colors.bg.primary, fontWeight: '800' },
 
