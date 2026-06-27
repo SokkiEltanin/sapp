@@ -838,6 +838,20 @@ export default function SettingsScreen() {
         <View>
           <Text style={styles.sectionTitle}>Powiadomienia</Text>
           <View style={styles.card}>
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push('/notifications' as any); }}
+              style={styles.row}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#8B5CF618' }]}>
+                <Bell size={16} color="#8B5CF6" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Zarządzaj powiadomieniami</Text>
+                <Text style={styles.rowSub}>Włącz/wyłącz każdy typ osobno</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+
             <View style={styles.row}>
               <View style={styles.iconWrap}>
                 <Bell size={16} color={colors.text.secondary} />

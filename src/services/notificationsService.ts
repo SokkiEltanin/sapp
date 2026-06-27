@@ -183,6 +183,7 @@ export const notificationsService = {
     try {
       await Notifications.cancelScheduledNotificationAsync('maintenance-due').catch(() => {});
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
+      if (await AsyncStorage.getItem('notif_maintenance_enabled') === 'false') return;
       if (dueLabels.length === 0) return;
       const body = dueLabels.slice(0, 3).join(' · ') + (dueLabels.length > 3 ? ` +${dueLabels.length - 3}` : '');
       await Notifications.scheduleNotificationAsync({
@@ -224,6 +225,7 @@ export const notificationsService = {
     try {
       await Notifications.cancelScheduledNotificationAsync('budget-limit').catch(() => {});
       if (await AsyncStorage.getItem('notif_enabled') === 'false') return; // respect the global toggle
+      if (await AsyncStorage.getItem('notif_budget_enabled') === 'false') return;
       const thrRaw = parseInt((await AsyncStorage.getItem('budget_alert_threshold')) ?? '80', 10);
       const threshold = (isNaN(thrRaw) ? 80 : Math.min(100, Math.max(50, thrRaw))) / 100;
       const hot = near.filter(n => n.pct >= threshold).sort((a, b) => b.pct - a.pct);
@@ -276,6 +278,7 @@ export const notificationsService = {
 
   async scheduleDailyHabitReminder(hour = 21, minute = 0): Promise<string> {
     await Notifications.cancelScheduledNotificationAsync('daily-habits').catch(() => {});
+    if (await AsyncStorage.getItem('notif_habits_enabled') === 'false') return '';
     return Notifications.scheduleNotificationAsync({
       identifier: 'daily-habits',
       content: {
@@ -452,6 +455,8 @@ export const notificationsService = {
 
   async scheduleSubscriptionReminder(sub: Subscription): Promise<void> {
     if (!sub.active || sub.reminderDaysBefore <= 0) return;
+    if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+    if (await AsyncStorage.getItem('notif_subs_enabled') === 'false') return;
     const fire = new Date(sub.nextBillingDate + 'T09:00:00');
     fire.setDate(fire.getDate() - sub.reminderDaysBefore);
     if (fire <= new Date()) return;
@@ -508,6 +513,9 @@ export const notificationsService = {
         await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
       }
     }
+
+    if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+    if (await AsyncStorage.getItem('notif_work_enabled') === 'false') return;
 
     const now = new Date();
     const in7Days = new Date(now);
