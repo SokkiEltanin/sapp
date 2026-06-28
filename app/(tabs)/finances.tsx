@@ -4,7 +4,6 @@ import {
   ScrollView, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
@@ -310,57 +309,39 @@ export default function FinancesScreen() {
           }
           ListHeaderComponent={
             <>
-              {/* ── Hero amount card (dark + red gradient border) ─── */}
-              <LinearGradient
-                colors={[F.accent + 'AA', F.accent + '25', 'transparent']}
-                start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-                style={st.heroBorder}
-              >
-                <View style={st.heroInner}>
-                  {/* Clean dark gradient — premium, theme-independent (no clouds) */}
-                  <LinearGradient
-                    colors={[colors.bg.card, colors.bg.secondary]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  {/* accent glow from the left */}
-                  <LinearGradient
-                    colors={[F.accent + '40', 'transparent']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }} end={{ x: 0.85, y: 0.7 }}
-                    pointerEvents="none"
-                  />
-                  <View style={st.heroGlassBorder} pointerEvents="none" />
-                  <View style={st.heroContent}>
-                    <Text style={st.heroDate}>SALDO KONTA</Text>
-                    {/* BILANS OGÓLNY = wszystkie przychody − wszystkie wydatki */}
-                    <View style={st.heroAmountRow}>
-                      <Text style={[st.heroAmount, { color: balance >= 0 ? colors.text.primary : colors.accent.red }]}>
-                        {balance >= 0 ? '+' : '−'}{Math.abs(balance).toFixed(2)}
-                      </Text>
-                      <Text style={st.heroCurrency}> PLN</Text>
-                    </View>
-                    <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }}>
-                      <Text style={st.heroSplit}>
-                        Karta <Text style={st.heroSubStrong}>{cardBalance.toFixed(2)}</Text> zł
-                        {'   ·   '}
-                        Gotówka <Text style={st.heroSubStrong}>{cashBalance.toFixed(2)}</Text> zł
-                      </Text>
-                    </PressableScale>
-                    <Text style={st.heroSub}>
-                      W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
-                      {'   ·   '}
-                      Przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
-                    </Text>
-                    <Text style={st.heroSub2}>
-                      Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
-                      {'   ·   '}
-                      Słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
-                      {'  '}<Text style={st.heroScopeTag}>({scope === 'all' ? 'wszyscy' : 'ja'})</Text>
-                    </Text>
-                  </View>
+              {/* ── Balance: card is the headline; cash + total are smaller pills ─── */}
+              <View style={st.heroMin}>
+                <Text style={st.heroDate}>NA KARCIE</Text>
+                <View style={st.heroAmountRow}>
+                  <Text style={[st.heroAmount, { color: cardBalance >= 0 ? colors.text.primary : colors.accent.red }]}>
+                    {cardBalance < 0 ? '−' : ''}{Math.abs(cardBalance).toFixed(2)}
+                  </Text>
+                  <Text style={st.heroCurrency}> PLN</Text>
                 </View>
-              </LinearGradient>
+                <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }}>
+                  <View style={st.heroPills}>
+                    <View style={st.heroPill}>
+                      <Text style={st.heroPillLabel}>Gotówka</Text>
+                      <Text style={[st.heroPillVal, cashBalance < 0 && { color: colors.accent.red }]}>{cashBalance.toFixed(2)} zł</Text>
+                    </View>
+                    <View style={st.heroPill}>
+                      <Text style={st.heroPillLabel}>Razem G+K</Text>
+                      <Text style={[st.heroPillVal, balance < 0 && { color: colors.accent.red }]}>{balance.toFixed(2)} zł</Text>
+                    </View>
+                  </View>
+                </PressableScale>
+                <Text style={st.heroSub}>
+                  W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
+                  {'   ·   '}
+                  Przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
+                </Text>
+                <Text style={st.heroSub2}>
+                  Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
+                  {'   ·   '}
+                  Słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
+                  {'  '}<Text style={st.heroScopeTag}>({scope === 'all' ? 'wszyscy' : 'ja'})</Text>
+                </Text>
+              </View>
 
               {/* ── Stats scope toggle: everyone vs only me ─── */}
               <View style={st.scopeRow}>
@@ -576,6 +557,19 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     padding: spacing[5],
     gap: spacing[2],
   },
+  heroMin: {
+    marginHorizontal: spacing[4], marginTop: spacing[2], marginBottom: spacing[3],
+    gap: spacing[2],
+  },
+  heroPills: { flexDirection: 'row', gap: spacing[2], marginTop: 4, marginBottom: 2 },
+  heroPill: {
+    flexDirection: 'row', alignItems: 'baseline', gap: 6,
+    backgroundColor: c.fill.subtle, borderRadius: radius.full,
+    paddingHorizontal: spacing[3], paddingVertical: 6,
+    borderWidth: 1, borderColor: c.border.subtle,
+  },
+  heroPillLabel: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
+  heroPillVal: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
   heroDate:      { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
   heroAmount:    { fontSize: 42, fontWeight: '800', color: c.text.primary, letterSpacing: -2, lineHeight: 46 },
