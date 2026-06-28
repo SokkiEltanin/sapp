@@ -2644,12 +2644,20 @@ export default function DashboardScreen() {
               }
 
               // ── Normal mode: render sections in saved order, skip hidden ──
-              return orderedSections.map(id => {
-                if (hiddenSet.has(id)) return null;
-                const node = nodes[id];
-                if (node === undefined) return null;
-                return <React.Fragment key={id}>{node}</React.Fragment>;
-              });
+              // The payday prompt is PINNED to the very top whenever it's due, so
+              // it can't be reordered/buried — it just stays until you confirm it.
+              return (
+                <>
+                  {!hiddenSet.has('payday-prompt') && nodes['payday-prompt']}
+                  {orderedSections.map(id => {
+                    if (id === 'payday-prompt') return null; // rendered pinned above
+                    if (hiddenSet.has(id)) return null;
+                    const node = nodes[id];
+                    if (node === undefined) return null;
+                    return <React.Fragment key={id}>{node}</React.Fragment>;
+                  })}
+                </>
+              );
             })()}
 
             <View style={{ height: 220 }} />
