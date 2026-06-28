@@ -12,3 +12,11 @@ export function useColors(): Colors {
   const isLight = mode === 'light' || (mode === 'system' && system === 'light');
   return (isLight ? lightColors : darkColors) as Colors;
 }
+
+// True when the effective theme is light (for the few places that need to branch
+// on mode itself, e.g. a BlurView tint).
+export function useIsLight(): boolean {
+  const mode = useThemeStore((s) => s.mode);
+  const system = useColorScheme();
+  return mode === 'light' || (mode === 'system' && system === 'light');
+}

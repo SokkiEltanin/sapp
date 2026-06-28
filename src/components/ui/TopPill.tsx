@@ -338,7 +338,7 @@ export default function TopPill() {
         onPress={() => { haptic.tap(); router.push(item.route as any); }}
         activeOpacity={0.7}
       >
-        <View style={[s.badge, { backgroundColor: item.color, shadowColor: item.color }]}>
+        <View style={[s.badge, { backgroundColor: item.color }]}>
           <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
         </View>
         <Text style={s.text} numberOfLines={1}>{item.text}</Text>
@@ -367,12 +367,12 @@ const makeS = (t: any) => StyleSheet.create({
     minWidth: 58,
     alignItems: 'center',
     justifyContent: 'center',
-    // A soft colored glow so the badge itself reads as floating (shadowColor is
-    // set per-item to the badge colour in the render).
-    elevation: 6,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 7,
+    // Subtle neutral lift — a coloured shadow read as a weird halo in light mode.
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
   },
   badgeText: {
     fontSize: 11,
@@ -386,9 +386,10 @@ const makeS = (t: any) => StyleSheet.create({
     fontWeight: '600',
     color: t.text.primary,
     letterSpacing: 0.2,
-    // Subtle shadow keeps the label legible now that there's no surface behind it.
-    textShadowColor: 'rgba(0,0,0,0.35)',
+    // Very light shadow for legibility over content; kept subtle so it doesn't
+    // look heavy on a light background.
+    textShadowColor: 'rgba(0,0,0,0.18)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 2,
   },
 });

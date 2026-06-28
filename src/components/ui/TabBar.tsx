@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Pressable, Animated,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
+import { useColors, useIsLight } from '@/theme/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -60,6 +61,9 @@ export default function TabBar({ currentIndex }: Props) {
   const [open, setOpen]       = useState(false);
   const insets                = useSafeAreaInsets();
   const { color: timeAccent } = useTimeAccent();
+  const c                     = useColors();
+  const isLight               = useIsLight();
+  const s                     = useMemo(() => makeStyles(c), [c]);
 
   const todayStr = (() => {
     const d = new Date();
@@ -170,11 +174,12 @@ export default function TabBar({ currentIndex }: Props) {
       {/* box-none: transparent areas pass touches through to the content
           behind, so only the FAB + pill are interactive and the bar floats. */}
       <View style={[s.container, { paddingBottom: (insets.bottom || 0) + 8 }]} pointerEvents="box-none">
-        {/* Bottom scrim — content fades out under the bar */}
+        {/* Bottom scrim — content fades into the page bg under the bar (theme-aware
+            so it isn't a dark band in light mode) */}
         <LinearGradient
-          colors={['transparent', 'rgba(10,12,12,0.55)', colors.bg.primary]}
+          colors={['transparent', c.bg.primary + 'D9', c.bg.primary]}
           locations={[0, 0.55, 1]}
-          style={[s.scrim, { height: (insets.bottom || 0) + 120 }]}
+          style={[s.scrim, { height: (insets.bottom || 0) + 110 }]}
           pointerEvents="none"
         />
         {/* FAB row — floating above pill, no background */}
@@ -215,18 +220,18 @@ export default function TabBar({ currentIndex }: Props) {
             activeOpacity={0.85}
           >
             <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <Plus size={22} color={colors.bg.primary} strokeWidth={2.8} />
+              <Plus size={22} color={isLight ? '#FFFFFF' : colors.bg.primary} strokeWidth={2.8} />
             </Animated.View>
           </TouchableOpacity>
         </View>
 
         {/* 4-tab pill — frosted glass with a faint accent hairline */}
         <LinearGradient
-          colors={[activeAccent + '55', 'rgba(255,255,255,0.06)', activeAccent + '33']}
+          colors={[activeAccent + '55', c.fill.subtle, activeAccent + '33']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={s.pillBorder}
         >
-        <BlurView intensity={32} tint="dark" style={s.pill}>
+        <BlurView intensity={isLight ? 40 : 32} tint={isLight ? 'light' : 'dark'} style={s.pill}>
           {TABS.map(({ Icon }, i) => {
             const focused   = currentIndex === i;
             const accent    = TAB_ACCENTS[i] ?? timeAccent;
@@ -247,7 +252,7 @@ export default function TabBar({ currentIndex }: Props) {
                 <View style={s.iconWrap}>
                   <Icon
                     size={20}
-                    color={focused ? accent : colors.text.muted}
+                    color={focused ? accent : c.text.muted}
                     strokeWidth={focused ? 2.2 : 1.5}
                   />
                   {showBadge && (
@@ -266,7 +271,7 @@ export default function TabBar({ currentIndex }: Props) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: typeof colors) => StyleSheet.create({
   container: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
@@ -293,11 +298,11 @@ const s = StyleSheet.create({
   },
   sortFab: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(18,18,18,0.97)',
+    backgroundColor: c.bg.elevated,
     borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
     elevation: 8,
-    shadowColor: colors.black,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3, shadowRadius: 8,
   },
@@ -309,13 +314,13 @@ const s = StyleSheet.create({
     borderRadius: 29,
     padding: 1,
     elevation: 8,
-    shadowColor: colors.black,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.45, shadowRadius: 14,
   },
   pill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(16,17,17,0.66)',
+    backgroundColor: c.fill.strong,
     borderRadius: 28,
     overflow: 'hidden',
     paddingHorizontal: 6,
@@ -339,9 +344,9 @@ const s = StyleSheet.create({
     position: 'absolute', top: -5, right: -8,
     minWidth: 14, height: 14, borderRadius: 7,
     alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 2, borderWidth: 1.5, borderColor: colors.black,
+    paddingHorizontal: 2, borderWidth: 1.5, borderColor: c.bg.elevated,
   },
-  badgeText: { fontSize: 8, fontWeight: '700', color: colors.white, lineHeight: 11 },
+  badgeText: { fontSize: 8, fontWeight: '700', color: '#FFFFFF', lineHeight: 11 },
 
   overlayRoot: {
     ...StyleSheet.absoluteFillObject,
@@ -357,10 +362,10 @@ const s = StyleSheet.create({
   },
   quickItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: 'rgba(22,22,22,0.98)',
+    backgroundColor: c.bg.card,
     borderRadius: radius.xl,
     paddingHorizontal: spacing[4], paddingVertical: 13,
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 0.5, borderColor: c.border.default,
     minWidth: 190,
   },
   quickPlus: {
@@ -368,7 +373,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   quickLabel: {
-    fontSize: 13, fontWeight: '700', color: colors.text.primary,
+    fontSize: 13, fontWeight: '700', color: c.text.primary,
     letterSpacing: 0.6, flex: 1,
   },
 });

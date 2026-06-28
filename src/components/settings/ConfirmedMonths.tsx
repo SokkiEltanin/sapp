@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { ShieldCheck, X, Check } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { useWorkStore } from '@/store/workStore';
 import { workService } from '@/services/workService';
 import { colors, spacing, radius } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
@@ -22,8 +23,10 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
   detectedSalary?: number;
   detectedHours?: number;
 }) {
-  const settings = useWorkStore(s => s.settings);
-  const setSettings = useWorkStore(s => s.setSettings);
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
+  const settings = useWorkStore(st => st.settings);
+  const setSettings = useWorkStore(st => st.setSettings);
   const confirmed = settings.confirmedMonths ?? {};
   const entries = Object.entries(confirmed).sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const [dismissed, setDismissed] = useState(false);
@@ -44,9 +47,20 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
   };
 
   const remove = (m: string) => {
-    haptic.medium();
-    const next = { ...confirmed }; delete next[m];
-    persist(next);
+    Alert.alert(
+      'Usunąć potwierdzony miesiąc?',
+      `${label(m)} przestanie liczyć się do średniej stawki. Tego nie cofniesz (chyba że potwierdzisz go ponownie).`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        {
+          text: 'Usuń', style: 'destructive', onPress: () => {
+            haptic.medium();
+            const next = { ...confirmed }; delete next[m];
+            persist(next);
+          },
+        },
+      ],
+    );
   };
 
   const avgRate = (() => {
@@ -75,7 +89,7 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
           </Text>
           <View style={s.askBtns}>
             <PressableScale onPress={() => { haptic.tap(); setDismissed(true); }} style={s.no}>
-              <X size={14} color={colors.text.muted} /><Text style={s.noText}>Nie teraz</Text>
+              <X size={14} color={c.text.muted} /><Text style={s.noText}>Nie teraz</Text>
             </PressableScale>
             <PressableScale onPress={confirmDetected} style={s.yes}>
               <Check size={15} color="#06231a" /><Text style={s.yesText}>Tak, zapisz</Text>
@@ -91,7 +105,7 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
           <View key={m} style={s.row}>
             <Text style={s.rowMonth}>{label(m)}</Text>
             <Text style={s.rowMeta}>{v.salary} zł · {v.hours} h · {(v.salary / v.hours).toFixed(1)} zł/h</Text>
-            <PressableScale onPress={() => remove(m)} style={s.del}><X size={14} color={colors.text.muted} /></PressableScale>
+            <PressableScale onPress={() => remove(m)} style={s.del}><X size={14} color={c.text.secondary} /></PressableScale>
           </View>
         ))
       )}
@@ -99,26 +113,26 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
   );
 }
 
-const s = StyleSheet.create({
-  wrap: { borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3], gap: spacing[2] },
+const makeStyles = (c: typeof colors) => StyleSheet.create({
+  wrap: { borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[3], gap: spacing[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { fontSize: 13, fontWeight: '700', color: colors.text.primary },
-  sub: { fontSize: 11, color: colors.text.muted, lineHeight: 15 },
+  title: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  sub: { fontSize: 11, color: c.text.muted, lineHeight: 15 },
   ask: {
     backgroundColor: 'rgba(42,198,143,0.08)', borderWidth: 1, borderColor: 'rgba(42,198,143,0.30)',
     borderRadius: radius.md, padding: spacing[3], gap: 6, marginTop: spacing[1],
   },
   askTitle: { fontSize: 13, fontWeight: '800', color: '#2AC68F' },
-  askLine: { fontSize: 12, color: colors.text.secondary },
-  askStrong: { fontWeight: '800', color: colors.text.primary },
+  askLine: { fontSize: 12, color: c.text.secondary },
+  askStrong: { fontWeight: '800', color: c.text.primary },
   askBtns: { flexDirection: 'row', gap: spacing[2], marginTop: 4 },
-  no: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9, borderRadius: radius.md, backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default },
-  noText: { fontSize: 12, fontWeight: '600', color: colors.text.muted },
+  no: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 9, borderRadius: radius.md, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  noText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   yes: { flex: 1.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: radius.md, backgroundColor: '#2AC68F' },
   yesText: { fontSize: 13, fontWeight: '800', color: '#06231a' },
-  empty: { fontSize: 12, color: colors.text.muted },
+  empty: { fontSize: 12, color: c.text.muted },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
-  rowMonth: { fontSize: 13, fontWeight: '700', color: colors.text.primary, width: 64 },
-  rowMeta: { flex: 1, fontSize: 11, color: colors.text.muted },
-  del: { padding: 6, borderRadius: radius.md, backgroundColor: colors.bg.elevated },
+  rowMonth: { fontSize: 13, fontWeight: '700', color: c.text.primary, width: 64 },
+  rowMeta: { flex: 1, fontSize: 11, color: c.text.muted },
+  del: { padding: 6, borderRadius: radius.md, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
 });
