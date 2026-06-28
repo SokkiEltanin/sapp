@@ -38,7 +38,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
   const eventsFor = (day: number) => events.filter(e => e.date.startsWith(ds(day)));
   const evColor = (day: number) => {
     const ev = events.find(e => e.date.startsWith(ds(day)));
-    return ev ? (ev.color ?? 'rgba(255,255,255,0.4)') : null;
+    return ev ? (ev.color ?? colors.tabs.calendar) : null;
   };
   const hasEv = (day: number) => events.some(e => e.date.startsWith(ds(day)));
   const hasTk = (day: number) => tasks.some(t => t.deadline?.startsWith(ds(day)) && t.status !== 'done');
@@ -124,7 +124,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                       key={`ev-${ei}`}
                       onPress={(e) => { e.stopPropagation(); haptic.tap(); onEventPress?.(ev.id); }}
                       style={[styles.eventPill, {
-                        backgroundColor: (ev.color ?? colors.accent.blue) + '40',
+                        backgroundColor: (ev.color ?? colors.accent.blue) + 'E6',
                         borderLeftColor: ev.color ?? colors.accent.blue,
                       }]}
                     >
@@ -143,12 +143,8 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                       key={`tk-${ti}`}
                       onPress={(e) => { e.stopPropagation(); haptic.tap(); onTaskPress?.(tk.id); }}
                       style={[styles.eventPill, {
-                        backgroundColor: tk.priority === 'high'
-                          ? colors.accent.danger + '25'
-                          : '#2EDEA0' + '22',
-                        borderLeftColor: tk.priority === 'high'
-                          ? colors.accent.danger
-                          : '#2EDEA0',
+                        backgroundColor: (tk.priority === 'high' ? colors.accent.danger : '#2EDEA0') + 'E6',
+                        borderLeftColor: tk.priority === 'high' ? colors.accent.danger : '#2EDEA0',
                       }]}
                     >
                       <Text style={styles.eventPillText} numberOfLines={1}>
@@ -181,7 +177,7 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
                   )}
                   {(ev || tk) && (
                     <View style={styles.dots}>
-                      {ev && <View style={[styles.dot, sel ? styles.dotSel : { backgroundColor: evCol ?? 'rgba(255,255,255,0.4)' }]} />}
+                      {ev && <View style={[styles.dot, sel ? styles.dotSel : { backgroundColor: evCol ?? colors.tabs.calendar }]} />}
                       {tk && <View style={[
                         styles.dot,
                         urgent && !sel ? styles.dotUrgent : undefined,
@@ -292,5 +288,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4, paddingVertical: 3,
     borderRadius: 3,
   },
-  eventPillText: { fontSize: 10, color: colors.text.primary, fontWeight: '500', lineHeight: 13 },
+  eventPillText: { fontSize: 10, color: '#FFFFFF', fontWeight: '600', lineHeight: 13 },
 });
