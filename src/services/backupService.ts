@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import {
   getDocs, setDoc, deleteDoc, getDoc, query, orderBy, writeBatch,
 } from 'firebase/firestore';
@@ -85,6 +87,25 @@ async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
     local,
     cloud: { expenses, mood, events, tasks, subscriptions, expenseTemplates, workShifts, vehicles, maintenanceItems, debts },
   };
+}
+
+// Export the whole snapshot to a JSON file and open the share sheet, so the data
+// can be sent out (e.g. to inspect how everything is captured). Returns the count
+// of items per cloud collection for a quick toast summary.
+export async function exportSnapshotToFile(appBuild?: number): Promise<{ uri: string; bytes: number }> {
+  const snap = await gatherSnapshot(appBuild);
+  const json = JSON.stringify(snap, null, 2);
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  const uri = `${FileSystem.cacheDirectory}sapp-export-${stamp}.json`;
+  await FileSystem.writeAsStringAsync(uri, json, { encoding: FileSystem.EncodingType.UTF8 });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/json',
+      dialogTitle: 'Eksport danych Sapp',
+      UTI: 'public.json',
+    });
+  }
+  return { uri, bytes: json.length };
 }
 
 export async function createBackup(auto: boolean, appBuild?: number): Promise<BackupMeta> {

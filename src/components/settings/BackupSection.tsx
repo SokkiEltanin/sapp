@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as Updates from 'expo-updates';
-import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert } from 'lucide-react-native';
+import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert, FileDown } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { createBackup, listBackups, restoreBackup, BackupMeta } from '@/services/backupService';
+import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, BackupMeta } from '@/services/backupService';
 
 function fmtWhen(iso: string): string {
   const d = new Date(iso);
@@ -29,7 +29,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   onConnectGoogle?: () => void;
 }) {
   const [backups, setBackups] = useState<BackupMeta[]>([]);
-  const [busy, setBusy] = useState<'create' | 'restore' | 'load' | null>('load');
+  const [busy, setBusy] = useState<'create' | 'restore' | 'load' | 'export' | null>('load');
   const protectedByGoogle = !!googleUser;
 
   const refresh = useCallback(async () => {
@@ -50,6 +50,21 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
     } catch (e: any) {
       haptic.error();
       toast.error('Nie udało się utworzyć kopii — sprawdź połączenie');
+      setBusy(null);
+    }
+  };
+
+  const onExport = async () => {
+    haptic.tap();
+    setBusy('export');
+    try {
+      const { bytes } = await exportSnapshotToFile(appBuild);
+      haptic.success();
+      toast.success(`Wyeksportowano (${fmtSize(bytes)}) — wybierz, gdzie zapisać/wysłać`);
+    } catch (e: any) {
+      haptic.error();
+      toast.error('Nie udało się wyeksportować danych');
+    } finally {
       setBusy(null);
     }
   };
@@ -128,6 +143,15 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
         </View>
       </PressableScale>
 
+      <PressableScale onPress={onExport} disabled={busy != null}>
+        <View style={[s.exportBtn, busy != null && { opacity: 0.5 }]}>
+          {busy === 'export'
+            ? <ActivityIndicator size="small" color={colors.text.secondary} />
+            : <FileDown size={15} color={colors.text.secondary} />}
+          <Text style={s.exportText}>{busy === 'export' ? 'Eksportuję…' : 'Eksportuj dane do pliku (JSON)'}</Text>
+        </View>
+      </PressableScale>
+
       {busy === 'load' ? (
         <ActivityIndicator size="small" color={colors.text.muted} style={{ marginTop: spacing[2] }} />
       ) : backups.length === 0 ? (
@@ -188,6 +212,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.accent.blue + '18', borderWidth: 1, borderColor: colors.accent.blue + '40',
   },
   createText: { fontSize: 13, fontWeight: '700', color: colors.accent.blue },
+  exportBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[3], borderRadius: radius.md,
+    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+  },
+  exportText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
   empty: { fontSize: 12, color: colors.text.muted, textAlign: 'center', paddingVertical: spacing[2] },
   list: { borderRadius: radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3] },
