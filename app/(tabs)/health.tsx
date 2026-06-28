@@ -700,6 +700,11 @@ export default function HealthScreen() {
                       const isLast = i === data.length - 1;
                       return (
                         <View key={p.date} style={styles.stepCol}>
+                          {stepsRange === 7 && (
+                            <Text style={[styles.stepValLabel, p.steps === 0 && { opacity: 0 }, goalMet && { color: T.accent, fontWeight: '800' }]}>
+                              {p.steps >= 1000 ? `${(p.steps / 1000).toFixed(1)}k` : p.steps}
+                            </Text>
+                          )}
                           <View style={styles.stepBarWrap}>
                             <View style={{
                               width: stepsRange === 7 ? '72%' : '100%',
@@ -1116,6 +1121,7 @@ export default function HealthScreen() {
                     <View style={styles.detailDowRow}>
                       {dowAvg.map((v, i) => (
                         <View key={i} style={styles.detailDowCol}>
+                          <Text style={[styles.detailDowVal, i === bestDow && { color: T.accent, fontWeight: '800' }]}>{v > 0 ? (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v)) : ''}</Text>
                           <View style={styles.detailDowBarWrap}>
                             <View style={[styles.detailDowBar, { height: v > 0 ? Math.max(3, (v / maxDow) * 52) : 2, backgroundColor: i === bestDow ? T.accent : T.muted, opacity: v === 0 ? 0.4 : 1 }]} />
                           </View>
@@ -1210,6 +1216,7 @@ export default function HealthScreen() {
                     <View style={styles.detailDowRow}>
                       {dowAvg.map((v, i) => (
                         <View key={i} style={styles.detailDowCol}>
+                          <Text style={[styles.detailDowVal, v >= 420 && { color: T.accent, fontWeight: '800' }]}>{v > 0 ? `${(v / 60).toFixed(1).replace('.0', '')}h` : ''}</Text>
                           <View style={styles.detailDowBarWrap}>
                             <View style={[styles.detailDowBar, { height: v > 0 ? Math.max(3, (v / maxDow) * 52) : 2, backgroundColor: v >= 420 ? T.accent : T.muted, opacity: v === 0 ? 0.4 : 1 }]} />
                           </View>
@@ -1292,6 +1299,7 @@ export default function HealthScreen() {
                         <View style={styles.detailDowRow}>
                           {weekWeight.map((w, i) => (
                             <View key={i} style={styles.detailDowCol}>
+                              <Text style={styles.detailDowVal}>{w > 0 ? w.toFixed(1) : ''}</Text>
                               <View style={styles.detailDowBarWrap}>
                                 <View style={[styles.detailDowBar, { height: w > 0 ? 6 + ((w - minW2) / rangeW) * 44 : 2, backgroundColor: w > 0 ? T.accent : colors.fill.medium, opacity: w > 0 ? 1 : 0.4 }]} />
                               </View>
@@ -1464,6 +1472,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   rangeBtnTextOn: { color: t.accent },
   weekDayLabel: { fontSize: 8, fontWeight: '600', color: c.text.muted, textAlign: 'center', marginTop: 4 },
   stepCol: { flex: 1, alignItems: 'center' },
+  stepValLabel: { fontSize: 8, fontWeight: '600', color: c.text.muted, marginBottom: 2 },
   stepBarWrap: { width: '100%', height: 60, justifyContent: 'flex-end', alignItems: 'center' },
   sleepInsight: { marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle, gap: 2 },
   sleepInsightMain: { fontSize: 12, fontWeight: '700', color: c.text.primary },
@@ -1530,6 +1539,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   detailDowBarWrap: { width: '100%', height: 52, justifyContent: 'flex-end', alignItems: 'center' },
   detailDowBar: { width: '66%', borderRadius: 3, minHeight: 2 },
   detailDowLabel: { fontSize: 8.5, color: c.text.muted, fontWeight: '600' },
+  detailDowVal: { fontSize: 8, color: c.text.secondary, fontWeight: '700', marginBottom: 1 },
   detailInsight: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[2], lineHeight: 16 },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
