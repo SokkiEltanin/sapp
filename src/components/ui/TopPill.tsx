@@ -308,23 +308,36 @@ export default function TopPill() {
     today, tomorrow, weekEnd, hour, timeAccent,
   ]);
 
-  // ── Fade animation on content change ──────────────────────────────────────
+  // ── Animation on content change — Dynamic-Island style pop ────────────────
   const opacity  = useRef(new Animated.Value(item ? 1 : 0)).current;
+  const scale    = useRef(new Animated.Value(item ? 1 : 0.9)).current;
   const prevKey  = useRef<string | null>(item?.key ?? null);
 
   useEffect(() => {
     if (!item) {
-      Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }).start();
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 0.9, useNativeDriver: true, damping: 16, stiffness: 220 }),
+      ]).start();
       return;
     }
     if (prevKey.current !== item.key) {
-      // Cross-fade: out → in
+      // Pop: shrink out, then spring in (the island "morphs" to new content).
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 0, duration: 120, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 0, duration: 110, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.88, duration: 110, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+          Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 240, mass: 0.7 }),
+        ]),
       ]).start();
     } else {
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 14, stiffness: 220 }),
+      ]).start();
     }
     prevKey.current = item.key;
   }, [item?.key]);
@@ -332,11 +345,11 @@ export default function TopPill() {
   if (!item) return null;
 
   return (
-    <Animated.View style={{ opacity }}>
+    <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }] }]}>
       <TouchableOpacity
-        style={s.row}
+        style={s.island}
         onPress={() => { haptic.tap(); router.push(item.route as any); }}
-        activeOpacity={0.7}
+        activeOpacity={0.85}
       >
         <View style={[s.badge, { backgroundColor: item.color }]}>
           <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
@@ -350,29 +363,38 @@ export default function TopPill() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeS = (t: any) => StyleSheet.create({
-  // No card/band behind it — just the floating colored badge + label.
-  row: {
-    flexDirection: 'row',
+  // Dynamic-Island feel: a centered, solid dark pill that floats over the page in
+  // both themes (like the iPhone island), with a colored badge + white label.
+  islandWrap: {
     alignItems: 'center',
-    marginHorizontal: 16,
     marginTop: 6,
     marginBottom: 4,
-    paddingVertical: 4,
-    gap: 10,
+    paddingHorizontal: 12,
+  },
+  island: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    maxWidth: '100%',
+    backgroundColor: '#15171A',
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
   },
   badge: {
     borderRadius: 999,
     paddingHorizontal: 11,
     paddingVertical: 5,
-    minWidth: 58,
+    minWidth: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    // Subtle neutral lift — a coloured shadow read as a weird halo in light mode.
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.18,
-    shadowRadius: 3,
   },
   badgeText: {
     fontSize: 11,
@@ -381,15 +403,11 @@ const makeS = (t: any) => StyleSheet.create({
     letterSpacing: 0.4,
   },
   text: {
-    flex: 1,
+    flexShrink: 1,
     fontSize: 12.5,
     fontWeight: '600',
-    color: t.text.primary,
+    color: '#F2F3F3',
     letterSpacing: 0.2,
-    // Very light shadow for legibility over content; kept subtle so it doesn't
-    // look heavy on a light background.
-    textShadowColor: 'rgba(0,0,0,0.18)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    paddingRight: 6,
   },
 });
