@@ -53,7 +53,7 @@ import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
-import { StatCtx, metricById, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
+import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer } from '@/utils/statWidgets';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -1563,11 +1563,12 @@ export default function DashboardScreen() {
     const storeCount:   Record<string, number> = {};
     let totalItems = 0;
     let biggest = { name: '', amount: 0 };
+    let receiptSum = 0, receiptN = 0; // for an honest "average receipt" fact
     const labelOf: Record<string, string> = {};
     for (const e of expenses) {
-      if (e.type === 'income') continue;
+      if (e.type === 'income' || isSelfTransfer(e)) continue; // skip savings/transfers
       if (e.amount > biggest.amount) biggest = { name: e.note || e.storeName || e.category, amount: e.amount };
-      if (e.storeName) storeCount[e.storeName] = (storeCount[e.storeName] ?? 0) + 1;
+      if (e.storeName) { storeCount[e.storeName] = (storeCount[e.storeName] ?? 0) + 1; receiptSum += e.amount; receiptN++; }
       for (const it of (e.receiptItems ?? [])) {
         if (!countsForConsumption(it)) continue;
         const name = it.name?.trim();
@@ -1591,6 +1592,7 @@ export default function DashboardScreen() {
     if (fs && fs.count >= 2) facts.push({ icon: 'candy', label: `Ulubiony słodycz: ${fs.name} (×${fs.count})` });
     const st = top(storeCount);
     if (st && st.count >= 2) facts.push({ icon: 'store', label: `Najczęstszy sklep: ${st.name} (${st.count}×)` });
+    if (receiptN >= 3) facts.push({ icon: 'store', label: `Średni paragon: ${Math.round(receiptSum / receiptN)} zł (${receiptN} zakupów)` });
     if (totalItems >= 5) facts.push({ icon: 'package', label: `Kupiłeś łącznie ${totalItems} produktów` });
     if (biggest.amount > 0) facts.push({ icon: 'flame', label: `Największy zakup: ${biggest.name} (${biggest.amount.toFixed(0)} zł)` });
     return facts;
@@ -1614,12 +1616,16 @@ export default function DashboardScreen() {
       if (!(e.date ?? '').startsWith(monthKey)) continue;
       for (const it of (e.receiptItems ?? [])) {
         if (!countsForConsumption(it)) continue;
-        // weightKg (explicit) → fractional qty (receipt-weighed) → learned weight
+        // Only count RELIABLY-weighed items, so the kg totals are trustworthy:
+        // a fractional quantity (loose-weighed, e.g. 0.636 kg) or an explicit/learned
+        // weight that isn't the 1 kg default sentinel. Pack items at the default
+        // 1 kg are skipped (we don't actually know their weight).
         const q0 = it.quantity ?? 0;
         const learned = it.name ? weightFor(it.name, weightMemory) : undefined;
-        const kg = it.weightKg && it.weightKg > 0 ? it.weightKg
-          : (q0 > 0 && q0 < 50 && !Number.isInteger(q0)) ? q0
-          : (learned && q0 > 0 && q0 < 50) ? learned * (Number.isInteger(q0) ? q0 : 1) : 0;
+        const explicitW = (it.weightKg && it.weightKg > 0 && it.weightKg !== 1) ? it.weightKg : 0;
+        const weighedQty = (q0 > 0 && q0 < 50 && !Number.isInteger(q0)) ? q0 : 0;
+        const learnedW = (learned && learned !== 1 && q0 > 0 && q0 < 50 && Number.isInteger(q0)) ? learned * q0 : 0;
+        const kg = explicitW || weighedQty || learnedW;
         if (kg <= 0) continue;
         const tags = it.tags ?? [];
         for (const g of GROUPS) {
@@ -1633,7 +1639,7 @@ export default function DashboardScreen() {
     const out: string[] = [];
     for (const g of GROUPS) {
       const kg = groupKg[g.tag] ?? 0;
-      if (kg < 1) continue;
+      if (kg < 1.5) continue; // only show when there's enough reliably-weighed data
       const parts = Object.entries(groupItems[g.tag] ?? {})
         .sort((a, b) => b[1] - a[1]).slice(0, 2)
         .map(([n, v]) => `${v.toFixed(1).replace('.0', '')} kg ${n}`);
