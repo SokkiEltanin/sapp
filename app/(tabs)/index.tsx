@@ -65,7 +65,7 @@ import { workService } from '@/services/workService';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
 import { expensesService } from '@/services/expensesService';
-import { getPaydayConfig, getPaydayHandledMonth, setPaydayHandledMonth, paydayDue, currentMonth, PaydayConfig } from '@/utils/payday';
+import { getPaydayConfig, getPaydayHandledMonth, setPaydayHandledMonth, paydayDue, currentMonth, PaydayConfig, getPaydayDismissedDate, setPaydayDismissedToday } from '@/utils/payday';
 import { debtsService } from '@/services/debtsService';
 import { Debt, PaymentMethod } from '@/types';
 import { moodService } from '@/services/moodService';
@@ -638,7 +638,7 @@ export default function DashboardScreen() {
   // Payday prompt — ask (on a configurable day) whether the paycheck arrived.
   const [paydayCfg, setPaydayCfg] = useState<PaydayConfig>({ enabled: false, day: 10 });
   const [paydayHandled, setPaydayHandled] = useState<string | null>(null);
-  const [paydayDismissed, setPaydayDismissed] = useState(false);
+  const [paydayDismissedDate, setPaydayDismissedDate] = useState<string | null>(null);
   const [paydayModal, setPaydayModal] = useState(false);
   const [paydayInput, setPaydayInput] = useState('');
 
@@ -734,9 +734,9 @@ export default function DashboardScreen() {
   // Load payday config + handled-month on focus so the prompt is current.
   useFocusEffect(useCallback(() => {
     let alive = true;
-    Promise.all([getPaydayConfig(), getPaydayHandledMonth()]).then(([cfg, handled]) => {
+    Promise.all([getPaydayConfig(), getPaydayHandledMonth(), getPaydayDismissedDate()]).then(([cfg, handled, dismissed]) => {
       if (!alive) return;
-      setPaydayCfg(cfg); setPaydayHandled(handled);
+      setPaydayCfg(cfg); setPaydayHandled(handled); setPaydayDismissedDate(dismissed);
       import('@/services/notificationsService')
         .then(({ notificationsService }) => notificationsService.refreshPaydayReminder(cfg.enabled, cfg.day, handled))
         .catch(() => {});
@@ -1763,7 +1763,7 @@ export default function DashboardScreen() {
                 </View>
               );
 
-              nodes['payday-prompt'] = (paydayDue(paydayCfg, paydayHandled) && !paydayDismissed) && (
+              nodes['payday-prompt'] = paydayDue(paydayCfg, paydayHandled, paydayDismissedDate) && (
                 <View style={[s.card, { backgroundColor: cardBgDark }]}>
                   <View style={s.cardHeader}>
                     <Wallet size={13} color={colors.accent.green} />
@@ -1776,7 +1776,7 @@ export default function DashboardScreen() {
                       <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak — dodaj</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7}
-                      onPress={() => { haptic.tap(); setPaydayDismissed(true); }}>
+                      onPress={() => { haptic.tap(); setPaydayDismissedToday(); setPaydayDismissedDate(new Date().toISOString().slice(0, 10)); }}>
                       <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Jeszcze nie</Text>
                     </TouchableOpacity>
                   </View>
