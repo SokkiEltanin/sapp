@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
+import { looksLikeFood } from '@/utils/calories';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag, Car, Package, HandCoins } from 'lucide-react-native';
@@ -84,11 +85,11 @@ function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
       <Defs>
         <SvgLinearGradient id="finExp" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#E43434" stopOpacity="0.28" />
-          <Stop offset="1" stopColor="#E43434" stopOpacity="0" />
+          <Stop offset="0" stopColor="#FF5A5A" stopOpacity="0.16" />
+          <Stop offset="1" stopColor="#FF5A5A" stopOpacity="0" />
         </SvgLinearGradient>
         <SvgLinearGradient id="finInc" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#2AC68F" stopOpacity="0.20" />
+          <Stop offset="0" stopColor="#2AC68F" stopOpacity="0.10" />
           <Stop offset="1" stopColor="#2AC68F" stopOpacity="0" />
         </SvgLinearGradient>
       </Defs>
@@ -119,6 +120,7 @@ export default function FinancesScreen() {
   const [activePayer, setActivePayer] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<'all' | 'cash' | 'card'>('all');
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
+  const [chartFoodOnly, setChartFoodOnly] = useState(false);
   const [balanceOffset, setBalanceOffset] = useState(0);
   const [cashOffset, setCashOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
@@ -202,6 +204,16 @@ export default function FinancesScreen() {
 
   // Chart data: expenses AND income per day (week) or per week-of-month (month).
   // Expenses respect the scope toggle; income is always mine (my paychecks).
+  // Spend that counts as food for an expense — receipt food items, else the whole
+  // amount if it's a grocery/food expense. Powers the "tylko jedzenie" chart toggle.
+  const foodSpend = (e: Expense): number => {
+    if (e.receiptItems?.length) {
+      return e.receiptItems.reduce((s, it) =>
+        s + (looksLikeFood({ name: it.name, tags: it.tags, category: it.category }) ? (it.price ?? 0) : 0), 0);
+    }
+    return (e.category === 'groceries' || (e.category as string) === 'food') ? e.amount : 0;
+  };
+
   const chartData = useMemo(() => {
     const expByDate: Record<string, number> = {};
     const incByDate: Record<string, number> = {};
@@ -210,7 +222,7 @@ export default function FinancesScreen() {
       if (e.type === 'income') {
         if (isMine(e)) incByDate[k] = (incByDate[k] ?? 0) + e.amount;
       } else if (isExp(e) && inScope(e, scope)) {
-        expByDate[k] = (expByDate[k] ?? 0) + e.amount;
+        expByDate[k] = (expByDate[k] ?? 0) + (chartFoodOnly ? foodSpend(e) : e.amount);
       }
     }
     if (chartPeriod === 'week') {
@@ -239,7 +251,7 @@ export default function FinancesScreen() {
         incTotal: inc.reduce((s, v) => s + v, 0),
       };
     }
-  }, [expenses, chartPeriod, scope]);
+  }, [expenses, chartPeriod, scope, chartFoodOnly]);
 
   const sections = useMemo(() => {
     const matches = (e: Expense) => {
@@ -367,7 +379,9 @@ export default function FinancesScreen() {
               {/* ── Spending wave chart + period toggle ─── */}
               <View style={st.chartCard}>
                 <View style={st.chartHeader}>
-                  <Text style={st.chartTitle}>WYDATKI — {chartPeriod === 'week' ? 'OSTATNIE 7 DNI' : 'MIESIĄC'}</Text>
+                  <TouchableOpacity onPress={() => { haptic.tap(); setChartFoodOnly(v => !v); }} activeOpacity={0.7}>
+                    <Text style={st.chartTitle}>{chartFoodOnly ? 'JEDZENIE' : 'WYDATKI'} — {chartPeriod === 'week' ? '7 DNI' : 'MIESIĄC'}  ⇄</Text>
+                  </TouchableOpacity>
                   <View style={st.toggle}>
                     <TouchableOpacity
                       style={[st.toggleBtn, chartPeriod === 'week' && st.toggleBtnOn]}
