@@ -29,7 +29,11 @@ export async function getHealthHistory(days = 60): Promise<Record<string, Health
       if (!raw) return;
       try {
         const d = JSON.parse(raw);
-        const sleepMinutes = (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
+        // Legacy fake default: 7h30m with no quality/stages was written automatically
+        // before manual sleep existed — treat it as "no data" so it doesn't inflate
+        // the sleep average.
+        const isFakeSleep = Number(d.sleepH) === 7 && Number(d.sleepM) === 30 && !d.sleepQuality;
+        const sleepMinutes = isFakeSleep ? 0 : (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
         out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: Number(d.steps) || 0 };
       } catch {}
     });

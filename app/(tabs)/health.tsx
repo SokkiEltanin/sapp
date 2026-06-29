@@ -259,7 +259,10 @@ export default function HealthScreen() {
     const bmr = (hcExtra.bmr as number) || 0;
     const active = (hcExtra.activeCalories as number) || 0;
     const totalC = (hcExtra.totalCalories as number) || 0;
-    const burned = totalC > 0 ? totalC : (bmr > 0 ? bmr + active : 0);
+    // A full-day burn is ~1500–3500 kcal. Samsung Health often shares only the
+    // EXERCISE calories (a few hundred) as "total" — using that as the whole day's
+    // burn produces a nonsense balance, so only trust totalC when it's plausible.
+    const burned = totalC >= 1200 ? totalC : (bmr > 0 ? bmr + active : 0);
     const intakeAvg = avgFoodKcal(expenses, 7, kcalMem);
     // This week's weight change (first → last logged) to sanity-check the balance.
     let first = 0, last = 0;
