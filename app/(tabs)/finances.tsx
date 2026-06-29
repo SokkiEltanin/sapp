@@ -8,6 +8,7 @@ import { BlurView } from 'expo-blur';
 import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import { looksLikeFood } from '@/utils/calories';
+import { isSelfTransfer } from '@/utils/statWidgets';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag, Car, Package, HandCoins } from 'lucide-react-native';
@@ -176,9 +177,13 @@ export default function FinancesScreen() {
         else if (isExpense) { allExp += e.amount; if (isCash) cashExp += e.amount; }
       }
       if ((e.date ?? '').slice(0, 7) !== mk) continue;
-      if (mine && isIncome) { inc += e.amount; continue; }
+      // Self-transfers (savings / Revolut) move money but aren't spend/income — they
+      // already counted toward the balance above; just skip them in the month stats.
+      const selfT = isSelfTransfer(e);
+      if (mine && isIncome) { if (!selfT) inc += e.amount; continue; }
       if (!isExpense) continue;
-      if (mine) exp += e.amount;
+      if (mine && !selfT) exp += e.amount;
+      if (selfT) continue;
       // Consumption (food / sweets): everyone or only me, per the scope toggle.
       if (!inScope(e, scope)) continue;
       if (e.category === 'groceries') food += e.amount;

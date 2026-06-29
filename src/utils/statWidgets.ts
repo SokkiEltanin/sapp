@@ -4,6 +4,15 @@ import { canonicalProductName, productGroupKey, productGroupLabel, weightFor, We
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
 import { WidgetViz } from '@/store/dashboardLayout';
 
+// A "self-transfer" is moving your own money (to savings / Revolut / another
+// account). It changes the account balance but is NOT real spending or income, so
+// stats exclude it. Detected by the transfer category or a savings/transfer tag.
+const SELF_TRANSFER_TAGS = ['oszczednosci', 'oszczędnościowe', 'przelew', 'revolut'];
+export function isSelfTransfer(e: Expense): boolean {
+  return (e.category as string) === 'transfer'
+    || (e.tags ?? []).some(t => SELF_TRANSFER_TAGS.includes(t.toLowerCase()));
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 export type MetricGroup = 'Finanse' | 'Konsumpcja' | 'Nastrój i zdrowie' | 'Praca i zadania';
@@ -177,10 +186,10 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       return kg;
     }
     case 'spend':
-      return exp.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && pred(e))
+      return exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e))
         .reduce((s, e) => s + e.amount, 0);
     case 'income':
-      return exp.filter(e => e.type === 'income' && pred(e)).reduce((s, e) => s + e.amount, 0);
+      return exp.filter(e => e.type === 'income' && !isSelfTransfer(e) && pred(e)).reduce((s, e) => s + e.amount, 0);
     case 'food':
       return exp.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && inScope(e, ctx.scope) && pred(e))
         .reduce((s, e) => s + e.amount, 0);
