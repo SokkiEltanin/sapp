@@ -15,12 +15,12 @@ import {
   loadKcalMemory, saveKcalMemory, kcalFor, KcalMemory,
   loadWeightMemory, saveWeightMemory, weightFor, WeightMemory,
   saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases,
-  productNameSimilarity,
+  productNameSimilarity, removeNameAliases,
 } from '@/utils/productMemory';
 import { kcalPer100g, looksLikeFood } from '@/utils/calories';
 import { ExpenseCategory } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
-import { GitMerge } from 'lucide-react-native';
+import { GitMerge, Check, RotateCcw } from 'lucide-react-native';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
@@ -44,6 +44,8 @@ export default function ProductsScreen() {
   const [editTags, setEditTags] = useState('');
   const [editCat, setEditCat]   = useState<ExpenseCategory>('groceries');
   const [dismissedDup, setDismissedDup] = useState<Set<string>>(new Set());
+  const [dupOpen, setDupOpen] = useState(false);
+  const [mergeHistory, setMergeHistory] = useState<{ loser: string; winner: string }[]>([]);
 
   const reload = useCallback(() => {
     expensesService.getAll().then(setExpenses).catch(() => {});
@@ -92,7 +94,7 @@ export default function ProductsScreen() {
         }
       }
     }
-    return out.slice(0, 6);
+    return out.slice(0, 40);
   }, [products, dismissedDup]);
 
   const mergePair = async (a: Product, b: Product, id: string) => {
@@ -100,10 +102,25 @@ export default function ProductsScreen() {
     try {
       await saveNameAliases([{ name: b.name }], { 0: a.name }); // b folds into a
       setDismissedDup(prev => new Set(prev).add(id));
+      setMergeHistory(prev => [{ loser: b.name, winner: a.name }, ...prev].slice(0, 20));
       await loadNameAliases().then(setAliases);
       reload();
       toast.success(`Scalono „${b.name}" → „${a.name}"`);
     } catch { haptic.error(); toast.error('Nie udało się scalić'); }
+  };
+
+  // Undo the most recent merge — un-aliases the folded name so it splits back out.
+  const undoMerge = async () => {
+    const last = mergeHistory[0];
+    if (!last) return;
+    haptic.tap();
+    try {
+      await removeNameAliases([last.loser]);
+      setMergeHistory(prev => prev.slice(1));
+      await loadNameAliases().then(setAliases);
+      reload();
+      toast.success(`Cofnięto: „${last.loser}" znów osobno`);
+    } catch { haptic.error(); toast.error('Nie udało się cofnąć'); }
   };
 
   const kcalOf = (p: Product): { value: number; learned: boolean } => {
@@ -173,26 +190,15 @@ export default function ProductsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing[4], paddingBottom: 120, gap: spacing[2] }} showsVerticalScrollIndicator={false}>
-        {!query && duplicatePairs.length > 0 && (
-          <View style={s.dupCard}>
-            <View style={s.dupHead}>
-              <GitMerge size={13} color="#46B0DE" />
-              <Text style={s.dupTitle}>Możliwe duplikaty</Text>
+        {!query && (duplicatePairs.length > 0 || mergeHistory.length > 0) && (
+          <TouchableOpacity style={s.dupBtn} activeOpacity={0.85} onPress={() => { haptic.tap(); setDupOpen(true); }}>
+            <View style={[s.dupBtnIcon, { backgroundColor: '#46B0DE22' }]}><GitMerge size={16} color="#46B0DE" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.dupBtnTitle}>Duplikaty{duplicatePairs.length > 0 ? ` (${duplicatePairs.length})` : ''}</Text>
+              <Text style={s.dupBtnSub}>{duplicatePairs.length > 0 ? 'Sprawdź i scal podobne produkty' : 'Brak — możesz cofnąć scalenia'}</Text>
             </View>
-            {duplicatePairs.map(({ a, b, id }) => (
-              <View key={id} style={s.dupRow}>
-                <Text style={s.dupText} numberOfLines={2}>
-                  „{a.name}" <Text style={{ color: c.text.muted }}>≈</Text> „{b.name}"?
-                </Text>
-                <TouchableOpacity onPress={() => mergePair(a, b, id)} style={s.dupMergeBtn}>
-                  <Text style={s.dupMergeText}>Scal</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { haptic.tap(); setDismissedDup(prev => new Set(prev).add(id)); }} style={{ padding: 3 }}>
-                  <X size={14} color={c.text.muted} />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
+            <ChevronLeft size={16} color={c.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableOpacity>
         )}
         {filtered.length === 0 ? (
           <Text style={s.empty}>{products.length === 0 ? 'Brak produktów — zeskanuj paragony, by je tu zobaczyć.' : 'Nic nie pasuje.'}</Text>
@@ -258,6 +264,49 @@ export default function ProductsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Duplicates — one pair at a time: To samo / Różne, with undo */}
+      <Modal visible={dupOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDupOpen(false)}>
+        <View style={s.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setDupOpen(false)} />
+          <View style={s.sheet}>
+            <View style={s.sheetHead}>
+              <Text style={s.sheetTitle}>Duplikaty{duplicatePairs.length > 0 ? ` · zostało ${duplicatePairs.length}` : ''}</Text>
+              <TouchableOpacity onPress={() => setDupOpen(false)} hitSlop={10}><X size={18} color={c.text.muted} /></TouchableOpacity>
+            </View>
+            {duplicatePairs.length > 0 ? (() => {
+              const { a, b, id } = duplicatePairs[0];
+              return (
+                <>
+                  <Text style={s.dupQ}>To ten sam produkt?</Text>
+                  <View style={s.dupPairCard}>
+                    <View style={s.dupNameBox}><Text style={s.dupNameText} numberOfLines={2}>{a.name}</Text><Text style={s.dupCount}>×{a.count}</Text></View>
+                    <Text style={s.dupVs}>≈</Text>
+                    <View style={s.dupNameBox}><Text style={s.dupNameText} numberOfLines={2}>{b.name}</Text><Text style={s.dupCount}>×{b.count}</Text></View>
+                  </View>
+                  <Text style={s.dupHintModal}>Scalenie złączy „{b.name}" w „{a.name}".</Text>
+                  <View style={s.dupActions}>
+                    <TouchableOpacity style={[s.dupAct, { borderColor: c.accent.red + '66', backgroundColor: c.accent.red + '14' }]} onPress={() => { haptic.tap(); setDismissedDup(prev => new Set(prev).add(id)); }} activeOpacity={0.85}>
+                      <X size={20} color={c.accent.red} /><Text style={[s.dupActText, { color: c.accent.red }]}>Różne</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.dupAct, { borderColor: c.accent.green + '66', backgroundColor: c.accent.green + '18' }]} onPress={() => mergePair(a, b, id)} activeOpacity={0.85}>
+                      <Check size={20} color={c.accent.green} /><Text style={[s.dupActText, { color: c.accent.green }]}>To samo</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })() : (
+              <Text style={s.dupDone}>Wszystko sprawdzone ✓</Text>
+            )}
+            {mergeHistory.length > 0 && (
+              <TouchableOpacity style={s.undoRow} onPress={undoMerge} activeOpacity={0.8}>
+                <RotateCcw size={13} color={c.text.secondary} />
+                <Text style={s.undoText} numberOfLines={1}>Cofnij: „{mergeHistory[0].loser}" → „{mergeHistory[0].winner}"</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -282,13 +331,23 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: c.text.primary, padding: 0 },
   empty: { fontSize: 13, color: c.text.muted, textAlign: 'center', marginTop: spacing[6], lineHeight: 19 },
-  dupCard: { backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: '#46B0DE44', padding: spacing[3], gap: spacing[2] },
-  dupHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dupTitle: { fontSize: 12, fontWeight: '800', color: '#46B0DE', letterSpacing: 0.3 },
-  dupRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dupText: { flex: 1, fontSize: 12, color: c.text.primary, lineHeight: 16 },
-  dupMergeBtn: { paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.full, backgroundColor: '#46B0DE22', borderWidth: 1, borderColor: '#46B0DE55' },
-  dupMergeText: { fontSize: 11, fontWeight: '800', color: '#46B0DE' },
+  dupBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: '#46B0DE44', paddingHorizontal: spacing[3], paddingVertical: spacing[3] },
+  dupBtnIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  dupBtnTitle: { fontSize: 14, fontWeight: '800', color: '#46B0DE' },
+  dupBtnSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
+  dupQ: { fontSize: 13, fontWeight: '700', color: c.text.secondary, textAlign: 'center', marginTop: spacing[1] },
+  dupPairCard: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[2] },
+  dupNameBox: { flex: 1, backgroundColor: c.fill.subtle, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.subtle, padding: spacing[3], alignItems: 'center', gap: 3 },
+  dupNameText: { fontSize: 13, fontWeight: '700', color: c.text.primary, textAlign: 'center' },
+  dupCount: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
+  dupVs: { fontSize: 16, color: c.text.muted, fontWeight: '800' },
+  dupHintModal: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2], lineHeight: 15 },
+  dupActions: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
+  dupAct: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1 },
+  dupActText: { fontSize: 14, fontWeight: '800' },
+  dupDone: { fontSize: 14, color: c.text.secondary, textAlign: 'center', paddingVertical: spacing[5] },
+  undoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  undoText: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, flexShrink: 1 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     backgroundColor: c.bg.card, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,

@@ -279,6 +279,15 @@ export async function saveNameAliases(
   } catch {}
 }
 
+// Undo a merge: drop the alias for these (raw) names so they split apart again.
+export async function removeNameAliases(names: string[]): Promise<void> {
+  try {
+    const aliases = await loadNameAliases();
+    for (const n of names) delete aliases[normalizeProductName(n)];
+    await AsyncStorage.setItem(NAME_KEY, JSON.stringify(aliases));
+  } catch {}
+}
+
 // Resolve a raw product name to its canonical form using learned aliases
 // (exact key → fuzzy key → prettified raw fallback).
 // ─── Known product bases ──────────────────────────────────────────────────────
