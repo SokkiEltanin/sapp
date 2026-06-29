@@ -398,14 +398,28 @@ export function getFoodTags(name: string): string[] {
     .map(([tag]) => tag);
 }
 
+// Whole-word(ish) keyword match so short keywords don't fire inside longer food
+// words — "on" must not match makar[on], "imax" must not match un[imax], etc.
+const KW_LETTER = 'a-z0-9ąćęłńóśźż';
+function keywordHit(lower: string, kw: string): boolean {
+  const k = kw.trim();
+  if (!k) return false;
+  const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^${KW_LETTER}])${esc}([^${KW_LETTER}]|$)`, 'i').test(lower);
+}
+
 export function categorize(name: string): ExpenseCategory {
   const lower = name.toLowerCase();
+  // If the name clearly reads as food (it picked up a food sub-tag like pieczywo /
+  // nabiał / przekąski), it's groceries — even if a keyword like "fitness" (bułka
+  // fitness) or "mango" (owoc) would otherwise misfile it.
+  if (getFoodTags(name).length > 0) return 'groceries';
   // health before groceries to catch pharmacy keywords
   const order: ExpenseCategory[] = ['health', 'transport', 'entertainment', 'clothing', 'housing', 'subscriptions', 'groceries'];
   for (const cat of order) {
     const keywords = CATEGORY_KEYWORDS[cat];
     if (cat === 'other') continue;
-    if (keywords.some(kw => lower.includes(kw))) return cat;
+    if (keywords.some(kw => keywordHit(lower, kw))) return cat;
   }
   return 'groceries';
 }
