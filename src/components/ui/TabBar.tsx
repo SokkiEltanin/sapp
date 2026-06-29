@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   Pressable, Animated,
@@ -81,6 +81,17 @@ export default function TabBar({ currentIndex }: Props) {
   const fabProgress  = useRef(new Animated.Value(0)).current;
   const itemAnims    = useRef(Array.from({ length: MAX_ACTIONS }, () => new Animated.Value(0))).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  // Animated "island" that slides under the active tab (Dynamic-Island feel).
+  const [pillW, setPillW] = useState(0); // inner width of the tab row (measured)
+  const tabW = pillW > 0 ? pillW / TABS.length : 0;
+  const islandX = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(islandX, {
+      toValue: currentIndex * tabW,
+      useNativeDriver: true, damping: 16, stiffness: 220, mass: 0.7,
+    }).start();
+  }, [currentIndex, tabW]);
 
   const menuBase = (insets.bottom || 16) + 8 + PILL_H + 12 + FAB_SIZE + 12;
 
@@ -232,38 +243,52 @@ export default function TabBar({ currentIndex }: Props) {
           style={s.pillBorder}
         >
         <BlurView intensity={isLight ? 40 : 32} tint={isLight ? 'light' : 'dark'} style={s.pill}>
-          {TABS.map(({ Icon }, i) => {
-            const focused   = currentIndex === i;
-            const accent    = TAB_ACCENTS[i] ?? timeAccent;
-            const showBadge = i === 1 && pendingCount > 0;
-            return (
-              <TouchableOpacity
-                key={i}
-                style={s.tabItem}
-                onPress={() => {
-                  haptic.tap();
-                  if (currentIndex !== i) router.navigate(TAB_PATHS[i] as any);
-                }}
-                activeOpacity={0.7}
-              >
-                {focused && (
-                  <View style={[s.activePill, { backgroundColor: accent + '40', borderWidth: 1, borderColor: accent + '55' }]} />
-                )}
-                <View style={s.iconWrap}>
-                  <Icon
-                    size={20}
-                    color={focused ? accent : c.text.muted}
-                    strokeWidth={focused ? 2.2 : 1.5}
-                  />
-                  {showBadge && (
-                    <View style={[s.badge, { backgroundColor: badgeColor }]}>
-                      <Text style={s.badgeText}>{badgeCount > 99 ? '99' : badgeCount}</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+          {/* Sliding island under the active tab */}
+          {tabW > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                s.island,
+                {
+                  width: tabW - 10,
+                  backgroundColor: activeAccent + '38',
+                  borderColor: activeAccent + '66',
+                  transform: [{ translateX: islandX }],
+                },
+              ]}
+            />
+          )}
+          <View style={s.tabRow} onLayout={e => setPillW(e.nativeEvent.layout.width)}>
+            {TABS.map(({ Icon }, i) => {
+              const focused   = currentIndex === i;
+              const accent    = TAB_ACCENTS[i] ?? timeAccent;
+              const showBadge = i === 1 && pendingCount > 0;
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={s.tabItem}
+                  onPress={() => {
+                    haptic.tap();
+                    if (currentIndex !== i) router.navigate(TAB_PATHS[i] as any);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={s.iconWrap}>
+                    <Icon
+                      size={focused ? 23 : 20}
+                      color={focused ? accent : c.text.muted}
+                      strokeWidth={focused ? 2.4 : 1.6}
+                    />
+                    {showBadge && (
+                      <View style={[s.badge, { backgroundColor: badgeColor }]}>
+                        <Text style={s.badgeText}>{badgeCount > 99 ? '99' : badgeCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </BlurView>
         </LinearGradient>
       </View>
@@ -327,16 +352,18 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
     paddingVertical: 6,
   },
 
+  tabRow: { flexDirection: 'row', flex: 1 },
   tabItem: {
     flex: 1,
     alignItems: 'center', justifyContent: 'center',
     paddingVertical: 10,
     position: 'relative',
   },
-  activePill: {
+  island: {
     position: 'absolute',
-    width: '100%', height: '100%',
-    borderRadius: 20,
+    left: 11, top: 5, bottom: 5,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   iconWrap: { position: 'relative', zIndex: 1 },
 
