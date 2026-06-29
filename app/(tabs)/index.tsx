@@ -939,14 +939,28 @@ export default function DashboardScreen() {
     type Ins = WeeklyNote;
     const out: Ins[] = [];
     const sp = wk('spend');
-    // Month-end spending forecast — project the current pace to the end of the month.
-    const monthSpend = metricSeries('spend', statCtx, 'month', 1).values[0] ?? 0;
+    // Month-end spending forecast. Only the DAILY/variable spend is extrapolated;
+    // one-offs (rent, bills, subscriptions, big purchases) are kept flat — they
+    // already happened and won't recur every week. Savings moves / transfers to
+    // Revolut aren't real spending, so they're dropped entirely.
     const dnow = new Date();
     const dayOfMonth = dnow.getDate();
     const daysInMonth = new Date(dnow.getFullYear(), dnow.getMonth() + 1, 0).getDate();
-    if (monthSpend > 0 && dayOfMonth >= 4 && dayOfMonth < daysInMonth) {
-      const projected = Math.round(monthSpend / dayOfMonth * daysInMonth);
-      out.push({ tone: 'neutral', text: `Tempo: ~${projected} zł do końca miesiąca (${Math.round(monthSpend)} zł dotąd)` });
+    const monthKey = `${dnow.getFullYear()}-${pad(dnow.getMonth() + 1)}`;
+    const isSavingsMove = (e: Expense) =>
+      e.category === 'transfer' ||
+      (e.tags ?? []).some(t => ['oszczednosci', 'oszczędnościowe', 'przelew', 'revolut'].includes(t.toLowerCase()));
+    let oneOff = 0, daily = 0;
+    for (const e of scopedExpenses) {
+      if (e.type === 'income' || !(e.date ?? '').startsWith(monthKey)) continue;
+      if (isSavingsMove(e)) continue;                    // money to savings ≠ spending
+      if (e.category === 'housing' || e.category === 'subscriptions' || e.amount >= 250) oneOff += e.amount;
+      else daily += e.amount;                            // groceries / small day-to-day
+    }
+    const realSpend = oneOff + daily;
+    if (realSpend > 0 && dayOfMonth >= 4 && dayOfMonth < daysInMonth) {
+      const projected = Math.round(oneOff + (daily / dayOfMonth) * daysInMonth);
+      out.push({ tone: 'neutral', text: `Tempo: ~${projected} zł do końca mies. (${Math.round(realSpend)} zł dotąd, w tym stałe ${Math.round(oneOff)})` });
     }
     const sw = wk('sweets');
     const md = wk('moodAvg');
