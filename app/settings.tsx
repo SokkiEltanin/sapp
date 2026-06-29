@@ -551,7 +551,7 @@ export default function SettingsScreen() {
               <Switch
                 value={hapticsOn}
                 onValueChange={(v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); }}
-                trackColor={{ false: colors.bg.elevated, true: colors.accent.purple + '80' }}
+                trackColor={{ false: colors.fill.strong, true: colors.accent.purple + '80' }}
                 thumbColor={hapticsOn ? colors.accent.purple : colors.text.muted}
               />
             </View>
@@ -800,7 +800,7 @@ export default function SettingsScreen() {
               <Switch
                 value={paydayEnabled}
                 onValueChange={(v) => { haptic.tap(); setPaydayEnabled(v); savePayday(v, paydayDay); }}
-                trackColor={{ false: colors.bg.elevated, true: '#2AC68F' }}
+                trackColor={{ false: colors.fill.strong, true: '#2AC68F' }}
                 thumbColor={colors.white}
               />
             </View>
@@ -863,7 +863,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notifEnabled}
                 onValueChange={toggleNotifications}
-                trackColor={{ false: colors.bg.elevated, true: 'rgba(255,255,255,0.3)' }}
+                trackColor={{ false: colors.fill.strong, true: colors.accent.green + '99' }}
                 thumbColor={notifEnabled ? colors.text.primary : colors.text.muted}
               />
             </View>
@@ -929,7 +929,7 @@ export default function SettingsScreen() {
                   <Switch
                     value={morningEnabled}
                     onValueChange={setMorningEnabled}
-                    trackColor={{ false: colors.bg.elevated, true: 'rgba(255,255,255,0.3)' }}
+                    trackColor={{ false: colors.fill.strong, true: colors.accent.green + '99' }}
                     thumbColor={morningEnabled ? colors.text.primary : colors.text.muted}
                   />
                 </View>
@@ -972,7 +972,7 @@ export default function SettingsScreen() {
                   <Switch
                     value={briefingEnabled}
                     onValueChange={setBriefingEnabled}
-                    trackColor={{ false: colors.bg.elevated, true: 'rgba(255,255,255,0.3)' }}
+                    trackColor={{ false: colors.fill.strong, true: colors.accent.green + '99' }}
                     thumbColor={briefingEnabled ? colors.text.primary : colors.text.muted}
                   />
                 </View>
@@ -1014,7 +1014,7 @@ export default function SettingsScreen() {
                   <Switch
                     value={habitNotifEnabled}
                     onValueChange={setHabitNotifEnabled}
-                    trackColor={{ false: colors.bg.elevated, true: 'rgba(255,255,255,0.3)' }}
+                    trackColor={{ false: colors.fill.strong, true: colors.accent.green + '99' }}
                     thumbColor={habitNotifEnabled ? colors.text.primary : colors.text.muted}
                   />
                 </View>
