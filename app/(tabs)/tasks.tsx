@@ -532,10 +532,9 @@ export default function TasksScreen() {
     <SafeAreaView style={s.root} edges={[]}>
       <View style={{ flex: 1 }}>
 
-        {/* Header */}
+        {/* Header — no big tab name, just a live status line */}
         <View style={s.header}>
           <View>
-            <Text style={s.title}>Zadania</Text>
             <Text style={s.subtitle}>
               {active.length > 0 ? `${active.length} aktywnych` : 'Wszystko ogarnięte'}
               {overdue > 0 ? ` · ${overdue} po terminie` : ''}
@@ -670,7 +669,7 @@ const makeS = (c: any, g: any) => StyleSheet.create({
 
   cardContent: { flex: 1, gap: 3 },
   cardTitle: {
-    fontSize: 13, fontWeight: '800', color: c.white,
+    fontSize: 13, fontWeight: '800', color: c.text.primary,
     letterSpacing: 0.3, lineHeight: 18,
   },
   cardTitleDone: { textDecorationLine: 'line-through', color: c.text.muted },
