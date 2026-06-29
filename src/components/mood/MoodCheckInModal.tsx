@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { haptic } from '@/utils/haptics';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
-  Animated, Pressable, TouchableOpacity, TextInput,
+  Animated, Pressable, TouchableOpacity, TextInput, LayoutAnimation, Platform, UIManager,
 } from 'react-native';
 import { X, Check, Plus } from 'lucide-react-native';
 
@@ -35,6 +35,11 @@ const NEGATIVE_TAGS = new Set([
   'zestresowany', 'sfrustrowany', 'samotny', 'bez motywacji', 'przygnębiony',
   'zaniepokojony',
 ]);
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+const smooth = () => LayoutAnimation.configureNext(LayoutAnimation.create(180, 'easeInEaseOut', 'opacity'));
 
 interface Props {
   visible: boolean;
@@ -132,11 +137,13 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
 
   const toggleTag = (tag: string) => {
     haptic.tap();
+    smooth();
     setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
 
   const addCustomTag = () => {
     const t = customTag.trim().toLowerCase();
+    smooth();
     if (!t || tags.includes(t)) { setCustomTag(''); setCustomTagOpen(false); return; }
     haptic.tap();
     setTags(prev => [...prev, t]);
@@ -234,7 +241,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                     />
                   ) : (
                     <TouchableOpacity
-                      onPress={() => { haptic.tap(); setCustomTagOpen(true); }}
+                      onPress={() => { haptic.tap(); smooth(); setCustomTagOpen(true); }}
                       style={[styles.customTagPlus, chipColor ? { borderColor: chipColor + '70' } : null]}
                       activeOpacity={0.8}
                     >

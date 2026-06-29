@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -69,6 +69,14 @@ export default function MoodPicker({ value, onChange, label = 'Jak się czujesz?
   const moodLabels = mode === 'energy' ? ENERGY_LABELS : MOOD_LABELS;
   const moodEmojis = mode === 'energy' ? ENERGY_EMOJIS : MOOD_EMOJIS;
 
+  // Fade + lift the selected label in place (no layout jump, no sudden pop).
+  const labelAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(labelAnim, {
+      toValue: value ? 1 : 0, duration: 220, useNativeDriver: true,
+    }).start();
+  }, [value]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>{label}</Text>
@@ -84,11 +92,21 @@ export default function MoodPicker({ value, onChange, label = 'Jak się czujesz?
           />
         ))}
       </View>
-      {value && (
-        <Text style={[styles.selectedLabel, { color: moodColors[value] }]}>
-          {moodLabels[value]}
-        </Text>
-      )}
+      {/* Always rendered with reserved height so picking a mood doesn't shove the
+          layout — the label just fades + lifts in place. */}
+      <Animated.Text
+        numberOfLines={1}
+        style={[
+          styles.selectedLabel,
+          {
+            color: value ? moodColors[value] : 'transparent',
+            opacity: labelAnim,
+            transform: [{ translateY: labelAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }],
+          },
+        ]}
+      >
+        {value ? moodLabels[value] : '·'}
+      </Animated.Text>
     </View>
   );
 }
