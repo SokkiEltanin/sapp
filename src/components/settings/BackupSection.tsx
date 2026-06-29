@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as Updates from 'expo-updates';
-import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert, FileDown } from 'lucide-react-native';
+import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert, FileDown, ChevronDown } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, BackupMeta } from '@/services/backupService';
@@ -28,8 +29,11 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   googleUser?: string | null;
   onConnectGoogle?: () => void;
 }) {
+  const c = useColors();
+  const s = useMemo(() => makeStyles(c), [c]);
   const [backups, setBackups] = useState<BackupMeta[]>([]);
   const [busy, setBusy] = useState<'create' | 'restore' | 'load' | 'export' | null>('load');
+  const [showAll, setShowAll] = useState(false);
   const protectedByGoogle = !!googleUser;
 
   const refresh = useCallback(async () => {
@@ -102,7 +106,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   return (
     <View style={s.card}>
       <View style={s.header}>
-        <Cloud size={15} color={colors.text.secondary} />
+        <Cloud size={15} color={c.text.secondary} />
         <Text style={s.title}>Kopia zapasowa (chmura)</Text>
       </View>
       <Text style={s.sub}>
@@ -137,8 +141,8 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
       <PressableScale onPress={onCreate} disabled={busy != null}>
         <View style={[s.createBtn, busy != null && { opacity: 0.5 }]}>
           {busy === 'create'
-            ? <ActivityIndicator size="small" color={colors.accent.blue} />
-            : <CloudUpload size={16} color={colors.accent.blue} />}
+            ? <ActivityIndicator size="small" color={c.accent.blue} />
+            : <CloudUpload size={16} color={c.accent.blue} />}
           <Text style={s.createText}>{busy === 'create' ? 'Tworzę kopię…' : 'Utwórz kopię teraz'}</Text>
         </View>
       </PressableScale>
@@ -146,22 +150,22 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
       <PressableScale onPress={onExport} disabled={busy != null}>
         <View style={[s.exportBtn, busy != null && { opacity: 0.5 }]}>
           {busy === 'export'
-            ? <ActivityIndicator size="small" color={colors.text.secondary} />
-            : <FileDown size={15} color={colors.text.secondary} />}
+            ? <ActivityIndicator size="small" color={c.text.secondary} />
+            : <FileDown size={15} color={c.text.secondary} />}
           <Text style={s.exportText}>{busy === 'export' ? 'Eksportuję…' : 'Eksportuj dane do pliku (JSON)'}</Text>
         </View>
       </PressableScale>
 
       {busy === 'load' ? (
-        <ActivityIndicator size="small" color={colors.text.muted} style={{ marginTop: spacing[2] }} />
+        <ActivityIndicator size="small" color={c.text.muted} style={{ marginTop: spacing[2] }} />
       ) : backups.length === 0 ? (
         <Text style={s.empty}>Brak kopii jeszcze.</Text>
       ) : (
         <View style={s.list}>
-          {backups.map((b, i) => (
+          {(showAll ? backups : backups.slice(0, 1)).map((b, i) => (
             <View key={b.id} style={[s.row, i > 0 && s.rowBorder]}>
               <View style={{ flex: 1 }}>
-                <Text style={s.rowWhen}>{fmtWhen(b.createdAt)}{i === 0 ? ' · ostatnia' : ''}</Text>
+                <Text style={s.rowWhen}>{fmtWhen(b.createdAt)}{i === 0 && !showAll ? ' · ostatnia' : ''}</Text>
                 <Text style={s.rowMeta}>
                   {b.auto ? 'auto' : 'ręczna'} · {fmtSize(b.sizeBytes)}
                   {b.counts?.expenses != null ? ` · ${b.counts.expenses} wydatków` : ''}
@@ -169,18 +173,26 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
               </View>
               <PressableScale onPress={() => onRestore(b)} disabled={busy != null}>
                 <View style={s.restoreBtn}>
-                  <RotateCcw size={13} color={colors.text.secondary} />
+                  <RotateCcw size={13} color={c.text.secondary} />
                   <Text style={s.restoreText}>Przywróć</Text>
                 </View>
               </PressableScale>
             </View>
           ))}
+          {backups.length > 1 && (
+            <PressableScale onPress={() => { haptic.tap(); setShowAll(v => !v); }}>
+              <View style={s.moreRow}>
+                <Text style={s.moreText}>{showAll ? 'Pokaż tylko ostatnią' : `Pokaż starsze (${backups.length - 1})`}</Text>
+                <ChevronDown size={14} color={c.text.muted} style={showAll ? { transform: [{ rotate: '180deg' }] } : undefined} />
+              </View>
+            </PressableScale>
+          )}
         </View>
       )}
 
       {busy === 'restore' && (
         <View style={s.overlay}>
-          <ActivityIndicator size="small" color={colors.accent.blue} />
+          <ActivityIndicator size="small" color={c.accent.blue} />
           <Text style={s.overlayText}>Przywracam…</Text>
         </View>
       )}
@@ -188,14 +200,14 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: typeof colors) => StyleSheet.create({
   card: {
-    backgroundColor: colors.bg.card, borderRadius: radius.xl, padding: spacing[4],
-    gap: spacing[3], borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4],
+    gap: spacing[3], borderWidth: 1, borderColor: c.border.default,
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { ...typography.body, fontWeight: '700', color: colors.text.primary },
-  sub: { fontSize: 12, color: colors.text.muted, lineHeight: 17, marginTop: -spacing[1] },
+  title: { ...typography.body, fontWeight: '700', color: c.text.primary },
+  sub: { fontSize: 12, color: c.text.muted, lineHeight: 17, marginTop: -spacing[1] },
   banner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2],
     padding: spacing[3], borderRadius: radius.md, borderWidth: 1,
@@ -209,27 +221,29 @@ const s = StyleSheet.create({
   createBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: colors.accent.blue + '18', borderWidth: 1, borderColor: colors.accent.blue + '40',
+    backgroundColor: c.accent.blue + '18', borderWidth: 1, borderColor: c.accent.blue + '40',
   },
-  createText: { fontSize: 13, fontWeight: '700', color: colors.accent.blue },
+  createText: { fontSize: 13, fontWeight: '700', color: c.accent.blue },
   exportBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
     paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
   },
-  exportText: { fontSize: 13, fontWeight: '700', color: colors.text.secondary },
-  empty: { fontSize: 12, color: colors.text.muted, textAlign: 'center', paddingVertical: spacing[2] },
+  exportText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  empty: { fontSize: 12, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[2] },
   list: { borderRadius: radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3] },
-  rowBorder: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' },
-  rowWhen: { fontSize: 13, fontWeight: '600', color: colors.text.primary },
-  rowMeta: { fontSize: 11, color: colors.text.muted, marginTop: 1 },
+  rowBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
+  rowWhen: { fontSize: 13, fontWeight: '600', color: c.text.primary },
+  rowMeta: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   restoreBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border.default, backgroundColor: colors.bg.elevated,
+    borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated,
   },
-  restoreText: { fontSize: 12, fontWeight: '600', color: colors.text.secondary },
+  restoreText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
+  moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing[2], marginTop: 2 },
+  moreText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   overlay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingTop: spacing[2] },
-  overlayText: { fontSize: 12, color: colors.text.secondary },
+  overlayText: { fontSize: 12, color: c.text.secondary },
 });
