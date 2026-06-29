@@ -1103,6 +1103,11 @@ export default function DashboardScreen() {
             <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(a.values[a.values.length - 1] ?? 0, a.unit)}</Text><Text style={s.statCmpKey}>{def.label}</Text></View>
             <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(b.values[b.values.length - 1] ?? 0, b.unit)}</Text><Text style={s.statCmpKey}>{defB?.label ?? '—'}</Text></View>
           </View>
+          {defB && (a.values[a.values.length - 1] ?? 0) > 0 && a.unit === b.unit && (
+            <Text style={[s.statSub, { marginTop: 2 }]}>
+              {defB.label} to {Math.round(((b.values[b.values.length - 1] ?? 0) / (a.values[a.values.length - 1] || 1)) * 100)}% „{def.label}"
+            </Text>
+          )}
           <DualWaveChart data1={a.values} data2={b.values} color1={accentColor} color2={'#FBBF24'} independent={a.unit !== b.unit} />
           <View style={s.waveLabels}>
             {a.labels.map((l, i) => <Text key={i} style={s.waveLabel}>{l}</Text>)}
