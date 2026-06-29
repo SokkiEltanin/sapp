@@ -15,6 +15,7 @@ import { moodService } from '@/services/moodService';
 import { useMoodStore } from '@/store/moodStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
+import { useColors } from '@/theme/useColors';
 
 const PRESET_TAGS = [
   'skupiony', 'zmęczony', 'niespokojny', 'radosny', 'smutny',
@@ -42,6 +43,8 @@ interface Props {
 }
 
 export default function MoodCheckInModal({ visible, onClose, existingEntry }: Props) {
+  const c = useColors();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const kb = useKeyboardHeight();
   const [mood, setMood]         = useState<MoodLevel | undefined>(existingEntry?.mood);
   const [energy, setEnergy]     = useState<MoodLevel | undefined>(existingEntry?.energy);
@@ -199,7 +202,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <X size={18} color={colors.text.secondary} />
+              <X size={18} color={c.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -222,7 +225,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                       value={customTag}
                       onChangeText={setCustomTag}
                       placeholder="własny…"
-                      placeholderTextColor={colors.text.muted}
+                      placeholderTextColor={c.text.muted}
                       onSubmitEditing={addCustomTag}
                       onBlur={() => { if (!customTag.trim()) setCustomTagOpen(false); }}
                       autoFocus
@@ -235,7 +238,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                       style={[styles.customTagPlus, chipColor ? { borderColor: chipColor + '70' } : null]}
                       activeOpacity={0.8}
                     >
-                      <Plus size={16} color={chipColor ?? colors.text.secondary} strokeWidth={2.6} />
+                      <Plus size={16} color={chipColor ?? c.text.secondary} strokeWidth={2.6} />
                     </TouchableOpacity>
                   )}
                   <ScrollView
@@ -273,7 +276,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                 <AnimatedButton
                   onPress={handleSave}
                   label={saving ? 'Zapisuję...' : (existingEntry ? 'Zaktualizuj' : 'Zapisz')}
-                  icon={<Check size={18} color={colors.bg.primary} />}
+                  icon={<Check size={18} color={c.bg.primary} />}
                   size="lg"
                   fullWidth
                   disabled={saving || !mood || !energy || !note.trim()}
@@ -286,38 +289,38 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: typeof colors) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: c.bg.secondary,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     maxHeight: '92%',
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: c.border.glass,
   },
   header: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
     padding: spacing[5], paddingBottom: spacing[3],
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1, borderBottomColor: c.border.subtle,
   },
-  title:    { ...typography.h3, color: colors.text.primary },
-  subtitle: { ...typography.caption, color: colors.text.muted, marginTop: 2 },
+  title:    { ...typography.h3, color: c.text.primary },
+  subtitle: { ...typography.caption, color: c.text.muted, marginTop: 2 },
   closeBtn: {
     width: 32, height: 32, borderRadius: radius.full,
-    backgroundColor: colors.bg.card, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: c.border.default,
   },
   scroll: { padding: spacing[5], paddingTop: spacing[4], gap: spacing[5], paddingBottom: spacing[4] },
   section: { gap: spacing[3] },
   sectionLabel: {
-    ...typography.label, color: colors.text.secondary,
+    ...typography.label, color: c.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
   },
   tagsScroll: { flexDirection: 'row', gap: spacing[2], paddingRight: spacing[2] },
@@ -326,8 +329,8 @@ const styles = StyleSheet.create({
   customTagPlus: {
     width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.bg.elevated,
-    borderWidth: 1, borderColor: colors.border.default,
+    backgroundColor: c.bg.elevated,
+    borderWidth: 1, borderColor: c.border.default,
   },
 
   customTagInline: {
@@ -335,15 +338,15 @@ const styles = StyleSheet.create({
   },
   customTagInputInline: {
     height: 30, minWidth: 80,
-    backgroundColor: colors.bg.elevated,
+    backgroundColor: c.bg.elevated,
     borderRadius: radius.full,
-    borderWidth: 1, borderColor: colors.border.default,
+    borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[3],
-    fontSize: 12, color: colors.text.primary,
+    fontSize: 12, color: c.text.primary,
   },
 
   footer: {
     padding: spacing[4], paddingBottom: spacing[8],
-    borderTopWidth: 1, borderTopColor: colors.border.subtle,
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
 });

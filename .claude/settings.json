@@ -42,7 +42,9 @@
       "Bash(grep -nE \"\\\\{/\\\\* Weight \\\\*/\\\\}|\\\\{/\\\\* Water\" \"app/\\(tabs\\)/health.tsx\")",
       "Bash(grep -nE \"return \\\\{|reload|load,|load }|useFocusEffect\" src/hooks/useHabits.ts)",
       "Bash(grep -nE \"\\\\{/\\\\* Weight \\\\*/\\\\}|CIAŁO|Water moved into\" \"app/\\(tabs\\)/health.tsx\")",
-      "Bash(grep -nE \"cardLabel}>CIAŁO|\\\\{/\\\\* Weight \\\\*/\\\\}|weightRow|weightCenter\" \"app/\\(tabs\\)/health.tsx\")"
+      "Bash(grep -nE \"cardLabel}>CIAŁO|\\\\{/\\\\* Weight \\\\*/\\\\}|weightRow|weightCenter\" \"app/\\(tabs\\)/health.tsx\")",
+      "Bash(grep -nE \"#170810|#0[0-9A-Fa-f]{5}|#1[0-7][0-9A-Fa-f]{4}|rgba\\\\\\(0,|rgba\\\\\\(10|rgba\\\\\\(16|rgba\\\\\\(18|rgba\\\\\\(23|tint=\\\\\"dark\\\\\"|'#000|'#111|'#0D\" \"app/\\(tabs\\)/mood.tsx\")",
+      "Bash(grep -nE \"#0[0-9A-Fa-f]{5}|#1[0-7][0-9A-Fa-f]{4}|rgba\\\\\\(0,|rgba\\\\\\(10|rgba\\\\\\(16|rgba\\\\\\(18|tint=\\\\\"dark\\\\\"|'#000|'#111|'#0D|bg\\\\.primary|backdrop\" app/expenses/scan.tsx)"
     ]
   }
 }
