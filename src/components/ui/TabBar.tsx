@@ -89,7 +89,7 @@ export default function TabBar({ currentIndex }: Props) {
   useEffect(() => {
     Animated.spring(islandX, {
       toValue: currentIndex * tabW,
-      useNativeDriver: true, damping: 16, stiffness: 220, mass: 0.7,
+      useNativeDriver: true, damping: 19, stiffness: 170, mass: 1,
     }).start();
   }, [currentIndex, tabW]);
 
@@ -250,9 +250,9 @@ export default function TabBar({ currentIndex }: Props) {
               style={[
                 s.island,
                 {
-                  width: tabW - 10,
-                  backgroundColor: activeAccent + '38',
-                  borderColor: activeAccent + '66',
+                  width: tabW - 4,
+                  backgroundColor: activeAccent + '30',
+                  borderColor: activeAccent + '5A',
                   transform: [{ translateX: islandX }],
                 },
               ]}
@@ -361,8 +361,8 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
   },
   island: {
     position: 'absolute',
-    left: 11, top: 5, bottom: 5,
-    borderRadius: 16,
+    left: 8, top: 3, bottom: 3,
+    borderRadius: 18,
     borderWidth: 1,
   },
   iconWrap: { position: 'relative', zIndex: 1 },
