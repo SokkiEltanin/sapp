@@ -19,7 +19,10 @@ Grzeszki (antyodznaki, czerwona ramka):
 
 ## Jeszcze na ikonie zastępczej (lucide) — nazwa pliku = id
 
-`no-junk-7` · `saver-1000` · `saver-10000` · `payday-first`
+Zwykłe: `no-junk-7` · `saver-1000` · `saver-10000` · `payday-first`
+
+Legendarne (tier 4, fioletowa poświata): `legend-saver` · `centurion` · `unbreakable` ·
+`year-one` · `clean-month` · `ultra-walk` · `titan`
 
 Wrzuć `<id>.png` i dopisz linię w `src/utils/badgeIcons.ts`.
-Ramki wg poziomu: brąz `#CD7F32` · srebro `#C4CAD4` · złoto `#FFC83D` · grzeszki `#E5484D`.
+Ramki wg poziomu: brąz `#CD7F32` · srebro `#C4CAD4` · złoto `#FFC83D` · legenda `#A855F7` · grzeszki `#E5484D`.

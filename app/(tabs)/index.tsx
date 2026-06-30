@@ -1002,6 +1002,7 @@ export default function DashboardScreen() {
       if (!fresh.length) return;
       const first = ACHIEVEMENTS.find(a => a.id === fresh[0]);
       if (first?.kind === 'bad') { haptic.error(); toast.error(`Antyodznaka: ${first.title} 💀`); }
+      else if (first?.tier === 4) { haptic.success(); toast.success(`✦ LEGENDARNA: ${first.title}!`); }
       else { haptic.success(); toast.success(fresh.length === 1 && first ? `Nowa odznaka: ${first.title}!` : `Zdobyto ${fresh.length} nowe odznaki!`); }
     }).catch(() => {});
   }, [achStates]);

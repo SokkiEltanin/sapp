@@ -32,21 +32,22 @@ export interface AchCtx {
   maxDaySpend: number;       // biggest single-day spend (zł)
 }
 
-export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Grzeszki';
+export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Legendy' | 'Grzeszki';
+export type Tier = 1 | 2 | 3 | 4; // 4 = legendary
 
 export interface Achievement {
   id: string;
   title: string;
   desc: string;
   group: AchGroup;
-  tier: 1 | 2 | 3;
+  tier: Tier;
   target: number;
   unit?: string;
   kind?: 'good' | 'bad';   // bad = anti-achievement (red, "earned" by slipping up)
   value: (c: AchCtx) => number;
 }
 
-export const TIER_COLOR: Record<1 | 2 | 3, string> = { 1: '#CD7F32', 2: '#C4CAD4', 3: '#FFC83D' };
+export const TIER_COLOR: Record<Tier, string> = { 1: '#CD7F32', 2: '#C4CAD4', 3: '#FFC83D', 4: '#A855F7' };
 export const BAD_COLOR = '#E5484D';
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -84,6 +85,15 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'no-junk-7',  title: 'Tydzień fit', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni', value: c => c.noJunkStreak },
   { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h', value: c => c.workHoursTotal },
   { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1, value: c => c.paydayLogged ? 1 : 0 },
+
+  // ── Legendy (tier 4 — rzadkie, trudne) ──
+  { id: 'legend-saver', title: 'Legenda oszczędzania', desc: '25 000 zł odłożone',        group: 'Legendy', tier: 4, target: 25000, unit: 'zł', value: c => c.savingsTotal },
+  { id: 'centurion',    title: 'Centurion',            desc: '100 dni z rzędu w aplikacji', group: 'Legendy', tier: 4, target: 100, unit: 'dni', value: c => c.logStreak },
+  { id: 'unbreakable',  title: 'Nieugięty',            desc: '100 dni nawyku z rzędu',      group: 'Legendy', tier: 4, target: 100, unit: 'dni', value: c => c.habitBestStreak },
+  { id: 'year-one',     title: 'Rok z aplikacją',      desc: '365 aktywnych dni',           group: 'Legendy', tier: 4, target: 365, unit: 'dni', value: c => c.activeDays },
+  { id: 'clean-month',  title: 'Czysty miesiąc',       desc: '30 dni z rzędu bez słodyczy', group: 'Legendy', tier: 4, target: 30, unit: 'dni', value: c => c.noJunkStreak },
+  { id: 'ultra-walk',   title: 'Ultramaraton',         desc: '20 000 kroków w jeden dzień', group: 'Legendy', tier: 4, target: 20000, unit: 'kroków', value: c => c.bestStepsDay },
+  { id: 'titan',        title: 'Tytan pracy',          desc: '500 h pracy łącznie',         group: 'Legendy', tier: 4, target: 500, unit: 'h', value: c => c.workHoursTotal },
 
   // ── Grzeszki (anti-achievements, custom icons) ──
   { id: 'crime-scene', title: 'Miejsce zbrodni',   desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad', value: c => Math.round(c.overBudgetPct * 100) },

@@ -22,7 +22,7 @@ import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
-const GROUP_ORDER: AchGroup[] = ['Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Konsekwencja', 'Grzeszki'];
+const GROUP_ORDER: AchGroup[] = ['Legendy', 'Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Konsekwencja', 'Grzeszki'];
 
 export default function Achievements() {
   const c = useColors();
@@ -95,9 +95,10 @@ export default function Achievements() {
 
         {GROUP_ORDER.filter(g => byGroup[g]?.length).map(g => {
           const isBad = g === 'Grzeszki';
+          const isLegend = g === 'Legendy';
           return (
             <View key={g} style={{ marginTop: spacing[4] }}>
-              <Text style={[s.groupTitle, isBad && { color: BAD_COLOR }]}>{isBad ? 'Grzeszki (antyodznaki)' : g}</Text>
+              <Text style={[s.groupTitle, isBad && { color: BAD_COLOR }, isLegend && { color: TIER_COLOR[4] }]}>{isBad ? 'Grzeszki (antyodznaki)' : isLegend ? '✦ Legendy' : g}</Text>
               <View style={s.grid}>
                 {byGroup[g].map(st => (
                   <TouchableOpacity key={st.a.id} style={s.cell} activeOpacity={0.8}
