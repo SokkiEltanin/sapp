@@ -19,7 +19,7 @@ import {
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
-  Cloud, CloudDrizzle, CloudRain, Snowflake,
+  Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -51,6 +51,7 @@ import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
+import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, ACHIEVEMENTS } from '@/utils/achievements';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -693,6 +694,8 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
+  const [earnedCount, setEarnedCount] = useState(0);
+  useEffect(() => { getEarned().then(m => setEarnedCount(Object.keys(m).length)).catch(() => {}); }, []);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -975,6 +978,25 @@ export default function DashboardScreen() {
     weightMemory,
     healthDays,
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
+
+  // Achievements — evaluate against live data so a newly-earned badge fires a
+  // toast + haptic the moment you land on the dashboard (the ADHD dopamine hit).
+  const achStates = useMemo(() => evaluateAchievements(buildAchCtx({
+    expenses, moodEntries, workEvents: allEvents, workSettings,
+    habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
+    allHabitsToday: habits.length > 0 && habitsDoneIds.length >= habits.length,
+    bestStepsDay: Object.values(healthDays).reduce((m, v) => Math.max(m, v.steps || 0), 0),
+    billTracked: subscriptions.some(sb => sb.active),
+  })), [expenses, moodEntries, allEvents, workSettings, habits, habitsDoneIds, getStreak, healthDays, subscriptions]);
+  useEffect(() => {
+    syncEarned(achStates).then(fresh => {
+      if (!fresh.length) return;
+      setEarnedCount(prev => prev + fresh.length);
+      haptic.success();
+      const first = ACHIEVEMENTS.find(a => a.id === fresh[0]);
+      toast.success(fresh.length === 1 && first ? `Nowa odznaka: ${first.title}!` : `Zdobyto ${fresh.length} nowe odznaki!`);
+    }).catch(() => {});
+  }, [achStates]);
 
   // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
   // Smart, qualitative notes only — the raw per-metric numbers now live in the
@@ -2171,6 +2193,7 @@ export default function DashboardScreen() {
               {([
                 { label: 'Humor',     Icon: Smile,     route: '/(tabs)/mood', sub: todayEntry ? '✓' : null         },
                 { label: 'Nawyki',    Icon: Flame,    route: '/habits',   sub: null                               },
+                { label: 'Gablota',   Icon: Trophy,    route: '/achievements', sub: earnedCount > 0 ? `${earnedCount}` : null },
                 { label: 'Notatki',   Icon: FileText,  route: '/notes',    sub: null                               },
                 { label: 'Skupienie', Icon: Activity,  route: '/focus',    sub: null                               },
                 { label: 'Pomodoro',  Icon: Timer,     route: '/pomodoro', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
