@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -11,7 +12,7 @@ import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors } from '@/theme';
-import { useColors } from '@/theme/useColors';
+import { useColors, useIsLight } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -65,6 +66,7 @@ export default function TopPill() {
   const hour     = new Date().getHours();
   const { color: timeAccent } = useTimeAccent(); // cyan by day, blue by night
   const theme    = useColors();
+  const isLight  = useIsLight();
   const s        = useMemo(() => makeS(theme), [theme]);
 
   // ── Store selectors ────────────────────────────────────────────────────────
@@ -347,14 +349,18 @@ export default function TopPill() {
   return (
     <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }] }]}>
       <TouchableOpacity
-        style={s.island}
+        style={s.islandTouch}
         onPress={() => { haptic.tap(); router.push(item.route as any); }}
         activeOpacity={0.85}
       >
-        <View style={[s.badge, { backgroundColor: item.color }]}>
-          <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
-        </View>
-        <Text style={s.text} numberOfLines={1}>{item.text}</Text>
+        {/* Frosted glass — content shows through, so it floats instead of being a
+            solid band. Tint flips with the theme. */}
+        <BlurView intensity={isLight ? 55 : 40} tint={isLight ? 'light' : 'dark'} style={s.island}>
+          <View style={[s.badge, { backgroundColor: item.color }]}>
+            <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
+          </View>
+          <Text style={[s.text, { color: theme.text.primary }]} numberOfLines={1}>{item.text}</Text>
+        </BlurView>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -371,22 +377,25 @@ const makeS = (t: any) => StyleSheet.create({
     marginBottom: 4,
     paddingHorizontal: 12,
   },
+  islandTouch: {
+    maxWidth: '100%',
+    borderRadius: 999,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
   island: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    maxWidth: '100%',
-    backgroundColor: '#15171A',
     borderRadius: 999,
+    overflow: 'hidden',
     paddingVertical: 6,
     paddingHorizontal: 7,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
+    borderColor: t.border.glass,
   },
   badge: {
     borderRadius: 999,
