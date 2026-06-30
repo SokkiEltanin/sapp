@@ -1,6 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -12,7 +11,7 @@ import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors } from '@/theme';
-import { useColors, useIsLight } from '@/theme/useColors';
+import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,7 +65,6 @@ export default function TopPill() {
   const hour     = new Date().getHours();
   const { color: timeAccent } = useTimeAccent(); // cyan by day, blue by night
   const theme    = useColors();
-  const isLight  = useIsLight();
   const s        = useMemo(() => makeS(theme), [theme]);
 
   // ── Store selectors ────────────────────────────────────────────────────────
@@ -348,19 +346,18 @@ export default function TopPill() {
 
   return (
     <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }] }]}>
+      {/* Truly floating — no container background/blur. Only the coloured badge is
+          solid (the island "anchor"); the label floats with a soft shadow so it
+          stays readable over whatever is behind it. */}
       <TouchableOpacity
-        style={s.islandTouch}
+        style={s.island}
         onPress={() => { haptic.tap(); router.push(item.route as any); }}
-        activeOpacity={0.85}
+        activeOpacity={0.7}
       >
-        {/* Frosted glass — content shows through, so it floats instead of being a
-            solid band. Tint flips with the theme. */}
-        <BlurView intensity={isLight ? 55 : 40} tint={isLight ? 'light' : 'dark'} style={s.island}>
-          <View style={[s.badge, { backgroundColor: item.color }]}>
-            <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
-          </View>
-          <Text style={[s.text, { color: theme.text.primary }]} numberOfLines={1}>{item.text}</Text>
-        </BlurView>
+        <View style={[s.badge, { backgroundColor: item.color, shadowColor: item.color }]}>
+          <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
+        </View>
+        <Text style={[s.text, { color: theme.text.primary }]} numberOfLines={1}>{item.text}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -369,33 +366,20 @@ export default function TopPill() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeS = (t: any) => StyleSheet.create({
-  // Dynamic-Island feel: a centered, solid dark pill that floats over the page in
-  // both themes (like the iPhone island), with a colored badge + white label.
+  // Truly floating island: no container background — just a solid coloured badge
+  // (the anchor) + a shadowed label sitting directly over the page.
   islandWrap: {
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 4,
     paddingHorizontal: 12,
   },
-  islandTouch: {
-    maxWidth: '100%',
-    borderRadius: 999,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-  },
   island: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    borderRadius: 999,
-    overflow: 'hidden',
-    paddingVertical: 6,
-    paddingHorizontal: 7,
-    borderWidth: 1,
-    borderColor: t.border.glass,
+    maxWidth: '100%',
+    paddingVertical: 4,
   },
   badge: {
     borderRadius: 999,
@@ -404,6 +388,11 @@ const makeS = (t: any) => StyleSheet.create({
     minWidth: 56,
     alignItems: 'center',
     justifyContent: 'center',
+    // soft coloured glow so the anchor pops while floating
+    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
   },
   badgeText: {
     fontSize: 11,
@@ -414,9 +403,12 @@ const makeS = (t: any) => StyleSheet.create({
   text: {
     flexShrink: 1,
     fontSize: 12.5,
-    fontWeight: '600',
-    color: '#F2F3F3',
+    fontWeight: '700',
     letterSpacing: 0.2,
     paddingRight: 6,
+    // legible over any background without a container
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
 });

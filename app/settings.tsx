@@ -1313,6 +1313,40 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* More */}
+        <View>
+          <Text style={styles.sectionTitle}>Więcej</Text>
+          <View style={styles.card}>
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
+              style={styles.row}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#FFC83D18' }]}>
+                <LucideIcons.Trophy size={16} color="#FFC83D" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Gablota osiągnięć</Text>
+                <Text style={styles.rowSub}>Odznaki, serie, legendy i grzeszki</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push('/counters' as any); }}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#46B0DE18' }]}>
+                <LucideIcons.Hourglass size={16} color="#46B0DE" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Liczniki i odliczania</Text>
+                <Text style={styles.rowSub}>Odliczanie do wydarzeń, „ile dni temu…"</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+          </View>
+        </View>
+
         {/* Diagnostics */}
         <View>
           <Text style={styles.sectionTitle}>Diagnostyka</Text>

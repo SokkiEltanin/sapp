@@ -2923,7 +2923,7 @@ export default function DashboardScreen() {
                           <TouchableOpacity style={[s.editAddBtn, { borderStyle: 'solid' }]} onPress={() => { haptic.tap(); setShowHiddenPool(v => !v); }} activeOpacity={0.85}>
                             <Plus size={15} color={accentColor} />
                             <Text style={[s.editAddText, { color: accentColor }]}>Dodaj sekcję ({hidden.length} wyłączonych)</Text>
-                            <ChevronDown size={14} color={accentColor} style={[{ marginLeft: 'auto' }, showHiddenPool && { transform: [{ rotate: '180deg' }] }]} />
+                            <ChevronDown size={14} color={accentColor} style={showHiddenPool && { transform: [{ rotate: '180deg' }] }} />
                           </TouchableOpacity>
                           {showHiddenPool && hidden.map(id => {
                             const isCustom = id.startsWith('custom:');
