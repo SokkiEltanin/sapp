@@ -50,6 +50,7 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
+import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -688,6 +689,10 @@ export default function DashboardScreen() {
     haptic.tap();
     dismissBill(tag).then(setBillDismissed).catch(() => {});
   }, []);
+
+  // Fixed vs variable spend — last 4 months so you see your real discretionary
+  // "kieszonkowe" once rent/bills are taken out.
+  const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -2396,6 +2401,63 @@ export default function DashboardScreen() {
               </View>
             );
 
+            nodes['fixed-variable'] = (() => {
+              const cur = fvMonths[fvMonths.length - 1];
+              if (!cur) return false;
+              const totalCur = cur.fixed + cur.variable;
+              if (totalCur === 0) return false;
+              const prev = fvMonths.slice(0, -1).filter(m => m.fixed + m.variable > 0);
+              const avgFixed = prev.length ? Math.round(prev.reduce((a, m) => a + m.fixed, 0) / prev.length) : cur.fixed;
+              const avgVar = prev.length ? Math.round(prev.reduce((a, m) => a + m.variable, 0) / prev.length) : cur.variable;
+              const maxMonth = Math.max(...fvMonths.map(m => m.fixed + m.variable), 1);
+              const MON = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+              const fixedC = '#8893A8';
+              const varC = accentColor;
+              const H = 46;
+              return (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Wallet size={13} color={accentColor} />
+                    <Text style={s.cardTitle} numberOfLines={1}>Stałe vs zmienne</Text>
+                    <Text style={s.fvHint}>ten miesiąc</Text>
+                  </View>
+                  <View style={s.fvRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.fvAmt, { color: fixedC }]}>{cur.fixed.toLocaleString('pl-PL')} zł</Text>
+                      <Text style={s.fvLbl}>Stałe (czynsz, rachunki, suby)</Text>
+                    </View>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={[s.fvAmt, { color: varC }]}>{cur.variable.toLocaleString('pl-PL')} zł</Text>
+                      <Text style={[s.fvLbl, { textAlign: 'right' }]}>Zmienne (codzienne)</Text>
+                    </View>
+                  </View>
+                  <View style={s.fvBar}>
+                    <View style={{ flex: Math.max(cur.fixed, 0.001), backgroundColor: fixedC }} />
+                    <View style={{ flex: Math.max(cur.variable, 0.001), backgroundColor: varC }} />
+                  </View>
+                  <Text style={s.fvNote}>
+                    Zmienne to Twoje realne „kieszonkowe" — {Math.round(cur.variable / totalCur * 100)}% wydatków.
+                  </Text>
+                  {prev.length > 0 && (
+                    <>
+                      <View style={s.fvTrend}>
+                        {fvMonths.map((m, i) => (
+                          <View key={m.month} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
+                            <View style={{ width: 20, height: H, justifyContent: 'flex-end', borderRadius: 4, overflow: 'hidden', backgroundColor: colors.fill.subtle }}>
+                              <View style={{ height: (m.variable / maxMonth) * H, backgroundColor: varC }} />
+                              <View style={{ height: (m.fixed / maxMonth) * H, backgroundColor: fixedC }} />
+                            </View>
+                            <Text style={[s.fvMonthLbl, i === fvMonths.length - 1 && { color: accentColor, fontWeight: '800' }]}>{MON[parseInt(m.month.slice(5, 7), 10) - 1]}</Text>
+                          </View>
+                        ))}
+                      </View>
+                      <Text style={s.fvAvg}>śr. {prev.length} mies.: stałe {avgFixed.toLocaleString('pl-PL')} zł · zmienne {avgVar.toLocaleString('pl-PL')} zł</Text>
+                    </>
+                  )}
+                </View>
+              );
+            })();
+
             nodes['spend-by-day'] = weekdayAvg.some(d => d.avg > 0) && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
@@ -3249,6 +3311,15 @@ const makeStyles = (c: any) => StyleSheet.create({
   pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
   pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
+  fvHint: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 'auto' },
+  fvRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[2], marginBottom: spacing[2] },
+  fvAmt: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  fvLbl: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: 2 },
+  fvBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: c.fill.subtle },
+  fvNote: { fontSize: 11, color: c.text.secondary, marginTop: spacing[2], lineHeight: 15 },
+  fvTrend: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  fvMonthLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
+  fvAvg: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[2], textAlign: 'center' },
   pinNoteTags: { fontSize: 10, color: c.text.muted, marginTop: 2 },
   pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
 

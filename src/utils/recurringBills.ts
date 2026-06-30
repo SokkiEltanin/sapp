@@ -14,6 +14,12 @@ const BILL_TYPES: { match: string[]; name: string; tag: string }[] = [
   { match: ['abonament', 'telefon'], name: 'Telefon / abonament', tag: 'telefon' },
 ];
 
+// True when an expense's text reads like a fixed bill (rent/utilities/internet…).
+export function looksLikeBill(text: string): boolean {
+  const hay = text.toLowerCase();
+  return BILL_TYPES.some(bt => bt.match.some(m => hay.includes(m)));
+}
+
 export interface BillCandidate {
   tag: string;
   name: string;
