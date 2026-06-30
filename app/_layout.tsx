@@ -272,6 +272,7 @@ export default function RootLayout() {
           <Stack.Screen name="debts" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="achievements" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="counters" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="work/add" options={{ animation: 'slide_from_bottom', presentation: 'modal', headerShown: false }} />
         </Stack>
         <PomodoroIndicator />

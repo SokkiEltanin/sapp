@@ -19,7 +19,7 @@ import {
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
-  Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy,
+  Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -52,6 +52,8 @@ import { deserializeBlocks } from '@/utils/richText';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, ACHIEVEMENTS } from '@/utils/achievements';
+import { useCounters, daysUntil, untilProgress } from '@/store/countersStore';
+import WalkProgress from '@/components/counters/WalkProgress';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -694,6 +696,14 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
+
+  // Countdowns (event "walk" tiles) — nearest upcoming first.
+  const counters = useCounters(st => st.counters);
+  const activeCountdowns = useMemo(
+    () => counters.filter(cn => cn.kind === 'until' && daysUntil(cn) >= 0).sort((a, b) => a.date.localeCompare(b.date)),
+    [counters],
+  );
+  const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -2187,11 +2197,12 @@ export default function DashboardScreen() {
             })();
 
             nodes['tools-row'] = (
-            <View style={s.toolsRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.toolsRow}>
               {([
                 { label: 'Humor',     Icon: Smile,     route: '/(tabs)/mood', sub: todayEntry ? '✓' : null         },
                 { label: 'Nawyki',    Icon: Flame,    route: '/habits',   sub: null                               },
                 { label: 'Gablota',   Icon: Trophy,    route: '/achievements', sub: earnedBadges > 0 ? `${earnedBadges}` : null },
+                { label: 'Liczniki',  Icon: Hourglass, route: '/counters', sub: nextCountdownDays != null ? `${nextCountdownDays}d` : null },
                 { label: 'Notatki',   Icon: FileText,  route: '/notes',    sub: null                               },
                 { label: 'Skupienie', Icon: Activity,  route: '/focus',    sub: null                               },
                 { label: 'Pomodoro',  Icon: Timer,     route: '/pomodoro', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
@@ -2211,7 +2222,33 @@ export default function DashboardScreen() {
                   )}
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
+            );
+
+            nodes['countdowns'] = activeCountdowns.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <CalendarClock size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Odliczania</Text>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
+                    <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ gap: spacing[3], marginTop: spacing[2] }}>
+                  {activeCountdowns.slice(0, 3).map(cn => {
+                    const left = daysUntil(cn);
+                    return (
+                      <View key={cn.id}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 1 }}>
+                          <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
+                          <Text style={s.cdDays}>{left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`}</Text>
+                        </View>
+                        <WalkProgress progress={untilProgress(cn)} color={accentColor} />
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
             );
 
             nodes['habits-nudge'] = habits.length > 0 && new Date().getHours() >= 17 && (() => {
@@ -3239,9 +3276,9 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
 
   // ── Tools row ─────────────────────────────────────────────────────────────
-  toolsRow: { flexDirection: 'row', gap: spacing[2] },
+  toolsRow: { flexDirection: 'row', gap: spacing[2], paddingRight: spacing[1] },
   toolTile: {
-    flex: 1, alignItems: 'center', gap: spacing[2],
+    width: 74, alignItems: 'center', gap: spacing[2],
     borderRadius: radius.xl,
     borderWidth: 1, paddingVertical: spacing[3],
   },
@@ -3250,6 +3287,8 @@ const makeStyles = (c: any) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   toolLabel: { fontSize: 10, fontWeight: '700', color: c.text.secondary, letterSpacing: 0.3 },
+  cdName: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
+  cdDays: { fontSize: 12, fontWeight: '800', color: c.tabs?.day ?? '#46B0DE' },
   toolSub: { fontSize: 11, fontWeight: '800', letterSpacing: -0.3 },
 
   // ── Evening habits nudge ──────────────────────────────────────────────────
