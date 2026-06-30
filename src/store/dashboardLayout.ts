@@ -57,7 +57,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'fixed-variable': 'Stałe vs zmienne (4 mies.)',
   'sweets-vs-food': 'Słodycze vs jedzenie (8 tyg.)',
   'spend-by-day':   'Wydatki wg dnia tygodnia',
-  'work-hours':     'Godziny pracy',
+  'work-hours':     'Praca (zarobek + godziny)',
   'top-products':   'Top 3 kupowane',
   'fun-facts':      'Ciekawostki',
   'correlations':   'Zależności (sen/kroki/nastrój/wydatki)',

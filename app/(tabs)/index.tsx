@@ -1458,6 +1458,7 @@ export default function DashboardScreen() {
     if (!wcol && !wp) return null;
     const isWork = (e: typeof allEvents[number]) => isWorkEvent(e, { workColor: wcol, workPrefix: wp });
     const dur = (e: typeof allEvents[number]) => shiftHours(e);
+    const rate = (workEarnings?.perSecond ?? 0) * 3600;
     const now = new Date();
     const months = Array.from({ length: 6 }, (_, idx) => {
       const i = 5 - idx;
@@ -1466,10 +1467,29 @@ export default function DashboardScreen() {
       const hours = allEvents
         .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
         .reduce((s, e) => s + dur(e), 0);
-      return { ym, label: MONTH_SHORT[d.getMonth()], hours, isCurrent: i === 0 };
+      return { ym, label: MONTH_SHORT[d.getMonth()], hours, earnings: Math.round(hours * rate), isCurrent: i === 0 };
     });
-    return { months, currentHours: months[5].hours };
-  }, [allEvents, workSettings]);
+    // This month: split worked-so-far vs still-scheduled (gcal holds future shifts),
+    // and count distinct days worked for an avg-per-day figure.
+    const ymCur = months[5].ym;
+    let workedH = 0, plannedH = 0;
+    const dayset = new Set<string>();
+    for (const e of allEvents) {
+      if (!isWork(e) || (e.date ?? '').slice(0, 7) !== ymCur) continue;
+      const h = dur(e); const day = (e.date ?? '').slice(0, 10);
+      if (day <= today) { workedH += h; if (h > 0) dayset.add(day); }
+      else plannedH += h;
+    }
+    const currentHours = months[5].hours;
+    return {
+      months, currentHours, rate,
+      currentEarnings: Math.round(currentHours * rate),
+      workedH, plannedH, workedEarnings: Math.round(workedH * rate),
+      daysWorked: dayset.size,
+      avgPerDay: dayset.size > 0 ? workedH / dayset.size : 0,
+      prevHours: months[4].hours, prevEarnings: months[4].earnings,
+    };
+  }, [allEvents, workSettings, workEarnings, today]);
 
   const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
     .replace(/^\w/, c => c.toUpperCase());
@@ -2491,54 +2511,92 @@ export default function DashboardScreen() {
               </View>
             );
 
-            nodes['work-hours'] = workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Briefcase size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Godziny pracy</Text>
-                  <TouchableOpacity
-                    onPress={() => { haptic.tap(); setWorkHoursChart(v => !v); }}
-                    style={s.workToggle}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[s.workToggleText, { color: accentColor }]}>
-                      {workHoursChart ? 'Ten miesiąc' : 'Ostatnie 6 msc'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {!workHoursChart ? (
-                  <View style={s.workHoursRow}>
-                    <Text style={[s.workHoursBig, { color: colors.text.primary }]}>
-                      {workMonthly.currentHours.toFixed(0)}
-                      <Text style={s.workHoursUnit}> h</Text>
-                    </Text>
-                    <Text style={s.workHoursSub}>przepracowane w tym miesiącu</Text>
+            nodes['work-hours'] = workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (() => {
+              const wm = workMonthly;
+              const hasRate = wm.rate > 0;
+              const deltaE = wm.currentEarnings - wm.prevEarnings;
+              const showDelta = hasRate && wm.prevEarnings > 0 && Math.abs(deltaE) > 1;
+              return (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Briefcase size={13} color={accentColor} />
+                    <Text style={s.cardTitle}>Praca</Text>
+                    <TouchableOpacity
+                      onPress={() => { haptic.tap(); setWorkHoursChart(v => !v); }}
+                      style={s.workToggle}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[s.workToggleText, { color: accentColor }]}>
+                        {workHoursChart ? 'Ten miesiąc' : 'Ostatnie 6 msc'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                ) : (
-                  <>
-                    <View style={s.waveValues}>
-                      {workMonthly.months.map((m, i) => (
-                        <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
-                          {m.hours > 0 ? `${Math.round(m.hours)}h` : ''}
+
+                  {!workHoursChart ? (
+                    <>
+                      <View style={s.workHeroRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[s.workHoursBig, { color: colors.text.primary }]}>
+                            {hasRate ? wm.currentEarnings.toLocaleString('pl-PL') : wm.currentHours.toFixed(0)}
+                            <Text style={s.workHoursUnit}>{hasRate ? ' zł' : ' h'}</Text>
+                          </Text>
+                          <Text style={s.workHoursSub}>
+                            {hasRate ? `≈ zarobek · ${wm.currentHours.toFixed(0)} h w tym miesiącu` : 'przepracowane w tym miesiącu'}
+                          </Text>
+                        </View>
+                        {showDelta && (
+                          <View style={[s.workDelta, { backgroundColor: (deltaE >= 0 ? colors.accent.green : colors.accent.red) + '1E' }]}>
+                            {deltaE >= 0 ? <ChevronUp size={12} color={colors.accent.green} /> : <ChevronDown size={12} color={colors.accent.red} />}
+                            <Text style={[s.workDeltaText, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>
+                              {Math.abs(deltaE).toLocaleString('pl-PL')} zł
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {wm.plannedH > 0 && (
+                        <View style={{ marginTop: spacing[3] }}>
+                          <View style={s.workSplitBar}>
+                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: accentColor }} />
+                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: accentColor + '40' }} />
+                          </View>
+                          <Text style={s.workSplitText}>
+                            <Text style={{ color: accentColor, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
+                            {`  ·  zaplanowane +${wm.plannedH.toFixed(0)} h`}
+                          </Text>
+                        </View>
+                      )}
+
+                      {wm.daysWorked > 0 && (
+                        <Text style={s.workMeta}>
+                          {wm.daysWorked} {wm.daysWorked === 1 ? 'dzień' : 'dni'} · śr. {wm.avgPerDay.toFixed(1)} h/dzień{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate).toLocaleString('pl-PL')} zł/dzień` : ''}
                         </Text>
-                      ))}
-                    </View>
-                    <WaveChart
-                      data={workMonthly.months.map(m => m.hours)}
-                      color={accentColor}
-                    />
-                    <View style={s.waveLabels}>
-                      {workMonthly.months.map((m, i) => (
-                        <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>
-                          {m.label}
-                        </Text>
-                      ))}
-                    </View>
-                  </>
-                )}
-              </View>
-            );
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <View style={s.waveValues}>
+                        {wm.months.map((m, i) => (
+                          <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+                            {hasRate
+                              ? (m.earnings > 0 ? (m.earnings >= 1000 ? `${(m.earnings / 1000).toFixed(1)}k` : String(m.earnings)) : '')
+                              : (m.hours > 0 ? `${Math.round(m.hours)}h` : '')}
+                          </Text>
+                        ))}
+                      </View>
+                      <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={accentColor} />
+                      <View style={s.waveLabels}>
+                        {wm.months.map((m, i) => (
+                          <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>
+                            {m.label}
+                          </Text>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </View>
+              );
+            })();
 
             nodes['top-products'] = topProducts.length > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -3297,6 +3355,12 @@ const makeStyles = (c: any) => StyleSheet.create({
   workHoursBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
   workHoursUnit: { fontSize: 16, fontWeight: '700', color: c.text.muted },
   workHoursSub: { fontSize: 12, color: c.text.secondary },
+  workHeroRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing[1] },
+  workDelta: { flexDirection: 'row', alignItems: 'center', gap: 1, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.full },
+  workDeltaText: { fontSize: 12, fontWeight: '800' },
+  workSplitBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: c.fill.subtle },
+  workSplitText: { fontSize: 11, color: c.text.secondary, marginTop: 6 },
+  workMeta: { fontSize: 11.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[3] },
 
   card: {
     backgroundColor: c.bg.card,
