@@ -1,12 +1,22 @@
-import { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { useState, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, Check, Wallet, ShoppingCart, Smile, Briefcase } from 'lucide-react-native';
+import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, Check, Wallet, ShoppingCart, Smile, Briefcase, Trash2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useDashboardLayout, WidgetViz } from '@/store/dashboardLayout';
-import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS } from '@/utils/statWidgets';
+import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS, StatCtx, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
+import { useExpensesStore } from '@/store/expensesStore';
+import { useStatsScope } from '@/store/statsScope';
+import { useMoodStore } from '@/store/moodStore';
+import { useCalendarStore } from '@/store/calendarStore';
+import { useWorkStore } from '@/store/workStore';
+import { useWorkEarnings } from '@/hooks/useWorkEarnings';
+import { useHabits } from '@/hooks/useHabits';
+import { loadNameAliases, loadWeightMemory, WeightMemory } from '@/utils/productMemory';
+import { getHealthHistory } from '@/utils/healthHistory';
+import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -28,7 +38,44 @@ export default function WidgetBuilder() {
   const s = useMemo(() => makeS(colors), [colors]);
   const addCustomTile = useDashboardLayout(s => s.addCustomTile);
   const updateCustomTile = useDashboardLayout(s => s.updateCustomTile);
+  const removeCustomTile = useDashboardLayout(s => s.removeCustomTile);
   const accent = '#6C9EFF';
+
+  // ── Real data for a live preview (so the tile shows YOUR numbers, not mockups) ──
+  const { expenses } = useExpensesStore();
+  const scope = useStatsScope(s => s.scope);
+  const { entries: moodEntries } = useMoodStore();
+  const { events, gcalEvents, tasks: calTasks } = useCalendarStore();
+  const { shifts: workShifts, settings: workSettings } = useWorkStore();
+  const { habits, todayDone } = useHabits();
+  const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
+  const workEarnings = useWorkEarnings(workShifts, allEvents, workSettings, expenses);
+  const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
+  const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
+  const [healthDays, setHealthDays] = useState<StatCtx['healthDays']>({});
+  useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
+  useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
+  useEffect(() => {
+    getHealthHistory(70).then(h => {
+      const m: StatCtx['healthDays'] = {};
+      for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
+      setHealthDays(m);
+    }).catch(() => {});
+  }, []);
+  const statCtx = useMemo<StatCtx>(() => ({
+    expenses, scope, moodEntries, workEvents: allEvents, workSettings,
+    ratePerHour: (workEarnings?.perSecond ?? 0) * 3600,
+    tasks: calTasks, habitsTotal: habits.length, habitsDone: todayDone.length,
+    nameAliases, weightMemory, healthDays,
+  }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits.length, todayDone.length, nameAliases, weightMemory, healthDays]);
+
+  const fmtVal = (v: number, unit: string): string => {
+    if (unit === 'zł') return Math.round(v).toLocaleString('pl-PL');
+    if (unit === 'kroki') return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v));
+    if (unit === 'h' || unit === 'kg') return v.toFixed(1).replace('.0', '');
+    if (unit === '/5') return v.toFixed(1);
+    return `${Math.round(v)}`;
+  };
 
   // Edit mode: preload an existing tile by id (?edit=custom:...).
   const { edit } = useLocalSearchParams<{ edit?: string }>();
@@ -98,9 +145,17 @@ export default function WidgetBuilder() {
       target: !isNaN(target) && target > 0 ? target : undefined,
       tag: needsTag ? tag : undefined,
     };
-    if (existing) updateCustomTile(existing.id, cfg);
-    else addCustomTile({ type: 'stat', ...cfg });
+    if (existing) { updateCustomTile(existing.id, cfg); toast.success('Widget zaktualizowany'); }
+    else { addCustomTile({ type: 'stat', ...cfg }); toast.success('Widget dodany na górze dashboardu'); }
     router.back();
+  };
+
+  const deleteWidget = () => {
+    if (!existing) return;
+    Alert.alert('Usunąć widget?', `„${existing.title}" zniknie z dashboardu.`, [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); removeCustomTile(existing.id); toast.success('Widget usunięty'); router.back(); } },
+    ]);
   };
 
   const showPeriod = !!def && def.periodic && viz !== 'list' && viz !== 'donut';
@@ -128,43 +183,61 @@ export default function WidgetBuilder() {
                 <Text style={s.previewTitle} numberOfLines={1}>{title.trim() || labelFor(def, tag)}</Text>
                 {showPeriod && <Text style={s.previewPeriod}>{period === 'week' ? 'tydz.' : 'mies.'}</Text>}
               </View>
-              {viz === 'number' && (
-                <View style={s.pNumberRow}>
-                  <Text style={s.pNumber}>123</Text>
-                  {!!def.unit && <Text style={s.pUnit}>{def.unit}</Text>}
-                </View>
-              )}
-              {viz === 'wave' && (
-                <View style={s.pWave}>
-                  {[5, 9, 6, 12, 8, 14].map((h, i) => (
-                    <View key={i} style={[s.pWaveBar, { height: h * 3, backgroundColor: i === 5 ? accent : accent + '55' }]} />
-                  ))}
-                </View>
-              )}
-              {viz === 'compare' && (
-                <View style={s.pWave}>
-                  {[10, 7].map((h, i) => (
-                    <View key={i} style={[s.pCmpBar, { height: h * 3 + 12, backgroundColor: i === 0 ? accent : '#FBBF24' }]} />
-                  ))}
-                </View>
-              )}
-              {viz === 'list' && (
-                <View style={{ gap: 6, marginTop: 8 }}>
-                  {[1, 2, 3].map(i => (
-                    <View key={i} style={s.pListRow}>
-                      <View style={[s.pListBar, { width: `${90 - i * 22}%` }]} />
-                    </View>
-                  ))}
-                </View>
-              )}
-              {viz === 'donut' && (
-                <View style={s.pDonutRow}>
-                  <View style={[s.pDonut, { borderColor: accent }]} />
-                  <View style={{ gap: 5 }}>{[accent, '#FBBF24', '#2AC68F'].map((cc, i) => (
-                    <View key={i} style={[s.pLegend, { backgroundColor: cc }]} />
-                  ))}</View>
-                </View>
-              )}
+              {viz === 'number' && (() => {
+                const r = metricNumber(def.id, statCtx, period, needsTag ? tag : undefined);
+                return (
+                  <View style={s.pNumberRow}>
+                    <Text style={s.pNumber}>{fmtVal(r.value, def.unit)}</Text>
+                    {!!def.unit && <Text style={s.pUnit}>{def.unit}</Text>}
+                  </View>
+                );
+              })()}
+              {viz === 'wave' && (() => {
+                const ser = metricSeries(def.id, statCtx, period, 6, needsTag ? tag : undefined);
+                const max = Math.max(...ser.values, 1);
+                return (
+                  <View style={s.pWave}>
+                    {ser.values.map((v, i) => (
+                      <View key={i} style={[s.pWaveBar, { height: v > 0 ? Math.max(4, (v / max) * 40) : 3, backgroundColor: i === ser.values.length - 1 ? accent : accent + '55' }]} />
+                    ))}
+                  </View>
+                );
+              })()}
+              {viz === 'compare' && (() => {
+                const a = metricNumber(def.id, statCtx, period, needsTag ? tag : undefined).value;
+                const defB = metricById(metric2);
+                const b = metric2 === '__self__'
+                  ? (metricSeries(def.id, statCtx, period, compareOffset + 1).values[0] ?? 0)
+                  : (defB ? metricNumber(metric2, statCtx, period).value : 0);
+                const mx = Math.max(a, b, 1);
+                return (
+                  <View style={[s.pWave, { alignItems: 'flex-end' }]}>
+                    {[{ v: a, c: accent }, { v: b, c: '#FBBF24' }].map((x, i) => (
+                      <View key={i} style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+                        <Text style={s.pCmpVal}>{fmtVal(x.v, def.unit)}</Text>
+                        <View style={[s.pCmpBar, { height: Math.max(10, (x.v / mx) * 36), backgroundColor: x.c }]} />
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+              {(viz === 'list' || viz === 'donut') && (() => {
+                const rows = metricList(def.id, statCtx, 3);
+                if (rows.length === 0) return <Text style={s.previewEmpty}>Brak danych jeszcze — pojawią się gdy dodasz wpisy</Text>;
+                const max = Math.max(...rows.map(r => r.value), 1);
+                const DC = [accent, '#FBBF24', '#2AC68F'];
+                return (
+                  <View style={{ gap: 6, marginTop: 6 }}>
+                    {rows.map((r, i) => (
+                      <View key={r.label + i} style={s.pListRow2}>
+                        <Text style={s.pListLabel} numberOfLines={1}>{r.label}</Text>
+                        <View style={[s.pListBar, { width: `${Math.max(12, (r.value / max) * 70)}%`, backgroundColor: DC[i % DC.length] }]} />
+                        <Text style={s.pListVal}>{fmtVal(r.value, r.unit)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
               {showTarget && targetInput.trim() !== '' && (
                 <Text style={s.pTarget}>cel: {targetInput} {def.unit}</Text>
               )}
@@ -337,12 +410,19 @@ export default function WidgetBuilder() {
       </ScrollView>
 
       <View style={s.footer}>
-        <PressableScale onPress={save} disabled={!canSave}>
-          <View style={[s.saveBtn, { backgroundColor: accent }, !canSave && { opacity: 0.4 }]}>
-            <Check size={18} color={colors.bg.primary} />
-            <Text style={s.saveText}>Dodaj widget</Text>
-          </View>
-        </PressableScale>
+        <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+          {existing && (
+            <PressableScale onPress={deleteWidget}>
+              <View style={s.delBtn}><Trash2 size={18} color={colors.accent.red} /></View>
+            </PressableScale>
+          )}
+          <PressableScale onPress={save} disabled={!canSave} style={{ flex: 1 }}>
+            <View style={[s.saveBtn, { backgroundColor: accent }, !canSave && { opacity: 0.4 }]}>
+              <Check size={18} color={colors.bg.primary} />
+              <Text style={s.saveText}>{existing ? 'Zapisz zmiany' : 'Dodaj widget'}</Text>
+            </View>
+          </PressableScale>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -371,8 +451,12 @@ const makeS = (c: any) => StyleSheet.create({
   pUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted, marginBottom: 5 },
   pWave: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 46, marginTop: 4 },
   pWaveBar: { flex: 1, borderRadius: 3, minHeight: 4 },
-  pCmpBar: { flex: 1, borderRadius: 4, minHeight: 10 },
+  pCmpBar: { width: '70%', borderRadius: 4, minHeight: 10 },
+  pCmpVal: { fontSize: 11, fontWeight: '800', color: c.text.primary },
   pListRow: { height: 12, justifyContent: 'center' },
+  pListRow2: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pListLabel: { width: 84, fontSize: 11, color: c.text.secondary, fontWeight: '600' },
+  pListVal: { fontSize: 11, fontWeight: '700', color: c.text.primary, marginLeft: 'auto' },
   pListBar: { height: 8, borderRadius: 4, backgroundColor: c.fill.strong },
   pDonutRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[4], marginTop: 2 },
   pDonut: { width: 44, height: 44, borderRadius: 22, borderWidth: 7 },
@@ -414,4 +498,5 @@ const makeS = (c: any) => StyleSheet.create({
   footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: c.border.subtle },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg },
   saveText: { fontSize: 15, fontWeight: '800', color: c.bg.primary },
+  delBtn: { width: 52, paddingVertical: 14, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.accent.red + '55', backgroundColor: c.accent.red + '14' },
 });
