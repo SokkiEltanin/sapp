@@ -346,18 +346,17 @@ export default function TopPill() {
 
   return (
     <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }] }]}>
-      {/* Truly floating — no container background/blur. Only the coloured badge is
-          solid (the island "anchor"); the label floats with a soft shadow so it
-          stays readable over whatever is behind it. */}
+      {/* A single self-contained pill (its own solid background) that hugs its
+          content — no surrounding band/border/halo around it. */}
       <TouchableOpacity
         style={s.island}
         onPress={() => { haptic.tap(); router.push(item.route as any); }}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <View style={[s.badge, { backgroundColor: item.color, shadowColor: item.color }]}>
+        <View style={[s.badge, { backgroundColor: item.color }]}>
           <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
         </View>
-        <Text style={[s.text, { color: theme.text.primary }]} numberOfLines={1}>{item.text}</Text>
+        <Text style={s.text} numberOfLines={1}>{item.text}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -366,20 +365,32 @@ export default function TopPill() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const makeS = (t: any) => StyleSheet.create({
-  // Truly floating island: no container background — just a solid coloured badge
-  // (the anchor) + a shadowed label sitting directly over the page.
+  // The wrap only centers the pill — it has NO background of its own, so there's
+  // no band/halo around the island.
   islandWrap: {
     alignItems: 'center',
     marginTop: 6,
     marginBottom: 4,
     paddingHorizontal: 12,
   },
+  // The island itself is one solid dark pill (dynamic-island style) that hugs its
+  // content. A soft drop shadow lifts it off the page; no border.
   island: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    alignSelf: 'center',
+    gap: 8,
     maxWidth: '100%',
-    paddingVertical: 4,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingLeft: 6,
+    paddingRight: 14,
+    backgroundColor: '#17191B',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   badge: {
     borderRadius: 999,
@@ -388,11 +399,6 @@ const makeS = (t: any) => StyleSheet.create({
     minWidth: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    // soft coloured glow so the anchor pops while floating
-    elevation: 6,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
   },
   badgeText: {
     fontSize: 11,
@@ -403,12 +409,8 @@ const makeS = (t: any) => StyleSheet.create({
   text: {
     flexShrink: 1,
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: 0.2,
-    paddingRight: 6,
-    // legible over any background without a container
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
+    color: '#F2F3F3',
   },
 });
