@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const DEFAULT_DASHBOARD_SECTIONS = [
   'payday-prompt',
   'debt-prompt',
+  'bill-suggest',
   'weekly-insights',
   'maintenance-reminders',
   'tag-limits',
@@ -39,6 +40,7 @@ export type SectionId = typeof DEFAULT_DASHBOARD_SECTIONS[number];
 export const SECTION_TITLES: Record<string, string> = {
   'payday-prompt':  'Pytanie o wypłatę',
   'debt-prompt':    'Pytanie o dług (zwrot)',
+  'bill-suggest':   'Propozycja stałego rachunku',
   'weekly-insights': 'Przegląd (kafelki + miesiące)',
   'maintenance-reminders': 'Serwis i przypomnienia',
   'tag-limits':     'Limity tagów (#słodycze…)',

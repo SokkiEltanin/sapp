@@ -49,6 +49,7 @@ import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
+import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -587,7 +588,7 @@ export default function DashboardScreen() {
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
   const { entries: moodEntries, setEntries: setMood, addEntry } = useMoodStore();
   const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
-  const { subscriptions, update: updateSub } = useSubscriptions();
+  const { subscriptions, update: updateSub, add: addSub } = useSubscriptions();
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
@@ -665,6 +666,28 @@ export default function DashboardScreen() {
   const [debtDismissed, setDebtDismissed] = useState<Set<string>>(new Set());
   const checkedSubs = useRef(false);
   const [weekOffset, setWeekOffset] = useState(0);
+
+  // Recurring-bill auto-detect — spot bills logged by hand every month (rent, prąd,
+  // internet) and offer to turn them into a tracked bill with a "paid?" prompt.
+  const [billDismissed, setBillDismissed] = useState<string[]>([]);
+  useEffect(() => { getDismissedBills().then(setBillDismissed).catch(() => {}); }, []);
+  const billSuggest = useMemo(() => {
+    const cands = detectRecurringBills(expenses, subscriptions).filter(c => !billDismissed.includes(c.tag));
+    return cands[0] ?? null;
+  }, [expenses, subscriptions, billDismissed]);
+  const addBillSubscription = useCallback(async (cand: NonNullable<typeof billSuggest>) => {
+    haptic.success();
+    await addSub({
+      name: cand.name, amount: cand.avgAmount, currency: 'PLN', category: 'housing',
+      billingCycle: 'monthly', nextBillingDate: nextBillingDate(cand.dayOfMonth),
+      reminderDaysBefore: 2, active: true, tags: [cand.tag],
+    });
+    toast.success(`Dodano rachunek: ${cand.name}`);
+  }, [addSub]);
+  const dismissBillSuggest = useCallback((tag: string) => {
+    haptic.tap();
+    dismissBill(tag).then(setBillDismissed).catch(() => {});
+  }, []);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -1866,6 +1889,28 @@ export default function DashboardScreen() {
                 </View>
               );
 
+              nodes['bill-suggest'] = billSuggest && (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Wallet size={13} color={colors.accent.blue} />
+                    <Text style={s.cardTitle}>Stały rachunek?</Text>
+                  </View>
+                  <Text style={[s.factText, { marginTop: spacing[1] }]}>
+                    Płacisz „{billSuggest.name}" co miesiąc (~{billSuggest.avgAmount} zł, {billSuggest.months} mies.). Dodać jako rachunek z przypomnieniem „zapłaciłeś?"?
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
+                    <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.blue }]} activeOpacity={0.85}
+                      onPress={() => addBillSubscription(billSuggest)}>
+                      <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak — dodaj</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7}
+                      onPress={() => dismissBillSuggest(billSuggest.tag)}>
+                      <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Nie pytaj</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+
               nodes['tag-limits'] = tagLimits.map(t => {
               const pctClamped = Math.min(100, Math.round(t.pct * 100));
               const over = t.pct >= 1;
@@ -2742,8 +2787,10 @@ export default function DashboardScreen() {
               return (
                 <>
                   {!hiddenSet.has('payday-prompt') && nodes['payday-prompt']}
+                  {!hiddenSet.has('bill-suggest') && nodes['bill-suggest']}
                   {orderedSections.map(id => {
                     if (id === 'payday-prompt') return null; // rendered pinned above
+                    if (id === 'bill-suggest') return null;  // rendered pinned above
                     if (hiddenSet.has(id)) return null;
                     const node = nodes[id];
                     if (node === undefined) return null;
