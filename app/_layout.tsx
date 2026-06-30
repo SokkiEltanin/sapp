@@ -14,6 +14,7 @@ import { auth } from '@/services/firebase';
 import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
+import BadgeCelebration from '@/components/achievements/BadgeCelebration';
 import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
@@ -277,6 +278,7 @@ export default function RootLayout() {
         </Stack>
         <PomodoroIndicator />
         <Toast />
+        <BadgeCelebration />
         <AutoMoodPopup />
       </SafeAreaProvider>
     </GestureHandlerRootView>

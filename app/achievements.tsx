@@ -14,6 +14,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { getBudgets } from '@/utils/budgets';
+import { useCelebration } from '@/store/celebrationStore';
 import {
   AchCtx, buildAchCtx, evaluateAchievements, syncEarned, getEarned, EarnedMap,
   fmtProgress, AchState, AchGroup, TIER_COLOR, BAD_COLOR,
@@ -50,9 +51,14 @@ export default function Achievements() {
     budgetTotal, billTracked: subscriptions.some(sub => sub.active),
   }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions]);
 
+  const celebrate = useCelebration(st => st.celebrate);
   const states = useMemo(() => evaluateAchievements(ctx), [ctx]);
   useEffect(() => {
-    syncEarned(states).then(fresh => { if (fresh.length) getEarned().then(setEarnedMap); }).catch(() => {});
+    (async () => {
+      const firstEver = Object.keys(await getEarned()).length === 0;
+      const fresh = await syncEarned(states);
+      if (fresh.length) { if (!firstEver) celebrate(fresh); setEarnedMap(await getEarned()); }
+    })().catch(() => {});
   }, [states]);
 
   // Trophy progress counts only the "good" badges (Grzeszki are shame, not progress).

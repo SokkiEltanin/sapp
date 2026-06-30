@@ -51,7 +51,8 @@ import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
-import { buildAchCtx, evaluateAchievements, syncEarned, ACHIEVEMENTS } from '@/utils/achievements';
+import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
+import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, untilProgress } from '@/store/countersStore';
 import WalkProgress from '@/components/counters/WalkProgress';
 import { vehiclesService } from '@/services/vehiclesService';
@@ -997,14 +998,13 @@ export default function DashboardScreen() {
     billTracked: subscriptions.some(sb => sb.active),
   })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions]);
   const earnedBadges = useMemo(() => achStates.filter(st => st.unlocked && st.a.kind !== 'bad').length, [achStates]);
+  const celebrate = useCelebration(st => st.celebrate);
   useEffect(() => {
-    syncEarned(achStates).then(fresh => {
-      if (!fresh.length) return;
-      const first = ACHIEVEMENTS.find(a => a.id === fresh[0]);
-      if (first?.kind === 'bad') { haptic.error(); toast.error(`Antyodznaka: ${first.title} 💀`); }
-      else if (first?.tier === 4) { haptic.success(); toast.success(`✦ LEGENDARNA: ${first.title}!`); }
-      else { haptic.success(); toast.success(fresh.length === 1 && first ? `Nowa odznaka: ${first.title}!` : `Zdobyto ${fresh.length} nowe odznaki!`); }
-    }).catch(() => {});
+    (async () => {
+      const firstEver = Object.keys(await getEarned()).length === 0;
+      const fresh = await syncEarned(achStates);
+      if (fresh.length && !firstEver) celebrate(fresh); // don't blast the backlog on first run
+    })().catch(() => {});
   }, [achStates]);
 
   // ── Weekly auto-review: cross-domain nuggets (this week vs last) ───────────
