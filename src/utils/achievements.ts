@@ -4,140 +4,168 @@ import { isSelfTransfer } from './statWidgets';
 import { isWorkEvent, shiftHours } from './workEvents';
 
 // ── Context the achievements are evaluated against ──────────────────────────
-// Assembled on the dashboard / gablota screen from the existing stores.
 export interface AchCtx {
-  habitBestStreak: number;   // longest current habit streak (days)
-  allHabitsToday: boolean;   // every habit checked today
-  noJunkStreak: number;      // consecutive days with no sweets/junk-tagged spend
-  savingsTotal: number;      // cumulative self-transfers (zł put aside)
-  receiptsCount: number;     // number of expense entries logged
-  moodDays: number;          // distinct days with a mood entry
-  workHoursTotal: number;    // all-time work hours
-  paydayLogged: boolean;     // any salary income logged
-  bestStepsDay: number;      // best single-day step count
-  billTracked: boolean;      // at least one tracked recurring bill
+  habitBestStreak: number;
+  noJunkStreak: number;
+  savingsTotal: number;
+  receiptsCount: number;
+  moodDays: number;
+  workHoursTotal: number;
+  paydayLogged: boolean;
+  bestStepsDay: number;
+  billTracked: boolean;
+  // richer signals (added for the custom-icon set)
+  logStreak: number;         // consecutive days (→ today) with any expense/mood logged
+  activeDays: number;        // distinct days with any activity
+  goodMoodStreak: number;    // consecutive days (→ today) with mood ≥ 4
+  moodLevelsSeen: number;    // distinct mood levels (1..5) ever logged
+  balancedMonth: boolean;    // any month where income ≥ expenses
+  hasBudget: boolean;        // a budget is set
+  tasksDone: number;         // all-time completed tasks
+  // anti-achievement signals
+  junkStreak: number;        // consecutive days (→ today) WITH a junk purchase
+  badSleepStreak: number;    // consecutive nights (→ today) with sleep < 5 h
+  overBudgetPct: number;     // this-month spend ÷ total budget (1 = exactly on budget)
 }
 
-export const EMPTY_ACH_CTX: AchCtx = {
-  habitBestStreak: 0, allHabitsToday: false, noJunkStreak: 0, savingsTotal: 0,
-  receiptsCount: 0, moodDays: 0, workHoursTotal: 0, paydayLogged: false,
-  bestStepsDay: 0, billTracked: false,
-};
+export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Grzeszki';
 
-// Junk/sweets keywords for the "no-junk streak" — shared so the dashboard and the
-// gablota classify identically.
+export interface Achievement {
+  id: string;
+  title: string;
+  desc: string;
+  group: AchGroup;
+  tier: 1 | 2 | 3;
+  target: number;
+  unit?: string;
+  kind?: 'good' | 'bad';   // bad = anti-achievement (red, "earned" by slipping up)
+  value: (c: AchCtx) => number;
+}
+
+export const TIER_COLOR: Record<1 | 2 | 3, string> = { 1: '#CD7F32', 2: '#C4CAD4', 3: '#FFC83D' };
+export const BAD_COLOR = '#E5484D';
+
+export const ACHIEVEMENTS: Achievement[] = [
+  // ── Start / Konsekwencja (custom icons) ──
+  { id: 'first-key', title: 'Pierwszy klucz', desc: 'Pierwszy zalogowany wydatek', group: 'Konsekwencja', tier: 1, target: 1, value: c => c.receiptsCount >= 1 ? 1 : 0 },
+  { id: 'scanner',   title: 'Skaner',         desc: '50 zalogowanych wydatków',     group: 'Konsekwencja', tier: 2, target: 50, unit: '×', value: c => c.receiptsCount },
+  { id: 'on-track',  title: 'Na kursie',      desc: '7 dni z rzędu coś zalogowane', group: 'Konsekwencja', tier: 2, target: 7, unit: 'dni', value: c => c.logStreak },
+  { id: 'loyal',     title: 'Wierny',         desc: '30 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 3, target: 30, unit: 'dni', value: c => c.activeDays },
+  { id: 'goal-set',  title: 'Wyznaczony cel', desc: 'Ustawiony pierwszy budżet',    group: 'Konsekwencja', tier: 1, target: 1, value: c => c.hasBudget ? 1 : 0 },
+
+  // ── Nastrój (custom icons) ──
+  { id: 'sunny-week', title: 'Słoneczny tydzień', desc: '7 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 2, target: 7, unit: 'dni', value: c => c.goodMoodStreak },
+  { id: 'self-care',  title: 'Dbam o siebie',     desc: '30 dni z wpisem nastroju',  group: 'Nastrój', tier: 2, target: 30, unit: 'dni', value: c => c.moodDays },
+  { id: 'full-range', title: 'Pełnia emocji',     desc: 'Zalogowane wszystkie nastroje 1–5', group: 'Nastrój', tier: 1, target: 5, unit: '/5', value: c => c.moodLevelsSeen },
+
+  // ── Zdrowie / Praca (custom icons) ──
+  { id: 'marathon', title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków', value: c => c.bestStepsDay },
+  { id: 'doer',     title: 'Wykonawca',    desc: '25 ukończonych zadań',        group: 'Praca',   tier: 2, target: 25, unit: '×', value: c => c.tasksDone },
+
+  // ── Oszczędzanie (justice-scale custom + lucide) ──
+  { id: 'balanced',   title: 'W równowadze', desc: 'Miesiąc na plusie (przychód ≥ wydatki)', group: 'Oszczędzanie', tier: 2, target: 1, value: c => c.balancedMonth ? 1 : 0 },
+  { id: 'saver-1000', title: 'Tysiąc',       desc: 'Łącznie 1 000 zł odłożone',  group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł', value: c => c.savingsTotal },
+  { id: 'saver-5000', title: 'Poduszka',     desc: 'Łącznie 5 000 zł odłożone',  group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł', value: c => c.savingsTotal },
+  { id: 'saver-10000',title: 'Forteca',      desc: 'Łącznie 10 000 zł odłożone', group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł', value: c => c.savingsTotal },
+
+  // ── Loyalty / brand (custom) ──
+  { id: 'loyal-heart', title: 'Z sercem', desc: '60 aktywnych dni — apka to nawyk', group: 'Konsekwencja', tier: 3, target: 60, unit: 'dni', value: c => c.activeDays },
+
+  // ── Lucide-only (no custom icon yet) ──
+  { id: 'habit-streak-7',  title: 'Tydzień mocy', desc: '7 dni nawyku z rzędu',  group: 'Nawyki', tier: 2, target: 7,  unit: 'dni', value: c => c.habitBestStreak },
+  { id: 'habit-streak-30', title: 'Żelazna wola', desc: '30 dni nawyku z rzędu', group: 'Nawyki', tier: 3, target: 30, unit: 'dni', value: c => c.habitBestStreak },
+  { id: 'no-junk-7',  title: 'Tydzień fit', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni', value: c => c.noJunkStreak },
+  { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h', value: c => c.workHoursTotal },
+  { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1, value: c => c.paydayLogged ? 1 : 0 },
+
+  // ── Grzeszki (anti-achievements, custom icons) ──
+  { id: 'crime-scene', title: 'Miejsce zbrodni',   desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad', value: c => Math.round(c.overBudgetPct * 100) },
+  { id: 'undead',      title: 'Żywy trup',         desc: '3 noce z rzędu sen poniżej 5 h',  group: 'Grzeszki', tier: 1, target: 3, unit: 'noce', kind: 'bad', value: c => c.badSleepStreak },
+  { id: 'bottomless',  title: 'Bezdenny żołądek',  desc: '5 dni z rzędu ze słodyczami',     group: 'Grzeszki', tier: 1, target: 5, unit: 'dni', kind: 'bad', value: c => c.junkStreak },
+];
+
+// ── Build context (single source of truth — dashboard + gablota call this) ───
 const JUNK = ['słodycz', 'slodycz', 'słodki', 'slodki', 'cukier', 'czekolad', 'baton', 'chips', 'fast', 'frytk', 'mcdonald', 'kfc', 'lody', 'ciast', 'żelk', 'zelk', 'oreo', 'jeżyk', 'jezyk', 'toffi', 'chałw', 'chalw', 'paluszk', 'chrupk'];
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// walk back from today counting consecutive days for which pred(dayKey) holds
+function streakBack(pred: (k: string) => boolean): number {
+  let n = 0; const base = new Date();
+  for (let i = 0; i < 400; i++) { const d = new Date(base); d.setDate(d.getDate() - i); if (!pred(dayKey(d))) break; n++; }
+  return n;
+}
 
-// Build the full context from raw data. The cheap habit/steps/bill bits are passed
-// in (they come from hooks); the expense/work-derived bits are computed here so the
-// dashboard and the gablota stay perfectly in sync.
 export function buildAchCtx(args: {
   expenses: Expense[];
-  moodEntries: { date?: string }[];
+  moodEntries: { date?: string; mood?: number }[];
   workEvents: CalendarEvent[];
   workSettings: { workColor?: string; workPrefix?: string };
   habitBestStreak: number;
-  allHabitsToday: boolean;
-  bestStepsDay: number;
+  healthDays: Record<string, { steps?: number; sleepMinutes?: number }>;
+  tasksDone: number;
+  budgetTotal: number;
   billTracked: boolean;
 }): AchCtx {
-  const { expenses, moodEntries, workEvents, workSettings } = args;
+  const { expenses, moodEntries, workEvents, workSettings, healthDays } = args;
   const wcol = workSettings.workColor;
   const wp = workSettings.workPrefix?.trim().toLowerCase();
   const workHoursTotal = workEvents
     .filter(e => isWorkEvent(e, { workColor: wcol, workPrefix: wp }))
     .reduce((sum, e) => sum + shiftHours(e), 0);
 
-  let savingsTotal = 0, receiptsCount = 0;
+  let savingsTotal = 0, receiptsCount = 0, thisMonthExp = 0;
+  const thisMonth = dayKey(new Date()).slice(0, 7);
   const junkDays = new Set<string>();
+  const loggedDays = new Set<string>();
+  const monthAgg: Record<string, { inc: number; exp: number }> = {};
   for (const e of expenses) {
+    const day = (e.date ?? '').slice(0, 10);
+    if (day) loggedDays.add(day);
     const isInc = e.type === 'income';
-    if (!isInc) receiptsCount++;
-    if (!isInc && isSelfTransfer(e)) savingsTotal += e.amount;
-    if (!isInc) {
-      const hay = `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase();
-      if (JUNK.some(k => hay.includes(k))) junkDays.add((e.date ?? '').slice(0, 10));
-    }
+    const m = (e.date ?? '').slice(0, 7);
+    if (m) (monthAgg[m] ??= { inc: 0, exp: 0 });
+    if (isInc) { if (m && !isSelfTransfer(e)) monthAgg[m].inc += e.amount; continue; }
+    receiptsCount++;
+    if (isSelfTransfer(e)) { savingsTotal += e.amount; continue; }
+    if (m) monthAgg[m].exp += e.amount;
+    if (m === thisMonth) thisMonthExp += e.amount;
+    const hay = `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase();
+    if (JUNK.some(k => hay.includes(k))) junkDays.add(day);
   }
-  let noJunkStreak = 0;
-  const base = new Date();
-  for (let i = 0; i < 400; i++) {
-    const d = new Date(base); d.setDate(d.getDate() - i);
-    if (junkDays.has(dayKey(d))) break;
-    noJunkStreak++;
+
+  // mood
+  const moodByDay: Record<string, number> = {};
+  const moodLevels = new Set<number>();
+  for (const m of moodEntries) {
+    const day = (m.date ?? '').slice(0, 10);
+    if (day) { loggedDays.add(day); moodByDay[day] = Math.max(moodByDay[day] ?? 0, m.mood ?? 0); }
+    if (m.mood) moodLevels.add(m.mood);
   }
-  const moodDays = new Set(moodEntries.map(m => (m.date ?? '').slice(0, 10)).filter(Boolean)).size;
-  const paydayLogged = expenses.some(e =>
-    e.type === 'income' && (e.category === 'salary' || (!!wp && `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase().includes(wp))));
+  const moodDays = Object.keys(moodByDay).length;
+
+  // sleep (best step + bad-sleep streak)
+  let bestStepsDay = 0;
+  for (const v of Object.values(healthDays)) bestStepsDay = Math.max(bestStepsDay, v.steps || 0);
+
+  const balancedMonth = Object.values(monthAgg).some(m => m.exp > 0 && m.inc >= m.exp);
 
   return {
-    habitBestStreak: args.habitBestStreak, allHabitsToday: args.allHabitsToday,
-    noJunkStreak, savingsTotal, receiptsCount, moodDays, workHoursTotal,
-    paydayLogged, bestStepsDay: args.bestStepsDay, billTracked: args.billTracked,
+    habitBestStreak: args.habitBestStreak,
+    noJunkStreak: streakBack(k => !junkDays.has(k)),
+    savingsTotal, receiptsCount, moodDays, workHoursTotal,
+    paydayLogged: expenses.some(e => e.type === 'income' && (e.category === 'salary' || (!!wp && `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase().includes(wp)))),
+    bestStepsDay, billTracked: args.billTracked,
+    logStreak: streakBack(k => loggedDays.has(k)),
+    activeDays: loggedDays.size,
+    goodMoodStreak: streakBack(k => (moodByDay[k] ?? 0) >= 4),
+    moodLevelsSeen: moodLevels.size,
+    balancedMonth, hasBudget: args.budgetTotal > 0, tasksDone: args.tasksDone,
+    junkStreak: streakBack(k => junkDays.has(k)),
+    badSleepStreak: streakBack(k => { const s = healthDays[k]?.sleepMinutes; return !!s && s > 0 && s < 300; }),
+    overBudgetPct: args.budgetTotal > 0 ? thisMonthExp / args.budgetTotal : 0,
   };
 }
 
-export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Konsekwencja' | 'Zdrowie';
-
-export interface Achievement {
-  id: string;
-  title: string;
-  desc: string;            // how you earn it
-  group: AchGroup;
-  tier: 1 | 2 | 3;         // bronze / silver / gold ring
-  target: number;
-  unit?: string;           // for progress text ("dni", "zł", "h", "×")
-  value: (c: AchCtx) => number;
-}
-
-// Tier ring colours (used by the gablota + as the lucide-placeholder accent).
-export const TIER_COLOR: Record<1 | 2 | 3, string> = {
-  1: '#CD7F32', // bronze
-  2: '#C4CAD4', // silver
-  3: '#FFC83D', // gold
-};
-
-export const ACHIEVEMENTS: Achievement[] = [
-  // ── Nawyki ──
-  { id: 'habit-streak-3',  title: 'Rozpęd',          desc: '3 dni nawyku z rzędu',          group: 'Nawyki', tier: 1, target: 3,  unit: 'dni', value: c => c.habitBestStreak },
-  { id: 'habit-streak-7',  title: 'Tydzień mocy',    desc: '7 dni nawyku z rzędu',          group: 'Nawyki', tier: 2, target: 7,  unit: 'dni', value: c => c.habitBestStreak },
-  { id: 'habit-streak-30', title: 'Żelazna wola',    desc: '30 dni nawyku z rzędu',         group: 'Nawyki', tier: 3, target: 30, unit: 'dni', value: c => c.habitBestStreak },
-  { id: 'habit-all-day',   title: 'Czysty dzień',    desc: 'Wszystkie dzisiejsze nawyki odhaczone', group: 'Nawyki', tier: 1, target: 1, value: c => c.allHabitsToday ? 1 : 0 },
-
-  // ── Jedzenie ──
-  { id: 'no-junk-3',  title: 'Bez cukru ×3',  desc: '3 dni z rzędu bez słodyczy',  group: 'Jedzenie', tier: 1, target: 3,  unit: 'dni', value: c => c.noJunkStreak },
-  { id: 'no-junk-7',  title: 'Tydzień fit',   desc: '7 dni z rzędu bez słodyczy',  group: 'Jedzenie', tier: 2, target: 7,  unit: 'dni', value: c => c.noJunkStreak },
-  { id: 'no-junk-14', title: 'Dwa tygodnie',  desc: '14 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 3, target: 14, unit: 'dni', value: c => c.noJunkStreak },
-
-  // ── Oszczędzanie ──
-  { id: 'saver-first', title: 'Pierwszy grosz', desc: 'Pierwszy raz coś odłożone',     group: 'Oszczędzanie', tier: 1, target: 1,     unit: 'zł', value: c => c.savingsTotal },
-  { id: 'saver-1000',  title: 'Tysiąc',         desc: 'Łącznie 1 000 zł odłożone',     group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł', value: c => c.savingsTotal },
-  { id: 'saver-5000',  title: 'Poduszka',       desc: 'Łącznie 5 000 zł odłożone',     group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł', value: c => c.savingsTotal },
-  { id: 'saver-10000', title: 'Forteca',        desc: 'Łącznie 10 000 zł odłożone',    group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł', value: c => c.savingsTotal },
-
-  // ── Praca ──
-  { id: 'work-payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1,   value: c => c.paydayLogged ? 1 : 0 },
-  { id: 'work-50h',  title: 'Robotnik',  desc: 'Łącznie 50 h pracy',  group: 'Praca', tier: 1, target: 50,  unit: 'h', value: c => c.workHoursTotal },
-  { id: 'work-100h', title: 'Maszyna',   desc: 'Łącznie 100 h pracy', group: 'Praca', tier: 2, target: 100, unit: 'h', value: c => c.workHoursTotal },
-
-  // ── Konsekwencja ──
-  { id: 'receipts-25',  title: 'Skaner',     desc: '25 zalogowanych wydatków',  group: 'Konsekwencja', tier: 1, target: 25,  unit: '×', value: c => c.receiptsCount },
-  { id: 'receipts-100', title: 'Księgowy',   desc: '100 zalogowanych wydatków', group: 'Konsekwencja', tier: 2, target: 100, unit: '×', value: c => c.receiptsCount },
-  { id: 'mood-7',  title: 'Świadomy',  desc: '7 dni z wpisem nastroju',   group: 'Konsekwencja', tier: 1, target: 7,  unit: 'dni', value: c => c.moodDays },
-  { id: 'mood-30', title: 'Introspekcja', desc: '30 dni z wpisem nastroju', group: 'Konsekwencja', tier: 3, target: 30, unit: 'dni', value: c => c.moodDays },
-
-  // ── Zdrowie / Finanse ──
-  { id: 'steps-10k',   title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków', value: c => c.bestStepsDay },
-  { id: 'bills-first', title: 'Ogarnięty',    desc: 'Pierwszy stały rachunek śledzony', group: 'Konsekwencja', tier: 1, target: 1, value: c => c.billTracked ? 1 : 0 },
-];
-
-export interface AchState {
-  a: Achievement;
-  value: number;
-  unlocked: boolean;
-  progress: number; // 0..1
-}
+export interface AchState { a: Achievement; value: number; unlocked: boolean; progress: number; }
 
 export function evaluateAchievements(ctx: AchCtx): AchState[] {
   return ACHIEVEMENTS.map(a => {
@@ -146,22 +174,19 @@ export function evaluateAchievements(ctx: AchCtx): AchState[] {
   });
 }
 
-// ── Earned timestamps (so we can show the date + detect NEW unlocks) ────────
+// ── Earned timestamps ───────────────────────────────────────────────────────
 const K_EARNED = 'achievements_earned';
-export type EarnedMap = Record<string, string>; // id -> ISO date first earned
+export type EarnedMap = Record<string, string>;
 
 export async function getEarned(): Promise<EarnedMap> {
   try { const raw = await AsyncStorage.getItem(K_EARNED); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
 }
 
-// Persist any newly-unlocked achievements; returns the ids that were NEW this run.
 export async function syncEarned(states: AchState[]): Promise<string[]> {
   const earned = await getEarned();
   const now = new Date().toISOString();
   const fresh: string[] = [];
-  for (const s of states) {
-    if (s.unlocked && !earned[s.a.id]) { earned[s.a.id] = now; fresh.push(s.a.id); }
-  }
+  for (const s of states) if (s.unlocked && !earned[s.a.id]) { earned[s.a.id] = now; fresh.push(s.a.id); }
   if (fresh.length) { try { await AsyncStorage.setItem(K_EARNED, JSON.stringify(earned)); } catch {} }
   return fresh;
 }
@@ -169,6 +194,6 @@ export async function syncEarned(states: AchState[]): Promise<string[]> {
 export function fmtProgress(s: AchState): string {
   if (s.a.target === 1 && !s.a.unit) return s.unlocked ? 'Zdobyte' : 'Niezdobyte';
   const v = Math.min(s.value, s.a.target);
-  const fmt = (n: number) => s.a.unit === 'zł' || s.a.unit === 'kroków' ? Math.round(n).toLocaleString('pl-PL') : String(Math.round(n));
+  const fmt = (n: number) => (s.a.unit === 'zł' || s.a.unit === 'kroków') ? Math.round(n).toLocaleString('pl-PL') : String(Math.round(n));
   return `${fmt(v)} / ${fmt(s.a.target)}${s.a.unit ? ' ' + s.a.unit : ''}`;
 }

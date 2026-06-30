@@ -51,7 +51,7 @@ import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
-import { buildAchCtx, evaluateAchievements, syncEarned, getEarned, ACHIEVEMENTS } from '@/utils/achievements';
+import { buildAchCtx, evaluateAchievements, syncEarned, ACHIEVEMENTS } from '@/utils/achievements';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -694,8 +694,6 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
-  const [earnedCount, setEarnedCount] = useState(0);
-  useEffect(() => { getEarned().then(m => setEarnedCount(Object.keys(m).length)).catch(() => {}); }, []);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -984,17 +982,17 @@ export default function DashboardScreen() {
   const achStates = useMemo(() => evaluateAchievements(buildAchCtx({
     expenses, moodEntries, workEvents: allEvents, workSettings,
     habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
-    allHabitsToday: habits.length > 0 && habitsDoneIds.length >= habits.length,
-    bestStepsDay: Object.values(healthDays).reduce((m, v) => Math.max(m, v.steps || 0), 0),
+    healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
+    budgetTotal: Object.values(budgets).reduce((s2, v) => s2 + (v ?? 0), 0),
     billTracked: subscriptions.some(sb => sb.active),
-  })), [expenses, moodEntries, allEvents, workSettings, habits, habitsDoneIds, getStreak, healthDays, subscriptions]);
+  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions]);
+  const earnedBadges = useMemo(() => achStates.filter(st => st.unlocked && st.a.kind !== 'bad').length, [achStates]);
   useEffect(() => {
     syncEarned(achStates).then(fresh => {
       if (!fresh.length) return;
-      setEarnedCount(prev => prev + fresh.length);
-      haptic.success();
       const first = ACHIEVEMENTS.find(a => a.id === fresh[0]);
-      toast.success(fresh.length === 1 && first ? `Nowa odznaka: ${first.title}!` : `Zdobyto ${fresh.length} nowe odznaki!`);
+      if (first?.kind === 'bad') { haptic.error(); toast.error(`Antyodznaka: ${first.title} 💀`); }
+      else { haptic.success(); toast.success(fresh.length === 1 && first ? `Nowa odznaka: ${first.title}!` : `Zdobyto ${fresh.length} nowe odznaki!`); }
     }).catch(() => {});
   }, [achStates]);
 
@@ -2193,7 +2191,7 @@ export default function DashboardScreen() {
               {([
                 { label: 'Humor',     Icon: Smile,     route: '/(tabs)/mood', sub: todayEntry ? '✓' : null         },
                 { label: 'Nawyki',    Icon: Flame,    route: '/habits',   sub: null                               },
-                { label: 'Gablota',   Icon: Trophy,    route: '/achievements', sub: earnedCount > 0 ? `${earnedCount}` : null },
+                { label: 'Gablota',   Icon: Trophy,    route: '/achievements', sub: earnedBadges > 0 ? `${earnedBadges}` : null },
                 { label: 'Notatki',   Icon: FileText,  route: '/notes',    sub: null                               },
                 { label: 'Skupienie', Icon: Activity,  route: '/focus',    sub: null                               },
                 { label: 'Pomodoro',  Icon: Timer,     route: '/pomodoro', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },

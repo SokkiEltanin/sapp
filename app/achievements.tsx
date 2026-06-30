@@ -13,15 +13,16 @@ import { useWorkStore } from '@/store/workStore';
 import { useHabits } from '@/hooks/useHabits';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getHealthHistory } from '@/utils/healthHistory';
+import { getBudgets } from '@/utils/budgets';
 import {
   AchCtx, buildAchCtx, evaluateAchievements, syncEarned, getEarned, EarnedMap,
-  fmtProgress, AchState, AchGroup, TIER_COLOR,
+  fmtProgress, AchState, AchGroup, TIER_COLOR, BAD_COLOR,
 } from '@/utils/achievements';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
-const GROUP_ORDER: AchGroup[] = ['Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Konsekwencja', 'Zdrowie'];
+const GROUP_ORDER: AchGroup[] = ['Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Konsekwencja', 'Grzeszki'];
 
 export default function Achievements() {
   const c = useColors();
@@ -29,36 +30,35 @@ export default function Achievements() {
 
   const { expenses } = useExpensesStore();
   const { entries: moodEntries } = useMoodStore();
-  const { events, gcalEvents } = useCalendarStore();
+  const { events, gcalEvents, tasks } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
-  const { habits, todayDone, getStreak } = useHabits();
+  const { habits, getStreak } = useHabits();
   const { subscriptions } = useSubscriptions();
-  const [bestSteps, setBestSteps] = useState(0);
+  const [healthDays, setHealthDays] = useState<Record<string, { steps?: number; sleepMinutes?: number }>>({});
+  const [budgetTotal, setBudgetTotal] = useState(0);
   const [earned, setEarnedMap] = useState<EarnedMap>({});
   const [detail, setDetail] = useState<AchState | null>(null);
 
   useEffect(() => { getEarned().then(setEarnedMap).catch(() => {}); }, []);
-  useEffect(() => {
-    getHealthHistory(180).then(h => {
-      let m = 0; for (const v of Object.values(h)) m = Math.max(m, v.steps || 0);
-      setBestSteps(m);
-    }).catch(() => {});
-  }, []);
+  useEffect(() => { getHealthHistory(200).then(setHealthDays).catch(() => {}); }, []);
+  useEffect(() => { getBudgets().then(b => setBudgetTotal(Object.values(b).reduce((s2, v) => s2 + (v ?? 0), 0))).catch(() => {}); }, []);
 
   const ctx = useMemo<AchCtx>(() => buildAchCtx({
     expenses, moodEntries, workEvents: [...events, ...gcalEvents], workSettings,
     habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
-    allHabitsToday: habits.length > 0 && todayDone.length >= habits.length,
-    bestStepsDay: bestSteps, billTracked: subscriptions.some(sub => sub.active),
-  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, todayDone, getStreak, bestSteps, subscriptions]);
+    healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
+    budgetTotal, billTracked: subscriptions.some(sub => sub.active),
+  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions]);
 
   const states = useMemo(() => evaluateAchievements(ctx), [ctx]);
   useEffect(() => {
     syncEarned(states).then(fresh => { if (fresh.length) getEarned().then(setEarnedMap); }).catch(() => {});
   }, [states]);
 
-  const unlockedCount = states.filter(st => st.unlocked).length;
-  const pct = states.length ? unlockedCount / states.length : 0;
+  // Trophy progress counts only the "good" badges (Grzeszki are shame, not progress).
+  const goodStates = states.filter(st => st.a.kind !== 'bad');
+  const unlockedCount = goodStates.filter(st => st.unlocked).length;
+  const pct = goodStates.length ? unlockedCount / goodStates.length : 0;
 
   const byGroup = useMemo(() => {
     const map = {} as Record<AchGroup, AchState[]>;
@@ -86,32 +86,35 @@ export default function Achievements() {
             <Trophy size={26} color={TIER_COLOR[3]} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.summaryBig}>{unlockedCount} <Text style={s.summarySmall}>/ {states.length} zdobyte</Text></Text>
+            <Text style={s.summaryBig}>{unlockedCount} <Text style={s.summarySmall}>/ {goodStates.length} zdobyte</Text></Text>
             <View style={s.sumBar}>
               <View style={{ width: `${Math.round(pct * 100)}%`, height: '100%', backgroundColor: TIER_COLOR[3], borderRadius: 5 }} />
             </View>
           </View>
         </View>
 
-        {GROUP_ORDER.filter(g => byGroup[g]?.length).map(g => (
-          <View key={g} style={{ marginTop: spacing[4] }}>
-            <Text style={s.groupTitle}>{g}</Text>
-            <View style={s.grid}>
-              {byGroup[g].map(st => (
-                <TouchableOpacity key={st.a.id} style={s.cell} activeOpacity={0.8}
-                  onPress={() => { haptic.tap(); setDetail(st); }}>
-                  <BadgeArt id={st.a.id} tier={st.a.tier} unlocked={st.unlocked} size={72} />
-                  <Text style={[s.cellTitle, !st.unlocked && { color: c.text.muted }]} numberOfLines={1}>{st.a.title}</Text>
-                  {!st.unlocked && st.a.target > 1 && (
-                    <View style={s.cellBar}>
-                      <View style={{ width: `${Math.round(st.progress * 100)}%`, height: '100%', backgroundColor: TIER_COLOR[st.a.tier], borderRadius: 2 }} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+        {GROUP_ORDER.filter(g => byGroup[g]?.length).map(g => {
+          const isBad = g === 'Grzeszki';
+          return (
+            <View key={g} style={{ marginTop: spacing[4] }}>
+              <Text style={[s.groupTitle, isBad && { color: BAD_COLOR }]}>{isBad ? 'Grzeszki (antyodznaki)' : g}</Text>
+              <View style={s.grid}>
+                {byGroup[g].map(st => (
+                  <TouchableOpacity key={st.a.id} style={s.cell} activeOpacity={0.8}
+                    onPress={() => { haptic.tap(); setDetail(st); }}>
+                    <BadgeArt id={st.a.id} tier={st.a.tier} unlocked={st.unlocked} bad={st.a.kind === 'bad'} size={72} />
+                    <Text style={[s.cellTitle, !st.unlocked && { color: c.text.muted }]} numberOfLines={1}>{st.a.title}</Text>
+                    {!st.unlocked && st.a.target > 1 && (
+                      <View style={s.cellBar}>
+                        <View style={{ width: `${Math.round(st.progress * 100)}%`, height: '100%', backgroundColor: st.a.kind === 'bad' ? BAD_COLOR : TIER_COLOR[st.a.tier], borderRadius: 2 }} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -124,11 +127,11 @@ export default function Achievements() {
             </TouchableOpacity>
             {detail && (
               <>
-                <BadgeArt id={detail.a.id} tier={detail.a.tier} unlocked={detail.unlocked} size={104} />
+                <BadgeArt id={detail.a.id} tier={detail.a.tier} unlocked={detail.unlocked} bad={detail.a.kind === 'bad'} size={104} />
                 <Text style={s.detailTitle}>{detail.a.title}</Text>
                 <Text style={s.detailDesc}>{detail.a.desc}</Text>
                 <View style={s.detailBar}>
-                  <View style={{ width: `${Math.round(detail.progress * 100)}%`, height: '100%', backgroundColor: TIER_COLOR[detail.a.tier], borderRadius: 4 }} />
+                  <View style={{ width: `${Math.round(detail.progress * 100)}%`, height: '100%', backgroundColor: detail.a.kind === 'bad' ? BAD_COLOR : TIER_COLOR[detail.a.tier], borderRadius: 4 }} />
                 </View>
                 <Text style={s.detailProg}>{fmtProgress(detail)}</Text>
                 {detail.unlocked && earned[detail.a.id] && (
