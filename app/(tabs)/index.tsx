@@ -619,6 +619,7 @@ export default function DashboardScreen() {
   const clearEditRequest = useDashboardLayout(s => s.clearEditRequest);
   const [editingDash, setEditingDash] = useState(false);
   const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const [showHiddenPool, setShowHiddenPool] = useState(false);
   const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles), [dashOrder, customTiles]);
   const hiddenSet = useMemo(() => new Set(dashHidden), [dashHidden]);
   const handleMoveTo = useCallback((id: string, target: number) => {
@@ -627,6 +628,22 @@ export default function DashboardScreen() {
     if (from < 0 || from === target) return;
     cur.splice(from, 1);
     cur.splice(target, 0, id);
+    setSectionOrder(cur);
+    haptic.tap();
+  }, [setSectionOrder]);
+
+  // Move among VISIBLE sections only (skip hidden ones in the order) so the up/down
+  // arrows don't waste taps stepping over hidden sections that aren't in the list.
+  const moveVisible = useCallback((id: string, dir: -1 | 1) => {
+    const st = useDashboardLayout.getState();
+    const cur = effectiveOrder(st.order, st.customTiles);
+    const hidden = new Set(st.hidden);
+    const from = cur.indexOf(id);
+    if (from < 0) return;
+    let to = from + dir;
+    while (to >= 0 && to < cur.length && hidden.has(cur[to])) to += dir; // skip hidden neighbours
+    if (to < 0 || to >= cur.length) return;
+    [cur[from], cur[to]] = [cur[to], cur[from]];
     setSectionOrder(cur);
     haptic.tap();
   }, [setSectionOrder]);
@@ -2621,7 +2638,9 @@ export default function DashboardScreen() {
                         <Text style={[s.editDoneText, { color: accentColor }]}>Gotowe</Text>
                       </TouchableOpacity>
                     </View>
-                    {orderedSections.map((id, idx) => {
+                    {/* Only the VISIBLE sections are in the reorder list — no scrolling
+                        past a dozen disabled ones. */}
+                    {orderedSections.filter(id => !hiddenSet.has(id)).map((id, idx, arr) => {
                       const isCustom = id.startsWith('custom:');
                       const ct = isCustom ? customTiles.find(t => t.id === id) : null;
                       const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
@@ -2630,14 +2649,14 @@ export default function DashboardScreen() {
                           key={id}
                           id={id}
                           index={idx}
-                          count={orderedSections.length}
+                          count={arr.length}
                           title={title}
                           isCustom={isCustom}
-                          hiddenNow={hiddenSet.has(id)}
+                          hiddenNow={false}
                           empty={!nodes[id]}
                           accent={accentColor}
                           cardBg={cardBgDark}
-                          onMoveDir={moveSection}
+                          onMoveDir={moveVisible}
                           onMoveTo={handleMoveTo}
                           onToggleHidden={toggleHiddenSection}
                           onRemove={(rid) => Alert.alert('Usuń kafelek', `Na pewno usunąć „${title}"?`, [
@@ -2648,6 +2667,33 @@ export default function DashboardScreen() {
                         />
                       );
                     })}
+
+                    {/* Hidden sections live in a collapsible pool — tap + to bring one back. */}
+                    {(() => {
+                      const hidden = orderedSections.filter(id => hiddenSet.has(id));
+                      if (hidden.length === 0) return null;
+                      return (
+                        <>
+                          <TouchableOpacity style={[s.editAddBtn, { borderStyle: 'solid' }]} onPress={() => { haptic.tap(); setShowHiddenPool(v => !v); }} activeOpacity={0.85}>
+                            <Plus size={15} color={accentColor} />
+                            <Text style={[s.editAddText, { color: accentColor }]}>Dodaj sekcję ({hidden.length} wyłączonych)</Text>
+                            <ChevronDown size={14} color={accentColor} style={[{ marginLeft: 'auto' }, showHiddenPool && { transform: [{ rotate: '180deg' }] }]} />
+                          </TouchableOpacity>
+                          {showHiddenPool && hidden.map(id => {
+                            const isCustom = id.startsWith('custom:');
+                            const ct = isCustom ? customTiles.find(t => t.id === id) : null;
+                            const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
+                            return (
+                              <TouchableOpacity key={id} style={s.hiddenRow} onPress={() => { haptic.tap(); toggleHiddenSection(id); setShowHiddenPool(true); }} activeOpacity={0.8}>
+                                <View style={[s.hiddenAddIcon, { borderColor: accentColor + '66' }]}><Plus size={13} color={accentColor} /></View>
+                                <Text style={s.hiddenRowText} numberOfLines={1}>{title}{!nodes[id] ? '  · brak danych' : ''}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </>
+                      );
+                    })()}
+
                     <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); router.push('/widget-builder' as any); }} activeOpacity={0.85}>
                       <BarChart2 size={15} color={accentColor} />
                       <Text style={[s.editAddText, { color: accentColor }]}>Dodaj widget statystyk</Text>
@@ -3191,6 +3237,9 @@ const makeStyles = (c: any) => StyleSheet.create({
     borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(108,158,255,0.4)',
   },
   editAddText: { fontSize: 12.5, fontWeight: '700' },
+  hiddenRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 9, paddingHorizontal: spacing[3], borderRadius: radius.md, backgroundColor: colors.fill.subtle, marginLeft: spacing[3] },
+  hiddenAddIcon: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  hiddenRowText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.secondary },
   editResetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
   editResetText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
 
