@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import PressableScale from '@/components/ui/PressableScale';
 import {
   Note, getAllNotes, createNote, updateNote, deleteNote,
@@ -341,6 +342,7 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
   };
 
   const focusedBlock = blocks.find(b => b.id === focusedId);
+  const kb = useKeyboardHeight();
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleSave}>
@@ -441,13 +443,17 @@ function NoteEditorModal({ note, visible, onClose, onSave, folders }: {
             </View>
           </ScrollView>
 
-          <RichToolbar
-            block={focusedBlock}
-            onToggle={applyToggle}
-            onColor={applyColor}
-            onSize={applySize}
-            onAdd={addBlock}
-          />
+          {/* Lift the toolbar above the keyboard on Android (KAV padding handles iOS),
+              so the bold/colour controls are never hidden behind it. */}
+          <View style={{ marginBottom: Platform.OS === 'android' ? kb : 0 }}>
+            <RichToolbar
+              block={focusedBlock}
+              onToggle={applyToggle}
+              onColor={applyColor}
+              onSize={applySize}
+              onAdd={addBlock}
+            />
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>

@@ -48,6 +48,7 @@ import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
+import { deserializeBlocks } from '@/utils/richText';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -1267,9 +1268,30 @@ export default function DashboardScreen() {
             <Pin size={13} color={accentColor} />
             <Text style={s.cardTitle} numberOfLines={1}>{t.title || note?.title || 'Notatka'}</Text>
           </View>
-          {note?.body?.trim()
-            ? <Text style={s.pinNoteBody} numberOfLines={3}>{note.body.trim()}</Text>
-            : <Text style={s.pinNoteBody}>{note ? '' : 'Notatka usunięta — edytuj kafelek.'}</Text>}
+          {(() => {
+            if (!note) return <Text style={s.pinNoteBody}>Notatka usunięta — edytuj kafelek.</Text>;
+            const blks = note.bodyRich ? deserializeBlocks(note.bodyRich).filter(b => b.text.trim()) : [];
+            if (blks.length > 0) {
+              // Render the note's own bold / colour / size 1:1 (first few lines).
+              return (
+                <View>
+                  {blks.slice(0, 4).map(b => (
+                    <Text key={b.id} numberOfLines={2} style={[s.pinNoteBody, {
+                      fontWeight: b.bold ? '700' : '400',
+                      fontStyle: b.italic ? 'italic' : 'normal',
+                      textDecorationLine: b.underline ? 'underline' : 'none',
+                      color: b.color ?? colors.text.secondary,
+                      fontSize: Math.min(b.size ?? 11.5, 14),
+                      lineHeight: Math.min(b.size ?? 11.5, 14) * 1.4,
+                    }]}>{b.text}</Text>
+                  ))}
+                </View>
+              );
+            }
+            return note.body?.trim()
+              ? <Text style={s.pinNoteBody} numberOfLines={3}>{note.body.trim()}</Text>
+              : <Text style={s.pinNoteBody} />;
+          })()}
         </TouchableOpacity>
       );
     }
