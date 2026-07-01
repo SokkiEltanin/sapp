@@ -43,6 +43,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { useWorkStore } from '@/store/workStore';
 import { useDashboardLayout } from '@/store/dashboardLayout';
 import { useHeroFont, HERO_FONTS } from '@/store/heroFont';
+import { useUiPrefs } from '@/store/uiPrefs';
 import { workService } from '@/services/workService';
 
 GoogleSignin.configure({
@@ -85,6 +86,8 @@ export default function SettingsScreen() {
   const { tasks, events, gcalEvents } = useCalendarStore();
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
   const themeMode = useThemeStore(s => s.mode);
+  const tabSlide = useUiPrefs(s => s.tabSlide);
+  const setTabSlide = useUiPrefs(s => s.setTabSlide);
   const setThemeMode = useThemeStore(s => s.setMode);
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
@@ -553,6 +556,21 @@ export default function SettingsScreen() {
                 onValueChange={(v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); }}
                 trackColor={{ false: colors.fill.strong, true: colors.accent.purple + '80' }}
                 thumbColor={hapticsOn ? colors.accent.purple : colors.text.muted}
+              />
+            </View>
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
+              <View style={styles.iconWrap}>
+                <LucideIcons.ArrowLeftRight size={16} color={colors.text.secondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>Płynne przejście (slide)</Text>
+                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Animowany slide między zakładkami zamiast natychmiastowego</Text>
+              </View>
+              <Switch
+                value={tabSlide}
+                onValueChange={setTabSlide}
+                trackColor={{ false: colors.fill.strong, true: '#46B0DE99' }}
+                thumbColor={tabSlide ? '#46B0DE' : colors.text.muted}
               />
             </View>
           </View>

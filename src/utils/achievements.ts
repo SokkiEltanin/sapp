@@ -148,8 +148,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Kły wyszczerzone, karta w dłoni. 3 kg mięsa w tydzień — dział mięsny drży, gdy wchodzisz do sklepu.', value: c => c.meatWeekMaxKg },
   { id: 'butcher', title: 'Rzeźnik', desc: '5 kg mięsa w jednym tygodniu', group: 'Życie', tier: 3, target: 5, unit: 'kg',
     lore: 'Nóż naostrzony, apetyt nienasycony. 5 kg mięsa w siedem dni — to już nie dieta, to rzeźnia domowa.', value: c => c.meatWeekMaxKg },
-  { id: 'alchemist', title: 'Alchemik', desc: 'Wydatki w 8 różnych kategoriach', group: 'Życie', tier: 2, target: 8, unit: '/8',
-    lore: 'Miksujesz kategorie jak eliksiry w kotle. Osiem różnych żywiołów wydatków — prawdziwy mistrz finansowej magii.', value: c => c.distinctCategories },
+  { id: 'alchemist', title: 'Alchemik', desc: 'Wydatki w 6 różnych kategoriach', group: 'Życie', tier: 2, target: 6, unit: '/6',
+    lore: 'Miksujesz kategorie jak eliksiry w kotle. Sześć różnych żywiołów wydatków — prawdziwy mistrz finansowej magii.', value: c => c.distinctCategories },
   { id: 'unplugged', title: 'Wyluzowany', desc: '3 dni z rzędu bez żadnego wydatku', group: 'Życie', tier: 2, target: 3, unit: 'dni',
     lore: 'Telefon w kieszeni, portfel zamknięty. Trzy dni bez ani jednego wydatku — cyfrowy i finansowy detoks w jednym.', value: c => c.noSpendStreak },
 
