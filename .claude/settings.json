@@ -48,7 +48,8 @@
       "Bash(grep -nE \"return \\\\{|add:|add,|const add\" src/hooks/useSubscriptions.ts)",
       "Bash(git pull *)",
       "Bash(xargs -n1 basename)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(grep -nE \"^import.*\\\\bImage\\\\b|, Image,| Image }| Image,|{ Image\" \"app/\\(tabs\\)/index.tsx\")"
     ]
   }
 }

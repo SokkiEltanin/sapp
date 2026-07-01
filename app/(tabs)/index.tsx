@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Modal, Alert,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
-  TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -49,6 +49,7 @@ import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
+import { weatherIconPng } from '@/utils/weatherIcon';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
@@ -1280,14 +1281,6 @@ export default function DashboardScreen() {
 
   const renderWeatherTile = (t: CustomTile): React.ReactNode => {
     const code = weather?.wmo ?? -1;
-    const WIcon = code < 0 ? CloudSun
-      : code === 0 ? Sun
-      : code <= 3 ? CloudSun
-      : code <= 48 ? Cloud
-      : code <= 67 ? CloudDrizzle
-      : code <= 77 ? Snowflake
-      : code <= 82 ? CloudRain
-      : code <= 86 ? Snowflake : Zap;
     const temp = weather?.temp ?? null;
     const warm = (temp ?? 15) >= 18;
     const grad: [string, string] = warm ? ['#3A2A12', '#1A1410'] : ['#10243A', '#0F1620'];
@@ -1301,7 +1294,7 @@ export default function DashboardScreen() {
           <Text style={s.statSub}>Pobieram pogodę…</Text>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] }}>
-            <WIcon size={44} color={warm ? '#FBBF24' : '#7FB2FF'} strokeWidth={1.6} />
+            <Image source={weatherIconPng(code)} style={{ width: 52, height: 52 }} resizeMode="contain" />
             <View style={{ flex: 1 }}>
               <Text style={s.weatherTemp}>{temp}°C</Text>
               <Text style={s.weatherDesc}>{(weather?.desc ?? '').toUpperCase()}</Text>
@@ -1860,7 +1853,7 @@ export default function DashboardScreen() {
                 <Text style={s.headerMinDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
                 {weather && (
                   <View style={s.headerMinWeather}>
-                    <CloudSun size={14} color={accentColor} strokeWidth={2} />
+                    <Image source={weatherIconPng(weather.wmo ?? -1)} style={{ width: 22, height: 22 }} resizeMode="contain" />
                     <Text style={s.headerMinTemp}>{weather.temp}°</Text>
                     <Text style={s.headerMinDesc} numberOfLines={1}>{weather.desc.toLowerCase()}</Text>
                   </View>

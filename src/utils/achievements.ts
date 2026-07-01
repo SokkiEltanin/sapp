@@ -22,6 +22,8 @@ export interface AchCtx {
   balancedMonth: boolean;    // any month where income ≥ expenses
   hasBudget: boolean;        // a budget is set
   tasksDone: number;         // all-time completed tasks
+  goodSleepStreak: number;   // consecutive nights (→ today) with sleep ≥ 7 h
+  lowMoodStreak: number;     // consecutive days (→ today) with mood ≤ 2 (anti)
   monthUnderBudget: boolean; // a completed month closed under the total budget
   // anti-achievement signals
   junkStreak: number;        // consecutive days (→ today) WITH a junk purchase
@@ -65,6 +67,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Inne apki dawno skamieniały na ekranie jak ta prehistoryczna czaszka. Ty zostałeś — okaz wytrwałości godny muzeum.', value: c => c.activeDays },
   { id: 'goal-set',  title: 'Wyznaczony cel', desc: 'Ustawiony pierwszy budżet',    group: 'Konsekwencja', tier: 1, target: 1,
     lore: 'Drogowskaz na finansowym rozstaju. Ustawiłeś budżet — od teraz wiadomo, dokąd naprawdę zmierzają Twoje pieniądze.', value: c => c.hasBudget ? 1 : 0 },
+  { id: 'first-week', title: 'Świeżo wyklute', desc: '7 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 1, target: 7, unit: 'dni',
+    lore: 'Coś się właśnie wykluło z jaja. Pierwszy tydzień za Tobą — Twoja przygoda z apką dopiero rozprostowuje łapki.', value: c => c.activeDays },
 
   // ── Nastrój (custom icons) ──
   { id: 'sunny-week', title: 'Słoneczny tydzień', desc: '7 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 2, target: 7, unit: 'dni',
@@ -75,22 +79,30 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Komedia i tragedia, i wszystko pomiędzy. Zagrałeś pełną gamę masek — prawdziwy teatr jednego aktora.', value: c => c.moodLevelsSeen },
   { id: 'chronicler', title: 'Kronikarz',         desc: '60 dni z wpisem nastroju',  group: 'Nastrój', tier: 3, target: 60, unit: 'dni',
     lore: 'Twój nastrój ma już własny zwój kroniki. 60 wpisów spisanych jak starożytny papirus — historia jednej duszy.', value: c => c.moodDays },
+  { id: 'zen', title: 'Rozkwit', desc: '14 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 3, target: 14, unit: 'dni',
+    lore: 'Dwa tygodnie pogody ducha i wewnętrzna róża rozkwitła. Nawet kolce zamieniły się w płatki.', value: c => c.goodMoodStreak },
 
   // ── Zdrowie / Praca (custom icons) ──
   { id: 'marathon', title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków',
     lore: 'Te trekkingowe buty dziś zarobiły na odpoczynek. 10 000 kroków — Twój prywatny maraton bez mety.', value: c => c.bestStepsDay },
+  { id: 'well-rested', title: 'Wyspany', desc: '7 nocy z rzędu snu ≥ 7 h', group: 'Zdrowie', tier: 2, target: 7, unit: 'nocy',
+    lore: 'Siedem nocy pod miękką kołdrą, każda po pełne 7 godzin. Zzz… Twój mózg dziękuje za regenerację.', value: c => c.goodSleepStreak },
   { id: 'doer',     title: 'Wykonawca',    desc: '25 ukończonych zadań',        group: 'Praca',   tier: 2, target: 25, unit: '×',
     lore: 'Nie odkładasz — naciskasz przycisk i robisz. Klik. Zrobione. 25 razy palec wylądował na „wykonaj".', value: c => c.tasksDone },
+  { id: 'tasks-50', title: 'Listoholik',   desc: '50 ukończonych zadań',        group: 'Praca',   tier: 3, target: 50, unit: '×',
+    lore: 'Odhaczasz szybciej, niż zdążysz dopisać. 50 zadań przekreślonych na liście — ptaszek za ptaszkiem.', value: c => c.tasksDone },
 
   // ── Oszczędzanie (justice-scale custom + lucide) ──
   { id: 'balanced',   title: 'W równowadze', desc: 'Miesiąc na plusie (przychód ≥ wydatki)', group: 'Oszczędzanie', tier: 2, target: 1,
     lore: 'Szala przychodów przeważyła wydatki. Waga sprawiedliwości tym razem po Twojej stronie — miesiąc na plusie.', value: c => c.balancedMonth ? 1 : 0 },
   { id: 'under-limit', title: 'Pod limitem',  desc: 'Miesiąc zamknięty pod budżetem', group: 'Oszczędzanie', tier: 2, target: 1,
     lore: 'Znak ograniczenia był po Twojej stronie. Zwolniłeś w porę i zmieściłeś się w budżecie — zero mandatu.', value: c => c.monthUnderBudget ? 1 : 0 },
-  { id: 'saver-1000', title: 'Tysiąc',       desc: 'Łącznie 1 000 zł odłożone',  group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł', value: c => c.savingsTotal },
+  { id: 'saver-1000', title: 'Tysiąc',       desc: 'Łącznie 1 000 zł odłożone',  group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł',
+    lore: 'Pierwszy tysiąc odłożony do koperty. Banknot z sercem — bo odkładanie na siebie to najczystsza forma dbania o przyszłość.', value: c => c.savingsTotal },
   { id: 'saver-5000', title: 'Poduszka',     desc: 'Łącznie 5 000 zł odłożone',  group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł',
     lore: 'Stos monet urósł w miękką poduszkę bezpieczeństwa. 5 000 zł — na takiej poduszce śpi się spokojniej.', value: c => c.savingsTotal },
-  { id: 'saver-10000',title: 'Forteca',      desc: 'Łącznie 10 000 zł odłożone', group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł', value: c => c.savingsTotal },
+  { id: 'saver-10000',title: 'Forteca',      desc: 'Łącznie 10 000 zł odłożone', group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł',
+    lore: 'Szlachetny kamień w Twoim skarbcu. 10 000 zł — twarde jak rubin i tak samo trudne do skruszenia.', value: c => c.savingsTotal },
 
   // ── Loyalty / brand (custom) ──
   { id: 'loyal-heart', title: 'Z sercem', desc: '60 aktywnych dni — apka to nawyk', group: 'Konsekwencja', tier: 3, target: 60, unit: 'dni',
@@ -139,6 +151,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Budżet krzyczał STOP, Ty wcisnąłeś gaz do dechy. Mandat wystawiony — płaci portfel.', value: c => Math.round(c.overBudgetPct * 100) },
   { id: 'panic',       title: 'Panikarz',          desc: 'Zakupy za 300+ zł w jeden dzień', group: 'Grzeszki', tier: 1, target: 300, unit: 'zł', kind: 'bad',
     lore: 'Ponad 300 zł w jeden dzień. Tryb pandemicznego chomika włączony — brakuje już tylko wieży z papieru toaletowego.', value: c => c.maxDaySpend },
+  { id: 'grumpy',      title: 'Zrzęda',            desc: '3 dni z rzędu nastrój ≤ 2',       group: 'Grzeszki', tier: 1, target: 3, unit: 'dni', kind: 'bad',
+    lore: 'Trzy dni z tą samą naburmuszoną miną. Chmura gradowa zawisła nad głową — może pora coś z tym zrobić?', value: c => c.lowMoodStreak },
 ];
 
 // ── Build context (single source of truth — dashboard + gablota call this) ───
@@ -197,10 +211,12 @@ export function buildAchCtx(args: {
 
   // mood
   const moodByDay: Record<string, number> = {};
+  const moodMinByDay: Record<string, number> = {};
   const moodLevels = new Set<number>();
   for (const m of moodEntries) {
     const day = (m.date ?? '').slice(0, 10);
     if (day) { loggedDays.add(day); moodByDay[day] = Math.max(moodByDay[day] ?? 0, m.mood ?? 0); }
+    if (day && m.mood) moodMinByDay[day] = Math.min(moodMinByDay[day] ?? 99, m.mood);
     if (m.mood) moodLevels.add(m.mood);
   }
   const moodDays = Object.keys(moodByDay).length;
@@ -222,6 +238,8 @@ export function buildAchCtx(args: {
     goodMoodStreak: streakBack(k => (moodByDay[k] ?? 0) >= 4),
     moodLevelsSeen: moodLevels.size,
     balancedMonth, hasBudget: args.budgetTotal > 0, tasksDone: args.tasksDone,
+    goodSleepStreak: streakBack(k => { const sl = healthDays[k]?.sleepMinutes; return !!sl && sl >= 420; }),
+    lowMoodStreak: streakBack(k => { const mn = moodMinByDay[k]; return mn != null && mn <= 2; }),
     monthUnderBudget,
     junkStreak: streakBack(k => junkDays.has(k)),
     badSleepStreak: streakBack(k => { const s = healthDays[k]?.sleepMinutes; return !!s && s > 0 && s < 300; }),
