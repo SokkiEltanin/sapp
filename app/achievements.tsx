@@ -14,6 +14,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { getBudgets } from '@/utils/budgets';
+import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { useCelebration } from '@/store/celebrationStore';
 import {
   AchCtx, buildAchCtx, evaluateAchievements, syncEarned, getEarned, EarnedMap,
@@ -23,7 +24,7 @@ import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
-const GROUP_ORDER: AchGroup[] = ['Legendy', 'Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Konsekwencja', 'Grzeszki'];
+const GROUP_ORDER: AchGroup[] = ['Legendy', 'Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Życie', 'Konsekwencja', 'Grzeszki'];
 
 export default function Achievements() {
   const c = useColors();
@@ -37,19 +38,21 @@ export default function Achievements() {
   const { subscriptions } = useSubscriptions();
   const [healthDays, setHealthDays] = useState<Record<string, { steps?: number; sleepMinutes?: number }>>({});
   const [budgetTotal, setBudgetTotal] = useState(0);
+  const [cardPeak, setCardPeak] = useState(0);
   const [earned, setEarnedMap] = useState<EarnedMap>({});
   const [detail, setDetail] = useState<AchState | null>(null);
 
   useEffect(() => { getEarned().then(setEarnedMap).catch(() => {}); }, []);
   useEffect(() => { getHealthHistory(200).then(setHealthDays).catch(() => {}); }, []);
   useEffect(() => { getBudgets().then(b => setBudgetTotal(Object.values(b).reduce((s2, v) => s2 + (v ?? 0), 0))).catch(() => {}); }, []);
+  useEffect(() => { updateCardBalancePeak(expenses).then(setCardPeak).catch(() => {}); }, [expenses]);
 
   const ctx = useMemo<AchCtx>(() => buildAchCtx({
     expenses, moodEntries, workEvents: [...events, ...gcalEvents], workSettings,
     habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
     healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
-    budgetTotal, billTracked: subscriptions.some(sub => sub.active),
-  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions]);
+    budgetTotal, billTracked: subscriptions.some(sub => sub.active), cardBalancePeak: cardPeak,
+  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions, cardPeak]);
 
   const celebrate = useCelebration(st => st.celebrate);
   const states = useMemo(() => evaluateAchievements(ctx), [ctx]);

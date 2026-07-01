@@ -49,7 +49,9 @@
       "Bash(git pull *)",
       "Bash(xargs -n1 basename)",
       "Read(//tmp/**)",
-      "Bash(grep -nE \"^import.*\\\\bImage\\\\b|, Image,| Image }| Image,|{ Image\" \"app/\\(tabs\\)/index.tsx\")"
+      "Bash(grep -nE \"^import.*\\\\bImage\\\\b|, Image,| Image }| Image,|{ Image\" \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(sed -n '/export interface Expense/,/^}/p' src/types/index.ts)",
+      "Bash(sed -n '/export interface ReceiptItem/,/^}/p' src/types/index.ts)"
     ]
   }
 }

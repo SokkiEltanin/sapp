@@ -50,6 +50,7 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherIconPng } from '@/utils/weatherIcon';
+import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
@@ -698,6 +699,8 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
+  const [cardPeak, setCardPeak] = useState(0);
+  useEffect(() => { updateCardBalancePeak(expenses).then(setCardPeak).catch(() => {}); }, [expenses]);
 
   // Countdowns (event "walk" tiles) — nearest upcoming first.
   const counters = useCounters(st => st.counters);
@@ -996,8 +999,8 @@ export default function DashboardScreen() {
     habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
     healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
     budgetTotal: Object.values(budgets).reduce((s2, v) => s2 + (v ?? 0), 0),
-    billTracked: subscriptions.some(sb => sb.active),
-  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions]);
+    billTracked: subscriptions.some(sb => sb.active), cardBalancePeak: cardPeak,
+  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions, cardPeak]);
   const earnedBadges = useMemo(() => achStates.filter(st => st.unlocked && st.a.kind !== 'bad').length, [achStates]);
   const celebrate = useCelebration(st => st.celebrate);
   useEffect(() => {

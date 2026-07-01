@@ -34,6 +34,16 @@ export const BADGE_PNG: Record<string, ImageSourcePropType> = {
   'tasks-50':      require('../../assets/badges/list.png'),
   'zen':           require('../../assets/badges/rose.png'),
   'well-rested':   require('../../assets/badges/sleeping.png'),
+  // lifestyle / finance / mood
+  'traveler':      require('../../assets/badges/card.png'),
+  'otaku':         require('../../assets/badges/japan.png'),
+  'carnivore':     require('../../assets/badges/fangs.png'),
+  'butcher':       require('../../assets/badges/knife.png'),
+  'alchemist':     require('../../assets/badges/witch-hat.png'),
+  'unplugged':     require('../../assets/badges/no-cellphone.png'),
+  'power-saver':   require('../../assets/badges/convert.png'),
+  'fat-wallet':    require('../../assets/badges/dollar-symbol.png'),
+  'poker-face':    require('../../assets/badges/mask.png'),
   // legendary
   'legend-saver':  require('../../assets/badges/slot-machine.png'),
   'centurion':     require('../../assets/badges/sword.png'),
@@ -51,6 +61,11 @@ export const BADGE_PNG: Record<string, ImageSourcePropType> = {
   'red-light':     require('../../assets/badges/stop.png'),
   'panic':         require('../../assets/badges/toilet-paper.png'),
   'grumpy':        require('../../assets/badges/annoyed.png'),
+  'rollercoaster': require('../../assets/badges/confused.png'),
+  'chemist':       require('../../assets/badges/flask.png'),
+  'high-roller':   require('../../assets/badges/gambler.png'),
+  'va-banque':     require('../../assets/badges/gambling.png'),
+  'jester':        require('../../assets/badges/jester.png'),
 };
 
 export function badgePng(id: string): ImageSourcePropType | undefined {

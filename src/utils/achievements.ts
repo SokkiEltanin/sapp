@@ -24,6 +24,19 @@ export interface AchCtx {
   tasksDone: number;         // all-time completed tasks
   goodSleepStreak: number;   // consecutive nights (→ today) with sleep ≥ 7 h
   lowMoodStreak: number;     // consecutive days (→ today) with mood ≤ 2 (anti)
+  neutralMoodStreak: number; // consecutive days (→ today) with mood exactly 3
+  moodSwing7: boolean;       // last 7 days mood spanned ≤2 and ≥4 (big swing)
+  noSpendStreak: number;     // consecutive days (→ today) with zero spending
+  trainTrips: number;        // train-ticket purchases (PKP/Intercity/Koleo…)
+  japanItems: number;        // Japanese products bought (matcha/mochi/sushi…)
+  drinkPurchasesMonth: number; // sugary/other drinks bought this month
+  meatWeekMaxKg: number;     // most kg of meat in any rolling 7-day window
+  cutElectricity: boolean;   // latest electricity bill well below the average
+  maxSinglePurchase: number; // biggest single expense (zł)
+  bettingBought: boolean;    // lottery/betting/casino purchase
+  maxTxPerDay: number;       // most separate transactions in one day
+  distinctCategories: number;// distinct expense categories ever used
+  cardBalancePeak: number;   // highest card balance ever reached
   monthUnderBudget: boolean; // a completed month closed under the total budget
   // anti-achievement signals
   junkStreak: number;        // consecutive days (→ today) WITH a junk purchase
@@ -34,7 +47,7 @@ export interface AchCtx {
   maxDaySpend: number;       // biggest single-day spend (zł)
 }
 
-export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Legendy' | 'Grzeszki';
+export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Życie' | 'Legendy' | 'Grzeszki';
 export type Tier = 1 | 2 | 3 | 4; // 4 = legendary
 
 export interface Achievement {
@@ -81,6 +94,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Twój nastrój ma już własny zwój kroniki. 60 wpisów spisanych jak starożytny papirus — historia jednej duszy.', value: c => c.moodDays },
   { id: 'zen', title: 'Rozkwit', desc: '14 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 3, target: 14, unit: 'dni',
     lore: 'Dwa tygodnie pogody ducha i wewnętrzna róża rozkwitła. Nawet kolce zamieniły się w płatki.', value: c => c.goodMoodStreak },
+  { id: 'poker-face', title: 'Poker Face', desc: '7 dni z rzędu nastrój dokładnie 3', group: 'Nastrój', tier: 1, target: 7, unit: 'dni',
+    lore: 'Ani wzlotów, ani upadków — kamienna twarz przez cały tydzień. Krupier nie odczytałby z niej nic. Może czas coś poczuć?', value: c => c.neutralMoodStreak },
 
   // ── Zdrowie / Praca (custom icons) ──
   { id: 'marathon', title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków',
@@ -97,6 +112,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Szala przychodów przeważyła wydatki. Waga sprawiedliwości tym razem po Twojej stronie — miesiąc na plusie.', value: c => c.balancedMonth ? 1 : 0 },
   { id: 'under-limit', title: 'Pod limitem',  desc: 'Miesiąc zamknięty pod budżetem', group: 'Oszczędzanie', tier: 2, target: 1,
     lore: 'Znak ograniczenia był po Twojej stronie. Zwolniłeś w porę i zmieściłeś się w budżecie — zero mandatu.', value: c => c.monthUnderBudget ? 1 : 0 },
+  { id: 'power-saver', title: 'Oszczędny prąd', desc: 'Rachunek za prąd ≥20% pod średnią', group: 'Oszczędzanie', tier: 2, target: 1,
+    lore: 'Zgaszone światła, wyłączone czuwanie. Twój ostatni rachunek za prąd spadł grubo pod średnią — licznik zwolnił, portfel odetchnął.', value: c => c.cutElectricity ? 1 : 0 },
+  { id: 'fat-wallet', title: 'Gruby portfel', desc: 'Saldo karty przekroczyło 5 000 zł (rekord)', group: 'Oszczędzanie', tier: 3, target: 5000, unit: 'zł',
+    lore: 'Worek pełen po brzegi. Na koncie zabłysło ponad 5 000 zł — a licznik pokazuje Twój życiowy rekord grubości portfela.', value: c => c.cardBalancePeak },
   { id: 'saver-1000', title: 'Tysiąc',       desc: 'Łącznie 1 000 zł odłożone',  group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł',
     lore: 'Pierwszy tysiąc odłożony do koperty. Banknot z sercem — bo odkładanie na siebie to najczystsza forma dbania o przyszłość.', value: c => c.savingsTotal },
   { id: 'saver-5000', title: 'Poduszka',     desc: 'Łącznie 5 000 zł odłożone',  group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł',
@@ -119,6 +138,20 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Pracujesz jak dobrze naoliwiony mechanizm — bez zacięć, bez postoju. 100 godzin na liczniku maszyny.', value: c => c.workHoursTotal },
   { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1,
     lore: 'Pierwszy banknot wpadł do systemu. Od teraz apka wie, ile realnie zarabiasz — i pilnuje reszty.', value: c => c.paydayLogged ? 1 : 0 },
+
+  // ── Życie (styl życia, konsumpcja) ──
+  { id: 'traveler', title: 'Podróżnik', desc: '5 przejazdów pociągiem', group: 'Życie', tier: 2, target: 5, unit: '×',
+    lore: 'Bilet skasowany, peron za peronem. PKP, Intercity, Koleo — świat jest Twoją siecią połączeń, a Ty jej stałym pasażerem.', value: c => c.trainTrips },
+  { id: 'otaku', title: 'Otaku', desc: 'Kupiony japoński produkt (matcha, mochi, sushi…)', group: 'Życie', tier: 1, target: 1,
+    lore: 'Matcha, mochi, kawałek sushi. Wpuściłeś do koszyka kawałek Kraju Kwitnącej Wiśni — 日本 na Twoim paragonie.', value: c => c.japanItems },
+  { id: 'carnivore', title: 'Drapieżnik', desc: '3 kg mięsa w jednym tygodniu', group: 'Życie', tier: 2, target: 3, unit: 'kg',
+    lore: 'Kły wyszczerzone, karta w dłoni. 3 kg mięsa w tydzień — dział mięsny drży, gdy wchodzisz do sklepu.', value: c => c.meatWeekMaxKg },
+  { id: 'butcher', title: 'Rzeźnik', desc: '5 kg mięsa w jednym tygodniu', group: 'Życie', tier: 3, target: 5, unit: 'kg',
+    lore: 'Nóż naostrzony, apetyt nienasycony. 5 kg mięsa w siedem dni — to już nie dieta, to rzeźnia domowa.', value: c => c.meatWeekMaxKg },
+  { id: 'alchemist', title: 'Alchemik', desc: 'Wydatki w 8 różnych kategoriach', group: 'Życie', tier: 2, target: 8, unit: '/8',
+    lore: 'Miksujesz kategorie jak eliksiry w kotle. Osiem różnych żywiołów wydatków — prawdziwy mistrz finansowej magii.', value: c => c.distinctCategories },
+  { id: 'unplugged', title: 'Wyluzowany', desc: '3 dni z rzędu bez żadnego wydatku', group: 'Życie', tier: 2, target: 3, unit: 'dni',
+    lore: 'Telefon w kieszeni, portfel zamknięty. Trzy dni bez ani jednego wydatku — cyfrowy i finansowy detoks w jednym.', value: c => c.noSpendStreak },
 
   // ── Legendy (tier 4 — rzadkie, trudne) ──
   { id: 'legend-saver', title: 'Legenda oszczędzania', desc: '25 000 zł odłożone',        group: 'Legendy', tier: 4, target: 25000, unit: 'zł',
@@ -153,11 +186,26 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Ponad 300 zł w jeden dzień. Tryb pandemicznego chomika włączony — brakuje już tylko wieży z papieru toaletowego.', value: c => c.maxDaySpend },
   { id: 'grumpy',      title: 'Zrzęda',            desc: '3 dni z rzędu nastrój ≤ 2',       group: 'Grzeszki', tier: 1, target: 3, unit: 'dni', kind: 'bad',
     lore: 'Trzy dni z tą samą naburmuszoną miną. Chmura gradowa zawisła nad głową — może pora coś z tym zrobić?', value: c => c.lowMoodStreak },
+  { id: 'rollercoaster', title: 'Rollercoaster',  desc: 'W tygodniu nastrój od ≤2 do ≥4',   group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
+    lore: 'W jednym tygodniu z piekła w niebo i z powrotem. Emocjonalny rollercoaster bez pasów — trzymaj się, robi się wyboiście.', value: c => c.moodSwing7 ? 1 : 0 },
+  { id: 'chemist',     title: 'Chemik',            desc: '10 słodkich napojów w miesiącu',   group: 'Grzeszki', tier: 1, target: 10, unit: '×', kind: 'bad',
+    lore: 'Kolorowe mikstury zamiast wody z filtra. 10 dziwnych napojów w miesiąc — Twój organizm zasługuje na coś prostszego niż H₂O++.', value: c => c.drinkPurchasesMonth },
+  { id: 'high-roller', title: 'Hazardzista',       desc: 'Pojedynczy zakup za 1000+ zł',     group: 'Grzeszki', tier: 1, target: 1000, unit: 'zł', kind: 'bad',
+    lore: 'Postawiłeś wszystko na jedną kartę — jeden zakup za ponad tysiaka. Va banque! Miejmy nadzieję, że było warto.', value: c => c.maxSinglePurchase },
+  { id: 'va-banque',   title: 'Va banque',         desc: 'Zakup u bukmachera / na lotto',    group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
+    lore: 'Kości rzucone, los kupiony. Fortuna kołem się toczy — a Ty właśnie oddałeś jej stery nad swoim portfelem.', value: c => c.bettingBought ? 1 : 0 },
+  { id: 'jester',      title: 'Błazen',            desc: '8 osobnych zakupów w jeden dzień', group: 'Grzeszki', tier: 1, target: 8, unit: '×', kind: 'bad',
+    lore: 'Osiem transakcji w jeden dzień — kup tu, kliknij tam, żonglujesz paragonami jak dworski błazen piłeczkami.', value: c => c.maxTxPerDay },
 ];
 
 // ── Build context (single source of truth — dashboard + gablota call this) ───
 const JUNK = ['słodycz', 'slodycz', 'słodki', 'slodki', 'cukier', 'czekolad', 'baton', 'chips', 'fast', 'frytk', 'mcdonald', 'kfc', 'lody', 'ciast', 'żelk', 'zelk', 'oreo', 'jeżyk', 'jezyk', 'toffi', 'chałw', 'chalw', 'paluszk', 'chrupk'];
 const FASTFOOD = ['mcdonald', 'kfc', 'pizza', 'burger', 'kebab', 'kebap', 'sushi', 'dominos', 'telepizza', 'bobby', 'pyszne', 'glovo', 'wolt', 'fast food', 'frytk'];
+const TRAIN = ['pkp', 'intercity', 'koleo', 'polregio', 'pociąg', 'pociag', 'kolej', 'e-podroznik', 'przewozy region'];
+const JAPAN = ['matcha', 'mochi', 'sushi', 'ramen', 'wasabi', 'nori', 'miso', 'sake', 'teriyaki', 'udon', 'sashimi', 'edamame', 'wakame', 'dango', 'takoyaki', 'onigiri', 'yakisoba'];
+const DRINKS = ['sok ', 'napój', 'napoj', 'cola', 'pepsi', 'sprite', 'fanta', 'oranżad', 'oranzad', 'lemoniad', 'energetyk', 'monster', 'red bull', 'redbull', 'tymbark', 'kubuś', 'kubus', 'ice tea', 'lipton', 'powerade', 'nestea', 'mirinda', '7up', 'mirinda', 'hoop', 'żywiec zdrój smak', 'frugo', 'toma', 'caprio'];
+const MEAT = ['mięso', 'mieso', 'kurczak', 'wołowin', 'wolowin', 'schab', 'karków', 'karkow', 'boczek', 'kiełbas', 'kielbas', 'szynk', 'mielone', 'indyk', 'żeberk', 'zeberk', 'parów', 'parow', 'pierś', 'piers', 'wieprz', 'polędwic', 'poledwic', 'filet z'];
+const BETTING = ['lotto', 'zakład', 'zaklad', 'totalizator', 'kasyno', 'lottomat', 'obstaw', 'betclic', 'betfan', 'fortuna zakład', 'sts '];
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 // walk back from today counting consecutive days for which pred(dayKey) holds
 function streakBack(pred: (k: string) => boolean): number {
@@ -176,6 +224,7 @@ export function buildAchCtx(args: {
   tasksDone: number;
   budgetTotal: number;
   billTracked: boolean;
+  cardBalancePeak?: number;
 }): AchCtx {
   const { expenses, moodEntries, workEvents, workSettings, healthDays } = args;
   const wcol = workSettings.workColor;
@@ -185,10 +234,15 @@ export function buildAchCtx(args: {
     .reduce((sum, e) => sum + shiftHours(e), 0);
 
   let savingsTotal = 0, receiptsCount = 0, thisMonthExp = 0, junkPurchasesMonth = 0, fastFoodCount = 0;
+  let trainTrips = 0, japanItems = 0, drinkPurchasesMonth = 0, maxSinglePurchase = 0, bettingBought = false;
   const thisMonth = dayKey(new Date()).slice(0, 7);
   const junkDays = new Set<string>();
   const loggedDays = new Set<string>();
   const daySpend: Record<string, number> = {};
+  const txByDay: Record<string, number> = {};
+  const meatByDay: Record<string, number> = {};
+  const elecByMonth: Record<string, number> = {};
+  const catSet = new Set<string>();
   const monthAgg: Record<string, { inc: number; exp: number }> = {};
   for (const e of expenses) {
     const day = (e.date ?? '').slice(0, 10);
@@ -201,13 +255,51 @@ export function buildAchCtx(args: {
     if (isSelfTransfer(e)) { savingsTotal += e.amount; continue; }
     if (m) monthAgg[m].exp += e.amount;
     if (m === thisMonth) thisMonthExp += e.amount;
-    if (day) daySpend[day] = (daySpend[day] ?? 0) + e.amount;
-    const hay = `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase();
+    if (day) { daySpend[day] = (daySpend[day] ?? 0) + e.amount; txByDay[day] = (txByDay[day] ?? 0) + 1; }
+    if (e.amount > maxSinglePurchase) maxSinglePurchase = e.amount;
+    if (e.category) catSet.add(e.category);
+    const hay = `${e.note ?? ''} ${(e.tags ?? []).join(' ')} ${e.storeName ?? ''}`.toLowerCase();
     if (JUNK.some(k => hay.includes(k))) { junkDays.add(day); if (m === thisMonth) junkPurchasesMonth++; }
     if (FASTFOOD.some(k => hay.includes(k))) fastFoodCount++;
+    if (TRAIN.some(k => hay.includes(k))) trainTrips++;
+    if (BETTING.some(k => hay.includes(k))) bettingBought = true;
+    if (/prąd|prad|\bpge\b|tauron|energa|\benea\b/.test(hay) && m) elecByMonth[m] = (elecByMonth[m] ?? 0) + e.amount;
+    // product-level detection (meat kg / japan / drinks)
+    for (const it of e.receiptItems ?? []) {
+      if (it.kind === 'deposit') continue;
+      const nm = (it.name ?? '').toLowerCase();
+      const isMeat = (it.tags ?? []).includes('mięso') || MEAT.some(k => nm.includes(k));
+      if (isMeat && day) meatByDay[day] = (meatByDay[day] ?? 0) + (it.weightKg && it.weightKg > 0 ? it.weightKg : (it.quantity || 1));
+      if (JAPAN.some(k => nm.includes(k))) japanItems++;
+      if (m === thisMonth && !nm.includes('woda') && DRINKS.some(k => nm.includes(k))) drinkPurchasesMonth++;
+    }
   }
   const maxDaySpend = Object.values(daySpend).reduce((mx, v) => Math.max(mx, v), 0);
+  const maxTxPerDay = Object.values(txByDay).reduce((mx, v) => Math.max(mx, v), 0);
   const monthUnderBudget = args.budgetTotal > 0 && Object.entries(monthAgg).some(([m, v]) => m !== thisMonth && v.exp > 0 && v.exp <= args.budgetTotal);
+
+  // meat: most kg in any rolling 7-day window
+  let meatWeekMaxKg = 0;
+  const meatDays = Object.keys(meatByDay);
+  for (const d of meatDays) {
+    const end = new Date(d + 'T00:00:00').getTime();
+    let sum = 0;
+    for (const d2 of meatDays) {
+      const t2 = new Date(d2 + 'T00:00:00').getTime();
+      if (t2 <= end && t2 > end - 7 * 86400000) sum += meatByDay[d2];
+    }
+    if (sum > meatWeekMaxKg) meatWeekMaxKg = sum;
+  }
+
+  // electricity: latest month with a bill well under the average of the earlier ones
+  const elecMonths = Object.keys(elecByMonth).sort();
+  let cutElectricity = false;
+  if (elecMonths.length >= 3) {
+    const latest = elecByMonth[elecMonths[elecMonths.length - 1]];
+    const prior = elecMonths.slice(0, -1).map(mm => elecByMonth[mm]);
+    const avg = prior.reduce((a, b) => a + b, 0) / prior.length;
+    cutElectricity = avg > 0 && latest <= avg * 0.8;
+  }
 
   // mood
   const moodByDay: Record<string, number> = {};
@@ -220,6 +312,13 @@ export function buildAchCtx(args: {
     if (m.mood) moodLevels.add(m.mood);
   }
   const moodDays = Object.keys(moodByDay).length;
+  // big mood swing within the last 7 days (spanned ≤2 and ≥4)
+  let swLo = 99, swHi = 0;
+  { const base = new Date();
+    for (let i = 0; i < 7; i++) { const d = new Date(base); d.setDate(d.getDate() - i); const k = dayKey(d);
+      if (moodByDay[k] != null) swHi = Math.max(swHi, moodByDay[k]);
+      if (moodMinByDay[k] != null) swLo = Math.min(swLo, moodMinByDay[k]); } }
+  const moodSwing7 = swHi >= 4 && swLo <= 2;
 
   // sleep (best step + bad-sleep streak)
   let bestStepsDay = 0;
@@ -240,6 +339,12 @@ export function buildAchCtx(args: {
     balancedMonth, hasBudget: args.budgetTotal > 0, tasksDone: args.tasksDone,
     goodSleepStreak: streakBack(k => { const sl = healthDays[k]?.sleepMinutes; return !!sl && sl >= 420; }),
     lowMoodStreak: streakBack(k => { const mn = moodMinByDay[k]; return mn != null && mn <= 2; }),
+    neutralMoodStreak: streakBack(k => moodByDay[k] === 3 && moodMinByDay[k] === 3),
+    moodSwing7,
+    noSpendStreak: streakBack(k => !daySpend[k]),
+    trainTrips, japanItems, drinkPurchasesMonth, meatWeekMaxKg, cutElectricity,
+    maxSinglePurchase, bettingBought, maxTxPerDay, distinctCategories: catSet.size,
+    cardBalancePeak: args.cardBalancePeak ?? 0,
     monthUnderBudget,
     junkStreak: streakBack(k => junkDays.has(k)),
     badSleepStreak: streakBack(k => { const s = healthDays[k]?.sleepMinutes; return !!s && s > 0 && s < 300; }),
