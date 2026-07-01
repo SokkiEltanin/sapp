@@ -55,6 +55,7 @@ export default function BadgeCelebration() {
             <Text style={[st.label, { color: accent }]}>{label}</Text>
             <Text style={st.title}>{a.title}</Text>
             <Text style={st.desc}>{a.desc}</Text>
+            {!!a.lore && <Text style={st.lore}>„{a.lore}"</Text>}
           </Animated.View>
         </View>
         <Text style={st.hint}>{queue.length > 1 ? `Stuknij — jeszcze ${queue.length - 1}` : 'Stuknij, aby zamknąć'}</Text>
@@ -71,5 +72,6 @@ const st = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '900', letterSpacing: 2, marginBottom: 6 },
   title: { fontSize: 28, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5, textAlign: 'center' },
   desc: { fontSize: 14, color: 'rgba(255,255,255,0.72)', textAlign: 'center', marginTop: 6, lineHeight: 20 },
+  lore: { fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontStyle: 'italic', marginTop: 12, lineHeight: 19, maxWidth: 300 },
   hint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 });

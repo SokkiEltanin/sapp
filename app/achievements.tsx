@@ -137,6 +137,11 @@ export default function Achievements() {
                 <BadgeArt id={detail.a.id} tier={detail.a.tier} unlocked={detail.unlocked} bad={detail.a.kind === 'bad'} size={104} />
                 <Text style={s.detailTitle}>{detail.a.title}</Text>
                 <Text style={s.detailDesc}>{detail.a.desc}</Text>
+                {!!detail.a.lore && (
+                  <View style={[s.loreBox, { borderLeftColor: detail.a.kind === 'bad' ? BAD_COLOR : TIER_COLOR[detail.a.tier] }]}>
+                    <Text style={s.loreText}>{detail.a.lore}</Text>
+                  </View>
+                )}
                 <View style={s.detailBar}>
                   <View style={{ width: `${Math.round(detail.progress * 100)}%`, height: '100%', backgroundColor: detail.a.kind === 'bad' ? BAD_COLOR : TIER_COLOR[detail.a.tier], borderRadius: 4 }} />
                 </View>
@@ -177,6 +182,8 @@ const makeS = (c: any) => StyleSheet.create({
   detailClose: { position: 'absolute', top: 12, right: 12, padding: 4, zIndex: 2 },
   detailTitle: { fontSize: 19, fontWeight: '900', color: c.text.primary, marginTop: spacing[2], textAlign: 'center' },
   detailDesc: { fontSize: 13, color: c.text.secondary, textAlign: 'center', lineHeight: 18 },
+  loreBox: { borderLeftWidth: 3, backgroundColor: c.fill.subtle, borderRadius: radius.sm, paddingVertical: spacing[2], paddingHorizontal: spacing[3], marginTop: spacing[3] },
+  loreText: { fontSize: 12.5, color: c.text.secondary, fontStyle: 'italic', lineHeight: 18 },
   detailBar: { width: '80%', height: 8, borderRadius: 4, backgroundColor: c.fill.subtle, marginTop: spacing[2], overflow: 'hidden' },
   detailProg: { fontSize: 12.5, fontWeight: '700', color: c.text.muted },
   detailDate: { fontSize: 11.5, fontWeight: '600', color: c.text.muted, marginTop: 2 },

@@ -44,6 +44,7 @@ export interface Achievement {
   target: number;
   unit?: string;
   kind?: 'good' | 'bad';   // bad = anti-achievement (red, "earned" by slipping up)
+  lore?: string;           // flavour — why THIS icon fits THIS achievement
   value: (c: AchCtx) => number;
 }
 
@@ -52,57 +53,92 @@ export const BAD_COLOR = '#E5484D';
 
 export const ACHIEVEMENTS: Achievement[] = [
   // ── Start / Konsekwencja (custom icons) ──
-  { id: 'first-key', title: 'Pierwszy klucz', desc: 'Pierwszy zalogowany wydatek', group: 'Konsekwencja', tier: 1, target: 1, value: c => c.receiptsCount >= 1 ? 1 : 0 },
-  { id: 'scanner',   title: 'Skaner',         desc: '50 zalogowanych wydatków',     group: 'Konsekwencja', tier: 2, target: 50, unit: '×', value: c => c.receiptsCount },
-  { id: 'groceries-100', title: 'Zakupowicz', desc: '100 zalogowanych wydatków',    group: 'Konsekwencja', tier: 3, target: 100, unit: '×', value: c => c.receiptsCount },
-  { id: 'on-track',  title: 'Na kursie',      desc: '7 dni z rzędu coś zalogowane', group: 'Konsekwencja', tier: 2, target: 7, unit: 'dni', value: c => c.logStreak },
-  { id: 'loyal',     title: 'Wierny',         desc: '30 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 3, target: 30, unit: 'dni', value: c => c.activeDays },
-  { id: 'goal-set',  title: 'Wyznaczony cel', desc: 'Ustawiony pierwszy budżet',    group: 'Konsekwencja', tier: 1, target: 1, value: c => c.hasBudget ? 1 : 0 },
+  { id: 'first-key', title: 'Pierwszy klucz', desc: 'Pierwszy zalogowany wydatek', group: 'Konsekwencja', tier: 1, target: 1,
+    lore: 'Klucz do skarbca Twoich finansów. Pierwszy wpis go przekręca — bez niego cała reszta statystyk pozostaje zamknięta na głucho.', value: c => c.receiptsCount >= 1 ? 1 : 0 },
+  { id: 'scanner',   title: 'Skaner',         desc: '50 zalogowanych wydatków',     group: 'Konsekwencja', tier: 2, target: 50, unit: '×',
+    lore: 'Odcisk palca jest niepowtarzalny — jak Twój wzorzec wydatków. Po 50 paragonach apka rozpoznaje Twoje nawyki na pierwszy „skan".', value: c => c.receiptsCount },
+  { id: 'groceries-100', title: 'Zakupowicz', desc: '100 zalogowanych wydatków',    group: 'Konsekwencja', tier: 3, target: 100, unit: '×',
+    lore: 'Ta torba już się nie domyka. 100 wpisów dźwiganych jak weteran działu spożywczego — znasz każdą alejkę na pamięć.', value: c => c.receiptsCount },
+  { id: 'on-track',  title: 'Na kursie',      desc: '7 dni z rzędu coś zalogowane', group: 'Konsekwencja', tier: 2, target: 7, unit: 'dni',
+    lore: 'Kompas nie gubi północy. Tydzień bez ani jednego pominiętego dnia — trzymasz kurs nawet, gdy łatwiej byłoby zboczyć.', value: c => c.logStreak },
+  { id: 'loyal',     title: 'Wierny',         desc: '30 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 3, target: 30, unit: 'dni',
+    lore: 'Inne apki dawno skamieniały na ekranie jak ta prehistoryczna czaszka. Ty zostałeś — okaz wytrwałości godny muzeum.', value: c => c.activeDays },
+  { id: 'goal-set',  title: 'Wyznaczony cel', desc: 'Ustawiony pierwszy budżet',    group: 'Konsekwencja', tier: 1, target: 1,
+    lore: 'Drogowskaz na finansowym rozstaju. Ustawiłeś budżet — od teraz wiadomo, dokąd naprawdę zmierzają Twoje pieniądze.', value: c => c.hasBudget ? 1 : 0 },
 
   // ── Nastrój (custom icons) ──
-  { id: 'sunny-week', title: 'Słoneczny tydzień', desc: '7 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 2, target: 7, unit: 'dni', value: c => c.goodMoodStreak },
-  { id: 'self-care',  title: 'Dbam o siebie',     desc: '30 dni z wpisem nastroju',  group: 'Nastrój', tier: 2, target: 30, unit: 'dni', value: c => c.moodDays },
-  { id: 'full-range', title: 'Pełnia emocji',     desc: 'Zalogowane wszystkie nastroje 1–5', group: 'Nastrój', tier: 1, target: 5, unit: '/5', value: c => c.moodLevelsSeen },
-  { id: 'chronicler', title: 'Kronikarz',         desc: '60 dni z wpisem nastroju',  group: 'Nastrój', tier: 3, target: 60, unit: 'dni', value: c => c.moodDays },
+  { id: 'sunny-week', title: 'Słoneczny tydzień', desc: '7 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 2, target: 7, unit: 'dni',
+    lore: 'Wewnętrzne słońce nie zaszło ani razu przez cały tydzień. Siedem dni pogody ducha — świeć dalej.', value: c => c.goodMoodStreak },
+  { id: 'self-care',  title: 'Dbam o siebie',     desc: '30 dni z wpisem nastroju',  group: 'Nastrój', tier: 2, target: 30, unit: 'dni',
+    lore: 'Serce nie tylko bije — Ty go słuchasz. Przez 30 dni sprawdzałeś, jak naprawdę się czujesz. To jest troska.', value: c => c.moodDays },
+  { id: 'full-range', title: 'Pełnia emocji',     desc: 'Zalogowane wszystkie nastroje 1–5', group: 'Nastrój', tier: 1, target: 5, unit: '/5',
+    lore: 'Komedia i tragedia, i wszystko pomiędzy. Zagrałeś pełną gamę masek — prawdziwy teatr jednego aktora.', value: c => c.moodLevelsSeen },
+  { id: 'chronicler', title: 'Kronikarz',         desc: '60 dni z wpisem nastroju',  group: 'Nastrój', tier: 3, target: 60, unit: 'dni',
+    lore: 'Twój nastrój ma już własny zwój kroniki. 60 wpisów spisanych jak starożytny papirus — historia jednej duszy.', value: c => c.moodDays },
 
   // ── Zdrowie / Praca (custom icons) ──
-  { id: 'marathon', title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków', value: c => c.bestStepsDay },
-  { id: 'doer',     title: 'Wykonawca',    desc: '25 ukończonych zadań',        group: 'Praca',   tier: 2, target: 25, unit: '×', value: c => c.tasksDone },
+  { id: 'marathon', title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków',
+    lore: 'Te trekkingowe buty dziś zarobiły na odpoczynek. 10 000 kroków — Twój prywatny maraton bez mety.', value: c => c.bestStepsDay },
+  { id: 'doer',     title: 'Wykonawca',    desc: '25 ukończonych zadań',        group: 'Praca',   tier: 2, target: 25, unit: '×',
+    lore: 'Nie odkładasz — naciskasz przycisk i robisz. Klik. Zrobione. 25 razy palec wylądował na „wykonaj".', value: c => c.tasksDone },
 
   // ── Oszczędzanie (justice-scale custom + lucide) ──
-  { id: 'balanced',   title: 'W równowadze', desc: 'Miesiąc na plusie (przychód ≥ wydatki)', group: 'Oszczędzanie', tier: 2, target: 1, value: c => c.balancedMonth ? 1 : 0 },
-  { id: 'under-limit', title: 'Pod limitem',  desc: 'Miesiąc zamknięty pod budżetem', group: 'Oszczędzanie', tier: 2, target: 1, value: c => c.monthUnderBudget ? 1 : 0 },
+  { id: 'balanced',   title: 'W równowadze', desc: 'Miesiąc na plusie (przychód ≥ wydatki)', group: 'Oszczędzanie', tier: 2, target: 1,
+    lore: 'Szala przychodów przeważyła wydatki. Waga sprawiedliwości tym razem po Twojej stronie — miesiąc na plusie.', value: c => c.balancedMonth ? 1 : 0 },
+  { id: 'under-limit', title: 'Pod limitem',  desc: 'Miesiąc zamknięty pod budżetem', group: 'Oszczędzanie', tier: 2, target: 1,
+    lore: 'Znak ograniczenia był po Twojej stronie. Zwolniłeś w porę i zmieściłeś się w budżecie — zero mandatu.', value: c => c.monthUnderBudget ? 1 : 0 },
   { id: 'saver-1000', title: 'Tysiąc',       desc: 'Łącznie 1 000 zł odłożone',  group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł', value: c => c.savingsTotal },
-  { id: 'saver-5000', title: 'Poduszka',     desc: 'Łącznie 5 000 zł odłożone',  group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł', value: c => c.savingsTotal },
+  { id: 'saver-5000', title: 'Poduszka',     desc: 'Łącznie 5 000 zł odłożone',  group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł',
+    lore: 'Stos monet urósł w miękką poduszkę bezpieczeństwa. 5 000 zł — na takiej poduszce śpi się spokojniej.', value: c => c.savingsTotal },
   { id: 'saver-10000',title: 'Forteca',      desc: 'Łącznie 10 000 zł odłożone', group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł', value: c => c.savingsTotal },
 
   // ── Loyalty / brand (custom) ──
-  { id: 'loyal-heart', title: 'Z sercem', desc: '60 aktywnych dni — apka to nawyk', group: 'Konsekwencja', tier: 3, target: 60, unit: 'dni', value: c => c.activeDays },
+  { id: 'loyal-heart', title: 'Z sercem', desc: '60 aktywnych dni — apka to nawyk', group: 'Konsekwencja', tier: 3, target: 60, unit: 'dni',
+    lore: 'Medal z sercem w środku. Nie chodzi już o obowiązek — wracasz z sentymentu. Wy dwoje: związek na medal.', value: c => c.activeDays },
 
   // ── Lucide-only (no custom icon yet) ──
-  { id: 'habit-streak-7',  title: 'Tydzień mocy', desc: '7 dni nawyku z rzędu',  group: 'Nawyki', tier: 2, target: 7,  unit: 'dni', value: c => c.habitBestStreak },
-  { id: 'habit-streak-30', title: 'Żelazna wola', desc: '30 dni nawyku z rzędu', group: 'Nawyki', tier: 3, target: 30, unit: 'dni', value: c => c.habitBestStreak },
-  { id: 'no-junk-7',  title: 'Tydzień fit', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni', value: c => c.noJunkStreak },
-  { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h', value: c => c.workHoursTotal },
-  { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1, value: c => c.paydayLogged ? 1 : 0 },
+  { id: 'habit-streak-7',  title: 'Tydzień mocy', desc: '7 dni nawyku z rzędu',  group: 'Nawyki', tier: 2, target: 7,  unit: 'dni',
+    lore: 'Kaktus nie potrzebuje wiele, by przetrwać i rosnąć każdego dnia. Tydzień nawyku — Ty też kwitniesz na uporze.', value: c => c.habitBestStreak },
+  { id: 'habit-streak-30', title: 'Żelazna wola', desc: '30 dni nawyku z rzędu', group: 'Nawyki', tier: 3, target: 30, unit: 'dni',
+    lore: 'Z małego pnia wystrzelił pęd. 30 dni i nawyk zakorzenił się na dobre — teraz to część Ciebie.', value: c => c.habitBestStreak },
+  { id: 'no-junk-7',  title: 'Tydzień fit', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
+    lore: 'Siedem dni i ani jednego cukrowego poślizgu. Twój organizm przybija Ci piątkę.', value: c => c.noJunkStreak },
+  { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h',
+    lore: 'Pracujesz jak dobrze naoliwiony mechanizm — bez zacięć, bez postoju. 100 godzin na liczniku maszyny.', value: c => c.workHoursTotal },
+  { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1,
+    lore: 'Pierwszy banknot wpadł do systemu. Od teraz apka wie, ile realnie zarabiasz — i pilnuje reszty.', value: c => c.paydayLogged ? 1 : 0 },
 
   // ── Legendy (tier 4 — rzadkie, trudne) ──
-  { id: 'legend-saver', title: 'Legenda oszczędzania', desc: '25 000 zł odłożone',        group: 'Legendy', tier: 4, target: 25000, unit: 'zł', value: c => c.savingsTotal },
-  { id: 'centurion',    title: 'Centurion',            desc: '100 dni z rzędu w aplikacji', group: 'Legendy', tier: 4, target: 100, unit: 'dni', value: c => c.logStreak },
-  { id: 'unbreakable',  title: 'Nieugięty',            desc: '100 dni nawyku z rzędu',      group: 'Legendy', tier: 4, target: 100, unit: 'dni', value: c => c.habitBestStreak },
-  { id: 'year-one',     title: 'Rok z aplikacją',      desc: '365 aktywnych dni',           group: 'Legendy', tier: 4, target: 365, unit: 'dni', value: c => c.activeDays },
-  { id: 'clean-month',  title: 'Czysty miesiąc',       desc: '30 dni z rzędu bez słodyczy', group: 'Legendy', tier: 4, target: 30, unit: 'dni', value: c => c.noJunkStreak },
-  { id: 'ultra-walk',   title: 'Ultramaraton',         desc: '20 000 kroków w jeden dzień', group: 'Legendy', tier: 4, target: 20000, unit: 'kroków', value: c => c.bestStepsDay },
-  { id: 'titan',        title: 'Tytan pracy',          desc: '500 h pracy łącznie',         group: 'Legendy', tier: 4, target: 500, unit: 'h', value: c => c.workHoursTotal },
+  { id: 'legend-saver', title: 'Legenda oszczędzania', desc: '25 000 zł odłożone',        group: 'Legendy', tier: 4, target: 25000, unit: 'zł',
+    lore: 'To już nie poduszka — to skarbiec pełen klejnotów. 25 000 zł, na które smoki patrzą z zazdrością.', value: c => c.savingsTotal },
+  { id: 'centurion',    title: 'Centurion',            desc: '100 dni z rzędu w aplikacji', group: 'Legendy', tier: 4, target: 100, unit: 'dni',
+    lore: 'Sto dni w szyku bez jednej wyrwy. Rzymski legionista salutuje — dyscyplina godna dowódcy setki.', value: c => c.logStreak },
+  { id: 'unbreakable',  title: 'Nieugięty',            desc: '100 dni nawyku z rzędu',      group: 'Legendy', tier: 4, target: 100, unit: 'dni',
+    lore: 'Sto dni tego samego nawyku. Nie ma siły, która to złamie — diament ukuty pod presją czasu.', value: c => c.habitBestStreak },
+  { id: 'year-one',     title: 'Rok z aplikacją',      desc: '365 aktywnych dni',           group: 'Legendy', tier: 4, target: 365, unit: 'dni',
+    lore: 'Pełne okrążenie Słońca razem. 365 dni — rocznica, na którą zasłużyliście oboje.', value: c => c.activeDays },
+  { id: 'clean-month',  title: 'Czysty miesiąc',       desc: '30 dni z rzędu bez słodyczy', group: 'Legendy', tier: 4, target: 30, unit: 'dni',
+    lore: 'Trzydzieści dni bez grama cukru. Detoks zaliczony — organizm lśni jak nowy.', value: c => c.noJunkStreak },
+  { id: 'ultra-walk',   title: 'Ultramaraton',         desc: '20 000 kroków w jeden dzień', group: 'Legendy', tier: 4, target: 20000, unit: 'kroków',
+    lore: '20 000 kroków w jeden dzień. Nogi mają pełne prawo złożyć wypowiedzenie — a Ty i tak idziesz dalej.', value: c => c.bestStepsDay },
+  { id: 'titan',        title: 'Tytan pracy',          desc: '500 h pracy łącznie',         group: 'Legendy', tier: 4, target: 500, unit: 'h',
+    lore: 'Atlas dźwigał niebo, Ty dźwigasz grafik. 500 godzin — praca godna tytana.', value: c => c.workHoursTotal },
 
   // ── Grzeszki (anti-achievements, custom icons) ──
-  { id: 'crime-scene', title: 'Miejsce zbrodni',   desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad', value: c => Math.round(c.overBudgetPct * 100) },
-  { id: 'undead',      title: 'Żywy trup',         desc: '3 noce z rzędu sen poniżej 5 h',  group: 'Grzeszki', tier: 1, target: 3, unit: 'noce', kind: 'bad', value: c => c.badSleepStreak },
-  { id: 'bottomless',  title: 'Bezdenny żołądek',  desc: '5 dni z rzędu ze słodyczami',     group: 'Grzeszki', tier: 1, target: 5, unit: 'dni', kind: 'bad', value: c => c.junkStreak },
-  { id: 'sweet-tooth', title: 'Słodki ząb',        desc: '15 zakupów słodyczy w miesiącu',  group: 'Grzeszki', tier: 1, target: 15, unit: '×', kind: 'bad', value: c => c.junkPurchasesMonth },
-  { id: 'fast-food',   title: 'Fast food',         desc: '5 razy fast food / pizza',        group: 'Grzeszki', tier: 1, target: 5, unit: '×', kind: 'bad', value: c => c.fastFoodCount },
-  { id: 'red-light',   title: 'Czerwone światło',  desc: 'Przekroczony budżet miesiąca',    group: 'Grzeszki', tier: 1, target: 100, unit: '%', kind: 'bad', value: c => Math.round(c.overBudgetPct * 100) },
-  { id: 'panic',       title: 'Panikarz',          desc: 'Zakupy za 300+ zł w jeden dzień', group: 'Grzeszki', tier: 1, target: 300, unit: 'zł', kind: 'bad', value: c => c.maxDaySpend },
+  { id: 'crime-scene', title: 'Miejsce zbrodni',   desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad',
+    lore: 'Kredowy obrys, taśma policyjna i portfel w roli ofiary. Budżet padł, a wszyscy wiemy, kto pociągnął za spust.', value: c => Math.round(c.overBudgetPct * 100) },
+  { id: 'undead',      title: 'Żywy trup',         desc: '3 noce z rzędu sen poniżej 5 h',  group: 'Grzeszki', tier: 1, target: 3, unit: 'noce', kind: 'bad',
+    lore: 'Trzy noce po niecałe 5 h snu. Chodzisz, mrugasz, mówisz — ale to już nie życie, to tryb zombie. Idź spać.', value: c => c.badSleepStreak },
+  { id: 'bottomless',  title: 'Bezdenny żołądek',  desc: '5 dni z rzędu ze słodyczami',     group: 'Grzeszki', tier: 1, target: 5, unit: 'dni', kind: 'bad',
+    lore: 'Pięć dni cukru z rzędu. Twój żołądek to czarna dziura na słodycze — nic z niej nie ucieka.', value: c => c.junkStreak },
+  { id: 'sweet-tooth', title: 'Słodki ząb',        desc: '15 zakupów słodyczy w miesiącu',  group: 'Grzeszki', tier: 1, target: 15, unit: '×', kind: 'bad',
+    lore: 'Piętnasty słodki zakup w miesiącu. Ten pączek ma już Twoje imię wygrawerowane na lukrze.', value: c => c.junkPurchasesMonth },
+  { id: 'fast-food',   title: 'Fast food',         desc: '5 razy fast food / pizza',        group: 'Grzeszki', tier: 1, target: 5, unit: '×', kind: 'bad',
+    lore: 'Piąta pizza w drodze. Kurier zna Twój adres lepiej niż listonosz — i macha Ci już na dzień dobry.', value: c => c.fastFoodCount },
+  { id: 'red-light',   title: 'Czerwone światło',  desc: 'Przekroczony budżet miesiąca',    group: 'Grzeszki', tier: 1, target: 100, unit: '%', kind: 'bad',
+    lore: 'Budżet krzyczał STOP, Ty wcisnąłeś gaz do dechy. Mandat wystawiony — płaci portfel.', value: c => Math.round(c.overBudgetPct * 100) },
+  { id: 'panic',       title: 'Panikarz',          desc: 'Zakupy za 300+ zł w jeden dzień', group: 'Grzeszki', tier: 1, target: 300, unit: 'zł', kind: 'bad',
+    lore: 'Ponad 300 zł w jeden dzień. Tryb pandemicznego chomika włączony — brakuje już tylko wieży z papieru toaletowego.', value: c => c.maxDaySpend },
 ];
 
 // ── Build context (single source of truth — dashboard + gablota call this) ───
