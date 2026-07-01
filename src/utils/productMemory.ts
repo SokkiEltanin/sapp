@@ -459,6 +459,58 @@ export function kcalFor(name: string, mem: KcalMemory): number | undefined {
   return mem[key] ?? findFuzzyMatch(key, mem);
 }
 
+// ─── Per-product PRICE memory (typical unit price) ────────────────────────────
+// Learns the typical per-unit price of each product from saved receipts, so the
+// scanner can flag a line whose price is nonsense (OCR grabbed the wrong number,
+// or a "SUMA/RAZEM" line slipped in as a product) — and hint at real price changes.
+const PRICE_KEY = 'product_price_memory';
+export interface PriceStat { n: number; mean: number; min: number; max: number; last: number }
+export type PriceMemory = Record<string, PriceStat>;
+
+export async function loadPriceMemory(): Promise<PriceMemory> {
+  try { const raw = await AsyncStorage.getItem(PRICE_KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+
+export async function savePriceMemory(items: { name: string; unitPrice: number }[]): Promise<void> {
+  const valid = items.filter(i => i.name.trim() && i.unitPrice > 0 && i.unitPrice < 100000);
+  if (valid.length === 0) return;
+  try {
+    const mem = await loadPriceMemory();
+    for (const i of valid) {
+      const key = normalize(i.name);
+      const p = Math.round(i.unitPrice * 100) / 100;
+      const cur = mem[key];
+      if (!cur) mem[key] = { n: 1, mean: p, min: p, max: p, last: p };
+      else {
+        const n = Math.min(cur.n + 1, 20); // cap so recent prices keep weight
+        mem[key] = { n, mean: cur.mean + (p - cur.mean) / n, min: Math.min(cur.min, p), max: Math.max(cur.max, p), last: p };
+      }
+    }
+    const entries = Object.entries(mem);
+    await AsyncStorage.setItem(PRICE_KEY, JSON.stringify(entries.length > MAX_ENTRIES ? Object.fromEntries(entries.slice(-MAX_ENTRIES)) : mem));
+  } catch {}
+}
+
+// Learned price stat for a product name (exact then fuzzy).
+export function priceFor(name: string, mem: PriceMemory): PriceStat | undefined {
+  const key = normalize(name);
+  return mem[key] ?? findFuzzyMatch(key, mem);
+}
+
+// Flag ONLY an implausibly HIGH price (needs ≥3 samples). Discounts make prices
+// LOWER, so we never flag a cheap/promo price — that would fight the user's reality
+// of frequent przeceny. A high outlier vs the regular price (max seen) is almost
+// always OCR grabbing the wrong number or a "SUMA/RAZEM" line sneaking in.
+export type PriceFlag = { kind: 'high'; typical: number } | null;
+export function priceAnomaly(unitPrice: number, stat: PriceStat | undefined): PriceFlag {
+  if (!stat || stat.n < 3 || !(unitPrice > 0)) return null;
+  const typical = Math.round(stat.mean * 100) / 100;
+  // regular-price anchor = the highest we've ever paid; require a big ratio AND a
+  // real absolute gap so cheap items with tiny swings never false-trigger.
+  if (unitPrice > stat.max * 2.5 && unitPrice - stat.max >= 5) return { kind: 'high', typical };
+  return null;
+}
+
 function unitToKg(n: number, unit: string): number | undefined {
   if (!(n > 0)) return undefined;
   // l/ml treated as kg-equivalent (density ~1) so volume products get a weight too.

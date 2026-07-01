@@ -16,6 +16,7 @@ import {
   loadTagMemory, applyTagMemory, saveTagMemory, saveCustomTagsToMemory, getTagFrequency,
   loadLineMemory, lineVerdict, saveLineVerdicts, saveNameAliases,
   loadWeightMemory, saveWeightMemory, weightFor, parseWeightFromName, WeightMemory, brandTag,
+  loadPriceMemory, savePriceMemory, priceFor, priceAnomaly, PriceMemory, PriceFlag,
   loadNameAliases, suggestSimilarName,
 } from '@/utils/productMemory';
 import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
@@ -65,6 +66,7 @@ export default function ScanReceiptModal() {
   const [editedWeight, setEditedWeight] = useState<Record<number, string>>({}); // GRAMS per piece (user-typed)
   const [editedQty, setEditedQty]       = useState<Record<number, string>>({}); // pieces (user-edited)
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
+  const [priceMemory, setPriceMemory] = useState<PriceMemory>({});
   const [knownNames, setKnownNames] = useState<string[]>([]); // confirmed canonical names (alias values)
   const [dismissedSug, setDismissedSug] = useState<Set<number>>(new Set()); // "to samo?" suggestions the user waved off
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
@@ -81,6 +83,7 @@ export default function ScanReceiptModal() {
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
+  useEffect(() => { loadPriceMemory().then(setPriceMemory).catch(() => {}); }, []);
   useEffect(() => { loadNameAliases().then(a => setKnownNames([...new Set(Object.values(a))])).catch(() => {}); }, []);
 
   // "To samo?" merge suggestion for a row: a known product name that's similar but
@@ -139,6 +142,18 @@ export default function ScanReceiptModal() {
     const learned = weightFor(name, weightMemory); // kg, remembered (e.g. XXL PIKOK = 0.25)
     if (learned) return String(Math.round(learned * 1000));
     return getProductTags(i).includes('nabiał') ? '1000' : '';
+  };
+
+  // Flag a line whose unit price looks implausibly high vs what this product
+  // usually costs (learned) — catches OCR grabbing a wrong number / a total line.
+  // Discounts (lower prices) are never flagged.
+  const priceFlagFor = (i: number): PriceFlag => {
+    const p = receipt?.products[i];
+    if (!p || p.kind === 'deposit') return null;
+    const qty = parseFloat(getQuantity(i).replace(',', '.')) || 1;
+    const finalPrice = getPrice(i);
+    const unit = qty > 1 ? finalPrice / qty : finalPrice;
+    return priceAnomaly(unit, priceFor(getProductName(i), priceMemory));
   };
 
   const addCustomProduct = () => {
@@ -371,6 +386,10 @@ export default function ScanReceiptModal() {
           const g = parseFloat((editedWeight[i] ?? '').replace(',', '.')); // grams
           return { name: getProductName(i), kg: isNaN(g) ? 0 : g / 1000 };
         })).catch(() => {});
+      // Learn each product's unit price so future scans can flag nonsense prices.
+      savePriceMemory(receiptItems
+        .filter(it => it.kind !== 'deposit' && it.unitPrice > 0)
+        .map(it => ({ name: it.name, unitPrice: it.unitPrice }))).catch(() => {});
       // Learn per-store verdicts on SUSPECT lines: kept = real product, dropped = junk.
       const verdicts = receipt.products
         .map((p, i) => ({ p, i }))
@@ -555,6 +574,7 @@ export default function ScanReceiptModal() {
                         onCategoryChange={c => changeCategory(i, c)}
                         priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
                         onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
+                        priceFlag={priceFlagFor(i)}
                         productName={getProductName(i)}
                         onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
                         mergeSuggestion={getMergeSuggestion(i)}
@@ -593,6 +613,7 @@ export default function ScanReceiptModal() {
                   onCategoryChange={c => changeCategory(i, c)}
                   priceValue={editedPrices[i] !== undefined ? editedPrices[i] : p.finalPrice.toFixed(2)}
                   onPriceChange={v => setEditedPrices(prev => ({ ...prev, [i]: v }))}
+                  priceFlag={priceFlagFor(i)}
                   productName={getProductName(i)}
                   onNameChange={v => setEditedNames(prev => ({ ...prev, [i]: v }))}
                   mergeSuggestion={getMergeSuggestion(i)}
@@ -821,7 +842,7 @@ function TagPicker({ activeTags, onToggle, freq = {} }: {
 function ProductRow({
   product, category, selected, onToggle,
   catPickerOpen, onCategoryPress, onCategoryChange,
-  priceValue, onPriceChange, productName, onNameChange,
+  priceValue, onPriceChange, priceFlag, productName, onNameChange,
   mergeSuggestion, onMerge, onDismissMerge,
   productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
   excluded, onToggleExcluded, weighable, weight, onWeightChange,
@@ -837,6 +858,7 @@ function ProductRow({
   onCategoryChange: (cat: ExpenseCategory) => void;
   priceValue: string;
   onPriceChange: (v: string) => void;
+  priceFlag?: PriceFlag;
   productName: string;
   onNameChange: (v: string) => void;
   mergeSuggestion?: string | null;
@@ -912,6 +934,14 @@ function ProductRow({
               <PressableScale onPress={() => onDismissMerge?.()} style={styles.mergeSugX}>
                 <LucideIcons.X size={13} color={colors.text.muted} />
               </PressableScale>
+            </View>
+          )}
+          {priceFlag?.kind === 'high' && (
+            <View style={styles.priceWarnRow}>
+              <LucideIcons.AlertTriangle size={11} color="#F59E0B" />
+              <Text style={styles.priceWarnText} numberOfLines={2}>
+                Cena wygląda za wysoka — zwykle ~{priceFlag.typical.toFixed(2)} zł/szt. Sprawdź, czy to nie linia „suma".
+              </Text>
             </View>
           )}
           <View style={styles.productMeta}>
@@ -1388,6 +1418,8 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   mergeSugRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   mergeSugText: { flex: 1, fontSize: 10.5, color: '#46B0DE', fontWeight: '600' },
+  priceWarnRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 4, backgroundColor: '#F59E0B18', borderRadius: 8, paddingVertical: 5, paddingHorizontal: 7 },
+  priceWarnText: { flex: 1, fontSize: 10.5, color: '#F59E0B', fontWeight: '600', lineHeight: 14 },
   mergeSugBtn: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#46B0DE22', borderWidth: 1, borderColor: '#46B0DE55' },
   mergeSugBtnText: { fontSize: 10.5, fontWeight: '800', color: '#46B0DE' },
   mergeSugX: { padding: 2 },
