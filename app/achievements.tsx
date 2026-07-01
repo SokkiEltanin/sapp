@@ -60,7 +60,7 @@ export default function Achievements() {
     (async () => {
       const firstEver = Object.keys(await getEarned()).length === 0;
       const fresh = await syncEarned(states);
-      if (fresh.length) { if (!firstEver) celebrate(fresh); setEarnedMap(await getEarned()); }
+      if (fresh.length) { if (!firstEver && fresh.length <= 3) celebrate(fresh); setEarnedMap(await getEarned()); }
     })().catch(() => {});
   }, [states]);
 

@@ -1007,7 +1007,10 @@ export default function DashboardScreen() {
     (async () => {
       const firstEver = Object.keys(await getEarned()).length === 0;
       const fresh = await syncEarned(achStates);
-      if (fresh.length && !firstEver) celebrate(fresh); // don't blast the backlog on first run
+      // Celebrate only genuine incremental unlocks. First run OR a big batch (e.g. after
+      // an update that adds many badges you already qualify for) is seeded silently —
+      // no avalanche of full-screen modals to tap through.
+      if (fresh.length && !firstEver && fresh.length <= 3) celebrate(fresh);
     })().catch(() => {});
   }, [achStates]);
 
