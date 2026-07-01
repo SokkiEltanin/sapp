@@ -373,8 +373,10 @@ const makeS = (t: any) => StyleSheet.create({
     marginBottom: 4,
     paddingHorizontal: 12,
   },
-  // The island itself is one solid dark pill (dynamic-island style) that hugs its
-  // content. A soft drop shadow lifts it off the page; no border.
+  // A single solid black pill (real dynamic-island look) that hugs its content.
+  // NO `elevation` on purpose — Android renders elevation as a grey rounded halo
+  // around the pill (the "szary wcięcie" you saw). Float comes from the pill being
+  // darker than the page; iOS gets a faint soft shadow, Android none.
   island: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,12 +387,11 @@ const makeS = (t: any) => StyleSheet.create({
     paddingVertical: 6,
     paddingLeft: 6,
     paddingRight: 14,
-    backgroundColor: '#17191B',
-    elevation: 8,
+    backgroundColor: '#0A0B0C',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 7,
   },
   badge: {
     borderRadius: 999,
