@@ -1676,44 +1676,81 @@ export default function DashboardScreen() {
 
   // ── Fun facts / advanced analytics from all shopping data ──────────────────
   const funFacts = useMemo(() => {
-    const productCount: Record<string, number> = {};
-    const sweetCount:   Record<string, number> = {};
-    const storeCount:   Record<string, number> = {};
-    let totalItems = 0;
-    let biggest = { name: '', amount: 0 };
-    let receiptSum = 0, receiptN = 0; // for an honest "average receipt" fact
-    const labelOf: Record<string, string> = {};
+    // Non-obvious, data-driven insights you CAN'T read off the other tiles.
+    const WD = ['niedzielę', 'poniedziałek', 'wtorek', 'środę', 'czwartek', 'piątek', 'sobotę'];
+    const monthKey = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
+    const shoppingDays: string[] = [];
+    const seenDay = new Set<string>();
+    const wdSpend = Array(7).fill(0);
+    const wdDaySet: Set<string>[] = Array.from({ length: 7 }, () => new Set<string>());
+    const storeSpend: Record<string, number> = {};
+    const sweetDays = new Set<string>();
+    let total = 0, weekendSpend = 0, cashSpend = 0, cardUsed = false, cashUsed = false, foodSpend = 0;
+    let smallN = 0, smallSum = 0;
+    let costliestItem = { name: '', price: 0 };
     for (const e of expenses) {
-      if (e.type === 'income' || isSelfTransfer(e)) continue; // skip savings/transfers
-      if (e.amount > biggest.amount) biggest = { name: e.note || e.storeName || e.category, amount: e.amount };
-      if (e.storeName) { storeCount[e.storeName] = (storeCount[e.storeName] ?? 0) + 1; receiptSum += e.amount; receiptN++; }
+      if (e.type === 'income' || isSelfTransfer(e)) continue;
+      const day = (e.date ?? '').slice(0, 10);
+      if (!day) continue;
+      const wd = new Date(day + 'T00:00:00').getDay();
+      if (!seenDay.has(day)) { seenDay.add(day); shoppingDays.push(day); }
+      total += e.amount;
+      wdSpend[wd] += e.amount; wdDaySet[wd].add(day);
+      if (wd === 0 || wd === 6) weekendSpend += e.amount;
+      if (e.paymentMethod === 'cash') { cashSpend += e.amount; cashUsed = true; } else cardUsed = true;
+      if (e.storeName) storeSpend[e.storeName] = (storeSpend[e.storeName] ?? 0) + e.amount;
+      if (e.category === 'groceries') foodSpend += e.amount;
+      if (e.amount < 10 && day.startsWith(monthKey)) { smallN++; smallSum += e.amount; }
       for (const it of (e.receiptItems ?? [])) {
-        if (!countsForConsumption(it)) continue;
-        const name = it.name?.trim();
-        if (!name) continue;
-        totalItems++;
-        const canon = canonicalProductName(name, nameAliases);
-        const key = normalizeProductName(canon) || canon.toLowerCase();
-        if (!labelOf[key]) labelOf[key] = canon;
-        productCount[key] = (productCount[key] ?? 0) + 1;
-        if (it.tags?.includes('słodycze')) sweetCount[key] = (sweetCount[key] ?? 0) + 1;
+        if (it.kind === 'deposit') continue;
+        if (it.price > costliestItem.price && it.name) costliestItem = { name: canonicalProductName(it.name, nameAliases), price: it.price };
+        if ((it.tags ?? []).includes('słodycze')) sweetDays.add(day);
       }
     }
-    const top = (obj: Record<string, number>) => {
-      const e = Object.entries(obj).sort((a, b) => b[1] - a[1])[0];
-      return e ? { name: labelOf[e[0]] ?? e[0], count: e[1] } : null;
-    };
-    const facts: { icon: 'cart' | 'candy' | 'store' | 'package' | 'flame'; label: string }[] = [];
-    const fp = top(productCount);
-    if (fp && fp.count >= 2) facts.push({ icon: 'cart', label: `Najczęściej kupujesz: ${fp.name} (×${fp.count})` });
-    const fs = top(sweetCount);
-    if (fs && fs.count >= 2) facts.push({ icon: 'candy', label: `Ulubiony słodycz: ${fs.name} (×${fs.count})` });
-    const st = top(storeCount);
-    if (st && st.count >= 2) facts.push({ icon: 'store', label: `Najczęstszy sklep: ${st.name} (${st.count}×)` });
-    if (receiptN >= 3) facts.push({ icon: 'store', label: `Średni paragon: ${Math.round(receiptSum / receiptN)} zł (${receiptN} zakupów)` });
-    if (totalItems >= 5) facts.push({ icon: 'package', label: `Kupiłeś łącznie ${totalItems} produktów` });
-    if (biggest.amount > 0) facts.push({ icon: 'flame', label: `Największy zakup: ${biggest.name} (${biggest.amount.toFixed(0)} zł)` });
-    return facts;
+    type Icon = 'calendar' | 'percent' | 'store' | 'wallet' | 'flame' | 'candy' | 'clock';
+    const facts: { icon: Icon; label: string }[] = [];
+
+    // shopping cadence
+    if (shoppingDays.length >= 5) {
+      const sorted = shoppingDays.slice().sort();
+      const span = (new Date(sorted[sorted.length - 1]).getTime() - new Date(sorted[0]).getTime()) / 86400000;
+      const every = span / (sorted.length - 1);
+      if (every >= 0.5) facts.push({ icon: 'clock', label: `Na zakupy chodzisz średnio co ${every.toFixed(1)} dnia` });
+    }
+    // priciest weekday (avg per shopping day of that weekday)
+    const wdAvg = wdSpend.map((sum, i) => ({ i, avg: wdDaySet[i].size ? sum / wdDaySet[i].size : 0, n: wdDaySet[i].size }));
+    const topWd = wdAvg.filter(w => w.n >= 2).sort((a, b) => b.avg - a.avg)[0];
+    if (topWd) facts.push({ icon: 'calendar', label: `Najwięcej wydajesz w ${WD[topWd.i]} — śr. ${Math.round(topWd.avg)} zł` });
+    // weekend share vs the 2/7 (≈29%) baseline
+    if (total > 0 && shoppingDays.length >= 6) {
+      const pct = Math.round(weekendSpend / total * 100);
+      const tail = pct >= 40 ? ' — sporo!' : pct <= 18 ? ' — raczej w tygodniu' : '';
+      facts.push({ icon: 'percent', label: `Weekendy to ${pct}% Twoich wydatków${tail}` });
+    }
+    // store loyalty
+    const topStore = Object.entries(storeSpend).sort((a, b) => b[1] - a[1])[0];
+    if (topStore && total > 0 && topStore[1] / total >= 0.15) {
+      facts.push({ icon: 'store', label: `${Math.round(topStore[1] / total * 100)}% pieniędzy zostawiasz w: ${topStore[0]}` });
+    }
+    // cash vs card
+    if (cashUsed && cardUsed && total > 0) {
+      facts.push({ icon: 'wallet', label: `Gotówką płacisz ${Math.round(cashSpend / total * 100)}% wydatków` });
+    }
+    // small buys add up
+    if (smallN >= 4) facts.push({ icon: 'wallet', label: `Drobne (<10 zł) w tym mies.: ${smallN} zakupów = ${Math.round(smallSum)} zł` });
+    // sweet cadence
+    if (sweetDays.size >= 3) {
+      const sd = Array.from(sweetDays).sort();
+      const span = (new Date(sd[sd.length - 1]).getTime() - new Date(sd[0]).getTime()) / 86400000;
+      const every = span / (sd.length - 1);
+      if (every >= 0.5) facts.push({ icon: 'candy', label: `Po słodycze sięgasz co ~${every.toFixed(1)} dnia` });
+    }
+    // food share
+    if (foodSpend > 0 && total > 0) facts.push({ icon: 'percent', label: `Jedzenie/spożywka to ${Math.round(foodSpend / total * 100)}% wydatków` });
+    // costliest single product (not receipt)
+    if (costliestItem.price > 0) facts.push({ icon: 'flame', label: `Najdroższy produkt: ${costliestItem.name} (${Math.round(costliestItem.price)} zł)` });
+
+    return facts.slice(0, 6);
   }, [expenses, nameAliases]);
 
   // ── Weight ciekawostka: kg per food group THIS MONTH, with top-2 breakdown ──
@@ -2744,10 +2781,12 @@ export default function DashboardScreen() {
                     </View>
                   ))}
                   {funFacts.map((f, i) => {
-                    const Icon = f.icon === 'cart' ? ShoppingCart
-                      : f.icon === 'candy' ? Candy
+                    const Icon = f.icon === 'calendar' ? CalendarDays
+                      : f.icon === 'percent' ? BarChart2
                       : f.icon === 'store' ? Store
-                      : f.icon === 'package' ? Package : Flame;
+                      : f.icon === 'wallet' ? Wallet
+                      : f.icon === 'candy' ? Candy
+                      : f.icon === 'clock' ? Timer : Flame;
                     return (
                       <View key={i} style={s.factRow}>
                         <View style={[s.factIcon, { backgroundColor: accentColor + '18' }]}>
