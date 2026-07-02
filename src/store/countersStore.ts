@@ -9,8 +9,11 @@ export interface Counter {
   kind: CounterKind;
   name: string;
   date: string;       // until → target date; since → last-done date (YYYY-MM-DD)
-  startDate: string;  // until → progress start (creation day); since → unused
+  startDate: string;  // until → progress start (creation day); since → baseline for auto
   icon?: string;      // optional lucide key (see counterIcons)
+  mode?: 'auto';      // since only: 'days without X' auto-tracked from purchases
+  keyword?: string;   // auto: '|'-separated keywords matched against expenses
+  onDashboard?: boolean; // show as a dashboard tile
   createdAt: string;
 }
 
@@ -62,4 +65,40 @@ export function untilProgress(c: Counter, now = Date.now()): number {
   const end = atMidnight(c.date);
   if (end <= start) return 1;
   return Math.min(1, Math.max(0, (now - start) / (end - start)));
+}
+
+// ── Auto "days without X" — tracked from purchases ──────────────────────────
+export const AVOID_PRESETS: { key: string; label: string; keyword: string }[] = [
+  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|toffi|chips|chrupk|paluszk' },
+  { key: 'fastfood', label: 'fast foodów', keyword: 'mcdonald|kfc|pizza|burger|kebab|kebap|frytk|sushi|glovo|wolt|telepizza|bobby' },
+  { key: 'alcohol',  label: 'alkoholu',    keyword: 'piwo|wino|wódka|wodka|whisky|drink|alkohol|browar|cydr|tyskie|żubr|zubr|lech ' },
+  { key: 'energy',   label: 'energetyków', keyword: 'monster|red bull|redbull|tiger energy|energetyk|rockstar|burn ' },
+];
+
+type MatchExpense = { type?: string; date?: string; note?: string; tags?: string[]; storeName?: string; receiptItems?: { name?: string }[] };
+
+export function matchesAvoid(text: string, keyword: string): boolean {
+  const hay = text.toLowerCase();
+  return keyword.split('|').some(k => { const t = k.trim(); return t && hay.includes(t); });
+}
+
+// Latest date a matching purchase happened (YYYY-MM-DD) or null if never.
+export function autoLastDate(keyword: string, expenses: MatchExpense[]): string | null {
+  let last: string | null = null;
+  for (const e of expenses) {
+    if (e.type === 'income') continue;
+    const day = (e.date ?? '').slice(0, 10);
+    if (!day) continue;
+    const parts = [e.note, (e.tags ?? []).join(' '), e.storeName, ...(e.receiptItems ?? []).map(it => it?.name)].filter(Boolean).join(' ');
+    if (matchesAvoid(parts, keyword) && (!last || day > last)) last = day;
+  }
+  return last;
+}
+
+// Days "without" for an auto counter: since the last matching purchase (or since
+// the counter was created if there was never one).
+export function autoDaysWithout(c: Counter, expenses: MatchExpense[], now = Date.now()): number {
+  const last = c.keyword ? autoLastDate(c.keyword, expenses) : null;
+  const from = last ?? (c.startDate || c.createdAt.slice(0, 10));
+  return Math.max(0, Math.floor((now - atMidnight(from)) / MS_DAY));
 }

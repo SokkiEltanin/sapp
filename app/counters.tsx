@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw } from 'lucide-react-native';
+import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
 import WalkProgress from '@/components/counters/WalkProgress';
-import { useCounters, Counter, CounterKind, daysSince, daysUntil, untilProgress } from '@/store/countersStore';
+import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS } from '@/store/countersStore';
 import { useCalendarStore } from '@/store/calendarStore';
+import { useExpensesStore } from '@/store/expensesStore';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -27,16 +28,21 @@ export default function Counters() {
   const s = useMemo(() => makeS(c), [c]);
   const { counters, add, update, remove, resetSince } = useCounters();
   const { events, gcalEvents } = useCalendarStore();
+  const { expenses } = useExpensesStore();
 
+  type UiKind = 'until' | 'since' | 'avoid';
   const [editing, setEditing] = useState<Counter | null>(null);
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<CounterKind>('until');
+  const [uiKind, setUiKind] = useState<UiKind>('until');
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [onDash, setOnDash] = useState(true);
   const [pickCal, setPickCal] = useState(false);
 
+  const daysFor = (cn: Counter) => cn.mode === 'auto' ? autoDaysWithout(cn, expenses) : daysSince(cn);
   const untils = counters.filter(x => x.kind === 'until').sort((a, b) => a.date.localeCompare(b.date));
-  const sinces = counters.filter(x => x.kind === 'since').sort((a, b) => daysSince(b) - daysSince(a));
+  const sinces = counters.filter(x => x.kind === 'since').sort((a, b) => daysFor(b) - daysFor(a));
 
   const upcoming = useMemo(() => {
     const t = todayStr();
@@ -46,15 +52,27 @@ export default function Counters() {
       .slice(0, 30);
   }, [events, gcalEvents]);
 
-  const openAdd = () => { setEditing(null); setKind('until'); setName(''); setDate(''); setPickCal(false); setOpen(true); };
-  const openEdit = (cn: Counter) => { setEditing(cn); setKind(cn.kind); setName(cn.name); setDate(cn.date); setPickCal(false); setOpen(true); };
+  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setKeyword(''); setOnDash(true); setPickCal(false); setOpen(true); };
+  const openEdit = (cn: Counter) => {
+    setEditing(cn);
+    setUiKind(cn.mode === 'auto' ? 'avoid' : cn.kind === 'until' ? 'until' : 'since');
+    setName(cn.name); setDate(cn.date); setKeyword(cn.keyword ?? ''); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
+  };
 
-  const canSave = name.trim() && date;
+  const canSave = !!name.trim() && (uiKind === 'avoid' ? !!keyword.trim() : !!date);
   const save = () => {
     if (!canSave) return;
     haptic.success();
-    if (editing) update(editing.id, { name: name.trim(), date, kind });
-    else add({ kind, name: name.trim(), date, startDate: kind === 'until' ? todayStr() : todayStr() });
+    if (uiKind === 'avoid') {
+      const patch = { kind: 'since' as const, mode: 'auto' as const, name: name.trim(), keyword: keyword.trim(), onDashboard: onDash };
+      if (editing) update(editing.id, patch);
+      else add({ ...patch, date: todayStr(), startDate: todayStr() });
+    } else {
+      const kind = uiKind as 'until' | 'since';
+      const patch = { kind, name: name.trim(), date, mode: undefined, keyword: undefined, onDashboard: onDash };
+      if (editing) update(editing.id, patch);
+      else add({ kind, name: name.trim(), date, startDate: todayStr(), onDashboard: onDash });
+    }
     setOpen(false);
   };
   const del = (cn: Counter) => Alert.alert('Usunąć?', `„${cn.name}" zniknie.`, [
@@ -105,24 +123,28 @@ export default function Counters() {
           );
         })}
 
-        {sinces.length > 0 && <Text style={s.section}>Ile dni temu…</Text>}
+        {sinces.length > 0 && <Text style={s.section}>Ile dni temu / bez…</Text>}
         {sinces.map(cn => {
-          const n = daysSince(cn);
+          const auto = cn.mode === 'auto';
+          const n = daysFor(cn);
           return (
             <View key={cn.id} style={s.card}>
               <View style={s.cardTop}>
-                <RotateCcw size={15} color={ACCENT} />
-                <Text style={s.cardName} numberOfLines={1}>{cn.name}</Text>
+                {auto ? <Ban size={15} color={ACCENT} /> : <RotateCcw size={15} color={ACCENT} />}
+                <Text style={s.cardName} numberOfLines={1}>{auto ? `bez ${cn.name}` : cn.name}</Text>
+                {cn.onDashboard !== false && <LayoutDashboard size={13} color={c.text.muted} />}
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
               <View style={s.sinceRow}>
                 <Text style={s.sinceBig}>{n}<Text style={s.sinceUnit}> {n === 1 ? 'dzień' : 'dni'}</Text></Text>
-                <TouchableOpacity style={s.doneBtn} onPress={() => { haptic.tap(); resetSince(cn.id); }} activeOpacity={0.8}>
-                  <Check size={13} color={ACCENT} /><Text style={[s.doneBtnText, { color: ACCENT }]}>Zrobione dziś</Text>
-                </TouchableOpacity>
+                {!auto && (
+                  <TouchableOpacity style={s.doneBtn} onPress={() => { haptic.tap(); resetSince(cn.id); }} activeOpacity={0.8}>
+                    <Check size={13} color={ACCENT} /><Text style={[s.doneBtnText, { color: ACCENT }]}>Zrobione dziś</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text style={s.cardMeta}>ostatnio: {cn.date}</Text>
+              <Text style={s.cardMeta}>{auto ? 'liczy się automatycznie z paragonów' : `ostatnio: ${cn.date}`}</Text>
             </View>
           );
         })}
@@ -139,11 +161,11 @@ export default function Counters() {
             </View>
 
             <View style={s.kindRow}>
-              {([['until', 'Odliczanie', CalendarClock], ['since', 'Ile dni temu', RotateCcw]] as const).map(([k, lbl, Ic]) => {
-                const active = kind === k;
+              {([['until', 'Odliczanie', CalendarClock], ['since', 'Dni temu', RotateCcw], ['avoid', 'Dni bez', Ban]] as const).map(([k, lbl, Ic]) => {
+                const active = uiKind === k;
                 return (
                   <TouchableOpacity key={k} style={[s.kindBtn, active && { backgroundColor: ACCENT + '22', borderColor: ACCENT }]}
-                    onPress={() => { haptic.tap(); setKind(k); }} activeOpacity={0.8}>
+                    onPress={() => { haptic.tap(); setUiKind(k); }} activeOpacity={0.8}>
                     <Ic size={15} color={active ? ACCENT : c.text.muted} />
                     <Text style={[s.kindText, active && { color: ACCENT }]}>{lbl}</Text>
                   </TouchableOpacity>
@@ -151,31 +173,58 @@ export default function Counters() {
               })}
             </View>
 
-            <TextInput value={name} onChangeText={setName} placeholder={kind === 'until' ? 'np. Urodziny, Wyjazd…' : 'np. Wizyta u dentysty, Olej w aucie…'}
+            <TextInput value={name} onChangeText={setName}
+              placeholder={uiKind === 'until' ? 'np. Urodziny, Wyjazd…' : uiKind === 'avoid' ? 'np. słodyczy, papierosów…' : 'np. Wizyta u dentysty…'}
               placeholderTextColor={c.text.muted} style={s.input} />
 
-            <Text style={s.fieldLabel}>{kind === 'until' ? 'Data wydarzenia' : 'Ostatnio zrobione'}</Text>
-            <DatePickerField value={date} onChange={setDate} placeholder={kind === 'until' ? 'Wybierz datę' : 'Domyślnie dziś'} />
-
-            {kind === 'until' && upcoming.length > 0 && (
+            {uiKind === 'avoid' ? (
               <>
-                <TouchableOpacity style={s.calToggle} onPress={() => { haptic.tap(); setPickCal(v => !v); }} activeOpacity={0.8}>
-                  <CalendarDays size={14} color={ACCENT} />
-                  <Text style={[s.calToggleText, { color: ACCENT }]}>{pickCal ? 'Ukryj kalendarz' : 'Wybierz z kalendarza'}</Text>
-                </TouchableOpacity>
-                {pickCal && (
-                  <View style={s.calList}>
-                    {upcoming.map(e => (
-                      <TouchableOpacity key={e.id} style={s.calItem} activeOpacity={0.7}
-                        onPress={() => { haptic.tap(); setName(e.title); setDate((e.date ?? '').slice(0, 10)); setPickCal(false); }}>
-                        <Text style={s.calItemDate}>{(e.date ?? '').slice(5)}</Text>
-                        <Text style={s.calItemName} numberOfLines={1}>{e.title}</Text>
+                <Text style={s.fieldLabel}>Śledź automatycznie (z paragonów)</Text>
+                <View style={s.presetRow}>
+                  {AVOID_PRESETS.map(p => {
+                    const active = keyword === p.keyword;
+                    return (
+                      <TouchableOpacity key={p.key} style={[s.presetChip, active && { backgroundColor: ACCENT + '22', borderColor: ACCENT }]}
+                        onPress={() => { haptic.tap(); setKeyword(p.keyword); if (!name.trim()) setName(p.label); }} activeOpacity={0.8}>
+                        <Text style={[s.presetText, active && { color: ACCENT }]}>{p.label}</Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
+                    );
+                  })}
+                </View>
+                <Text style={s.fieldLabel}>…lub własne słowa (oddziel znakiem |)</Text>
+                <TextInput value={keyword} onChangeText={setKeyword} placeholder="np. cola|fanta|sprite" placeholderTextColor={c.text.muted} style={s.input} autoCapitalize="none" />
+              </>
+            ) : (
+              <>
+                <Text style={s.fieldLabel}>{uiKind === 'until' ? 'Data wydarzenia' : 'Ostatnio zrobione'}</Text>
+                <DatePickerField value={date} onChange={setDate} placeholder={uiKind === 'until' ? 'Wybierz datę' : 'Domyślnie dziś'} />
+                {uiKind === 'until' && upcoming.length > 0 && (
+                  <>
+                    <TouchableOpacity style={s.calToggle} onPress={() => { haptic.tap(); setPickCal(v => !v); }} activeOpacity={0.8}>
+                      <CalendarDays size={14} color={ACCENT} />
+                      <Text style={[s.calToggleText, { color: ACCENT }]}>{pickCal ? 'Ukryj kalendarz' : 'Wybierz z kalendarza'}</Text>
+                    </TouchableOpacity>
+                    {pickCal && (
+                      <View style={s.calList}>
+                        {upcoming.map(e => (
+                          <TouchableOpacity key={e.id} style={s.calItem} activeOpacity={0.7}
+                            onPress={() => { haptic.tap(); setName(e.title); setDate((e.date ?? '').slice(0, 10)); setPickCal(false); }}>
+                            <Text style={s.calItemDate}>{(e.date ?? '').slice(5)}</Text>
+                            <Text style={s.calItemName} numberOfLines={1}>{e.title}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
                 )}
               </>
             )}
+
+            <TouchableOpacity style={s.dashToggle} onPress={() => { haptic.tap(); setOnDash(v => !v); }} activeOpacity={0.8}>
+              <LayoutDashboard size={15} color={onDash ? ACCENT : c.text.muted} />
+              <Text style={[s.dashToggleText, onDash && { color: ACCENT }]}>Pokaż na dashboardzie</Text>
+              <View style={[s.checkbox, onDash && { backgroundColor: ACCENT, borderColor: ACCENT }]}>{onDash && <Check size={12} color="#fff" />}</View>
+            </TouchableOpacity>
 
             <TouchableOpacity style={[s.saveBtn, { backgroundColor: ACCENT }, !canSave && { opacity: 0.4 }]} onPress={save} disabled={!canSave} activeOpacity={0.85}>
               <Check size={17} color="#fff" /><Text style={s.saveText}>{editing ? 'Zapisz' : 'Dodaj'}</Text>
@@ -222,6 +271,12 @@ const makeS = (c: any) => StyleSheet.create({
   kindText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   input: { backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 12, fontSize: 15, color: c.text.primary },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: spacing[2] },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[1] },
+  presetChip: { paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
+  presetText: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },
+  dashToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[3], paddingVertical: spacing[2] },
+  dashToggleText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: c.text.secondary },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   calToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
   calToggleText: { fontSize: 12.5, fontWeight: '700' },
   calList: { gap: 2, maxHeight: 200 },

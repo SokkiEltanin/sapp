@@ -55,7 +55,7 @@ import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill }
 import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
-import { useCounters, daysUntil, untilProgress } from '@/store/countersStore';
+import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
 import WalkProgress from '@/components/counters/WalkProgress';
 import { vehiclesService } from '@/services/vehiclesService';
@@ -741,6 +741,12 @@ export default function DashboardScreen() {
     [counters],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
+  const dashSince = useMemo(
+    () => counters.filter(cn => cn.kind === 'since' && cn.onDashboard !== false)
+      .map(cn => ({ cn, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses) : daysSince(cn) }))
+      .sort((a, b) => b.days - a.days),
+    [counters, expenses],
+  );
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -2336,6 +2342,27 @@ export default function DashboardScreen() {
               </View>
             );
 
+            nodes['counters-since'] = dashSince.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Hourglass size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Liczniki</Text>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
+                    <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={s.sinceGrid}>
+                  {dashSince.slice(0, 6).map(({ cn, days }) => (
+                    <View key={cn.id} style={s.sinceTile}>
+                      <Text style={s.sinceTileDays}>{days}</Text>
+                      <Text style={s.sinceTileUnit}>{days === 1 ? 'dzień' : 'dni'}</Text>
+                      <Text style={s.sinceTileName} numberOfLines={1}>{cn.mode === 'auto' ? `bez ${cn.name}` : cn.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+
             nodes['gablota-card'] = (() => {
               const total = achStates.filter(st => st.a.kind !== 'bad').length;
               if (total === 0) return false;
@@ -3607,6 +3634,11 @@ const makeStyles = (c: any) => StyleSheet.create({
   toolLabel: { fontSize: 10, fontWeight: '700', color: c.text.secondary, letterSpacing: 0.3 },
   cdName: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
   cdDays: { fontSize: 12, fontWeight: '800', color: c.tabs?.day ?? '#46B0DE' },
+  sinceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
+  sinceTile: { width: '31.5%', flexGrow: 1, backgroundColor: c.fill.subtle, borderRadius: radius.md, paddingVertical: spacing[3], paddingHorizontal: spacing[2], alignItems: 'center' },
+  sinceTileDays: { fontSize: 26, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
+  sinceTileUnit: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginTop: -2 },
+  sinceTileName: { fontSize: 11, fontWeight: '600', color: c.text.secondary, marginTop: 3, textAlign: 'center', maxWidth: '100%' },
   toolSub: { fontSize: 11, fontWeight: '800', letterSpacing: -0.3 },
 
   // ── Evening habits nudge ──────────────────────────────────────────────────
