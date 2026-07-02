@@ -1942,13 +1942,13 @@ export default function DashboardScreen() {
         end={{ x: 0.6, y: 0.52 }}
       />
 
-      <SafeAreaView style={[s.safe, { paddingTop: insets.top + 50 }]} edges={[]}>
+      <SafeAreaView style={s.safe} edges={[]}>
         <View style={{ flex: 1 }}>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={s.scroll}
-            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} />}
+            contentContainerStyle={[s.scroll, { paddingTop: insets.top + 50 }]}
+            refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} progressViewOffset={insets.top + 50} />}
           >
 
             {/* ══ HEADER — date + weather + tab shortcuts (Humor / Liczniki / Gablota) */}
