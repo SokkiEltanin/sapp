@@ -55,7 +55,8 @@
       "Bash(awk 'NR>=624 && /header:/ {print NR\": \"$0}' \"app/\\(tabs\\)/tasks.tsx\")",
       "Bash(git push *)",
       "Bash(awk 'NR>=624 && /  list:/ {print NR\": \"$0}' \"app/\\(tabs\\)/tasks.tsx\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(grep -nE \"\\\\{/\\\\* Work panel \\\\*/\\\\}\" \"app/\\(tabs\\)/index.tsx\")"
     ]
   }
 }

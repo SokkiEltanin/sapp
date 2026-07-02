@@ -1556,13 +1556,20 @@ export default function DashboardScreen() {
       else plannedH += h;
     }
     const currentHours = months[5].hours;
+    const projectedH = workedH + plannedH;
+    // Average over the completed prior months that had any work (months[0..4]).
+    const prior = months.slice(0, 5).filter(m => m.hours > 0);
+    const avgHours = prior.length ? prior.reduce((a, m) => a + m.hours, 0) / prior.length : 0;
+    const avgEarnings = prior.length ? Math.round(prior.reduce((a, m) => a + m.earnings, 0) / prior.length) : 0;
     return {
       months, currentHours, rate,
       currentEarnings: Math.round(currentHours * rate),
       workedH, plannedH, workedEarnings: Math.round(workedH * rate),
+      projectedH, projectedEarnings: Math.round(projectedH * rate),
       daysWorked: dayset.size,
       avgPerDay: dayset.size > 0 ? workedH / dayset.size : 0,
       prevHours: months[4].hours, prevEarnings: months[4].earnings,
+      avgHours, avgEarnings,
     };
   }, [allEvents, workSettings, workEarnings, today]);
 
@@ -3139,12 +3146,12 @@ export default function DashboardScreen() {
               <Text style={[s.factText, { marginTop: spacing[2] }]}>Ustaw kolor lub prefiks pracy w kalendarzu, aby liczyć godziny i zarobek.</Text>
             ) : (() => {
               const wm = workMonthly; const hasRate = wm.rate > 0;
-              const deltaE = wm.currentEarnings - wm.prevEarnings;
+              const deltaE = wm.projectedEarnings - wm.prevEarnings;
               return (
-                <>
+                <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
                   <View style={{ marginTop: spacing[2] }}>
-                    <Text style={s.wpBig}>{hasRate ? wm.currentEarnings.toLocaleString('pl-PL') : wm.currentHours.toFixed(0)}<Text style={s.wpUnit}>{hasRate ? ' zł' : ' h'}</Text></Text>
-                    <Text style={s.wpSub}>{hasRate ? `szac. zarobek w tym miesiącu · ${wm.currentHours.toFixed(0)} h` : 'godzin przepracowanych w tym miesiącu'}</Text>
+                    <Text style={s.wpBig}>{hasRate ? wm.workedEarnings.toLocaleString('pl-PL') : wm.workedH.toFixed(0)}<Text style={s.wpUnit}>{hasRate ? ' zł' : ' h'}</Text></Text>
+                    <Text style={s.wpSub}>{hasRate ? `zarobione do teraz · ${wm.workedH.toFixed(0)} h w tym miesiącu` : 'godzin przepracowanych w tym miesiącu'}</Text>
                   </View>
                   {wm.plannedH > 0 && (
                     <View style={{ marginTop: spacing[3] }}>
@@ -3152,14 +3159,18 @@ export default function DashboardScreen() {
                         <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: accentColor }} />
                         <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: accentColor + '40' }} />
                       </View>
-                      <Text style={s.workSplitText}><Text style={{ color: accentColor, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>{`  ·  zaplanowane +${wm.plannedH.toFixed(0)} h`}</Text>
+                      <Text style={s.workSplitText}>
+                        <Text style={{ color: accentColor, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h zrobione</Text>
+                        {`  ·  +${wm.plannedH.toFixed(0)} h w planie → prognoza ${hasRate ? `${wm.projectedEarnings.toLocaleString('pl-PL')} zł` : `${wm.projectedH.toFixed(0)} h`}`}
+                      </Text>
                     </View>
                   )}
                   <View style={s.wxChips}>
                     {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy</Text><Text style={s.wxChipV}>{wm.daysWorked}</Text></View>}
                     {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Śr. na dzień</Text><Text style={s.wxChipV}>{wm.avgPerDay.toFixed(1)} h{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate)} zł` : ''}</Text></View>}
                     {hasRate && <View style={s.wxChip}><Text style={s.wxChipK}>Stawka</Text><Text style={s.wxChipV}>{Math.round(wm.rate)} zł/h</Text></View>}
-                    {hasRate && wm.prevEarnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>vs poprzedni mies.</Text><Text style={[s.wxChipV, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>{deltaE >= 0 ? '+' : '−'}{Math.abs(deltaE).toLocaleString('pl-PL')} zł</Text></View>}
+                    {wm.avgHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Śr. miesiąc</Text><Text style={s.wxChipV}>{hasRate ? `${wm.avgEarnings.toLocaleString('pl-PL')} zł` : `${wm.avgHours.toFixed(0)} h`}</Text></View>}
+                    {hasRate && wm.prevEarnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Prognoza vs poprz.</Text><Text style={[s.wxChipV, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>{deltaE >= 0 ? '+' : '−'}{Math.abs(deltaE).toLocaleString('pl-PL')} zł</Text></View>}
                   </View>
                   <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
                   <View style={s.waveValues}>
@@ -3175,7 +3186,18 @@ export default function DashboardScreen() {
                       <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>{m.label}</Text>
                     ))}
                   </View>
-                </>
+                  {/* per-month breakdown table */}
+                  <View style={{ marginTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[2] }}>
+                    {wm.months.slice().reverse().map((m, i) => (
+                      <View key={i} style={s.wmRow}>
+                        <Text style={[s.wmMonth, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>{m.label}{m.isCurrent ? ' · teraz' : ''}</Text>
+                        <Text style={s.wmH}>{m.hours > 0 ? `${Math.round(m.hours)} h` : '—'}</Text>
+                        {hasRate && <Text style={s.wmZl}>{m.earnings > 0 ? `${m.earnings.toLocaleString('pl-PL')} zł` : '—'}</Text>}
+                      </View>
+                    ))}
+                  </View>
+                  {hasRate && <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: spacing[2] }]}>Stawka ~{Math.round(wm.rate)} zł/h liczona z ostatniej wypłaty ÷ godziny jej miesiąca.</Text>}
+                </ScrollView>
               );
             })()}
           </TouchableOpacity>
@@ -3872,6 +3894,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   wpBig: { fontSize: 38, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
   wpUnit: { fontSize: 18, fontWeight: '700', color: c.text.muted },
   wpSub: { fontSize: 12.5, color: c.text.secondary, marginTop: 1 },
+  wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  wmMonth: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.secondary },
+  wmH: { width: 70, textAlign: 'right', fontSize: 13, fontWeight: '700', color: c.text.primary },
+  wmZl: { width: 90, textAlign: 'right', fontSize: 13, fontWeight: '800', color: c.text.primary },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
