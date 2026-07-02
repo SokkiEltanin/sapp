@@ -563,8 +563,8 @@ export default function SettingsScreen() {
                 <LucideIcons.ArrowLeftRight size={16} color={colors.text.secondary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowLabel}>Płynne przejście (slide)</Text>
-                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Animowany slide między zakładkami zamiast natychmiastowego</Text>
+                <Text style={styles.rowLabel}>Płynne przejście</Text>
+                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Delikatne rozmycie między zakładkami (slide klatkował na ciężkich ekranach)</Text>
               </View>
               <Switch
                 value={tabSlide}

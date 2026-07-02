@@ -2252,6 +2252,29 @@ export default function DashboardScreen() {
               </View>
             );
 
+            nodes['gablota-card'] = (() => {
+              const total = achStates.filter(st => st.a.kind !== 'bad').length;
+              if (total === 0) return false;
+              const pct = Math.min(1, earnedBadges / total);
+              const left = total - earnedBadges;
+              return (
+                <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.85}
+                  onPress={() => { haptic.tap(); router.push('/achievements' as any); }}>
+                  <View style={s.cardHeader}>
+                    <Trophy size={13} color="#FFC83D" />
+                    <Text style={s.cardTitle}>Gablota osiągnięć</Text>
+                    <Text style={{ marginLeft: 'auto', fontSize: 13, fontWeight: '800', color: '#FFC83D' }}>{earnedBadges} / {total}</Text>
+                  </View>
+                  <View style={{ height: 9, borderRadius: 5, backgroundColor: colors.fill.subtle, overflow: 'hidden', marginTop: spacing[2] }}>
+                    <View style={{ width: `${Math.round(pct * 100)}%`, height: '100%', backgroundColor: '#FFC83D', borderRadius: 5 }} />
+                  </View>
+                  <Text style={[s.factText, { marginTop: spacing[2] }]}>
+                    {left > 0 ? `Jeszcze ${left} ${left === 1 ? 'odznaka' : 'odznak'} do zdobycia · stuknij` : 'Wszystkie zdobyte! 👑 stuknij'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })();
+
             nodes['habits-nudge'] = habits.length > 0 && new Date().getHours() >= 17 && (() => {
               const notDone = habits.filter(h => !habitsDoneIds.includes(h.id));
               if (notDone.length === 0) return null;

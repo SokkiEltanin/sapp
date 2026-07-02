@@ -67,7 +67,10 @@ export default function TabsLayout() {
             screenOptions={{
               headerShown: false,
               lazy: false,
-              animation: tabSlide ? 'shift' : 'none',
+              // 'shift' (true horizontal slide) janks hard because all 5 heavy screens
+              // stay mounted and re-layout during the transition. 'fade' is GPU-cheap
+              // (opacity only) so it stays smooth — the pragmatic "płynne przejście".
+              animation: tabSlide ? 'fade' : 'none',
               freezeOnBlur: true,
               sceneStyle: { backgroundColor: c.bg.primary },
             }}
