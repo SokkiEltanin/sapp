@@ -124,7 +124,14 @@ const WMO_DESC: Record<number, string> = {
   95: 'Burza',
 };
 
-interface WeatherData { temp: number; desc: string; wmo: number; }
+interface WeatherDay { date: string; wmo: number; hi: number; lo: number }
+interface WeatherData {
+  temp: number; desc: string; wmo: number;
+  feels?: number; wind?: number; humidity?: number;
+  hi?: number; lo?: number;
+  sunrise?: string; sunset?: string;
+  forecast?: WeatherDay[];
+}
 
 async function fetchWeather(): Promise<WeatherData | null> {
   try {
@@ -132,16 +139,34 @@ async function fetchWeather(): Promise<WeatherData | null> {
     if (status !== 'granted') return null;
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
     const { latitude, longitude } = loc.coords;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}&current_weather=true&daily=sunrise,sunset&timezone=auto&temperature_unit=celsius`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(4)}&longitude=${longitude.toFixed(4)}`
+      + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code`
+      + `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&forecast_days=6&timezone=auto&temperature_unit=celsius`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
-    const cw = data.current_weather;
+    const cur = data.current ?? {};
+    const d = data.daily ?? {};
     // Persist today's sunrise/sunset so the theme follows the real sun.
-    const sr = data.daily?.sunrise?.[0];
-    const ss = data.daily?.sunset?.[0];
+    const sr = d.sunrise?.[0];
+    const ss = d.sunset?.[0];
     if (sr && ss) setSunTimes(isoToDecimalHour(sr), isoToDecimalHour(ss)).catch(() => {});
-    return { temp: Math.round(cw.temperature), desc: WMO_DESC[cw.weathercode] ?? 'Nieznana pogoda', wmo: cw.weathercode };
+    const forecast: WeatherDay[] = (d.time ?? []).map((date: string, i: number) => ({
+      date, wmo: d.weather_code?.[i] ?? 0, hi: Math.round(d.temperature_2m_max?.[i] ?? 0), lo: Math.round(d.temperature_2m_min?.[i] ?? 0),
+    }));
+    const wmo = cur.weather_code ?? 0;
+    return {
+      temp: Math.round(cur.temperature_2m ?? 0),
+      desc: WMO_DESC[wmo] ?? 'Nieznana pogoda',
+      wmo,
+      feels: cur.apparent_temperature != null ? Math.round(cur.apparent_temperature) : undefined,
+      wind: cur.wind_speed_10m != null ? Math.round(cur.wind_speed_10m) : undefined,
+      humidity: cur.relative_humidity_2m != null ? Math.round(cur.relative_humidity_2m) : undefined,
+      hi: forecast[0]?.hi, lo: forecast[0]?.lo,
+      sunrise: sr ? sr.slice(11, 16) : undefined,
+      sunset: ss ? ss.slice(11, 16) : undefined,
+      forecast: forecast.slice(0, 6),
+    };
   } catch { return null; }
 }
 
@@ -599,6 +624,7 @@ export default function DashboardScreen() {
   const { subscriptions, update: updateSub, add: addSub } = useSubscriptions();
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
+  const [weatherPanel, setWeatherPanel] = useState(false);
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
   const [tagModal, setTagModal]     = useState<any>(null);  // open tag-limit's item list
@@ -1292,23 +1318,26 @@ export default function DashboardScreen() {
     const warm = (temp ?? 15) >= 18;
     const grad: [string, string] = warm ? ['#3A2A12', '#1A1410'] : ['#10243A', '#0F1620'];
     return (
-      <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.card, { borderWidth: 1, borderColor: accentColor + '30' }]}>
-        <View style={s.cardHeader}>
-          <CloudSun size={13} color={accentColor} />
-          <Text style={s.cardTitle}>{t.title || 'Pogoda'}</Text>
-        </View>
-        {temp == null ? (
-          <Text style={s.statSub}>Pobieram pogodę…</Text>
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] }}>
-            <Image source={weatherIconPng(code)} style={{ width: 52, height: 52 }} resizeMode="contain" />
-            <View style={{ flex: 1 }}>
-              <Text style={s.weatherTemp}>{temp}°C</Text>
-              <Text style={s.weatherDesc}>{(weather?.desc ?? '').toUpperCase()}</Text>
-            </View>
+      <TouchableOpacity activeOpacity={0.85} onPress={() => { if (temp != null) { haptic.tap(); setWeatherPanel(true); } }}>
+        <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.card, { borderWidth: 1, borderColor: accentColor + '30' }]}>
+          <View style={s.cardHeader}>
+            <CloudSun size={13} color={accentColor} />
+            <Text style={s.cardTitle}>{t.title || 'Pogoda'}</Text>
+            {temp != null && <Text style={{ marginLeft: 'auto', fontSize: 11, color: colors.text.muted }}>szczegóły ›</Text>}
           </View>
-        )}
-      </LinearGradient>
+          {temp == null ? (
+            <Text style={s.statSub}>Pobieram pogodę…</Text>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] }}>
+              <Image source={weatherIconPng(code)} style={{ width: 52, height: 52 }} resizeMode="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={s.weatherTemp}>{temp}°C</Text>
+                <Text style={s.weatherDesc}>{(weather?.desc ?? '').toUpperCase()}</Text>
+              </View>
+            </View>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
     );
   };
 
@@ -1896,11 +1925,12 @@ export default function DashboardScreen() {
               <View style={s.headerMinRow}>
                 <Text style={s.headerMinDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
                 {weather && (
-                  <View style={s.headerMinWeather}>
+                  <TouchableOpacity style={s.headerMinWeather} activeOpacity={0.7}
+                    onPress={() => { haptic.tap(); setWeatherPanel(true); }}>
                     <Image source={weatherIconPng(weather.wmo ?? -1)} style={{ width: 22, height: 22 }} resizeMode="contain" />
                     <Text style={s.headerMinTemp}>{weather.temp}°</Text>
                     <Text style={s.headerMinDesc} numberOfLines={1}>{weather.desc.toLowerCase()}</Text>
-                  </View>
+                  </TouchableOpacity>
                 )}
               </View>
               <View style={s.headerMinRule} />
@@ -3049,6 +3079,59 @@ export default function DashboardScreen() {
       {/* Mood check-in modal */}
       <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={todayEntry ?? null} />
 
+      {/* Weather panel */}
+      <Modal visible={weatherPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWeatherPanel(false)}>
+        <TouchableOpacity style={s.npOverlay} activeOpacity={1} onPress={() => setWeatherPanel(false)}>
+          <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
+            <View style={s.cardHeader}>
+              <CloudSun size={14} color={accentColor} />
+              <Text style={s.cardTitle}>Pogoda</Text>
+              <TouchableOpacity onPress={() => setWeatherPanel(false)} hitSlop={10} style={{ marginLeft: 'auto' }}>
+                <X size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            {weather && (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[2] }}>
+                  <Image source={weatherIconPng(weather.wmo ?? -1)} style={{ width: 68, height: 68 }} resizeMode="contain" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 40, fontWeight: '900', color: colors.text.primary, letterSpacing: -1.5 }}>{weather.temp}°</Text>
+                    <Text style={{ fontSize: 13, color: colors.text.secondary, fontWeight: '600' }}>{weather.desc}</Text>
+                    {(weather.hi != null && weather.lo != null) && (
+                      <Text style={{ fontSize: 12, color: colors.text.muted, marginTop: 2 }}>maks {weather.hi}° · min {weather.lo}°</Text>
+                    )}
+                  </View>
+                </View>
+                <View style={s.wxChips}>
+                  {weather.feels != null && <View style={s.wxChip}><Text style={s.wxChipK}>Odczuwalna</Text><Text style={s.wxChipV}>{weather.feels}°</Text></View>}
+                  {weather.wind != null && <View style={s.wxChip}><Text style={s.wxChipK}>Wiatr</Text><Text style={s.wxChipV}>{weather.wind} km/h</Text></View>}
+                  {weather.humidity != null && <View style={s.wxChip}><Text style={s.wxChipK}>Wilgotność</Text><Text style={s.wxChipV}>{weather.humidity}%</Text></View>}
+                  {(weather.sunrise && weather.sunset) && <View style={s.wxChip}><Text style={s.wxChipK}>Wschód/zachód</Text><Text style={s.wxChipV}>{weather.sunrise}–{weather.sunset}</Text></View>}
+                </View>
+                {weather.forecast && weather.forecast.length > 1 && (
+                  <>
+                    <Text style={s.wxSection}>Prognoza</Text>
+                    <View style={s.wxForecast}>
+                      {weather.forecast.map((fd, i) => {
+                        const wd = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'][new Date(fd.date + 'T00:00:00').getDay()];
+                        return (
+                          <View key={fd.date} style={s.wxDay}>
+                            <Text style={[s.wxDayLbl, i === 0 && { color: accentColor, fontWeight: '800' }]}>{i === 0 ? 'Dziś' : wd}</Text>
+                            <Image source={weatherIconPng(fd.wmo)} style={{ width: 30, height: 30, marginVertical: 3 }} resizeMode="contain" />
+                            <Text style={s.wxHi}>{fd.hi}°</Text>
+                            <Text style={s.wxLo}>{fd.lo}°</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Tag-limit item list — see/remove what counts toward a limit */}
       <Modal visible={!!tagModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setTagModal(null)}>
         <View style={s.npOverlay}>
@@ -3572,6 +3655,16 @@ const makeStyles = (c: any) => StyleSheet.create({
 
   // ── Note picker modal ──
   npOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing[4] },
+  wxChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
+  wxChip: { backgroundColor: c.fill.subtle, borderRadius: radius.md, paddingVertical: spacing[2], paddingHorizontal: spacing[3], minWidth: '47%', flexGrow: 1 },
+  wxChipK: { fontSize: 10.5, color: c.text.muted, fontWeight: '600' },
+  wxChipV: { fontSize: 15, color: c.text.primary, fontWeight: '800', marginTop: 1 },
+  wxSection: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing[3], marginBottom: spacing[1] },
+  wxForecast: { flexDirection: 'row', justifyContent: 'space-between' },
+  wxDay: { alignItems: 'center', flex: 1 },
+  wxDayLbl: { fontSize: 11, color: c.text.secondary, fontWeight: '700' },
+  wxHi: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
+  wxLo: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
