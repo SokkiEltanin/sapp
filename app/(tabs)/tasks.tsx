@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
   ChevronRight, Trash2, X,
-  Square, CheckSquare2, Clock, Timer, RefreshCw,
+  Square, CheckSquare2, Clock, Timer, RefreshCw, Activity,
 } from 'lucide-react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useTasks } from '@/hooks/useTasks';
@@ -533,14 +533,20 @@ export default function TasksScreen() {
     <SafeAreaView style={[s.root, { paddingTop: insets.top + 50 }]} edges={[]}>
       <View style={{ flex: 1 }}>
 
-        {/* Header — no big tab name, just a live status line */}
+        {/* Header — live status line + tab shortcuts (focus / pomodoro) */}
         <View style={s.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={s.subtitle}>
               {active.length > 0 ? `${active.length} aktywnych` : 'Wszystko ogarnięte'}
               {overdue > 0 ? ` · ${overdue} po terminie` : ''}
             </Text>
           </View>
+          <TouchableOpacity onPress={() => { haptic.tap(); router.push('/focus' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+            <Activity size={18} color={colors.tabs.tasks} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { haptic.tap(); router.push('/pomodoro' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+            <Timer size={18} color={colors.tabs.tasks} />
+          </TouchableOpacity>
         </View>
 
         {/* List */}
@@ -618,8 +624,10 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
 
   header: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     paddingHorizontal: spacing[4], paddingTop: spacing[4], paddingBottom: spacing[3],
   },
+  hdrIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: g.cardBorder },
   title:    { fontSize: 28, fontWeight: '800', color: c.white, letterSpacing: -0.5 },
   subtitle: { fontSize: 12, color: c.text.muted, marginTop: 2 },
 

@@ -1919,13 +1919,8 @@ export default function DashboardScreen() {
             refreshControl={<RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={colors.text.muted} />}
           >
 
-            {/* ══ HEADER — minimal: date + weather (taps to log mood). No big
-                greeting / preachy briefing; the cards below carry the content. */}
-            <TouchableOpacity
-              onPress={() => { haptic.tap(); openCheckIn(); }}
-              activeOpacity={0.6}
-              style={s.headerMin}
-            >
+            {/* ══ HEADER — date + weather + tab shortcuts (Humor / Liczniki / Gablota) */}
+            <View style={s.headerMin}>
               <View style={s.headerMinRow}>
                 <Text style={s.headerMinDate} numberOfLines={1}>{dateLabel.toUpperCase()}</Text>
                 {weather && (
@@ -1936,9 +1931,20 @@ export default function DashboardScreen() {
                     <Text style={s.headerMinDesc} numberOfLines={1}>{weather.desc.toLowerCase()}</Text>
                   </TouchableOpacity>
                 )}
+                <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto' }}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); openCheckIn(); }} style={s.hdrIcon} activeOpacity={0.8}>
+                    <Smile size={18} color={todayEntry ? colors.accent.green : colors.accent.purple} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                    <Hourglass size={17} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/achievements' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                    <Trophy size={17} color="#FFC83D" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={s.headerMinRule} />
-            </TouchableOpacity>
+            </View>
 
             {/* ══ DASHBOARD SECTIONS (reorderable registry) ═══════════════ */}
             {(() => {
@@ -2268,34 +2274,9 @@ export default function DashboardScreen() {
               );
             })();
 
-            nodes['tools-row'] = (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.toolsRow}>
-              {([
-                { label: 'Humor',     Icon: Smile,     route: '/(tabs)/mood', sub: todayEntry ? '✓' : null         },
-                { label: 'Nawyki',    Icon: Flame,    route: '/habits',   sub: null                               },
-                { label: 'Gablota',   Icon: Trophy,    route: '/achievements', sub: earnedBadges > 0 ? `${earnedBadges}` : null },
-                { label: 'Liczniki',  Icon: Hourglass, route: '/counters', sub: nextCountdownDays != null ? `${nextCountdownDays}d` : null },
-                { label: 'Notatki',   Icon: FileText,  route: '/notes',    sub: null                               },
-                { label: 'Skupienie', Icon: Activity,  route: '/focus',    sub: null                               },
-                { label: 'Pomodoro',  Icon: Timer,     route: '/pomodoro', sub: todayPomCount > 0 ? `${todayPomCount}×` : null },
-              ] as const).map(tool => (
-                <TouchableOpacity
-                  key={tool.route}
-                  style={[s.toolTile, { backgroundColor: cardBgDark }]}
-                  onPress={() => router.push(tool.route as any)}
-                  activeOpacity={0.75}
-                >
-                  <View style={s.toolIcon}>
-                    <tool.Icon size={18} color={accentColor} />
-                  </View>
-                  <Text style={s.toolLabel}>{tool.label}</Text>
-                  {tool.sub && (
-                    <Text style={[s.toolSub, { color: accentColor }]}>{tool.sub}</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            );
+            // tools-row removed — its shortcuts moved to tab headers (Humor/Liczniki/
+            // Gablota → dashboard header, Skupienie/Pomodoro → tasks header) and the
+            // per-tab action buttons (Nawyki, Notatki).
 
             nodes['countdowns'] = activeCountdowns.length > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -3349,6 +3330,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   headerMinRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerMinDate: { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: c.text.primary, flexShrink: 1 },
   headerMinWeather: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: spacing[2] },
+  hdrIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border.subtle },
   headerMinTemp: { fontSize: 13, fontWeight: '800', color: c.text.primary },
   headerMinDesc: { fontSize: 11, fontWeight: '600', color: c.text.muted, textTransform: 'capitalize', maxWidth: 110 },
   headerMinRule: { height: 1, backgroundColor: c.border.subtle, marginTop: spacing[2] },
