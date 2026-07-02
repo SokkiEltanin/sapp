@@ -1631,6 +1631,33 @@ export default function DashboardScreen() {
       .sort((a, b) => b.pct - a.pct);
   }, [tagRules, scopedExpenses, today, weekDates, payers]);
 
+  // Multi-month history for the open tag-limit (how much each month vs the limit).
+  const MON_SHORT = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+  const tagHistory = useMemo(() => {
+    if (!tagModal) return [] as { key: string; label: string; spend: number }[];
+    const rule = tagModal;
+    const tags = ruleTags(rule);
+    const hasAny = (arr?: string[]) => !!arr && tags.some((t: string) => arr.includes(t));
+    const now = new Date();
+    const out: { key: string; label: string; spend: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      let spend = 0;
+      for (const e of scopedExpenses) {
+        if (e.type === 'income') continue;
+        if ((e.date ?? '').slice(0, 7) !== key) continue;
+        if ((e.receiptItems?.length ?? 0) > 0) {
+          e.receiptItems!.forEach(it => { if (countsForConsumption(it) && hasAny(it.tags)) spend += attributedPrice(it, rule.person, payers); });
+        } else if (hasAny(e.tags) && (!rule.person || e.payer === rule.person)) {
+          spend += e.amount;
+        }
+      }
+      out.push({ key, label: MON_SHORT[d.getMonth()], spend: Math.round(spend) });
+    }
+    return out;
+  }, [tagModal, scopedExpenses, payers]);
+
   // Re-arm a budget notification when a tag-limit is near/over (closed-app nudge).
   useEffect(() => {
     const near = tagLimits.map(t => ({ label: t.label, pct: t.pct, spend: t.spend, limit: t.limit, period: t.period }));
@@ -3184,6 +3211,39 @@ export default function DashboardScreen() {
               <>
                 <Text style={s.tagModalTitle}>{tagModal.label}</Text>
                 <Text style={s.tagModalSub}>{Math.round(tagModal.spend)}/{Math.round(tagModal.limit)} zł · {tagModal.items.length} pozycji · {tagModal.period === 'week' ? 'tydzień' : 'miesiąc'}</Text>
+                {tagModal.period === 'month' && tagHistory.length > 0 && (() => {
+                  const limit = tagModal.limit;
+                  const max = Math.max(limit, ...tagHistory.map(m => m.spend), 1);
+                  const H = 58;
+                  const overMonths = tagHistory.filter(m => m.spend > limit);
+                  const totalOver = overMonths.reduce((a, m) => a + (m.spend - limit), 0);
+                  return (
+                    <View style={s.tagHistWrap}>
+                      <Text style={s.tagHistTitle}>Ostatnie 6 miesięcy · limit {Math.round(limit)} zł</Text>
+                      <View style={s.tagHistChart}>
+                        {tagHistory.map((m, i) => {
+                          const over = m.spend > limit;
+                          const h = Math.max(2, (m.spend / max) * H);
+                          return (
+                            <View key={m.key} style={s.tagHistCol}>
+                              <Text style={[s.tagHistVal, over && { color: colors.accent.red }]}>{m.spend}</Text>
+                              <View style={{ height: H, width: 22, justifyContent: 'flex-end' }}>
+                                <View style={{ position: 'absolute', left: -3, right: -3, bottom: (limit / max) * H, height: 1, backgroundColor: colors.text.muted + '80' }} />
+                                <View style={{ height: h, borderRadius: 4, backgroundColor: over ? colors.accent.red : accentColor }} />
+                              </View>
+                              <Text style={[s.tagHistLbl, i === tagHistory.length - 1 && { color: accentColor, fontWeight: '800' }]}>{m.label}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                      <Text style={s.tagHistNote}>
+                        {overMonths.length === 0
+                          ? 'Ani razu nie przekroczyłeś limitu w tym okresie 👏'
+                          : `Przekroczone w ${overMonths.length} mies. · łącznie +${Math.round(totalOver)} zł ponad limit`}
+                      </Text>
+                    </View>
+                  );
+                })()}
                 <Text style={s.tagModalHint}>Dotknij pozycję, by edytować kategorię/tagi · kosz usuwa z tego licznika</Text>
                 <ScrollView style={{ marginTop: spacing[2] }}>
                   {tagModal.items.length === 0
@@ -3431,6 +3491,13 @@ const makeStyles = (c: any) => StyleSheet.create({
   tagLastItem: { fontSize: 11, color: c.text.muted, marginTop: -spacing[1] },
   tagModalTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
   tagModalSub: { fontSize: 12, color: c.text.muted, marginTop: 2 },
+  tagHistWrap: { marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  tagHistTitle: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: spacing[2] },
+  tagHistChart: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  tagHistCol: { alignItems: 'center', flex: 1, gap: 3 },
+  tagHistVal: { fontSize: 10, fontWeight: '700', color: c.text.secondary },
+  tagHistLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
+  tagHistNote: { fontSize: 11, color: c.text.secondary, marginTop: spacing[2], fontWeight: '600' },
   tagModalHint: { fontSize: 10.5, color: c.text.muted, marginTop: spacing[2], lineHeight: 15, fontStyle: 'italic' },
   tagModalEmpty: { fontSize: 13, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[3] },
   tagItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
