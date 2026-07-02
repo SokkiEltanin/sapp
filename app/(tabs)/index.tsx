@@ -56,6 +56,7 @@ import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, untilProgress } from '@/store/countersStore';
+import { useUiActions } from '@/store/uiActions';
 import WalkProgress from '@/components/counters/WalkProgress';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
@@ -625,6 +626,9 @@ export default function DashboardScreen() {
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [weatherPanel, setWeatherPanel] = useState(false);
+  const [workPanel, setWorkPanel]   = useState(false);
+  const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
+  useEffect(() => { if (workPanelTrigger > 0) setWorkPanel(true); }, [workPanelTrigger]);
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
   const [tagModal, setTagModal]     = useState<any>(null);  // open tag-limit's item list
@@ -2666,7 +2670,8 @@ export default function DashboardScreen() {
               const deltaE = wm.currentEarnings - wm.prevEarnings;
               const showDelta = hasRate && wm.prevEarnings > 0 && Math.abs(deltaE) > 1;
               return (
-                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.9}
+                  onPress={() => { haptic.tap(); setWorkPanel(true); }}>
                   <View style={s.cardHeader}>
                     <Briefcase size={13} color={accentColor} />
                     <Text style={s.cardTitle}>Praca</Text>
@@ -2743,7 +2748,7 @@ export default function DashboardScreen() {
                       </View>
                     </>
                   )}
-                </View>
+                </TouchableOpacity>
               );
             })();
 
@@ -3078,6 +3083,64 @@ export default function DashboardScreen() {
 
       {/* Mood check-in modal */}
       <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={todayEntry ?? null} />
+
+      {/* Work panel */}
+      <Modal visible={workPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWorkPanel(false)}>
+        <TouchableOpacity style={s.npOverlay} activeOpacity={1} onPress={() => setWorkPanel(false)}>
+          <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
+            <View style={s.cardHeader}>
+              <Briefcase size={14} color={accentColor} />
+              <Text style={s.cardTitle}>Praca</Text>
+              <TouchableOpacity onPress={() => setWorkPanel(false)} hitSlop={10} style={{ marginLeft: 'auto' }}>
+                <X size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            {!workMonthly ? (
+              <Text style={[s.factText, { marginTop: spacing[2] }]}>Ustaw kolor lub prefiks pracy w kalendarzu, aby liczyć godziny i zarobek.</Text>
+            ) : (() => {
+              const wm = workMonthly; const hasRate = wm.rate > 0;
+              const deltaE = wm.currentEarnings - wm.prevEarnings;
+              return (
+                <>
+                  <View style={{ marginTop: spacing[2] }}>
+                    <Text style={s.wpBig}>{hasRate ? wm.currentEarnings.toLocaleString('pl-PL') : wm.currentHours.toFixed(0)}<Text style={s.wpUnit}>{hasRate ? ' zł' : ' h'}</Text></Text>
+                    <Text style={s.wpSub}>{hasRate ? `szac. zarobek w tym miesiącu · ${wm.currentHours.toFixed(0)} h` : 'godzin przepracowanych w tym miesiącu'}</Text>
+                  </View>
+                  {wm.plannedH > 0 && (
+                    <View style={{ marginTop: spacing[3] }}>
+                      <View style={s.workSplitBar}>
+                        <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: accentColor }} />
+                        <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: accentColor + '40' }} />
+                      </View>
+                      <Text style={s.workSplitText}><Text style={{ color: accentColor, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>{`  ·  zaplanowane +${wm.plannedH.toFixed(0)} h`}</Text>
+                    </View>
+                  )}
+                  <View style={s.wxChips}>
+                    {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy</Text><Text style={s.wxChipV}>{wm.daysWorked}</Text></View>}
+                    {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Śr. na dzień</Text><Text style={s.wxChipV}>{wm.avgPerDay.toFixed(1)} h{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate)} zł` : ''}</Text></View>}
+                    {hasRate && <View style={s.wxChip}><Text style={s.wxChipK}>Stawka</Text><Text style={s.wxChipV}>{Math.round(wm.rate)} zł/h</Text></View>}
+                    {hasRate && wm.prevEarnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>vs poprzedni mies.</Text><Text style={[s.wxChipV, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>{deltaE >= 0 ? '+' : '−'}{Math.abs(deltaE).toLocaleString('pl-PL')} zł</Text></View>}
+                  </View>
+                  <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
+                  <View style={s.waveValues}>
+                    {wm.months.map((m, i) => (
+                      <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+                        {hasRate ? (m.earnings > 0 ? (m.earnings >= 1000 ? `${(m.earnings / 1000).toFixed(1)}k` : String(m.earnings)) : '') : (m.hours > 0 ? `${Math.round(m.hours)}h` : '')}
+                      </Text>
+                    ))}
+                  </View>
+                  <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={accentColor} />
+                  <View style={s.waveLabels}>
+                    {wm.months.map((m, i) => (
+                      <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>{m.label}</Text>
+                    ))}
+                  </View>
+                </>
+              );
+            })()}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Weather panel */}
       <Modal visible={weatherPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWeatherPanel(false)}>
@@ -3665,6 +3728,9 @@ const makeStyles = (c: any) => StyleSheet.create({
   wxDayLbl: { fontSize: 11, color: c.text.secondary, fontWeight: '700' },
   wxHi: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
   wxLo: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
+  wpBig: { fontSize: 38, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
+  wpUnit: { fontSize: 18, fontWeight: '700', color: c.text.muted },
+  wpSub: { fontSize: 12.5, color: c.text.secondary, marginTop: 1 },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },

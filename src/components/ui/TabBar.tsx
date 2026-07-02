@@ -7,7 +7,8 @@ import { router } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, Plus, SlidersHorizontal, ScanLine, Settings,
+  LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, ScanLine, Settings,
+  Briefcase, Flame, FileText, CalendarPlus, TrendingUp, TrendingDown, CheckSquare,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -37,25 +38,7 @@ const TAB_ACCENTS = [
   '#8B5CF6',
 ] as const;
 
-const QUICK_ACTIONS = [
-  { label: 'NOTATKA',     color: '#6C9EFF',            route: '/notes?new=1'   },
-  { label: 'NAWYK',       color: '#F97316',            route: '/habits'        },
-  { label: 'HUMOR',       color: colors.accent.purple, route: '/(tabs)/mood'   },
-  { label: 'ZDROWIE',     color: '#8B5CF6',            route: '/(tabs)/health' },
-  { label: 'WYD/PRZYCH',  color: colors.accent.red,    route: '/expenses/add'  },
-  { label: 'ZADANIE',     color: colors.tabs.tasks,    route: '/tasks/add'     },
-  { label: 'PARSER PAR.', color: colors.accent.blue,   route: '/expenses/scan' },
-];
-
-const FINANCE_ACTIONS = [
-  { label: 'WYDATEK',  color: colors.tabs.finances, route: '/expenses/add?type=expense' },
-  { label: 'PRZYCHÓD', color: colors.tabs.tasks,    route: '/expenses/add?type=income'  },
-];
-
-const MAX_ACTIONS = Math.max(QUICK_ACTIONS.length, FINANCE_ACTIONS.length);
-
-const FAB_SIZE = 48;
-const PILL_H   = 52;
+const PILL_H = 52;
 
 export default function TabBar({ currentIndex }: Props) {
   const [open, setOpen]       = useState(false);
@@ -76,11 +59,7 @@ export default function TabBar({ currentIndex }: Props) {
   const todayDueCount = useCalendarStore(s => s.tasks.filter(t => t.status === 'pending' && (t.deadline?.split('T')[0] === todayStr || t.scheduledDate === todayStr)).length);
 
   const activeAccent = TAB_ACCENTS[currentIndex] ?? timeAccent;
-  const triggerTasksSort = useUiActions(s => s.triggerTasksSort);
-
-  const fabProgress  = useRef(new Animated.Value(0)).current;
-  const itemAnims    = useRef(Array.from({ length: MAX_ACTIONS }, () => new Animated.Value(0))).current;
-  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const openWorkPanel = useUiActions(s => s.openWorkPanel);
 
   // Animated "island" that slides under the active tab (Dynamic-Island feel).
   const [pillW, setPillW] = useState(0); // inner width of the tab row (measured)
@@ -93,52 +72,22 @@ export default function TabBar({ currentIndex }: Props) {
     }).start();
   }, [currentIndex, tabW]);
 
-  const menuBase = (insets.bottom || 16) + 8 + PILL_H + 12 + FAB_SIZE + 12;
-
-  const menuActions = currentIndex === 3 ? FINANCE_ACTIONS : QUICK_ACTIONS;
-
-  const openMenu = () => {
-    setOpen(true);
-    // Snappy: tiny stagger + a stiff spring so the whole menu lands in ~120ms
-    // instead of cascading in over ~280ms (felt like "loading").
-    Animated.parallel([
-      Animated.timing(backdropAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
-      Animated.timing(fabProgress,  { toValue: 1, duration: 150, useNativeDriver: true }),
-      ...menuActions.map((_, i) => {
-        itemAnims[i].setValue(0);
-        return Animated.spring(itemAnims[i], {
-          toValue: 1, useNativeDriver: true,
-          damping: 18, stiffness: 340, delay: i * 16,
-        } as any);
-      }),
-    ]).start();
-  };
-
-  const handleFabPress = () => {
-    haptic.tap();
-    if (open) { closeMenu(); return; }
-    if (currentIndex === 1) {
-      router.push('/tasks/add' as any);
-    } else if (currentIndex === 2) {
-      router.push('/calendar/add' as any);
-    } else {
-      openMenu();
-    }
-  };
-
-  const closeMenu = (cb?: () => void) => {
-    Animated.parallel([
-      Animated.timing(backdropAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
-      Animated.timing(fabProgress,  { toValue: 0, duration: 180, useNativeDriver: true }),
-      ...itemAnims.map(anim =>
-        Animated.timing(anim, { toValue: 0, duration: 130, useNativeDriver: true })
-      ),
-    ]).start(() => { setOpen(false); cb?.(); });
-  };
-
-  const fabRotate = fabProgress.interpolate({
-    inputRange: [0, 1], outputRange: ['0deg', '45deg'], extrapolate: 'clamp',
-  });
+  // Per-tab quick actions — a small row of round buttons (replaces the old "+").
+  const ACTIONS: { icon: any; color: string; onPress: () => void }[] =
+    currentIndex === 0 ? [
+      { icon: Briefcase,   color: '#2AC68F',            onPress: () => openWorkPanel() },
+      { icon: Flame,       color: '#F97316',            onPress: () => router.push('/habits' as any) },
+      { icon: Settings,    color: '#8A93A8',            onPress: () => router.push('/settings' as any) },
+    ] : currentIndex === 1 ? [
+      { icon: FileText,    color: '#6C9EFF',            onPress: () => router.push('/notes?new=1' as any) },
+      { icon: CheckSquare, color: colors.tabs.tasks,    onPress: () => router.push('/tasks/add' as any) },
+    ] : currentIndex === 2 ? [
+      { icon: CalendarPlus, color: colors.tabs.calendar, onPress: () => router.push('/calendar/add' as any) },
+    ] : currentIndex === 3 ? [
+      { icon: TrendingDown, color: colors.tabs.finances, onPress: () => router.push('/expenses/add?type=expense' as any) },
+      { icon: TrendingUp,   color: colors.tabs.tasks,    onPress: () => router.push('/expenses/add?type=income' as any) },
+      { icon: ScanLine,     color: colors.accent.blue,   onPress: () => router.push('/expenses/scan' as any) },
+    ] : [];
 
   const badgeColor = overdueCount > 0 ? colors.accent.red
     : todayDueCount > 0 ? colors.accent.amber
@@ -149,38 +98,6 @@ export default function TabBar({ currentIndex }: Props) {
 
   return (
     <>
-      {/* ── Quick actions menu — in-tree overlay (no native Modal, so it
-            opens instantly on Android instead of waiting on a modal window) ── */}
-      {open && (
-        <View style={s.overlayRoot} pointerEvents="box-none">
-          <Animated.View style={[s.backdrop, { opacity: backdropAnim }]}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => closeMenu()} />
-          </Animated.View>
-
-          <View style={[s.quickMenu, { bottom: menuBase + 12 }]}>
-            {menuActions.map((action, i) => {
-              const translateY = itemAnims[i].interpolate({
-                inputRange: [0, 1], outputRange: [20, 0], extrapolate: 'clamp',
-              });
-              return (
-                <Animated.View key={action.label} style={{ opacity: itemAnims[i], transform: [{ translateY }] }}>
-                  <TouchableOpacity
-                    style={s.quickItem}
-                    onPress={() => { haptic.tap(); closeMenu(() => router.push(action.route as any)); }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[s.quickPlus, { backgroundColor: action.color + '22' }]}>
-                      <Plus size={14} color={action.color} strokeWidth={2.8} />
-                    </View>
-                    <Text style={s.quickLabel}>{action.label}</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
       {/* ── Bar ────────────────────────────────────────────────────── */}
       {/* box-none: transparent areas pass touches through to the content
           behind, so only the FAB + pill are interactive and the bar floats. */}
@@ -193,47 +110,21 @@ export default function TabBar({ currentIndex }: Props) {
           style={[s.scrim, { height: (insets.bottom || 0) + 110 }]}
           pointerEvents="none"
         />
-        {/* FAB row — floating above pill, no background */}
+        {/* Per-tab action buttons — floating above the pill, no background */}
         <View style={s.fabRow} pointerEvents="box-none">
-          {/* Secondary: settings button for dashboard tab */}
-          {currentIndex === 0 && (
-            <TouchableOpacity
-              style={[s.sortFab, { borderColor: activeAccent + '50' }]}
-              onPress={() => { haptic.tap(); router.push('/settings' as any); }}
-              activeOpacity={0.85}
-            >
-              <Settings size={18} color={activeAccent} />
-            </TouchableOpacity>
-          )}
-          {/* Secondary: sort button for tasks tab */}
-          {currentIndex === 1 && (
-            <TouchableOpacity
-              style={[s.sortFab, { borderColor: activeAccent + '50' }]}
-              onPress={() => { haptic.tap(); triggerTasksSort(); }}
-              activeOpacity={0.85}
-            >
-              <SlidersHorizontal size={18} color={activeAccent} />
-            </TouchableOpacity>
-          )}
-          {/* Secondary: scan receipt for finances tab */}
-          {currentIndex === 3 && (
-            <TouchableOpacity
-              style={[s.sortFab, { borderColor: activeAccent + '50' }]}
-              onPress={() => { haptic.tap(); router.push('/expenses/scan' as any); }}
-              activeOpacity={0.85}
-            >
-              <ScanLine size={18} color={activeAccent} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[s.fab, { backgroundColor: activeAccent, shadowColor: activeAccent }]}
-            onPress={handleFabPress}
-            activeOpacity={0.85}
-          >
-            <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
-              <Plus size={22} color={isLight ? '#FFFFFF' : colors.bg.primary} strokeWidth={2.8} />
-            </Animated.View>
-          </TouchableOpacity>
+          {ACTIONS.map((a, i) => {
+            const Icon = a.icon;
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[s.actionFab, { borderColor: a.color + '66', backgroundColor: c.bg.elevated }]}
+                onPress={() => { haptic.tap(); a.onPress(); }}
+                activeOpacity={0.85}
+              >
+                <Icon size={21} color={a.color} strokeWidth={2.2} />
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* 4-tab pill — frosted glass with a faint accent hairline */}
@@ -313,23 +204,14 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
     marginBottom: 6,
     gap: 8,
   },
-  fab: {
-    width: FAB_SIZE, height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
-    alignItems: 'center', justifyContent: 'center',
-    elevation: 12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5, shadowRadius: 16,
-  },
-  sortFab: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: c.bg.elevated,
-    borderWidth: 1,
+  actionFab: {
+    width: 46, height: 46, borderRadius: 23,
+    borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3, shadowRadius: 8,
+    shadowOpacity: 0.32, shadowRadius: 9,
   },
 
   scrim: {
