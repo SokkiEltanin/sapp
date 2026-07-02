@@ -262,6 +262,7 @@ const makeDm = (c: any, vp: any) => StyleSheet.create({
 
 export default function CalendarTabScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(58,76,156,0.24)', accent: '#3A4C9C', accentDim: 'rgba(58,76,156,0.18)', muted: 'rgba(58,76,156,0.55)' }), [colors]);
   const styles = useMemo(() => makeStyles(colors, VP), [colors, VP]);
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
@@ -448,7 +449,7 @@ export default function CalendarTabScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 50 }]} edges={[]}>
       <View style={{ flex: 1 }}>
         <ScreenHeader
           title="Kalendarz"

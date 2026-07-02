@@ -4,7 +4,7 @@ import {
   Modal, Pressable, TextInput, KeyboardAvoidingView,
   Platform, ScrollView, RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
@@ -490,6 +490,7 @@ const makeSw = (c: any, g: any) => StyleSheet.create({
 
 export default function TasksScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const G = useMemo(() => gFor(colors), [colors]);
   const s = useMemo(() => makeS(colors, G), [colors, G]);
   const { tasks, isLoading, reload, toggle, remove, update, create, snooze, addSubtask, toggleSubtask } = useTasks();
@@ -529,7 +530,7 @@ export default function TasksScreen() {
   }, [sorted, done, today, sort, doneCollapsed]);
 
   return (
-    <SafeAreaView style={s.root} edges={[]}>
+    <SafeAreaView style={[s.root, { paddingTop: insets.top + 50 }]} edges={[]}>
       <View style={{ flex: 1 }}>
 
         {/* Header — no big tab name, just a live status line */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, X, Award } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -80,6 +80,7 @@ function qualityFromMinutes(min: number): SleepQuality | undefined {
 function ymd(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
 export default function HealthScreen() {
+  const insets = useSafeAreaInsets();
   // Theme-reactive: shadow the module `colors`/`T` so the whole screen (incl. its
   // StyleSheet via makeStyles) flips with light/dark. Teal accent stays both ways.
   const colors = useColors();
@@ -437,7 +438,7 @@ export default function HealthScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 50 }]} edges={[]}>
       <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>

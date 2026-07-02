@@ -8,7 +8,7 @@ import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText, Circle as SvgCircle, Line as SvgLine } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
@@ -584,6 +584,7 @@ export default function DashboardScreen() {
   // ── Stores & hooks ────────────────────────────────────────────────────────
   const pomodoro = usePomodoroStore();
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
+  const insets = useSafeAreaInsets();
   const { expenses, setExpenses } = useExpensesStore();
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
@@ -1839,7 +1840,7 @@ export default function DashboardScreen() {
         end={{ x: 0.6, y: 0.52 }}
       />
 
-      <SafeAreaView style={s.safe} edges={[]}>
+      <SafeAreaView style={[s.safe, { paddingTop: insets.top + 50 }]} edges={[]}>
         <View style={{ flex: 1 }}>
 
           <ScrollView

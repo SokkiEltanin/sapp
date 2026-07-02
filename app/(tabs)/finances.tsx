@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, RefreshControl, SectionList,
   ScrollView, TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
@@ -103,6 +103,7 @@ function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
 }
 
 export default function FinancesScreen() {
+  const insets = useSafeAreaInsets();
   // Theme-reactive: shadow module colors/F so the screen + its StyleSheet flip.
   const colors = useColors();
   const F = useMemo(() => ({
@@ -281,7 +282,7 @@ export default function FinancesScreen() {
   }, [grouped, activeTagFilter, activePayer, activePayment]);
 
   return (
-    <SafeAreaView style={st.root} edges={[]}>
+    <SafeAreaView style={[st.root, { paddingTop: insets.top + 50 }]} edges={[]}>
       <View style={{ flex: 1 }}>
         <ScreenHeader
           title="Finanse"
