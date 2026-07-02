@@ -7,6 +7,7 @@ import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
 import WalkProgress from '@/components/counters/WalkProgress';
+import StreakFlame from '@/components/counters/StreakFlame';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS } from '@/store/countersStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -137,7 +138,10 @@ export default function Counters() {
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
               <View style={s.sinceRow}>
-                <Text style={s.sinceBig}>{n}<Text style={s.sinceUnit}> {n === 1 ? 'dzień' : 'dni'}</Text></Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <StreakFlame days={n} size={42} />
+                  <Text style={s.sinceUnit}>{n === 1 ? 'dzień' : 'dni'}</Text>
+                </View>
                 {!auto && (
                   <TouchableOpacity style={s.doneBtn} onPress={() => { haptic.tap(); resetSince(cn.id); }} activeOpacity={0.8}>
                     <Check size={13} color={ACCENT} /><Text style={[s.doneBtnText, { color: ACCENT }]}>Zrobione dziś</Text>

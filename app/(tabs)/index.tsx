@@ -58,6 +58,7 @@ import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
 import WalkProgress from '@/components/counters/WalkProgress';
+import StreakFlame from '@/components/counters/StreakFlame';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
@@ -2361,7 +2362,7 @@ export default function DashboardScreen() {
                 <View style={s.sinceGrid}>
                   {dashSince.slice(0, 6).map(({ cn, days }) => (
                     <View key={cn.id} style={s.sinceTile}>
-                      <Text style={s.sinceTileDays}>{days}</Text>
+                      <StreakFlame days={days} size={46} />
                       <Text style={s.sinceTileUnit}>{days === 1 ? 'dzień' : 'dni'}</Text>
                       <Text style={s.sinceTileName} numberOfLines={1}>{cn.mode === 'auto' ? `bez ${cn.name}` : cn.name}</Text>
                     </View>
