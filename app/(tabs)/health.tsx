@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, X, Award } from 'lucide-react-native';
@@ -439,21 +439,20 @@ export default function HealthScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top + 50 }]} edges={[]}>
-      <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }} />
+      <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }}
+        rightSlot={
+          <PressableScale onPress={syncHealthConnect} onLongPress={async () => { const s = await probeHealthConnect(); toast.info(`Health Connect: ${s}`); }} disabled={syncing}
+            style={[styles.syncIconBtn, { borderColor: T.accent + '55', opacity: syncing ? 0.5 : 1 }]}>
+            <RefreshCw size={17} color={T.accent} />
+          </PressableScale>
+        }
+      />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={syncing} onRefresh={syncHealthConnect} tintColor={T.accent} colors={[T.accent]} />}>
 
-        {/* Sync from the watch via Health Connect (Samsung Health → Health Connect) */}
-        <PressableScale onPress={syncHealthConnect} onLongPress={async () => { const s = await probeHealthConnect(); toast.info(`Health Connect: ${s}`); }} disabled={syncing}>
-          <View style={styles.syncBtn}>
-            <RefreshCw size={14} color={T.accent} />
-            <Text style={[styles.syncText, { color: T.accent }]}>
-              {syncing ? 'Synchronizuję…' : 'Synchronizuj z zegarka (Health Connect)'}
-            </Text>
-          </View>
-        </PressableScale>
         <PressableScale onPress={async () => { const ok = await openHealthConnect(); if (!ok) toast.error('Nie można otworzyć Health Connect'); }}>
-          <Text style={styles.syncFallback}>Nie działa? Otwórz Health Connect i włącz dostęp dla „Sapp"</Text>
+          <Text style={styles.syncFallback}>Pociągnij w dół, by zsynchronizować z zegarka · nie działa? Otwórz Health Connect</Text>
         </PressableScale>
 
         {/* Today at a glance */}
@@ -1335,6 +1334,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
     backgroundColor: t.accent + '14', borderWidth: 1, borderColor: t.accent + '33',
   },
   syncText: { fontSize: 13, fontWeight: '700' },
+  syncIconBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   hcGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
   hcTile: {
     width: '31%', flexGrow: 1, gap: 3, paddingVertical: spacing[2], paddingHorizontal: spacing[2],
