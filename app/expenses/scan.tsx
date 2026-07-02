@@ -23,6 +23,7 @@ import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { getPayers, addPayer } from '@/utils/payers';
 import * as LucideIcons from 'lucide-react-native';
 
@@ -67,6 +68,7 @@ export default function ScanReceiptModal() {
   const [editedQty, setEditedQty]       = useState<Record<number, string>>({}); // pieces (user-edited)
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [priceMemory, setPriceMemory] = useState<PriceMemory>({});
+  const kb = useKeyboardHeight();
   const [knownNames, setKnownNames] = useState<string[]>([]); // confirmed canonical names (alias values)
   const [dismissedSug, setDismissedSug] = useState<Set<number>>(new Set()); // "to samo?" suggestions the user waved off
   const [tagPickerFor, setTagPickerFor] = useState<number | null>(null);
@@ -434,7 +436,7 @@ export default function ScanReceiptModal() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={{ flex: 1, paddingBottom: Platform.OS === 'android' ? kb : 0 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.header}>
