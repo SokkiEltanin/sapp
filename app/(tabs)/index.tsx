@@ -627,6 +627,7 @@ export default function DashboardScreen() {
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [weatherPanel, setWeatherPanel] = useState(false);
   const [workPanel, setWorkPanel]   = useState(false);
+  const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
   useEffect(() => { if (workPanelTrigger > 0) setWorkPanel(true); }, [workPanelTrigger]);
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
@@ -1346,7 +1347,11 @@ export default function DashboardScreen() {
   };
 
   const renderCustomTile = (t: CustomTile): React.ReactNode => {
-    if (t.type === 'stat') return renderStatTile(t);
+    if (t.type === 'stat') return (
+      <TouchableOpacity activeOpacity={0.9} onPress={() => { haptic.tap(); setStatDetail(t); }}>
+        {renderStatTile(t)}
+      </TouchableOpacity>
+    );
     if (t.type === 'weather') return renderWeatherTile(t);
     if (t.type === 'note') {
       const note = allNotes.find(n => n.id === t.noteId);
@@ -3142,6 +3147,61 @@ export default function DashboardScreen() {
                     {wm.months.map((m, i) => (
                       <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>{m.label}</Text>
                     ))}
+                  </View>
+                </>
+              );
+            })()}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Custom stat widget — multi-month detail */}
+      <Modal visible={!!statDetail} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setStatDetail(null)}>
+        <TouchableOpacity style={s.npOverlay} activeOpacity={1} onPress={() => setStatDetail(null)}>
+          <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
+            {statDetail && (() => {
+              const def = metricById(statDetail.metric);
+              const ser = metricSeries(statDetail.metric!, statCtx, 'month', 6, statDetail.tag);
+              const cur = metricNumber(statDetail.metric!, statCtx, 'month', statDetail.tag);
+              const vals = ser.values;
+              const max = Math.max(...vals, statDetail.target ?? 0, 1);
+              const H = 64;
+              const nz = vals.filter(v => v > 0);
+              const avg = nz.length ? nz.reduce((a, b) => a + b, 0) / nz.length : 0;
+              const peak = Math.max(...vals, 0);
+              const u = ser.unit ? ' ' + ser.unit : '';
+              const fmt = (v: number) => fmtWave(v, ser.unit);
+              return (
+                <>
+                  <View style={s.cardHeader}>
+                    <BarChart2 size={14} color={accentColor} />
+                    <Text style={s.cardTitle} numberOfLines={1}>{statDetail.title || def?.label || 'Widget'}</Text>
+                    <TouchableOpacity onPress={() => setStatDetail(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
+                  </View>
+                  <View style={{ marginTop: spacing[2] }}>
+                    <Text style={s.wpBig}>{fmt(cur.value)}<Text style={s.wpUnit}>{u}</Text></Text>
+                    <Text style={s.wpSub}>ten miesiąc{statDetail.target ? ` · cel ${fmt(statDetail.target)}${u}` : ''}</Text>
+                  </View>
+                  <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
+                  <View style={s.tagHistChart}>
+                    {vals.map((v, i) => {
+                      const h = Math.max(2, (v / max) * H);
+                      const isCur = i === vals.length - 1;
+                      return (
+                        <View key={i} style={s.tagHistCol}>
+                          <Text style={[s.tagHistVal, isCur && { color: accentColor }]}>{v > 0 ? fmt(v) : ''}</Text>
+                          <View style={{ height: H, width: 22, justifyContent: 'flex-end' }}>
+                            {statDetail.target ? <View style={{ position: 'absolute', left: -3, right: -3, bottom: (Math.min(statDetail.target, max) / max) * H, height: 1, backgroundColor: colors.text.muted + '80' }} /> : null}
+                            <View style={{ height: h, borderRadius: 4, backgroundColor: isCur ? accentColor : accentColor + '88' }} />
+                          </View>
+                          <Text style={[s.tagHistLbl, isCur && { color: accentColor, fontWeight: '800' }]}>{ser.labels[i]}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <View style={s.wxChips}>
+                    <View style={s.wxChip}><Text style={s.wxChipK}>Średnia</Text><Text style={s.wxChipV}>{fmt(avg)}{u}</Text></View>
+                    <View style={s.wxChip}><Text style={s.wxChipK}>Rekord</Text><Text style={s.wxChipV}>{fmt(peak)}{u}</Text></View>
                   </View>
                 </>
               );
