@@ -282,51 +282,38 @@ export default function FinancesScreen() {
   }, [grouped, activeTagFilter, activePayer, activePayment]);
 
   return (
-    <SafeAreaView style={[st.root, { paddingTop: insets.top + 50 }]} edges={[]}>
+    <SafeAreaView style={st.root} edges={[]}>
       <View style={{ flex: 1 }}>
-        <ScreenHeader
-          title="Finanse"
-          subtitle={new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}
-          accentColor={colors.tabs.finances}
-          style={{ borderBottomColor: F.cardBorder }}
-          rightSlot={
-            <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-              <PressableScale
-                onPress={() => { haptic.tap(); router.push('/products' as any); }}
-                style={st.hBtn}
-              >
-                <Package size={17} color={colors.text.secondary} />
-              </PressableScale>
-              <PressableScale
-                onPress={() => { haptic.tap(); router.push('/debts' as any); }}
-                style={st.hBtn}
-              >
-                <HandCoins size={17} color={colors.text.secondary} />
-              </PressableScale>
-              <PressableScale
-                onPress={() => { haptic.tap(); router.push('/vehicles' as any); }}
-                style={st.hBtn}
-              >
-                <Car size={17} color={colors.text.secondary} />
-              </PressableScale>
-              <PressableScale
-                onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }}
-                style={st.hBtn}
-              >
-                <RefreshCcw size={17} color={colors.text.secondary} />
-              </PressableScale>
-            </View>
-          }
-        />
-
         <SectionList
           sections={sections}
           keyExtractor={item => item.id}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} />
+            <RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.text.muted} progressViewOffset={insets.top + 50} />
           }
           ListHeaderComponent={
             <>
+              <ScreenHeader
+                title="Finanse"
+                subtitle={new Date().toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}
+                accentColor={colors.tabs.finances}
+                style={{ borderBottomColor: F.cardBorder }}
+                rightSlot={
+                  <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                    <PressableScale onPress={() => { haptic.tap(); router.push('/products' as any); }} style={st.hBtn}>
+                      <Package size={17} color={colors.text.secondary} />
+                    </PressableScale>
+                    <PressableScale onPress={() => { haptic.tap(); router.push('/debts' as any); }} style={st.hBtn}>
+                      <HandCoins size={17} color={colors.text.secondary} />
+                    </PressableScale>
+                    <PressableScale onPress={() => { haptic.tap(); router.push('/vehicles' as any); }} style={st.hBtn}>
+                      <Car size={17} color={colors.text.secondary} />
+                    </PressableScale>
+                    <PressableScale onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }} style={st.hBtn}>
+                      <RefreshCcw size={17} color={colors.text.secondary} />
+                    </PressableScale>
+                  </View>
+                }
+              />
               {/* ── Balance: card is the headline; cash + total are smaller pills ─── */}
               <View style={st.heroMin}>
                 <Text style={st.heroDate}>NA KARCIE</Text>
@@ -536,7 +523,7 @@ export default function FinancesScreen() {
               </View>
             ) : null
           }
-          contentContainerStyle={{ paddingBottom: 200 }}
+          contentContainerStyle={{ paddingTop: insets.top + 50, paddingBottom: 200 }}
           stickySectionHeadersEnabled={false}
         />
 

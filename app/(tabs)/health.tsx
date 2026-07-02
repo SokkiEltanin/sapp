@@ -438,18 +438,21 @@ export default function HealthScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 50 }]} edges={[]}>
-      <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }}
-        rightSlot={
-          <PressableScale onPress={syncHealthConnect} onLongPress={async () => { const s = await probeHealthConnect(); toast.info(`Health Connect: ${s}`); }} disabled={syncing}
-            style={[styles.syncIconBtn, { borderColor: T.accent + '55', opacity: syncing ? 0.5 : 1 }]}>
-            <RefreshCw size={17} color={T.accent} />
-          </PressableScale>
-        }
-      />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <ScrollView showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 50 }]}
+        refreshControl={<RefreshControl refreshing={syncing} onRefresh={syncHealthConnect} tintColor={T.accent} colors={[T.accent]} progressViewOffset={insets.top + 50} />}>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={syncing} onRefresh={syncHealthConnect} tintColor={T.accent} colors={[T.accent]} />}>
+        <View style={{ marginHorizontal: -spacing[4], marginTop: -spacing[4], marginBottom: spacing[2] }}>
+          <ScreenHeader title="Zdrowie" subtitle="Dzisiaj" style={{ borderBottomColor: T.cardBorder }}
+            rightSlot={
+              <PressableScale onPress={syncHealthConnect} onLongPress={async () => { const s = await probeHealthConnect(); toast.info(`Health Connect: ${s}`); }} disabled={syncing}
+                style={[styles.syncIconBtn, { borderColor: T.accent + '55', opacity: syncing ? 0.5 : 1 }]}>
+                <RefreshCw size={17} color={T.accent} />
+              </PressableScale>
+            }
+          />
+        </View>
 
         <PressableScale onPress={async () => { const ok = await openHealthConnect(); if (!ok) toast.error('Nie można otworzyć Health Connect'); }}>
           <Text style={styles.syncFallback}>Pociągnij w dół, by zsynchronizować z zegarka · nie działa? Otwórz Health Connect</Text>

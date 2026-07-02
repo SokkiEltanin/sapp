@@ -52,7 +52,10 @@
       "Bash(grep -nE \"^import.*\\\\bImage\\\\b|, Image,| Image }| Image,|{ Image\" \"app/\\(tabs\\)/index.tsx\")",
       "Bash(sed -n '/export interface Expense/,/^}/p' src/types/index.ts)",
       "Bash(sed -n '/export interface ReceiptItem/,/^}/p' src/types/index.ts)",
-      "Bash(awk 'NR>=624 && /header:/ {print NR\": \"$0}' \"app/\\(tabs\\)/tasks.tsx\")"
+      "Bash(awk 'NR>=624 && /header:/ {print NR\": \"$0}' \"app/\\(tabs\\)/tasks.tsx\")",
+      "Bash(git push *)",
+      "Bash(awk 'NR>=624 && /  list:/ {print NR\": \"$0}' \"app/\\(tabs\\)/tasks.tsx\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

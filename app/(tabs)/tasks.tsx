@@ -530,26 +530,10 @@ export default function TasksScreen() {
   }, [sorted, done, today, sort, doneCollapsed]);
 
   return (
-    <SafeAreaView style={[s.root, { paddingTop: insets.top + 50 }]} edges={[]}>
+    <SafeAreaView style={s.root} edges={[]}>
       <View style={{ flex: 1 }}>
 
-        {/* Header — live status line + tab shortcuts (focus / pomodoro) */}
-        <View style={s.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.subtitle}>
-              {active.length > 0 ? `${active.length} aktywnych` : 'Wszystko ogarnięte'}
-              {overdue > 0 ? ` · ${overdue} po terminie` : ''}
-            </Text>
-          </View>
-          <TouchableOpacity onPress={() => { haptic.tap(); router.push('/focus' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
-            <Activity size={18} color={colors.tabs.tasks} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => { haptic.tap(); router.push('/pomodoro' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
-            <Timer size={18} color={colors.tabs.tasks} />
-          </TouchableOpacity>
-        </View>
-
-        {/* List */}
+        {/* List — the header scrolls with it (under the floating pill) */}
         <FlatList
           data={listData as any[]}
           keyExtractor={(item: ListItem) => {
@@ -594,9 +578,27 @@ export default function TasksScreen() {
               />
             );
           }}
-          contentContainerStyle={s.list}
+          contentContainerStyle={[s.list, { paddingTop: insets.top + 50 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={G.accent} />}
+          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={G.accent} progressViewOffset={insets.top + 50} />}
+          ListHeaderComponent={
+            <View style={{ marginHorizontal: -spacing[4], marginBottom: spacing[2] }}>
+              <View style={s.header}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.subtitle}>
+                    {active.length > 0 ? `${active.length} aktywnych` : 'Wszystko ogarnięte'}
+                    {overdue > 0 ? ` · ${overdue} po terminie` : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => { haptic.tap(); router.push('/focus' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                  <Activity size={18} color={colors.tabs.tasks} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { haptic.tap(); router.push('/pomodoro' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                  <Timer size={18} color={colors.tabs.tasks} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          }
           ListEmptyComponent={
             <View style={s.empty}>
               <Text style={s.emptyTitle}>Brak zadań</Text>

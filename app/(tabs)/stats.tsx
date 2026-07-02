@@ -449,34 +449,33 @@ export default function CalendarTabScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top + 50 }]} edges={[]}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <View style={{ flex: 1 }}>
-        <ScreenHeader
-          title="Kalendarz"
-          subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
-          style={{ borderBottomColor: VP.cardBorder }}
-          rightSlot={
-            <View style={styles.headerRight}>
-              <PressableScale onPress={goToday} style={styles.todayBtn}>
-                <Text style={styles.todayBtnText}>Dziś</Text>
-              </PressableScale>
-              {gcalAvailable && (
-                <PressableScale onPress={syncGcal} style={styles.iconBtn}>
-                  <RefreshCw size={14} color={gcalSyncing ? colors.text.muted : colors.accent.blue} />
-                </PressableScale>
-              )}
-              <PressableScale onPress={() => router.push('/calendar/add')} style={styles.iconBtn}>
-                <Plus size={16} color={colors.text.primary} />
-              </PressableScale>
-            </View>
-          }
-        />
-
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} />}
-          contentContainerStyle={{ paddingBottom: 180 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.text.muted} progressViewOffset={insets.top + 50} />}
+          contentContainerStyle={{ paddingTop: insets.top + 50, paddingBottom: 180 }}
         >
+          <ScreenHeader
+            title="Kalendarz"
+            subtitle={isToday ? 'Dzisiaj' : fmtDay(selectedDate)}
+            style={{ borderBottomColor: VP.cardBorder }}
+            rightSlot={
+              <View style={styles.headerRight}>
+                <PressableScale onPress={goToday} style={styles.todayBtn}>
+                  <Text style={styles.todayBtnText}>Dziś</Text>
+                </PressableScale>
+                {gcalAvailable && (
+                  <PressableScale onPress={syncGcal} style={styles.iconBtn}>
+                    <RefreshCw size={14} color={gcalSyncing ? colors.text.muted : colors.accent.blue} />
+                  </PressableScale>
+                )}
+                <PressableScale onPress={() => router.push('/calendar/add')} style={styles.iconBtn}>
+                  <Plus size={16} color={colors.text.primary} />
+                </PressableScale>
+              </View>
+            }
+          />
           {/* ── Calendar area with gesture ── */}
           <View {...calGesturePR.panHandlers}>
             <View style={styles.monthNav}>
