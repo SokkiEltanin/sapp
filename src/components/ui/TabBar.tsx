@@ -243,8 +243,8 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
   },
   island: {
     position: 'absolute',
-    left: 8, top: 3, bottom: 3,
-    borderRadius: 18,
+    left: 8, top: 4, bottom: 4,
+    borderRadius: 999,   // full capsule → matches the rounded pill (was a boxy 18)
     borderWidth: 1,
   },
   iconWrap: { position: 'relative', zIndex: 1 },
