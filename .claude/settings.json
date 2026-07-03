@@ -59,7 +59,8 @@
       "Bash(grep -nE \"\\\\{/\\\\* Work panel \\\\*/\\\\}\" \"app/\\(tabs\\)/index.tsx\")",
       "Bash(cp assets/LOGOPNG.png assets/icon.png)",
       "Bash(cp assets/LOGOPNG.png assets/adaptive-icon.png)",
-      "Bash(cp assets/LOGOPNG.png assets/splash-icon.png)"
+      "Bash(cp assets/LOGOPNG.png assets/splash-icon.png)",
+      "Bash(echo \"pushed exit=$?\")"
     ]
   }
 }

@@ -57,6 +57,7 @@ import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/util
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
+import { useBankQueue } from '@/store/bankQueueStore';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame from '@/components/counters/StreakFlame';
 import { vehiclesService } from '@/services/vehiclesService';
@@ -631,6 +632,7 @@ export default function DashboardScreen() {
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
   useEffect(() => { if (workPanelTrigger > 0) setWorkPanel(true); }, [workPanelTrigger]);
+  const bankPendingCount = useBankQueue(st => st.pending.length);
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
   const [tagModal, setTagModal]     = useState<any>(null);  // open tag-limit's item list
@@ -2348,6 +2350,20 @@ export default function DashboardScreen() {
                   })}
                 </View>
               </View>
+            );
+
+            nodes['bank-queue'] = bankPendingCount > 0 && (
+              <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.85}
+                onPress={() => { haptic.tap(); router.push('/bank-review' as any); }}>
+                <View style={s.cardHeader}>
+                  <Wallet size={13} color={colors.accent.green} />
+                  <Text style={s.cardTitle}>Płatności z banku</Text>
+                  <View style={{ marginLeft: 'auto', backgroundColor: colors.accent.green, borderRadius: 999, minWidth: 22, paddingHorizontal: 6, paddingVertical: 2, alignItems: 'center' }}>
+                    <Text style={{ color: colors.bg.primary, fontWeight: '800', fontSize: 12 }}>{bankPendingCount}</Text>
+                  </View>
+                </View>
+                <Text style={[s.factText, { marginTop: spacing[1] }]}>{bankPendingCount === 1 ? '1 płatność do zatwierdzenia' : `${bankPendingCount} płatności do zatwierdzenia`} · stuknij</Text>
+              </TouchableOpacity>
             );
 
             nodes['counters-since'] = dashSince.length > 0 && (

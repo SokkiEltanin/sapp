@@ -44,6 +44,8 @@ import { useWorkStore } from '@/store/workStore';
 import { useDashboardLayout } from '@/store/dashboardLayout';
 import { useHeroFont, HERO_FONTS } from '@/store/heroFont';
 import { useUiPrefs } from '@/store/uiPrefs';
+import { useBankQueue } from '@/store/bankQueueStore';
+import { ingestBankNotification } from '@/services/bankIngest';
 import { workService } from '@/services/workService';
 
 GoogleSignin.configure({
@@ -88,6 +90,10 @@ export default function SettingsScreen() {
   const themeMode = useThemeStore(s => s.mode);
   const tabSlide = useUiPrefs(s => s.tabSlide);
   const setTabSlide = useUiPrefs(s => s.setTabSlide);
+  const bankEnabled = useBankQueue(s => s.enabled);
+  const setBankEnabled = useBankQueue(s => s.setEnabled);
+  const bankPending = useBankQueue(s => s.pending.length);
+  const [bankTest, setBankTest] = useState('');
   const setThemeMode = useThemeStore(s => s.setMode);
   const heroFontId = useHeroFont(s => s.fontId);
   const setHeroFont = useHeroFont(s => s.setFont);
@@ -1362,6 +1368,34 @@ export default function SettingsScreen() {
               </View>
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
+          </View>
+        </View>
+
+        {/* Bank auto-expenses */}
+        <View>
+          <Text style={styles.sectionTitle}>Auto-wydatki z banku (PeoPay)</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                <LucideIcons.Landmark size={16} color="#2AC68F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>Czytaj powiadomienia o płatności</Text>
+                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Powiadomienie z banku → wydatek do zatwierdzenia{bankPending > 0 ? ` · ${bankPending} czeka` : ''}</Text>
+              </View>
+              <Switch value={bankEnabled} onValueChange={setBankEnabled} trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }} thumbColor={bankEnabled ? '#2AC68F' : colors.text.muted} />
+            </View>
+            {bankEnabled && (
+              <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
+                <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400' }]}>Test odczytu — wklej treść powiadomienia z banku:</Text>
+                <TextInput value={bankTest} onChangeText={setBankTest} multiline placeholder="Zapłacono kwotę 10,18 PLN karta *8743 dnia 03-07-2026 godz. 06:37:30 w LIDL…" placeholderTextColor={colors.text.muted}
+                  style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: colors.border.default, padding: 10, color: colors.text.primary, minHeight: 70, fontSize: 13 }} />
+                <PressableScale onPress={async () => { const ok = await ingestBankNotification('', bankTest); if (ok) { toast.success('Rozpoznano — zobacz „Płatności z banku" na dashboardzie'); setBankTest(''); } else { toast.error('Nie rozpoznano płatności w tym tekście'); } }}
+                  style={{ backgroundColor: '#2AC68F', borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
+                  <Text style={{ color: colors.bg.primary, fontWeight: '800' }}>Przetestuj odczyt</Text>
+                </PressableScale>
+              </View>
+            )}
           </View>
         </View>
 

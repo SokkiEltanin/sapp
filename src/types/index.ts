@@ -51,6 +51,7 @@ export interface Expense {
   storeName?: string;       // for receipt expenses
   receiptItems?: ReceiptItem[];  // products when saved as single receipt
   payer?: string;           // who paid (e.g. "Ja", "Partnerka") — counts in totals, lets you split by person
+  bankMatched?: boolean;    // confirmed against / created from a bank notification
   vehicleId?: string;       // manual link to a vehicle (Pojazdy) — overrides tag/category auto-match
   paymentMethod?: PaymentMethod; // cash vs card; undefined treated as 'card'
   createdAt: string;
