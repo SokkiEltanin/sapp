@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Modal, Alert,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
-  TextInput, KeyboardAvoidingView, Platform, Image,
+  TextInput, KeyboardAvoidingView, Platform, Image, Pressable,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -3134,8 +3134,9 @@ export default function DashboardScreen() {
 
       {/* Work panel */}
       <Modal visible={workPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWorkPanel(false)}>
-        <TouchableOpacity style={s.npOverlay} activeOpacity={1} onPress={() => setWorkPanel(false)}>
-          <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
+        <View style={s.npOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setWorkPanel(false)} />
+          <View style={[s.card, { backgroundColor: colors.bg.card }]}>
             <View style={s.cardHeader}>
               <Briefcase size={14} color={accentColor} />
               <Text style={s.cardTitle}>Praca</Text>
@@ -3201,8 +3202,8 @@ export default function DashboardScreen() {
                 </ScrollView>
               );
             })()}
-          </TouchableOpacity>
-        </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* Custom stat widget — multi-month detail */}
