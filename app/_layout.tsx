@@ -18,6 +18,7 @@ import BadgeCelebration from '@/components/achievements/BadgeCelebration';
 import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
+import { autoSyncHealth } from '@/services/healthAutoSync';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 
@@ -161,6 +162,18 @@ export default function RootLayout() {
     });
     return () => { clearTimeout(t); sub.remove(); };
   }, [authReady]);
+
+  // Background-ish health sync: pull the watch's recent history into the per-day
+  // cache on cold start + every time the app returns to the foreground, so the
+  // dashboard / achievements / calories stay current even on days the Zdrowie
+  // screen was never opened. Silent + throttled (10 min) inside autoSyncHealth.
+  useEffect(() => {
+    const t = setTimeout(() => { autoSyncHealth().catch(() => {}); }, 3000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') autoSyncHealth().catch(() => {});
+    });
+    return () => { clearTimeout(t); sub.remove(); };
+  }, []);
 
   // After signing into a pre-existing Google account (e.g. on a fresh install),
   // offer to restore that account's latest cloud backup so local config/data come

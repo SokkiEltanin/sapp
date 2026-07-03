@@ -21,6 +21,7 @@ import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
+import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
@@ -428,6 +429,7 @@ export default function HealthScreen() {
           hydrationMl: d.hydrationMl,
         }));
         setFromWatch(true);
+        autoSyncHealth(30, true).catch(() => {}); // backfill the per-day cache now so the dashboard is fresh too
         haptic.success();
         toast.success('Zsynchronizowano z zegarka');
       } else {
