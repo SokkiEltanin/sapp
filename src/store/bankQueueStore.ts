@@ -7,7 +7,9 @@ import { ExpenseCategory } from '@/types';
 // A parsed bank payment waiting for the user to confirm (accept / fix / reject).
 export interface PendingBankTx extends ParsedBankTx {
   id: string;
-  category: ExpenseCategory; // best guess (learned or dictionary)
+  category: ExpenseCategory;      // current (possibly user-edited) category
+  suggestedCategory: ExpenseCategory; // what the reader guessed — to detect a correction
+  auto?: boolean;                // trusted merchant → auto-accept on next app open
   addedAt: number;
 }
 

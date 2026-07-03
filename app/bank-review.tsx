@@ -1,15 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { ChevronLeft, Check, X, Landmark } from 'lucide-react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { ChevronLeft, Check, X, Landmark, Zap, Sparkles } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useBankQueue, PendingBankTx } from '@/store/bankQueueStore';
-import { useExpensesStore } from '@/store/expensesStore';
-import { expensesService } from '@/services/expensesService';
-import { findMatchingExpense } from '@/utils/bankNotification';
-import { saveMerchant } from '@/utils/merchantMemory';
+import { commitBankTx } from '@/services/bankCommit';
+import { loadMerchantMemory, setMerchantAuto, AUTO_THRESHOLD, MerchantMemory } from '@/utils/merchantMemory';
 import { ExpenseCategory } from '@/types';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -26,34 +24,42 @@ export default function BankReview() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { pending, update, remove } = useBankQueue();
-  const { addExpense, updateExpense } = useExpensesStore();
+  const [mem, setMem] = useState<MerchantMemory>({});
+  const reloadMem = useCallback(() => { loadMerchantMemory().then(setMem).catch(() => {}); }, []);
+  useFocusEffect(reloadMem);
 
   const accept = async (p: PendingBankTx) => {
     haptic.success();
-    const expenses = useExpensesStore.getState().expenses;
-    const match = findMatchingExpense(p, expenses);
-    if (match) {
-      updateExpense(match.id, { bankMatched: true });
-      expensesService.update(match.id, { bankMatched: true }).catch(() => {});
-      toast.success(`Dopasowano do paragonu: ${match.storeName ?? p.store}`);
+    const corrected = p.category !== p.suggestedCategory; // reader guessed wrong → don't reward trust
+    const res = await commitBankTx(p, { corrected });
+    if (!res.ok) { toast.error('Nie udało się dodać'); return; }
+    if (res.matched) {
+      toast.success(`Dopasowano do paragonu: ${p.store || 'płatność'}`);
+    } else if (res.merchant?.auto && (res.merchant.cleanAccepts ?? 0) === AUTO_THRESHOLD) {
+      toast.success(`${p.store || 'Sklep'} przechodzi na automat — kolejne płatności dodam sam`);
+    } else if (!corrected && res.merchant) {
+      const left = Math.max(0, AUTO_THRESHOLD - (res.merchant.cleanAccepts ?? 0));
+      toast.success(left > 0 ? `Dodano · jeszcze ${left} do automatu` : `Dodano: ${p.amount.toFixed(2)} zł`);
     } else {
-      try {
-        const exp = await expensesService.add({
-          type: 'expense', amount: p.amount, currency: 'PLN', category: p.category,
-          tags: [], note: p.store || 'Płatność', date: p.dateISO,
-          ...(p.store ? { storeName: p.store } : {}),
-          paymentMethod: p.method === 'cash' ? 'cash' : 'card', bankMatched: true,
-        });
-        addExpense(exp);
-        toast.success(`Dodano: ${p.amount.toFixed(2)} zł · ${p.store || 'płatność'}`);
-      } catch { toast.error('Nie udało się dodać'); return; }
+      toast.success(`Dodano: ${p.amount.toFixed(2)} zł · ${p.store || 'płatność'}`);
     }
-    // Learn: this merchant → this category (+ cleaned name) for next time.
-    saveMerchant(p.storeKey, { category: p.category, name: p.store }).catch(() => {});
+    reloadMem();
     remove(p.id);
   };
 
   const reject = (p: PendingBankTx) => { haptic.tap(); remove(p.id); };
+
+  const revoke = (storeKey: string, name?: string) => {
+    haptic.tap();
+    setMerchantAuto(storeKey, false).then(reloadMem).catch(() => {});
+    toast.info(`${name || 'Sklep'} wróci do ręcznej akceptacji`);
+  };
+
+  // Shops that graduated to autopilot — shown so the user can revoke trust.
+  const autoMerchants = useMemo(
+    () => Object.entries(mem).filter(([, v]) => v.auto).map(([k, v]) => ({ key: k, name: v.name || k })),
+    [mem],
+  );
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -74,6 +80,8 @@ export default function BankReview() {
         )}
         {pending.map(p => {
           const d = new Date(p.dateISO);
+          const info = mem[p.storeKey];
+          const accepts = info?.cleanAccepts ?? 0;
           return (
             <View key={p.id} style={s.card}>
               <View style={s.cardTop}>
@@ -94,6 +102,20 @@ export default function BankReview() {
                   );
                 })}
               </View>
+              {info?.auto ? (
+                <View style={s.trustRow}>
+                  <Zap size={13} color="#2AC68F" />
+                  <Text style={s.trustAuto}>Sklep na automacie — kolejne dodam sam</Text>
+                </View>
+              ) : (
+                <View style={s.trustRow}>
+                  <Sparkles size={13} color={c.text.muted} />
+                  <Text style={s.trustText}>Zaufanie {accepts}/{AUTO_THRESHOLD} → automat</Text>
+                  <View style={s.trustBar}>
+                    <View style={[s.trustFill, { width: `${Math.min(100, (accepts / AUTO_THRESHOLD) * 100)}%` }]} />
+                  </View>
+                </View>
+              )}
               <View style={s.actions}>
                 <TouchableOpacity style={[s.actBtn, s.rejectBtn]} onPress={() => reject(p)} activeOpacity={0.85}>
                   <X size={16} color={c.accent.red} /><Text style={[s.actText, { color: c.accent.red }]}>Odrzuć</Text>
@@ -105,6 +127,24 @@ export default function BankReview() {
             </View>
           );
         })}
+
+        {autoMerchants.length > 0 && (
+          <View style={s.trusted}>
+            <View style={s.trustedHead}>
+              <Zap size={16} color="#2AC68F" />
+              <Text style={s.trustedTitle}>Zaufane sklepy (automat)</Text>
+            </View>
+            <Text style={s.trustedSub}>Płatności z tych sklepów dodaję automatycznie. Stuknij ×, by wrócić do ręcznej akceptacji.</Text>
+            {autoMerchants.map(m => (
+              <View key={m.key} style={s.trustedRow}>
+                <Text style={s.trustedName} numberOfLines={1}>{m.name}</Text>
+                <TouchableOpacity onPress={() => revoke(m.key, m.name)} style={s.trustedRevoke} activeOpacity={0.8} hitSlop={8}>
+                  <X size={15} color={c.text.muted} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
@@ -128,6 +168,18 @@ const makeS = (c: any) => StyleSheet.create({
   catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   catChip: { paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
   catText: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },
+  trustRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[3] },
+  trustText: { fontSize: 11.5, fontWeight: '700', color: c.text.muted },
+  trustAuto: { fontSize: 11.5, fontWeight: '800', color: '#2AC68F' },
+  trustBar: { flex: 1, height: 5, borderRadius: 3, backgroundColor: c.border.default, overflow: 'hidden', marginLeft: 4 },
+  trustFill: { height: '100%', borderRadius: 3, backgroundColor: '#2AC68F' },
+  trusted: { marginTop: spacing[4], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4] },
+  trustedHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  trustedTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  trustedSub: { fontSize: 12, color: c.text.muted, lineHeight: 17, marginTop: spacing[1], marginBottom: spacing[2] },
+  trustedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, borderTopWidth: 1, borderTopColor: c.border.default },
+  trustedName: { flex: 1, fontSize: 14, fontWeight: '600', color: c.text.secondary },
+  trustedRevoke: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, backgroundColor: c.bg.primary },
   actions: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[4] },
   actBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.lg },
   rejectBtn: { borderWidth: 1, borderColor: c.accent.red + '55', backgroundColor: c.accent.red + '12' },

@@ -58,6 +58,7 @@ import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
 import { useBankQueue } from '@/store/bankQueueStore';
+import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame from '@/components/counters/StreakFlame';
 import { vehiclesService } from '@/services/vehiclesService';
@@ -632,7 +633,8 @@ export default function DashboardScreen() {
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
   useEffect(() => { if (workPanelTrigger > 0) setWorkPanel(true); }, [workPanelTrigger]);
-  const bankPendingCount = useBankQueue(st => st.pending.length);
+  const bankPendingCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 0 : 1), 0)); // manual review only
+  const bankAutoCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 1 : 0), 0));
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
   const [payers, setPayers]         = useState<string[]>(['Ja', 'Partnerka']);
   const [tagModal, setTagModal]     = useState<any>(null);  // open tag-limit's item list
@@ -974,6 +976,12 @@ export default function DashboardScreen() {
     const sub = AppState.addEventListener('change', s => setAppActive(s === 'active'));
     return () => sub.remove();
   }, []);
+  // Auto-accept queued payments from trusted (auto) merchants once expenses are
+  // loaded (so receipt-matching is reliable). Re-runs when the app comes back to
+  // the foreground — the native listener may have queued new ones while away.
+  useEffect(() => {
+    if (appActive && expenses.length > 0 && bankAutoCount > 0) processAutoBankQueue().catch(() => {});
+  }, [appActive, expenses.length, bankAutoCount]);
   // Respect the OS "reduce motion" accessibility setting — static hero when on.
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {

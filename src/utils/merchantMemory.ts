@@ -5,27 +5,90 @@ import { ExpenseCategory } from '@/types';
 // the category (and a cleaned display name) the user confirmed, so the next payment
 // from the same shop is auto-categorised correctly. This is how the reader "gets
 // better" every time you fix one.
+//
+// It also earns TRUST gradually: every time you accept a payment for a shop WITHOUT
+// changing its category, a clean-accept counter goes up; after AUTO_THRESHOLD clean
+// accepts the shop graduates to `auto` and its future payments are logged for you
+// automatically (still matched to receipts, still visible/undoable). Any correction
+// resets the counter and drops it back to manual review — it has to re-earn trust.
 const KEY = 'merchant_memory_v1';
 
-export interface MerchantInfo { category: ExpenseCategory; name?: string }
+export const AUTO_THRESHOLD = 5; // clean accepts before a merchant goes on autopilot
+
+export interface MerchantInfo {
+  category: ExpenseCategory;
+  name?: string;
+  cleanAccepts?: number; // consecutive accepts where the suggested category was kept
+  auto?: boolean;        // graduated → log automatically without manual review
+}
 export type MerchantMemory = Record<string, MerchantInfo>; // storeKey (lowercased) → info
+
+const norm = (k: string) => k.trim().toLowerCase();
 
 export async function loadMerchantMemory(): Promise<MerchantMemory> {
   try { const raw = await AsyncStorage.getItem(KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
 }
 
+async function writeMemory(mem: MerchantMemory): Promise<void> {
+  try { await AsyncStorage.setItem(KEY, JSON.stringify(mem)); } catch {}
+}
+
+// Save/refresh a merchant's category + name WITHOUT touching its trust counters.
 export async function saveMerchant(storeKey: string, info: MerchantInfo): Promise<void> {
-  const key = storeKey.trim().toLowerCase();
+  const key = norm(storeKey);
   if (!key) return;
-  try {
-    const mem = await loadMerchantMemory();
-    mem[key] = { category: info.category, ...(info.name ? { name: info.name } : {}) };
-    await AsyncStorage.setItem(KEY, JSON.stringify(mem));
-  } catch {}
+  const mem = await loadMerchantMemory();
+  const prev = mem[key] ?? { category: info.category };
+  mem[key] = { ...prev, category: info.category, ...(info.name ? { name: info.name } : {}) };
+  await writeMemory(mem);
+}
+
+// Record one accepted payment and advance (or reset) the merchant's trust. Returns
+// the updated info so the caller can tell the user "3/5" or "just went automatic".
+export async function recordMerchantAccept(
+  storeKey: string,
+  opts: { category: ExpenseCategory; name?: string; corrected: boolean },
+): Promise<MerchantInfo | undefined> {
+  const key = norm(storeKey);
+  if (!key) return undefined;
+  const mem = await loadMerchantMemory();
+  const prev = mem[key] ?? { category: opts.category };
+  const next: MerchantInfo = {
+    ...prev,
+    category: opts.category,
+    ...(opts.name ? { name: opts.name } : {}),
+  };
+  if (opts.corrected) {
+    // the reader was wrong → back to square one, needs supervision again
+    next.cleanAccepts = 0;
+    next.auto = false;
+  } else {
+    next.cleanAccepts = (prev.cleanAccepts ?? 0) + 1;
+    if (next.cleanAccepts >= AUTO_THRESHOLD) next.auto = true;
+  }
+  mem[key] = next;
+  await writeMemory(mem);
+  return next;
 }
 
 export function merchantFor(storeKey: string, mem: MerchantMemory): MerchantInfo | undefined {
-  return mem[storeKey.trim().toLowerCase()];
+  return mem[norm(storeKey)];
+}
+
+// Is this shop trusted enough to log automatically? (async form for headless ingest)
+export async function merchantIsAuto(storeKey: string): Promise<boolean> {
+  const mem = await loadMerchantMemory();
+  return !!merchantFor(storeKey, mem)?.auto;
+}
+
+// Manual override — revoke (or grant) a shop's autopilot from the UI.
+export async function setMerchantAuto(storeKey: string, auto: boolean): Promise<void> {
+  const key = norm(storeKey);
+  const mem = await loadMerchantMemory();
+  const prev = mem[key];
+  if (!prev) return;
+  mem[key] = { ...prev, auto, ...(auto ? {} : { cleanAccepts: 0 }) };
+  await writeMemory(mem);
 }
 
 // First guess for a store's category before anything is learned — a small built-in
