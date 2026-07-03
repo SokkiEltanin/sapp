@@ -71,6 +71,7 @@
       ],
       "react-native-health-connect",
       "./plugins/withHealthConnectQueries",
+      "./plugins/withAppShortcuts",
       [
         "expo-build-properties",
         {

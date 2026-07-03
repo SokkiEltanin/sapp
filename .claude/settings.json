@@ -60,7 +60,10 @@
       "Bash(cp assets/LOGOPNG.png assets/icon.png)",
       "Bash(cp assets/LOGOPNG.png assets/adaptive-icon.png)",
       "Bash(cp assets/LOGOPNG.png assets/splash-icon.png)",
-      "Bash(echo \"pushed exit=$?\")"
+      "Bash(echo \"pushed exit=$?\")",
+      "Bash(node -e \"const a=require\\('./app.json'\\); console.log\\(JSON.stringify\\(a.expo.plugins,null,1\\)\\); console.log\\('scheme:', a.expo.scheme\\); console.log\\('package:', a.expo.android&&a.expo.android.package\\);\")",
+      "Bash(npx expo *)",
+      "Bash(echo \"PREBUILD_EXIT: $?\")"
     ]
   }
 }
