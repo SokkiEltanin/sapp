@@ -19,6 +19,7 @@ import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
 import { autoSyncHealth } from '@/services/healthAutoSync';
+import { drainBankNotifications } from '@/services/bankNotificationDrain';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 
@@ -171,6 +172,17 @@ export default function RootLayout() {
     const t = setTimeout(() => { autoSyncHealth().catch(() => {}); }, 3000);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') autoSyncHealth().catch(() => {});
+    });
+    return () => { clearTimeout(t); sub.remove(); };
+  }, []);
+
+  // Drain bank notifications captured by the native listener while the app was
+  // closed/backgrounded, on cold start + every foreground. Enqueued items are then
+  // auto-accepted (trusted merchants) or shown for review by the dashboard.
+  useEffect(() => {
+    const t = setTimeout(() => { drainBankNotifications().catch(() => {}); }, 1500);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') drainBankNotifications().catch(() => {});
     });
     return () => { clearTimeout(t); sub.remove(); };
   }, []);

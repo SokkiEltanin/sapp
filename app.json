@@ -72,6 +72,7 @@
       "react-native-health-connect",
       "./plugins/withHealthConnectQueries",
       "./plugins/withAppShortcuts",
+      "./plugins/withBankNotificationListener",
       [
         "expo-build-properties",
         {

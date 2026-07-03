@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset, getCashOffset, setCashOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -1385,6 +1385,16 @@ export default function SettingsScreen() {
               </View>
               <Switch value={bankEnabled} onValueChange={setBankEnabled} trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }} thumbColor={bankEnabled ? '#2AC68F' : colors.text.muted} />
             </View>
+            {bankEnabled && Platform.OS === 'android' && (
+              <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: 6 }]}>
+                <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400' }]}>Aby łapać płatności automatycznie, włącz Sapp w „Dostęp do powiadomień" (raz).</Text>
+                <PressableScale
+                  onPress={() => { Linking.sendIntent('android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS').catch(() => { toast.error('Nie udało się otworzyć ustawień — znajdź „Dostęp do powiadomień" ręcznie'); }); }}
+                  style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: '#2AC68F55', paddingVertical: 11, alignItems: 'center' }}>
+                  <Text style={{ color: '#2AC68F', fontWeight: '800' }}>Otwórz dostęp do powiadomień</Text>
+                </PressableScale>
+              </View>
+            )}
             {bankEnabled && (
               <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: 8 }]}>
                 <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400' }]}>Test odczytu — wklej treść powiadomienia z banku:</Text>
