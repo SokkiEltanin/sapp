@@ -56,7 +56,10 @@
       "Bash(git push *)",
       "Bash(awk 'NR>=624 && /  list:/ {print NR\": \"$0}' \"app/\\(tabs\\)/tasks.tsx\")",
       "Bash(npx tsc *)",
-      "Bash(grep -nE \"\\\\{/\\\\* Work panel \\\\*/\\\\}\" \"app/\\(tabs\\)/index.tsx\")"
+      "Bash(grep -nE \"\\\\{/\\\\* Work panel \\\\*/\\\\}\" \"app/\\(tabs\\)/index.tsx\")",
+      "Bash(cp assets/LOGOPNG.png assets/icon.png)",
+      "Bash(cp assets/LOGOPNG.png assets/adaptive-icon.png)",
+      "Bash(cp assets/LOGOPNG.png assets/splash-icon.png)"
     ]
   }
 }
