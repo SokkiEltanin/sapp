@@ -26,6 +26,8 @@ import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
 import { getBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
+import { categorize, getFoodTags } from '@/utils/receiptParser';
+import { loadProductMemory, applyProductMemory, loadTagMemory, applyTagMemory, getTagFrequency, saveProductCategories, saveTagMemory } from '@/utils/productMemory';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -51,6 +53,14 @@ export default function AddExpenseModal() {
   const [incCat, setIncCat] = useState<IncomeCategory>((prefillCategory as IncomeCategory) ?? 'salary');
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState('');
+  // Live suggestions from the description: category auto-picks itself (until the
+  // user overrides), and relevant tags jump to the front of the tag row.
+  const [prodMem, setProdMem] = useState<Record<string, any>>({});
+  const [tagMem, setTagMem] = useState<Record<string, string[]>>({});
+  const [tagFreq, setTagFreq] = useState<Record<string, number>>({});
+  const [sugCat, setSugCat] = useState<ExpenseCategory | null>(null);
+  const [sugTags, setSugTags] = useState<string[]>([]);
+  const [catTouched, setCatTouched] = useState<boolean>(!!prefillCategory);
   const [saving, setSaving] = useState(false);
   const [budgets, setBudgets] = useState<MonthlyBudgets>({});
   const [payers, setPayers] = useState<string[]>([]);
@@ -86,6 +96,7 @@ export default function AddExpenseModal() {
     return () => task.cancel();
   }, []);
 
+  useEffect(() => { loadProductMemory().then(setProdMem).catch(() => {}); loadTagMemory().then(setTagMem).catch(() => {}); getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
   useEffect(() => { vehiclesService.getAll().then(setVehicles).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
@@ -106,6 +117,38 @@ export default function AddExpenseModal() {
     ? accountBalance + (isIncome ? amtNum : -amtNum)
     : null;
   const quickTags = isIncome ? INCOME_TAGS : EXPENSE_TAGS;
+
+  // Recompute suggestions whenever the description changes.
+  useEffect(() => {
+    let cancelled = false;
+    const n = note.trim();
+    if (!n) { setSugCat(null); setSugTags([]); return; }
+    (async () => {
+      const [catMap, tagMap] = await Promise.all([
+        applyProductMemory([{ name: n }], prodMem),
+        applyTagMemory([{ name: n }], tagMem),
+      ]);
+      if (cancelled) return;
+      setSugCat((catMap[0] as ExpenseCategory) ?? categorize(n));
+      const lower = n.toLowerCase();
+      const learned = tagMap[0] ?? [];
+      const food = getFoodTags(n);
+      const byTitle = Object.keys(tagFreq).filter(t => t.length > 2 && lower.includes(t.toLowerCase()));
+      setSugTags(Array.from(new Set([...learned, ...food, ...byTitle])));
+    })();
+    return () => { cancelled = true; };
+  }, [note, prodMem, tagMem, tagFreq]);
+
+  // Auto-apply the suggested category for expenses until the user picks one by hand.
+  useEffect(() => {
+    if (!isIncome && !catTouched && sugCat && note.trim()) setExpCat(sugCat);
+  }, [sugCat, isIncome, catTouched, note]);
+
+  // Suggested tags first (highlighted), then the usual quick tags — deduped.
+  const displayTags = useMemo(
+    () => Array.from(new Set([...sugTags.filter(t => !tags.includes(t)), ...quickTags])),
+    [sugTags, quickTags, tags],
+  );
 
   const nowM = new Date().toISOString().slice(0, 7);
   const monthSpendByCat = expenses
@@ -173,6 +216,14 @@ export default function AddExpenseModal() {
         paymentMethod,
         vehicleId: !isIncome ? (vehicleId || undefined) : undefined,
       });
+      // Learn from this manual entry so the description suggests better next time.
+      if (txType === 'expense') {
+        const nm = note.trim();
+        if (nm.length >= 2) {
+          saveProductCategories([{ name: nm }], { 0: expCat }, {}).catch(() => {});
+          if (tags.length) saveTagMemory([{ name: nm }], { 0: tags }).catch(() => {});
+        }
+      }
       haptic.success();
       router.back();
       InteractionManager.runAfterInteractions(async () => {
@@ -359,7 +410,12 @@ export default function AddExpenseModal() {
 
           {/* Category */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Kategoria</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}>Kategoria</Text>
+              {!isIncome && !catTouched && sugCat && note.trim().length > 0 && (
+                <Text style={styles.autoHint}>✦ auto wg opisu</Text>
+              )}
+            </View>
             <View style={styles.categoryGrid}>
               {(isIncome ? INCOME_CATS : EXPENSE_CATS).map(([key, meta]) => {
                 const IconComp = (LucideIcons as any)[meta.icon];
@@ -372,10 +428,12 @@ export default function AddExpenseModal() {
                 return (
                   <PressableScale
                     key={key}
-                    onPress={() => isIncome
-                      ? setIncCat(key as IncomeCategory)
-                      : setExpCat(key as ExpenseCategory)
-                    }
+                    onPress={() => {
+                      haptic.tap();
+                      setCatTouched(true);
+                      if (isIncome) setIncCat(key as IncomeCategory);
+                      else setExpCat(key as ExpenseCategory);
+                    }}
                     style={[styles.categoryItem, selected && styles.categoryItemSelected]}
                   >
                     <View style={styles.categoryIcon}>
@@ -404,17 +462,25 @@ export default function AddExpenseModal() {
 
           {/* Tags */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Tagi</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.sectionLabel}>Tagi</Text>
+              {sugTags.filter(t => !tags.includes(t)).length > 0 && (
+                <Text style={styles.autoHint}>✦ proponowane wg opisu</Text>
+              )}
+            </View>
             <View style={styles.tagsWrap}>
-              {quickTags.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  selected={tags.includes(tag)}
-                  onPress={() => toggleTag(tag)}
-                  color={isIncome ? colors.accent.success : undefined}
-                />
-              ))}
+              {displayTags.map((tag) => {
+                const isSug = sugTags.includes(tag) && !tags.includes(tag);
+                return (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    selected={tags.includes(tag)}
+                    onPress={() => toggleTag(tag)}
+                    color={isSug ? colors.accent.blue : (isIncome ? colors.accent.success : undefined)}
+                  />
+                );
+              })}
             </View>
             <View style={styles.customTagRow}>
               <InputField
@@ -529,6 +595,8 @@ const makeStyles = (c: any) => StyleSheet.create({
     ...typography.label, color: c.text.secondary,
     textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11,
   },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  autoHint: { fontSize: 10.5, fontWeight: '700', color: c.accent.blue, letterSpacing: 0.2 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   categoryItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
