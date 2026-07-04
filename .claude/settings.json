@@ -75,7 +75,8 @@
       "Bash(node -e \"const fs=require\\('fs'\\);const b=fs.readFileSync\\('assets/V3logoSapp.png'\\);const w=b.readUInt32BE\\(16\\),h=b.readUInt32BE\\(20\\);console.log\\('V3logoSapp dims:',w+'x'+h, w===h?'\\(kwadrat ✓\\)':'\\(NIE kwadrat ⚠\\)'\\);\")",
       "Bash(cp assets/V3logoSapp.png assets/icon.png)",
       "Bash(cp assets/V3logoSapp.png assets/adaptive-icon.png)",
-      "Bash(cp assets/V3logoSapp.png assets/splash-icon.png)"
+      "Bash(cp assets/V3logoSapp.png assets/splash-icon.png)",
+      "Bash(sed -n \"/export function findMatchingExpense/,/^}/p\" src/utils/bankNotification.ts)"
     ]
   }
 }

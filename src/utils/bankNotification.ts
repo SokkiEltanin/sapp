@@ -69,6 +69,11 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
 // best candidate expense id or null (→ create a fresh expense from the notification).
 export interface MatchExpense { id: string; type?: string; amount: number; date?: string; storeName?: string; note?: string; bankMatched?: boolean }
 
+export function sameLocalDay(a: number, b: number): boolean {
+  const da = new Date(a), db = new Date(b);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+}
+
 export function findMatchingExpense(tx: ParsedBankTx, expenses: MatchExpense[], windowMin = 150): MatchExpense | null {
   const txTime = new Date(tx.dateISO).getTime();
   let best: { e: MatchExpense; score: number } | null = null;
@@ -78,10 +83,16 @@ export function findMatchingExpense(tx: ParsedBankTx, expenses: MatchExpense[], 
     const et = new Date(e.date ?? '').getTime();
     if (!et) continue;
     const diffMin = Math.abs(et - txTime) / 60000;
-    if (diffMin > windowMin) continue;                                  // within the time window
     const hay = `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase();
     const storeOk = !tx.storeKey || hay.includes(tx.storeKey) || tx.storeKey.includes((e.storeName ?? '').toLowerCase().split(/\s+/)[0] ?? '');
-    const score = (storeOk ? 100 : 0) - diffMin;                        // prefer store match, then closest in time
+    const sameDay = sameLocalDay(et, txTime);
+    // Normally require the payment within `windowMin`. But a SCANNED receipt is
+    // stored at noon (OCR gives no clock time) while the bank push carries the real
+    // time, so they can be hours apart. When the store also matches and it's the same
+    // calendar day, exact-amount + same-store is certainly the same purchase — widen
+    // the window to the whole day so the receipt and the notification don't double up.
+    if (diffMin > windowMin && !(storeOk && sameDay)) continue;
+    const score = (storeOk ? 100 : 0) + (sameDay ? 50 : 0) - diffMin;   // prefer store + same day, then closest
     if (!best || score > best.score) best = { e, score };
   }
   return best ? best.e : null;

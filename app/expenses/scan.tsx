@@ -8,6 +8,8 @@ import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/utils/receiptParser';
+import { sameLocalDay } from '@/utils/bankNotification';
+import { toast } from '@/store/toastStore';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
@@ -81,6 +83,7 @@ export default function ScanReceiptModal() {
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer]     = useState('');
   const addExpense = useExpensesStore(s => s.addExpense);
+  const updateExpense = useExpensesStore(s => s.updateExpense);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
@@ -357,20 +360,48 @@ export default function ScanReceiptModal() {
       const foodTags = [...new Set(receiptItems.flatMap(it => it.tags))];
       const tags = [storeTag, ...foodTags].filter(Boolean) as string[];
 
-      const expense = await expensesService.add({
-        type: 'expense',
-        amount: Math.round(total * 100) / 100,
-        currency: 'PLN',
-        category: dominantCat,
-        tags,
-        note: receipt.storeName || 'Paragon',
-        date: dateParsed,
-        ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
-        ...(payer ? { payer } : {}),
-        paymentMethod,
-        receiptItems,
-      });
-      addExpense(expense);
+      const roundedTotal = Math.round(total * 100) / 100;
+
+      // Reverse-merge: a bank notification for this purchase may already have created
+      // a bare expense (bankMatched, no receiptItems). If one matches on amount + same
+      // day + store, enrich THAT one with the receipt instead of adding a duplicate.
+      const store0 = receipt.storeName?.toLowerCase().split(/\s+/)[0] ?? '';
+      const dTime = new Date(dateParsed).getTime();
+      const existingBank = useExpensesStore.getState().expenses.find(e =>
+        e.bankMatched && !e.receiptItems && (e.type === 'expense' || !e.type) &&
+        Math.abs(e.amount - roundedTotal) <= 0.011 &&
+        !!e.date && sameLocalDay(new Date(e.date).getTime(), dTime) &&
+        (!store0
+          || `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase().includes(store0)
+          || store0.includes((e.storeName ?? '').toLowerCase().split(/\s+/)[0] ?? '')),
+      );
+
+      if (existingBank) {
+        const patch: any = {
+          category: dominantCat, tags, receiptItems,
+          note: receipt.storeName || existingBank.note,
+          ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
+          ...(payer ? { payer } : {}),
+        };
+        updateExpense(existingBank.id, patch);
+        expensesService.update(existingBank.id, patch).catch(() => {});
+        toast.success('Dopasowano do płatności z banku — bez duplikatu');
+      } else {
+        const expense = await expensesService.add({
+          type: 'expense',
+          amount: roundedTotal,
+          currency: 'PLN',
+          category: dominantCat,
+          tags,
+          note: receipt.storeName || 'Paragon',
+          date: dateParsed,
+          ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
+          ...(payer ? { payer } : {}),
+          paymentMethod,
+          receiptItems,
+        });
+        addExpense(expense);
+      }
       // Persist corrections to memory for future receipts
       const parsedCats: Record<number, ExpenseCategory> = {};
       receipt.products.forEach((p, i) => { parsedCats[i] = p.category; });
