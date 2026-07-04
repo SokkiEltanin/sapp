@@ -69,7 +69,13 @@
       "Bash(rm -rf android)",
       "Bash(echo \"EXIT: $?\")",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(ls -la assets/V3logoSapp.png assets/icon.png assets/adaptive-icon.png assets/splash-icon.png)",
+      "Bash(node -e \"const a=require\\('./app.json'\\).expo; console.log\\('icon:', a.icon\\); console.log\\('splash:', JSON.stringify\\(a.splash\\)\\); console.log\\('adaptive:', JSON.stringify\\(a.android&&a.android.adaptiveIcon\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const b=fs.readFileSync\\('assets/V3logoSapp.png'\\);const w=b.readUInt32BE\\(16\\),h=b.readUInt32BE\\(20\\);console.log\\('V3logoSapp dims:',w+'x'+h, w===h?'\\(kwadrat ✓\\)':'\\(NIE kwadrat ⚠\\)'\\);\")",
+      "Bash(cp assets/V3logoSapp.png assets/icon.png)",
+      "Bash(cp assets/V3logoSapp.png assets/adaptive-icon.png)",
+      "Bash(cp assets/V3logoSapp.png assets/splash-icon.png)"
     ]
   }
 }
