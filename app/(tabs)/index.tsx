@@ -632,7 +632,11 @@ export default function DashboardScreen() {
   const [workPanel, setWorkPanel]   = useState(false);
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
-  useEffect(() => { if (workPanelTrigger > 0) setWorkPanel(true); }, [workPanelTrigger]);
+  // Consume the trigger so it can't re-open the panel on a later remount/startup
+  // (the counter otherwise stays > 0 after the first open and the mount effect fires again).
+  useEffect(() => {
+    if (workPanelTrigger > 0) { setWorkPanel(true); useUiActions.setState({ workPanelTrigger: 0 }); }
+  }, [workPanelTrigger]);
   const bankPendingCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 0 : 1), 0)); // manual review only
   const bankAutoCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 1 : 0), 0));
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
@@ -973,7 +977,11 @@ export default function DashboardScreen() {
   useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
   const [appActive, setAppActive] = useState(true);
   useEffect(() => {
-    const sub = AppState.addEventListener('change', s => setAppActive(s === 'active'));
+    const sub = AppState.addEventListener('change', s => {
+      setAppActive(s === 'active');
+      // Don't let a left-open popup greet you on the next resume.
+      if (s !== 'active') { setWorkPanel(false); setPaydayModal(false); }
+    });
     return () => sub.remove();
   }, []);
   // Auto-accept queued payments from trusted (auto) merchants once expenses are
