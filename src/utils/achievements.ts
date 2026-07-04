@@ -136,6 +136,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Siedem dni i ani jednego cukrowego poślizgu. Twój organizm przybija Ci piątkę.', value: c => c.noJunkStreak },
   { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h',
     lore: 'Pracujesz jak dobrze naoliwiony mechanizm — bez zacięć, bez postoju. 100 godzin na liczniku maszyny.', value: c => c.workHoursTotal },
+  { id: 'work-1000h', title: 'Weteran',     desc: 'Łącznie 1 000 h pracy',      group: 'Praca', tier: 3, target: 1000, unit: 'h',
+    lore: 'Tysiąc godzin za sobą. Grafik nie ma już przed Tobą tajemnic — jesteś weteranem z odznaczeniami za wysługę.', value: c => c.workHoursTotal },
   { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1,
     lore: 'Pierwszy banknot wpadł do systemu. Od teraz apka wie, ile realnie zarabiasz — i pilnuje reszty.', value: c => c.paydayLogged ? 1 : 0 },
 
@@ -166,8 +168,8 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Trzydzieści dni bez grama cukru. Detoks zaliczony — organizm lśni jak nowy.', value: c => c.noJunkStreak },
   { id: 'ultra-walk',   title: 'Ultramaraton',         desc: '20 000 kroków w jeden dzień', group: 'Legendy', tier: 4, target: 20000, unit: 'kroków',
     lore: '20 000 kroków w jeden dzień. Nogi mają pełne prawo złożyć wypowiedzenie — a Ty i tak idziesz dalej.', value: c => c.bestStepsDay },
-  { id: 'titan',        title: 'Tytan pracy',          desc: '500 h pracy łącznie',         group: 'Legendy', tier: 4, target: 500, unit: 'h',
-    lore: 'Atlas dźwigał niebo, Ty dźwigasz grafik. 500 godzin — praca godna tytana.', value: c => c.workHoursTotal },
+  { id: 'titan',        title: 'Tytan pracy',          desc: '5 000 h pracy łącznie',       group: 'Legendy', tier: 4, target: 5000, unit: 'h',
+    lore: 'Atlas dźwigał niebo, Ty dźwigasz grafik. 5 000 godzin — praca godna tytana, mierzona w latach, nie tygodniach.', value: c => c.workHoursTotal },
 
   // ── Grzeszki (anti-achievements, custom icons) ──
   { id: 'crime-scene', title: 'Miejsce zbrodni',   desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad',
@@ -329,7 +331,11 @@ export function buildAchCtx(args: {
   return {
     habitBestStreak: args.habitBestStreak,
     noJunkStreak: streakBack(k => !junkDays.has(k)),
-    savingsTotal, receiptsCount, moodDays, workHoursTotal,
+    // "Odłożone" = tagged self-transfers if you use them; otherwise fall back to the
+    // highest balance you ever reached, so the saver badges reflect real money even
+    // without a separate savings account.
+    savingsTotal: savingsTotal > 0 ? savingsTotal : (args.cardBalancePeak ?? 0),
+    receiptsCount, moodDays, workHoursTotal,
     paydayLogged: expenses.some(e => e.type === 'income' && (e.category === 'salary' || (!!wp && `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase().includes(wp)))),
     bestStepsDay, billTracked: args.billTracked,
     logStreak: streakBack(k => loggedDays.has(k)),

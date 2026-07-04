@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { View, Image, StyleSheet, Animated, Easing } from 'react-native';
 import {
   Flame, Crown, Salad, PiggyBank, Landmark, Banknote, Briefcase, Heart, Award, Lock, Skull,
-  Gem, ShieldCheck, Star, Sparkles, Zap, Dumbbell,
+  Gem, ShieldCheck, Star, Sparkles, Zap, Dumbbell, Medal,
 } from 'lucide-react-native';
 
 import { badgePng } from '@/utils/badgeIcons';
@@ -13,7 +13,7 @@ import { useColors } from '@/theme/useColors';
 const FALLBACK: Record<string, any> = {
   'loyal': Heart, 'habit-streak-7': Flame, 'habit-streak-30': Crown, 'no-junk-7': Salad,
   'saver-1000': PiggyBank, 'saver-5000': PiggyBank, 'saver-10000': Landmark,
-  'work-100h': Briefcase, 'payday-first': Banknote,
+  'work-100h': Briefcase, 'work-1000h': Medal, 'payday-first': Banknote,
   // legendary
   'legend-saver': Gem, 'centurion': ShieldCheck, 'unbreakable': Crown, 'year-one': Star,
   'clean-month': Sparkles, 'ultra-walk': Zap, 'titan': Dumbbell,

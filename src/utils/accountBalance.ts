@@ -49,19 +49,29 @@ export async function setCashOffset(offset: number): Promise<void> {
 // Highest card balance ever reached (for the "Gruby portfel" record). Recomputes the
 // current card balance and bumps the persisted peak — returns the peak.
 const PEAK_KEY = 'card_balance_peak_v1';
+// Highest the card balance EVER reached. Previously this only sampled the *current*
+// balance whenever the app happened to run it, so a peak reached between app opens
+// was missed. Now it replays every card transaction in date order and tracks the
+// running maximum — the true historical peak — and still keeps a persisted floor so
+// it never drops (e.g. after you spend the money down again).
 export async function updateCardBalancePeak(
-  expenses: { type?: string; amount: number; paymentMethod?: string }[],
+  expenses: { type?: string; amount: number; paymentMethod?: string; date?: string }[],
 ): Promise<number> {
   const [off, cashOff] = await Promise.all([getBalanceOffset(), getCashOffset()]);
-  let allInc = 0, allExp = 0, cashInc = 0, cashExp = 0;
-  for (const e of expenses) {
-    const isCash = e.paymentMethod === 'cash';
-    if (e.type === 'income') { allInc += e.amount; if (isCash) cashInc += e.amount; }
-    else { allExp += e.amount; if (isCash) cashExp += e.amount; }
+  const cardOffset = off - cashOff; // starting card balance before recorded transactions
+  const card = expenses
+    .filter(e => e.paymentMethod !== 'cash')
+    .slice()
+    .sort((a, b) => new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime());
+  let running = cardOffset;
+  let peakRun = running;
+  for (const e of card) {
+    running += e.type === 'income' ? e.amount : -e.amount;
+    if (running > peakRun) peakRun = running;
   }
-  const cardBalance = (off + allInc - allExp) - (cashOff + cashInc - cashExp);
-  let peak = 0;
-  try { const raw = await AsyncStorage.getItem(PEAK_KEY); peak = raw ? parseFloat(raw) : 0; } catch {}
-  if (cardBalance > peak) { peak = cardBalance; try { await AsyncStorage.setItem(PEAK_KEY, String(peak)); } catch {} }
-  return Math.max(peak, 0);
+  let stored = 0;
+  try { const raw = await AsyncStorage.getItem(PEAK_KEY); stored = raw ? parseFloat(raw) : 0; } catch {}
+  const peak = Math.max(stored, peakRun, 0);
+  if (peak !== stored) { try { await AsyncStorage.setItem(PEAK_KEY, String(peak)); } catch {} }
+  return peak;
 }
