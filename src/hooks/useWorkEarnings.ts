@@ -16,6 +16,17 @@ function timeToMins(hhmm: string): number {
   return h * 60 + m;
 }
 
+// A paycheck = income that's either explicitly the "salary" category OR carries the
+// work prefix ([JD]) as a tag/in the note. The salary-category path means a manually
+// entered paycheck counts even without remembering the [JD] tag.
+export function isPaycheck(e: Expense, workPrefix?: string): boolean {
+  if (e.type !== 'income') return false;
+  if ((e.category as string) === 'salary') return true;
+  const wp = workPrefix?.trim().toLowerCase();
+  if (!wp) return false;
+  return (e.tags ?? []).some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp);
+}
+
 export interface WorkEarningsResult {
   activeShift:      WorkShift | null;
   activeEventTitle: string | null;
@@ -49,15 +60,8 @@ export function useWorkEarnings(
   // worked in that paycheck's month (not the partial current month).
   const salaryInfo = useMemo(() => {
     const fallback = { amount: settings.monthlySalary, month: null as string | null };
-    if (!expenses?.length || !settings.workPrefix?.trim()) return fallback;
-    const wp = settings.workPrefix.trim().toLowerCase();
-    // A paycheck = income carrying the [JD] prefix, whether as a tag OR in the note.
-    const candidates = expenses.filter(e =>
-      e.type === 'income' && (
-        e.tags.some(t => t.toLowerCase() === wp) ||
-        (e.note ?? '').toLowerCase().includes(wp)
-      )
-    );
+    if (!expenses?.length) return fallback;
+    const candidates = expenses.filter(e => isPaycheck(e, settings.workPrefix));
     if (!candidates.length) return fallback;
     candidates.sort((a, b) => b.date.localeCompare(a.date));
     return { amount: candidates[0].amount, month: candidates[0].date.slice(0, 7) };

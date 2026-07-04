@@ -73,7 +73,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { useWorkStore } from '@/store/workStore';
-import { useWorkEarnings } from '@/hooks/useWorkEarnings';
+import { useWorkEarnings, isPaycheck } from '@/hooks/useWorkEarnings';
 import { workService } from '@/services/workService';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -3188,13 +3188,11 @@ export default function DashboardScreen() {
                     <Text style={s.wpSub}>{hasRate ? `zarobione do teraz · ${wm.workedH.toFixed(0)} h w tym miesiącu` : 'godzin przepracowanych w tym miesiącu'}</Text>
                   </View>
                   {(() => {
-                    const wp = workSettings.workPrefix?.trim().toLowerCase();
-                    const jdTotal = wp
-                      ? expenses.filter(e => e.type === 'income' && (e.tags?.some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp))).reduce((sum, e) => sum + e.amount, 0)
-                      : 0;
+                    const paychecks = expenses.filter(e => isPaycheck(e, workSettings.workPrefix));
+                    const jdTotal = paychecks.reduce((sum, e) => sum + e.amount, 0);
                     return jdTotal > 0 ? (
                       <View style={s.wpTotalRow}>
-                        <Text style={s.wpTotalLabel}>Łącznie zarobione{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''}</Text>
+                        <Text style={s.wpTotalLabel}>Łącznie zarobione{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
                         <Text style={[s.wpTotalVal, { color: accentColor }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
                       </View>
                     ) : null;
