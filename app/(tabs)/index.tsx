@@ -3179,6 +3179,18 @@ export default function DashboardScreen() {
                     <Text style={s.wpBig}>{hasRate ? wm.workedEarnings.toLocaleString('pl-PL') : wm.workedH.toFixed(0)}<Text style={s.wpUnit}>{hasRate ? ' zł' : ' h'}</Text></Text>
                     <Text style={s.wpSub}>{hasRate ? `zarobione do teraz · ${wm.workedH.toFixed(0)} h w tym miesiącu` : 'godzin przepracowanych w tym miesiącu'}</Text>
                   </View>
+                  {(() => {
+                    const wp = workSettings.workPrefix?.trim().toLowerCase();
+                    const jdTotal = wp
+                      ? expenses.filter(e => e.type === 'income' && (e.tags?.some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp))).reduce((sum, e) => sum + e.amount, 0)
+                      : 0;
+                    return jdTotal > 0 ? (
+                      <View style={s.wpTotalRow}>
+                        <Text style={s.wpTotalLabel}>Łącznie zarobione{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''}</Text>
+                        <Text style={[s.wpTotalVal, { color: accentColor }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
+                      </View>
+                    ) : null;
+                  })()}
                   {wm.plannedH > 0 && (
                     <View style={{ marginTop: spacing[3] }}>
                       <View style={s.workSplitBar}>
@@ -3920,6 +3932,9 @@ const makeStyles = (c: any) => StyleSheet.create({
   wpBig: { fontSize: 38, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
   wpUnit: { fontSize: 18, fontWeight: '700', color: c.text.muted },
   wpSub: { fontSize: 12.5, color: c.text.secondary, marginTop: 1 },
+  wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  wpTotalLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  wpTotalVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.4 },
   wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
   wmMonth: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.secondary },
   wmH: { width: 70, textAlign: 'right', fontSize: 13, fontWeight: '700', color: c.text.primary },

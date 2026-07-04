@@ -314,7 +314,7 @@ export interface WorkSettings {
   // Months the user has personally CONFIRMED (salary + hours). When any exist, the
   // estimated hourly rate = Σsalary / Σhours over them (averaged across the months
   // you trust), instead of guessing from the last paycheck alone.
-  confirmedMonths?: Record<string, { salary: number; hours: number }>; // YYYY-MM
+  confirmedMonths?: Record<string, { salary: number; hours: number; excluded?: boolean }>; // YYYY-MM (excluded = kept for the earnings total but left out of the average rate)
 }
 
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {

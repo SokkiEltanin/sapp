@@ -108,8 +108,9 @@ export function useWorkEarnings(
     if (settings.rateOverride && settings.rateOverride > 0) return settings.rateOverride / 3600;
 
     // Confirmed months win over auto-detection: average rate = Σsalary / Σhours
-    // across the months the user personally verified (most trustworthy).
-    const confirmed = Object.values(settings.confirmedMonths ?? {});
+    // across the months the user personally verified — MINUS any they excluded
+    // (e.g. after switching to a fixed employment contract at a different rate).
+    const confirmed = Object.values(settings.confirmedMonths ?? {}).filter(m => !m.excluded);
     if (confirmed.length > 0) {
       const totSalary = confirmed.reduce((s, m) => s + (m.salary || 0), 0);
       const totHours = confirmed.reduce((s, m) => s + (m.hours || 0), 0);

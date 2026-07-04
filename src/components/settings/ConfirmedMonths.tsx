@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
-import { ShieldCheck, X, Check } from 'lucide-react-native';
+import { ShieldCheck, X, Check, Calculator } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { useWorkStore } from '@/store/workStore';
 import { workService } from '@/services/workService';
@@ -31,10 +31,20 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
   const entries = Object.entries(confirmed).sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const [dismissed, setDismissed] = useState(false);
 
-  const persist = (next: Record<string, { salary: number; hours: number }>) => {
+  const persist = (next: Record<string, { salary: number; hours: number; excluded?: boolean }>) => {
     const s = { ...settings, confirmedMonths: next };
     setSettings(s);
     workService.saveSettings(s).catch(() => {});
+  };
+
+  // Keep the month (and its earnings) but stop it counting toward the average rate —
+  // e.g. months on a fixed employment contract at a different rate.
+  const toggleExclude = (m: string) => {
+    haptic.tap();
+    const cur = confirmed[m];
+    if (!cur) return;
+    persist({ ...confirmed, [m]: { ...cur, excluded: !cur.excluded } });
+    toast.info(cur.excluded ? `${label(m)} liczy się do średniej` : `${label(m)} wyłączony ze średniej`);
   };
 
   const askable = !!detectedMonth && (detectedSalary ?? 0) > 0 && (detectedHours ?? 0) > 0 && !confirmed[detectedMonth] && !dismissed;
@@ -64,11 +74,13 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
   };
 
   const avgRate = (() => {
-    const ms = Object.values(confirmed);
+    const ms = Object.values(confirmed).filter(m => !m.excluded);
     const sal = ms.reduce((s, m) => s + (m.salary || 0), 0);
     const hrs = ms.reduce((s, m) => s + (m.hours || 0), 0);
     return hrs > 0 ? sal / hrs : null;
   })();
+  // Total earned across ALL confirmed months (excluded ones still count here).
+  const totalEarned = Object.values(confirmed).reduce((s, m) => s + (m.salary || 0), 0);
 
   return (
     <View style={s.wrap}>
@@ -79,7 +91,11 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
       <Text style={s.sub}>
         Stawka szacunkowa = średnia z potwierdzonych miesięcy
         {avgRate != null ? ` · teraz ${avgRate.toFixed(2)} zł/h` : ' (jeszcze brak — potwierdź poniżej)'}.
+        {'\n'}Kalkulatorem wyłączasz miesiąc ze średniej (np. po zmianie na umowę o pracę), nie tracąc go z sumy zarobków.
       </Text>
+      {totalEarned > 0 && (
+        <Text style={s.total}>Łącznie zarobione: <Text style={s.totalStrong}>{Math.round(totalEarned).toLocaleString('pl-PL')} zł</Text></Text>
+      )}
 
       {askable && (
         <View style={s.ask}>
@@ -103,8 +119,16 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
       ) : (
         entries.map(([m, v]) => (
           <View key={m} style={s.row}>
-            <Text style={s.rowMonth}>{label(m)}</Text>
-            <Text style={s.rowMeta}>{v.salary} zł · {v.hours} h · {(v.salary / v.hours).toFixed(1)} zł/h</Text>
+            <Text style={[s.rowMonth, v.excluded && s.rowMuted]}>{label(m)}</Text>
+            <Text style={[s.rowMeta, v.excluded && s.rowMuted]} numberOfLines={1}>
+              {v.salary} zł · {v.hours} h · {(v.salary / v.hours).toFixed(1)} zł/h{v.excluded ? ' · poza średnią' : ''}
+            </Text>
+            <PressableScale
+              onPress={() => toggleExclude(m)}
+              style={[s.avgToggle, !v.excluded && s.avgToggleOn]}
+            >
+              <Calculator size={13} color={v.excluded ? c.text.muted : '#2AC68F'} />
+            </PressableScale>
             <PressableScale onPress={() => remove(m)} style={s.del}><X size={14} color={c.text.secondary} /></PressableScale>
           </View>
         ))
@@ -131,8 +155,13 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
   yes: { flex: 1.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: radius.md, backgroundColor: '#2AC68F' },
   yesText: { fontSize: 13, fontWeight: '800', color: '#06231a' },
   empty: { fontSize: 12, color: c.text.muted },
+  total: { fontSize: 12, color: c.text.secondary, marginTop: 2 },
+  totalStrong: { fontWeight: '800', color: '#2AC68F' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
   rowMonth: { fontSize: 13, fontWeight: '700', color: c.text.primary, width: 64 },
+  rowMuted: { color: c.text.muted, opacity: 0.6 },
   rowMeta: { flex: 1, fontSize: 11, color: c.text.muted },
+  avgToggle: { padding: 6, borderRadius: radius.md, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
+  avgToggleOn: { backgroundColor: '#2AC68F18', borderColor: '#2AC68F55' },
   del: { padding: 6, borderRadius: radius.md, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
 });
