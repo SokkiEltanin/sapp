@@ -189,7 +189,11 @@ export const googleCalendarService = {
     return resp.ok || resp.status === 204;
   },
 
-  async fetchEvents(daysBack = 75, daysForward = 60): Promise<CalendarEvent[]> {
+  // Default reaches ~2 years back so old work shifts (the user started at JD in
+  // Oct 2025) count toward hours/earnings, and pages through results so nothing is
+  // dropped by the per-request cap. (Confirmed months also lock their hours in
+  // settings permanently, so this window only needs to cover the recent history.)
+  async fetchEvents(daysBack = 730, daysForward = 60): Promise<CalendarEvent[]> {
     let token = await this.getStoredToken();
     if (!token) {
       token = await this.refreshToken();
@@ -199,27 +203,35 @@ export const googleCalendarService = {
     const past = new Date(); past.setDate(past.getDate() - daysBack);
     const future = new Date(); future.setDate(future.getDate() + daysForward);
 
-    const params = new URLSearchParams({
-      timeMin: past.toISOString(),
-      timeMax: future.toISOString(),
-      singleEvents: 'true',
-      orderBy: 'startTime',
-      maxResults: '200',
-    });
+    const out: CalendarEvent[] = [];
+    let pageToken: string | undefined;
+    let guard = 0; // safety: never loop more than ~10 pages (25k events)
+    do {
+      const params = new URLSearchParams({
+        timeMin: past.toISOString(),
+        timeMax: future.toISOString(),
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '2500',
+      });
+      if (pageToken) params.set('pageToken', pageToken);
 
-    let resp = await doFetch(token, params);
+      let resp = await doFetch(token, params);
+      if (resp.status === 401) {
+        const fresh = await this.refreshToken();
+        if (!fresh) { await this.clearToken(); return out; }
+        token = fresh;
+        resp = await doFetch(fresh, params);
+      }
+      if (!resp.ok) return out;
 
-    if (resp.status === 401) {
-      const fresh = await this.refreshToken();
-      if (!fresh) { await this.clearToken(); return []; }
-      resp = await doFetch(fresh, params);
-    }
+      const data = await resp.json();
+      for (const e of ((data.items ?? []) as GCalEvent[])) {
+        if (e.status !== 'cancelled') out.push(mapEvent(e));
+      }
+      pageToken = data.nextPageToken;
+    } while (pageToken && ++guard < 10);
 
-    if (!resp.ok) return [];
-
-    const data = await resp.json();
-    return ((data.items ?? []) as GCalEvent[])
-      .filter(e => e.status !== 'cancelled')
-      .map(mapEvent);
+    return out;
   },
 };

@@ -1501,7 +1501,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   rowLabel: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
   rowSub: { ...typography.caption, color: c.text.muted, marginTop: 1 },
   diagBox: {
-    marginTop: spacing[2], paddingTop: spacing[3],
+    paddingTop: spacing[3], paddingHorizontal: spacing[4], paddingBottom: spacing[4],
     borderTopWidth: 1, borderTopColor: c.border.subtle, gap: spacing[2],
   },
   diagTitle: { fontSize: 9, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8 },

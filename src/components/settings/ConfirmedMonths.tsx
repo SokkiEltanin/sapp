@@ -138,7 +138,7 @@ export default function ConfirmedMonths({ detectedMonth, detectedSalary, detecte
 }
 
 const makeStyles = (c: typeof colors) => StyleSheet.create({
-  wrap: { borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[3], gap: spacing[2] },
+  wrap: { borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[3], paddingHorizontal: spacing[4], paddingBottom: spacing[4], gap: spacing[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   sub: { fontSize: 11, color: c.text.muted, lineHeight: 15 },

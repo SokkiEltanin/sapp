@@ -776,7 +776,7 @@ export default function DashboardScreen() {
         // Fetch a WIDE window (≈2.5 months back) — this overwrites the shared
         // gcalEvents store, and Settings derives monthly work hours from it.
         // A narrow window here was silently undercounting work shifts.
-        googleCalendarService.fetchEvents(75, 60).then(evs => setGcalEvents(evs)).catch(() => {});
+        googleCalendarService.fetchEvents().then(evs => setGcalEvents(evs)).catch(() => {});
       } else {
         setGcalEvents([]);  // clear any cached events from a previous session
       }
