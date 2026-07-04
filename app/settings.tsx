@@ -278,11 +278,13 @@ export default function SettingsScreen() {
   const saveAccountBalance = async () => {
     const real = parseFloat(balanceInput.replace(/\s/g, '').replace(',', '.'));
     if (isNaN(real)) return;
-    const offset = real - accountNet.net;
+    // Field is the CARD balance now → offset = real card − card net (non-cash flow).
+    const cardNet = accountNet.net - accountNet.cashNet;
+    const offset = real - cardNet;
     setBalanceOffsetState(offset);
     await setBalanceOffset(offset);
     setBalanceInput('');
-    toast.success('Zapisano saldo konta');
+    toast.success('Zapisano saldo karty');
   };
   const saveCash = async () => {
     const real = parseFloat(cashInput.replace(/\s/g, '').replace(',', '.'));
@@ -756,10 +758,10 @@ export default function SettingsScreen() {
                 <Wallet size={16} color="#5B7BE3" />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>Aktualne saldo konta</Text>
+                <Text style={styles.rowLabel}>Ile mam na karcie</Text>
                 <Text style={styles.rowSub}>
-                  App liczy teraz: {(balanceOffset + accountNet.net).toFixed(2)} zł.{'\n'}
-                  Wpisz ile masz realnie — reszta policzy się sama.
+                  App liczy teraz: {(balanceOffset + accountNet.net - accountNet.cashNet).toFixed(2)} zł.{'\n'}
+                  Wpisz ile masz realnie na karcie — reszta liczy się sama.
                 </Text>
               </View>
               <TextInput
@@ -787,7 +789,7 @@ export default function SettingsScreen() {
                 <Text style={styles.rowLabel}>Ile mam gotówki</Text>
                 <Text style={styles.rowSub}>
                   App liczy teraz: {(cashOffset + accountNet.cashNet).toFixed(2)} zł.{'\n'}
-                  Reszta salda = karta. Wydatki gotówką ją zmniejszają.
+                  Osobna pula. Wydatki gotówką ją zmniejszają.
                 </Text>
               </View>
               <TextInput
@@ -805,6 +807,12 @@ export default function SettingsScreen() {
                   borderWidth: 1, borderColor: '#2AC68F30',
                 }}
               />
+            </View>
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3], justifyContent: 'space-between' }]}>
+              <Text style={[styles.rowLabel, { fontWeight: '700' }]}>Razem (karta + gotówka)</Text>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary }}>
+                {(balanceOffset + cashOffset + accountNet.net).toFixed(2)} zł
+              </Text>
             </View>
           </View>
         </View>

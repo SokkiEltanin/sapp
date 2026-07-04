@@ -1,16 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// The app only knows the net of the transactions you entered. Your real bank
-// balance also includes whatever you had BEFORE you started tracking. We store
-// an "offset" so the displayed balance matches reality:
+// Card and cash are two INDEPENDENT pots. The user types how much they have on
+// the CARD and how much in CASH; the total is simply the sum. Each pot stores an
+// "offset" = the money that was there before tracking started, so:
 //
-//   displayedBalance = offset + (allIncome - allExpenses)
+//   cardBalance = cardOffset + (cardIncome - cardExpense)   // non-cash transactions
+//   cashBalance = cashOffset + (cashIncome - cashExpense)   // cash transactions
+//   totalBalance = cardBalance + cashBalance
 //
-// When the user types their current real balance, we compute:
-//   offset = realBalanceNow - currentNet
-// so the displayed balance equals the real one now, and tracks every change after.
+// When the user types their real card (or cash) balance, offset = real - thatNet.
+// NOTE: KEY historically held the TOTAL offset; migrateBalanceModel() converts it
+// to a card offset (cardOffset = oldTotalOffset - cashOffset) once, so nothing jumps.
 
-const KEY = 'account_balance_offset_v1';
+const KEY = 'account_balance_offset_v1'; // now the CARD offset (see migrateBalanceModel)
 
 export async function getBalanceOffset(): Promise<number> {
   try {
@@ -27,9 +29,22 @@ export async function setBalanceOffset(offset: number): Promise<void> {
   try { await AsyncStorage.setItem(KEY, String(offset)); } catch {}
 }
 
-// How much of the balance is CASH. The card balance is then (total − cash), so
-// the total stays consistent. cashBalance = cashOffset + (cashIncome − cashExpense).
+// The CASH pot: cashBalance = cashOffset + (cashIncome − cashExpense).
 const CASH_KEY = 'account_cash_offset_v1';
+
+// One-time migration: the old model stored the TOTAL offset in KEY and derived the
+// card balance as (total − cash). The new model stores the CARD offset directly, so
+// convert once: cardOffset = oldTotalOffset − cashOffset. Keeps the shown card
+// balance identical across the update.
+const MIGRATION_KEY = 'balance_model_card_v2';
+export async function migrateBalanceModel(): Promise<void> {
+  try {
+    if (await AsyncStorage.getItem(MIGRATION_KEY)) return;
+    const [off, cashOff] = await Promise.all([getBalanceOffset(), getCashOffset()]);
+    await setBalanceOffset(off - cashOff);
+    await AsyncStorage.setItem(MIGRATION_KEY, '1');
+  } catch {}
+}
 
 export async function getCashOffset(): Promise<number> {
   try {
@@ -57,8 +72,7 @@ const PEAK_KEY = 'card_balance_peak_v1';
 export async function updateCardBalancePeak(
   expenses: { type?: string; amount: number; paymentMethod?: string; date?: string }[],
 ): Promise<number> {
-  const [off, cashOff] = await Promise.all([getBalanceOffset(), getCashOffset()]);
-  const cardOffset = off - cashOff; // starting card balance before recorded transactions
+  const cardOffset = await getBalanceOffset(); // starting card balance before recorded transactions
   const card = expenses
     .filter(e => e.paymentMethod !== 'cash')
     .slice()

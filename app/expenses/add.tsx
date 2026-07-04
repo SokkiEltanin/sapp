@@ -24,7 +24,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getPayers, addPayer } from '@/utils/payers';
 import { notificationsService } from '@/services/notificationsService';
 import { toast } from '@/store/toastStore';
-import { getBalanceOffset } from '@/utils/accountBalance';
+import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { categorize, getFoodTags } from '@/utils/receiptParser';
 import { loadProductMemory, applyProductMemory, loadTagMemory, applyTagMemory, getTagFrequency, saveProductCategories, saveTagMemory } from '@/utils/productMemory';
@@ -78,6 +78,7 @@ export default function AddExpenseModal() {
   const addExpense  = useExpensesStore((s) => s.addExpense);
   const expenses    = useExpensesStore((s) => s.expenses);
   const [balanceOffset, setBalanceOffset] = useState(0);
+  const [cashOffset, setCashOffset] = useState(0);
   const kb = useKeyboardHeight();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -101,16 +102,17 @@ export default function AddExpenseModal() {
   useEffect(() => { vehiclesService.getAll().then(setVehicles).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
   useEffect(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []);
+  useEffect(() => { getCashOffset().then(setCashOffset).catch(() => {}); }, []);
 
   const isIncome = txType === 'income';
   const amountColor = isIncome ? '#2AC68F' : '#E43434';
 
-  // Current account balance (mine only — matches Finances) + projection after this.
+  // Current TOTAL balance (card + cash, mine only — matches Finances) + projection.
   const accountBalance = (() => {
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let net = 0;
     for (const e of unique) { if (!isMine(e)) continue; net += e.type === 'income' ? e.amount : -e.amount; }
-    return balanceOffset + net;
+    return balanceOffset + cashOffset + net;
   })();
   const amtNum = parseFloat(amount.replace(',', '.'));
   const projectedBalance = !isNaN(amtNum) && amtNum > 0

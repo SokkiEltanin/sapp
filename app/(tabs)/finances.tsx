@@ -201,12 +201,11 @@ export default function FinancesScreen() {
     return { exp, inc, allExp, allInc, cashExp, cashInc, food, sweets };
   }, [expenses, scope]);
 
-  // Overall account balance = ALL income − ALL expenses (not just this month).
-  // displayed balance = manual offset (money you had before tracking) + net flow
-  const balance = balanceOffset + monthTotals.allInc - monthTotals.allExp;
-  // Cash on hand = cash offset + cash net; card balance = the rest of the total.
+  // Card and cash are independent pots; the total is their sum. Each = its offset
+  // (money there before tracking) + its own net flow (all-time).
+  const cardBalance = balanceOffset + (monthTotals.allInc - monthTotals.cashInc) - (monthTotals.allExp - monthTotals.cashExp);
   const cashBalance = cashOffset + monthTotals.cashInc - monthTotals.cashExp;
-  const cardBalance = balance - cashBalance;
+  const balance = cardBalance + cashBalance;
 
   // Chart data: expenses AND income per day (week) or per week-of-month (month).
   // Expenses respect the scope toggle; income is always mine (my paychecks).

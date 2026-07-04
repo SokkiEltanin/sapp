@@ -78,7 +78,9 @@
       "Bash(cp assets/V3logoSapp.png assets/splash-icon.png)",
       "Bash(sed -n \"/export function findMatchingExpense/,/^}/p\" src/utils/bankNotification.ts)",
       "Bash(sed -n \"/export async function updateCardBalancePeak/,/^}/p\" src/utils/accountBalance.ts)",
-      "Bash(sed -n \"/export function isSelfTransfer/,/^}/p\" src/utils/statWidgets.ts)"
+      "Bash(sed -n \"/export function isSelfTransfer/,/^}/p\" src/utils/statWidgets.ts)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)"
     ]
   }
 }

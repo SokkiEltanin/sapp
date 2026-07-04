@@ -20,6 +20,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { drainBankNotifications } from '@/services/bankNotificationDrain';
+import { migrateBalanceModel } from '@/utils/accountBalance';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 
@@ -132,6 +133,7 @@ export default function RootLayout() {
   });
 
   useEffect(() => { appSettings.loadAll(); }, []);
+  useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
   useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);
 
   useEffect(() => {
