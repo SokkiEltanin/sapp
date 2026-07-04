@@ -31,6 +31,18 @@ interface Item {
   weightG: string;        // grams PER PIECE (optional) — total weightKg = ×pieces
   category: ExpenseCategory;
   tags: string[];
+  groupWithPrev?: boolean; // shares one combined price with the item(s) above
+}
+
+// Split a combined price evenly across n items to the grosz, remainder on the first
+// ones, so the parts always sum back to exactly the total (e.g. 9 zł / 2 = 4,50+4,50;
+// 10 zł / 3 = 3,34+3,33+3,33).
+function splitEven(total: number, n: number): number[] {
+  if (n <= 0) return [];
+  const cents = Math.round(total * 100);
+  const base = Math.floor(cents / n);
+  const rem = cents - base * n;
+  return Array.from({ length: n }, (_, i) => (base + (i < rem ? 1 : 0)) / 100);
 }
 
 const ALL_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
@@ -68,11 +80,15 @@ function CategoryPicker({ current, onSelect }: {
   );
 }
 
-function ItemRow({ item, index, onUpdate, onDelete }: {
+function ItemRow({ item, index, onUpdate, onDelete, groupSize, share, canGroup, onToggleGroup }: {
   item: Item;
   index: number;
   onUpdate: (updates: Partial<Item>) => void;
   onDelete: () => void;
+  groupSize: number;      // members sharing this LEADER's price (1 = not a group)
+  share: number | null;   // this item's split of the combined price (preview)
+  canGroup: boolean;      // there is an item above to share a price with
+  onToggleGroup: () => void;
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -82,6 +98,8 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
   const [suggCat, setSuggCat] = useState<ExpenseCategory | null>(null);
   const suggTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const meta = getCategoryMeta(item.category);
+  const isFollower = !!item.groupWithPrev;
+  const isLeaderGroup = groupSize > 1;
   const qty = parseFloat(item.quantity) || 1;
   const unitPrice = parseFloat(item.price.replace(',', '.')) || 0;
   const lineTotal = qty * unitPrice;
@@ -142,60 +160,80 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
           </TouchableOpacity>
         )}
 
-        {/* Qty × price row */}
-        <View style={styles.priceRow}>
-          <View style={styles.qtyWrap}>
-            <TouchableOpacity
-              onPress={() => onUpdate({ quantity: String(Math.max(1, Math.round((parseFloat(item.quantity) || 1) - 1))) })}
-              style={styles.qtyStep} hitSlop={6}
-            >
-              <Text style={styles.qtyStepText}>−</Text>
-            </TouchableOpacity>
+        {/* Qty × price row — or, when this item shares a combined price, an inherited-share row */}
+        {isFollower ? (
+          <TouchableOpacity onPress={onToggleGroup} activeOpacity={0.7} style={styles.groupedRow}>
+            <Text style={styles.groupedText} numberOfLines={1}>
+              ↳ wspólna cena z pozycją wyżej{share != null ? `  ·  ~${share.toFixed(2)} zł` : ''}
+            </Text>
+            <Text style={styles.groupedUnlink}>rozłącz</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.priceRow}>
+            {!isLeaderGroup && (
+              <>
+                <View style={styles.qtyWrap}>
+                  <TouchableOpacity
+                    onPress={() => onUpdate({ quantity: String(Math.max(1, Math.round((parseFloat(item.quantity) || 1) - 1))) })}
+                    style={styles.qtyStep} hitSlop={6}
+                  >
+                    <Text style={styles.qtyStepText}>−</Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    value={item.quantity}
+                    onChangeText={quantity => onUpdate({ quantity })}
+                    placeholder="1"
+                    placeholderTextColor={colors.text.muted}
+                    style={styles.qtyInput}
+                    keyboardType="decimal-pad"
+                    selectTextOnFocus
+                  />
+                  <TouchableOpacity
+                    onPress={() => onUpdate({ quantity: String(Math.round((parseFloat(item.quantity) || 0) + 1)) })}
+                    style={styles.qtyStep} hitSlop={6}
+                  >
+                    <Text style={styles.qtyStepText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.timesSign}>×</Text>
+              </>
+            )}
             <TextInput
-              value={item.quantity}
-              onChangeText={quantity => onUpdate({ quantity })}
-              placeholder="1"
+              value={item.price}
+              onChangeText={price => onUpdate({ price })}
+              placeholder={isLeaderGroup ? 'łącznie' : '0,00'}
               placeholderTextColor={colors.text.muted}
-              style={styles.qtyInput}
+              style={styles.unitPriceInput}
               keyboardType="decimal-pad"
+              returnKeyType="done"
               selectTextOnFocus
             />
-            <TouchableOpacity
-              onPress={() => onUpdate({ quantity: String(Math.round((parseFloat(item.quantity) || 0) + 1)) })}
-              style={styles.qtyStep} hitSlop={6}
-            >
-              <Text style={styles.qtyStepText}>+</Text>
-            </TouchableOpacity>
+            <Text style={styles.priceSuffix}>zł</Text>
+            {isLeaderGroup && unitPrice > 0 ? (
+              <>
+                <Text style={styles.eqSign}>za</Text>
+                <Text style={styles.lineTotalText}>{groupSize} poz.{share != null ? ` · ~${share.toFixed(2)}` : ''}</Text>
+              </>
+            ) : (qty > 1 && unitPrice > 0 && (
+              <>
+                <Text style={styles.eqSign}>=</Text>
+                <Text style={styles.lineTotalText}>{lineTotal.toFixed(2)} zł</Text>
+              </>
+            ))}
+            <View style={{ flex: 1 }} />
+            {!isLeaderGroup && (
+              <TextInput
+                value={item.weightG}
+                onChangeText={weightG => onUpdate({ weightG })}
+                placeholder="g/szt"
+                placeholderTextColor={colors.text.muted}
+                style={styles.weightInput}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+              />
+            )}
           </View>
-          <Text style={styles.timesSign}>×</Text>
-          <TextInput
-            value={item.price}
-            onChangeText={price => onUpdate({ price })}
-            placeholder="0,00"
-            placeholderTextColor={colors.text.muted}
-            style={styles.unitPriceInput}
-            keyboardType="decimal-pad"
-            returnKeyType="done"
-            selectTextOnFocus
-          />
-          <Text style={styles.priceSuffix}>zł</Text>
-          {qty > 1 && unitPrice > 0 && (
-            <>
-              <Text style={styles.eqSign}>=</Text>
-              <Text style={styles.lineTotalText}>{lineTotal.toFixed(2)} zł</Text>
-            </>
-          )}
-          <View style={{ flex: 1 }} />
-          <TextInput
-            value={item.weightG}
-            onChangeText={weightG => onUpdate({ weightG })}
-            placeholder="g/szt"
-            placeholderTextColor={colors.text.muted}
-            style={styles.weightInput}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
-          />
-        </View>
+        )}
 
         {/* Category & tags row */}
         <View style={styles.metaRow}>
@@ -205,6 +243,11 @@ function ItemRow({ item, index, onUpdate, onDelete }: {
           >
             <Text style={[styles.catChipText, catOpen && { color: meta.color }]}>{meta.label}</Text>
           </PressableScale>
+          {canGroup && !isFollower && (
+            <PressableScale onPress={onToggleGroup} style={styles.groupChip}>
+              <Text style={styles.groupChipText}>⛓ wspólna cena ↑</Text>
+            </PressableScale>
+          )}
           <PressableScale
             onPress={() => { setTagsOpen(o => !o); setCatOpen(false); }}
             style={[
@@ -320,14 +363,62 @@ export default function ManualReceiptScreen() {
     });
   };
 
-  const validItems = items.filter(it => it.name.trim() && parseFloat(it.price.replace(',', '.')) > 0);
-  const total = validItems.reduce((s, it) => {
-    const qty = Math.max(1, parseFloat(it.quantity) || 1);
-    return s + parseFloat(it.price.replace(',', '.')) * qty;
-  }, 0);
+  const toggleGroup = (id: string) => {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, groupWithPrev: !it.groupWithPrev } : it));
+  };
+
+  // Group consecutive items that share a combined price. A group starts at any item
+  // whose `groupWithPrev` is off; following items with it on attach to that group and
+  // split its (the leader's) price evenly.
+  const groups = useMemo(() => {
+    const gs: number[][] = [];
+    items.forEach((it, i) => {
+      if (i === 0 || !it.groupWithPrev) gs.push([i]);
+      else gs[gs.length - 1].push(i);
+    });
+    return gs;
+  }, [items]);
+
+  // Per-item display info: leader group size + each member's split-preview share.
+  const infoById = useMemo(() => {
+    const m = new Map<string, { size: number; share: number | null }>();
+    for (const g of groups) {
+      const leader = items[g[0]];
+      const leaderPrice = parseFloat(leader.price.replace(',', '.')) || 0;
+      const named = g.filter(idx => items[idx].name.trim());
+      const shares = g.length > 1 && named.length > 0 && leaderPrice > 0
+        ? splitEven(leaderPrice, named.length) : null;
+      let si = 0;
+      for (const idx of g) {
+        const it = items[idx];
+        const share = shares && it.name.trim() ? shares[si++] : null;
+        m.set(it.id, { size: idx === g[0] ? g.length : 1, share });
+      }
+    }
+    return m;
+  }, [groups, items]);
+
+  const { validCount, total } = useMemo(() => {
+    let count = 0, sum = 0;
+    for (const g of groups) {
+      const leader = items[g[0]];
+      const leaderPrice = parseFloat(leader.price.replace(',', '.')) || 0;
+      if (g.length > 1) {
+        if (leaderPrice > 0) {
+          const named = g.filter(idx => items[idx].name.trim()).length;
+          if (named > 0) { count += named; sum += leaderPrice; }
+        }
+      } else {
+        const it = items[g[0]];
+        const up = parseFloat(it.price.replace(',', '.')) || 0;
+        if (it.name.trim() && up > 0) { count += 1; sum += up * Math.max(1, parseFloat(it.quantity) || 1); }
+      }
+    }
+    return { validCount: count, total: sum };
+  }, [groups, items]);
 
   const save = async () => {
-    if (validItems.length === 0) {
+    if (validCount === 0) {
       toast.error('Dodaj co najmniej jeden produkt z ceną');
       return;
     }
@@ -343,26 +434,41 @@ export default function ManualReceiptScreen() {
       }
       const store = storeName.trim();
 
-      const receiptItems: ReceiptItem[] = validItems.map(it => {
-        const unitPrice = parseFloat(it.price.replace(',', '.'));
-        const qty = Math.max(1, parseFloat(it.quantity) || 1);
-        const price = Math.round(unitPrice * qty * 100) / 100;
-        const item: ReceiptItem = {
+      const makeItemRecord = (it: Item, price: number, qty: number): ReceiptItem => {
+        const ri: ReceiptItem = {
           name: it.name.trim(),
-          price,
+          price: Math.round(price * 100) / 100,
           category: it.category,
           quantity: qty,
-          unitPrice,
+          unitPrice: qty !== 1 ? Math.round((price / qty) * 100) / 100 : Math.round(price * 100) / 100,
           tags: it.tags.length > 0 ? it.tags : getFoodTags(it.name),
         };
-        // Weight per piece (g) → total weightKg = per-piece × whole-piece count.
         const wg = parseFloat((it.weightG ?? '').replace(',', '.'));
         if (!isNaN(wg) && wg > 0) {
           const pieces = Number.isInteger(qty) && qty > 1 ? qty : 1;
-          item.weightKg = Math.round((wg / 1000) * pieces * 1000) / 1000;
+          ri.weightKg = Math.round((wg / 1000) * pieces * 1000) / 1000;
         }
-        return item;
-      });
+        return ri;
+      };
+
+      const receiptItems: ReceiptItem[] = [];
+      for (const g of groups) {
+        const leader = items[g[0]];
+        const leaderPrice = parseFloat(leader.price.replace(',', '.')) || 0;
+        if (g.length > 1) {
+          // Combined-price group: split the leader's total evenly across named members.
+          const named = g.filter(idx => items[idx].name.trim());
+          if (leaderPrice <= 0 || named.length === 0) continue;
+          const shares = splitEven(leaderPrice, named.length);
+          named.forEach((idx, si) => receiptItems.push(makeItemRecord(items[idx], shares[si], 1)));
+        } else {
+          const it = items[g[0]];
+          const unitPrice = parseFloat(it.price.replace(',', '.')) || 0;
+          if (!it.name.trim() || unitPrice <= 0) continue;
+          const qty = Math.max(1, parseFloat(it.quantity) || 1);
+          receiptItems.push(makeItemRecord(it, unitPrice * qty, qty));
+        }
+      }
 
       const totalAmount = receiptItems.reduce((s, it) => s + it.price, 0);
 
@@ -426,8 +532,8 @@ export default function ManualReceiptScreen() {
         </PressableScale>
         <View style={styles.headerCenter}>
           <Text style={styles.title}>Ręczny paragon</Text>
-          {validItems.length > 0 && (
-            <Text style={styles.subtitle}>{validItems.length} produktów · {total.toFixed(2)} zł</Text>
+          {validCount > 0 && (
+            <Text style={styles.subtitle}>{validCount} produktów · {total.toFixed(2)} zł</Text>
           )}
         </View>
         <View style={{ width: 36 }} />
@@ -513,18 +619,25 @@ export default function ManualReceiptScreen() {
 
           <View style={styles.itemsLabel}>
             <Text style={styles.labelText}>PRODUKTY</Text>
-            <Text style={styles.labelCount}>{validItems.length} z {items.length}</Text>
+            <Text style={styles.labelCount}>{validCount} z {items.length}</Text>
           </View>
 
-          {items.map((item, i) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              index={i}
-              onUpdate={u => updateItem(item.id, u)}
-              onDelete={() => deleteItem(item.id)}
-            />
-          ))}
+          {items.map((item, i) => {
+            const info = infoById.get(item.id);
+            return (
+              <ItemRow
+                key={item.id}
+                item={item}
+                index={i}
+                onUpdate={u => updateItem(item.id, u)}
+                onDelete={() => deleteItem(item.id)}
+                groupSize={info?.size ?? 1}
+                share={info?.share ?? null}
+                canGroup={i > 0}
+                onToggleGroup={() => toggleGroup(item.id)}
+              />
+            );
+          })}
 
           <TouchableOpacity onPress={addItem} style={styles.addItemBtn} activeOpacity={0.7}>
             <Plus size={14} color={colors.accent.blue} />
@@ -544,11 +657,11 @@ export default function ManualReceiptScreen() {
         )}
         <AnimatedButton
           onPress={save}
-          label={saving ? 'Zapisuję...' : `Zapisz paragon${validItems.length > 0 ? ` (${validItems.length} poz.)` : ''}`}
+          label={saving ? 'Zapisuję...' : `Zapisz paragon${validCount > 0 ? ` (${validCount} poz.)` : ''}`}
           icon={<Check size={18} color={colors.bg.primary} />}
           size="lg"
           fullWidth
-          disabled={saving || validItems.length === 0}
+          disabled={saving || validCount === 0}
         />
       </View>
     </SafeAreaView>
@@ -660,6 +773,21 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   eqSign: { fontSize: 12, color: c.text.muted },
   lineTotalText: { fontSize: 13, fontWeight: '800', color: c.accent.green, letterSpacing: -0.3 },
+
+  // combined-price grouping
+  groupedRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 8, paddingHorizontal: spacing[2],
+    borderRadius: radius.sm, borderWidth: 1, borderStyle: 'dashed',
+    borderColor: c.accent.blue + '40', backgroundColor: c.accent.blue + '0C',
+  },
+  groupedText: { flex: 1, fontSize: 12, fontWeight: '600', color: c.accent.blue },
+  groupedUnlink: { fontSize: 11, fontWeight: '700', color: c.text.muted, marginLeft: spacing[2] },
+  groupChip: {
+    paddingHorizontal: spacing[2], paddingVertical: 5, borderRadius: radius.sm,
+    borderWidth: 1, borderColor: c.accent.blue + '40', backgroundColor: c.accent.blue + '10',
+  },
+  groupChipText: { fontSize: 10, color: c.accent.blue, fontWeight: '700' },
 
   // category & tags row
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
