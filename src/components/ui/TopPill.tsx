@@ -13,6 +13,7 @@ import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
+import { plPlural } from '@/utils/plural';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ export default function TopPill() {
     if (overdue.length > 0) {
       const first = overdue.sort((a, b) => a.deadline!.localeCompare(b.deadline!))[0];
       return {
-        badge: `${overdue.length} ZALEGŁE`,
+        badge: `${overdue.length} ${plPlural(overdue.length, 'ZALEGŁE', 'ZALEGŁE', 'ZALEGŁYCH')}`,
         color:  colors.tabs.finances,  // #E63535 red
         text:   up(first.title),
         route:  '/(tabs)/tasks',
@@ -280,7 +281,7 @@ export default function TopPill() {
       return {
         badge: `${pending}`,
         color:  timeAccent,
-        text:   pending === 1 ? 'JEDNO ZADANIE W TOKU' : 'ZADAŃ W TOKU',
+        text:   `${plPlural(pending, 'ZADANIE', 'ZADANIA', 'ZADAŃ')} W TOKU`,
         route:  '/(tabs)/tasks',
         key:    `pending-${pending}`,
       };

@@ -243,7 +243,7 @@ function moodColor(avg: number): string {
 }
 function plTasks(n: number): string {
   const m10 = n % 10, m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return 'zadanie';
+  if (n === 1) return 'zadanie'; // only exactly 1 — "21 zadań", not "21 zadanie"
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'zadania';
   return 'zadań';
 }

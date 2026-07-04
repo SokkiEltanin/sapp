@@ -19,6 +19,7 @@ import { vehiclesService } from '@/services/vehiclesService';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { expensesService } from '@/services/expensesService';
 import { templatesService } from '@/services/templatesService';
+import { workService } from '@/services/workService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { getPayers, addPayer } from '@/utils/payers';
@@ -79,6 +80,7 @@ export default function AddExpenseModal() {
   const expenses    = useExpensesStore((s) => s.expenses);
   const [balanceOffset, setBalanceOffset] = useState(0);
   const [cashOffset, setCashOffset] = useState(0);
+  const [workPrefix, setWorkPrefix] = useState('');
   const kb = useKeyboardHeight();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -103,6 +105,7 @@ export default function AddExpenseModal() {
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0]); }).catch(() => {}); }, []);
   useEffect(() => { getBalanceOffset().then(setBalanceOffset).catch(() => {}); }, []);
   useEffect(() => { getCashOffset().then(setCashOffset).catch(() => {}); }, []);
+  useEffect(() => { workService.getSettings().then(s => setWorkPrefix((s.workPrefix ?? '').trim())).catch(() => {}); }, []);
 
   const isIncome = txType === 'income';
   const amountColor = isIncome ? '#2AC68F' : '#E43434';
@@ -164,6 +167,19 @@ export default function AddExpenseModal() {
     const t = customTag.trim().toLowerCase();
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
     setCustomTag('');
+  };
+
+  // One-tap "this income is my [JD] paycheck" — tags it with the work prefix so it's
+  // detected as a paycheck (rate + total earnings) and sets the salary category.
+  const isPaycheck = !!workPrefix && tags.some(t => t.toLowerCase() === workPrefix.toLowerCase());
+  const togglePaycheck = () => {
+    haptic.tap();
+    if (isPaycheck) {
+      setTags(prev => prev.filter(t => t.toLowerCase() !== workPrefix.toLowerCase()));
+    } else {
+      setTags(prev => [...prev.filter(t => t.toLowerCase() !== workPrefix.toLowerCase()), workPrefix]);
+      setIncCat('salary');
+    }
   };
 
   const handleTypeSwitch = (type: TransactionType) => {
@@ -335,6 +351,16 @@ export default function AddExpenseModal() {
               placeholder={isIncome ? 'np. Wypłata za kwiecień...' : 'np. Biedronka, tankowanie...'}
             />
           </View>
+
+          {/* One-tap paycheck marker (income only) — makes it count toward the rate + JD total */}
+          {isIncome && !!workPrefix && (
+            <PressableScale onPress={togglePaycheck} style={[styles.paycheckChip, isPaycheck && styles.paycheckChipOn]}>
+              <LucideIcons.Briefcase size={15} color={isPaycheck ? '#06231a' : '#2AC68F'} />
+              <Text style={[styles.paycheckText, isPaycheck && { color: '#06231a' }]}>
+                {isPaycheck ? `Wypłata ${workPrefix} ✓` : `To jest wypłata ${workPrefix}`}
+              </Text>
+            </PressableScale>
+          )}
 
           {/* Date */}
           <DatePickerField value={dateInput} onChange={setDateInput} placeholder="Wybierz datę" />
@@ -599,6 +625,13 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   autoHint: { fontSize: 10.5, fontWeight: '700', color: c.accent.blue, letterSpacing: 0.2 },
+  paycheckChip: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[3], borderRadius: radius.md,
+    borderWidth: 1, borderColor: '#2AC68F55', backgroundColor: '#2AC68F14',
+  },
+  paycheckChipOn: { backgroundColor: '#2AC68F', borderColor: '#2AC68F' },
+  paycheckText: { fontSize: 13.5, fontWeight: '800', color: '#2AC68F' },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   categoryItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
