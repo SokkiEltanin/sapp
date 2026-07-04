@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { Tabs, usePathname, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -10,7 +10,6 @@ import TabBar from '@/components/ui/TabBar';
 import TopPill from '@/components/ui/TopPill';
 import { useUiPrefs } from '@/store/uiPrefs';
 
-const W = Dimensions.get('window').width;
 const TABS = ['/', '/tasks', '/stats', '/finances', '/health'] as const;
 
 function tabIdx(path: string): number {
@@ -23,6 +22,7 @@ export default function TabsLayout() {
   const currentIdx = tabIdx(pathname);
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const { width: W } = useWindowDimensions(); // reactive swipe threshold (updates on resize)
   // Opt-in slide between boards. Safe now because all screens stay mounted
   // (detachInactiveScreens=false + lazy=false), so the destination is already laid
   // out during the v7 'shift' transition — no empty-slide / teleport pop-in like the
@@ -51,7 +51,7 @@ export default function TabsLayout() {
       if (e.translationX < 0 && currentIdx < TABS.length - 1) runOnJS(goTo)(currentIdx + 1);
       else if (e.translationX > 0 && currentIdx > 0)          runOnJS(goTo)(currentIdx - 1);
     }),
-  [currentIdx, goTo]);
+  [currentIdx, goTo, W]);
 
   return (
     <View style={[s.root, { backgroundColor: c.bg.primary }]}>

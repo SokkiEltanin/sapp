@@ -1,12 +1,12 @@
 import { useRef, useEffect } from 'react';
-import { View, Animated, Dimensions, Easing, StyleSheet } from 'react-native';
+import { View, Animated, useWindowDimensions, Easing, StyleSheet } from 'react-native';
 
-const { width: W, height: H } = Dimensions.get('window');
 const COUNT = 30;
 
 // Lightweight confetti — no extra deps. Each particle loops top→bottom with drift +
 // spin, driven by its own native-driver timing.
 export default function Confetti({ colors }: { colors: string[] }) {
+  const { width: W, height: H } = useWindowDimensions(); // reactive → correct after a resize
   const parts = useRef(
     Array.from({ length: COUNT }).map((_, i) => ({
       x: Math.random() * W,
