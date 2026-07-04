@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, RefreshControl, SectionList,
-  ScrollView, TouchableOpacity,
+  ScrollView, TouchableOpacity, Modal, TextInput, Pressable,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -11,7 +11,7 @@ import { looksLikeFood } from '@/utils/calories';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
-import { RefreshCcw, Tag, Car, Package, HandCoins } from 'lucide-react-native';
+import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -121,6 +121,10 @@ export default function FinancesScreen() {
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [activePayer, setActivePayer] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<'all' | 'cash' | 'card'>('all');
+  const [activeType, setActiveType] = useState<'all' | 'income' | 'expense'>('all');
+  const [amtMin, setAmtMin] = useState('');
+  const [amtMax, setAmtMax] = useState('');
+  const [filterModal, setFilterModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
   const [chartFoodOnly, setChartFoodOnly] = useState(false);
   const [balanceOffset, setBalanceOffset] = useState(0);
@@ -258,10 +262,25 @@ export default function FinancesScreen() {
     }
   }, [expenses, chartPeriod, scope, chartFoodOnly]);
 
+  const min = parseFloat(amtMin.replace(',', '.'));
+  const max = parseFloat(amtMax.replace(',', '.'));
+  const activeFilterCount =
+    (activeType !== 'all' ? 1 : 0) + (activePayer ? 1 : 0) + (activePayment !== 'all' ? 1 : 0) +
+    (activeTagFilter ? 1 : 0) + (!isNaN(min) ? 1 : 0) + (!isNaN(max) ? 1 : 0);
+
+  const clearFilters = () => {
+    setActiveType('all'); setActivePayer(null); setActivePayment('all');
+    setActiveTagFilter(null); setAmtMin(''); setAmtMax('');
+  };
+
   const sections = useMemo(() => {
     const matches = (e: Expense) => {
+      if (activeType === 'income' && e.type !== 'income') return false;
+      if (activeType === 'expense' && !isExp(e)) return false;
       if (activePayer && e.payer !== activePayer) return false;
       if (activePayment !== 'all' && (e.paymentMethod ?? 'card') !== activePayment) return false;
+      if (!isNaN(min) && e.amount < min) return false;
+      if (!isNaN(max) && e.amount > max) return false;
       if (activeTagFilter) {
         if (e.tags.includes(activeTagFilter)) return true;
         if (e.receiptItems?.some(it => it.tags.includes(activeTagFilter))) return true;
@@ -269,7 +288,7 @@ export default function FinancesScreen() {
       }
       return true;
     };
-    const filtered = (activeTagFilter || activePayer || activePayment !== 'all')
+    const filtered = activeFilterCount > 0
       ? grouped.map(([date, items]) => [date, items.filter(matches)] as [string, typeof items])
           .filter(([, items]) => items.length > 0)
       : grouped;
@@ -278,7 +297,7 @@ export default function FinancesScreen() {
       data: items,
       total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
     }));
-  }, [grouped, activeTagFilter, activePayer, activePayment]);
+  }, [grouped, activeTagFilter, activePayer, activePayment, activeType, min, max, activeFilterCount]);
 
   return (
     <SafeAreaView style={st.root} edges={[]}>
@@ -425,77 +444,24 @@ export default function FinancesScreen() {
                 </View>
               </View>
 
-              {/* ── Payer filter chips (who paid) ─── */}
-              {payersInData.length > 0 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={st.tagRow}
-                  style={{ marginBottom: 8 }}
+              {/* ── Filters button → popup ─── */}
+              <View style={st.filterBar}>
+                <TouchableOpacity
+                  style={[st.filterBtn, activeFilterCount > 0 && st.filterBtnOn]}
+                  onPress={() => { haptic.tap(); setFilterModal(true); }}
+                  activeOpacity={0.8}
                 >
-                  <TouchableOpacity
-                    onPress={() => { haptic.tap(); setActivePayer(null); }}
-                    style={[st.tagChip, !activePayer && st.tagChipOn]}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[st.tagText, !activePayer && st.tagTextOn]}>Wszyscy</Text>
+                  <SlidersHorizontal size={15} color={activeFilterCount > 0 ? F.accent : colors.text.secondary} />
+                  <Text style={[st.filterBtnText, activeFilterCount > 0 && { color: F.accent }]}>
+                    Filtry{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+                  </Text>
+                </TouchableOpacity>
+                {activeFilterCount > 0 && (
+                  <TouchableOpacity onPress={() => { haptic.tap(); clearFilters(); }} style={st.filterClear} activeOpacity={0.8}>
+                    <Text style={st.filterClearText}>Wyczyść</Text>
                   </TouchableOpacity>
-                  {payersInData.map(p => (
-                    <TouchableOpacity
-                      key={p}
-                      onPress={() => { haptic.tap(); setActivePayer(activePayer === p ? null : p); }}
-                      style={[st.tagChip, activePayer === p && st.tagChipOn]}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[st.tagText, activePayer === p && st.tagTextOn]}>{p}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-              {/* ── Payment-method filter (karta / gotówka) ─── */}
-              {expenses.some(e => e.paymentMethod === 'cash') && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tagRow} style={{ marginBottom: 8 }}>
-                  {([['all', 'Wszystko'], ['card', 'Karta'], ['cash', 'Gotówka']] as const).map(([val, lbl]) => (
-                    <TouchableOpacity
-                      key={val}
-                      onPress={() => { haptic.tap(); setActivePayment(val); }}
-                      style={[st.tagChip, activePayment === val && st.tagChipOn]}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[st.tagText, activePayment === val && st.tagTextOn]}>{lbl}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-
-              {/* ── Tag filter chips ─── */}
-              {availableTags.length > 0 && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={st.tagRow}
-                  style={{ marginBottom: 8 }}
-                >
-                  <TouchableOpacity
-                    onPress={() => { haptic.tap(); setActiveTagFilter(null); }}
-                    style={[st.tagChip, !activeTagFilter && st.tagChipOn]}
-                    activeOpacity={0.7}
-                  >
-                    <Tag size={10} color={!activeTagFilter ? F.accent : colors.text.muted} />
-                    <Text style={[st.tagText, !activeTagFilter && st.tagTextOn]}>Wszystkie</Text>
-                  </TouchableOpacity>
-                  {availableTags.map(tag => (
-                    <TouchableOpacity
-                      key={tag}
-                      onPress={() => { haptic.tap(); setActiveTagFilter(activeTagFilter === tag ? null : tag); }}
-                      style={[st.tagChip, activeTagFilter === tag && st.tagChipOn]}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[st.tagText, activeTagFilter === tag && st.tagTextOn]}>{tag}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
+                )}
+              </View>
             </>
           }
           renderSectionHeader={({ section }) => (
@@ -527,6 +493,119 @@ export default function FinancesScreen() {
         />
 
       </View>
+
+      {/* ── Filters popup ─── */}
+      <Modal visible={filterModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setFilterModal(false)}>
+        <View style={st.fmOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setFilterModal(false)} />
+          <View style={st.fmCard}>
+            <View style={st.fmHeader}>
+              <SlidersHorizontal size={16} color={F.accent} />
+              <Text style={st.fmTitle}>Filtry</Text>
+              <TouchableOpacity onPress={() => setFilterModal(false)} hitSlop={10} style={{ marginLeft: 'auto' }}>
+                <X size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {/* Typ */}
+              <Text style={st.fmLabel}>Typ</Text>
+              <View style={st.fmRow}>
+                {([['all', 'Wszystko'], ['expense', 'Wydatki'], ['income', 'Przychody']] as const).map(([val, lbl]) => (
+                  <TouchableOpacity key={val} onPress={() => { haptic.tap(); setActiveType(val); }}
+                    style={[st.tagChip, activeType === val && st.tagChipOn]} activeOpacity={0.8}>
+                    <Text style={[st.tagText, activeType === val && st.tagTextOn]}>{lbl}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Kwota */}
+              <Text style={st.fmLabel}>Kwota (zł)</Text>
+              <View style={st.fmAmtRow}>
+                <TextInput value={amtMin} onChangeText={setAmtMin} keyboardType="decimal-pad" placeholder="od"
+                  placeholderTextColor={colors.text.muted} style={st.fmInput} />
+                <Text style={st.fmDash}>—</Text>
+                <TextInput value={amtMax} onChangeText={setAmtMax} keyboardType="decimal-pad" placeholder="do"
+                  placeholderTextColor={colors.text.muted} style={st.fmInput} />
+              </View>
+              <View style={st.fmRow}>
+                {([['', '20', 'do 20'], ['20', '100', '20–100'], ['100', '', '100+']] as const).map(([lo, hi, lbl]) => {
+                  const on = amtMin === lo && amtMax === hi;
+                  return (
+                    <TouchableOpacity key={lbl} onPress={() => { haptic.tap(); setAmtMin(lo); setAmtMax(hi); }}
+                      style={[st.tagChip, on && st.tagChipOn]} activeOpacity={0.8}>
+                      <Text style={[st.tagText, on && st.tagTextOn]}>{lbl}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Osoba */}
+              {payersInData.length > 0 && (
+                <>
+                  <Text style={st.fmLabel}>Osoba</Text>
+                  <View style={st.fmRow}>
+                    <TouchableOpacity onPress={() => { haptic.tap(); setActivePayer(null); }}
+                      style={[st.tagChip, !activePayer && st.tagChipOn]} activeOpacity={0.8}>
+                      <Text style={[st.tagText, !activePayer && st.tagTextOn]}>Wszyscy</Text>
+                    </TouchableOpacity>
+                    {payersInData.map(p => (
+                      <TouchableOpacity key={p} onPress={() => { haptic.tap(); setActivePayer(activePayer === p ? null : p); }}
+                        style={[st.tagChip, activePayer === p && st.tagChipOn]} activeOpacity={0.8}>
+                        <Text style={[st.tagText, activePayer === p && st.tagTextOn]}>{p}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* Płatność */}
+              {expenses.some(e => e.paymentMethod === 'cash') && (
+                <>
+                  <Text style={st.fmLabel}>Płatność</Text>
+                  <View style={st.fmRow}>
+                    {([['all', 'Wszystko'], ['card', 'Karta'], ['cash', 'Gotówka']] as const).map(([val, lbl]) => (
+                      <TouchableOpacity key={val} onPress={() => { haptic.tap(); setActivePayment(val); }}
+                        style={[st.tagChip, activePayment === val && st.tagChipOn]} activeOpacity={0.8}>
+                        <Text style={[st.tagText, activePayment === val && st.tagTextOn]}>{lbl}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* Tag */}
+              {availableTags.length > 0 && (
+                <>
+                  <Text style={st.fmLabel}>Tag</Text>
+                  <View style={st.fmRow}>
+                    <TouchableOpacity onPress={() => { haptic.tap(); setActiveTagFilter(null); }}
+                      style={[st.tagChip, !activeTagFilter && st.tagChipOn]} activeOpacity={0.8}>
+                      <Text style={[st.tagText, !activeTagFilter && st.tagTextOn]}>Wszystkie</Text>
+                    </TouchableOpacity>
+                    {availableTags.map(tag => (
+                      <TouchableOpacity key={tag} onPress={() => { haptic.tap(); setActiveTagFilter(activeTagFilter === tag ? null : tag); }}
+                        style={[st.tagChip, activeTagFilter === tag && st.tagChipOn]} activeOpacity={0.8}>
+                        <Text style={[st.tagText, activeTagFilter === tag && st.tagTextOn]}>{tag}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+              <View style={{ height: 12 }} />
+            </ScrollView>
+
+            <View style={st.fmFooter}>
+              <TouchableOpacity onPress={() => { haptic.tap(); clearFilters(); }} style={st.fmClearBtn} activeOpacity={0.85}>
+                <Text style={st.fmClearText}>Wyczyść</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { haptic.tap(); setFilterModal(false); }} style={st.fmApplyBtn} activeOpacity={0.9}>
+                <Text style={st.fmApplyText}>Zastosuj{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -642,6 +721,38 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   tagChipOn: { backgroundColor: f.accent + '18', borderColor: f.accent + '55' },
   tagText:   { fontSize: 11, fontWeight: '600', color: c.text.muted },
   tagTextOn: { color: f.accent },
+
+  // ── Filters ───────────────────────────────────────────────────────────────────
+  filterBar: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], marginBottom: 8 },
+  filterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    backgroundColor: f.card, borderRadius: radius.full, borderWidth: 1, borderColor: f.cardBorder,
+  },
+  filterBtnOn: { backgroundColor: f.accent + '14', borderColor: f.accent + '66' },
+  filterBtnText: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+  filterClear: { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
+  filterClearText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  fmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  fmCard: {
+    backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    padding: spacing[4], paddingBottom: spacing[6], borderWidth: 1, borderColor: c.border.default,
+  },
+  fmHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
+  fmTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  fmLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: spacing[3], marginBottom: spacing[2] },
+  fmRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  fmAmtRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[2] },
+  fmInput: {
+    flex: 1, backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default,
+    paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 15, color: c.text.primary,
+  },
+  fmDash: { fontSize: 15, color: c.text.muted },
+  fmFooter: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
+  fmClearBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default },
+  fmClearText: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
+  fmApplyBtn: { flex: 1.6, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: radius.lg, backgroundColor: f.accent },
+  fmApplyText: { fontSize: 14, fontWeight: '800', color: '#fff' },
 
   // ── Section header ────────────────────────────────────────────────────────────
   sectionHeader: {
