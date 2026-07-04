@@ -67,7 +67,9 @@
       "Bash(node -e \"console.log\\(require\\('./app.json'\\).expo.android.package\\)\")",
       "Bash(ls -la android/app/src/main/java/com/sokki/sapp/SappNotificationListener.kt)",
       "Bash(rm -rf android)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

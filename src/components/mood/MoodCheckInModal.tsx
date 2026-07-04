@@ -62,6 +62,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
+  const tagsScrollRef = useRef<ScrollView>(null);
 
   const { addEntry, updateEntry, entries: allEntries } = useMoodStore();
   const chipColor = mood ? MOOD_COLORS[mood] : undefined;
@@ -149,6 +150,8 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     setTags(prev => [...prev, t]);
     setCustomTag('');
     setCustomTagOpen(false);
+    // Snap the tag rail back to the start so the new custom tag is visible at once.
+    setTimeout(() => tagsScrollRef.current?.scrollTo({ x: 0, animated: true }), 60);
   };
 
   const handleSave = async () => {
@@ -185,10 +188,11 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
     }
   };
 
-  // All tags to show: sorted presets + any custom tags already selected not in preset
+  // Custom (non-preset) tags are pinned to the FRONT (right after the + button) so a
+  // just-added one is visible immediately on the left instead of scrolled off the end.
   const allDisplayTags = [
-    ...sortedPresetTags,
     ...tags.filter(t => !PRESET_TAGS.includes(t)),
+    ...sortedPresetTags,
   ];
 
   return (
@@ -249,6 +253,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                     </TouchableOpacity>
                   )}
                   <ScrollView
+                    ref={tagsScrollRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.tagsScroll}
