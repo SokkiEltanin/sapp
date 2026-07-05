@@ -11,7 +11,13 @@ export const expensesService = {
   async getAll(): Promise<Expense[]> {
     const q = query(userCol(COL), orderBy('date', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Expense));
+    // Normalise: an old/partial Firestore doc may lack `tags`, and code across the
+    // app calls e.tags.includes/.map unguarded — a single missing field would crash
+    // a whole screen. Guarantee the array here, at the one load boundary.
+    return snap.docs.map((d) => {
+      const data = d.data() as Expense;
+      return { ...data, id: d.id, tags: Array.isArray(data.tags) ? data.tags : [] };
+    });
   },
 
   async add(expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<Expense> {

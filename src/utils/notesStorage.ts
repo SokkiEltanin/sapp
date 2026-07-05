@@ -18,7 +18,9 @@ const FOLDERS_KEY = 'notes_folders_v1';
 async function load(): Promise<Note[]> {
   try {
     const raw = await AsyncStorage.getItem(NOTES_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const notes: Note[] = raw ? JSON.parse(raw) : [];
+    // Guarantee tags — consumers call n.tags.map/.some/.length unguarded.
+    return notes.map(n => ({ ...n, tags: Array.isArray(n.tags) ? n.tags : [] }));
   } catch {
     return [];
   }
