@@ -5,6 +5,15 @@ const HABITS_KEY = 'habits_list';
 const cntKey    = (date: string) => `habits_cnt_${date}`;
 const legacyKey = (date: string) => `habits_done_${date}`;
 
+// How much one tap adds/removes for a count habit. Water (or any ml goal) steps by a
+// glass (250 ml) so you don't tap 250 times to reach 2500; everything else steps by 1.
+export function stepFor(h: Habit): number {
+  if (h.step && h.step > 0) return h.step;
+  const u = (h.unit ?? '').trim().toLowerCase();
+  if (h.kind === 'water' || u === 'ml') return 250;
+  return 1;
+}
+
 export async function getHabits(): Promise<Habit[]> {
   const raw = await AsyncStorage.getItem(HABITS_KEY);
   return raw ? JSON.parse(raw) : [];

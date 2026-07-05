@@ -349,6 +349,7 @@ export interface Habit {
   type?: HabitType;        // default 'check'
   kind?: 'water';          // special habit fed by Health Connect hydration
   dailyGoal?: number;      // for count type (e.g. 8 glasses)
+  step?: number;           // amount added per tap (e.g. 250 for a glass of water); default 1
   unit?: string;           // e.g. 'szkl.', 'ml', 'min'
   weeklyTarget?: number;   // 1-7, default 7 = every day
   reminderTime?: string;   // HH:mm or undefined = no reminder

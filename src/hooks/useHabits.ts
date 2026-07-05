@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Habit } from '@/types';
-import { getHabits, saveHabits, getCounts, setCounts } from '@/utils/habits';
+import { getHabits, saveHabits, getCounts, setCounts, stepFor } from '@/utils/habits';
+import { useHabitsSync } from '@/store/habitsSync';
 import { notificationsService } from '@/services/notificationsService';
 
 function applyReminder(habit: Habit) {
@@ -38,6 +39,8 @@ export function useHabits() {
   const [isLoading, setIsLoading] = useState(true);
 
   const today = todayStr();
+  const syncVersion = useHabitsSync((s) => s.version);
+  const bump = useHabitsSync((s) => s.bump);
 
   const load = useCallback(async () => {
     try {
@@ -56,6 +59,17 @@ export function useHabits() {
 
   useEffect(() => { load(); }, []);
 
+  // Another instance mutated → re-read the list + today's counts (cheap) so a
+  // deleted habit disappears everywhere, not just on the screen that deleted it.
+  useEffect(() => {
+    if (syncVersion === 0) return;
+    (async () => {
+      const [list, tc] = await Promise.all([getHabits(), getCounts(today)]);
+      setHabits(list);
+      setComp((prev) => ({ ...prev, [today]: tc }));
+    })();
+  }, [syncVersion, today]);
+
   // Toggle for check-type habits
   const toggle = useCallback(async (habitId: string) => {
     const counts = completions[today] ?? {};
@@ -64,29 +78,32 @@ export function useHabits() {
     const nextCounts = { ...counts, [habitId]: next };
     setComp((prev) => ({ ...prev, [today]: nextCounts }));
     await setCounts(today, nextCounts);
+    bump();
   }, [completions, today]);
 
-  // +1 for count-type habits
+  // +step for count-type habits (a glass = 250 ml for water, else 1)
   const increment = useCallback(async (habitId: string) => {
     const counts  = completions[today] ?? {};
     const current = counts[habitId] ?? 0;
     const habit   = habits.find((h) => h.id === habitId);
-    const goal    = goalFor(habit!);
-    const next    = current + 1;
+    const next    = current + (habit ? stepFor(habit) : 1);
     const nextCounts = { ...counts, [habitId]: next };
     setComp((prev) => ({ ...prev, [today]: nextCounts }));
     await setCounts(today, nextCounts);
+    bump();
   }, [completions, today, habits]);
 
-  // -1 for count-type habits (min 0)
+  // -step for count-type habits (min 0)
   const decrement = useCallback(async (habitId: string) => {
     const counts  = completions[today] ?? {};
     const current = counts[habitId] ?? 0;
     if (current <= 0) return;
-    const nextCounts = { ...counts, [habitId]: current - 1 };
+    const habit   = habits.find((h) => h.id === habitId);
+    const nextCounts = { ...counts, [habitId]: Math.max(0, current - (habit ? stepFor(habit) : 1)) };
     setComp((prev) => ({ ...prev, [today]: nextCounts }));
     await setCounts(today, nextCounts);
-  }, [completions, today]);
+    bump();
+  }, [completions, today, habits]);
 
   const add = useCallback(async (partial: Omit<Habit, 'id' | 'createdAt'>) => {
     const newHabit: Habit = {
@@ -98,6 +115,7 @@ export function useHabits() {
     setHabits(next);
     await saveHabits(next);
     applyReminder(newHabit);
+    bump();
     return newHabit;
   }, [habits]);
 
@@ -106,6 +124,7 @@ export function useHabits() {
     const next = habits.filter((h) => h.id !== id);
     setHabits(next);
     await saveHabits(next);
+    bump();
   }, [habits]);
 
   const update = useCallback(async (id: string, partial: Partial<Omit<Habit, 'id' | 'createdAt'>>) => {
@@ -114,6 +133,7 @@ export function useHabits() {
     await saveHabits(next);
     const updated = next.find((h) => h.id === id);
     if (updated) applyReminder(updated);
+    bump();
   }, [habits]);
 
   const getStreak = useCallback((habitId: string): number => {

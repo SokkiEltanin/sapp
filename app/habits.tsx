@@ -13,6 +13,7 @@ import {
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useHabits } from '@/hooks/useHabits';
+import { stepFor } from '@/utils/habits';
 import { HABIT_COLORS, HABIT_ICONS, Habit, HabitType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -90,6 +91,7 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   const hr = useMemo(() => makeHr(colors), [colors]);
   const isCount = habit.type === 'count';
   const goal    = habit.dailyGoal ?? 1;
+  const step    = isCount ? stepFor(habit) : 1;
   const pct     = isCount ? Math.min(count / goal, 1) : (done ? 1 : 0);
 
   // Weekly progress for habits with weeklyTarget < 7
@@ -130,10 +132,10 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
           )}
         </View>
 
-        {/* Progress bar for count habits */}
+        {/* Progress bar for count habits — a taller, blue "water level" for water */}
         {isCount && (
           <View style={hr.progressWrap}>
-            <View style={hr.progressTrack}>
+            <View style={[hr.progressTrack, habit.kind === 'water' && { height: 14, backgroundColor: habit.color + '1F' }]}>
               <View style={[
                 hr.progressFill,
                 { width: `${pct * 100}%` as any, backgroundColor: done ? colors.accent.green : habit.color },
@@ -154,8 +156,10 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
 
       {isCount ? (
         <View style={hr.countControls}>
-          <PressableScale onPress={onIncrement} style={[hr.countBtn, { borderColor: habit.color + '60' }]}>
-            <Plus size={13} color={habit.color} />
+          <PressableScale onPress={onIncrement} style={[hr.countBtn, step > 1 && hr.countBtnWide, { borderColor: habit.color + '60' }]}>
+            {step > 1
+              ? <Text style={{ fontSize: 11, fontWeight: '800', color: habit.color }}>+{step}</Text>
+              : <Plus size={13} color={habit.color} />}
           </PressableScale>
           <Text style={hr.countNum}>{count}</Text>
           <PressableScale onPress={onDecrement} style={hr.countBtn} disabled={count === 0}>
@@ -234,6 +238,7 @@ const makeHr = (c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: c.border.default,
     alignItems: 'center', justifyContent: 'center',
   },
+  countBtnWide: { width: 44 },
   countNum: { fontSize: 13, fontWeight: '800', color: c.text.primary, minWidth: 20, textAlign: 'center' },
 });
 
@@ -771,7 +776,7 @@ export default function HabitsScreen() {
                     toggle(habit.id);
                   }}
                   onIncrement={() => {
-                    haptic[count + 1 >= goal ? 'success' : 'tap']();
+                    haptic[count + stepFor(habit) >= goal ? 'success' : 'tap']();
                     increment(habit.id);
                   }}
                   onDecrement={() => { haptic.tap(); decrement(habit.id); }}
