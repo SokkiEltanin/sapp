@@ -1871,6 +1871,10 @@ export default function DashboardScreen() {
     const sweetDays = new Set<string>();
     let total = 0, weekendSpend = 0, cashSpend = 0, cardUsed = false, cashUsed = false, foodSpend = 0;
     let smallN = 0, smallSum = 0;
+    const pm = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+    const prevMonthKey = `${pm.getFullYear()}-${pad(pm.getMonth() + 1)}`;
+    let thisMonthTotal = 0, prevMonthTotal = 0, monthTxCount = 0;
+    const monthSpendDays = new Set<string>();
     let costliestItem = { name: '', price: 0 };
     for (const e of expenses) {
       if (e.type === 'income' || isSelfTransfer(e)) continue;
@@ -1885,6 +1889,8 @@ export default function DashboardScreen() {
       if (e.storeName) storeSpend[e.storeName] = (storeSpend[e.storeName] ?? 0) + e.amount;
       if (e.category === 'groceries') foodSpend += e.amount;
       if (e.amount < 10 && day.startsWith(monthKey)) { smallN++; smallSum += e.amount; }
+      if (day.startsWith(monthKey)) { thisMonthTotal += e.amount; monthTxCount++; monthSpendDays.add(day); }
+      else if (day.startsWith(prevMonthKey)) prevMonthTotal += e.amount;
       for (const it of (e.receiptItems ?? [])) {
         if (it.kind === 'deposit') continue;
         if (it.price > costliestItem.price && it.name) costliestItem = { name: canonicalProductName(it.name, nameAliases), price: it.price };
@@ -1933,8 +1939,18 @@ export default function DashboardScreen() {
     if (foodSpend > 0 && total > 0) facts.push({ icon: 'percent', label: `Jedzenie/spożywka to ${Math.round(foodSpend / total * 100)}% wydatków` });
     // costliest single product (not receipt)
     if (costliestItem.price > 0) facts.push({ icon: 'flame', label: `Najdroższy produkt: ${costliestItem.name} (${Math.round(costliestItem.price)} zł)` });
+    // this month vs previous month
+    if (prevMonthTotal > 0 && thisMonthTotal > 0) {
+      const pct = Math.round((thisMonthTotal - prevMonthTotal) / prevMonthTotal * 100);
+      if (Math.abs(pct) >= 5) facts.push({ icon: 'percent', label: pct > 0 ? `Ten miesiąc o ${pct}% drożej niż poprzedni` : `Ten miesiąc o ${-pct}% taniej niż poprzedni` });
+    }
+    // no-spend days this month
+    const noSpend = new Date().getDate() - monthSpendDays.size;
+    if (noSpend >= 3) facts.push({ icon: 'calendar', label: `W tym miesiącu ${noSpend} dni bez żadnego wydatku` });
+    // average transaction this month
+    if (monthTxCount >= 5) facts.push({ icon: 'wallet', label: `Średni wydatek w tym mies.: ${Math.round(thisMonthTotal / monthTxCount)} zł (${monthTxCount} transakcji)` });
 
-    return facts.slice(0, 6);
+    return facts.slice(0, 8);
   }, [expenses, nameAliases]);
 
   // ── Weight ciekawostka: kg per food group THIS MONTH, with top-2 breakdown ──
