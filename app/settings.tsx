@@ -5,7 +5,7 @@ import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { isPaycheck } from '@/hooks/useWorkEarnings';
 import { paycheckTargetMonth } from '@/utils/paycheck';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -81,6 +81,38 @@ function HeroStepper({ label, value, onDec, onInc }: { label: string; value: str
     </View>
   );
 }
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// A settings section that collapses. Its own header (icon + title + chevron) replaces
+// the old flat sectionTitle, so the screen reads as a tidy, tappable menu.
+function CollapsibleSection({ icon: Icon, title, color = '#8A93A8', defaultOpen = true, right, children }: {
+  icon: any; title: string; color?: string; defaultOpen?: boolean; right?: React.ReactNode; children: React.ReactNode;
+}) {
+  const c = useColors();
+  const [open, setOpen] = useState(defaultOpen);
+  const toggle = () => { LayoutAnimation.configureNext(LayoutAnimation.create(200, 'easeInEaseOut', 'opacity')); haptic.tap(); setOpen(o => !o); };
+  return (
+    <View style={{ marginBottom: spacing[4] }}>
+      <Pressable onPress={toggle} style={csStyles(c).head}>
+        <View style={[csStyles(c).icon, { backgroundColor: color + '1A' }]}>
+          <Icon size={15} color={color} />
+        </View>
+        <Text style={csStyles(c).title}>{title}</Text>
+        {right}
+        <LucideIcons.ChevronDown size={18} color={c.text.muted} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+      </Pressable>
+      {open && <View style={{ marginTop: spacing[2] }}>{children}</View>}
+    </View>
+  );
+}
+const csStyles = (c: any) => StyleSheet.create({
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[2], paddingHorizontal: spacing[1] },
+  icon: { width: 30, height: 30, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, fontSize: 15, fontWeight: '800', color: c.text.primary, letterSpacing: 0.2 },
+});
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -578,8 +610,7 @@ export default function SettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* Haptics */}
-        <View>
-          <Text style={styles.sectionTitle}>Interfejs</Text>
+        <CollapsibleSection icon={LucideIcons.Palette} title="Interfejs" color="#A78BFA">
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={styles.iconWrap}>
@@ -612,11 +643,10 @@ export default function SettingsScreen() {
               />
             </View>
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Work prefix */}
-        <View>
-          <Text style={styles.sectionTitle}>Praca</Text>
+        <CollapsibleSection icon={LucideIcons.Briefcase} title="Praca" color="#60A5FA">
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#60A5FA18' }]}>
@@ -773,11 +803,10 @@ export default function SettingsScreen() {
 
             <ConfirmedMonths payMonths={payMonths} />
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Account balance reconciliation */}
-        <View>
-          <Text style={styles.sectionTitle}>Saldo konta</Text>
+        <CollapsibleSection icon={LucideIcons.Wallet} title="Saldo konta" color="#5B7BE3">
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#5B7BE318' }]}>
@@ -841,11 +870,10 @@ export default function SettingsScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Payday prompt */}
-        <View>
-          <Text style={styles.sectionTitle}>Wypłata</Text>
+        <CollapsibleSection icon={LucideIcons.Banknote} title="Wypłata" color="#2AC68F">
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
@@ -890,11 +918,10 @@ export default function SettingsScreen() {
               </View>
             )}
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Notifications */}
-        <View>
-          <Text style={styles.sectionTitle}>Powiadomienia</Text>
+        <CollapsibleSection icon={LucideIcons.Bell} title="Powiadomienia" color="#A78BFA" defaultOpen={false}>
           <View style={styles.card}>
             <PressableScale
               onPress={() => { haptic.tap(); router.push('/notifications' as any); }}
@@ -1115,17 +1142,15 @@ export default function SettingsScreen() {
               <Text style={[styles.dangerText, { color: colors.accent.danger }]}>Anuluj wszystkie powiadomienia</Text>
             </PressableScale>
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Monthly budgets */}
-        <View>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Budżet miesięczny</Text>
-            <PressableScale onPress={handleSaveBudgets} style={styles.saveBudgetBtn}>
-              <Check size={14} color={colors.accent.success} />
-              <Text style={styles.saveBudgetText}>Zapisz</Text>
-            </PressableScale>
-          </View>
+        <CollapsibleSection icon={LucideIcons.PiggyBank} title="Budżet miesięczny" color="#2AC68F" defaultOpen={false} right={
+          <PressableScale onPress={handleSaveBudgets} style={styles.saveBudgetBtn}>
+            <Check size={14} color={colors.accent.success} />
+            <Text style={styles.saveBudgetText}>Zapisz</Text>
+          </PressableScale>
+        }>
           <View style={styles.card}>
             {(Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][])
               .filter(([cat]) => cat !== 'other')
@@ -1153,11 +1178,10 @@ export default function SettingsScreen() {
                 );
               })}
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Tag budgets */}
-        <View>
-          <Text style={styles.sectionTitle}>Limity na tagi</Text>
+        <CollapsibleSection icon={LucideIcons.Tag} title="Limity na tagi" color="#FBBF24" defaultOpen={false}>
           <View style={styles.card}>
             {/* Existing rules */}
             {tagRules.map((rule, i) => (
@@ -1257,11 +1281,10 @@ export default function SettingsScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Data overview */}
-        <View>
-          <Text style={styles.sectionTitle}>Dane</Text>
+        <CollapsibleSection icon={LucideIcons.Database} title="Dane" color="#46B0DE" defaultOpen={false}>
           <View style={styles.card}>
             {[
               { icon: <Smile size={14} color={colors.text.secondary} />, label: 'Wpisy nastroju', val: moodEntries.length },
@@ -1278,7 +1301,7 @@ export default function SettingsScreen() {
               </View>
             ))}
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Cloud backup */}
         <View>
@@ -1286,8 +1309,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Account */}
-        <View>
-          <Text style={styles.sectionTitle}>Konto</Text>
+        <CollapsibleSection icon={LucideIcons.User} title="Konto" color="#2AC68F">
           <View style={styles.card}>
             {googleUser ? (
               <View style={styles.row}>
@@ -1320,11 +1342,10 @@ export default function SettingsScreen() {
               </View>
             )}
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Personalization */}
-        <View>
-          <Text style={styles.sectionTitle}>Personalizacja</Text>
+        <CollapsibleSection icon={LucideIcons.Sparkles} title="Personalizacja" color="#F472B6" defaultOpen={false}>
           <View style={styles.card}>
             {/* Theme mode — engine is live; screens flip as they're migrated. */}
             <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
@@ -1369,11 +1390,10 @@ export default function SettingsScreen() {
             </PressableScale>
 
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* More */}
-        <View>
-          <Text style={styles.sectionTitle}>Więcej</Text>
+        <CollapsibleSection icon={LucideIcons.MoreHorizontal} title="Więcej" color="#8A93A8" defaultOpen={false}>
           <View style={styles.card}>
             <PressableScale
               onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
@@ -1403,11 +1423,10 @@ export default function SettingsScreen() {
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Bank auto-expenses */}
-        <View>
-          <Text style={styles.sectionTitle}>Auto-wydatki z banku (PeoPay)</Text>
+        <CollapsibleSection icon={LucideIcons.Landmark} title="Auto-wydatki z banku (PeoPay)" color="#2AC68F" defaultOpen={false}>
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
@@ -1441,11 +1460,10 @@ export default function SettingsScreen() {
               </View>
             )}
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* Diagnostics */}
-        <View>
-          <Text style={styles.sectionTitle}>Diagnostyka</Text>
+        <CollapsibleSection icon={LucideIcons.Wrench} title="Diagnostyka" color="#8A93A8" defaultOpen={false}>
           <View style={styles.card}>
             <PressableScale
               onPress={() => { router.push('/expenses/audit' as any); }}
@@ -1461,11 +1479,10 @@ export default function SettingsScreen() {
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
           </View>
-        </View>
+        </CollapsibleSection>
 
         {/* About */}
-        <View>
-          <Text style={styles.sectionTitle}>Aplikacja</Text>
+        <CollapsibleSection icon={LucideIcons.Info} title="Aplikacja" color="#8A93A8" defaultOpen={false}>
           <View style={styles.card}>
             <View style={styles.aboutHeader}>
               <View style={styles.appIcon}>
@@ -1491,7 +1508,7 @@ export default function SettingsScreen() {
               </View>
             ))}
           </View>
-        </View>
+        </CollapsibleSection>
 
       </ScrollView>
     </SafeAreaView>
