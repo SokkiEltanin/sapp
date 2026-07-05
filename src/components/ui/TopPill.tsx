@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState } from 'react-native';
 import { router } from 'expo-router';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -91,8 +91,16 @@ export default function TopPill() {
   const { habits, todayDone } = useHabits();
   const todayMoodEntry = useMoodStore(s => s.todayEntry);
 
+  // The pill never re-focuses (it lives in the tab bar), so reload budgets on
+  // cold start AND every foreground — otherwise a limit changed in Settings would
+  // leave the pill's "near limit" warning stale for the whole session.
   const [budgets, setBudgets] = useState<MonthlyBudgets>({});
-  useEffect(() => { getBudgets().then(setBudgets).catch(() => {}); }, []);
+  useEffect(() => {
+    const reload = () => getBudgets().then(setBudgets).catch(() => {});
+    reload();
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
+    return () => sub.remove();
+  }, []);
 
   // ── Priority logic ─────────────────────────────────────────────────────────
   const item: PillItem | null = useMemo(() => {
