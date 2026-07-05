@@ -73,6 +73,57 @@ export const SECTION_TITLES: Record<string, string> = {
   'gcal':           'Kalendarz Google',
 };
 
+// Short "what it shows" line per section — surfaced in the dashboard editor so you
+// know what each toggle does without enabling it.
+export const SECTION_DESC: Record<string, string> = {
+  'payday-prompt':  'Pyta o wypłatę w dniu wypłaty',
+  'debt-prompt':    'Pyta o zwrot pożyczonych pieniędzy',
+  'bill-suggest':   'Wykrywa powtarzalny wydatek → stały rachunek',
+  'bank-queue':     'Płatności z banku do zatwierdzenia',
+  'weekly-insights':'Kafelki tygodnia + porównanie miesięcy',
+  'maintenance-reminders': 'Serwis pojazdów i przypomnienia',
+  'tag-limits':     'Ile zostało z limitów #tagów',
+  'budget-warning': 'Ostrzeżenie gdy budżet na wyczerpaniu',
+  'pinned-notes':   'Przypięte notatki na wierzchu',
+  'tasks-work-row': 'Kafelki: zadania na dziś + praca',
+  'today-tasks':    'Lista zadań na dziś i zaległych',
+  'countdowns':     'Odliczanie dni do wydarzeń',
+  'counters-since': 'Ile dni bez / od czegoś',
+  'gablota-card':   'Postęp w gablocie osiągnięć',
+  'habits-nudge':   'Wieczorne przypomnienie o nawykach',
+  'habits-today':   'Nawyki do odhaczenia dziś',
+  'stats-scope':    'Przełącznik: ja / wszyscy',
+  'finances':       'Saldo, wydatki i przychody (tydzień/miesiąc)',
+  'fixed-variable': 'Koszty stałe vs zmienne (4 mies.)',
+  'sweets-vs-food': 'Słodycze vs jedzenie (8 tygodni)',
+  'spend-by-day':   'Wydatki wg dnia tygodnia',
+  'work-hours':     'Zarobek + godziny pracy w miesiącu',
+  'top-products':   'Top 3 najczęściej kupowane',
+  'fun-facts':      'Ciekawostki z Twoich danych',
+  'correlations':   'Zależności: sen / kroki / nastrój / wydatki',
+  'mood-cal':       'Kalendarz nastroju',
+  'mood-wave':      'Nastrój — fala 8 tygodni',
+  'month-tasks':    'Statystyki ukończonych zadań (miesiąc)',
+  'gcal':           'Nadchodzące wydarzenia z Google Calendar',
+};
+
+// Category for grouping the "add section" pool in the editor.
+export const SECTION_GROUP: Record<string, string> = {
+  'payday-prompt': 'Przypomnienia', 'debt-prompt': 'Przypomnienia', 'bill-suggest': 'Przypomnienia',
+  'bank-queue': 'Przypomnienia', 'maintenance-reminders': 'Przypomnienia', 'budget-warning': 'Przypomnienia',
+  'tag-limits': 'Przypomnienia', 'habits-nudge': 'Przypomnienia',
+  'tasks-work-row': 'Zadania i nawyki', 'today-tasks': 'Zadania i nawyki', 'month-tasks': 'Zadania i nawyki',
+  'habits-today': 'Zadania i nawyki',
+  'finances': 'Finanse', 'fixed-variable': 'Finanse', 'sweets-vs-food': 'Finanse',
+  'spend-by-day': 'Finanse', 'top-products': 'Finanse', 'work-hours': 'Finanse',
+  'weekly-insights': 'Przegląd i statystyki', 'stats-scope': 'Przegląd i statystyki',
+  'fun-facts': 'Przegląd i statystyki', 'correlations': 'Przegląd i statystyki',
+  'mood-cal': 'Nastrój i liczniki', 'mood-wave': 'Nastrój i liczniki', 'countdowns': 'Nastrój i liczniki',
+  'counters-since': 'Nastrój i liczniki', 'gablota-card': 'Nastrój i liczniki',
+  'pinned-notes': 'Inne', 'gcal': 'Inne',
+};
+export const SECTION_GROUP_ORDER = ['Przypomnienia', 'Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
+
 export type CustomTileType = 'note' | 'link' | 'stat' | 'weather';
 export type WidgetViz = 'number' | 'wave' | 'list' | 'compare' | 'donut';
 

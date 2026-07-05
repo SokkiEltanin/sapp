@@ -67,7 +67,7 @@ import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
-import { useDashboardLayout, effectiveOrder, SECTION_TITLES, CustomTile } from '@/store/dashboardLayout';
+import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer } from '@/utils/statWidgets';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
@@ -3115,17 +3115,36 @@ export default function DashboardScreen() {
                             <Text style={[s.editAddText, { color: accentColor }]}>Dodaj sekcję ({hidden.length} wyłączonych)</Text>
                             <ChevronDown size={14} color={accentColor} style={showHiddenPool && { transform: [{ rotate: '180deg' }] }} />
                           </TouchableOpacity>
-                          {showHiddenPool && hidden.map(id => {
-                            const isCustom = id.startsWith('custom:');
-                            const ct = isCustom ? customTiles.find(t => t.id === id) : null;
-                            const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
-                            return (
-                              <TouchableOpacity key={id} style={s.hiddenRow} onPress={() => { haptic.tap(); toggleHiddenSection(id); setShowHiddenPool(true); }} activeOpacity={0.8}>
-                                <View style={[s.hiddenAddIcon, { borderColor: accentColor + '66' }]}><Plus size={13} color={accentColor} /></View>
-                                <Text style={s.hiddenRowText} numberOfLines={1}>{title}{!nodes[id] ? '  · brak danych' : ''}</Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                          {showHiddenPool && (() => {
+                            // Group the hidden sections by category (+ custom tiles last)
+                            // so the picker reads as a tidy menu with descriptions.
+                            const byGroup: Record<string, string[]> = {};
+                            for (const id of hidden) {
+                              const g = id.startsWith('custom:') ? 'Twoje kafelki' : (SECTION_GROUP[id] ?? 'Inne');
+                              (byGroup[g] ??= []).push(id);
+                            }
+                            const groupOrder = [...SECTION_GROUP_ORDER, 'Twoje kafelki'].filter(g => byGroup[g]?.length);
+                            return groupOrder.map(g => (
+                              <View key={g} style={{ marginTop: spacing[2] }}>
+                                <Text style={s.hiddenGroupLabel}>{g}</Text>
+                                {byGroup[g].map(id => {
+                                  const isCustom = id.startsWith('custom:');
+                                  const ct = isCustom ? customTiles.find(t => t.id === id) : null;
+                                  const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
+                                  const desc = isCustom ? null : SECTION_DESC[id];
+                                  return (
+                                    <TouchableOpacity key={id} style={s.hiddenRow} onPress={() => { haptic.tap(); toggleHiddenSection(id); setShowHiddenPool(true); }} activeOpacity={0.8}>
+                                      <View style={[s.hiddenAddIcon, { borderColor: accentColor + '66' }]}><Plus size={13} color={accentColor} /></View>
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={s.hiddenRowText} numberOfLines={1}>{title}{!nodes[id] ? '  · brak danych' : ''}</Text>
+                                        {desc ? <Text style={s.hiddenRowDesc} numberOfLines={1}>{desc}</Text> : null}
+                                      </View>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            ));
+                          })()}
                         </>
                       );
                     })()}
@@ -3932,7 +3951,9 @@ const makeStyles = (c: any) => StyleSheet.create({
   editAddText: { fontSize: 12.5, fontWeight: '700' },
   hiddenRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 9, paddingHorizontal: spacing[3], borderRadius: radius.md, backgroundColor: colors.fill.subtle, marginLeft: spacing[3] },
   hiddenAddIcon: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  hiddenRowText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  hiddenRowText: { fontSize: 13, fontWeight: '600', color: colors.text.secondary },
+  hiddenRowDesc: { fontSize: 10.5, color: colors.text.muted, marginTop: 1 },
+  hiddenGroupLabel: { fontSize: 10, fontWeight: '800', color: colors.text.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginLeft: spacing[3], marginBottom: 3 },
   editResetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
   editResetText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
 
