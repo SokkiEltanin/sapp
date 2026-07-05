@@ -1261,6 +1261,32 @@ export default function DashboardScreen() {
           </View>
         );
       }
+      // Compare vs your own recent average.
+      if (t.metric2 === '__avg__') {
+        const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
+        const nowV = ser.values[ser.values.length - 1] ?? 0;
+        const prior = ser.values.slice(0, -1).filter(v => v !== 0);
+        const avgV = prior.length ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
+        const dPct = avgV > 0 ? Math.round(((nowV - avgV) / avgV) * 100) : null;
+        const up = nowV >= avgV;
+        return (
+          <View style={[s.card, { backgroundColor: cardBgDark }]}>
+            {header}
+            <View style={s.statCmpRow}>
+              <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(nowV, ser.unit)}</Text><Text style={s.statCmpKey}>teraz</Text></View>
+              {dPct != null && (
+                <View style={[s.statDelta, { backgroundColor: (up ? '#2AC68F' : '#FF6B6B') + '1E' }]}>
+                  {up ? <TrendingUp size={11} color="#2AC68F" /> : <TrendingDown size={11} color="#FF6B6B" />}
+                  <Text style={[s.statDeltaText, { color: up ? '#2AC68F' : '#FF6B6B' }]}>{dPct >= 0 ? '+' : ''}{dPct}%</Text>
+                </View>
+              )}
+              <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(avgV, ser.unit)}</Text><Text style={s.statCmpKey}>Twoja średnia</Text></View>
+            </View>
+            <WaveChart data={ser.values} color={accentColor} />
+            <View style={s.waveLabels}>{ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}</View>
+          </View>
+        );
+      }
       const a = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       const defB = metricById(t.metric2);
       const b = defB ? metricSeries(t.metric2!, statCtx, period, 6) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };

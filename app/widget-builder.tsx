@@ -208,7 +208,9 @@ export default function WidgetBuilder() {
                 const defB = metricById(metric2);
                 const b = metric2 === '__self__'
                   ? (metricSeries(def.id, statCtx, period, compareOffset + 1).values[0] ?? 0)
-                  : (defB ? metricNumber(metric2, statCtx, period).value : 0);
+                  : metric2 === '__avg__'
+                    ? (() => { const vs = metricSeries(def.id, statCtx, period, 6, needsTag ? tag : undefined).values.slice(0, -1).filter(v => v !== 0); return vs.length ? vs.reduce((s, v) => s + v, 0) / vs.length : 0; })()
+                    : (defB ? metricNumber(metric2, statCtx, period).value : 0);
                 const mx = Math.max(a, b, 1);
                 return (
                   <View style={[s.pWave, { alignItems: 'flex-end' }]}>
@@ -319,7 +321,9 @@ export default function WidgetBuilder() {
             <View style={[s.chipsWrap, { marginBottom: spacing[2] }]}>
               {([
                 { off: 1,  label: period === 'month' ? 'Poprzedni miesiąc' : 'Poprzedni tydzień' },
+                { off: 2,  label: period === 'month' ? '2 mies. temu' : '2 tyg. temu' },
                 { off: 3,  label: period === 'month' ? '3 mies. temu' : '3 tyg. temu' },
+                { off: 6,  label: period === 'month' ? '6 mies. temu' : '6 tyg. temu' },
                 { off: 12, label: period === 'month' ? 'Rok temu' : '12 tyg. temu' },
               ] as const).map(o => {
                 const active = metric2 === '__self__' && compareOffset === o.off;
@@ -331,6 +335,11 @@ export default function WidgetBuilder() {
                   </PressableScale>
                 );
               })}
+              <PressableScale onPress={() => { haptic.tap(); setMetric2('__avg__'); }}>
+                <View style={[s.chip, metric2 === '__avg__' && { backgroundColor: '#2AC68F22', borderColor: '#2AC68F' }]}>
+                  <Text style={[s.chipText, metric2 === '__avg__' && { color: '#2AC68F' }]}>Twoja średnia</Text>
+                </View>
+              </PressableScale>
             </View>
             <Text style={[s.rowSubLabel]}>…albo z inną metryką:</Text>
             <View style={s.chipsWrap}>

@@ -39,6 +39,11 @@ export const WIDGET_METRICS: MetricDef[] = [
   { id: 'food',       label: 'Jedzenie',           group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'sweets',     label: 'Słodycze (wydatki)', group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
   { id: 'income',     label: 'Przychody',          group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'net',        label: 'Bilans (przych.−wyd.)', group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'savings',    label: 'Odłożone (przelewy własne)', group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'avgExpense', label: 'Średni wydatek',     group: 'Finanse', unit: 'zł', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'expenseCount', label: 'Liczba transakcji', group: 'Finanse', unit: '×', viz: ['number', 'wave', 'compare'], periodic: true },
+  { id: 'biggestExpense', label: 'Największy wydatek', group: 'Finanse', unit: 'zł', viz: ['number', 'wave'], periodic: true },
   { id: 'byCategory', label: 'Wydatki per kategoria', group: 'Finanse', unit: 'zł', viz: ['list', 'donut'], periodic: false },
   // Konsumpcja
   { id: 'cheeseKg',   label: 'Nabiał / ser (kg)',  group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
@@ -190,6 +195,27 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         .reduce((s, e) => s + e.amount, 0);
     case 'income':
       return exp.filter(e => e.type === 'income' && !isSelfTransfer(e) && pred(e)).reduce((s, e) => s + e.amount, 0);
+    case 'net': {
+      let inc = 0, out = 0;
+      for (const e of exp) {
+        if (isSelfTransfer(e) || !pred(e)) continue;
+        if (e.type === 'income') inc += e.amount;
+        else if (inScope(e, ctx.scope)) out += e.amount;
+      }
+      return Math.round((inc - out) * 100) / 100;
+    }
+    case 'savings':
+      return exp.filter(e => isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e)).reduce((s, e) => s + e.amount, 0);
+    case 'avgExpense': {
+      const rows = exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e));
+      if (!rows.length) return 0;
+      return Math.round(rows.reduce((s, e) => s + e.amount, 0) / rows.length * 100) / 100;
+    }
+    case 'expenseCount':
+      return exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e)).length;
+    case 'biggestExpense':
+      return exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e))
+        .reduce((m, e) => Math.max(m, e.amount), 0);
     case 'food':
       return exp.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && inScope(e, ctx.scope) && pred(e))
         .reduce((s, e) => s + e.amount, 0);
