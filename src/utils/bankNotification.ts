@@ -9,9 +9,11 @@
 export interface ParsedBankTx {
   amount: number;        // 10.18
   dateISO: string;       // 2026-07-03T06:37:30 (local)
-  store: string;         // "LIDL HETMANSKA Rzeszow" (cleaned)
-  storeKey: string;      // "lidl" — first word, for fuzzy matching
+  store: string;         // outgoing: merchant ("LIDL HETMANSKA"); incoming: sender/title
+  storeKey: string;      // first word lowercased — for fuzzy matching / merchant memory
   method: 'card' | 'blik' | 'transfer' | 'cash';
+  direction: 'out' | 'in'; // out = expense (payment), in = income (incoming transfer)
+  isSalary?: boolean;    // incoming looks like a paycheck (wynagrodzenie / wypłata)
   raw: string;
 }
 
@@ -31,10 +33,15 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
   const amount = num(amtM[1]);
   if (!(amount > 0)) return null;
 
-  // Only payment/purchase notifications — skip balance/info pushes.
-  if (!/zapłacono|transakcj|płatność|platnosc|blik|zakup/i.test(body)) return null;
+  // Incoming (money IN) vs outgoing (money OUT). Incoming = a credit / transfer in;
+  // outgoing = a card payment / purchase. If neither is recognised, skip the push.
+  const inTrig = /przelew\s+przychodz|uznanie\s+rachunku|wp[łl]yn[ęęąe][łl]|wp[łl]yn[ęe][łl]o|wynagrodzen|zasilenie|otrzyma[łl]e[śs]|zaksi[ęe]gowano\s+wp[łl]at|\bwp[łl]ata\b|na\s+rachunek/i.test(body);
+  const paidOut = /zap[łl]acono/i.test(body);
+  const outTrig = /zap[łl]acono|transakcj|p[łl]atno[śs][cć]|platnosc|blik|zakup/i.test(body);
+  if (!inTrig && !outTrig) return null;
+  const direction: 'in' | 'out' = (inTrig && !paidOut) ? 'in' : 'out';
 
-  // Date + time: "dnia 03-07-2026 godz. 06:37:30"
+  // Date + time: "dnia 03-07-2026 godz. 06:37:30" (fallback: now)
   let dateISO = new Date().toISOString().slice(0, 19);
   const dtM = body.match(/(\d{2})-(\d{2})-(\d{4}).*?(\d{2}):(\d{2})(?::(\d{2}))?/);
   if (dtM) {
@@ -42,6 +49,20 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
     dateISO = `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss ?? '00'}`;
   }
 
+  // ── Incoming transfer → income ──────────────────────────────────────────────
+  if (direction === 'in') {
+    const isSalary = /wynagrodzen|wyp[łl]at|pensj|sal(?:ary|ariu)/i.test(body);
+    // Sender/title: after "od"/"nadawca:"/"tytuł:" up to the next section marker.
+    const senderM = body.match(/(?:nadawca:?|\bod\s+nadawcy:?|\bod:)\s*(.+?)(?:\s*(?:tytu[łl]|tyt\.?|kwot|dnia|nr\b|rachun|\.\s*Bank|$))/i)
+      ?? body.match(/\bod\s+([A-ZŁŚŻĆŃÓĄĘ][^.,;]+?)(?:\s*(?:tytu[łl]|tyt\.?|kwot|dnia|nr\b|rachun|\.\s*Bank|$))/);
+    const titleM = body.match(/tytu[łl][:\s]+(.+?)(?:\s*(?:dnia|nr\b|kwot|rachun|\.\s*Bank|$))/i);
+    let store = (senderM?.[1] ?? titleM?.[1] ?? (isSalary ? 'Wynagrodzenie' : 'Przelew')).replace(/\s+/g, ' ').trim();
+    if (store.length > 40) store = store.slice(0, 40).trim();
+    const storeKey = (store.split(/\s+/)[0] ?? 'przelew').toLowerCase();
+    return { amount, dateISO, store, storeKey, method: 'transfer', direction, isSalary, raw: body };
+  }
+
+  // ── Outgoing payment → expense ──────────────────────────────────────────────
   // Store: text after " w " up to " POL" / ". Bank" / end.
   let store = '';
   const stM = body.match(/\bw\s+(.+?)(?:\s+POL\b|\.\s*Bank|\.\s*$|$)/i);
@@ -61,7 +82,21 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
     : /przelew/i.test(body) ? 'transfer'
     : /karta|kart[aąy]/i.test(body) ? 'card' : 'card';
 
-  return { amount, dateISO, store, storeKey, method, raw: body };
+  return { amount, dateISO, store, storeKey, method, direction: 'out', raw: body };
+}
+
+// Match an incoming transfer to income already logged (same amount, same day) so a
+// paycheck you entered by hand isn't duplicated by the auto-capture.
+export function findMatchingIncome(tx: ParsedBankTx, expenses: MatchExpense[], windowMin = 1440): MatchExpense | null {
+  const txTime = new Date(tx.dateISO).getTime();
+  for (const e of expenses) {
+    if (e.type !== 'income' || e.bankMatched) continue;
+    if (Math.abs(e.amount - tx.amount) > 0.011) continue;
+    const et = new Date(e.date ?? '').getTime();
+    if (!et) continue;
+    if (sameLocalDay(et, txTime) || Math.abs(et - txTime) / 60000 <= windowMin) return e;
+  }
+  return null;
 }
 
 // ── Match a parsed bank tx to an existing (scanned) expense ──────────────────

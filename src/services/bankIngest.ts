@@ -12,6 +12,19 @@ export async function ingestBankNotification(title: string, text: string): Promi
   if (!store.enabled) return false;
   const tx = parseBankNotification(title, text);
   if (!tx) return false;
+
+  // Incoming transfer → income. Default to "[JD] paycheck" when it looks like salary
+  // (the common case for a single job); the user can flip it in review.
+  if (tx.direction === 'in') {
+    return store.enqueue({
+      ...tx,
+      category: 'other',
+      suggestedCategory: 'other',
+      jd: !!tx.isSalary,
+      auto: false, // never auto-log income blindly — always review first
+    });
+  }
+
   const mem = await loadMerchantMemory();
   const learned = merchantFor(tx.storeKey, mem);
   const category = learned?.category ?? guessCategory(tx.store);

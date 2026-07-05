@@ -33,6 +33,12 @@ export default function BankReview() {
     const corrected = p.category !== p.suggestedCategory; // reader guessed wrong → don't reward trust
     const res = await commitBankTx(p, { corrected });
     if (!res.ok) { toast.error('Nie udało się dodać'); return; }
+    if (p.direction === 'in') {
+      toast.success(res.matched
+        ? `Dopasowano do istniejącego przychodu: +${p.amount.toFixed(2)} zł`
+        : `Dodano przychód: +${p.amount.toFixed(2)} zł${p.jd ? ' (wypłata)' : ''}`);
+      reloadMem(); remove(p.id); return;
+    }
     if (res.matched) {
       toast.success(`Dopasowano do paragonu: ${p.store || 'płatność'}`);
     } else if (res.merchant?.auto && (res.merchant.cleanAccepts ?? 0) === AUTO_THRESHOLD) {
@@ -75,46 +81,60 @@ export default function BankReview() {
         {pending.length === 0 && (
           <View style={s.empty}>
             <Landmark size={30} color={c.text.muted} />
-            <Text style={s.emptyText}>Brak płatności do zatwierdzenia. Gdy zapłacisz kartą, powiadomienie z banku pojawi się tu automatycznie.</Text>
+            <Text style={s.emptyText}>Brak nic do zatwierdzenia. Gdy zapłacisz kartą lub wpłynie przelew, powiadomienie z banku pojawi się tu automatycznie.</Text>
           </View>
         )}
         {pending.map(p => {
           const d = new Date(p.dateISO);
           const info = mem[p.storeKey];
           const accepts = info?.cleanAccepts ?? 0;
+          const isIn = p.direction === 'in';
           return (
             <View key={p.id} style={s.card}>
               <View style={s.cardTop}>
-                <Text style={s.amount}>{p.amount.toFixed(2)} zł</Text>
+                <Text style={[s.amount, isIn && { color: '#2AC68F' }]}>{isIn ? '+' : ''}{p.amount.toFixed(2)} zł</Text>
                 <Text style={s.time}>{d.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</Text>
               </View>
-              <Text style={s.fieldLabel}>Sklep</Text>
-              <TextInput value={p.store} onChangeText={v => update(p.id, { store: v })} style={s.input} placeholderTextColor={c.text.muted} placeholder="Sklep" />
-              <Text style={s.fieldLabel}>Kategoria</Text>
-              <View style={s.catRow}>
-                {CATS.map(([cat, lbl]) => {
-                  const active = p.category === cat;
-                  return (
-                    <TouchableOpacity key={cat} style={[s.catChip, active && { backgroundColor: '#46B0DE22', borderColor: '#46B0DE' }]}
-                      onPress={() => { haptic.tap(); update(p.id, { category: cat }); }} activeOpacity={0.8}>
-                      <Text style={[s.catText, active && { color: '#46B0DE' }]}>{lbl}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              {info?.auto ? (
-                <View style={s.trustRow}>
-                  <Zap size={13} color="#2AC68F" />
-                  <Text style={s.trustAuto}>Sklep na automacie — kolejne dodam sam</Text>
-                </View>
+              <Text style={s.fieldLabel}>{isIn ? 'Nadawca / tytuł' : 'Sklep'}</Text>
+              <TextInput value={p.store} onChangeText={v => update(p.id, { store: v })} style={s.input} placeholderTextColor={c.text.muted} placeholder={isIn ? 'Nadawca' : 'Sklep'} />
+
+              {isIn ? (
+                <TouchableOpacity onPress={() => { haptic.tap(); update(p.id, { jd: !p.jd }); }}
+                  style={[s.jdToggle, p.jd && s.jdToggleOn]} activeOpacity={0.85}>
+                  <Zap size={14} color={p.jd ? '#06231a' : '#2AC68F'} />
+                  <Text style={[s.jdText, p.jd && { color: '#06231a' }]}>
+                    {p.jd ? 'Wypłata z pracy — wejdzie do stawki ✓' : 'To zwykły przychód (stuknij = wypłata)'}
+                  </Text>
+                </TouchableOpacity>
               ) : (
-                <View style={s.trustRow}>
-                  <Sparkles size={13} color={c.text.muted} />
-                  <Text style={s.trustText}>Zaufanie {accepts}/{AUTO_THRESHOLD} → automat</Text>
-                  <View style={s.trustBar}>
-                    <View style={[s.trustFill, { width: `${Math.min(100, (accepts / AUTO_THRESHOLD) * 100)}%` }]} />
+                <>
+                  <Text style={s.fieldLabel}>Kategoria</Text>
+                  <View style={s.catRow}>
+                    {CATS.map(([cat, lbl]) => {
+                      const active = p.category === cat;
+                      return (
+                        <TouchableOpacity key={cat} style={[s.catChip, active && { backgroundColor: '#46B0DE22', borderColor: '#46B0DE' }]}
+                          onPress={() => { haptic.tap(); update(p.id, { category: cat }); }} activeOpacity={0.8}>
+                          <Text style={[s.catText, active && { color: '#46B0DE' }]}>{lbl}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                </View>
+                  {info?.auto ? (
+                    <View style={s.trustRow}>
+                      <Zap size={13} color="#2AC68F" />
+                      <Text style={s.trustAuto}>Sklep na automacie — kolejne dodam sam</Text>
+                    </View>
+                  ) : (
+                    <View style={s.trustRow}>
+                      <Sparkles size={13} color={c.text.muted} />
+                      <Text style={s.trustText}>Zaufanie {accepts}/{AUTO_THRESHOLD} → automat</Text>
+                      <View style={s.trustBar}>
+                        <View style={[s.trustFill, { width: `${Math.min(100, (accepts / AUTO_THRESHOLD) * 100)}%` }]} />
+                      </View>
+                    </View>
+                  )}
+                </>
               )}
               <View style={s.actions}>
                 <TouchableOpacity style={[s.actBtn, s.rejectBtn]} onPress={() => reject(p)} activeOpacity={0.85}>
@@ -168,6 +188,12 @@ const makeS = (c: any) => StyleSheet.create({
   catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   catChip: { paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
   catText: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },
+  jdToggle: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing[3],
+    paddingVertical: 11, borderRadius: radius.md, borderWidth: 1, borderColor: '#2AC68F55', backgroundColor: '#2AC68F14',
+  },
+  jdToggleOn: { backgroundColor: '#2AC68F', borderColor: '#2AC68F' },
+  jdText: { fontSize: 12.5, fontWeight: '800', color: '#2AC68F' },
   trustRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[3] },
   trustText: { fontSize: 11.5, fontWeight: '700', color: c.text.muted },
   trustAuto: { fontSize: 11.5, fontWeight: '800', color: '#2AC68F' },

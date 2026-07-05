@@ -1,8 +1,9 @@
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
-import { findMatchingExpense } from '@/utils/bankNotification';
+import { findMatchingExpense, findMatchingIncome } from '@/utils/bankNotification';
 import { recordMerchantAccept, MerchantInfo } from '@/utils/merchantMemory';
 import { PendingBankTx } from '@/store/bankQueueStore';
+import { useWorkStore } from '@/store/workStore';
 
 export interface CommitResult {
   ok: boolean;
@@ -20,6 +21,31 @@ export async function commitBankTx(
   opts?: { corrected?: boolean; learn?: boolean },
 ): Promise<CommitResult> {
   const st = useExpensesStore.getState();
+
+  // ── Incoming transfer → income ──────────────────────────────────────────────
+  if (p.direction === 'in') {
+    const dup = findMatchingIncome(p, st.expenses);
+    try {
+      if (dup) {
+        st.updateExpense(dup.id, { bankMatched: true });
+        expensesService.update(dup.id, { bankMatched: true }).catch(() => {});
+        return { ok: true, matched: true };
+      }
+      const wp = (useWorkStore.getState().settings.workPrefix ?? '').trim();
+      const note = p.jd && wp ? `${wp} ${p.store || 'Wynagrodzenie'}` : (p.store || 'Przychód');
+      const exp = await expensesService.add({
+        type: 'income', amount: p.amount, currency: 'PLN',
+        category: (p.jd ? 'salary' : 'other') as any,
+        tags: p.jd && wp ? [wp] : [],
+        note, date: p.dateISO, paymentMethod: 'card', bankMatched: true,
+      } as any);
+      st.addExpense(exp);
+      return { ok: true, matched: false };
+    } catch {
+      return { ok: false, matched: !!dup };
+    }
+  }
+
   const match = findMatchingExpense(p, st.expenses);
   try {
     if (match) {
