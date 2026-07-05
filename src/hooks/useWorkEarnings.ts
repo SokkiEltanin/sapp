@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { WorkShift, WorkSettings, CalendarEvent, Expense } from '@/types';
 import { shiftMinutes, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
+import { paycheckTargetMonth } from '@/utils/paycheck';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
@@ -111,6 +112,27 @@ export function useWorkEarnings(
     if (mOver && mOver > 0) return mOver / 3600;
     if (settings.rateOverride && settings.rateOverride > 0) return settings.rateOverride / 3600;
 
+    // Paycheck-driven average (most accurate + matches what the user entered):
+    // Σ(actual paycheck) ÷ Σ(calendar hours of the month each paycheck is FOR),
+    // one paycheck per target month, skipping months the user turned off.
+    if (colorMode && expenses?.length) {
+      const excluded = new Set(settings.excludedPayMonths ?? []);
+      const seen = new Set<string>();
+      let totS = 0, totH = 0;
+      const paychecks = expenses.filter(e => isPaycheck(e, settings.workPrefix))
+        .sort((a, b) => b.date.localeCompare(a.date));
+      for (const p of paychecks) {
+        const tm = paycheckTargetMonth(p);
+        if (seen.has(tm) || excluded.has(tm)) continue;
+        seen.add(tm);
+        const h = colorMode.workEvents
+          .filter(e => e.date.slice(0, 7) === tm)
+          .reduce((s, e) => s + shiftMinutes(e), 0) / 60;
+        if (h > 0) { totS += p.amount; totH += h; }
+      }
+      if (totH > 0) return totS / (totH * 3600);
+    }
+
     // Confirmed months win over auto-detection: average rate = Σsalary / Σhours
     // across the months the user personally verified — MINUS any they excluded
     // (e.g. after switching to a fixed employment contract at a different rate).
@@ -153,7 +175,7 @@ export function useWorkEarnings(
       else if (colorMode.monthWorkHours > 0) hours = colorMode.monthWorkHours;
     }
     return hours > 0 ? salaryUsed / (hours * 3600) : 0;
-  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.hoursOverride, settings.rateOverride, settings.monthRateOverride, settings.confirmedMonths, salaryUsed]);
+  }, [colorMode, salaryInfo, settings.hoursPerMonth, settings.hoursOverride, settings.rateOverride, settings.monthRateOverride, settings.confirmedMonths, settings.excludedPayMonths, settings.workPrefix, expenses, salaryUsed]);
 
   // ── Manual-shift active detection (fallback when no workColor) ────────────
   const activeShift = useMemo(() => {
