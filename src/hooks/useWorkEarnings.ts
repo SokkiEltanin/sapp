@@ -17,15 +17,15 @@ function timeToMins(hhmm: string): number {
   return h * 60 + m;
 }
 
-// A paycheck = income that's either explicitly the "salary" category OR carries the
-// work prefix ([JD]) as a tag/in the note. The salary-category path means a manually
-// entered paycheck counts even without remembering the [JD] tag.
+// A paycheck for the WORK rate = income carrying the work prefix ([JD]) as a tag or
+// in the note. This is strict on purpose: the rate divides by JD calendar hours, so a
+// generic "salary" income from another source (e.g. a side gig) must NOT count. Only
+// when no prefix is configured do we fall back to the salary category.
 export function isPaycheck(e: Expense, workPrefix?: string): boolean {
   if (e.type !== 'income') return false;
-  if ((e.category as string) === 'salary') return true;
   const wp = workPrefix?.trim().toLowerCase();
-  if (!wp) return false;
-  return (e.tags ?? []).some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp);
+  if (wp) return (e.tags ?? []).some(t => t.toLowerCase() === wp) || (e.note ?? '').toLowerCase().includes(wp);
+  return (e.category as string) === 'salary';
 }
 
 export interface WorkEarningsResult {

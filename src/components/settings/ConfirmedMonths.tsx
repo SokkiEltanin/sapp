@@ -15,7 +15,7 @@ function label(ym: string) {
   return `${MONTHS[(m || 1) - 1]} ${y}`;
 }
 
-export interface PayMonthRow { month: string; amount: number; hours: number; excluded: boolean; date: string }
+export interface PayMonthRow { month: string; amount: number; hours: number; excluded: boolean; date: string; count?: number }
 
 // The estimated hourly rate now comes straight from the REAL paychecks: each row is
 // one paycheck (its target month, actual amount, calendar hours). The user includes
@@ -73,6 +73,7 @@ export default function ConfirmedMonths({ payMonths }: { payMonths: PayMonthRow[
               <Text style={[s.rowMonth, r.excluded && s.rowMuted]}>{label(r.month)}</Text>
               <Text style={[s.rowMeta, r.excluded && s.rowMuted]} numberOfLines={1}>
                 {Math.round(r.amount)} zł{r.hours > 0 ? ` · ${Math.round(r.hours)} h · ${rate!.toFixed(1)} zł/h` : ' · brak godzin'}
+                {(r.count ?? 1) > 1 ? ` · ⚠ ${r.count}× (duplikat?)` : ''}
                 {r.excluded ? ' · poza średnią' : ''}
               </Text>
               <PressableScale

@@ -204,12 +204,14 @@ export default function SettingsScreen() {
       .filter(e => isPaycheck(e, workSettings.workPrefix))
       .sort((a, b) => b.date.localeCompare(a.date));
     const seen = new Set<string>();
-    const rows: { month: string; amount: number; hours: number; excluded: boolean; date: string }[] = [];
+    const countByMonth: Record<string, number> = {};
+    for (const p of paychecks) { const m = paycheckTargetMonth(p); countByMonth[m] = (countByMonth[m] ?? 0) + 1; }
+    const rows: { month: string; amount: number; hours: number; excluded: boolean; date: string; count: number }[] = [];
     for (const p of paychecks) {
       const month = paycheckTargetMonth(p);
-      if (seen.has(month)) continue;
+      if (seen.has(month)) continue; // most recent paycheck per month wins (list is date-desc)
       seen.add(month);
-      rows.push({ month, amount: p.amount, hours: hoursIn(month), excluded: excluded.has(month), date: p.date.slice(0, 10) });
+      rows.push({ month, amount: p.amount, hours: hoursIn(month), excluded: excluded.has(month), date: p.date.slice(0, 10), count: countByMonth[month] });
     }
     return rows;
   }, [events, gcalEvents, expenses, workSettings.workPrefix, workSettings.workColor, workSettings.excludedPayMonths]);
