@@ -152,8 +152,8 @@ function taskSection(task: Task, today: string, tomorrow: string, weekEnd: strin
 }
 
 function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem[] {
-  const tomorrow = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })();
-  const weekEnd  = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; })();
+  const tomorrow = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
+  const weekEnd  = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 7); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; })();
   const buckets: Record<string, Task[]> = { overdue: [], today: [], tomorrow: [], week: [], later: [], none: [] };
   for (const t of sorted) buckets[taskSection(t, today, tomorrow, weekEnd)].push(t);
   const result: ListItem[] = [];

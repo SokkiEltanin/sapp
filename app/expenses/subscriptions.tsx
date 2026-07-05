@@ -15,6 +15,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
+import { todayISO, ymd } from '@/utils/date';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -71,7 +72,7 @@ function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
     case 'quarterly': d.setMonth(d.getMonth() + 3); break;
     case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
   }
-  return d.toISOString().split('T')[0];
+  return ymd(d);
 }
 
 function isDurationExpired(sub: Subscription): boolean {
@@ -100,7 +101,7 @@ const emptyForm = (): FormState => {
   const d = new Date(); d.setDate(d.getDate() + 30);
   return {
     name: '', amount: '', billingCycle: 'monthly',
-    nextBillingDate: d.toISOString().split('T')[0].split('-').reverse().join('.'),
+    nextBillingDate: ymd(d).split('-').reverse().join('.'),
     reminderDaysBefore: 3, category: 'subscriptions', note: '', durationMonths: 0, tags: '',
   };
 };
@@ -156,7 +157,7 @@ export default function SubscriptionsScreen() {
     checkedRef.current = true;
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = ymd(today);
 
     subscriptions.forEach((sub) => {
       if (sub.active && isDurationExpired(sub)) {
@@ -177,7 +178,7 @@ export default function SubscriptionsScreen() {
     haptic.success();
     setPaymentConfirming(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = todayISO();
       await expensesService.add({
         type: 'expense',
         amount: currentPayment.amount,
@@ -211,7 +212,7 @@ export default function SubscriptionsScreen() {
     const dateIso = parseDate(nextBillingDate);
     if (!dateIso) { Alert.alert('Błędna data', 'Format: DD.MM.RRRR'); return; }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayISO();
 
     setSaving(true);
     try {

@@ -17,6 +17,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { ExpenseCategory, IncomeCategory, TransactionType, PaymentMethod, Vehicle } from '@/types';
 import { vehiclesService } from '@/services/vehiclesService';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
+import { monthISO } from '@/utils/date';
 import { expensesService } from '@/services/expensesService';
 import { templatesService } from '@/services/templatesService';
 import { workService } from '@/services/workService';
@@ -155,7 +156,7 @@ export default function AddExpenseModal() {
     [sugTags, quickTags, tags],
   );
 
-  const nowM = new Date().toISOString().slice(0, 7);
+  const nowM = monthISO();
   const monthSpendByCat = expenses
     .filter(e => (!e.type || e.type === 'expense') && e.date.startsWith(nowM))
     .reduce<Record<string, number>>((acc, e) => { acc[e.category] = (acc[e.category] ?? 0) + e.amount; return acc; }, {});
@@ -250,7 +251,7 @@ export default function AddExpenseModal() {
           const budgets = await getBudgets();
           const limit = budgets[expCat];
           if (limit && limit > 0) {
-            const nowM = new Date().toISOString().slice(0, 7);
+            const nowM = monthISO();
             const monthSpent = expenses
               .filter(e => (!e.type || e.type === 'expense') && e.category === expCat && e.date.startsWith(nowM))
               .reduce((s, e) => s + e.amount, 0) + parsed;

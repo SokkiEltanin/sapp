@@ -1,4 +1,5 @@
 import { Expense, Vehicle, VehicleMaintenance } from '@/types';
+import { monthISO } from '@/utils/date';
 
 // What "fuel" looks like (Transport + a fuel-ish tag/word). Only the MAIN car
 // catches it; everything else is matched strictly by tag.
@@ -49,7 +50,7 @@ export interface VehicleSummary {
 }
 
 export function summarizeVehicle(v: Vehicle, expenses: Expense[], mainId?: string): VehicleSummary {
-  const ym = new Date().toISOString().slice(0, 7);
+  const ym = monthISO();
   const mine = expenses.filter(e => expenseMatchesVehicle(e, v, mainId));
   let total = 0, fuel = 0, other = 0, thisMonth = 0;
   for (const e of mine) {

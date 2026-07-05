@@ -17,7 +17,7 @@ interface MoodState {
   setLoading: (loading: boolean) => void;
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } // LOCAL date (toISOString is UTC → wrong day at night)
 
 export const useMoodStore = create<MoodState>()(
   persist(

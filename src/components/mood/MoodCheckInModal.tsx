@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { haptic } from '@/utils/haptics';
+import { todayISO } from '@/utils/date';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Alert,
   Animated, Pressable, TouchableOpacity, TextInput, LayoutAnimation, Platform, UIManager,
@@ -68,7 +69,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   const chipColor = mood ? MOOD_COLORS[mood] : undefined;
 
   // You can log mood several times a day. Show which check-in of the day this is.
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayISO();
   const todayCount = useMemo(() => allEntries.filter(e => e.date === todayStr).length, [allEntries, todayStr]);
   const ordinal = existingEntry ? null : todayCount + 1;
 
@@ -171,7 +172,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
         updateEntry(existingEntry.id, updates);
       } else {
         const entry = await moodService.add({
-          date: new Date().toISOString().split('T')[0],
+          date: todayISO(),
           mood, energy,
           note: note.trim() || undefined,
           tags,

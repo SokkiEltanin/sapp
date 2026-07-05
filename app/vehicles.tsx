@@ -24,6 +24,7 @@ import {
 } from '@/utils/vehicleMatch';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
+import { todayISO } from '@/utils/date';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 
@@ -70,7 +71,7 @@ export default function VehiclesScreen() {
 
   // Maintenance add/edit (for a specific vehicle)
   const [mFor, setMFor] = useState<Vehicle | null>(null);
-  const [mForm, setMForm] = useState<MForm>({ label: '', date: new Date().toISOString().slice(0, 10), intervalMonths: '' });
+  const [mForm, setMForm] = useState<MForm>({ label: '', date: todayISO(), intervalMonths: '' });
   // Expense picker — target is either { vehicle } (attach) or { maintenance } (link)
   const [picker, setPicker] = useState<{ mode: 'attach' | 'link'; vehicle: Vehicle } | null>(null);
 
@@ -133,12 +134,12 @@ export default function VehiclesScreen() {
   };
   const openMaintenance = (v: Vehicle, preset?: { label: string; intervalMonths?: number }) => {
     setMFor(v);
-    setMForm({ label: preset?.label ?? '', date: new Date().toISOString().slice(0, 10), intervalMonths: preset?.intervalMonths ? String(preset.intervalMonths) : '' });
+    setMForm({ label: preset?.label ?? '', date: todayISO(), intervalMonths: preset?.intervalMonths ? String(preset.intervalMonths) : '' });
   };
   const saveMaintenance = async () => {
     if (!mFor || !mForm.label.trim()) { Alert.alert('Błąd', 'Podaj nazwę serwisu'); return; }
     const entry: VehicleMaintenance = {
-      id: uid(), label: mForm.label.trim(), date: mForm.date || new Date().toISOString().slice(0, 10),
+      id: uid(), label: mForm.label.trim(), date: mForm.date || todayISO(),
       intervalMonths: mForm.intervalMonths ? parseInt(mForm.intervalMonths) : undefined,
       expenseId: mForm.expenseId,
     };
@@ -155,7 +156,7 @@ export default function VehiclesScreen() {
   };
   const redoMaintenance = async (v: Vehicle, m: VehicleMaintenance) => {
     haptic.tap();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     await persistMaintenance(v, (v.maintenance ?? []).map(x => x.id === m.id ? { ...x, date: today } : x));
     toast.success('Zapisano nową datę');
   };

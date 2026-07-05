@@ -31,7 +31,7 @@ const SUGGESTIONS: { name: string; days: number; color: string }[] = [
   { name: 'Filtr w okapie',               days: 120, color: '#FB923C' },
 ];
 
-function todayIso() { return new Date().toISOString().slice(0, 10); }
+function todayIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } // LOCAL (toISOString=UTC → wrong day at night)
 
 interface FormState { name: string; color: string; lastChangedDate: string; intervalDays: string; }
 const emptyForm = (): FormState => ({ name: '', color: COLORS[0], lastChangedDate: todayIso(), intervalDays: '90' });

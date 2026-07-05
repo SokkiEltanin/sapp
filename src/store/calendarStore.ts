@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CalendarEvent, Task } from '@/types';
+import { todayISO } from '@/utils/date';
 
 interface CalendarState {
   events: CalendarEvent[];
@@ -31,7 +32,7 @@ export const useCalendarStore = create<CalendarState>()(
       events: [],
       gcalEvents: [],
       tasks: [],
-      selectedDate: new Date().toISOString().split('T')[0],
+      selectedDate: todayISO(),
       isLoading: false,
 
       setEvents: (events) => set({ events }),

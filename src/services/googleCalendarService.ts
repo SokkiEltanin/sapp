@@ -108,7 +108,7 @@ export const googleCalendarService = {
       const nextDay = new Date(opts.date + 'T00:00:00');
       nextDay.setDate(nextDay.getDate() + 1);
       body.start = { date: opts.date };
-      body.end   = { date: nextDay.toISOString().slice(0, 10) };
+      body.end   = { date: `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}` }; // LOCAL (toISOString=UTC → off by a day)
     } else {
       body.start = { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz };
       body.end   = { dateTime: `${opts.date}T${opts.endTime || opts.startTime}:00`, timeZone: tz };
@@ -158,7 +158,7 @@ export const googleCalendarService = {
         const nextDay = new Date(updates.date + 'T00:00:00');
         nextDay.setDate(nextDay.getDate() + 1);
         body.start = { date: updates.date };
-        body.end   = { date: nextDay.toISOString().slice(0, 10) };
+        body.end   = { date: `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}` }; // LOCAL (toISOString=UTC → off by a day)
       } else {
         const tz = 'Europe/Warsaw';
         body.start = { dateTime: `${updates.date}T${updates.startTime}:00`, timeZone: tz };

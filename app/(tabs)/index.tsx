@@ -38,6 +38,7 @@ import {
 } from '@/types';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
+import { todayISO, ymd } from '@/utils/date';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -278,7 +279,7 @@ function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
     case 'quarterly': d.setMonth(d.getMonth() + 3); break;
     case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
   }
-  return d.toISOString().split('T')[0];
+  return ymd(d);
 }
 
 // ─── Wave charts ──────────────────────────────────────────────────────────────
@@ -797,9 +798,9 @@ export default function DashboardScreen() {
     checkedSubs.current = true;
     (async () => {
       const now = new Date();
-      const period = `${now.toISOString().slice(0, 10)}-${now.getHours() < 15 ? 'am' : 'pm'}`;
+      const period = `${ymd(now)}-${now.getHours() < 15 ? 'am' : 'pm'}`;
       try { if ((await AsyncStorage.getItem('subs_prompt_period')) === period) return; } catch {}
-      const todayS = now.toISOString().split('T')[0];
+      const todayS = ymd(now);
       const due = subscriptions.filter(s => s.active && !isDurationExpired(s) && s.nextBillingDate <= todayS);
       if (due.length > 0) {
         setPaymentQueue(due);
@@ -815,7 +816,7 @@ export default function DashboardScreen() {
     haptic.success();
     setPaymentConfirming(true);
     try {
-      const todayS = new Date().toISOString().split('T')[0];
+      const todayS = todayISO();
       await expensesService.add({
         type: 'expense', amount: currentPayment.amount, currency: currentPayment.currency,
         category: currentPayment.category, tags: currentPayment.tags ?? [], note: `Subskrypcja: ${currentPayment.name}`, date: todayS,
@@ -833,14 +834,14 @@ export default function DashboardScreen() {
 
   // First open, due, not-yet-dismissed debt → the dashboard asks about it.
   const dueDebt = useMemo(() => {
-    const t = new Date().toISOString().slice(0, 10);
+    const t = todayISO();
     return debts.find(d => !d.settled && d.askDate <= t && !debtDismissed.has(d.id)) ?? null;
   }, [debts, debtDismissed]);
 
   const settleDebt = useCallback(async (d: Debt, method: PaymentMethod) => {
     haptic.success();
     try {
-      const todayS = new Date().toISOString().slice(0, 10);
+      const todayS = todayISO();
       await expensesService.add({
         type: 'income', amount: d.amount, currency: 'PLN', category: 'transfer' as any,
         tags: [], note: `Zwrot: ${d.person}`, date: todayS, paymentMethod: method,
@@ -871,7 +872,7 @@ export default function DashboardScreen() {
     if (isNaN(amt) || amt <= 0) { haptic.error(); toast.error('Podaj prawidłową kwotę'); return; }
     haptic.success();
     try {
-      const todayS = new Date().toISOString().split('T')[0];
+      const todayS = todayISO();
       // Tag with the work prefix so it becomes the "last paycheck" the rate is
       // derived from; Settings then offers to add the month to the average.
       const wp = workSettings.workPrefix?.trim().toLowerCase();
@@ -2067,7 +2068,7 @@ export default function DashboardScreen() {
                       <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak — dodaj</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7}
-                      onPress={() => { haptic.tap(); setPaydayDismissedToday(); setPaydayDismissedDate(new Date().toISOString().slice(0, 10)); }}>
+                      onPress={() => { haptic.tap(); setPaydayDismissedToday(); setPaydayDismissedDate(todayISO()); }}>
                       <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Jeszcze nie</Text>
                     </TouchableOpacity>
                   </View>

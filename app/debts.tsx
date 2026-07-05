@@ -16,7 +16,7 @@ import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
 import { spacing, radius } from '@/theme';
 
-function todayIso() { return new Date().toISOString().slice(0, 10); }
+function todayIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } // LOCAL (toISOString=UTC → wrong day at night)
 
 export default function DebtsScreen() {
   const c = useColors();

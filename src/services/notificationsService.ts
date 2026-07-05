@@ -372,7 +372,7 @@ export const notificationsService = {
 
   async scheduleDeadlineDigests(tasks: Task[]): Promise<void> {
     const now = new Date();
-    const nowDate = now.toISOString().slice(0, 10);
+    const nowDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; // LOCAL (toISOString=UTC → wrong day at night)
 
     // Group pending tasks by deadline date
     const byDate: Record<string, string[]> = {};
