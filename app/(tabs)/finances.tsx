@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -104,6 +105,7 @@ function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
 
 export default function FinancesScreen() {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardHeight();
   // Theme-reactive: shadow module colors/F so the screen + its StyleSheet flip.
   const colors = useColors();
   const F = useMemo(() => ({
@@ -496,7 +498,7 @@ export default function FinancesScreen() {
 
       {/* ── Filters popup ─── */}
       <Modal visible={filterModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setFilterModal(false)}>
-        <View style={st.fmOverlay}>
+        <View style={[st.fmOverlay, { paddingBottom: kb }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setFilterModal(false)} />
           <View style={st.fmCard}>
             <View style={st.fmHeader}>
