@@ -74,6 +74,8 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
       .filter(w => { const k = w.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return w.length > 1; })
       .join(' ')
       .replace(/\s*(POL|POLSKA)\s*$/i, '')
+      .replace(/[\s\-–—.,;:*]+$/, '')   // trailing punctuation ("NÚVEI GLOBAL SERVICES-")
+      .replace(/^[\s\-–—.,;:*]+/, '')
       .trim();
   }
   const storeKey = (store.split(/\s+/)[0] ?? '').toLowerCase();

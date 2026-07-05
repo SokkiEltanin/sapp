@@ -96,7 +96,7 @@ export async function setMerchantAuto(storeKey: string, auto: boolean): Promise<
 const STORE_CAT: [string[], ExpenseCategory][] = [
   [['lidl', 'biedronka', 'kaufland', 'auchan', 'carrefour', 'żabka', 'zabka', 'aldi', 'netto', 'dino', 'stokrotka', 'lewiatan', 'delikatesy', 'spar'], 'groceries'],
   [['orlen', ' bp', 'shell', 'circle k', 'moya', 'lotos', 'amic', 'stacja paliw', 'mpk', 'pkp', 'intercity', 'uber', 'bolt'], 'transport'],
-  [['mcdonald', 'kfc', 'burger', 'pizza', 'kebab', 'sushi', 'restauracja', 'pyszne', 'glovo', 'wolt', 'kino', 'cinema', 'steam', 'spotify', 'netflix'], 'entertainment'],
+  [['mcdonald', 'kfc', 'burger', 'pizza', 'kebab', 'sushi', 'restauracja', 'pyszne', 'glovo', 'wolt', 'kino', 'cinema', 'steam', 'nuvei', 'núvei', 'spotify', 'netflix', 'playstation', 'xbox', 'epic games', 'gog'], 'entertainment'],
   [['rossmann', 'hebe', 'super-pharm', 'apteka', 'ziko', 'dr max', 'gemini'], 'health'],
   [['ccc', 'deichmann', 'reserved', 'sinsay', 'house', 'cropp', 'h&m', 'zara', 'pepco', 'primark', 'decathlon'], 'clothing'],
   [['media expert', 'rtv euro', 'x-kom', 'komputronik', 'media markt', 'empik', 'action', 'ikea', 'leroy'], 'other'],
