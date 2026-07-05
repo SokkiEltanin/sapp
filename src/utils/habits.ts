@@ -15,8 +15,12 @@ export function stepFor(h: Habit): number {
 }
 
 export async function getHabits(): Promise<Habit[]> {
-  const raw = await AsyncStorage.getItem(HABITS_KEY);
-  return raw ? JSON.parse(raw) : [];
+  try {
+    const raw = await AsyncStorage.getItem(HABITS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return []; // corrupt JSON → don't break the whole Habits screen
+  }
 }
 
 export async function saveHabits(habits: Habit[]): Promise<void> {
@@ -25,16 +29,18 @@ export async function saveHabits(habits: Habit[]): Promise<void> {
 
 // Returns Record<habitId, count> — check habits store 0 or 1, count habits store 0..N
 export async function getCounts(date: string): Promise<Record<string, number>> {
-  const newRaw = await AsyncStorage.getItem(cntKey(date));
-  if (newRaw) return JSON.parse(newRaw);
-  // Migrate from legacy string[] format
-  const oldRaw = await AsyncStorage.getItem(legacyKey(date));
-  if (oldRaw) {
-    const ids: string[] = JSON.parse(oldRaw);
-    const counts: Record<string, number> = {};
-    ids.forEach((id) => { counts[id] = 1; });
-    return counts;
-  }
+  try {
+    const newRaw = await AsyncStorage.getItem(cntKey(date));
+    if (newRaw) return JSON.parse(newRaw);
+    // Migrate from legacy string[] format
+    const oldRaw = await AsyncStorage.getItem(legacyKey(date));
+    if (oldRaw) {
+      const ids: string[] = JSON.parse(oldRaw);
+      const counts: Record<string, number> = {};
+      ids.forEach((id) => { counts[id] = 1; });
+      return counts;
+    }
+  } catch {} // corrupt JSON for one day → treat as empty, don't break habit loading
   return {};
 }
 

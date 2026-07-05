@@ -38,8 +38,12 @@ export const workService = {
   // ── Settings (AsyncStorage) ──────────────────────────────────────────────────
 
   async getSettings(): Promise<WorkSettings> {
-    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-    return raw ? { ...DEFAULT_WORK_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_WORK_SETTINGS };
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+      return raw ? { ...DEFAULT_WORK_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_WORK_SETTINGS };
+    } catch {
+      return { ...DEFAULT_WORK_SETTINGS }; // corrupt JSON → fall back instead of throwing
+    }
   },
 
   async saveSettings(settings: WorkSettings): Promise<void> {
