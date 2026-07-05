@@ -59,6 +59,7 @@ import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout } fro
 import { useUiActions } from '@/store/uiActions';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame from '@/components/counters/StreakFlame';
 import { vehiclesService } from '@/services/vehiclesService';
@@ -788,12 +789,23 @@ export default function DashboardScreen() {
   }, []);
 
   // ── Subscription check ────────────────────────────────────────────────────
+  // A due bill you don't pay ("Nie") stays due, so this used to nag on EVERY app
+  // open. Limit it to once per half-day (morning / evening → at most twice a day),
+  // persisted so it survives app restarts.
   useEffect(() => {
     if (checkedSubs.current || subscriptions.length === 0) return;
     checkedSubs.current = true;
-    const todayS = new Date().toISOString().split('T')[0];
-    const due = subscriptions.filter(s => s.active && !isDurationExpired(s) && s.nextBillingDate <= todayS);
-    if (due.length > 0) setPaymentQueue(due);
+    (async () => {
+      const now = new Date();
+      const period = `${now.toISOString().slice(0, 10)}-${now.getHours() < 15 ? 'am' : 'pm'}`;
+      try { if ((await AsyncStorage.getItem('subs_prompt_period')) === period) return; } catch {}
+      const todayS = now.toISOString().split('T')[0];
+      const due = subscriptions.filter(s => s.active && !isDurationExpired(s) && s.nextBillingDate <= todayS);
+      if (due.length > 0) {
+        setPaymentQueue(due);
+        AsyncStorage.setItem('subs_prompt_period', period).catch(() => {});
+      }
+    })();
   }, [subscriptions]);
 
   const currentPayment = paymentQueue[0] ?? null;
