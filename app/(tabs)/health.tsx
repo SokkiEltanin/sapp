@@ -464,7 +464,7 @@ export default function HealthScreen() {
         <View style={styles.summaryRow}>
           <View style={styles.summaryTile}>
             <Footprints size={15} color={T.accent} />
-            <Text style={styles.summaryVal}>{steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps}</Text>
+            <Text style={styles.summaryVal}>{steps > 0 ? (steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps) : '—'}</Text>
             <Text style={styles.summaryLabel}>kroki</Text>
           </View>
           <View style={styles.summaryTile}>
@@ -505,12 +505,14 @@ export default function HealthScreen() {
               <ChevronRight size={15} color={colors.text.muted} style={{ marginLeft: 4 }} />
             </View>
             <Text style={[styles.heroNum, {
-              color: steps >= stepGoal ? T.accent : colors.text.primary,
+              color: steps <= 0 ? colors.text.muted : (steps >= stepGoal ? T.accent : colors.text.primary),
             }]}>
-              {steps.toLocaleString()}
+              {steps > 0 ? steps.toLocaleString() : '—'}
             </Text>
             <Text style={styles.heroSub}>
-              cel {stepGoal.toLocaleString()} · {(steps * 0.00075).toFixed(1)} km · {Math.round(stepPct * 100)}% · szczegóły
+              {steps > 0
+                ? `cel ${stepGoal.toLocaleString()} · ${(steps * 0.00075).toFixed(1)} km · ${Math.round(stepPct * 100)}% · szczegóły`
+                : 'brak kroków z zegarka — sprawdź „Kroki" w Health Connect + synchronizację Samsung Health'}
             </Text>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, {
