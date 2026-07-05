@@ -1619,6 +1619,22 @@ export default function DashboardScreen() {
     const prior = months.slice(0, 5).filter(m => m.hours > 0);
     const avgHours = prior.length ? prior.reduce((a, m) => a + m.hours, 0) / prior.length : 0;
     const avgEarnings = prior.length ? Math.round(prior.reduce((a, m) => a + m.earnings, 0) / prior.length) : 0;
+    // This calendar year + shifts this month + best of the last 12 months.
+    const yearPrefix = `${now.getFullYear()}-`;
+    let yearHours = 0, shiftCount = 0;
+    for (const e of allEvents) {
+      if (!isWork(e)) continue;
+      const ym = (e.date ?? '').slice(0, 7);
+      if (ym.startsWith(yearPrefix) && ym <= ymCur) yearHours += dur(e);
+      if (ym === ymCur && (e.date ?? '').slice(0, 10) <= today && dur(e) > 0) shiftCount++;
+    }
+    const best12 = Array.from({ length: 12 }, (_, k) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+      const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      const h = allEvents.filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym).reduce((s, e) => s + dur(e), 0);
+      return { label: MONTH_SHORT[d.getMonth()], year: d.getFullYear(), hours: h, earnings: Math.round(h * rate) };
+    });
+    const bestMonth = best12.reduce((m, x) => (x.earnings > m.earnings ? x : m), best12[0]);
     return {
       months, currentHours, rate,
       currentEarnings: Math.round(currentHours * rate),
@@ -1628,6 +1644,9 @@ export default function DashboardScreen() {
       avgPerDay: dayset.size > 0 ? workedH / dayset.size : 0,
       prevHours: months[4].hours, prevEarnings: months[4].earnings,
       avgHours, avgEarnings,
+      yearHours, yearEarnings: Math.round(yearHours * rate),
+      shiftCount, perShift: shiftCount > 0 ? Math.round((workedH * rate) / shiftCount) : 0,
+      bestMonth,
     };
   }, [allEvents, workSettings, workEarnings, today]);
 
@@ -3273,6 +3292,9 @@ export default function DashboardScreen() {
                     {hasRate && <View style={s.wxChip}><Text style={s.wxChipK}>Stawka</Text><Text style={s.wxChipV}>{Math.round(wm.rate)} zł/h</Text></View>}
                     {wm.avgHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Śr. miesiąc</Text><Text style={s.wxChipV}>{hasRate ? `${wm.avgEarnings.toLocaleString('pl-PL')} zł` : `${wm.avgHours.toFixed(0)} h`}</Text></View>}
                     {hasRate && wm.prevEarnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Prognoza vs poprz.</Text><Text style={[s.wxChipV, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>{deltaE >= 0 ? '+' : '−'}{Math.abs(deltaE).toLocaleString('pl-PL')} zł</Text></View>}
+                    {wm.shiftCount > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Zmiany w mies.</Text><Text style={s.wxChipV}>{wm.shiftCount}{hasRate ? ` · ${wm.perShift.toLocaleString('pl-PL')} zł/zm.` : ''}</Text></View>}
+                    {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{hasRate ? `${wm.yearEarnings.toLocaleString('pl-PL')} zł · ${wm.yearHours.toFixed(0)} h` : `${wm.yearHours.toFixed(0)} h`}</Text></View>}
+                    {hasRate && wm.bestMonth && wm.bestMonth.earnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Najlepszy mies.</Text><Text style={s.wxChipV}>{wm.bestMonth.earnings.toLocaleString('pl-PL')} zł · {wm.bestMonth.label} {String(wm.bestMonth.year).slice(2)}</Text></View>}
                   </View>
                   <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
                   <View style={s.waveValues}>
