@@ -16,7 +16,7 @@ import {
   CalendarDays, Wallet,
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
-  Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike,
+  Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike, Footprints, CheckSquare,
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock,
@@ -48,6 +48,8 @@ import { loadNameAliases, canonicalProductName, normalizeProductName, productGro
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
+import { getHealthGoals } from '@/utils/healthGoals';
+import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherIconPng } from '@/utils/weatherIcon';
@@ -652,6 +654,7 @@ export default function DashboardScreen() {
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
   const [weightMemory, setWeightMemory] = useState<WeightMemory>({});
   const [healthDays, setHealthDays] = useState<StatCtx['healthDays']>({});
+  const [healthGoals, setHealthGoals] = useState({ stepGoal: 10000, waterGoal: 8, weightGoal: 0 });
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [maintItems, setMaintItems] = useState<MaintenanceItem[]>([]);
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
@@ -940,6 +943,7 @@ export default function DashboardScreen() {
       for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
       setHealthDays(m);
     }).catch(() => {});
+    getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
   }, []);
   useFocusEffect(useCallback(() => {
     vehiclesService.getAll().then(setVehicles).catch(() => {});
@@ -1649,6 +1653,31 @@ export default function DashboardScreen() {
       bestMonth,
     };
   }, [allEvents, workSettings, workEarnings, today]);
+
+  // Daily goal rings (Apple-Watch style): today's steps / water / budget / habits.
+  const dailyRings = useMemo<RingSpec[]>(() => {
+    const tISO = todayISO();
+    const rings: RingSpec[] = [];
+    const stepsToday = healthDays[tISO]?.steps ?? 0;
+    rings.push({ key: 'steps', label: 'kroki', Icon: Footprints, value: stepsToday, goal: healthGoals.stepGoal, color: '#2AC68F',
+      display: stepsToday > 0 ? (stepsToday >= 1000 ? `${(stepsToday / 1000).toFixed(1)}k` : String(stepsToday)) : '—' });
+    const waterHabit = habits.find(h => h.kind === 'water');
+    if (waterHabit) {
+      const cnt = getTodayCount(waterHabit.id);
+      rings.push({ key: 'water', label: 'woda', Icon: Droplets, value: cnt, goal: waterHabit.dailyGoal || 1, color: '#46B0DE', display: `${cnt}/${waterHabit.dailyGoal || 1}` });
+    }
+    const totalBudget = Object.values(budgets).reduce((s, v) => s + (v ?? 0), 0);
+    if (totalBudget > 0) {
+      const now = new Date();
+      const daily = totalBudget / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const spentToday = scopedExpenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && e.date.slice(0, 10) === tISO).reduce((s, e) => s + e.amount, 0);
+      rings.push({ key: 'budget', label: 'budżet dnia', Icon: Wallet, value: spentToday, goal: daily, color: '#FBBF24', over: spentToday > daily, display: `${Math.round(spentToday)} zł` });
+    }
+    if (habits.length > 0) {
+      rings.push({ key: 'habits', label: 'nawyki', Icon: CheckSquare, value: habitsDoneIds.length, goal: habits.length, color: '#A78BFA', display: `${habitsDoneIds.length}/${habits.length}` });
+    }
+    return rings;
+  }, [healthDays, healthGoals, habits, habitsDoneIds, budgets, scopedExpenses, getTodayCount]);
 
   const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
     .replace(/^\w/, c => c.toUpperCase());
@@ -2509,6 +2538,18 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               );
             })();
+
+            nodes['daily-rings'] = dailyRings.length > 0 && (
+              <View style={[s.habitsCard, { backgroundColor: cardBgDark }]}>
+                <View style={s.habitsHeader}>
+                  <View style={s.habitsHeaderLeft}>
+                    <Sparkles size={13} color={accentColor} />
+                    <Text style={s.habitsTitle}>Cele na dziś</Text>
+                  </View>
+                </View>
+                <DailyRings rings={dailyRings} />
+              </View>
+            );
 
             nodes['habits-today'] = habits.length > 0 && (() => {
               const doneCount = habitsDoneIds.length;

@@ -16,6 +16,7 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'tag-limits',
   'budget-warning',
   'pinned-notes',
+  'daily-rings',
   'tasks-work-row',
   'today-tasks',
   'countdowns',
@@ -51,6 +52,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'tag-limits':     'Limity tagów (#słodycze…)',
   'budget-warning': 'Ostrzeżenie o budżecie',
   'pinned-notes':   'Przypięte notatki',
+  'daily-rings':    'Pierścienie celów dnia',
   'tasks-work-row': 'Zadania + praca (kafelki)',
   'today-tasks':    'Zadania na dziś / zaległe',
   'countdowns':     'Odliczania do wydarzeń',
@@ -85,6 +87,7 @@ export const SECTION_DESC: Record<string, string> = {
   'tag-limits':     'Ile zostało z limitów #tagów',
   'budget-warning': 'Ostrzeżenie gdy budżet na wyczerpaniu',
   'pinned-notes':   'Przypięte notatki na wierzchu',
+  'daily-rings':    'Pierścienie na dziś: kroki, woda, budżet, nawyki',
   'tasks-work-row': 'Kafelki: zadania na dziś + praca',
   'today-tasks':    'Lista zadań na dziś i zaległych',
   'countdowns':     'Odliczanie dni do wydarzeń',
@@ -120,7 +123,7 @@ export const SECTION_GROUP: Record<string, string> = {
   'fun-facts': 'Przegląd i statystyki', 'correlations': 'Przegląd i statystyki',
   'mood-cal': 'Nastrój i liczniki', 'mood-wave': 'Nastrój i liczniki', 'countdowns': 'Nastrój i liczniki',
   'counters-since': 'Nastrój i liczniki', 'gablota-card': 'Nastrój i liczniki',
-  'pinned-notes': 'Inne', 'gcal': 'Inne',
+  'pinned-notes': 'Inne', 'gcal': 'Inne', 'daily-rings': 'Zadania i nawyki',
 };
 export const SECTION_GROUP_ORDER = ['Przypomnienia', 'Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
 
