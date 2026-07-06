@@ -3,8 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBalanceOffset, setBalanceOffset, getCashOffset, setCashOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
-import { isPaycheck } from '@/hooks/useWorkEarnings';
-import { paycheckTargetMonth } from '@/utils/paycheck';
+import { computePayMonths } from '@/utils/workSummary';
 import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -222,31 +221,10 @@ export default function SettingsScreen() {
 
   // One row per real paycheck (its target month, actual amount, calendar hours) so
   // the user sees exactly what's counted and can toggle each in/out of the average.
-  const payMonths = useMemo(() => {
-    const wp = (workSettings.workPrefix ?? '').trim();
-    const wc = workSettings.workColor;
-    if (!wp && !wc) return [] as { month: string; amount: number; hours: number; excluded: boolean; date: string }[];
-    const allEvents = [...events, ...gcalEvents];
-    const isWork = (e: any) => isWorkEvent(e, { workColor: wc, workPrefix: wp.toLowerCase() });
-    const hoursIn = (ym: string) => allEvents
-      .filter(e => isWork(e) && (e.date ?? '').slice(0, 7) === ym)
-      .reduce((s, e) => s + shiftHours(e), 0);
-    const excluded = new Set(workSettings.excludedPayMonths ?? []);
-    const paychecks = expenses
-      .filter(e => isPaycheck(e, workSettings.workPrefix))
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const seen = new Set<string>();
-    const countByMonth: Record<string, number> = {};
-    for (const p of paychecks) { const m = paycheckTargetMonth(p); countByMonth[m] = (countByMonth[m] ?? 0) + 1; }
-    const rows: { month: string; amount: number; hours: number; excluded: boolean; date: string; count: number }[] = [];
-    for (const p of paychecks) {
-      const month = paycheckTargetMonth(p);
-      if (seen.has(month)) continue; // most recent paycheck per month wins (list is date-desc)
-      seen.add(month);
-      rows.push({ month, amount: p.amount, hours: hoursIn(month), excluded: excluded.has(month), date: p.date.slice(0, 10), count: countByMonth[month] });
-    }
-    return rows;
-  }, [events, gcalEvents, expenses, workSettings.workPrefix, workSettings.workColor, workSettings.excludedPayMonths]);
+  const payMonths = useMemo(
+    () => computePayMonths(expenses, [...events, ...gcalEvents], workSettings),
+    [events, gcalEvents, expenses, workSettings.workPrefix, workSettings.workColor, workSettings.excludedPayMonths],
+  );
 
   // Ask (once per detected month) to confirm the auto-detected paycheck + hours.
   // "Tak" saves it as a confirmed month → it joins the averaged rate forever.

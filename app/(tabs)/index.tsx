@@ -78,6 +78,7 @@ import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings, isPaycheck } from '@/hooks/useWorkEarnings';
+import { computePayMonths, payMonthsSummary } from '@/utils/workSummary';
 import { workService } from '@/services/workService';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -1653,6 +1654,14 @@ export default function DashboardScreen() {
       bestMonth,
     };
   }, [allEvents, workSettings, workEarnings, today]);
+
+  // Paycheck-driven pay breakdown + average zł/h (Σ included paycheck ÷ Σ hours),
+  // across ALL confirmed months — shown in the work panel, matches Settings.
+  const workPayMonths = useMemo(
+    () => computePayMonths(expenses, allEvents, workSettings),
+    [expenses, allEvents, workSettings.workPrefix, workSettings.workColor, workSettings.excludedPayMonths],
+  );
+  const workAvg = useMemo(() => payMonthsSummary(workPayMonths), [workPayMonths]);
 
   // Daily goal rings (Apple-Watch style): today's steps / water / budget / habits.
   const dailyRings = useMemo<RingSpec[]>(() => {
@@ -3331,6 +3340,29 @@ export default function DashboardScreen() {
                       </View>
                     ) : null;
                   })()}
+                  {workAvg.avgRate != null && (
+                    <View style={s.wpTotalRow}>
+                      <Text style={s.wpTotalLabel}>Średnia stawka · z {workAvg.includedCount} {workAvg.includedCount === 1 ? 'miesiąca' : 'miesięcy'}</Text>
+                      <Text style={[s.wpTotalVal, { color: '#FBBF24' }]}>{workAvg.avgRate.toFixed(2)} zł/h</Text>
+                    </View>
+                  )}
+                  {workPayMonths.length > 0 && (
+                    <View style={{ marginTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[2] }}>
+                      <Text style={s.wxSection}>Wypłaty · stawka = wypłata ÷ godziny miesiąca</Text>
+                      {workPayMonths.map(r => {
+                        const rate = r.hours > 0 ? r.amount / r.hours : null;
+                        const inAvg = !r.excluded && r.hours > 0;
+                        return (
+                          <View key={r.month} style={s.wmRow}>
+                            <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : ''}</Text>
+                            <Text style={s.wmH}>{Math.round(r.amount)} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
+                            <Text style={[s.wmZl, { color: inAvg ? '#FBBF24' : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)} zł/h` : '—'}</Text>
+                          </View>
+                        );
+                      })}
+                      <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: spacing[1] }]}>Miesiące bez godzin w kalendarzu wypadają ze średniej. Wyłącz/włącz je w Ustawienia → Praca.</Text>
+                    </View>
+                  )}
                   {wm.plannedH > 0 && (
                     <View style={{ marginTop: spacing[3] }}>
                       <View style={s.workSplitBar}>

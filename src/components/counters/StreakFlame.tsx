@@ -28,17 +28,24 @@ export default function StreakFlame({ days, size = 48 }: { days: number; size?: 
   const alive = days >= 1;
   const scaleY = flick.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
   const opacity = flick.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
+  const fSize = size * 1.1; // flame ~10% bigger than the box
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={{ transform: [{ scaleY }], opacity: alive ? opacity : 0.5 }}>
-        <Flame size={size} color={color} fill={alive ? color + '2E' : 'transparent'} strokeWidth={2.1} />
+      {/* Flame sits behind; a fuller fill so it reads as lit. */}
+      <Animated.View style={{ position: 'absolute', transform: [{ scaleY }], opacity: alive ? opacity : 0.5 }}>
+        <Flame size={fSize} color={color} fill={alive ? color + '66' : 'transparent'} strokeWidth={2} />
       </Animated.View>
-      <Text style={[st.count, { fontSize: size * 0.34, color: alive ? color : '#8A93A8', top: size * 0.36 }]}>{days}</Text>
+      {/* Number on TOP of the flame — white + shadow so it never gets buried. */}
+      <Text style={[st.count, { fontSize: size * 0.36, top: size * 0.34, color: alive ? '#FFFFFF' : '#8A93A8' }]}>{days}</Text>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  count: { position: 'absolute', fontWeight: '900', letterSpacing: -0.5 },
+  count: {
+    position: 'absolute', left: 0, right: 0, textAlign: 'center',
+    fontWeight: '900', letterSpacing: -0.5,
+    textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
 });
