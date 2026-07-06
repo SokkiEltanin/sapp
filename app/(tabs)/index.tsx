@@ -239,6 +239,23 @@ function allSpend(expenses: Expense[], dates: string[]): number {
   return expenses.filter(e => (!e.type || e.type === 'expense') && set.has(e.date.slice(0, 10)))
     .reduce((s, e) => s + e.amount, 0);
 }
+// A spend delta chip: lower spend = green, higher = red (opposite of "growth good").
+function SpendDelta({ pct, label, muted }: { pct: number; label: string; muted: string }) {
+  const up = pct > 0;
+  const color = pct === 0 ? muted : up ? '#F87171' : '#2AC68F';
+  return (
+    <View style={sd.chip}>
+      {up ? <TrendingUp size={11} color={color} /> : <TrendingDown size={11} color={color} />}
+      <Text style={[sd.val, { color }]}>{up ? '+' : ''}{pct}%</Text>
+      <Text style={[sd.label, { color: muted }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+const sd = StyleSheet.create({
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1 },
+  val: { fontSize: 12, fontWeight: '800' },
+  label: { fontSize: 11, fontWeight: '600' },
+});
 function weekIncome(expenses: Expense[], dates: string[]): number {
   const set = new Set(dates);
   return expenses.filter(e => e.type === 'income' && set.has(e.date.slice(0, 10)))
@@ -1572,6 +1589,34 @@ export default function DashboardScreen() {
     });
   }, [weekOffset, moodByDay, scopedExpenses, expenses, scope]);
 
+  // Spend comparison for the Finanse card: this period vs the PREVIOUS one and vs
+  // the AVERAGE of prior periods (mirrors the work panel's rate comparison).
+  const finCompare = useMemo(() => {
+    const pct = (cur: number, base: number) => base > 0 ? Math.round((cur - base) / base * 100) : null;
+    if (finPeriod === 'week') {
+      const cur = weekOverview[weekOverview.length - 1]?.totalSpend ?? 0;
+      const prev = weekOverview[weekOverview.length - 2]?.totalSpend ?? 0;
+      const priors = weekOverview.slice(0, -1).map(w => w.totalSpend).filter(v => v > 0);
+      const avg = priors.length ? priors.reduce((a, b) => a + b, 0) / priors.length : 0;
+      return { vsPrev: pct(cur, prev), vsAvg: pct(cur, avg) };
+    }
+    // month: bucket scoped spend by calendar month
+    const byMonth: Record<string, number> = {};
+    for (const e of scopedExpenses) {
+      if ((e.type && e.type !== 'expense') || isSelfTransfer(e)) continue;
+      const m = (e.date ?? '').slice(0, 7); if (!m) continue;
+      byMonth[m] = (byMonth[m] ?? 0) + e.amount;
+    }
+    const months = Object.keys(byMonth).sort();
+    const curKey = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
+    const cur = byMonth[curKey] ?? 0;
+    const priorKeys = months.filter(m => m < curKey);
+    const prev = priorKeys.length ? byMonth[priorKeys[priorKeys.length - 1]] : 0;
+    const priorVals = priorKeys.slice(-6).map(m => byMonth[m]);
+    const avg = priorVals.length ? priorVals.reduce((a, b) => a + b, 0) / priorVals.length : 0;
+    return { vsPrev: pct(cur, prev), vsAvg: pct(cur, avg) };
+  }, [finPeriod, weekOverview, scopedExpenses]);
+
   // Average spending on FOOD per day-of-week (groceries only — other expenses
   // filtered out, per design). Data-driven from all historical grocery entries.
   const weekdayAvg = useMemo(() => {
@@ -2787,6 +2832,14 @@ export default function DashboardScreen() {
                   )}
                 </View>
               </View>
+
+              {/* spend vs previous period + vs average (lower = green, higher = red) */}
+              {(finCompare.vsPrev != null || finCompare.vsAvg != null) && (
+                <View style={s.finCompareRow}>
+                  {finCompare.vsPrev != null && <SpendDelta pct={finCompare.vsPrev} label={finPeriod === 'week' ? 'vs poprz. tydzień' : 'vs poprz. mies.'} muted={colors.text.muted} />}
+                  {finCompare.vsAvg != null && <SpendDelta pct={finCompare.vsAvg} label="vs Twoja średnia" muted={colors.text.muted} />}
+                </View>
+              )}
             </View>
             );
 
@@ -4224,6 +4277,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   finKey: { fontSize: 10, color: c.text.muted },
   finPct: { fontSize: 10, color: c.accent.blue, fontWeight: '600' },
   finDivider: { width: 1, height: 40, backgroundColor: c.border.subtle, alignSelf: 'center' },
+  finCompareRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[4], marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle, justifyContent: 'center' },
 
   // ── Wave chart labels ──────────────────────────────────────────────────────
   avgPill: {
