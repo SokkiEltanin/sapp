@@ -18,8 +18,8 @@ function shade(hex: string, amt: number): string {
 }
 
 export default function Blob({
-  color, expression, size = 120, onPress, animate = true,
-}: { color: string; expression: PetExpression; size?: number; onPress?: () => void; animate?: boolean }) {
+  color, expression, size = 120, onPress, animate = true, equipped,
+}: { color: string; expression: PetExpression; size?: number; onPress?: () => void; animate?: boolean; equipped?: { hat?: string; face?: string; held?: string } }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
@@ -81,6 +81,10 @@ export default function Blob({
             <Ellipse cx="36" cy="34" rx="12" ry="8" fill="#fff" opacity={0.28} />
             <Face expression={expression} blink={blink} accent={shade(color, -70)} />
           </Svg>
+          {/* equipped cosmetics as sticker overlays */}
+          {equipped?.face && <Text style={[eq.face, { fontSize: size * 0.32, top: size * 0.30 }]}>{equipped.face}</Text>}
+          {equipped?.hat && <Text style={[eq.hat, { fontSize: size * 0.36, top: -size * 0.13 }]}>{equipped.hat}</Text>}
+          {equipped?.held && <Text style={[eq.held, { fontSize: size * 0.30, bottom: size * 0.06, right: -size * 0.06 }]}>{equipped.held}</Text>}
           {asleep && <SleepZs size={size} />}
         </Animated.View>
       </Animated.View>
@@ -154,4 +158,10 @@ function SleepZs({ size }: { size: number }) {
 const zs = StyleSheet.create({
   wrap: { position: 'absolute' },
   z: { color: '#B9B0E8', fontWeight: '900' },
+});
+
+const eq = StyleSheet.create({
+  hat: { position: 'absolute', alignSelf: 'center', textAlign: 'center' },
+  face: { position: 'absolute', alignSelf: 'center', textAlign: 'center' },
+  held: { position: 'absolute' },
 });

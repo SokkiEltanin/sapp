@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Check, Coins, ShoppingBag } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import Blob from '@/components/pet/Blob';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx } from '@/utils/quests';
+import { equippedStickers, equippedRoom } from '@/utils/petShop';
 import { useHabits } from '@/hooks/useHabits';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -31,7 +33,9 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimedQuests, dailyClaims } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimedQuests, dailyClaims, equipped } = usePetStore();
+  const stickers = useMemo(() => equippedStickers(equipped), [equipped]);
+  const room = useMemo(() => equippedRoom(equipped), [equipped]);
   const { habits, todayDone, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -113,6 +117,9 @@ export default function Pet() {
           <ChevronLeft size={22} color={c.text.primary} />
         </PressableScale>
         <Text style={s.headerTitle}>Pupil</Text>
+        <PressableScale onPress={() => router.push('/pet-shop' as any)} style={s.shopBtn}>
+          <ShoppingBag size={17} color="#A78BFA" />
+        </PressableScale>
         <View style={s.coinPill}>
           <Coins size={13} color="#FBBF24" />
           <Text style={s.coinTxt}>{coins}</Text>
@@ -120,9 +127,16 @@ export default function Pet() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* stage */}
+        {/* stage (room backdrop if equipped) */}
         <View style={s.stage}>
-          <Blob color={pet.color} expression={pet.expression} size={STAGE_SIZE[stage]} />
+          {room?.colors && (
+            <LinearGradient colors={room.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.room}>
+              {room.decor?.map((d, i) => (
+                <Text key={i} style={[s.roomDecor, i === 0 ? { top: 10, left: 14 } : { top: 16, right: 16 }]}>{d}</Text>
+              ))}
+            </LinearGradient>
+          )}
+          <Blob color={pet.color} expression={pet.expression} size={STAGE_SIZE[stage]} equipped={stickers} />
         </View>
 
         {/* name + status */}
@@ -229,11 +243,14 @@ const makeS = (c: any) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
-  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#FBBF2440' },
+  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#FBBF2440', marginLeft: 6 },
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
+  shopBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A78BFA18' },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[8], alignItems: 'center' },
 
-  stage: { alignItems: 'center', justifyContent: 'flex-end', height: 240, marginTop: spacing[2] },
+  stage: { alignItems: 'center', justifyContent: 'center', height: 250, marginTop: spacing[2], width: '100%' },
+  room: { position: 'absolute', width: 250, height: 200, borderRadius: 26, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2] },
   name: { fontSize: 24, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
   nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[2] },
