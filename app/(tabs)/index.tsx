@@ -42,7 +42,7 @@ import { todayISO, ymd } from '@/utils/date';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
-import { useStatsScope, inScope, countsForConsumption } from '@/store/statsScope';
+import { useStatsScope, inScope, countsForConsumption, consumesInScope, StatsScope } from '@/store/statsScope';
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
@@ -219,14 +219,14 @@ function groceryTotal(expenses: Expense[], dates: string[]): number {
   return expenses.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && set.has(e.date.slice(0, 10)))
     .reduce((s, e) => s + e.amount, 0);
 }
-function sweetsTotal(expenses: Expense[], dates: string[]): number {
+function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = 'all'): number {
   const set = new Set(dates);
   let total = 0;
   for (const e of expenses) {
     if (e.type && e.type !== 'expense') continue;
     if (!set.has(e.date.slice(0, 10))) continue;
     for (const it of (e.receiptItems ?? [])) {
-      if (countsForConsumption(it) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+      if (consumesInScope(it, scope) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
     }
   }
   return total;
@@ -1546,10 +1546,10 @@ export default function DashboardScreen() {
   const activeDates = finPeriod === 'week' ? weekDates : monthDates;
   const weekTotal  = useMemo(() => allSpend(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
   const weekFood   = useMemo(() => groceryTotal(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
-  const weekSweets = useMemo(() => sweetsTotal(scopedExpenses, weekDates), [scopedExpenses, weekDates]);
+  const weekSweets = useMemo(() => sweetsTotal(expenses, weekDates, scope), [expenses, weekDates, scope]);
   const monthTotal  = useMemo(() => allSpend(scopedExpenses, monthDates), [scopedExpenses, monthDates]);
   const monthFood   = useMemo(() => groceryTotal(scopedExpenses, monthDates), [scopedExpenses, monthDates]);
-  const monthSweets = useMemo(() => sweetsTotal(scopedExpenses, monthDates), [scopedExpenses, monthDates]);
+  const monthSweets = useMemo(() => sweetsTotal(expenses, monthDates, scope), [expenses, monthDates, scope]);
 
   const displayTotal  = finPeriod === 'week' ? weekTotal  : monthTotal;
   const displayFood   = finPeriod === 'week' ? weekFood   : monthFood;
@@ -1562,12 +1562,12 @@ export default function DashboardScreen() {
       const dates  = getWeekDates(offset);
       const moodVals = dates.flatMap(d => (moodByDay[d] ?? []).map(e => e.mood));
       const avgMood  = moodVals.length ? moodVals.reduce((a, b) => a + b, 0) / moodVals.length : null;
-      const sw = sweetsTotal(scopedExpenses, dates);
+      const sw = sweetsTotal(expenses, dates, scope);
       const food      = groceryTotal(scopedExpenses, dates);
       const totalSpend = allSpend(scopedExpenses, dates);
       return { offset, dates, avgMood, sweets: sw, food, totalSpend, isCurrent: offset === weekOffset };
     });
-  }, [weekOffset, moodByDay, scopedExpenses]);
+  }, [weekOffset, moodByDay, scopedExpenses, expenses, scope]);
 
   // Average spending on FOOD per day-of-week (groceries only — other expenses
   // filtered out, per design). Data-driven from all historical grocery entries.
@@ -1667,8 +1667,8 @@ export default function DashboardScreen() {
 
   // Collectible "Wrapped" month cards — one per month, newest first.
   const monthCards = useMemo(
-    () => buildMonthCards({ expenses, moodEntries, healthDays, payMonths: workPayMonths, nameAliases }),
-    [expenses, moodEntries, healthDays, workPayMonths, nameAliases],
+    () => buildMonthCards({ expenses, moodEntries, healthDays, payMonths: workPayMonths, nameAliases, scope }),
+    [expenses, moodEntries, healthDays, workPayMonths, nameAliases, scope],
   );
   // The card to surface on the dashboard = most recent SEALED (completed) month.
   const featuredCard = useMemo(() => monthCards.find(c => !c.inProgress) ?? monthCards[0], [monthCards]);
@@ -1911,9 +1911,9 @@ export default function DashboardScreen() {
       if (day.startsWith(monthKey)) { thisMonthTotal += e.amount; monthTxCount++; monthSpendDays.add(day); }
       else if (day.startsWith(prevMonthKey)) prevMonthTotal += e.amount;
       for (const it of (e.receiptItems ?? [])) {
-        if (it.kind === 'deposit') continue;
+        if (!consumesInScope(it, scope)) continue;
         if (it.price > costliestItem.price && it.name) costliestItem = { name: canonicalProductName(it.name, nameAliases), price: it.price };
-        if ((it.tags ?? []).includes('słodycze')) sweetDays.add(day);
+        if ((it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) sweetDays.add(day);
       }
     }
     type Icon = 'calendar' | 'percent' | 'store' | 'wallet' | 'flame' | 'candy' | 'clock';
@@ -1970,7 +1970,7 @@ export default function DashboardScreen() {
     if (monthTxCount >= 5) facts.push({ icon: 'wallet', label: `Średni wydatek w tym mies.: ${Math.round(thisMonthTotal / monthTxCount)} zł (${monthTxCount} transakcji)` });
 
     return facts.slice(0, 8);
-  }, [expenses, nameAliases]);
+  }, [expenses, nameAliases, scope]);
 
   // ── Weight ciekawostka: kg per food group THIS MONTH, with top-2 breakdown ──
   // e.g. "10 kg sera — 4 kg gouda, 6 kg cesarski". Best-effort: only weighed
@@ -1985,11 +1985,11 @@ export default function DashboardScreen() {
     ];
     const groupKg: Record<string, number> = {};
     const groupItems: Record<string, Record<string, number>> = {};
-    for (const e of scopedExpenses) {
+    for (const e of expenses) {
       if (e.type === 'income') continue;
       if (!(e.date ?? '').startsWith(monthKey)) continue;
       for (const it of (e.receiptItems ?? [])) {
-        if (!countsForConsumption(it)) continue;
+        if (!consumesInScope(it, scope)) continue;
         // Only count RELIABLY-weighed items, so the kg totals are trustworthy:
         // a fractional quantity (loose-weighed, e.g. 0.636 kg) or an explicit/learned
         // weight that isn't the 1 kg default sentinel. Pack items at the default
@@ -2020,7 +2020,7 @@ export default function DashboardScreen() {
       out.push(`Ten miesiąc: ${kg.toFixed(1).replace('.0', '')} kg ${g.label}${parts.length ? ` — ${parts.join(', ')}` : ''}`);
     }
     return out;
-  }, [scopedExpenses, nameAliases, weightMemory]);
+  }, [expenses, nameAliases, weightMemory, scope]);
 
   // ── Cross-metric correlations (#16): sleep / steps / mood / daily spend ──────
   const correlations = useMemo(() => {
@@ -2056,7 +2056,7 @@ export default function DashboardScreen() {
     for (const e of expenses) {
       if (e.type === 'income') continue;
       for (const it of (e.receiptItems ?? [])) {
-        if (!countsForConsumption(it)) continue;
+        if (!consumesInScope(it, scope)) continue;
         const name = it.name?.trim();
         if (!name) continue;
         const canon = canonicalProductName(name, nameAliases);
@@ -2080,7 +2080,7 @@ export default function DashboardScreen() {
           .sort((a, b) => b[1] - a[1])
           .map(([n, cc]) => ({ name: n, count: cc })),
       }));
-  }, [expenses, nameAliases]);
+  }, [expenses, nameAliases, scope]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────

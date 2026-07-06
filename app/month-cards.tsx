@@ -12,6 +12,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
+import { useStatsScope } from '@/store/statsScope';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { loadNameAliases } from '@/utils/productMemory';
 import { spacing, typography } from '@/theme';
@@ -27,6 +28,7 @@ export default function MonthCards() {
   const { entries: moodEntries } = useMoodStore();
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
+  const scope = useStatsScope(st => st.scope);
 
   const [healthDays, setHealthDays] = useState<Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>>({});
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
@@ -43,8 +45,8 @@ export default function MonthCards() {
   const allEvents = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
   const payMonths = useMemo(() => computePayMonths(expenses, allEvents, workSettings), [expenses, allEvents, workSettings]);
   const cards = useMemo(
-    () => buildMonthCards({ expenses, moodEntries, healthDays, payMonths, nameAliases }),
-    [expenses, moodEntries, healthDays, payMonths, nameAliases],
+    () => buildMonthCards({ expenses, moodEntries, healthDays, payMonths, nameAliases, scope }),
+    [expenses, moodEntries, healthDays, payMonths, nameAliases, scope],
   );
 
   const sealed = cards.filter(c2 => !c2.inProgress).length;

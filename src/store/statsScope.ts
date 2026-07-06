@@ -29,6 +29,23 @@ export function countsForConsumption(it: { excluded?: boolean; kind?: string }):
   return !it.excluded && it.kind !== 'deposit';
 }
 
+// Item-level scope by WHO ATE IT (eaters), independent of who PAID (payer). Under
+// "mine" only items I ate count: untagged/shared items (no eaters set) count as
+// mine by default, an item tagged for someone else (e.g. eaters ['Partnerka'])
+// does not. This is what makes the Ja/Wszyscy toggle actually split consumption
+// even when I pay for everything.
+export function itemInScope(it: { eaters?: string[] }, scope: StatsScope): boolean {
+  if (scope === 'all') return true;
+  const eaters = it.eaters ?? [];
+  return eaters.length === 0 || eaters.includes(MY_PAYER);
+}
+
+// Consumption-eligible AND in the current eater scope — the predicate every
+// consumption stat should use so the Ja/Wszyscy toggle behaves consistently.
+export function consumesInScope(it: { excluded?: boolean; kind?: string; eaters?: string[] }, scope: StatsScope): boolean {
+  return countsForConsumption(it) && itemInScope(it, scope);
+}
+
 interface StatsScopeState {
   scope: StatsScope;
   setScope: (s: StatsScope) => void;

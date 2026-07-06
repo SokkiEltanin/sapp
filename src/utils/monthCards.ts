@@ -1,5 +1,5 @@
 import { Expense, MoodEntry } from '@/types';
-import { countsForConsumption } from '@/store/statsScope';
+import { consumesInScope, StatsScope } from '@/store/statsScope';
 import { canonicalProductName } from '@/utils/productMemory';
 import { PayMonthRow } from '@/utils/workSummary';
 
@@ -109,6 +109,7 @@ export interface MonthCardCtx {
   healthDays: Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>;
   payMonths: PayMonthRow[];         // from computePayMonths — earnings per month
   nameAliases: Record<string, string>;
+  scope?: StatsScope;               // 'mine' → only sweets I ate (eaters); default 'all'
   maxMonths?: number;               // cap (default 24)
 }
 
@@ -128,6 +129,7 @@ function prevKey(month: string): string {
 // Build the full collection, newest month first.
 export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
   const { expenses, moodEntries, healthDays, payMonths, nameAliases } = ctx;
+  const scope = ctx.scope ?? 'all';
   const cap = ctx.maxMonths ?? 24;
   const nowKey = currentMonthKey();
 
@@ -156,7 +158,7 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     if (e.type === 'income') { a.income += e.amount; continue; }
     a.spend += e.amount;
     for (const it of (e.receiptItems ?? [])) {
-      if (!countsForConsumption(it)) continue;
+      if (!consumesInScope(it, scope)) continue;
       if (!(it.tags ?? []).some(t => SWEET_TAGS.includes(t))) continue;
       a.sweetsSpend += it.price;
       const canon = canonicalProductName(it.name ?? '', nameAliases) || (it.name ?? '').trim();

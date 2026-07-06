@@ -1,5 +1,5 @@
 import { Expense, ReceiptItem } from '@/types';
-import { countsForConsumption } from '@/store/statsScope';
+import { consumesInScope } from '@/store/statsScope';
 import { KcalMemory, kcalFor, normalizeProductName } from '@/utils/productMemory';
 
 // Known foods → kcal per 100 g (of the product as bought). Keys are diacritic-free
@@ -78,7 +78,9 @@ export function kcalPer100g(it: { name?: string; tags?: string[]; category?: str
 
 // kcal for one receipt item: grams (explicit weight, else ~150 g/szt guess) × density.
 export function estimateItemKcal(it: ReceiptItem, mem?: KcalMemory): number {
-  if (!countsForConsumption(it)) return 0;
+  // Personal intake proxy → count only what I ate (untagged/shared = mine; items
+  // tagged for someone else are excluded so they don't inflate my calories).
+  if (!consumesInScope(it, 'mine')) return 0;
   const per100 = kcalPer100g(it, mem);
   if (per100 <= 0) return 0;
   let grams = (it.weightKg ?? 0) * 1000;
