@@ -27,14 +27,14 @@ export default function StreakFlame({ days, size = 48 }: { days: number; size?: 
   const color = streakColor(days);
   const alive = days >= 1;
   const scaleY = flick.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
-  const opacity = flick.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
+  const opacity = flick.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }); // subtle flicker, stays fully lit
   const fSize = size * 1.1; // flame ~10% bigger than the box
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {/* Flame sits behind; a fuller fill so it reads as lit. */}
+      {/* Flame sits behind; FULL solid fill so it reads as a lit, opaque flame. */}
       <Animated.View style={{ position: 'absolute', transform: [{ scaleY }], opacity: alive ? opacity : 0.5 }}>
-        <Flame size={fSize} color={color} fill={alive ? color + '66' : 'transparent'} strokeWidth={2} />
+        <Flame size={fSize} color={color} fill={alive ? color : 'transparent'} strokeWidth={2} />
       </Animated.View>
       {/* Number on TOP of the flame — white + shadow so it never gets buried. */}
       <Text style={[st.count, { fontSize: size * 0.36, top: size * 0.34, color: alive ? '#FFFFFF' : '#8A93A8' }]}>{days}</Text>
