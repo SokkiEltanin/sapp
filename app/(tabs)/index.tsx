@@ -51,7 +51,8 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { getHealthGoals } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
-import { buildMonthCards } from '@/utils/monthCards';
+import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
+import { buildMonthCards, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
@@ -1675,6 +1676,31 @@ export default function DashboardScreen() {
   // The card to surface on the dashboard = most recent SEALED (completed) month.
   const featuredCard = useMemo(() => monthCards.find(c => !c.inProgress) ?? monthCards[0], [monthCards]);
 
+  // "Nowa karta!" unlock moment: when a freshly-sealed month appears that we
+  // haven't celebrated yet. First run just records the baseline (no confetti spam
+  // over historical data); after that, each new sealed month pops a celebration.
+  const [unlockCard, setUnlockCard] = useState<MonthCard | null>(null);
+  useEffect(() => {
+    const sealed = monthCards.find(c => !c.inProgress);
+    if (!sealed) return;
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem('month_card_seen');
+        if (seen == null) { await AsyncStorage.setItem('month_card_seen', sealed.month); return; }
+        if (sealed.month > seen) {
+          setUnlockCard(sealed);
+          await AsyncStorage.setItem('month_card_seen', sealed.month);
+        }
+      } catch {}
+    })();
+  }, [monthCards]);
+  // Schedule the 1st-of-next-month nudge that a new card has joined the collection.
+  useEffect(() => {
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshMonthCardReminder())
+      .catch(() => {});
+  }, []);
+
   // "Kto zjadł słodycze" — this-month consumption split between people (eaters).
   const personConsumption = useMemo(
     () => buildPersonConsumption(expenses, payers, nameAliases),
@@ -2103,6 +2129,8 @@ export default function DashboardScreen() {
         start={{ x: 0.4, y: 0 }}
         end={{ x: 0.6, y: 0.52 }}
       />
+
+      {unlockCard && <MonthCardUnlock card={unlockCard} onDismiss={() => setUnlockCard(null)} />}
 
       <SafeAreaView style={s.safe} edges={[]}>
         <View style={{ flex: 1 }}>

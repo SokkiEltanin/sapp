@@ -267,6 +267,22 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Nudge on the 1st of next month: a fresh "Karta miesiąca" (Wrapped) has sealed
+  // and joined the collection. Deep-links to the collection screen.
+  async refreshMonthCardReminder(): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('month-card').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+      const now = new Date();
+      const date = new Date(now.getFullYear(), now.getMonth() + 1, 1, 10, 0, 0, 0); // 1st of next month, 10:00
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'month-card',
+        content: { title: '🎴 Nowa karta miesiąca!', body: 'Miniony miesiąc trafił do Twojej kolekcji — zobacz, jaki tier zdobył.', data: { screen: 'month-cards' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+      });
+    } catch {}
+  },
+
   async scheduleDailyTaskBriefing(
     hour = 8, minute = 0,
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },

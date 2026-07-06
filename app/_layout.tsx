@@ -246,6 +246,8 @@ export default function RootLayout() {
         router.push('/(tabs)/' as any);       // work shift → dashboard (live earnings widget)
       } else if (screen === 'work' || screen === 'stats') {
         router.push('/(tabs)/stats' as any);
+      } else if (screen === 'month-cards') {
+        router.push('/month-cards' as any);
       } else {
         // Never leave a tap dead — fall back to the dashboard.
         router.push('/(tabs)/' as any);
