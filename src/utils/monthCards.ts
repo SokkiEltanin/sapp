@@ -10,7 +10,7 @@ import { PayMonthRow } from '@/utils/workSummary';
 // Emoji here are intentional design "stickers" (decorative only, on the card).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SWEET_TAGS = ['słodycze', 'przekąski'];
+export const SWEET_TAGS = ['słodycze', 'przekąski'];
 
 const MONTH_NAMES = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -56,7 +56,7 @@ const SWEET_EMOJI: [RegExp, string][] = [
   [/cukier|cukr|dropsy|krów|toffi|karmel/i, '🍬'],
 ];
 
-function sweetEmoji(name: string): string {
+export function sweetEmoji(name: string): string {
   for (const [re, e] of SWEET_EMOJI) if (re.test(name)) return e;
   return '🍬';
 }

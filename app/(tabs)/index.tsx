@@ -52,6 +52,8 @@ import { getHealthGoals } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
 import { buildMonthCards } from '@/utils/monthCards';
+import WhoAteCard from '@/components/dashboard/WhoAteCard';
+import { buildPersonConsumption } from '@/utils/personConsumption';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherIconPng } from '@/utils/weatherIcon';
@@ -1673,6 +1675,12 @@ export default function DashboardScreen() {
   // The card to surface on the dashboard = most recent SEALED (completed) month.
   const featuredCard = useMemo(() => monthCards.find(c => !c.inProgress) ?? monthCards[0], [monthCards]);
 
+  // "Kto zjadł słodycze" — this-month consumption split between people (eaters).
+  const personConsumption = useMemo(
+    () => buildPersonConsumption(expenses, payers, nameAliases),
+    [expenses, payers, nameAliases],
+  );
+
   // Daily goal rings (Apple-Watch style): today's steps / water / budget / habits.
   const dailyRings = useMemo<RingSpec[]>(() => {
     const tISO = todayISO();
@@ -2792,6 +2800,10 @@ export default function DashboardScreen() {
                   ))}
                 </View>
               </View>
+            );
+
+            nodes['who-ate'] = personConsumption.totalSweets > 0 && payers.length >= 2 && (
+              <WhoAteCard data={personConsumption} monthLabel={MONTH_SHORT[new Date().getMonth()]} />
             );
 
             nodes['fixed-variable'] = (() => {
