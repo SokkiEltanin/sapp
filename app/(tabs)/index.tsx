@@ -1745,6 +1745,13 @@ export default function DashboardScreen() {
       .then(({ notificationsService }) => notificationsService.refreshMonthCardReminder())
       .catch(() => {});
   }, []);
+  // Persist skin-unlock progress (cards collected + any legendary) for the Skórki
+  // screen to read without recomputing the whole collection.
+  useEffect(() => {
+    const sealed = monthCards.filter(c => !c.inProgress).length;
+    const legendary = monthCards.some(c => c.tierRank >= 4);
+    AsyncStorage.setItem('skin_progress', JSON.stringify({ cards: sealed, legendary })).catch(() => {});
+  }, [monthCards]);
 
   // "Kto zjadł słodycze" — this-month consumption split between people (eaters).
   const personConsumption = useMemo(

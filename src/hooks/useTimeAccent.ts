@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { getSunTimes } from '@/utils/sunTimes';
+import { useSkinStore } from '@/store/skinStore';
+import { skinById } from '@/theme/skins';
 
 export type TimeOfDay = 'night' | 'dawn' | 'morning' | 'afternoon' | 'evening';
 
@@ -42,12 +44,16 @@ export function useTimeAccent(): TimeAccent {
   const now = new Date();
   const nowH = now.getHours() + now.getMinutes() / 60;
   const sun = getSunTimes();
-  // Key changes every 30 min and whenever sun times update → theme re-evaluates.
-  const key = `${Math.floor(nowH * 2)}-${sun?.sunrise ?? ''}-${sun?.sunset ?? ''}`;
+  const activeSkin = useSkinStore((s) => s.active);
+  // Key changes every 30 min and whenever sun times / skin update → theme re-evaluates.
+  const key = `${Math.floor(nowH * 2)}-${sun?.sunrise ?? ''}-${sun?.sunset ?? ''}-${activeSkin}`;
   return useMemo(() => {
     const tod = sun
       ? timeOfDayBySun(nowH, sun.sunrise, sun.sunset)
       : timeOfDayByHour(now.getHours());
-    return { ...ACCENTS[tod], timeOfDay: tod };
+    const base = { ...ACCENTS[tod], timeOfDay: tod };
+    // An equipped skin overrides the colours but keeps the time-based greeting.
+    const skin = activeSkin !== 'auto' ? skinById(activeSkin) : undefined;
+    return skin?.colors ? { ...base, ...skin.colors } : base;
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 }
