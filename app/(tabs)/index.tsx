@@ -19,7 +19,7 @@ import {
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike, Footprints, CheckSquare,
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
-  Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock,
+  Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock, Layers,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -2123,6 +2123,9 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Hourglass size={17} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/month-cards' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                    <Layers size={17} color="#A78BFA" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { haptic.tap(); router.push('/achievements' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Trophy size={17} color="#FFC83D" />
