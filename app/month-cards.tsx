@@ -6,7 +6,9 @@ import { ChevronLeft, Layers } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
+import YearWrappedCard from '@/components/dashboard/YearWrappedCard';
 import { buildMonthCards } from '@/utils/monthCards';
+import { buildYearCards } from '@/utils/yearCards';
 import { computePayMonths } from '@/utils/workSummary';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
@@ -50,6 +52,14 @@ export default function MonthCards() {
   );
 
   const sealed = cards.filter(c2 => !c2.inProgress).length;
+  const yearCards = useMemo(() => buildYearCards(cards), [cards]);
+  // Interleave: a year's grand card, then that year's month cards (newest first).
+  const years = useMemo(() => {
+    const byYear: Record<number, typeof cards> = {};
+    for (const card of cards) (byYear[card.year] ??= []).push(card);
+    return Object.keys(byYear).map(Number).sort((a, b) => b - a)
+      .map(y => ({ year: y, months: byYear[y], yearCard: yearCards.find(yc => yc.year === y) ?? null }));
+  }, [cards, yearCards]);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -79,7 +89,12 @@ export default function MonthCards() {
               </Text>
             </View>
             <View style={{ gap: spacing[4] }}>
-              {cards.map((card, i) => <MonthWrappedCard key={card.month} card={card} delay={Math.min(i, 6) * 70} />)}
+              {years.map(grp => (
+                <View key={grp.year} style={{ gap: spacing[4] }}>
+                  {grp.yearCard && <YearWrappedCard card={grp.yearCard} />}
+                  {grp.months.map((card, i) => <MonthWrappedCard key={card.month} card={card} delay={Math.min(i, 6) * 70} />)}
+                </View>
+              ))}
             </View>
           </>
         )}
