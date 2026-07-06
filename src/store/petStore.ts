@@ -20,7 +20,8 @@ interface PetState {
   lastCareTick: string | null;  // YYYY-MM-DD — one passive care-XP grant per day
   ownedItems: string[];         // cosmetic ids owned
   equipped: Record<string, string>; // slot → itemId (e.g. { hat: 'hat_party' })
-  claimedQuests: string[];      // quest milestone ids already rewarded
+  claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
+  dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
   _hydrated: boolean;
 
   setName: (name: string) => void;
@@ -29,7 +30,8 @@ interface PetState {
   spendCoins: (n: number) => boolean;   // false if not enough
   buyItem: (id: string, cost: number) => boolean;
   equip: (slot: string, id: string | null) => void;
-  claimQuest: (id: string, coins: number, xp: number) => void;
+  claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
+  claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
   careTick: (xp: number) => void;        // once/day passive growth from good care
   reset: () => void;
 }
@@ -45,6 +47,7 @@ export const usePetStore = create<PetState>()(
       ownedItems: [],
       equipped: {},
       claimedQuests: [],
+      dailyClaims: {},
       _hydrated: false,
 
       setName: (name) => set({ name: name.trim() || 'Blobek' }),
@@ -72,19 +75,26 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
+      claimDaily: (id, coins, xp) => {
+        const t = todayISO();
+        if (get().dailyClaims[id] === t) return false;
+        set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: t }, coins: s.coins + coins, xp: s.xp + xp }));
+        return true;
+      },
       careTick: (xp) => {
         const t = todayISO();
         if (get().lastCareTick === t) return;
         set((s) => ({ xp: s.xp + xp, lastCareTick: t }));
       },
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [] }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {} }),
     }),
     {
       name: 'pet-v1',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
-        lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped, claimedQuests: s.claimedQuests,
+        lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped,
+        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims,
       }),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
