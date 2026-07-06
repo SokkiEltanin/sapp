@@ -50,6 +50,8 @@ import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { getHealthGoals } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
+import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
+import { buildMonthCards } from '@/utils/monthCards';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherIconPng } from '@/utils/weatherIcon';
@@ -1663,6 +1665,14 @@ export default function DashboardScreen() {
   );
   const workAvg = useMemo(() => payMonthsSummary(workPayMonths), [workPayMonths]);
 
+  // Collectible "Wrapped" month cards — one per month, newest first.
+  const monthCards = useMemo(
+    () => buildMonthCards({ expenses, moodEntries, healthDays, payMonths: workPayMonths, nameAliases }),
+    [expenses, moodEntries, healthDays, workPayMonths, nameAliases],
+  );
+  // The card to surface on the dashboard = most recent SEALED (completed) month.
+  const featuredCard = useMemo(() => monthCards.find(c => !c.inProgress) ?? monthCards[0], [monthCards]);
+
   // Daily goal rings (Apple-Watch style): today's steps / water / budget / habits.
   const dailyRings = useMemo<RingSpec[]>(() => {
     const tISO = todayISO();
@@ -2218,6 +2228,10 @@ export default function DashboardScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+              );
+
+              nodes['month-summary'] = featuredCard && (
+                <MonthWrappedCard card={featuredCard} compact onPress={() => router.push('/month-cards' as any)} />
               );
 
               nodes['tag-limits'] = tagLimits.map(t => {

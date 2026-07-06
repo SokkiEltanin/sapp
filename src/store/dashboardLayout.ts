@@ -11,6 +11,7 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'debt-prompt',
   'bank-queue',
   'bill-suggest',
+  'month-summary',
   'weekly-insights',
   'maintenance-reminders',
   'tag-limits',
@@ -46,6 +47,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'payday-prompt':  'Pytanie o wypłatę',
   'debt-prompt':    'Pytanie o dług (zwrot)',
   'bill-suggest':   'Propozycja stałego rachunku',
+  'month-summary':  'Karta miesiąca (Wrapped)',
   'bank-queue':     'Płatności z banku (do zatwierdzenia)',
   'weekly-insights': 'Przegląd (kafelki + miesiące)',
   'maintenance-reminders': 'Serwis i przypomnienia',
@@ -81,6 +83,7 @@ export const SECTION_DESC: Record<string, string> = {
   'payday-prompt':  'Pyta o wypłatę w dniu wypłaty',
   'debt-prompt':    'Pyta o zwrot pożyczonych pieniędzy',
   'bill-suggest':   'Wykrywa powtarzalny wydatek → stały rachunek',
+  'month-summary':  'Kolekcjonerska karta miesiąca (Wrapped)',
   'bank-queue':     'Płatności z banku do zatwierdzenia',
   'weekly-insights':'Kafelki tygodnia + porównanie miesięcy',
   'maintenance-reminders': 'Serwis pojazdów i przypomnienia',
@@ -123,7 +126,7 @@ export const SECTION_GROUP: Record<string, string> = {
   'fun-facts': 'Przegląd i statystyki', 'correlations': 'Przegląd i statystyki',
   'mood-cal': 'Nastrój i liczniki', 'mood-wave': 'Nastrój i liczniki', 'countdowns': 'Nastrój i liczniki',
   'counters-since': 'Nastrój i liczniki', 'gablota-card': 'Nastrój i liczniki',
-  'pinned-notes': 'Inne', 'gcal': 'Inne', 'daily-rings': 'Zadania i nawyki',
+  'pinned-notes': 'Inne', 'gcal': 'Inne', 'daily-rings': 'Zadania i nawyki', 'month-summary': 'Przegląd i statystyki',
 };
 export const SECTION_GROUP_ORDER = ['Przypomnienia', 'Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
 
