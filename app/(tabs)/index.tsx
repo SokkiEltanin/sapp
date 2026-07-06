@@ -3346,6 +3346,30 @@ export default function DashboardScreen() {
                       <Text style={[s.wpTotalVal, { color: '#FBBF24' }]}>{workAvg.avgRate.toFixed(2)} zł/h</Text>
                     </View>
                   )}
+                  {/* Compare: latest paycheck's rate vs your overall average + best/worst month */}
+                  {workAvg.avgRate != null && (() => {
+                    const included = workPayMonths.filter(r => !r.excluded && r.hours > 0);
+                    if (included.length < 2) return null;
+                    const last = included[0]; // most recent (list is date-desc)
+                    const lastRate = last.amount / last.hours;
+                    const dPct = workAvg.avgRate! > 0 ? Math.round(((lastRate - workAvg.avgRate!) / workAvg.avgRate!) * 100) : 0;
+                    const up = lastRate >= workAvg.avgRate!;
+                    const rates = included.map(r => r.amount / r.hours);
+                    const best = Math.max(...rates), worst = Math.min(...rates);
+                    return (
+                      <View style={{ marginTop: spacing[2] }}>
+                        <View style={s.statCmpRow}>
+                          <View><Text style={[s.statCmpVal, { color: accentColor }]}>{lastRate.toFixed(1)} zł/h</Text><Text style={s.statCmpKey}>ost. wypłata · {MONTH_SHORT[Number(last.month.slice(5, 7)) - 1]}</Text></View>
+                          <View style={[s.statDelta, { backgroundColor: (up ? '#2AC68F' : '#FF6B6B') + '1E' }]}>
+                            {up ? <TrendingUp size={11} color="#2AC68F" /> : <TrendingDown size={11} color="#FF6B6B" />}
+                            <Text style={[s.statDeltaText, { color: up ? '#2AC68F' : '#FF6B6B' }]}>{dPct >= 0 ? '+' : ''}{dPct}%</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{workAvg.avgRate!.toFixed(1)} zł/h</Text><Text style={s.statCmpKey}>Twoja średnia</Text></View>
+                        </View>
+                        <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: 4 }]}>Najlepszy miesiąc {best.toFixed(1)} zł/h · najsłabszy {worst.toFixed(1)} zł/h</Text>
+                      </View>
+                    );
+                  })()}
                   {workPayMonths.length > 0 && (
                     <View style={{ marginTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[2] }}>
                       <Text style={s.wxSection}>Wypłaty · stawka = wypłata ÷ godziny miesiąca</Text>
