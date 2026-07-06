@@ -14,6 +14,9 @@ import { workService } from './workService';
 import { vehiclesService } from './vehiclesService';
 import { maintenanceService } from './maintenanceService';
 import { debtsService } from './debtsService';
+import { buildDerivedAnalysis } from '@/utils/exportAnalysis';
+import { loadNameAliases } from '@/utils/productMemory';
+import { getHealthHistory } from '@/utils/healthHistory';
 
 // ─── Cloud backup ─────────────────────────────────────────────────────────────
 // A backup is ONE snapshot of everything the app owns: all local config/data in
@@ -89,12 +92,55 @@ async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
   };
 }
 
+// Parse every local AsyncStorage value into JSON where possible, so the exported
+// config is readable (dashboard layout, budgets, tag rules, memories…) instead of
+// a wall of escaped strings. Non-JSON values are kept verbatim.
+function parseLocalConfig(local: Record<string, string>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(local)) {
+    try { out[k] = JSON.parse(v); } catch { out[k] = v; }
+  }
+  return out;
+}
+
 // Export the whole snapshot to a JSON file and open the share sheet, so the data
-// can be sent out (e.g. to inspect how everything is captured). Returns the count
-// of items per cloud collection for a quick toast summary.
+// can be sent out and inspected. On top of the raw `local` + `cloud` snapshot it
+// adds a `config` block (parsed settings incl. the dashboard layout) and a
+// `derived` block that runs the app's own computations over the data (paychecks,
+// work rate, monthly reports, Wrapped cards, health rollups, product grouping,
+// integrity warnings) — so raw vs. interpreted can be cross-checked. Returns the
+// byte size for a quick toast summary.
 export async function exportSnapshotToFile(appBuild?: number): Promise<{ uri: string; bytes: number }> {
   const snap = await gatherSnapshot(appBuild);
-  const json = JSON.stringify(snap, null, 2);
+
+  // Extra inputs the derived analysis needs (best-effort — never block the export).
+  const [workSettings, nameAliases, health] = await Promise.all([
+    workService.getSettings().catch(() => undefined),
+    loadNameAliases().catch(() => ({})),
+    getHealthHistory(400).catch(() => ({})),
+  ]);
+  const healthDays: Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }> = {};
+  for (const [d, v] of Object.entries(health as Record<string, { steps: number; sleepMinutes: number; weight: number }>)) {
+    healthDays[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
+  }
+
+  let derived: any = null;
+  try {
+    derived = buildDerivedAnalysis({
+      expenses: snap.cloud.expenses ?? [],
+      events: snap.cloud.events ?? [],
+      mood: snap.cloud.mood ?? [],
+      tasks: snap.cloud.tasks ?? [],
+      workSettings: workSettings ?? ({ workPrefix: '', workColor: undefined, excludedPayMonths: [] } as any),
+      healthDays,
+      nameAliases: nameAliases as Record<string, string>,
+    });
+  } catch (e: any) {
+    derived = { error: String(e?.message ?? e) };
+  }
+
+  const out = { ...snap, exportVersion: 2, config: parseLocalConfig(snap.local), derived };
+  const json = JSON.stringify(out, null, 2);
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   const uri = `${FileSystem.cacheDirectory}sapp-export-${stamp}.json`;
   await FileSystem.writeAsStringAsync(uri, json, { encoding: FileSystem.EncodingType.UTF8 });

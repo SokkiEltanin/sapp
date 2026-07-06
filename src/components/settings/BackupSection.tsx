@@ -64,7 +64,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
     try {
       const { bytes } = await exportSnapshotToFile(appBuild);
       haptic.success();
-      toast.success(`Wyeksportowano (${fmtSize(bytes)}) — wybierz, gdzie zapisać/wysłać`);
+      toast.success(`Wyeksportowano dane + analizę (${fmtSize(bytes)}) — wybierz, gdzie wysłać`);
     } catch (e: any) {
       haptic.error();
       toast.error('Nie udało się wyeksportować danych');
@@ -155,6 +155,9 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
           <Text style={s.exportText}>{busy === 'export' ? 'Eksportuję…' : 'Eksportuj dane do pliku (JSON)'}</Text>
         </View>
       </PressableScale>
+      <Text style={s.exportHint}>
+        Zawiera surowe dane + ustawienia (w tym dashboard) + sekcję „derived": jak apka je interpretuje (wypłaty, stawka zł/h, karty miesiąca, zdrowie) i ostrzeżenia spójności. Do wglądu/analizy.
+      </Text>
 
       {busy === 'load' ? (
         <ActivityIndicator size="small" color={c.text.muted} style={{ marginTop: spacing[2] }} />
@@ -230,6 +233,7 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
     backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
   },
   exportText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  exportHint: { fontSize: 11, color: c.text.muted, lineHeight: 15, marginTop: -spacing[1] },
   empty: { fontSize: 12, color: c.text.muted, textAlign: 'center', paddingVertical: spacing[2] },
   list: { borderRadius: radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3] },
