@@ -1,0 +1,35 @@
+import { View, Text, StyleSheet } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
+import Blob from '@/components/pet/Blob';
+import { PetState, petStatusLine } from '@/utils/petState';
+import { useColors } from '@/theme/useColors';
+
+// Dashboard companion tile: a live mini blob + its name + a kind status line.
+// Taps through to the full pet page.
+export default function PetTile({ name, pet, level }: { name: string; pet: PetState; level: number }) {
+  const c = useColors();
+  return (
+    <View style={[st.card, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
+      <Blob color={pet.color} expression={pet.expression} size={64} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={st.top}>
+          <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>
+          <View style={[st.lvl, { backgroundColor: '#A78BFA22' }]}><Text style={st.lvlTxt}>lvl {level}</Text></View>
+        </View>
+        <Text style={[st.status, { color: pet.color }]}>{pet.label}</Text>
+        <Text style={[st.tip, { color: c.text.muted }]} numberOfLines={1}>{petStatusLine(pet)}</Text>
+      </View>
+      <ChevronRight size={18} color={c.text.muted} />
+    </View>
+  );
+}
+
+const st = StyleSheet.create({
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, borderWidth: 1, padding: 12, paddingRight: 10 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  name: { fontSize: 16, fontWeight: '800', flexShrink: 1 },
+  lvl: { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 1 },
+  lvlTxt: { fontSize: 10, fontWeight: '900', color: '#A78BFA', letterSpacing: 0.3 },
+  status: { fontSize: 13, fontWeight: '800', marginTop: 2 },
+  tip: { fontSize: 11.5, fontWeight: '500', marginTop: 1 },
+});

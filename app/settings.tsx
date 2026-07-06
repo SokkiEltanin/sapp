@@ -1414,6 +1414,20 @@ export default function SettingsScreen() {
               </View>
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
+
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push('/pet' as any); }}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                <LucideIcons.Sparkles size={16} color="#2AC68F" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Pupil</Text>
+                <Text style={styles.rowSub}>Twój blob — nastrój zależny od tego, jak dbasz o siebie</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
           </View>
         </CollapsibleSection>
 

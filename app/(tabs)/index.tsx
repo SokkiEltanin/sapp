@@ -55,6 +55,9 @@ import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
 import { buildMonthCards, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import { buildPersonConsumption } from '@/utils/personConsumption';
+import PetTile from '@/components/pet/PetTile';
+import { computePetState } from '@/utils/petState';
+import { usePetStore, levelFromXp } from '@/store/petStore';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
 import { weatherIconPng } from '@/utils/weatherIcon';
@@ -1759,6 +1762,34 @@ export default function DashboardScreen() {
     [expenses, payers, nameAliases],
   );
 
+  // ── Companion blob: live mood from today's self-care data ──────────────────
+  const petName = usePetStore(st => st.name);
+  const petXp = usePetStore(st => st.xp);
+  const petCareTick = usePetStore(st => st.careTick);
+  const petState = useMemo(() => {
+    const tISO = todayISO();
+    const todayMoods = moodEntries.filter(e => e.date === tISO);
+    const avgMood = todayMoods.length ? todayMoods.reduce((a, b) => a + b.mood, 0) / todayMoods.length : null;
+    return computePetState({
+      stepsToday: healthDays[tISO]?.steps ?? 0,
+      stepGoal: healthGoals.stepGoal,
+      sleepMinutes: healthDays[tISO]?.sleepMinutes ?? 0,
+      habitsDone: habitsDoneIds.length, habitsTotal: habits.length,
+      moodLoggedToday: todayMoods.length > 0, avgMoodToday: avgMood,
+      hour: new Date().getHours(),
+    });
+  }, [healthDays, healthGoals, habitsDoneIds.length, habits.length, moodEntries]);
+  const petLevel = useMemo(() => levelFromXp(petXp).level, [petXp]);
+  // Passive daily care XP (once/day), scaled by how well you're doing.
+  const petTicked = useRef(false);
+  useEffect(() => {
+    if (petTicked.current) return;
+    if ((healthDays[todayISO()]?.steps ?? 0) > 0 || habits.length > 0 || moodEntries.length > 0) {
+      petTicked.current = true;
+      petCareTick(Math.max(1, Math.round(petState.wellbeing / 12)));
+    }
+  }, [petState.wellbeing, healthDays, habits.length, moodEntries.length]);
+
   // Daily goal rings (Apple-Watch style): today's steps / water / budget / habits.
   const dailyRings = useMemo<RingSpec[]>(() => {
     const tISO = todayISO();
@@ -2318,6 +2349,12 @@ export default function DashboardScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+              );
+
+              nodes['pet'] = (
+                <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/pet' as any); }}>
+                  <PetTile name={petName} pet={petState} level={petLevel} />
+                </TouchableOpacity>
               );
 
               nodes['month-summary'] = featuredCard && (
