@@ -1,11 +1,14 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Footprints, TrendingUp, TrendingDown, Trophy, Coins, Smile, Sparkles, ChevronRight } from 'lucide-react-native';
 import { MonthCard } from '@/utils/monthCards';
 
 // A Spotify-Wrapped-style COLLECTIBLE card for one month. The gradient + emoji
 // stickers are deliberate decoration; the stats are real (sweets, steps, spend,
-// and how the month ranks against the rest of the collection).
+// and how the month ranks against the rest of the collection). The card animates
+// in and a holographic sheen sweeps across it like a foil trading card — rarer
+// months (more records) shine stronger.
 
 function fmt(n: number): string {
   return Math.round(n).toLocaleString('pl-PL');
@@ -16,8 +19,38 @@ function fmtSteps(n: number): string {
 }
 
 export default function MonthWrappedCard({
-  card, compact = false, onPress,
-}: { card: MonthCard; compact?: boolean; onPress?: () => void }) {
+  card, compact = false, onPress, delay = 0,
+}: { card: MonthCard; compact?: boolean; onPress?: () => void; delay?: number }) {
+  // ── rarity: how many "records" this month holds → foil intensity ───────────
+  const notable = [
+    card.isTopSteps, card.isTopMood, card.isTopSweets,
+    card.spendRank === 1 && card.monthsTracked >= 2, card.earned > 0,
+  ].filter(Boolean).length;
+  const rarity: 'legendarna' | 'rzadka' | null = notable >= 3 ? 'legendarna' : notable === 2 ? 'rzadka' : null;
+
+  // ── entrance + looping sheen ───────────────────────────────────────────────
+  const enter = useRef(new Animated.Value(0)).current;
+  const shine = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(enter, { toValue: 1, duration: 440, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    const loop = Animated.loop(Animated.sequence([
+      Animated.delay(700 + delay),
+      Animated.timing(shine, { toValue: 1, duration: 950, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(shine, { toValue: 0, duration: 0, useNativeDriver: true }),
+      Animated.delay(rarity === 'legendarna' ? 2400 : rarity ? 3800 : 5600),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  const enterStyle = {
+    opacity: enter,
+    transform: [
+      { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+      { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) },
+    ],
+  };
+  const shineX = shine.interpolate({ inputRange: [0, 1], outputRange: [-320, 470] });
+
   const chips: { icon: any; text: string; tone?: 'up' | 'down' | 'gold' }[] = [];
   if (card.spendRank === 1 && card.monthsTracked >= 2)
     chips.push({ icon: Trophy, text: 'Rekord wydatków', tone: 'gold' });
@@ -36,92 +69,108 @@ export default function MonthWrappedCard({
       tone: card.spendVsPrevPct < 0 ? 'up' : 'down' });
 
   const Body = (
-    <LinearGradient
-      colors={card.palette}
-      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-      style={[st.card, compact && st.cardCompact, { borderColor: card.accent + '55' }]}
-    >
-      {/* faint oversized sticker as a watermark, top-right */}
-      {card.stickers[0] ? <Text style={st.watermark}>{card.stickers[0]}</Text> : null}
+    <Animated.View style={enterStyle}>
+      <LinearGradient
+        colors={card.palette}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[st.card, compact && st.cardCompact, { borderColor: rarity ? card.accent + 'AA' : card.accent + '55' }]}
+      >
+        {/* faint oversized sticker as a watermark, top-right */}
+        {card.stickers[0] ? <Text style={st.watermark}>{card.stickers[0]}</Text> : null}
 
-      {/* header */}
-      <View style={st.head}>
-        <View style={{ flex: 1 }}>
-          <View style={st.kicker}>
-            <Sparkles size={12} color={card.accent} />
-            <Text style={[st.kickerTxt, { color: card.accent }]}>
-              {card.inProgress ? 'Karta w trakcie' : 'Karta miesiąca'} · #{card.index}
-            </Text>
-          </View>
-          <Text style={st.month}>{card.monthName}</Text>
-          <Text style={st.year}>{card.year}</Text>
-        </View>
-        <View style={st.stickerCol}>
-          {card.stickers.slice(0, 4).map((s, i) => (
-            <Text key={i} style={[st.sticker, { transform: [{ rotate: `${(i % 2 ? 8 : -8)}deg` }] }]}>{s}</Text>
-          ))}
-        </View>
-      </View>
-
-      {/* hero: steps */}
-      <View style={st.heroRow}>
-        <View style={st.heroStat}>
-          <View style={st.heroIcon}><Footprints size={16} color="#fff" /></View>
-          <View>
-            <Text style={st.heroVal}>{fmtSteps(card.steps)}</Text>
-            <Text style={st.heroKey}>kroków{card.stepsDays > 0 ? ` · ${card.stepsDays} dni` : ''}</Text>
-          </View>
-        </View>
-        {card.earned > 0 && (
-          <View style={st.heroStat}>
-            <View style={st.heroIcon}><Coins size={16} color="#fff" /></View>
-            <View>
-              <Text style={st.heroVal}>{fmt(card.earned)}</Text>
-              <Text style={st.heroKey}>zł zarobku</Text>
+        {/* header */}
+        <View style={st.head}>
+          <View style={{ flex: 1 }}>
+            <View style={st.kicker}>
+              <Sparkles size={12} color={card.accent} />
+              <Text style={[st.kickerTxt, { color: card.accent }]}>
+                {card.inProgress ? 'Karta w trakcie' : 'Karta miesiąca'} · #{card.index}
+              </Text>
+              {rarity && (
+                <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '22' }]}>
+                  <Text style={[st.rarityTxt, { color: card.accent }]}>{rarity === 'legendarna' ? 'LEGENDARNA' : 'RZADKA'}</Text>
+                </View>
+              )}
             </View>
+            <Text style={st.month}>{card.monthName}</Text>
+            <Text style={st.year}>{card.year}</Text>
+          </View>
+          <View style={st.stickerCol}>
+            {card.stickers.slice(0, 4).map((sx, i) => (
+              <Text key={i} style={[st.sticker, { transform: [{ rotate: `${(i % 2 ? 8 : -8)}deg` }] }]}>{sx}</Text>
+            ))}
+          </View>
+        </View>
+
+        {/* hero: steps */}
+        <View style={st.heroRow}>
+          <View style={st.heroStat}>
+            <View style={st.heroIcon}><Footprints size={16} color="#fff" /></View>
+            <View>
+              <Text style={st.heroVal}>{fmtSteps(card.steps)}</Text>
+              <Text style={st.heroKey}>kroków{card.stepsDays > 0 ? ` · ${card.stepsDays} dni` : ''}</Text>
+            </View>
+          </View>
+          {card.earned > 0 && (
+            <View style={st.heroStat}>
+              <View style={st.heroIcon}><Coins size={16} color="#fff" /></View>
+              <View>
+                <Text style={st.heroVal}>{fmt(card.earned)}</Text>
+                <Text style={st.heroKey}>zł zarobku</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* favourite sweets */}
+        {card.sweets.length > 0 && (
+          <View style={st.sweets}>
+            <Text style={st.sectionLabel}>Ulubione słodycze</Text>
+            {card.sweets.map((sw, i) => (
+              <View key={i} style={st.sweetRow}>
+                <Text style={st.sweetEmoji}>{sw.emoji}</Text>
+                <Text style={st.sweetName} numberOfLines={1}>{sw.name}</Text>
+                <Text style={st.sweetCount}>×{sw.count}</Text>
+              </View>
+            ))}
           </View>
         )}
-      </View>
 
-      {/* favourite sweets */}
-      {card.sweets.length > 0 && (
-        <View style={st.sweets}>
-          <Text style={st.sectionLabel}>Ulubione słodycze</Text>
-          {card.sweets.map((s, i) => (
-            <View key={i} style={st.sweetRow}>
-              <Text style={st.sweetEmoji}>{s.emoji}</Text>
-              <Text style={st.sweetName} numberOfLines={1}>{s.name}</Text>
-              <Text style={st.sweetCount}>×{s.count}</Text>
-            </View>
-          ))}
-        </View>
-      )}
+        {/* comparison chips */}
+        {chips.length > 0 && (
+          <View style={st.chips}>
+            {chips.slice(0, 3).map((c, i) => {
+              const C = c.icon;
+              const tint = c.tone === 'gold' ? '#FDE047' : c.tone === 'down' ? '#FCA5A5' : '#86EFAC';
+              return (
+                <View key={i} style={[st.chip, { borderColor: tint + '66' }]}>
+                  <C size={11} color={tint} />
+                  <Text style={[st.chipTxt, { color: tint }]}>{c.text}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
-      {/* comparison chips */}
-      {chips.length > 0 && (
-        <View style={st.chips}>
-          {chips.slice(0, 3).map((c, i) => {
-            const C = c.icon;
-            const tint = c.tone === 'gold' ? '#FDE047' : c.tone === 'down' ? '#FCA5A5' : '#86EFAC';
-            return (
-              <View key={i} style={[st.chip, { borderColor: tint + '66' }]}>
-                <C size={11} color={tint} />
-                <Text style={[st.chipTxt, { color: tint }]}>{c.text}</Text>
-              </View>
-            );
-          })}
+        {/* headline + spend footer */}
+        <View style={st.foot}>
+          <Text style={st.headline} numberOfLines={2}>{card.headline}</Text>
+          <View style={st.footBar}>
+            <Text style={st.footSpend}>{fmt(card.totalSpend)} zł wydane</Text>
+            {onPress && <View style={st.footLink}><Text style={st.footLinkTxt}>Kolekcja</Text><ChevronRight size={13} color="#fff" /></View>}
+          </View>
         </View>
-      )}
 
-      {/* headline + spend footer */}
-      <View style={st.foot}>
-        <Text style={st.headline} numberOfLines={2}>{card.headline}</Text>
-        <View style={st.footBar}>
-          <Text style={st.footSpend}>{fmt(card.totalSpend)} zł wydane</Text>
-          {onPress && <View style={st.footLink}><Text style={st.footLinkTxt}>Kolekcja</Text><ChevronRight size={13} color="#fff" /></View>}
-        </View>
-      </View>
-    </LinearGradient>
+        {/* holographic sheen sweep — foil trading-card feel */}
+        <Animated.View pointerEvents="none" style={[st.sheen, { transform: [{ translateX: shineX }, { rotate: '18deg' }] }]}>
+          <LinearGradient
+            colors={['transparent', rarity === 'legendarna' ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.22)', 'transparent']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={{ flex: 1 }}
+          />
+        </Animated.View>
+      </LinearGradient>
+    </Animated.View>
   );
 
   if (onPress) return <Pressable onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.92, transform: [{ scale: 0.995 }] }}>{Body}</Pressable>;
@@ -136,10 +185,13 @@ const st = StyleSheet.create({
   },
   cardCompact: { padding: 16 },
   watermark: { position: 'absolute', top: -18, right: -6, fontSize: 96, opacity: 0.14 },
+  sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
 
   head: { flexDirection: 'row', alignItems: 'flex-start' },
   kicker: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
   kickerTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  rarityPill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 2 },
+  rarityTxt: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
   month: { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -1, ...shadow },
   year: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '700', marginTop: -2, ...shadow },
   stickerCol: { alignItems: 'flex-end', maxWidth: 84, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 2 },

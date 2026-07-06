@@ -77,7 +77,7 @@ export default function MonthCards() {
               </Text>
             </View>
             <View style={{ gap: spacing[4] }}>
-              {cards.map(card => <MonthWrappedCard key={card.month} card={card} />)}
+              {cards.map((card, i) => <MonthWrappedCard key={card.month} card={card} delay={Math.min(i, 6) * 70} />)}
             </View>
           </>
         )}
