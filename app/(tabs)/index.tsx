@@ -2114,7 +2114,6 @@ export default function DashboardScreen() {
                     onPress={() => { haptic.tap(); setWeatherPanel(true); }}>
                     <Image source={weatherIconPng(weather.wmo ?? -1)} style={{ width: 22, height: 22 }} resizeMode="contain" />
                     <Text style={s.headerMinTemp}>{weather.temp}°</Text>
-                    <Text style={s.headerMinDesc} numberOfLines={1}>{weather.desc.toLowerCase()}</Text>
                   </TouchableOpacity>
                 )}
                 <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto' }}>

@@ -17,22 +17,27 @@ const MONTH_NAMES = [
   'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
 ];
 
-// One themed gradient per calendar month → the collection reads as a matched set,
-// each month recognisable by its own "season" colour. [top, mid, bottom, accent].
-const MONTH_THEME: [string, string, string, string][] = [
-  ['#1E3A8A', '#2563EB', '#0F172A', '#93C5FD'], // Sty — mroźny błękit
-  ['#4C1D95', '#7C3AED', '#1E1B4B', '#C4B5FD'], // Lut — fiolet
-  ['#065F46', '#10B981', '#0B2E22', '#6EE7B7'], // Mar — wiosenna zieleń
-  ['#9D174D', '#EC4899', '#3B0A24', '#F9A8D4'], // Kwi — róż kwiatów
-  ['#166534', '#22C55E', '#0B2E17', '#86EFAC'], // Maj — soczysta zieleń
-  ['#B45309', '#F59E0B', '#3B240A', '#FCD34D'], // Cze — złote lato
-  ['#C2410C', '#FB923C', '#3B1206', '#FDBA74'], // Lip — upalny pomarańcz
-  ['#B91C1C', '#F87171', '#3B0A0A', '#FCA5A5'], // Sie — czerwień
-  ['#A16207', '#EAB308', '#332107', '#FDE047'], // Wrz — bursztyn
-  ['#9A3412', '#EA580C', '#331206', '#FDBA74'], // Paź — jesień
-  ['#3730A3', '#6366F1', '#191833', '#A5B4FC'], // Lis — chłodny indygo
-  ['#155E75', '#06B6D4', '#082F36', '#67E8F9'], // Gru — lodowy cyjan
-];
+// RARITY TIERS — the card's colour communicates how special the month is, like a
+// graded collectible: copper (common) → silver → gold → diamond → sapphire
+// (legendary). [top, mid, bottom] gradient + accent + medal emoji + label.
+export type MonthTier = 'miedziana' | 'srebrna' | 'zlota' | 'diamentowa' | 'szafirowa';
+
+const TIER_THEME: Record<MonthTier, { rank: number; palette: [string, string, string]; accent: string; emoji: string; label: string }> = {
+  miedziana:  { rank: 0, palette: ['#8A4B24', '#C87A3C', '#2E1A0D'], accent: '#F0B27A', emoji: '🥉', label: 'MIEDZIANA' },
+  srebrna:    { rank: 1, palette: ['#5B6472', '#AEB7C4', '#23282F'], accent: '#EAF0F7', emoji: '🥈', label: 'SREBRNA' },
+  zlota:      { rank: 2, palette: ['#9A6B08', '#F2B90C', '#2E2205'], accent: '#FDE047', emoji: '🥇', label: 'ZŁOTA' },
+  diamentowa: { rank: 3, palette: ['#2C6E7C', '#68D8E6', '#0B2A31'], accent: '#CFFAFE', emoji: '💎', label: 'DIAMENTOWA' },
+  szafirowa:  { rank: 4, palette: ['#1E3A8A', '#3B6FE0', '#0C1636'], accent: '#93C5FD', emoji: '🔷', label: 'LEGENDARNA · SZAFIR' },
+};
+
+// notable = how many "records" the month holds → its tier on the ladder.
+function tierFor(notable: number): MonthTier {
+  if (notable >= 4) return 'szafirowa';
+  if (notable === 3) return 'diamentowa';
+  if (notable === 2) return 'zlota';
+  if (notable === 1) return 'srebrna';
+  return 'miedziana';
+}
 
 const SWEET_EMOJI: [RegExp, string][] = [
   [/lod(y|ów)|ice/i, '🍦'],
@@ -88,6 +93,10 @@ export interface MonthCard {
   isTopSweets: boolean;
 
   // presentation
+  tier: MonthTier;        // rarity tier (drives the colour)
+  tierRank: number;       // 0 (miedziana) … 4 (szafirowa)
+  tierLabel: string;      // "ZŁOTA" etc.
+  tierEmoji: string;      // 🥉🥈🥇💎🔷
   palette: [string, string, string];
   accent: string;
   stickers: string[];     // decorative emoji
@@ -194,7 +203,6 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
   const cards: MonthCard[] = ordered.map((month, i) => {
     const a = ensure(month);
     const [y, mo] = month.split('-').map(Number);
-    const theme = MONTH_THEME[(mo - 1) % 12];
     const avgMood = a.moodN ? a.moodSum / a.moodN : null;
     const avgSteps = a.stepDays ? a.steps / a.stepDays : 0;
     const earned = earnedByMonth[month] ?? 0;
@@ -212,6 +220,14 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     const isTopMood = bestMoodMonth === month && a.moodN > 0 && ordered.length >= 2;
     const isTopSteps = bestStepsMonth === month && a.stepDays > 0 && ordered.length >= 2;
     const isTopSweets = bestSweetsMonth === month && a.sweetsSpend > 0 && ordered.length >= 2;
+    const isTopSpendMonth = isTopSpend(spendRankList, month);
+
+    // rarity ladder: how many collection RECORDS this month holds → its metal
+    // tier. Copper = a normal month; each record it dominates bumps it up; holding
+    // all four (steps + mood + sweets + spend) makes it legendary sapphire.
+    const notable = [isTopSteps, isTopMood, isTopSweets, isTopSpendMonth].filter(Boolean).length;
+    const tier = tierFor(notable);
+    const th = TIER_THEME[tier];
 
     // decorative stickers: the top sweet, plus badges the month earned
     const stickers: string[] = [];
@@ -220,7 +236,7 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     else if (a.steps > 0) stickers.push('👣');
     if (isTopMood) stickers.push('😄');
     if (earned > 0) stickers.push('💰');
-    if (isTopSpend(spendRankList, month)) stickers.push('🔥');
+    if (isTopSpendMonth) stickers.push('🔥');
 
     const headline = buildHeadline({ sweets, steps: a.steps, isTopSteps, isTopMood, isTopSweets, earned, spendVsPrevPct, avgMood });
 
@@ -236,7 +252,8 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
       monthsTracked: ordered.length,
       stepsVsAvgPct, spendVsPrevPct,
       isTopMood, isTopSteps, isTopSweets,
-      palette: [theme[0], theme[1], theme[2]], accent: theme[3],
+      tier, tierRank: th.rank, tierLabel: th.label, tierEmoji: th.emoji,
+      palette: th.palette, accent: th.accent,
       stickers, headline,
     };
   });

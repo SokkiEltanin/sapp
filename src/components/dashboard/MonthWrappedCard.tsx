@@ -21,23 +21,22 @@ function fmtSteps(n: number): string {
 export default function MonthWrappedCard({
   card, compact = false, onPress, delay = 0,
 }: { card: MonthCard; compact?: boolean; onPress?: () => void; delay?: number }) {
-  // ── rarity: how many "records" this month holds → foil intensity ───────────
-  const notable = [
-    card.isTopSteps, card.isTopMood, card.isTopSweets,
-    card.spendRank === 1 && card.monthsTracked >= 2, card.earned > 0,
-  ].filter(Boolean).length;
-  const rarity: 'legendarna' | 'rzadka' | null = notable >= 3 ? 'legendarna' : notable === 2 ? 'rzadka' : null;
+  // rarity tier drives the colour + foil intensity (0 miedziana … 4 szafirowa).
+  const rank = card.tierRank;
+  const legendary = rank >= 4;
 
   // ── entrance + looping sheen ───────────────────────────────────────────────
   const enter = useRef(new Animated.Value(0)).current;
   const shine = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 440, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    // Higher tiers catch the light more often (copper rarely, sapphire briskly).
+    const idle = [6000, 5000, 4000, 3000, 2200][rank] ?? 5000;
     const loop = Animated.loop(Animated.sequence([
       Animated.delay(700 + delay),
       Animated.timing(shine, { toValue: 1, duration: 950, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       Animated.timing(shine, { toValue: 0, duration: 0, useNativeDriver: true }),
-      Animated.delay(rarity === 'legendarna' ? 2400 : rarity ? 3800 : 5600),
+      Animated.delay(idle),
     ]));
     loop.start();
     return () => loop.stop();
@@ -73,10 +72,10 @@ export default function MonthWrappedCard({
       <LinearGradient
         colors={card.palette}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[st.card, compact && st.cardCompact, { borderColor: rarity ? card.accent + 'AA' : card.accent + '55' }]}
+        style={[st.card, compact && st.cardCompact, { borderColor: card.accent + (legendary ? 'CC' : rank >= 2 ? 'AA' : '66') }]}
       >
-        {/* faint oversized sticker as a watermark, top-right */}
-        {card.stickers[0] ? <Text style={st.watermark}>{card.stickers[0]}</Text> : null}
+        {/* the tier medal as a faint oversized watermark — reads rarity at a glance */}
+        <Text style={st.watermark}>{card.tierEmoji}</Text>
 
         {/* header */}
         <View style={st.head}>
@@ -86,11 +85,11 @@ export default function MonthWrappedCard({
               <Text style={[st.kickerTxt, { color: card.accent }]}>
                 {card.inProgress ? 'Karta w trakcie' : 'Karta miesiąca'} · #{card.index}
               </Text>
-              {rarity && (
-                <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '22' }]}>
-                  <Text style={[st.rarityTxt, { color: card.accent }]}>{rarity === 'legendarna' ? 'LEGENDARNA' : 'RZADKA'}</Text>
-                </View>
-              )}
+            </View>
+            {/* rarity tier — always shown so the colour is legible */}
+            <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '1F' }]}>
+              <Text style={st.rarityEmoji}>{card.tierEmoji}</Text>
+              <Text style={[st.rarityTxt, { color: card.accent }]}>{card.tierLabel}</Text>
             </View>
             <Text style={st.month}>{card.monthName}</Text>
             <Text style={st.year}>{card.year}</Text>
@@ -164,7 +163,7 @@ export default function MonthWrappedCard({
         {/* holographic sheen sweep — foil trading-card feel */}
         <Animated.View pointerEvents="none" style={[st.sheen, { transform: [{ translateX: shineX }, { rotate: '18deg' }] }]}>
           <LinearGradient
-            colors={['transparent', rarity === 'legendarna' ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.22)', 'transparent']}
+            colors={['transparent', `rgba(255,255,255,${(0.18 + rank * 0.05).toFixed(2)})`, 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={{ flex: 1 }}
           />
@@ -188,10 +187,11 @@ const st = StyleSheet.create({
   sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
 
   head: { flexDirection: 'row', alignItems: 'flex-start' },
-  kicker: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  kicker: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
   kickerTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  rarityPill: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 2 },
-  rarityTxt: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  rarityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 7 },
+  rarityEmoji: { fontSize: 11 },
+  rarityTxt: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   month: { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -1, ...shadow },
   year: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '700', marginTop: -2, ...shadow },
   stickerCol: { alignItems: 'flex-end', maxWidth: 84, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 2 },
