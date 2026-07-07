@@ -10,7 +10,7 @@ import Blob from '@/components/pet/Blob';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx } from '@/utils/quests';
-import { equippedStickers, equippedRoom } from '@/utils/petShop';
+import { equippedRoom } from '@/utils/petShop';
 import { useHabits } from '@/hooks/useHabits';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -34,7 +34,7 @@ export default function Pet() {
   const s = useMemo(() => makeS(c), [c]);
 
   const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimedQuests, dailyClaims, equipped } = usePetStore();
-  const stickers = useMemo(() => equippedStickers(equipped), [equipped]);
+  const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, held: equipped.held }), [equipped]);
   const room = useMemo(() => equippedRoom(equipped), [equipped]);
   const { habits, todayDone, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
@@ -136,7 +136,7 @@ export default function Pet() {
               ))}
             </LinearGradient>
           )}
-          <Blob color={pet.color} expression={pet.expression} size={STAGE_SIZE[stage]} equipped={stickers} />
+          <Blob color={pet.color} expression={pet.expression} size={STAGE_SIZE[stage]} equipped={worn} />
         </View>
 
         {/* name + status */}
