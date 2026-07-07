@@ -16,7 +16,7 @@ export interface PetInput {
   hour: number;               // 0..23
 }
 
-export interface PetNeed { key: string; label: string; value: number; met: boolean }
+export interface PetNeed { key: string; label: string; value: number; met: boolean; unknown?: boolean }
 
 export interface PetState {
   needs: PetNeed[];
@@ -43,24 +43,31 @@ const LABELS: Record<PetExpression, string> = {
 };
 
 export function computePetState(inp: PetInput): PetState {
+  // A metric only counts once we actually HAVE it. In particular steps==0 almost
+  // always means "not synced from the watch yet", not "walked zero" — treating it
+  // as 0% used to make the pet falsely sad, then jump to happy once steps loaded.
+  // Unknown metrics are excluded from wellbeing instead of dragging it down.
   const energy = inp.sleepMinutes > 0 ? clamp(inp.sleepMinutes / 450 * 100) : null;      // ~7.5h = full
-  const activity = inp.stepGoal > 0 ? clamp(inp.stepsToday / inp.stepGoal * 100) : null;
+  const activity = (inp.stepGoal > 0 && inp.stepsToday > 0) ? clamp(inp.stepsToday / inp.stepGoal * 100) : null;
   const habits = inp.habitsTotal > 0 ? clamp(inp.habitsDone / inp.habitsTotal * 100) : null;
-  const mood = inp.moodLoggedToday && inp.avgMoodToday != null ? clamp(inp.avgMoodToday / 5 * 100) : (inp.moodLoggedToday ? 60 : 25);
+  const mood = inp.moodLoggedToday ? (inp.avgMoodToday != null ? clamp(inp.avgMoodToday / 5 * 100) : 60) : null;
 
+  const need = (key: string, label: string, v: number | null, dflt: number): PetNeed =>
+    ({ key, label, value: v ?? dflt, met: v == null ? true : v >= 55, unknown: v == null });
   const needs: PetNeed[] = [
-    { key: 'energy', label: 'Energia', value: energy ?? 50, met: (energy ?? 50) >= 55 },
-    { key: 'activity', label: 'Ruch', value: activity ?? 0, met: (activity ?? 0) >= 55 },
-    { key: 'habits', label: 'Nawyki', value: habits ?? 100, met: (habits ?? 100) >= 55 },
-    { key: 'mood', label: 'Nastrój', value: mood, met: mood >= 55 },
+    need('energy', 'Energia', energy, 0),
+    need('activity', 'Ruch', activity, 0),
+    need('habits', 'Nawyki', habits, 100),
+    need('mood', 'Nastrój', mood, 0),
   ];
 
   const vals = [energy, activity, habits, mood].filter((v): v is number => v != null);
-  const wellbeing = vals.length ? clamp(vals.reduce((a, b) => a + b, 0) / vals.length) : 50;
+  // No data yet → gently neutral (never sad on an empty/just-opened day).
+  const wellbeing = vals.length ? clamp(vals.reduce((a, b) => a + b, 0) / vals.length) : 60;
 
   const asleep = inp.hour >= 22 || inp.hour < 6;
   let expression: PetExpression;
-  if (asleep && activity != null && activity < 80) expression = 'sleeping';
+  if (asleep && (activity == null || activity < 80)) expression = 'sleeping';
   else if (wellbeing >= 80) expression = 'happy';
   else if (wellbeing >= 60) expression = 'content';
   else if (wellbeing >= 42) expression = 'meh';

@@ -38,7 +38,9 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
 
   // Incoming (money IN) vs outgoing (money OUT). Incoming = a credit / transfer in;
   // outgoing = a card payment / purchase. If neither is recognised, skip the push.
-  const inTrig = /przelew\s+przychodz|uznanie\s+rachunku|wp[łl]yn[ęęąe][łl]|wp[łl]yn[ęe][łl]o|wynagrodzen|zasilenie|otrzyma[łl]e[śs]|zaksi[ęe]gowano\s+wp[łl]at|\bwp[łl]ata\b|na\s+rachunek/i.test(body);
+  // Incoming triggers. `wp[łl]y[wn]` covers both "Wpływ" (title) and "wpłynęło/wpłynął";
+  // "na konto/rachunek" is a diacritic-free fallback for a plain "Wpływ … na konto …".
+  const inTrig = /przelew\s+przychodz|uznanie\s+rachunku|wp[łl]y[wn]|wynagrodzen|zasilenie|otrzyma[łl]e[śs]|zaksi[ęe]gowano\s+wp[łl]at|\bwp[łl]ata\b|na\s+(?:konto|rachunek)/i.test(body);
   const paidOut = /zap[łl]acono/i.test(body);
   const outTrig = /zap[łl]acono|transakcj|p[łl]atno[śs][cć]|platnosc|blik|zakup/i.test(body);
   if (!inTrig && !outTrig) return null;

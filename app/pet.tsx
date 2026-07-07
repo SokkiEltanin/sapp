@@ -50,7 +50,7 @@ export default function Pet() {
 
   // Reload on every focus (screens stay mounted here), so logging mood / walking /
   // ticking a habit and coming back shows a fresh, reactive pet — not a stale one.
-  const reload = useCallback(() => {
+  const readHealth = useCallback(() => {
     const t = todayISO();
     const month = t.slice(0, 7);
     getHealthHistory(200).then(h => {
@@ -60,7 +60,6 @@ export default function Pet() {
       const sleep = (h[t]?.sleepMinutes ?? 0) || (yest ? h[yest]?.sleepMinutes ?? 0 : 0);
       const bestStepDay = Object.values(h).reduce((m, d) => Math.max(m, d.steps ?? 0), 0);
       const stepsThisMonth = Object.entries(h).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
-      // adaptive "beat your form" target: ~110% of your recent step average, floored.
       const recent = Object.values(h).map(d => d.steps).filter(x => x > 0).slice(0, 14);
       const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
       const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
@@ -70,6 +69,14 @@ export default function Pet() {
     AsyncStorage.getItem(`health_${t}`).then(raw => { try { setWaterToday(raw ? Number(JSON.parse(raw).water) || 0 : 0); } catch {} }).catch(() => {});
     AsyncStorage.getItem('skin_progress').then(raw => { if (raw) setCardsCollected(JSON.parse(raw).cards ?? 0); }).catch(() => {});
   }, []);
+  const reload = useCallback(() => {
+    readHealth(); // show cache immediately…
+    // …and pull fresh steps/sleep from the watch, then re-read if anything changed.
+    import('@/services/healthAutoSync')
+      .then(({ autoSyncHealth }) => autoSyncHealth(3))
+      .then(n => { if (n > 0) readHealth(); })
+      .catch(() => {});
+  }, [readHealth]);
   useFocusEffect(reload);
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
@@ -202,9 +209,9 @@ export default function Pet() {
             <View key={n.key} style={s.needRow}>
               <Text style={s.needLabel}>{n.label}</Text>
               <View style={s.needTrack}>
-                <View style={[s.needFill, { width: `${n.value}%`, backgroundColor: n.met ? '#2AC68F' : n.value >= 30 ? '#FBBF24' : '#F87171' }]} />
+                {!n.unknown && <View style={[s.needFill, { width: `${n.value}%`, backgroundColor: n.met ? '#2AC68F' : n.value >= 30 ? '#FBBF24' : '#F87171' }]} />}
               </View>
-              <Text style={s.needVal}>{n.value}%</Text>
+              <Text style={[s.needVal, n.unknown && { opacity: 0.5 }]}>{n.unknown ? '—' : `${n.value}%`}</Text>
             </View>
           ))}
         </View>

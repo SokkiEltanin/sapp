@@ -976,12 +976,17 @@ export default function DashboardScreen() {
   useEffect(() => { loadPomSessions(); }, []);
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
   const reloadHealth = useCallback(() => {
-    getHealthHistory(70).then(h => {
-      const m: StatCtx['healthDays'] = {};
-      for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
-      setHealthDays(m);
-    }).catch(() => {});
-    getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
+    const read = () => {
+      getHealthHistory(70).then(h => {
+        const m: StatCtx['healthDays'] = {};
+        for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
+        setHealthDays(m);
+      }).catch(() => {});
+      getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
+    };
+    read();
+    // pull fresh steps/sleep from the watch (throttled), re-read if it wrote anything
+    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(3)).then(n => { if (n > 0) read(); }).catch(() => {});
   }, []);
   useEffect(() => { reloadHealth(); }, [reloadHealth]);
   // Re-read health on focus so a weight/steps logged elsewhere isn't shown stale.
