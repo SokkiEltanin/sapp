@@ -8,6 +8,7 @@
 
 export interface ParsedBankTx {
   amount: number;        // 10.18
+  currency: string;      // 'PLN' | 'EUR' | 'USD' … (foreign-card payments abroad)
   dateISO: string;       // 2026-07-03T06:37:30 (local)
   store: string;         // outgoing: merchant ("LIDL HETMANSKA"); incoming: sender/title
   storeKey: string;      // first word lowercased — for fuzzy matching / merchant memory
@@ -26,12 +27,14 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
   const body = `${title ?? ''} ${text ?? ''}`.replace(/\s+/g, ' ').trim();
   if (!body) return null;
 
-  // Amount: "kwotę 10,18 PLN" (fallback: first "NN,NN PLN/zł")
-  const amtM = body.match(/kwot[ęe]\s+([\d\s]+[.,]\d{2})\s*(?:PLN|zł)/i)
-    ?? body.match(/([\d\s]+[.,]\d{2})\s*(?:PLN|zł)/i);
+  // Amount + currency: "kwotę 10,18 PLN" / "22,14 EUR" (payments abroad aren't PLN).
+  const CUR = 'PLN|zł|z\\u0142|EUR|USD|GBP|CHF|CZK|SEK|NOK|DKK|HUF';
+  const amtM = body.match(new RegExp(`kwot[ęe]\\s+([\\d\\s]+[.,]\\d{2})\\s*(${CUR})`, 'i'))
+    ?? body.match(new RegExp(`([\\d\\s]+[.,]\\d{2})\\s*(${CUR})`, 'i'));
   if (!amtM) return null;
   const amount = num(amtM[1]);
   if (!(amount > 0)) return null;
+  const currency = /z[łl]/i.test(amtM[2]) ? 'PLN' : amtM[2].toUpperCase();
 
   // Incoming (money IN) vs outgoing (money OUT). Incoming = a credit / transfer in;
   // outgoing = a card payment / purchase. If neither is recognised, skip the push.
@@ -59,7 +62,7 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
     let store = (senderM?.[1] ?? titleM?.[1] ?? (isSalary ? 'Wynagrodzenie' : 'Przelew')).replace(/\s+/g, ' ').trim();
     if (store.length > 40) store = store.slice(0, 40).trim();
     const storeKey = (store.split(/\s+/)[0] ?? 'przelew').toLowerCase();
-    return { amount, dateISO, store, storeKey, method: 'transfer', direction, isSalary, raw: body };
+    return { amount, currency, dateISO, store, storeKey, method: 'transfer', direction, isSalary, raw: body };
   }
 
   // ── Outgoing payment → expense ──────────────────────────────────────────────
@@ -84,7 +87,7 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
     : /przelew/i.test(body) ? 'transfer'
     : /karta|kart[aąy]/i.test(body) ? 'card' : 'card';
 
-  return { amount, dateISO, store, storeKey, method, direction: 'out', raw: body };
+  return { amount, currency, dateISO, store, storeKey, method, direction: 'out', raw: body };
 }
 
 // Match an incoming transfer to income already logged (same amount, same day) so a

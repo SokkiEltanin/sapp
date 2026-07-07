@@ -37,10 +37,11 @@ export function matchSubscriptionForPayment(p: PaymentLite, subs: Subscription[]
   const amountClose = (s: Subscription, tol: number) => Math.abs(p.amount - s.amount) <= tol;
   const dueBy = (s: Subscription, days: number) => s.nextBillingDate <= shiftISO(p.dateISO, days);
 
-  // 1) name + amount + due (within +7 days grace)
+  // 1) name + due (within +7 days grace). Amount is NOT required here — a foreign-card
+  //    charge is in another currency (e.g. 22,14 EUR for a sub you stored in PLN), so a
+  //    confident merchant-name match is the reliable signal.
   if (store) {
     for (const s of active) {
-      if (!amountClose(s, Math.max(2, s.amount * 0.15))) continue;
       if (!dueBy(s, 7)) continue;
       const nameNorm = norm(s.name);
       const tokens = s.name.toLowerCase().split(/\s+/).map(norm).filter(t => t.length >= 4);

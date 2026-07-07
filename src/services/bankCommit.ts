@@ -52,7 +52,7 @@ export async function commitBankTx(
       const wp = (useWorkStore.getState().settings.workPrefix ?? '').trim();
       const note = p.jd && wp ? `${wp} ${p.store || 'Wynagrodzenie'}` : (p.store || 'Przychód');
       const exp = await expensesService.add({
-        type: 'income', amount: p.amount, currency: 'PLN',
+        type: 'income', amount: p.amount, currency: p.currency || 'PLN',
         category: (p.jd ? 'salary' : 'other') as any,
         tags: p.jd && wp ? [wp] : [],
         note, date: p.dateISO, paymentMethod: 'card', bankMatched: true,
@@ -71,7 +71,7 @@ export async function commitBankTx(
       expensesService.update(match.id, { bankMatched: true }).catch(() => {});
     } else {
       const exp = await expensesService.add({
-        type: 'expense', amount: p.amount, currency: 'PLN', category: p.category,
+        type: 'expense', amount: p.amount, currency: p.currency || 'PLN', category: p.category,
         tags: [], note: p.store || 'Płatność', date: p.dateISO,
         ...(p.store ? { storeName: p.store } : {}),
         paymentMethod: p.method === 'cash' ? 'cash' : 'card', bankMatched: true,
