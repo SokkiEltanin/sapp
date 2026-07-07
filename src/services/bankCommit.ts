@@ -4,6 +4,24 @@ import { findMatchingExpense, findMatchingIncome } from '@/utils/bankNotificatio
 import { recordMerchantAccept, MerchantInfo } from '@/utils/merchantMemory';
 import { PendingBankTx } from '@/store/bankQueueStore';
 import { useWorkStore } from '@/store/workStore';
+import { useSubscriptionsStore } from '@/store/subscriptionsStore';
+import { subscriptionsService } from '@/services/subscriptionsService';
+import { matchSubscriptionForPayment, advanceBillingDate } from '@/utils/subscriptionAuto';
+
+// A bank payment that settles a due subscription auto-advances its billing date, so
+// the "zapłaciłeś?" prompt understands it's paid and stops asking.
+async function maybeAutoPaySubscription(p: PendingBankTx): Promise<void> {
+  try {
+    let subs = useSubscriptionsStore.getState().subscriptions;
+    if (!subs.length) subs = await subscriptionsService.getAll();
+    const sub = matchSubscriptionForPayment({ store: p.store, amount: p.amount, dateISO: p.dateISO }, subs);
+    if (!sub) return;
+    const next = advanceBillingDate(sub.nextBillingDate, sub.billingCycle);
+    if (next === sub.nextBillingDate) return;
+    useSubscriptionsStore.getState().updateSubscription(sub.id, { nextBillingDate: next });
+    await subscriptionsService.update(sub.id, { nextBillingDate: next });
+  } catch { /* best-effort */ }
+}
 
 export interface CommitResult {
   ok: boolean;
@@ -66,6 +84,7 @@ export async function commitBankTx(
         category: p.category, name: p.store, corrected: !!opts?.corrected,
       });
     }
+    await maybeAutoPaySubscription(p);
     return { ok: true, matched: !!match, merchant };
   } catch {
     return { ok: false, matched: !!match };

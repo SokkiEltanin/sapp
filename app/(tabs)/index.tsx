@@ -839,6 +839,16 @@ export default function DashboardScreen() {
     })();
   }, [subscriptions]);
 
+  // If a queued subscription got auto-paid (e.g. bank notification advanced its
+  // billing date), drop it from the "zapłaciłeś?" prompt so it stops asking.
+  useEffect(() => {
+    const todayS = ymd(new Date());
+    setPaymentQueue(q => q.filter(s => {
+      const cur = subscriptions.find(x => x.id === s.id);
+      return !!cur && cur.active && cur.nextBillingDate <= todayS;
+    }));
+  }, [subscriptions]);
+
   const currentPayment = paymentQueue[0] ?? null;
 
   const handlePaymentYes = useCallback(async () => {
