@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Pencil, Check, Coins, ShoppingBag } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -46,7 +46,9 @@ export default function Pet() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
 
-  useEffect(() => {
+  // Reload on every focus (screens stay mounted here), so logging mood / walking /
+  // ticking a habit and coming back shows a fresh, reactive pet — not a stale one.
+  const reload = useCallback(() => {
     getHealthHistory(200).then(h => {
       const t = todayISO();
       const days = Object.keys(h).sort();
@@ -59,6 +61,7 @@ export default function Pet() {
     getHealthGoals().then(g => setStepGoal(g.stepGoal || 10000)).catch(() => {});
     AsyncStorage.getItem('skin_progress').then(raw => { if (raw) setCardsCollected(JSON.parse(raw).cards ?? 0); }).catch(() => {});
   }, []);
+  useFocusEffect(reload);
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
   const questCtx: QuestCtx = useMemo(() => ({
