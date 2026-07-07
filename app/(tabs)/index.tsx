@@ -1796,6 +1796,7 @@ export default function DashboardScreen() {
   const petCareTick = usePetStore(st => st.careTick);
   const petClaimedQuests = usePetStore(st => st.claimedQuests);
   const petDailyClaims = usePetStore(st => st.dailyClaims);
+  const petMonthlyClaims = usePetStore(st => st.monthlyClaims);
   const petState = useMemo(() => {
     const tISO = todayISO();
     const todayMoods = moodEntries.filter(e => e.date === tISO);
@@ -1812,6 +1813,9 @@ export default function DashboardScreen() {
   const petLevel = useMemo(() => levelFromXp(petXp).level, [petXp]);
   const petClaimable = useMemo(() => {
     const tISO = todayISO();
+    const month = tISO.slice(0, 7);
+    const recent = Object.values(healthDays).map(d => d.steps).filter(x => x > 0).slice(0, 14);
+    const avgSteps = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
     return buildQuests({
       stepsToday: healthDays[tISO]?.steps ?? 0,
       moodLoggedToday: moodEntries.some(e => e.date === tISO),
@@ -1820,8 +1824,12 @@ export default function DashboardScreen() {
       bestStepDay: Object.values(healthDays).reduce((m, d) => Math.max(m, d.steps ?? 0), 0),
       habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
       cardsCollected: monthCards.filter(c => !c.inProgress).length,
-    }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, today: tISO }).claimableCount;
-  }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, monthCards, petClaimedQuests, petDailyClaims, getStreak]);
+      boughtSweetToday: expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === tISO && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski'))),
+      stepTarget: avgSteps > 0 ? Math.max(8000, Math.ceil(avgSteps * 1.1 / 500) * 500) : 0,
+      moodDaysThisMonth: new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size,
+      stepsThisMonth: Object.entries(healthDays).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0),
+    }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, monthlyClaims: petMonthlyClaims, today: tISO }).claimableCount;
+  }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, monthCards, petClaimedQuests, petDailyClaims, petMonthlyClaims, getStreak]);
   // Passive daily care XP (once/day), scaled by how well you're doing.
   const petTicked = useRef(false);
   useEffect(() => {

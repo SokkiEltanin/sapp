@@ -33,15 +33,17 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimedQuests, dailyClaims, equipped } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimedQuests, dailyClaims, monthlyClaims, equipped } = usePetStore();
   const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, held: equipped.held }), [equipped]);
   const room = useMemo(() => equippedRoom(equipped), [equipped]);
   const { habits, todayDone, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
 
-  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number }>({ steps: 0, sleep: 0, bestStepDay: 0 });
+  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0 });
   const [stepGoal, setStepGoal] = useState(10000);
+  const [waterGoal, setWaterGoal] = useState(8);
+  const [waterToday, setWaterToday] = useState(0);
   const [cardsCollected, setCardsCollected] = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -49,34 +51,57 @@ export default function Pet() {
   // Reload on every focus (screens stay mounted here), so logging mood / walking /
   // ticking a habit and coming back shows a fresh, reactive pet — not a stale one.
   const reload = useCallback(() => {
+    const t = todayISO();
+    const month = t.slice(0, 7);
     getHealthHistory(200).then(h => {
-      const t = todayISO();
       const days = Object.keys(h).sort();
       const yest = days[days.length - 2];
       const steps = h[t]?.steps ?? 0;
       const sleep = (h[t]?.sleepMinutes ?? 0) || (yest ? h[yest]?.sleepMinutes ?? 0 : 0);
       const bestStepDay = Object.values(h).reduce((m, d) => Math.max(m, d.steps ?? 0), 0);
-      setHealth({ steps, sleep, bestStepDay });
+      const stepsThisMonth = Object.entries(h).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
+      // adaptive "beat your form" target: ~110% of your recent step average, floored.
+      const recent = Object.values(h).map(d => d.steps).filter(x => x > 0).slice(0, 14);
+      const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
+      const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
+      setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth });
     }).catch(() => {});
-    getHealthGoals().then(g => setStepGoal(g.stepGoal || 10000)).catch(() => {});
+    getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
+    AsyncStorage.getItem(`health_${t}`).then(raw => { try { setWaterToday(raw ? Number(JSON.parse(raw).water) || 0 : 0); } catch {} }).catch(() => {});
     AsyncStorage.getItem('skin_progress').then(raw => { if (raw) setCardsCollected(JSON.parse(raw).cards ?? 0); }).catch(() => {});
   }, []);
   useFocusEffect(reload);
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
-  const questCtx: QuestCtx = useMemo(() => ({
-    stepsToday: health.steps,
-    moodLoggedToday: moodEntries.some(e => e.date === todayISO()),
-    habitsDone: todayDone.length, habitsTotal: habits.length,
-    sweetlessDays: sweetlessDaysFrom(expenses),
-    bestStepDay: health.bestStepDay,
-    habitBestStreak,
-    cardsCollected,
-  }), [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected]);
+  const questCtx: QuestCtx = useMemo(() => {
+    const t = todayISO();
+    const month = t.slice(0, 7);
+    const boughtSweetToday = expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === t
+      && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski')));
+    const moodDaysThisMonth = new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size;
+    return {
+      stepsToday: health.steps,
+      moodLoggedToday: moodEntries.some(e => e.date === t),
+      habitsDone: todayDone.length, habitsTotal: habits.length,
+      sweetlessDays: sweetlessDaysFrom(expenses),
+      bestStepDay: health.bestStepDay,
+      habitBestStreak,
+      cardsCollected,
+      boughtSweetToday,
+      stepTarget: health.stepTarget,
+      waterToday, waterGoal,
+      moodDaysThisMonth,
+      stepsThisMonth: health.stepsThisMonth,
+    };
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal]);
   const quests = useMemo(
-    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, today: todayISO() }),
-    [questCtx, claimedQuests, dailyClaims],
+    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, monthlyClaims, today: todayISO() }),
+    [questCtx, claimedQuests, dailyClaims, monthlyClaims],
   );
+
+  const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
+    if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); }
+  };
 
   const onClaimDaily = (id: string, c2: number, x: number, label: string) => {
     if (claimDaily(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); }
@@ -206,6 +231,54 @@ export default function Pet() {
           ))}
         </View>
 
+        {/* ── Bonus dailies (adaptive, higher reward) ── */}
+        {quests.bonusDaily.length > 0 && (
+          <>
+            <Text style={s.section}>Bonusowe dziś</Text>
+            <View style={s.qCard}>
+              {quests.bonusDaily.map((q, i) => (
+                <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[s.qLabel, q.claimed && { color: c.text.muted }]} numberOfLines={1}>{q.label}</Text>
+                    {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                  </View>
+                  <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                  {q.claimed
+                    ? <View style={s.qDone}><CheckIcon size={14} color="#2AC68F" /></View>
+                    : q.done
+                      ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                      : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* ── Monthly challenges ── */}
+        {quests.monthly.length > 0 && (
+          <>
+            <Text style={s.section}>Miesięczne</Text>
+            <View style={{ width: '100%', gap: spacing[3] }}>
+              {quests.monthly.map(m => (
+                <View key={m.id} style={s.mCard}>
+                  <View style={s.mTop}>
+                    <Text style={s.mLabel}>{m.label}</Text>
+                    {m.done && !m.claimed
+                      ? <PressableScale onPress={() => onClaimMonthly(m.id, m.coins, m.xp, m.label)}>
+                          <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>Odbierz +{m.coins}</Text></View>
+                        </PressableScale>
+                      : m.claimed
+                        ? <View style={[s.mTier, s.mTierClaimed]}><CheckIcon size={10} color="#2AC68F" /><Text style={[s.mTierTxt, { color: '#2AC68F' }]}>odebrane</Text></View>
+                        : <Text style={s.mVal}>+{m.coins} 🪙</Text>}
+                  </View>
+                  <View style={s.moTrack}><View style={[s.moFill, { width: `${Math.round(m.progress * 100)}%`, backgroundColor: m.done ? '#2AC68F' : '#FBBF24' }]} /></View>
+                  <Text style={s.moVal}>{m.value.toLocaleString('pl-PL')} / {m.target.toLocaleString('pl-PL')} {m.unit}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
         {/* ── Milestone quests ── */}
         <Text style={s.section}>Cele</Text>
         <View style={{ width: '100%', gap: spacing[3] }}>
@@ -236,7 +309,7 @@ export default function Pet() {
 
         <View style={s.hintBox}>
           <Text style={s.hintTxt}>
-            Monety zbierasz questami — za dbanie o SIEBIE. Wkrótce: sklep z czapkami, ubrankami i dekoracją pokoju {name}a.
+            Monety zbierasz questami — za dbanie o SIEBIE. Wydaj je w sklepie 🛍️ na stroje i pokój dla {name}a, a energią z nawyków walcz z bossami ⚔️.
           </Text>
         </View>
       </ScrollView>
@@ -310,4 +383,7 @@ const makeS = (c: any) => StyleSheet.create({
   mTierCoins: { fontSize: 10.5, fontWeight: '700', color: '#FBBF24' },
   mClaim: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5 },
   mClaimTxt: { fontSize: 11.5, fontWeight: '900', color: '#0B0E1A' },
+  moTrack: { height: 9, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 2 },
+  moFill: { height: '100%', borderRadius: 5 },
+  moVal: { fontSize: 11, color: c.text.muted, fontWeight: '600', marginTop: 4 },
 });

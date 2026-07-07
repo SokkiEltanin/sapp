@@ -13,12 +13,21 @@ export interface QuestCtx {
   bestStepDay: number;     // all-time best single-day step count on record
   habitBestStreak: number;
   cardsCollected: number;
+  // ── optional (drives dynamic daily + monthly quests when provided) ──
+  boughtSweetToday?: boolean;
+  stepTarget?: number;         // adaptive "beat your form" step goal
+  waterToday?: number;         // glasses drunk today
+  waterGoal?: number;          // daily water goal (glasses)
+  moodDaysThisMonth?: number;  // distinct days with a mood entry this month
+  stepsThisMonth?: number;     // total steps this month
 }
 
 export interface ClaimState {
   claimedMilestones: string[];         // tier ids already claimed
   dailyClaims: Record<string, string>; // dailyId → YYYY-MM-DD
+  monthlyClaims?: Record<string, string>; // monthlyId → YYYY-MM
   today: string;                       // YYYY-MM-DD
+  month?: string;                      // YYYY-MM
 }
 
 // ─── Daily quests ───────────────────────────────────────────────────────────
@@ -49,22 +58,54 @@ const MILESTONES: MilestoneDef[] = [
 export interface MilestoneTierState { id: string; at: number; coins: number; xp: number; reached: boolean; claimed: boolean }
 export interface MilestoneQuestState { id: string; label: string; unit: string; value: number; tiers: MilestoneTierState[]; nextAt: number | null }
 
+// ─── Dynamic bonus dailies (higher reward, adaptive to you) ─────────────────
+interface BonusDef { id: string; coins: number; xp: number; available: (c: QuestCtx) => boolean; label: (c: QuestCtx) => string; note?: (c: QuestCtx) => string; done: (c: QuestCtx) => boolean }
+const BONUS: BonusDef[] = [
+  { id: 'b_stepbeat', coins: 2, xp: 6, available: c => (c.stepTarget ?? 0) > 0,
+    label: c => `Pobij formę: ${c.stepTarget!.toLocaleString('pl-PL')} kroków`, note: c => `${c.stepsToday}/${c.stepTarget}`, done: c => c.stepsToday >= (c.stepTarget ?? Infinity) },
+  { id: 'b_water', coins: 2, xp: 6, available: c => (c.waterGoal ?? 0) > 0,
+    label: c => `Wypij ${c.waterGoal} szklanek wody`, note: c => `${c.waterToday ?? 0}/${c.waterGoal}`, done: c => (c.waterToday ?? 0) >= (c.waterGoal ?? Infinity) },
+  { id: 'b_nosweet', coins: 2, xp: 6, available: c => c.boughtSweetToday !== undefined,
+    label: () => 'Dziś bez słodyczy', done: c => c.boughtSweetToday === false },
+];
+
+// ─── Monthly challenges (claim once per month) ──────────────────────────────
+interface MonthlyDef { id: string; label: string; unit: string; coins: number; xp: number; target: number; value: (c: QuestCtx) => number | undefined }
+const MONTHLY: MonthlyDef[] = [
+  { id: 'mo_mood',    label: 'Nastrój przez 20 dni',       unit: 'dni',    coins: 15, xp: 120, target: 20,     value: c => c.moodDaysThisMonth },
+  { id: 'mo_steps',   label: '150 000 kroków w miesiącu',  unit: 'kroków', coins: 12, xp: 100, target: 150000, value: c => c.stepsThisMonth },
+  { id: 'mo_nosweet', label: '7 dni bez słodyczy z rzędu', unit: 'dni',    coins: 10, xp: 90,  target: 7,      value: c => c.sweetlessDays },
+];
+
+export interface MonthlyQuestState { id: string; label: string; unit: string; value: number; target: number; coins: number; xp: number; done: boolean; claimed: boolean; progress: number }
+
 export interface QuestsResult {
   daily: DailyQuestState[];
+  bonusDaily: DailyQuestState[];
   milestones: MilestoneQuestState[];
-  claimableCount: number;   // daily ready + milestone tiers reached-but-unclaimed
+  monthly: MonthlyQuestState[];
+  claimableCount: number;   // everything ready-but-unclaimed
 }
 
 const milestoneXp = (coins: number) => coins * 10;
 
 export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
   let claimable = 0;
+  const month = claim.month ?? claim.today.slice(0, 7);
+  const monthlyClaims = claim.monthlyClaims ?? {};
 
   const daily: DailyQuestState[] = DAILY.map(d => {
     const done = d.done(ctx);
     const claimed = claim.dailyClaims[d.id] === claim.today;
     if (done && !claimed) claimable++;
     return { id: d.id, label: d.label, coins: d.coins, xp: d.xp, done, claimed, note: d.note?.(ctx) };
+  });
+
+  const bonusDaily: DailyQuestState[] = BONUS.filter(b => b.available(ctx)).map(b => {
+    const done = b.done(ctx);
+    const claimed = claim.dailyClaims[b.id] === claim.today;
+    if (done && !claimed) claimable++;
+    return { id: b.id, label: b.label(ctx), coins: b.coins, xp: b.xp, done, claimed, note: b.note?.(ctx) };
   });
 
   const milestones: MilestoneQuestState[] = MILESTONES.map(m => {
@@ -80,7 +121,18 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
     return { id: m.id, label: m.label, unit: m.unit, value, tiers, nextAt: next?.at ?? null };
   });
 
-  return { daily, milestones, claimableCount: claimable };
+  const monthly: MonthlyQuestState[] = MONTHLY.map(m => {
+    const raw = m.value(ctx);
+    return { def: m, raw };
+  }).filter(x => x.raw !== undefined).map(({ def, raw }) => {
+    const value = raw as number;
+    const done = value >= def.target;
+    const claimed = monthlyClaims[def.id] === month;
+    if (done && !claimed) claimable++;
+    return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: def.coins, xp: def.xp, done, claimed, progress: Math.min(1, value / def.target) };
+  });
+
+  return { daily, bonusDaily, milestones, monthly, claimableCount: claimable };
 }
 
 // Days since the most recent sweet/snack receipt item (for the sweetless ladder).

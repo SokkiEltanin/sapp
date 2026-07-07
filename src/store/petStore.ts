@@ -22,6 +22,7 @@ interface PetState {
   equipped: Record<string, string>; // slot → itemId (e.g. { hat: 'hat_party' })
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
+  monthlyClaims: Record<string, string>; // monthlyQuestId → YYYY-MM claimed
   // ── boss battles ──
   energy: number;               // banked attack energy
   energyDate: string | null;    // day the top-up counter belongs to
@@ -38,6 +39,7 @@ interface PetState {
   equip: (slot: string, id: string | null) => void;
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
+  claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
@@ -58,6 +60,7 @@ export const usePetStore = create<PetState>()(
       equipped: {},
       claimedQuests: [],
       dailyClaims: {},
+      monthlyClaims: {},
       energy: 0,
       energyDate: null,
       energyToday: 0,
@@ -94,6 +97,12 @@ export const usePetStore = create<PetState>()(
         const t = todayISO();
         if (get().dailyClaims[id] === t) return false;
         set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: t }, coins: s.coins + coins, xp: s.xp + xp }));
+        return true;
+      },
+      claimMonthly: (id, coins, xp) => {
+        const m = todayISO().slice(0, 7);
+        if (get().monthlyClaims[id] === m) return false;
+        set((s) => ({ monthlyClaims: { ...s.monthlyClaims, [id]: m }, coins: s.coins + coins, xp: s.xp + xp }));
         return true;
       },
       careTick: (xp) => {
@@ -136,7 +145,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, monthlyClaims: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -144,7 +153,7 @@ export const usePetStore = create<PetState>()(
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped,
-        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims,
+        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, monthlyClaims: s.monthlyClaims,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
       }),
