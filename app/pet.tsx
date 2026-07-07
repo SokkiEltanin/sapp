@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins, ShoppingBag } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Check, Coins, ShoppingBag, Swords } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import Blob from '@/components/pet/Blob';
@@ -120,6 +120,9 @@ export default function Pet() {
           <ChevronLeft size={22} color={c.text.primary} />
         </PressableScale>
         <Text style={s.headerTitle}>Pupil</Text>
+        <PressableScale onPress={() => router.push('/bosses' as any)} style={[s.shopBtn, { backgroundColor: '#38BDF818' }]}>
+          <Swords size={17} color="#38BDF8" />
+        </PressableScale>
         <PressableScale onPress={() => router.push('/pet-shop' as any)} style={s.shopBtn}>
           <ShoppingBag size={17} color="#A78BFA" />
         </PressableScale>
@@ -248,7 +251,7 @@ const makeS = (c: any) => StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   coinPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#FBBF2440', marginLeft: 6 },
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
-  shopBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A78BFA18' },
+  shopBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A78BFA18', marginLeft: 6 },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[8], alignItems: 'center' },
 
   stage: { alignItems: 'center', justifyContent: 'center', height: 250, marginTop: spacing[2], width: '100%' },

@@ -22,6 +22,12 @@ interface PetState {
   equipped: Record<string, string>; // slot → itemId (e.g. { hat: 'hat_party' })
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
+  // ── boss battles ──
+  energy: number;               // banked attack energy
+  energyDate: string | null;    // day the top-up counter belongs to
+  energyToday: number;          // energy already granted today (for daily top-up)
+  defeatedBosses: string[];
+  bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
   _hydrated: boolean;
 
   setName: (name: string) => void;
@@ -33,6 +39,10 @@ interface PetState {
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
   careTick: (xp: number) => void;        // once/day passive growth from good care
+  // boss battles
+  syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
+  attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
+  defeatBoss: (bossId: string, lootId: string, coins: number, xp: number) => void;
   reset: () => void;
 }
 
@@ -48,6 +58,11 @@ export const usePetStore = create<PetState>()(
       equipped: {},
       claimedQuests: [],
       dailyClaims: {},
+      energy: 0,
+      energyDate: null,
+      energyToday: 0,
+      defeatedBosses: [],
+      bossHp: {},
       _hydrated: false,
 
       setName: (name) => set({ name: name.trim() || 'Blobek' }),
@@ -86,7 +101,42 @@ export const usePetStore = create<PetState>()(
         if (get().lastCareTick === t) return;
         set((s) => ({ xp: s.xp + xp, lastCareTick: t }));
       },
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {} }),
+      // Top up the energy bank with today's self-care output (once per amount, tops
+      // up as the day's data grows). energyMult from loot boosts the gain.
+      syncEnergy: (todayEnergy, mult) => {
+        const t = todayISO();
+        const s = get();
+        const grantedToday = s.energyDate === t ? s.energyToday : 0;
+        const target = Math.round(todayEnergy * (1 + mult));
+        const delta = target - grantedToday;
+        if (delta <= 0 && s.energyDate === t) return;
+        set({
+          energy: s.energy + Math.max(0, delta),
+          energyDate: t,
+          energyToday: Math.max(grantedToday, target),
+        });
+      },
+      attackBoss: (bossId, maxHp, damage, dodge) => {
+        const s = get();
+        const cur = s.bossHp[bossId] ?? maxHp;
+        let remaining = Math.max(0, cur - damage);
+        const defeated = remaining <= 0;
+        // spend all banked energy on the hit; if the boss survives it may regen a
+        // little (dodge from loot reduces that comeback).
+        if (!defeated) {
+          const regen = Math.round(maxHp * 0.04 * (1 - Math.min(0.9, dodge)));
+          remaining = Math.min(maxHp, remaining + regen);
+        }
+        set({ energy: 0, bossHp: { ...s.bossHp, [bossId]: remaining } });
+        return { remaining, defeated };
+      },
+      defeatBoss: (bossId, lootId, coins, xp) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
+        defeatedBosses: [...s.defeatedBosses, bossId],
+        ownedItems: s.ownedItems.includes(lootId) ? s.ownedItems : [...s.ownedItems, lootId],
+        coins: s.coins + coins,
+        xp: s.xp + xp,
+      })),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -95,6 +145,8 @@ export const usePetStore = create<PetState>()(
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims,
+        energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
+        defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
       }),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
