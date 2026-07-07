@@ -1442,7 +1442,7 @@ export default function SettingsScreen() {
                 <Text style={styles.rowLabel}>Czytaj powiadomienia o płatności</Text>
                 <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Powiadomienie z banku → wydatek do zatwierdzenia{bankPending > 0 ? ` · ${bankPending} czeka` : ''}</Text>
               </View>
-              <Switch value={bankEnabled} onValueChange={setBankEnabled} trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }} thumbColor={bankEnabled ? '#2AC68F' : colors.text.muted} />
+              <Switch value={bankEnabled} onValueChange={(v) => { setBankEnabled(v); if (v) import('@/services/bankNotificationDrain').then(m => m.drainBankNotifications()).catch(() => {}); }} trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }} thumbColor={bankEnabled ? '#2AC68F' : colors.text.muted} />
             </View>
             {bankEnabled && Platform.OS === 'android' && (
               <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: 6 }]}>
@@ -1462,6 +1462,24 @@ export default function SettingsScreen() {
                 <PressableScale onPress={async () => { const ok = await ingestBankNotification('', bankTest); if (ok) { toast.success('Rozpoznano — zobacz „Płatności z banku" na dashboardzie'); setBankTest(''); } else { toast.error('Nie rozpoznano płatności w tym tekście'); } }}
                   style={{ backgroundColor: '#2AC68F', borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
                   <Text style={{ color: colors.bg.primary, fontWeight: '800' }}>Przetestuj odczyt</Text>
+                </PressableScale>
+
+                <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 4 }]}>Nic nie łapie? Sprawdź, czy powiadomienia w ogóle docierają do apki:</Text>
+                <PressableScale onPress={async () => {
+                    const { peekBankCapture, drainBankNotifications } = await import('@/services/bankNotificationDrain');
+                    const peek = await peekBankCapture();
+                    const queued = await drainBankNotifications();
+                    if (!peek.fileExists || peek.count === 0) {
+                      Alert.alert('Brak przechwyconych powiadomień',
+                        'Apka NIE dostała żadnego powiadomienia z banku.\n\nTo znaczy, że system nie przekazuje ich do Sappa. Sprawdź:\n1) „Dostęp do powiadomień" → Sapp WŁĄCZONY,\n2) Samsung: wyłącz optymalizację baterii dla Sappa (inaczej ubija nasłuch),\n3) po zmianach zrób jedną testową płatność.');
+                    } else {
+                      Alert.alert('Przechwycono ' + peek.count + ' powiadomień',
+                        (queued > 0 ? `Dodano ${queued} do zatwierdzenia (zobacz dashboard).\n\n` : 'Żadne nie wyglądało na płatność do dodania (mogły już być dodane).\n\n') +
+                        'Ostatnie:\n' + peek.samples.map(s => '• ' + s).join('\n'));
+                    }
+                  }}
+                  style={{ backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
+                  <Text style={{ color: colors.text.primary, fontWeight: '800' }}>Sprawdź teraz (diagnostyka)</Text>
                 </PressableScale>
               </View>
             )}
