@@ -13,6 +13,18 @@ function pad(n: number) { return String(n).padStart(2, '0'); }
 function keyFor(d: Date) { return `health_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function dateStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
+// Save today's weight (kg) without clobbering the day's other health fields
+// (water/steps/sleep). Also updates the "last known weight" seed.
+export async function saveTodayWeight(kg: number): Promise<void> {
+  if (!(kg > 0)) return;
+  const key = keyFor(new Date());
+  let obj: Record<string, any> = {};
+  try { const raw = await AsyncStorage.getItem(key); if (raw) obj = JSON.parse(raw); } catch {}
+  obj.weight = kg;
+  await AsyncStorage.setItem(key, JSON.stringify(obj));
+  await AsyncStorage.setItem('health_last_weight', String(kg)).catch(() => {});
+}
+
 export async function getHealthHistory(days = 60): Promise<Record<string, HealthDayHistory>> {
   const keys: string[] = [];
   const dates: string[] = [];

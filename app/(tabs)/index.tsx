@@ -47,7 +47,7 @@ import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
-import { getHealthHistory } from '@/utils/healthHistory';
+import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
 import { getHealthGoals } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
@@ -662,6 +662,7 @@ export default function DashboardScreen() {
   const [weatherPanel, setWeatherPanel] = useState(false);
   const [workPanel, setWorkPanel]   = useState(false);
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
+  const [weightInput, setWeightInput] = useState('');
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
   // Consume the trigger so it can't re-open the panel on a later remount/startup
   // (the counter otherwise stays > 0 after the first open and the mount effect fires again).
@@ -974,7 +975,7 @@ export default function DashboardScreen() {
 
   useEffect(() => { loadPomSessions(); }, []);
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
-  useEffect(() => {
+  const reloadHealth = useCallback(() => {
     getHealthHistory(70).then(h => {
       const m: StatCtx['healthDays'] = {};
       for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
@@ -982,6 +983,22 @@ export default function DashboardScreen() {
     }).catch(() => {});
     getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
   }, []);
+  useEffect(() => { reloadHealth(); }, [reloadHealth]);
+  // Re-read health on focus so a weight/steps logged elsewhere isn't shown stale.
+  useFocusEffect(reloadHealth);
+  // Quick weight entry from the weight widget's popup.
+  const saveWeightEntry = useCallback(async () => {
+    const kg = parseFloat(weightInput.replace(',', '.'));
+    if (!(kg > 0) || kg > 400) { haptic.error(); toast.error('Podaj poprawną wagę'); return; }
+    haptic.success();
+    try {
+      await saveTodayWeight(kg);
+      reloadHealth();
+      setWeightInput('');
+      toast.success(`Waga zapisana: ${kg} kg`);
+      setStatDetail(null);
+    } catch { haptic.error(); toast.error('Nie zapisano — spróbuj ponownie'); }
+  }, [weightInput, reloadHealth]);
   useFocusEffect(useCallback(() => {
     vehiclesService.getAll().then(setVehicles).catch(() => {});
     maintenanceService.getAll().then(setMaintItems).catch(() => {});
@@ -3667,6 +3684,23 @@ export default function DashboardScreen() {
                     <View style={s.wxChip}><Text style={s.wxChipK}>Średnia</Text><Text style={s.wxChipV}>{fmt(avg)}{u}</Text></View>
                     <View style={s.wxChip}><Text style={s.wxChipK}>Rekord</Text><Text style={s.wxChipV}>{fmt(peak)}{u}</Text></View>
                   </View>
+                  {statDetail.metric === 'weight' && (
+                    <View style={s.weightAddRow}>
+                      <TextInput
+                        style={s.weightAddInput}
+                        value={weightInput}
+                        onChangeText={setWeightInput}
+                        keyboardType="decimal-pad"
+                        placeholder={cur.value > 0 ? `${cur.value} kg` : 'np. 72,5'}
+                        placeholderTextColor={colors.text.muted}
+                        onSubmitEditing={saveWeightEntry}
+                        returnKeyType="done"
+                      />
+                      <TouchableOpacity style={[s.weightAddBtn, { backgroundColor: accentColor }]} onPress={saveWeightEntry} activeOpacity={0.85}>
+                        <Text style={[s.weightAddBtnTxt, { color: colors.bg.primary }]}>Zapisz wagę</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </>
               );
             })()}
@@ -4302,6 +4336,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   wxChip: { backgroundColor: c.fill.subtle, borderRadius: radius.md, paddingVertical: spacing[2], paddingHorizontal: spacing[3], minWidth: '47%', flexGrow: 1 },
   wxChipK: { fontSize: 10.5, color: c.text.muted, fontWeight: '600' },
   wxChipV: { fontSize: 15, color: c.text.primary, fontWeight: '800', marginTop: 1 },
+  weightAddRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  weightAddInput: { flex: 1, backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 16, fontWeight: '700', color: c.text.primary },
+  weightAddBtn: { paddingHorizontal: spacing[4], paddingVertical: 11, borderRadius: radius.md },
+  weightAddBtnTxt: { fontSize: 13, fontWeight: '800' },
   wxSection: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing[3], marginBottom: spacing[1] },
   wxForecast: { flexDirection: 'row', justifyContent: 'space-between' },
   wxDay: { alignItems: 'center', flex: 1 },
