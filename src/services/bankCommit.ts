@@ -6,20 +6,30 @@ import { PendingBankTx } from '@/store/bankQueueStore';
 import { useWorkStore } from '@/store/workStore';
 import { useSubscriptionsStore } from '@/store/subscriptionsStore';
 import { subscriptionsService } from '@/services/subscriptionsService';
-import { matchSubscriptionForPayment, advanceBillingDate } from '@/utils/subscriptionAuto';
+import { matchSubscriptionForPayment, advanceBillingDate, isConfidentSubMatch, queueSubConfirm } from '@/utils/subscriptionAuto';
 
-// A bank payment that settles a due subscription auto-advances its billing date, so
-// the "zapłaciłeś?" prompt understands it's paid and stops asking.
+// A bank payment that settles a subscription: if it's a CONFIDENT match (same
+// currency + close amount) advance the billing date silently, so the "zapłaciłeś?"
+// prompt stops asking. If it only matches by NAME but the amount/currency differs
+// (e.g. a EUR charge for a PLN sub, floating with the exchange rate) queue a
+// dashboard confirmation "is this your Claude subscription — 22,14 EUR?" instead.
 async function maybeAutoPaySubscription(p: PendingBankTx): Promise<void> {
   try {
     let subs = useSubscriptionsStore.getState().subscriptions;
     if (!subs.length) subs = await subscriptionsService.getAll();
     const sub = matchSubscriptionForPayment({ store: p.store, amount: p.amount, dateISO: p.dateISO }, subs);
     if (!sub) return;
-    const next = advanceBillingDate(sub.nextBillingDate, sub.billingCycle);
-    if (next === sub.nextBillingDate) return;
-    useSubscriptionsStore.getState().updateSubscription(sub.id, { nextBillingDate: next });
-    await subscriptionsService.update(sub.id, { nextBillingDate: next });
+    if (isConfidentSubMatch({ store: p.store, amount: p.amount, dateISO: p.dateISO, currency: p.currency }, sub)) {
+      const next = advanceBillingDate(sub.nextBillingDate, sub.billingCycle);
+      if (next === sub.nextBillingDate) return;
+      useSubscriptionsStore.getState().updateSubscription(sub.id, { nextBillingDate: next });
+      await subscriptionsService.update(sub.id, { nextBillingDate: next });
+    } else {
+      await queueSubConfirm({
+        subId: sub.id, subName: sub.name, merchant: p.store || sub.name,
+        amount: p.amount, currency: p.currency || 'PLN', date: p.dateISO.slice(0, 10),
+      });
+    }
   } catch { /* best-effort */ }
 }
 

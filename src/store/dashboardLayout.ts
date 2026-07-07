@@ -11,6 +11,7 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'debt-prompt',
   'bank-queue',
   'bill-suggest',
+  'sub-confirm',
   'pet',
   'month-summary',
   'weekly-insights',
@@ -49,6 +50,7 @@ export const SECTION_TITLES: Record<string, string> = {
   'payday-prompt':  'Pytanie o wypłatę',
   'debt-prompt':    'Pytanie o dług (zwrot)',
   'bill-suggest':   'Propozycja stałego rachunku',
+  'sub-confirm':    'Potwierdź subskrypcję z banku',
   'pet':            'Pupil (blob)',
   'month-summary':  'Karta miesiąca (Wrapped)',
   'bank-queue':     'Płatności z banku (do zatwierdzenia)',
@@ -87,6 +89,7 @@ export const SECTION_DESC: Record<string, string> = {
   'payday-prompt':  'Pyta o wypłatę w dniu wypłaty',
   'debt-prompt':    'Pyta o zwrot pożyczonych pieniędzy',
   'bill-suggest':   'Wykrywa powtarzalny wydatek → stały rachunek',
+  'sub-confirm':    'Płatność z banku pasuje do subskrypcji (inna waluta) — potwierdź',
   'pet':            'Twój pupil — nastrój zależny od tego, jak dbasz o siebie',
   'month-summary':  'Kolekcjonerska karta miesiąca (Wrapped)',
   'bank-queue':     'Płatności z banku do zatwierdzenia',
@@ -121,7 +124,7 @@ export const SECTION_DESC: Record<string, string> = {
 
 // Category for grouping the "add section" pool in the editor.
 export const SECTION_GROUP: Record<string, string> = {
-  'payday-prompt': 'Przypomnienia', 'debt-prompt': 'Przypomnienia', 'bill-suggest': 'Przypomnienia',
+  'payday-prompt': 'Przypomnienia', 'debt-prompt': 'Przypomnienia', 'bill-suggest': 'Przypomnienia', 'sub-confirm': 'Przypomnienia',
   'bank-queue': 'Przypomnienia', 'maintenance-reminders': 'Przypomnienia', 'budget-warning': 'Przypomnienia',
   'tag-limits': 'Przypomnienia', 'habits-nudge': 'Przypomnienia',
   'tasks-work-row': 'Zadania i nawyki', 'today-tasks': 'Zadania i nawyki', 'month-tasks': 'Zadania i nawyki',

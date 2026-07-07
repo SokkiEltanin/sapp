@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Subscription, BillingCycle } from '@/types';
 import { ymd } from '@/utils/date';
 
@@ -56,4 +57,40 @@ export function matchSubscriptionForPayment(p: PaymentLite, subs: Subscription[]
   if (exactDue.length === 1) return exactDue[0];
 
   return null;
+}
+
+// Is a bank payment a CONFIDENT match for a subscription (same currency + close
+// amount)? Then we advance it silently. Otherwise (e.g. a EUR charge for a PLN sub,
+// where the amount floats with the exchange rate) we ask the user to confirm first.
+export function isConfidentSubMatch(p: PaymentLite & { currency?: string }, sub: Subscription): boolean {
+  const sameCur = (p.currency ?? 'PLN') === (sub.currency ?? 'PLN');
+  const close = Math.abs(p.amount - sub.amount) <= Math.max(2, sub.amount * 0.15);
+  return sameCur && close;
+}
+
+// ── Pending "is this your subscription?" confirmations (surfaced on the dashboard) ──
+const CONFIRM_KEY = 'pending_sub_confirm';
+export interface PendingSubConfirm {
+  id: string; subId: string; subName: string; merchant: string;
+  amount: number; currency: string; date: string; // YYYY-MM-DD
+}
+
+export async function loadSubConfirms(): Promise<PendingSubConfirm[]> {
+  try { const raw = await AsyncStorage.getItem(CONFIRM_KEY); return raw ? JSON.parse(raw) : []; }
+  catch { return []; }
+}
+export async function queueSubConfirm(c: Omit<PendingSubConfirm, 'id'>): Promise<void> {
+  try {
+    const list = await loadSubConfirms();
+    // de-dupe: one ask per subscription per day
+    if (list.some(x => x.subId === c.subId && x.date.slice(0, 10) === c.date.slice(0, 10))) return;
+    list.push({ ...c, id: `${c.subId}:${Date.now()}` });
+    await AsyncStorage.setItem(CONFIRM_KEY, JSON.stringify(list.slice(-10)));
+  } catch {}
+}
+export async function removeSubConfirm(id: string): Promise<void> {
+  try {
+    const list = (await loadSubConfirms()).filter(x => x.id !== id);
+    await AsyncStorage.setItem(CONFIRM_KEY, JSON.stringify(list));
+  } catch {}
 }

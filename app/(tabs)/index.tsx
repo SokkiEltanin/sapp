@@ -64,6 +64,7 @@ import { deserializeBlocks } from '@/utils/richText';
 import { weatherIconPng } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
+import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
 import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
@@ -663,6 +664,7 @@ export default function DashboardScreen() {
   const [workPanel, setWorkPanel]   = useState(false);
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const [weightInput, setWeightInput] = useState('');
+  const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
   // Consume the trigger so it can't re-open the panel on a later remount/startup
   // (the counter otherwise stays > 0 after the first open and the mount effect fires again).
@@ -873,6 +875,23 @@ export default function DashboardScreen() {
 
   const handlePaymentNo = useCallback(() => { haptic.tap(); setPaymentQueue(q => q.slice(1)); }, []);
 
+  // Confirm (or reject) a bank payment as a subscription charge (EUR-by-rate case).
+  const confirmSub = useCallback(async (c: PendingSubConfirm) => {
+    haptic.success();
+    setSubConfirms(list => list.filter(x => x.id !== c.id));
+    removeSubConfirm(c.id).catch(() => {});
+    const sub = subscriptions.find(s => s.id === c.subId);
+    if (!sub) return;
+    const next = advanceBillingDate(sub.nextBillingDate, sub.billingCycle);
+    if (next !== sub.nextBillingDate) { try { await updateSub(sub.id, { nextBillingDate: next }); } catch {} }
+    toast.success(`Oznaczono „${c.subName}" jako opłaconą`);
+  }, [subscriptions, updateSub]);
+  const dismissSub = useCallback((c: PendingSubConfirm) => {
+    haptic.tap();
+    setSubConfirms(list => list.filter(x => x.id !== c.id));
+    removeSubConfirm(c.id).catch(() => {});
+  }, []);
+
   // First open, due, not-yet-dismissed debt → the dashboard asks about it.
   const dueDebt = useMemo(() => {
     const t = todayISO();
@@ -1043,6 +1062,7 @@ export default function DashboardScreen() {
     getBudgets().then(setBudgets).catch(() => {});
     getTagBudgetRules().then(setTagRules).catch(() => {});
     getAllNotes().then(ns => { setAllNotes(ns); setPinnedNotes(ns.filter(n => n.pinned)); }).catch(() => {});
+    loadSubConfirms().then(setSubConfirms).catch(() => {});
     if (editRequested) { setEditingDash(true); clearEditRequest(); }
   }, [loadPomSessions, editRequested]));
 
@@ -2405,6 +2425,29 @@ export default function DashboardScreen() {
                   </View>
                 </View>
               );
+
+              nodes['sub-confirm'] = subConfirms.length > 0 && (() => {
+                const c = subConfirms[0];
+                return (
+                  <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                    <View style={s.cardHeader}>
+                      <Wallet size={13} color={colors.accent.amber} />
+                      <Text style={s.cardTitle}>Płatność za subskrypcję?</Text>
+                    </View>
+                    <Text style={[s.factText, { marginTop: spacing[1] }]}>
+                      Z banku: <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.amount.toFixed(2)} {c.currency}</Text> w „{c.merchant}". Wygląda na Twoją subskrypcję <Text style={{ fontWeight: '800', color: colors.text.primary }}>{c.subName}</Text> (kwota w innej walucie zależy od kursu). Oznaczyć jako opłaconą za ten okres?
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
+                      <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85} onPress={() => confirmSub(c)}>
+                        <Text style={[s.paydayBtnText, { color: colors.bg.primary }]}>Tak, opłacona</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.paydayBtn, s.paydayBtnGhost]} activeOpacity={0.7} onPress={() => dismissSub(c)}>
+                        <Text style={[s.paydayBtnText, { color: colors.text.secondary }]}>Nie</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })();
 
               nodes['pet'] = (
                 <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/pet' as any); }}>
