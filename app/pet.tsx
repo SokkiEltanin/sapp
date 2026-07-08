@@ -97,6 +97,7 @@ export default function Pet() {
       boughtSweetToday,
       stepTarget: health.stepTarget,
       waterToday, waterGoal,
+      sleepMinutes: health.sleep,
       moodDaysThisMonth,
       stepsThisMonth: health.stepsThisMonth,
     };

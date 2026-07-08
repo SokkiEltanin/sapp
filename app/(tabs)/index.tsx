@@ -1851,6 +1851,7 @@ export default function DashboardScreen() {
       cardsCollected: monthCards.filter(c => !c.inProgress).length,
       boughtSweetToday: expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === tISO && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski'))),
       stepTarget: avgSteps > 0 ? Math.max(8000, Math.ceil(avgSteps * 1.1 / 500) * 500) : 0,
+      sleepMinutes: healthDays[tISO]?.sleepMinutes ?? 0,
       moodDaysThisMonth: new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size,
       stepsThisMonth: Object.entries(healthDays).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0),
     }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, monthlyClaims: petMonthlyClaims, today: tISO }).claimableCount;
@@ -3706,6 +3707,11 @@ export default function DashboardScreen() {
               const nz = vals.filter(v => v > 0);
               const avg = nz.length ? nz.reduce((a, b) => a + b, 0) / nz.length : 0;
               const peak = Math.max(...vals, 0);
+              // Zoom the axis when values sit in a narrow high band (e.g. weight
+              // ~70-72 kg) so small changes are visible, not a row of full bars.
+              const nzMin = nz.length ? Math.min(...nz) : 0;
+              const floor = (nz.length >= 2 && nzMin > max * 0.5) ? Math.max(0, nzMin - Math.max(0.4, max - nzMin) * 0.8) : 0;
+              const span = (max - floor) || 1;
               const u = ser.unit ? ' ' + ser.unit : '';
               const fmt = (v: number) => fmtWave(v, ser.unit);
               return (
@@ -3722,13 +3728,13 @@ export default function DashboardScreen() {
                   <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
                   <View style={s.tagHistChart}>
                     {vals.map((v, i) => {
-                      const h = Math.max(2, (v / max) * H);
+                      const h = v > 0 ? Math.max(3, ((v - floor) / span) * H) : 0;
                       const isCur = i === vals.length - 1;
                       return (
                         <View key={i} style={s.tagHistCol}>
                           <Text style={[s.tagHistVal, isCur && { color: accentColor }]}>{v > 0 ? fmt(v) : ''}</Text>
                           <View style={{ height: H, width: 22, justifyContent: 'flex-end' }}>
-                            {statDetail.target ? <View style={{ position: 'absolute', left: -3, right: -3, bottom: (Math.min(statDetail.target, max) / max) * H, height: 1, backgroundColor: colors.text.muted + '80' }} /> : null}
+                            {statDetail.target ? <View style={{ position: 'absolute', left: -3, right: -3, bottom: (Math.max(0, Math.min(statDetail.target, max) - floor) / span) * H, height: 1, backgroundColor: colors.text.muted + '80' }} /> : null}
                             <View style={{ height: h, borderRadius: 4, backgroundColor: isCur ? accentColor : accentColor + '88' }} />
                           </View>
                           <Text style={[s.tagHistLbl, isCur && { color: accentColor, fontWeight: '800' }]}>{ser.labels[i]}</Text>

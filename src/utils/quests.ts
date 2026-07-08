@@ -18,6 +18,7 @@ export interface QuestCtx {
   stepTarget?: number;         // adaptive "beat your form" step goal
   waterToday?: number;         // glasses drunk today
   waterGoal?: number;          // daily water goal (glasses)
+  sleepMinutes?: number;       // last night's sleep (0 = unknown)
   moodDaysThisMonth?: number;  // distinct days with a mood entry this month
   stepsThisMonth?: number;     // total steps this month
 }
@@ -65,8 +66,8 @@ const BONUS: BonusDef[] = [
     label: c => `Pobij formę: ${c.stepTarget!.toLocaleString('pl-PL')} kroków`, note: c => `${c.stepsToday}/${c.stepTarget}`, done: c => c.stepsToday >= (c.stepTarget ?? Infinity) },
   { id: 'b_water', coins: 2, xp: 6, available: c => (c.waterGoal ?? 0) > 0,
     label: c => `Wypij ${c.waterGoal} szklanek wody`, note: c => `${c.waterToday ?? 0}/${c.waterGoal}`, done: c => (c.waterToday ?? 0) >= (c.waterGoal ?? Infinity) },
-  { id: 'b_nosweet', coins: 2, xp: 6, available: c => c.boughtSweetToday !== undefined,
-    label: () => 'Dziś bez słodyczy', done: c => c.boughtSweetToday === false },
+  { id: 'b_sleep', coins: 2, xp: 6, available: c => (c.sleepMinutes ?? 0) > 0,
+    label: () => 'Prześpij 7 godzin', note: c => `${((c.sleepMinutes ?? 0) / 60).toFixed(1)}h / 7h`, done: c => (c.sleepMinutes ?? 0) >= 420 },
 ];
 
 // ─── Monthly challenges (claim once per month) ──────────────────────────────
