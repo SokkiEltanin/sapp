@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Zap, Lock, Check, Swords } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import Blob from '@/components/pet/Blob';
+import CatArt from '@/components/pet/CatArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import {
@@ -132,7 +132,7 @@ export default function Bosses() {
                   <Text style={s.previewTxt}>Twój cios: ~{previewDmg} obrażeń (energia {energy})</Text>
                 </View>
                 <View style={s.fightRow}>
-                  <Blob size={72} color="#2AC68F" expression="content" />
+                  <CatArt size={80} expression="content" />
                   <PressableScale onPress={attack} style={{ flex: 1 }}>
                     <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
                       <Swords size={18} color="#0B0E1A" />

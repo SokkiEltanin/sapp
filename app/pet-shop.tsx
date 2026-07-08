@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import Blob from '@/components/pet/Blob';
+import CatArt from '@/components/pet/CatArt';
 import { usePetStore } from '@/store/petStore';
 import { COSMETICS, SLOT_ORDER, SLOT_LABEL, Cosmetic } from '@/utils/petShop';
 import { spacing, radius, typography } from '@/theme';
@@ -62,7 +62,7 @@ export default function PetShop() {
                       {item.colors
                         ? <><LinearGradient colors={item.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
                             <Text style={s.swatchEmoji}>{item.decor?.[0] ?? '🏠'}</Text></>
-                        : <Blob color="#4FC98E" expression="happy" size={58} animate={false} equipped={{ [item.slot]: item.id }} />}
+                        : <CatArt expression="happy" size={66} animate={false} equipped={{ [item.slot]: item.id }} />}
                       {isEq && <View style={s.eqBadge}><Check size={12} color="#fff" /></View>}
                     </View>
                     <Text style={s.name} numberOfLines={1}>{item.name}</Text>
