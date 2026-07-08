@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Animated, StyleSheet, Easing } from 'react-native';
-import { PersonStanding } from 'lucide-react-native';
+import { PersonStanding, Car } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 
-// A progress bar with a little figure that walks along it (bobbing like steps) as
-// the fraction `progress` (0..1) grows — used for event countdowns.
-export default function WalkProgress({ progress, color, height = 10 }: {
-  progress: number; color: string; height?: number;
+// A progress bar with a little figure moving along it as the fraction `progress`
+// (0..1) grows — used for event countdowns. mode 'walk' = a person bobbing like
+// steps (counting down to an event); mode 'drive' = a car (the event is underway).
+export default function WalkProgress({ progress, color, height = 10, mode = 'walk' }: {
+  progress: number; color: string; height?: number; mode?: 'walk' | 'drive';
 }) {
   const c = useColors();
   const p = Math.min(1, Math.max(0, progress));
@@ -26,10 +27,13 @@ export default function WalkProgress({ progress, color, height = 10 }: {
     return () => loop.stop();
   }, []);
 
+  const drive = mode === 'drive';
+  const Fig = drive ? Car : PersonStanding;
   const FIG = 24;
   const translateX = x.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, w - FIG)] });
-  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -3] });
-  const rotate = bob.interpolate({ inputRange: [0, 1], outputRange: ['-7deg', '7deg'] });
+  // walker bobs up/down + tilts like steps; the car just jiggles a touch over bumps
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, drive ? -1.5 : -3] });
+  const rotate = bob.interpolate({ inputRange: [0, 1], outputRange: drive ? ['0deg', '0deg'] : ['-7deg', '7deg'] });
 
   return (
     <View style={[st.wrap, { height: FIG + height + 4 }]}>
@@ -40,7 +44,7 @@ export default function WalkProgress({ progress, color, height = 10 }: {
         <View style={{ width: `${p * 100}%`, height: '100%', borderRadius: height / 2, backgroundColor: color }} />
       </View>
       <Animated.View style={[st.figure, { bottom: height - 2, transform: [{ translateX }, { translateY }, { rotate }] }]}>
-        <PersonStanding size={FIG} color={color} strokeWidth={2.5} />
+        <Fig size={FIG} color={color} strokeWidth={2.5} />
       </Animated.View>
     </View>
   );

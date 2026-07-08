@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard } from 'lucide-react-native';
+import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, Car } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame from '@/components/counters/StreakFlame';
-import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS } from '@/store/countersStore';
+import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { spacing, radius, typography } from '@/theme';
@@ -37,6 +37,7 @@ export default function Counters() {
   const [uiKind, setUiKind] = useState<UiKind>('until');
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
+  const [endDate, setEndDate] = useState('');   // until: optional event-window end (trip)
   const [keyword, setKeyword] = useState('');
   const [onDash, setOnDash] = useState(true);
   const [pickCal, setPickCal] = useState(false);
@@ -53,11 +54,11 @@ export default function Counters() {
       .slice(0, 30);
   }, [events, gcalEvents]);
 
-  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setKeyword(''); setOnDash(true); setPickCal(false); setOpen(true); };
+  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setKeyword(''); setOnDash(true); setPickCal(false); setOpen(true); };
   const openEdit = (cn: Counter) => {
     setEditing(cn);
     setUiKind(cn.mode === 'auto' ? 'avoid' : cn.kind === 'until' ? 'until' : 'since');
-    setName(cn.name); setDate(cn.date); setKeyword(cn.keyword ?? ''); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
+    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setKeyword(cn.keyword ?? ''); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
   };
 
   const canSave = !!name.trim() && (uiKind === 'avoid' ? !!keyword.trim() : !!date);
@@ -70,9 +71,10 @@ export default function Counters() {
       else add({ ...patch, date: todayStr(), startDate: todayStr() });
     } else {
       const kind = uiKind as 'until' | 'since';
-      const patch = { kind, name: name.trim(), date, mode: undefined, keyword: undefined, onDashboard: onDash };
+      const evEnd = (kind === 'until' && endDate && endDate >= date) ? endDate : undefined;
+      const patch = { kind, name: name.trim(), date, endDate: evEnd, mode: undefined, keyword: undefined, onDashboard: onDash };
       if (editing) update(editing.id, patch);
-      else add({ kind, name: name.trim(), date, startDate: todayStr(), onDashboard: onDash });
+      else add({ kind, name: name.trim(), date, endDate: evEnd, startDate: todayStr(), onDashboard: onDash });
     }
     setOpen(false);
   };
@@ -106,20 +108,28 @@ export default function Counters() {
 
         {untils.length > 0 && <Text style={s.section}>Odliczania</Text>}
         {untils.map(cn => {
+          const during = isDuringEvent(cn);
+          const over = isOver(cn);
           const left = daysUntil(cn);
-          const prog = untilProgress(cn);
-          const done = left < 0;
+          const endLeft = daysUntilEnd(cn);
+          const prog = during ? eventProgress(cn) : untilProgress(cn);
+          const bigLabel = over ? 'minęło'
+            : during ? (endLeft > 1 ? `koniec za ${endLeft} dni` : endLeft === 1 ? 'ostatni dzień!' : 'kończy się dziś!')
+            : untilLabel(left);
+          const meta = during ? `w trakcie · wróć ${cn.endDate}`
+            : cn.endDate && !over ? `${cn.date} → ${cn.endDate}${left > 1 ? ` · start za ${left} dni` : ''}`
+            : `${cn.date}${!over && left > 1 ? ` · ${Math.round(prog * 100)}% drogi za Tobą` : ''}`;
           return (
             <View key={cn.id} style={s.card}>
               <View style={s.cardTop}>
-                <CalendarClock size={15} color={ACCENT} />
+                {during ? <Car size={16} color="#2AC68F" /> : <CalendarClock size={15} color={ACCENT} />}
                 <Text style={s.cardName} numberOfLines={1}>{cn.name}</Text>
-                <Text style={[s.cardBig, done && { color: c.text.muted }]}>{untilLabel(left)}</Text>
+                <Text style={[s.cardBig, over && { color: c.text.muted }, during && { color: '#2AC68F' }]}>{bigLabel}</Text>
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
-              <WalkProgress progress={prog} color={ACCENT} />
-              <Text style={s.cardMeta}>{cn.date}{!done && left > 1 ? ` · ${Math.round(prog * 100)}% drogi za Tobą` : ''}</Text>
+              <WalkProgress progress={prog} color={during ? '#2AC68F' : ACCENT} mode={during ? 'drive' : 'walk'} />
+              <Text style={s.cardMeta}>{meta}</Text>
             </View>
           );
         })}
@@ -202,6 +212,14 @@ export default function Counters() {
               <>
                 <Text style={s.fieldLabel}>{uiKind === 'until' ? 'Data wydarzenia' : 'Ostatnio zrobione'}</Text>
                 <DatePickerField value={date} onChange={setDate} placeholder={uiKind === 'until' ? 'Wybierz datę' : 'Domyślnie dziś'} />
+                {uiKind === 'until' && (
+                  <>
+                    <Text style={s.fieldLabel}>Koniec wyjazdu (opcjonalnie)</Text>
+                    <DatePickerField value={endDate} onChange={setEndDate} placeholder="Bez okresu — tylko odliczanie" />
+                    {!!endDate && endDate < date && <Text style={s.warnText}>Koniec musi być po dacie wydarzenia.</Text>}
+                    {!!endDate && endDate >= date && <Text style={s.hintTextSm}>W trakcie wyjazdu pojedzie samochodzik i pokaże ile dni do końca.</Text>}
+                  </>
+                )}
                 {uiKind === 'until' && upcoming.length > 0 && (
                   <>
                     <TouchableOpacity style={s.calToggle} onPress={() => { haptic.tap(); setPickCal(v => !v); }} activeOpacity={0.8}>
@@ -275,6 +293,8 @@ const makeS = (c: any) => StyleSheet.create({
   kindText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   input: { backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 12, fontSize: 15, color: c.text.primary },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: spacing[2] },
+  warnText: { fontSize: 11.5, color: c.accent.red, marginTop: 4, fontWeight: '600' },
+  hintTextSm: { fontSize: 11.5, color: '#2AC68F', marginTop: 4, fontWeight: '600' },
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[1] },
   presetChip: { paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
   presetText: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },

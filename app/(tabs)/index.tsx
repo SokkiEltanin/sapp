@@ -68,7 +68,7 @@ import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfir
 import { fixedVariableMonths } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
-import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout } from '@/store/countersStore';
+import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
@@ -781,7 +781,7 @@ export default function DashboardScreen() {
   // Countdowns (event "walk" tiles) — nearest upcoming first.
   const counters = useCounters(st => st.counters);
   const activeCountdowns = useMemo(
-    () => counters.filter(cn => cn.kind === 'until' && daysUntil(cn) >= 0).sort((a, b) => a.date.localeCompare(b.date)),
+    () => counters.filter(cn => cn.kind === 'until' && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
     [counters],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
@@ -2705,14 +2705,19 @@ export default function DashboardScreen() {
                 </View>
                 <View style={{ gap: spacing[3], marginTop: spacing[2] }}>
                   {activeCountdowns.slice(0, 3).map(cn => {
+                    const during = isDuringEvent(cn);
                     const left = daysUntil(cn);
+                    const endLeft = daysUntilEnd(cn);
+                    const label = during
+                      ? (endLeft <= 0 ? 'ostatni dzień!' : endLeft === 1 ? 'koniec jutro' : `koniec za ${endLeft} dni`)
+                      : (left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`);
                     return (
                       <View key={cn.id}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 1 }}>
                           <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
-                          <Text style={s.cdDays}>{left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`}</Text>
+                          <Text style={[s.cdDays, during && { color: '#2AC68F' }]}>{label}</Text>
                         </View>
-                        <WalkProgress progress={untilProgress(cn)} color={accentColor} />
+                        <WalkProgress progress={during ? eventProgress(cn) : untilProgress(cn)} color={during ? '#2AC68F' : accentColor} mode={during ? 'drive' : 'walk'} />
                       </View>
                     );
                   })}

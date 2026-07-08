@@ -10,6 +10,7 @@ export interface Counter {
   name: string;
   date: string;       // until → target date; since → last-done date (YYYY-MM-DD)
   startDate: string;  // until → progress start (creation day); since → baseline for auto
+  endDate?: string;   // until only → end of an event window (e.g. trip's last day)
   icon?: string;      // optional lucide key (see counterIcons)
   mode?: 'auto';      // since only: 'days without X' auto-tracked from purchases
   keyword?: string;   // auto: '|'-separated keywords matched against expenses
@@ -63,6 +64,29 @@ export function daysUntil(c: Counter, now = Date.now()): number {
 export function untilProgress(c: Counter, now = Date.now()): number {
   const start = atMidnight(c.startDate || c.createdAt.slice(0, 10));
   const end = atMidnight(c.date);
+  if (end <= start) return 1;
+  return Math.min(1, Math.max(0, (now - start) / (end - start)));
+}
+
+// ── Event window (a trip that lasts several days) ───────────────────────────
+// today sits inside [date .. endDate] (both days inclusive).
+export function isDuringEvent(c: Counter, now = Date.now()): boolean {
+  if (!c.endDate) return false;
+  return now >= atMidnight(c.date) && now < atMidnight(c.endDate) + MS_DAY;
+}
+// whole days left until the event ends (0 = ends today, negative = over).
+export function daysUntilEnd(c: Counter, now = Date.now()): number {
+  if (!c.endDate) return 0;
+  return Math.ceil((atMidnight(c.endDate) - now) / MS_DAY);
+}
+// true once the event window (or plain target) is fully in the past.
+export function isOver(c: Counter, now = Date.now()): boolean {
+  return c.endDate ? now >= atMidnight(c.endDate) + MS_DAY : daysUntil(c, now) < 0;
+}
+// 0..1 progress through the event window (date → endDate) — the car drives along it.
+export function eventProgress(c: Counter, now = Date.now()): number {
+  if (!c.endDate) return 0;
+  const start = atMidnight(c.date), end = atMidnight(c.endDate);
   if (end <= start) return 1;
   return Math.min(1, Math.max(0, (now - start) / (end - start)));
 }
