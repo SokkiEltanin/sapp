@@ -1452,6 +1452,12 @@ export default function SettingsScreen() {
                   style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: '#2AC68F55', paddingVertical: 11, alignItems: 'center' }}>
                   <Text style={{ color: '#2AC68F', fontWeight: '800' }}>Otwórz dostęp do powiadomień</Text>
                 </PressableScale>
+                <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400', marginTop: 4 }]}>Łapie tylko raz i przestaje? Samsung usypia Sappa — ustaw baterię na „Bez ograniczeń" (Bateria → Bez ograniczeń) i wyłącz „Usypianie aplikacji".</Text>
+                <PressableScale
+                  onPress={() => { Linking.openSettings().catch(() => { toast.error('Otwórz Ustawienia → Aplikacje → Sapp → Bateria ręcznie'); }); }}
+                  style={{ backgroundColor: colors.bg.elevated, borderRadius: 10, borderWidth: 1, borderColor: '#FBBF2455', paddingVertical: 11, alignItems: 'center' }}>
+                  <Text style={{ color: '#FBBF24', fontWeight: '800' }}>Ustawienia baterii Sappa</Text>
+                </PressableScale>
               </View>
             )}
             {bankEnabled && (

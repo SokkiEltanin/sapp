@@ -25,6 +25,7 @@ function kotlinSource(pkg) {
   return `package ${pkg}
 
 import android.app.Notification
+import android.content.ComponentName
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import org.json.JSONArray
@@ -37,6 +38,25 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
   private val bankPackages = setOf(${pkgSet})
 
   override fun onNotificationPosted(sbn: StatusBarNotification?) {
+    handle(sbn)
+  }
+
+  // When the system (re)binds the listener — e.g. after an OEM battery-saver killed
+  // it and it came back — sweep any bank notifications still in the tray so a kill
+  // doesn't silently drop the ones that arrived while we were down.
+  override fun onListenerConnected() {
+    try {
+      val active = activeNotifications ?: return
+      for (sbn in active) handle(sbn)
+    } catch (e: Exception) {}
+  }
+
+  // If we get unbound, politely ask the system to rebind us.
+  override fun onListenerDisconnected() {
+    try { requestRebind(ComponentName(this, ${SERVICE_CLASS}::class.java)) } catch (e: Exception) {}
+  }
+
+  private fun handle(sbn: StatusBarNotification?) {
     try {
       val n = sbn ?: return
       val pkg = n.packageName ?: return
@@ -57,6 +77,11 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
       val arr = if (file.exists()) {
         try { JSONArray(file.readText()) } catch (e: Exception) { JSONArray() }
       } else JSONArray()
+      // dedup: the reconnect sweep can re-see a notification we already stored
+      for (i in 0 until arr.length()) {
+        val o = arr.optJSONObject(i) ?: continue
+        if (o.optLong("time") == time && o.optString("title") == title && o.optString("text") == text) return
+      }
       val obj = JSONObject()
       obj.put("pkg", pkg)
       obj.put("title", title)
