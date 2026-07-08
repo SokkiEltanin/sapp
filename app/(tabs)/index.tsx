@@ -3712,6 +3712,10 @@ export default function DashboardScreen() {
               const nzMin = nz.length ? Math.min(...nz) : 0;
               const floor = (nz.length >= 2 && nzMin > max * 0.5) ? Math.max(0, nzMin - Math.max(0.4, max - nzMin) * 0.8) : 0;
               const span = (max - floor) || 1;
+              // overall (all-time) average — for weight, across every logged day.
+              const allW = statDetail.metric === 'weight'
+                ? Object.values(statCtx.healthDays).map(d => d.weightKg).filter((w): w is number => !!w && w > 0) : [];
+              const overallAvg = allW.length ? allW.reduce((a, b) => a + b, 0) / allW.length : 0;
               const u = ser.unit ? ' ' + ser.unit : '';
               const fmt = (v: number) => fmtWave(v, ser.unit);
               return (
@@ -3743,8 +3747,10 @@ export default function DashboardScreen() {
                     })}
                   </View>
                   <View style={s.wxChips}>
-                    <View style={s.wxChip}><Text style={s.wxChipK}>Średnia</Text><Text style={s.wxChipV}>{fmt(avg)}{u}</Text></View>
-                    <View style={s.wxChip}><Text style={s.wxChipK}>Rekord</Text><Text style={s.wxChipV}>{fmt(peak)}{u}</Text></View>
+                    <View style={s.wxChip}><Text style={s.wxChipK}>{statDetail.metric === 'weight' ? 'Śr. 6 mies.' : 'Średnia'}</Text><Text style={s.wxChipV}>{fmt(avg)}{u}</Text></View>
+                    {statDetail.metric === 'weight' && overallAvg > 0
+                      ? <View style={s.wxChip}><Text style={s.wxChipK}>Śr. ogólna</Text><Text style={s.wxChipV}>{fmt(overallAvg)}{u}</Text></View>
+                      : <View style={s.wxChip}><Text style={s.wxChipK}>Rekord</Text><Text style={s.wxChipV}>{fmt(peak)}{u}</Text></View>}
                   </View>
                   {statDetail.metric === 'weight' && (
                     <View style={s.weightAddRow}>
