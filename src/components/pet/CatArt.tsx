@@ -17,10 +17,13 @@ const INK = '#3B3C4E';
 const LX = 794, RX = 1107, EYY = 762;
 
 function mouthFor(expr: PetExpression): React.ReactNode {
-  if (expr === 'sad') return <Path d="M920 900 Q985 928 1050 900" fill="none" stroke={INK} strokeWidth={13} strokeLinecap="round" />;
+  // frown — control point ABOVE the corners so it curves ∩ (was a ∪ smile = bug)
+  if (expr === 'sad') return <Path d="M918 916 Q985 884 1052 916" fill="none" stroke={INK} strokeWidth={15} strokeLinecap="round" />;
   if (expr === 'meh') return <Path d="M925 905 H1045" fill="none" stroke={INK} strokeWidth={13} strokeLinecap="round" />;
+  // queasy wavy mouth for sick (no longer a smile)
+  if (expr === 'sick') return <Path d="M918 905 q22 -20 44 0 t44 0" fill="none" stroke={INK} strokeWidth={14} strokeLinecap="round" />;
   if (expr === 'sleeping') return <Path d="M955 902 Q985 916 1015 902" fill="none" stroke={INK} strokeWidth={12} strokeLinecap="round" />;
-  // happy / content / sick → the user's original two-stroke smile
+  // happy / content → the user's original two-stroke smile
   return (
     <G id="mouth">
       <G transform="matrix(1,0,0,1.31158,57.033642,-397.041139)">
@@ -39,36 +42,28 @@ export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, equipped,
 }: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; held?: string } }) {
   const breathe = useRef(new Animated.Value(0)).current;
-  const sway = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
   const tailWag = useRef(new Animated.Value(0)).current;
-  const react = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
   const asleep = expression === 'sleeping';
   const closed = blink || asleep;
 
-  // mood transition — when the expression changes, the cat blinks (masking the
-  // instant mouth/eye swap so it reads as a deliberate change) and gives a little
-  // "!" reaction pulse. Skipped on first mount so it doesn't fire on load.
+  // mood transition — a single blink masks the mouth/eye swap so a mood change
+  // reads as deliberate. No bounce/pulse: the cat stays put. Skipped on first mount.
   const firstMood = useRef(true);
   useEffect(() => {
     if (firstMood.current) { firstMood.current = false; return; }
-    if (!animate) return;
+    if (!animate || asleep) return;
     setBlink(true);
-    const t = setTimeout(() => setBlink(false), 160);
-    react.setValue(0);
-    Animated.sequence([
-      Animated.timing(react, { toValue: 1, duration: 130, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.spring(react, { toValue: 0, friction: 4, tension: 90, useNativeDriver: true }),
-    ]).start();
+    const t = setTimeout(() => setBlink(false), 150);
     return () => clearTimeout(t);
   }, [expression, animate]);
 
-  // tail wag — a JS-driven SVG rotation around the tail base (native driver can't
-  // animate SVG props). Slower + smaller while asleep.
+  // tail wag — a gentle, slow JS-driven SVG rotation around the tail's base (native
+  // driver can't animate SVG props). Small amplitude so it stays attached to the body.
   useEffect(() => {
     if (!animate) return;
-    const dur = asleep ? 2600 : 1400;
+    const dur = asleep ? 3200 : 2100;
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(tailWag, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
       Animated.timing(tailWag, { toValue: -1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
@@ -76,20 +71,17 @@ export default function CatArt({
     loop.start();
     return () => loop.stop();
   }, [animate, asleep]);
-  const tailRot = tailWag.interpolate({ inputRange: [-1, 1], outputRange: [asleep ? -3 : -7, asleep ? 3 : 7] });
+  const tailRot = tailWag.interpolate({ inputRange: [-1, 1], outputRange: [asleep ? -1.5 : -3.5, asleep ? 1.5 : 3.5] });
 
+  // very light body breathing only — no floating, no sway.
   useEffect(() => {
     if (!animate) return;
     const b = Animated.loop(Animated.sequence([
-      Animated.timing(breathe, { toValue: 1, duration: asleep ? 2800 : 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(breathe, { toValue: 0, duration: asleep ? 2800 : 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 1, duration: asleep ? 3000 : 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 0, duration: asleep ? 3000 : 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
-    const s = Animated.loop(Animated.sequence([
-      Animated.timing(sway, { toValue: 1, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(sway, { toValue: -1, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    b.start(); s.start();
-    return () => { b.stop(); s.stop(); };
+    b.start();
+    return () => b.stop();
   }, [animate, asleep]);
 
   useEffect(() => {
@@ -103,24 +95,20 @@ export default function CatArt({
   const onTap = () => {
     haptic.tap();
     Animated.sequence([
-      Animated.timing(hop, { toValue: 1, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.spring(hop, { toValue: 0, friction: 4.5, tension: 80, useNativeDriver: true }),
+      Animated.timing(hop, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(hop, { toValue: 0, friction: 5, tension: 90, useNativeDriver: true }),
     ]).start();
     onPress?.();
   };
 
-  const amp = asleep ? 0.02 : 0.028;
+  const amp = asleep ? 0.008 : 0.012;   // barely-there breathing, keeps it grounded
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1 - amp, 1 + amp] });
-  const bob = breathe.interpolate({ inputRange: [0, 1], outputRange: [size * 0.012, -size * 0.012] });
-  const rot = sway.interpolate({ inputRange: [-1, 1], outputRange: ['-2deg', '2deg'] });
-  const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.13] });
-  const reactScale = react.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
-  const reactY = react.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.03] });
+  const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.07] });
 
   return (
     <Pressable onPress={onTap} hitSlop={12}>
       <Animated.View style={{ transform: [{ translateY: hopY }] }}>
-        <Animated.View style={{ transform: [{ translateY: bob }, { translateY: reactY }, { rotate: rot }, { scale }, { scale: reactScale }] }}>
+        <Animated.View style={{ transform: [{ scale }] }}>
           <Svg width={size} height={size} viewBox="0 0 2000 2000">
             {/* tail (wags around its base) */}
             <AG rotation={tailRot as any} originX={1200} originY={1240}>
@@ -174,9 +162,9 @@ export default function CatArt({
 
             {/* mouth (mood) */}
             {mouthFor(expression)}
-            {/* tear when sad / sweat drop when sick */}
-            {expression === 'sad' && <Path d="M735 840 q-34 66 0 104 q34 -34 0 -104 z" fill="#8CC7FF" />}
-            {expression === 'sick' && <Path d="M1245 720 q30 60 0 94 q-30 -30 0 -94 z" fill="#BFE3F5" />}
+            {/* tear when sad / sweat drop when sick — outlined so they read on the blue coat */}
+            {expression === 'sad' && <Path d="M726 838 q-40 74 0 116 q40 -40 0 -116 z" fill="#5AB0F0" stroke="#3E93D8" strokeWidth={5} />}
+            {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
           </Svg>
           {/* cosmetics — the blob-space items overlaid, aligned to the cat's head */}
           {(equipped?.hat || equipped?.face) && (

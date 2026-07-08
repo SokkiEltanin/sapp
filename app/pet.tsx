@@ -167,19 +167,7 @@ export default function Pet() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* stage (room backdrop if equipped) */}
-        <View style={s.stage}>
-          {room?.colors && (
-            <LinearGradient colors={room.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.room}>
-              {room.decor?.map((d, i) => (
-                <Text key={i} style={[s.roomDecor, i === 0 ? { top: 10, left: 14 } : { top: 16, right: 16 }]}>{d}</Text>
-              ))}
-            </LinearGradient>
-          )}
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 30} equipped={worn} />
-        </View>
-
-        {/* name + status */}
+        {/* name + mood — at the very top */}
         {editing ? (
           <View style={s.nameEdit}>
             <TextInput value={draft} onChangeText={setDraft} style={s.nameInput} autoFocus maxLength={16}
@@ -192,8 +180,22 @@ export default function Pet() {
             <Pencil size={14} color={c.text.muted} />
           </TouchableOpacity>
         )}
-        <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
+        <View style={[s.moodChip, { backgroundColor: pet.color + '1E', borderColor: pet.color + '55' }]}>
+          <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
+        </View>
         <Text style={s.tip}>{petStatusLine(pet)}</Text>
+
+        {/* stage (room backdrop if equipped) */}
+        <View style={s.stage}>
+          {room?.colors && (
+            <LinearGradient colors={room.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.room}>
+              {room.decor?.map((d, i) => (
+                <Text key={i} style={[s.roomDecor, i === 0 ? { top: 10, left: 14 } : { top: 16, right: 16 }]}>{d}</Text>
+              ))}
+            </LinearGradient>
+          )}
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 56} equipped={worn} />
+        </View>
 
         {/* level */}
         <View style={s.levelCard}>
@@ -344,8 +346,9 @@ const makeS = (c: any) => StyleSheet.create({
   nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[2] },
   nameInput: { fontSize: 20, fontWeight: '800', color: c.text.primary, borderBottomWidth: 2, borderBottomColor: c.accent.blue, minWidth: 140, textAlign: 'center', paddingVertical: 2 },
   nameSave: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.accent.green, alignItems: 'center', justifyContent: 'center' },
-  status: { fontSize: 15, fontWeight: '800', marginTop: 4 },
-  tip: { fontSize: 12.5, color: c.text.muted, marginTop: 2, textAlign: 'center' },
+  moodChip: { marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
+  status: { fontSize: 14, fontWeight: '800' },
+  tip: { fontSize: 12.5, color: c.text.muted, marginTop: 6, textAlign: 'center' },
 
   levelCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[4] },
   levelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
@@ -375,9 +378,9 @@ const makeS = (c: any) => StyleSheet.create({
   qNote: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   qReward: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   qRewardTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
-  qClaim: { backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 6 },
-  qClaimTxt: { fontSize: 12, fontWeight: '800', color: '#0B1E17' },
-  qDone: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2AC68F1A' },
+  qClaim: { backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 10, shadowColor: '#2AC68F', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  qClaimTxt: { fontSize: 14, fontWeight: '900', color: '#07160F', letterSpacing: 0.2 },
+  qDone: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2AC68F1A' },
   qLocked: { width: 30, alignItems: 'center' },
   qLockedTxt: { fontSize: 14, color: c.text.muted, fontWeight: '800' },
 
