@@ -174,7 +174,7 @@ export default function Pet() {
               ))}
             </LinearGradient>
           )}
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 30} />
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 30} equipped={worn} />
         </View>
 
         {/* name + status */}

@@ -3,6 +3,7 @@ import { Animated, Easing, Pressable, View, StyleSheet, Text } from 'react-nativ
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
+import { HatArt, GlassesArt, HeldArt } from '@/components/pet/BlobItems';
 
 // The companion cat — a faithful 1:1 port of the user's own Affinity drawing
 // (pupildoapki.svg), kept in named layers so it can be animated: gentle breathing
@@ -33,8 +34,8 @@ function mouthFor(expr: PetExpression): React.ReactNode {
 }
 
 export default function CatArt({
-  size = 150, expression = 'happy', animate = true, onPress,
-}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void }) {
+  size = 150, expression = 'happy', animate = true, onPress, equipped,
+}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; held?: string } }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const sway = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
@@ -137,6 +138,20 @@ export default function CatArt({
             {/* tear when sad */}
             {expression === 'sad' && <Path d="M735 840 q-34 66 0 104 q34 -34 0 -104 z" fill="#8CC7FF" />}
           </Svg>
+          {/* cosmetics — the blob-space items overlaid, aligned to the cat's head */}
+          {(equipped?.hat || equipped?.face) && (
+            <View pointerEvents="none" style={{ position: 'absolute', width: size * 0.47, height: size * 0.47 * 1.05, left: size * 0.242, top: size * 0.15 }}>
+              <Svg viewBox="0 0 100 105" width="100%" height="100%">
+                <GlassesArt id={equipped?.face} />
+                <HatArt id={equipped?.hat} />
+              </Svg>
+            </View>
+          )}
+          {equipped?.held && (
+            <View pointerEvents="none" style={{ position: 'absolute', width: size * 0.4, height: size * 0.4 * 1.05, left: size * 0.52, top: size * 0.44 }}>
+              <Svg viewBox="0 0 100 105" width="100%" height="100%"><HeldArt id={equipped.held} /></Svg>
+            </View>
+          )}
           {asleep && <SleepZs size={size} />}
         </Animated.View>
       </Animated.View>
