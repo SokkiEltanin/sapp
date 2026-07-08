@@ -33,15 +33,32 @@ function mouthFor(expr: PetExpression): React.ReactNode {
   );
 }
 
+const AG = Animated.createAnimatedComponent(G);
+
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, equipped,
 }: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; held?: string } }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const sway = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
+  const tailWag = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
   const asleep = expression === 'sleeping';
   const closed = blink || asleep;
+
+  // tail wag — a JS-driven SVG rotation around the tail base (native driver can't
+  // animate SVG props). Slower + smaller while asleep.
+  useEffect(() => {
+    if (!animate) return;
+    const dur = asleep ? 2600 : 1400;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(tailWag, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      Animated.timing(tailWag, { toValue: -1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [animate, asleep]);
+  const tailRot = tailWag.interpolate({ inputRange: [-1, 1], outputRange: [asleep ? -3 : -7, asleep ? 3 : 7] });
 
   useEffect(() => {
     if (!animate) return;
@@ -85,10 +102,12 @@ export default function CatArt({
       <Animated.View style={{ transform: [{ translateY: hopY }] }}>
         <Animated.View style={{ transform: [{ translateY: bob }, { rotate: rot }, { scale }] }}>
           <Svg width={size} height={size} viewBox="0 0 2000 2000">
-            {/* tail */}
-            <G transform="matrix(1,0,0,1,-106.194312,-183.051682)">
-              <Path d="M1308.567,1421.964C1297.672,1432.859 1279.982,1432.859 1269.087,1421.964C1258.192,1411.069 1258.192,1393.379 1269.087,1382.484C1274.676,1376.895 1277.281,1367.411 1282.899,1357.04C1301.861,1322.036 1336.867,1273.685 1472.244,1256.763C1513.594,1251.594 1538.649,1251.292 1557.619,1235.85C1577.302,1219.829 1589.355,1189.318 1609.223,1129.716C1618.603,1101.577 1623.848,1052.64 1624.601,1045.862C1626.302,1030.548 1640.116,1019.497 1655.43,1021.198C1670.743,1022.9 1681.794,1036.714 1680.093,1052.027C1679.236,1059.741 1672.864,1115.352 1662.191,1147.372C1637.124,1222.574 1617.7,1258.937 1592.866,1279.152C1567.314,1299.95 1534.864,1305.204 1479.169,1312.165C1417.965,1319.816 1382.013,1333.948 1359.888,1350.59C1339.802,1365.699 1332.394,1382.571 1325.987,1395.385C1320.517,1406.322 1315.177,1415.355 1308.567,1421.964Z" fill={BLUE} />
-            </G>
+            {/* tail (wags around its base) */}
+            <AG rotation={tailRot as any} originX={1200} originY={1240}>
+              <G transform="matrix(1,0,0,1,-106.194312,-183.051682)">
+                <Path d="M1308.567,1421.964C1297.672,1432.859 1279.982,1432.859 1269.087,1421.964C1258.192,1411.069 1258.192,1393.379 1269.087,1382.484C1274.676,1376.895 1277.281,1367.411 1282.899,1357.04C1301.861,1322.036 1336.867,1273.685 1472.244,1256.763C1513.594,1251.594 1538.649,1251.292 1557.619,1235.85C1577.302,1219.829 1589.355,1189.318 1609.223,1129.716C1618.603,1101.577 1623.848,1052.64 1624.601,1045.862C1626.302,1030.548 1640.116,1019.497 1655.43,1021.198C1670.743,1022.9 1681.794,1036.714 1680.093,1052.027C1679.236,1059.741 1672.864,1115.352 1662.191,1147.372C1637.124,1222.574 1617.7,1258.937 1592.866,1279.152C1567.314,1299.95 1534.864,1305.204 1479.169,1312.165C1417.965,1319.816 1382.013,1333.948 1359.888,1350.59C1339.802,1365.699 1332.394,1382.571 1325.987,1395.385C1320.517,1406.322 1315.177,1415.355 1308.567,1421.964Z" fill={BLUE} />
+              </G>
+            </AG>
             {/* body */}
             <G>
               <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={BLUE} /></G>
@@ -135,8 +154,9 @@ export default function CatArt({
 
             {/* mouth (mood) */}
             {mouthFor(expression)}
-            {/* tear when sad */}
+            {/* tear when sad / sweat drop when sick */}
             {expression === 'sad' && <Path d="M735 840 q-34 66 0 104 q34 -34 0 -104 z" fill="#8CC7FF" />}
+            {expression === 'sick' && <Path d="M1245 720 q30 60 0 94 q-30 -30 0 -94 z" fill="#BFE3F5" />}
           </Svg>
           {/* cosmetics — the blob-space items overlaid, aligned to the cat's head */}
           {(equipped?.hat || equipped?.face) && (
