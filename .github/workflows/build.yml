@@ -128,17 +128,22 @@ jobs:
       # download. Gradle's own auto-install has no retry, so a single bad download
       # (ZipException: Archive is not a ZIP archive) fails the whole build.
       - name: Install Android NDK 27.1.12297006
+        continue-on-error: true
         run: |
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SM" ] || SM="$(command -v sdkmanager || true)"
+          if [ -z "$SM" ] || [ ! -x "$SM" ]; then
+            echo "sdkmanager not found — leaving NDK to Gradle's own installer"; exit 0
+          fi
           for i in 1 2 3; do
-            echo "NDK install attempt $i…"
-            yes | sdkmanager --sdk_root="$SDK" --install "ndk;27.1.12297006" && break
+            echo "NDK install attempt $i via $SM …"
+            (yes || true) | "$SM" --sdk_root="$SDK" --install "ndk;27.1.12297006" && break
             echo "attempt $i failed — removing partial download and retrying"
             rm -rf "$SDK/ndk/27.1.12297006" || true
             sleep 10
           done
-          test -d "$SDK/ndk/27.1.12297006" || { echo "NDK still missing after retries"; exit 1; }
-          echo "NDK OK: $SDK/ndk/27.1.12297006"
+          if [ -d "$SDK/ndk/27.1.12297006" ]; then echo "NDK OK: $SDK/ndk/27.1.12297006"; else echo "NDK not pre-installed — Gradle will try"; fi
 
       - name: Build release APK
         run: cd android && ./gradlew assembleRelease --no-daemon -x lint -x lintVitalAnalyzeRelease -x lintVitalRelease
