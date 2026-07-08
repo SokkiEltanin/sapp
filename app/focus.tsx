@@ -82,9 +82,7 @@ export default function FocusScreen() {
 
   const handleDone = () => {
     if (!task) return;
-    haptic.success();
-    toggle(task.id);
-    toast.success('Ukończono!');
+    toggle(task.id);   // hook handles haptics + the coin-reward toast
   };
 
   const handleSkip = () => {

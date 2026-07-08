@@ -3,11 +3,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalendarStore } from '@/store/calendarStore';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
+import { usePetStore } from '@/store/petStore';
 import { Task, TaskRecurring, Subtask } from '@/types';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
 const SAVE_FAIL = 'Nie zapisano — sprawdź połączenie';
+
+// ─── Pet reward: finishing your real tasks feeds the companion ───────────────
+// You set a task's difficulty yourself; the harder you rate it, the more coins the
+// pet earns when you complete it (1 / 2 / 3). Every milestone you tick off gives a
+// small XP nibble so breaking a task down pays off as you chip at it.
+export function taskCoins(difficulty?: number): number {
+  if (!difficulty) return 1;
+  if (difficulty <= 2) return 1;   // Łatwe / Proste
+  if (difficulty === 3) return 2;  // Średnie
+  return 3;                        // Trudne / Hardkor
+}
+function taskXp(difficulty?: number): number {
+  return 6 + (difficulty ?? 1) * 3;
+}
+const MILESTONE_XP = 4;
 
 function nextDeadline(iso: string, recurring: TaskRecurring): string {
   const d = new Date(iso);
@@ -93,7 +109,14 @@ export function useTasks() {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
     const next = task.status === 'done' ? 'pending' : 'done';
-    if (next === 'done') haptic.success(); else haptic.tap();
+    if (next === 'done') {
+      haptic.success();
+      const coins = taskCoins(task.difficulty);
+      const pet = usePetStore.getState();
+      pet.addCoins(coins);
+      pet.addXp(taskXp(task.difficulty));
+      toast.success(`Ukończono!  +${coins} 🪙`);
+    } else haptic.tap();
     await update(id, { status: next });
     if (next === 'done') {
       notificationsService.cancelTaskReminder(id).catch(() => {});
@@ -168,10 +191,16 @@ export function useTasks() {
   const toggleSubtask = async (taskId: string, subtaskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
+    const sub = (task.subtasks ?? []).find(s => s.id === subtaskId);
+    const becomingDone = sub ? !sub.done : false;
     const subtasks = (task.subtasks ?? []).map(s =>
       s.id === subtaskId ? { ...s, done: !s.done } : s,
     );
     updateTask(taskId, { subtasks });
+    if (becomingDone) {
+      usePetStore.getState().addXp(MILESTONE_XP);
+      toast.success(`Kamień zaliczony  +${MILESTONE_XP} XP`);
+    }
     await tasksService.updateTask(taskId, { subtasks }).catch(() => load());
   };
 

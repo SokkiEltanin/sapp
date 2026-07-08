@@ -4,10 +4,23 @@
 
 export type CosmeticSlot = 'hat' | 'face' | 'held' | 'room';
 
+// Rarity tiers — the more polished / desirable the item, the higher the tier and
+// the price. Basic bits are cheap impulse buys; legendary pieces (crown, cosmos
+// backdrop) are long-term goals you save coins toward.
+export type CosmeticTier = 'basic' | 'rare' | 'epic' | 'legendary';
+
+export const TIER_META: Record<CosmeticTier, { label: string; color: string }> = {
+  basic:     { label: 'Zwykły',     color: '#8A94A6' },
+  rare:      { label: 'Rzadki',     color: '#4DA8FF' },
+  epic:      { label: 'Epicki',     color: '#B061FF' },
+  legendary: { label: 'Legendarny', color: '#FBBF24' },
+};
+
 export interface Cosmetic {
   id: string;
   name: string;
   slot: CosmeticSlot;
+  tier: CosmeticTier;
   cost: number;
   emoji?: string;              // wearable sticker
   colors?: [string, string];   // room backdrop gradient
@@ -16,30 +29,30 @@ export interface Cosmetic {
 
 export const COSMETICS: Cosmetic[] = [
   // ── Czapki ──
-  { id: 'hat_cap',    name: 'Czapka',      slot: 'hat', cost: 10, emoji: '🧢' },
-  { id: 'hat_bow',    name: 'Kokarda',     slot: 'hat', cost: 12, emoji: '🎀' },
-  { id: 'hat_top',    name: 'Cylinder',    slot: 'hat', cost: 16, emoji: '🎩' },
-  { id: 'hat_grad',   name: 'Biret',       slot: 'hat', cost: 18, emoji: '🎓' },
-  { id: 'hat_crown',  name: 'Korona',      slot: 'hat', cost: 30, emoji: '👑' },
+  { id: 'hat_cap',    name: 'Czapka',      slot: 'hat', tier: 'basic',     cost: 25,  emoji: '🧢' },
+  { id: 'hat_bow',    name: 'Kokarda',     slot: 'hat', tier: 'basic',     cost: 30,  emoji: '🎀' },
+  { id: 'hat_top',    name: 'Cylinder',    slot: 'hat', tier: 'rare',      cost: 55,  emoji: '🎩' },
+  { id: 'hat_grad',   name: 'Biret',       slot: 'hat', tier: 'rare',      cost: 60,  emoji: '🎓' },
+  { id: 'hat_crown',  name: 'Korona',      slot: 'hat', tier: 'legendary', cost: 180, emoji: '👑' },
 
   // ── Twarz ──
-  { id: 'face_glass', name: 'Okularki',    slot: 'face', cost: 10, emoji: '👓' },
-  { id: 'face_shade', name: 'Słoneczne',   slot: 'face', cost: 14, emoji: '🕶️' },
-  { id: 'face_dis',   name: 'Przebranie',  slot: 'face', cost: 20, emoji: '🥸' },
+  { id: 'face_glass', name: 'Okularki',    slot: 'face', tier: 'basic',    cost: 25,  emoji: '👓' },
+  { id: 'face_shade', name: 'Słoneczne',   slot: 'face', tier: 'rare',     cost: 50,  emoji: '🕶️' },
+  { id: 'face_dis',   name: 'Przebranie',  slot: 'face', tier: 'epic',     cost: 90,  emoji: '🥸' },
 
   // ── Trzymane ──
-  { id: 'held_balloon', name: 'Balonik',   slot: 'held', cost: 6,  emoji: '🎈' },
-  { id: 'held_lolly',   name: 'Lizak',     slot: 'held', cost: 8,  emoji: '🍭' },
-  { id: 'held_flower',  name: 'Kwiatek',   slot: 'held', cost: 8,  emoji: '🌸' },
-  { id: 'held_guitar',  name: 'Gitara',    slot: 'held', cost: 20, emoji: '🎸' },
-  { id: 'held_sword',   name: 'Miecz',     slot: 'held', cost: 25, emoji: '⚔️' },
+  { id: 'held_balloon', name: 'Balonik',   slot: 'held', tier: 'basic',    cost: 18,  emoji: '🎈' },
+  { id: 'held_lolly',   name: 'Lizak',     slot: 'held', tier: 'basic',    cost: 22,  emoji: '🍭' },
+  { id: 'held_flower',  name: 'Kwiatek',   slot: 'held', tier: 'basic',    cost: 22,  emoji: '🌸' },
+  { id: 'held_guitar',  name: 'Gitara',    slot: 'held', tier: 'epic',     cost: 85,  emoji: '🎸' },
+  { id: 'held_sword',   name: 'Miecz',     slot: 'held', tier: 'epic',     cost: 100, emoji: '⚔️' },
 
-  // ── Pokój (tło) ──
-  { id: 'room_night',  name: 'Noc',        slot: 'room', cost: 12, colors: ['#1E2A52', '#0B1024'], decor: ['⭐', '🌙'] },
-  { id: 'room_meadow', name: 'Łąka',       slot: 'room', cost: 14, colors: ['#2E5A3A', '#14301F'], decor: ['🌼', '🌿'] },
-  { id: 'room_beach',  name: 'Plaża',      slot: 'room', cost: 18, colors: ['#2F6270', '#153038'], decor: ['🐚', '🌴'] },
-  { id: 'room_candy',  name: 'Cukierkowo', slot: 'room', cost: 22, colors: ['#6B2A52', '#2E1226'], decor: ['🍬', '🧁'] },
-  { id: 'room_space',  name: 'Kosmos',     slot: 'room', cost: 26, colors: ['#2A1E52', '#0E0A24'], decor: ['🚀', '✨'] },
+  // ── Pokój (tło) — the polished backdrops are the premium tier ──
+  { id: 'room_night',  name: 'Noc',        slot: 'room', tier: 'rare',      cost: 50,  colors: ['#1E2A52', '#0B1024'], decor: ['⭐', '🌙'] },
+  { id: 'room_meadow', name: 'Łąka',       slot: 'room', tier: 'rare',      cost: 55,  colors: ['#2E5A3A', '#14301F'], decor: ['🌼', '🌿'] },
+  { id: 'room_beach',  name: 'Plaża',      slot: 'room', tier: 'epic',      cost: 90,  colors: ['#2F6270', '#153038'], decor: ['🐚', '🌴'] },
+  { id: 'room_candy',  name: 'Cukierkowo', slot: 'room', tier: 'epic',      cost: 110, colors: ['#6B2A52', '#2E1226'], decor: ['🍬', '🧁'] },
+  { id: 'room_space',  name: 'Kosmos',     slot: 'room', tier: 'legendary', cost: 200, colors: ['#2A1E52', '#0E0A24'], decor: ['🚀', '✨'] },
 ];
 
 export const SLOT_LABEL: Record<CosmeticSlot, string> = {

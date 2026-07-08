@@ -9,10 +9,10 @@ import { router } from 'expo-router';
 import {
   Check, Pencil, Plus, SlidersHorizontal,
   ChevronRight, Trash2, X,
-  Square, CheckSquare2, Clock, Timer, RefreshCw, Activity,
+  Square, CheckSquare2, Clock, Timer, RefreshCw, Activity, Coins,
 } from 'lucide-react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import { useTasks } from '@/hooks/useTasks';
+import { useTasks, taskCoins } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -230,12 +230,28 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
           {task.title.toUpperCase()}
         </Text>
         <Text style={[s.cardSub, { color: subColor }]}>{subtitle}</Text>
-        {((task.subtasks?.length ?? 0) > 0 || (task.estimatedPomodoros ?? 0) > 0 || (task.tags?.length ?? 0) > 0) && (
+        {/* milestone progress — visible so you can see a broken-down task at a glance */}
+        {(task.subtasks?.length ?? 0) > 0 && (() => {
+          const done  = task.subtasks!.filter(st => st.done).length;
+          const total = task.subtasks!.length;
+          const all   = done >= total;
+          return (
+            <View style={s.msRow}>
+              <View style={s.msTrack}>
+                <View style={[s.msFill, { width: `${(done / total) * 100}%` }, all && s.msFillDone]} />
+              </View>
+              <Text style={[s.msText, all && { color: G.accent }]}>{done}/{total}</Text>
+            </View>
+          );
+        })()}
+        {((task.estimatedPomodoros ?? 0) > 0 || (task.tags?.length ?? 0) > 0 || task.difficulty != null || (task.recurring && task.recurring !== 'none')) && (
           <View style={s.cardMeta}>
-            {task.subtasks && task.subtasks.length > 0 && (() => {
-              const done = task.subtasks.filter(st => st.done).length;
-              return <Text style={s.cardMilestones}>{done}/{task.subtasks.length} kamieni</Text>;
-            })()}
+            {task.difficulty != null && !isDone && (
+              <View style={s.coinPill}>
+                <Coins size={9} color="#FBBF24" strokeWidth={2.5} />
+                <Text style={s.coinPillText}>{taskCoins(task.difficulty)}</Text>
+              </View>
+            )}
             {!!task.estimatedPomodoros && task.estimatedPomodoros > 0 && (
               <View style={s.pomoPill}>
                 <Timer size={9} color={isDone ? colors.text.muted : '#4DD9F5'} strokeWidth={2.5} />
@@ -511,10 +527,8 @@ export default function TasksScreen() {
   const sorted = useMemo(() => sortTasks(active, sort), [active, sort]);
   const overdue = active.filter(t => { const d = t.deadline?.split('T')[0]; return !!d && d < today; }).length;
 
-  const handleCompletePress = useCallback((task: Task) => {
-    if (task.status === 'done') { haptic.tap(); toggle(task.id); }
-    else { haptic.success(); toggle(task.id); toast.success('Ukończono!'); }
-  }, [toggle]);
+  // haptics + the reward toast now live in the hook so every path is consistent
+  const handleCompletePress = useCallback((task: Task) => { toggle(task.id); }, [toggle]);
 
   const handleEditPress     = useCallback((task: Task) => { setDetailTask(task); setDetailVisible(true); }, []);
   const handleEditDirect    = useCallback((task: Task) => { haptic.tap(); router.push(`/tasks/${task.id}?edit=1` as any); }, []);
@@ -687,6 +701,13 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   cardSub: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2 },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
   cardMilestones: { fontSize: 9, color: c.text.muted },
+  msRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  msTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: c.border.subtle, overflow: 'hidden' },
+  msFill: { height: '100%', borderRadius: 2, backgroundColor: g.accent + '80' },
+  msFillDone: { backgroundColor: g.accent },
+  msText: { fontSize: 9, fontWeight: '800', color: c.text.muted, letterSpacing: 0.4, minWidth: 24, textAlign: 'right' },
+  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(251,191,36,0.25)' },
+  coinPillText: { fontSize: 9, fontWeight: '800', color: '#FBBF24' },
   pomoPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(77,217,245,0.10)', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
   pomoPillText: { fontSize: 9, fontWeight: '700', color: '#4DD9F5' },
   recurPill: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.border.subtle },

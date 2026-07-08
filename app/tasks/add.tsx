@@ -8,13 +8,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   X, Check, CalendarDays, Flag, AlignLeft, Timer,
-  Bell, BellOff, ChevronUp, ChevronDown,
+  Bell, BellOff, ChevronUp, ChevronDown, ListChecks, Plus, Coins,
 } from 'lucide-react-native';
 
-import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring } from '@/types';
+import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring, Subtask } from '@/types';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
+import { taskCoins } from '@/hooks/useTasks';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -147,6 +148,10 @@ export default function AddTaskScreen() {
   const [reminderMin, setReminderMin]     = useState(0);
   const [reminderMsg, setReminderMsg]     = useState('');
 
+  // Milestones — break the task into small steps up front (easier to start)
+  const [milestones, setMilestones]       = useState<string[]>([]);
+  const [msInput, setMsInput]             = useState('');
+
   // Advanced (collapsed by default)
   const [showAdvanced, setShowAdvanced]   = useState(false);
   const [difficulty, setDifficulty]       = useState<TaskDifficulty | undefined>(undefined);
@@ -175,6 +180,14 @@ export default function AddTaskScreen() {
     setTagInput('');
   };
 
+  // ── Milestones ────────────────────────────────────────────────────────────
+  const addMilestone = () => {
+    const t = msInput.trim();
+    if (t) { haptic.tap(); setMilestones(prev => [...prev, t]); }
+    setMsInput('');
+  };
+  const removeMilestone = (i: number) => setMilestones(prev => prev.filter((_, idx) => idx !== i));
+
   // ── Save ──────────────────���──────────────────────────────────────────────
   const handleSave = async () => {
     if (!title.trim()) { toast.error('Wpisz tytuł zadania'); return; }
@@ -198,6 +211,9 @@ export default function AddTaskScreen() {
         recurring,
         reminderTime,
         reminderMessage,
+        subtasks: milestones.length > 0
+          ? milestones.map((t, i): Subtask => ({ id: `${Date.now()}_${i}`, title: t, done: false }))
+          : undefined,
       });
 
       // Schedule reminder — use deadline date or today if no deadline
@@ -389,6 +405,45 @@ export default function AddTaskScreen() {
             />
           </SectionCard>
 
+          {/* ── Milestones — break it into small steps ── */}
+          <SectionCard
+            label="Rozbij na kroki"
+            icon={<ListChecks size={12} color={milestones.length > 0 ? G.accent : G.muted} />}
+          >
+            {milestones.length > 0 && (
+              <View style={{ gap: spacing[2] }}>
+                {milestones.map((m, i) => (
+                  <View key={i} style={s.msRow}>
+                    <View style={s.msDot} />
+                    <Text style={s.msText} numberOfLines={2}>{m}</Text>
+                    <TouchableOpacity onPress={() => { haptic.tap(); removeMilestone(i); }} hitSlop={8} style={s.msRemove}>
+                      <X size={12} color={G.muted} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            <View style={s.msInputRow}>
+              <Plus size={14} color={G.accent} />
+              <TextInput
+                value={msInput}
+                onChangeText={setMsInput}
+                onSubmitEditing={addMilestone}
+                placeholder="Dodaj krok / kamień milowy..."
+                placeholderTextColor={G.muted}
+                style={s.msInput}
+                returnKeyType="done"
+                blurOnSubmit={false}
+              />
+              {msInput.trim().length > 0 && (
+                <TouchableOpacity onPress={addMilestone} style={s.msAddBtn} activeOpacity={0.8}>
+                  <Check size={13} color={G.accent} strokeWidth={3} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={s.msHint}>Za każdy odhaczony krok pupil dostaje +4 XP.</Text>
+          </SectionCard>
+
           {/* ── Advanced options (collapsed) ── */}
           <TouchableOpacity
             style={s.advancedToggle}
@@ -407,15 +462,15 @@ export default function AddTaskScreen() {
 
           {showAdvanced && (
             <>
-              {/* Difficulty */}
+              {/* Difficulty — you rate it, the pet gets 1/2/3 coins on completion */}
               <View style={s.advCard}>
-                <Text style={s.advLabel}>TRUDNOŚĆ</Text>
+                <Text style={s.advLabel}>TRUDNOŚĆ → MONETY DLA PUPILA</Text>
                 <View style={s.diffRow}>
                   {([1, 2, 3, 4, 5] as TaskDifficulty[]).map(d => {
                     const active = difficulty !== undefined && d <= difficulty;
                     const col = difficulty ? (difficulty <= 2 ? G.accent : difficulty === 3 ? colors.accent.amber : colors.accent.red) : G.accent;
                     return (
-                      <TouchableOpacity key={d} onPress={() => setDifficulty(d)} style={s.diffDotWrap} activeOpacity={0.7}>
+                      <TouchableOpacity key={d} onPress={() => { haptic.tap(); setDifficulty(d); }} style={s.diffDotWrap} activeOpacity={0.7}>
                         <View style={[
                           s.diffDot,
                           active && { backgroundColor: col, width: 18, height: 18 },
@@ -428,6 +483,12 @@ export default function AddTaskScreen() {
                     <Text style={[s.diffLabel, { color: difficulty <= 2 ? G.accent : difficulty === 3 ? colors.accent.amber : colors.accent.red }]}>
                       {['', 'Łatwe', 'Proste', 'Średnie', 'Trudne', 'Hardkor'][difficulty]}
                     </Text>
+                  )}
+                  {difficulty !== undefined && (
+                    <View style={s.diffCoin}>
+                      <Coins size={11} color="#FBBF24" strokeWidth={2.5} />
+                      <Text style={s.diffCoinText}>+{taskCoins(difficulty)}</Text>
+                    </View>
                   )}
                 </View>
               </View>
@@ -645,6 +706,22 @@ const makeS = (c: any) => StyleSheet.create({
   diffDotWrap: { padding: 4 },
   diffDot: { width: 14, height: 14, borderRadius: 7 },
   diffLabel: { fontSize: 12, fontWeight: '600', marginLeft: spacing[1] },
+  diffCoin: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto', backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(251,191,36,0.28)' },
+  diffCoinText: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
+
+  // milestones
+  msRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  msDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: G.accent },
+  msText: { flex: 1, fontSize: 13, color: c.text.secondary, fontWeight: '500', lineHeight: 18 },
+  msRemove: { padding: 4 },
+  msInputRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: radius.md,
+    borderWidth: 1, borderColor: G.cardBorder, paddingHorizontal: spacing[3], minHeight: 42,
+  },
+  msInput: { flex: 1, fontSize: 13, color: c.text.primary },
+  msAddBtn: { padding: 4 },
+  msHint: { fontSize: 11, color: G.muted, lineHeight: 15 },
 
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   stepBtn: {

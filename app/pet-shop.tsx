@@ -8,7 +8,7 @@ import { ChevronLeft, Coins, Check } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import { usePetStore } from '@/store/petStore';
-import { COSMETICS, SLOT_ORDER, SLOT_LABEL, Cosmetic } from '@/utils/petShop';
+import { COSMETICS, SLOT_ORDER, SLOT_LABEL, Cosmetic, TIER_META } from '@/utils/petShop';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -56,14 +56,22 @@ export default function PetShop() {
                 const owned = ownedItems.includes(item.id);
                 const isEq = equipped[item.slot] === item.id;
                 const afford = coins >= item.cost;
+                const tier = TIER_META[item.tier];
+                const premium = item.tier === 'epic' || item.tier === 'legendary';
                 return (
                   <PressableScale key={item.id} onPress={() => act(item)} style={s.cell}>
-                    <View style={[s.swatch, isEq && { borderColor: '#2AC68F', borderWidth: 2 }, !owned && !afford && { opacity: 0.5 }]}>
+                    <View style={[
+                      s.swatch,
+                      { borderColor: tier.color + (premium ? '99' : '55'), borderWidth: premium ? 1.5 : 1 },
+                      isEq && { borderColor: '#2AC68F', borderWidth: 2 },
+                      !owned && !afford && { opacity: 0.5 },
+                    ]}>
                       {item.colors
                         ? <><LinearGradient colors={item.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
                             <Text style={s.swatchEmoji}>{item.decor?.[0] ?? '🏠'}</Text></>
                         : <CatArt expression="happy" size={66} animate={false} equipped={{ [item.slot]: item.id }} />}
                       {isEq && <View style={s.eqBadge}><Check size={12} color="#fff" /></View>}
+                      {!owned && <View style={[s.tierDot, { backgroundColor: tier.color }]} />}
                     </View>
                     <Text style={s.name} numberOfLines={1}>{item.name}</Text>
                     {owned
@@ -75,7 +83,16 @@ export default function PetShop() {
             </View>
           </View>
         ))}
-        <Text style={s.foot}>Monety zdobywasz questami na stronie pupila.</Text>
+
+        <View style={s.legend}>
+          {(['basic', 'rare', 'epic', 'legendary'] as const).map(t => (
+            <View key={t} style={s.legendItem}>
+              <View style={[s.tierDot, { position: 'relative', top: 0, right: 0 }, { backgroundColor: TIER_META[t].color }]} />
+              <Text style={s.legendText}>{TIER_META[t].label}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={s.foot}>Monety zdobywasz questami pupila i kończąc zadania. Im rzadszy przedmiot, tym droższy.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -96,6 +113,10 @@ const makeS = (c: any) => StyleSheet.create({
   swatch: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: c.bg.card },
   swatchEmoji: { fontSize: 30 },
   eqBadge: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: '#2AC68F', alignItems: 'center', justifyContent: 'center' },
+  tierDot: { position: 'absolute', top: 4, left: 4, width: 8, height: 8, borderRadius: 4 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing[3], marginTop: spacing[5] },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendText: { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
   name: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, marginTop: 5 },
   tag: { fontSize: 10.5, fontWeight: '800', marginTop: 1 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1 },
