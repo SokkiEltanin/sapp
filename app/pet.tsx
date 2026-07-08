@@ -6,7 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Pencil, Check, Coins, ShoppingBag, Swords } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import Blob from '@/components/pet/Blob';
+import CatArt from '@/components/pet/CatArt';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx } from '@/utils/quests';
@@ -174,7 +174,7 @@ export default function Pet() {
               ))}
             </LinearGradient>
           )}
-          <Blob color={pet.color} expression={pet.expression} size={STAGE_SIZE[stage]} equipped={worn} />
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 30} />
         </View>
 
         {/* name + status */}

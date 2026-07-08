@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { ChevronRight, Gift } from 'lucide-react-native';
-import Blob from '@/components/pet/Blob';
+import CatArt from '@/components/pet/CatArt';
 import { PetState, petStatusLine } from '@/utils/petState';
 import { useColors } from '@/theme/useColors';
 
@@ -10,7 +10,7 @@ export default function PetTile({ name, pet, level, claimable = 0 }: { name: str
   const c = useColors();
   return (
     <View style={[st.card, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
-      <Blob color={pet.color} expression={pet.expression} size={64} />
+      <CatArt expression={pet.expression} size={70} animate={false} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>
           <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>
