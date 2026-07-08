@@ -7,14 +7,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
-import { feedWaterHabit } from '@/utils/habits';
+import { feedWaterHabit, getWaterHabit, getCounts, setCounts, getHabits, saveHabits } from '@/utils/habits';
+import { useHabitsSync } from '@/store/habitsSync';
 import PressableScale from '@/components/ui/PressableScale';
 import GlassCard from '@/components/ui/GlassCard';
+import WaterGauge from '@/components/health/WaterGauge';
 import { haptic } from '@/utils/haptics';
 import { useMoodStore } from '@/store/moodStore';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
-import { MOOD_COLORS, Expense } from '@/types';
+import { MOOD_COLORS, Expense, Habit } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
@@ -62,10 +64,12 @@ const QUALITY_KEYS: SleepQuality[] = ['poor', 'fair', 'good', 'excellent'];
 interface WeekSleep { h: number; m: number; quality?: SleepQuality }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
-function dateKey(d: Date) {
-  return `health_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function dateStr(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+function dateKey(d: Date) { return `health_${dateStr(d)}`; }
 function todayKey() { return dateKey(new Date()); }
+function todayDate() { return dateStr(new Date()); }
 
 // Sleep is read-only from the watch, so its "quality" is derived from duration
 // rather than tapped in by hand.
@@ -100,7 +104,8 @@ export default function HealthScreen() {
   const [weightGoal, setWeightGoal]     = useState(0); // target weight kg, 0 = unset
   const [goalModal, setGoalModal]       = useState(false);
   const [goalInput, setGoalInput]       = useState('');
-  const [water, setWater]               = useState(0);
+  const [water, setWater]               = useState(0);            // glasses today, sourced from the "Woda" habit
+  const [waterHabitId, setWaterHabitId] = useState<string | null>(null);
   const [steps, setSteps]               = useState(0);
   const [sleepH, setSleepH]             = useState(0);
   const [sleepM, setSleepM]             = useState(0);
@@ -122,6 +127,8 @@ export default function HealthScreen() {
   const [fromWatch, setFromWatch]       = useState(false);                // HC delivered data
 
   const { entries } = useMoodStore();
+  const waterSyncVersion = useHabitsSync(s => s.version);
+  const bumpHabits = useHabitsSync(s => s.bump);
   const pomodoroIsRunning = usePomodoroStore(s => s.isRunning);
   const [todayPomCount, setTodayPomCount] = useState(0);
   const recentMood = entries.slice(0, 7).reverse();
@@ -298,7 +305,7 @@ export default function HealthScreen() {
         const raw = await AsyncStorage.getItem(todayKey());
         if (raw) {
           const d = JSON.parse(raw);
-          if (d.water != null)        setWater(d.water);
+          // water is sourced from the "Woda" habit (see loadWater), not this blob
           if (d.steps != null)        setSteps(d.steps);
           if (d.sleepH != null)       setSleepH(d.sleepH);
           if (d.sleepM != null)       setSleepM(d.sleepM);
@@ -370,11 +377,49 @@ export default function HealthScreen() {
     });
   }, [water, steps, sleepH, sleepM, sleepQuality, weight, hcExtra, loaded]);
 
-  const updateWater = (v: number) => {
-    const next = Math.max(0, Math.min(waterGoal, v));
+  // Water lives in the "Woda" habit (glasses) so the Health screen, the Habits
+  // screen, the pet quest and Health Connect hydration all share one number.
+  const loadWater = useCallback(async () => {
+    const w = await getWaterHabit();
+    setWaterHabitId(w?.id ?? null);
+    if (w) {
+      if (w.dailyGoal && w.dailyGoal > 0) setWaterGoal(w.dailyGoal);   // habit's goal wins, keeps it single-source
+      const counts = await getCounts(todayDate());
+      setWater(counts[w.id] ?? 0);
+    }
+  }, []);
+  useFocusEffect(useCallback(() => { loadWater(); }, [loadWater]));
+  useEffect(() => { if (waterSyncVersion > 0) loadWater(); }, [waterSyncVersion, loadWater]);
+
+  // First tap when there's no water habit yet: create the "Woda" preset so the
+  // tracker is never a dead end.
+  const ensureWaterHabit = async (): Promise<string | null> => {
+    const existing = await getWaterHabit();
+    if (existing) { setWaterHabitId(existing.id); return existing.id; }
+    const list = await getHabits();
+    const habit: Habit = {
+      id: Date.now().toString(),
+      title: 'Woda', color: '#60A5FA', icon: 'droplets',
+      type: 'count', kind: 'water', dailyGoal: waterGoal || 8, unit: 'szkl.',
+      createdAt: new Date().toISOString(),
+    };
+    await saveHabits([...list, habit]);
+    setWaterHabitId(habit.id);
+    return habit.id;
+  };
+
+  const updateWater = async (v: number) => {
+    const next = Math.max(0, v);   // no upper cap — stays in sync with the habit even past goal
     setWater(next);
-    if (next === waterGoal) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
+    if (next === waterGoal && v > water) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
     else haptic.tap();
+    const id = waterHabitId ?? await ensureWaterHabit();
+    if (!id) return;
+    const date = todayDate();
+    const counts = await getCounts(date);
+    counts[id] = next;
+    await setCounts(date, counts);
+    bumpHabits();   // notify the Habits screen + pet
   };
 
   // Nudge weight. When today isn't logged yet, start from the last known weight
@@ -761,8 +806,32 @@ export default function HealthScreen() {
           </GlassCard>
         )}
 
-        {/* Water moved into the Habits system — the "Woda" count habit (fed by
-            Health Connect hydration). Manage it on the Nawyki screen. */}
+        {/* Water — one number shared with the "Woda" habit in Nawyki + fed by
+            Health Connect hydration; also drives the pet's hydration quest. */}
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
+          <View style={styles.cardRow}>
+            <Droplets size={13} color={colors.text.muted} />
+            <Text style={styles.cardLabel}>NAWODNIENIE</Text>
+            <View style={{ flex: 1 }} />
+            <View style={styles.goalChip}>
+              <Text style={styles.goalChipText}>cel {waterGoal} szkl.</Text>
+            </View>
+          </View>
+
+          <View style={styles.waterBody}>
+            <PressableScale onPress={() => updateWater(water - 1)} style={styles.weightBtn} disabled={water <= 0}>
+              <Minus size={16} color={water <= 0 ? colors.border.default : colors.text.muted} />
+            </PressableScale>
+            <WaterGauge
+              ml={water * GLASS_ML} goalMl={waterGoal * GLASS_ML}
+              accent="#46B0DE" muted={colors.text.muted} textColor={colors.text.primary} size={150}
+            />
+            <PressableScale onPress={() => updateWater(water + 1)} style={styles.weightBtn}>
+              <Plus size={16} color={colors.text.muted} />
+            </PressableScale>
+          </View>
+          <Text style={[styles.waterSub, { textAlign: 'center', marginTop: spacing[3] }]}>{water}/{waterGoal} szklanek · dzielone z nawykiem „Woda"</Text>
+        </GlassCard>
 
         {/* Weight */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -1599,6 +1668,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   bodyCompTile: { flexBasis: '47%', flexGrow: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
   bodyCompLabel: { fontSize: 10, color: c.text.muted },
+  waterBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4], marginTop: spacing[2] },
   weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
   weightBtn: {
     width: 36, height: 36, borderRadius: radius.md,

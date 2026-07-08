@@ -12,6 +12,7 @@ import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx } from '@/utils/quests';
 import { equippedRoom } from '@/utils/petShop';
 import { useHabits } from '@/hooks/useHabits';
+import { getWaterGlasses } from '@/utils/habits';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getHealthHistory } from '@/utils/healthHistory';
@@ -66,7 +67,7 @@ export default function Pet() {
       setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth });
     }).catch(() => {});
     getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
-    AsyncStorage.getItem(`health_${t}`).then(raw => { try { setWaterToday(raw ? Number(JSON.parse(raw).water) || 0 : 0); } catch {} }).catch(() => {});
+    getWaterGlasses(t).then(g => setWaterToday(g)).catch(() => {});
     AsyncStorage.getItem('skin_progress').then(raw => { if (raw) setCardsCollected(JSON.parse(raw).cards ?? 0); }).catch(() => {});
   }, []);
   const reload = useCallback(() => {

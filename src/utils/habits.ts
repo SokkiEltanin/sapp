@@ -5,12 +5,13 @@ const HABITS_KEY = 'habits_list';
 const cntKey    = (date: string) => `habits_cnt_${date}`;
 const legacyKey = (date: string) => `habits_done_${date}`;
 
-// How much one tap adds/removes for a count habit. Water (or any ml goal) steps by a
-// glass (250 ml) so you don't tap 250 times to reach 2500; everything else steps by 1.
+// How much one tap adds/removes for a count habit. Only an explicitly ml-based goal
+// steps by a glass (250 ml) so you don't tap 250 times; everything else — including
+// the glasses-based water habit (unit 'szkl.', goal in glasses) — steps by 1.
 export function stepFor(h: Habit): number {
   if (h.step && h.step > 0) return h.step;
   const u = (h.unit ?? '').trim().toLowerCase();
-  if (h.kind === 'water' || u === 'ml') return 250;
+  if (u === 'ml') return 250;
   return 1;
 }
 
@@ -66,4 +67,13 @@ export async function feedWaterHabit(glasses: number, date: string): Promise<voi
   if ((counts[w.id] ?? 0) === glasses) return;
   counts[w.id] = Math.max(0, glasses);
   await setCounts(date, counts);
+}
+
+// A day's water intake in glasses = the water habit's count (0 if no water habit).
+// Single source of truth shared by the Health screen, the Habits screen and the pet.
+export async function getWaterGlasses(date: string): Promise<number> {
+  const w = await getWaterHabit();
+  if (!w) return 0;
+  const counts = await getCounts(date);
+  return Math.max(0, counts[w.id] ?? 0);
 }
