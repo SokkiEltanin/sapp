@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -37,7 +37,7 @@ const T = {
 };
 
 const WEEK_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
-const GLASS_ML = 250; // one "szklanka" = 250 ml (for Health Connect hydration ⇄ glasses)
+const DEFAULT_GLASS_ML = 250; // default "szklanka" size; user-configurable in the water card
 
 const DOW_LABELS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
 const DOW_FULL = ['poniedziałki', 'wtorki', 'środy', 'czwartki', 'piątki', 'soboty', 'niedziele'];
@@ -106,6 +106,12 @@ export default function HealthScreen() {
   const [goalInput, setGoalInput]       = useState('');
   const [water, setWater]               = useState(0);            // glasses today, sourced from the "Woda" habit
   const [waterHabitId, setWaterHabitId] = useState<string | null>(null);
+  const [glassMl, setGlassMl]           = useState(DEFAULT_GLASS_ML);
+  const glassMlRef                      = useRef(DEFAULT_GLASS_ML);   // for HC callbacks (avoids stale closures)
+  const [waterCfgOpen, setWaterCfgOpen] = useState(false);
+  const [waterGoalInput, setWaterGoalInput] = useState('');
+  const [glassMlInput, setGlassMlInput]     = useState('');
+  const [waterFromWatch, setWaterFromWatch] = useState(false);
   const [steps, setSteps]               = useState(0);
   const [sleepH, setSleepH]             = useState(0);
   const [sleepM, setSleepM]             = useState(0);
@@ -184,7 +190,8 @@ export default function HealthScreen() {
           if (day.weightKg != null) setWeight(w => w || day.weightKg!);
           if (day.hydrationMl != null && day.hydrationMl > 0) {
             const ds = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
-            feedWaterHabit(Math.round(day.hydrationMl / GLASS_ML), ds).catch(() => {});
+            setWaterFromWatch(true);
+            feedWaterHabit(Math.round(day.hydrationMl / glassMlRef.current), ds).then(() => { bumpHabits(); loadWater(); }).catch(() => {});
           }
           setHcExtra(prev => ({
             ...prev, // keep manually-entered body composition the watch doesn't report
@@ -300,6 +307,8 @@ export default function HealthScreen() {
         const goals = await getHealthGoals();
         setStepGoal(goals.stepGoal);
         setWaterGoal(goals.waterGoal);
+        setGlassMl(goals.glassMl);
+        glassMlRef.current = goals.glassMl;
         setWeightGoal(goals.weightGoal);
 
         const raw = await AsyncStorage.getItem(todayKey());
@@ -422,6 +431,21 @@ export default function HealthScreen() {
     bumpHabits();   // notify the Habits screen + pet
   };
 
+  const saveWaterCfg = async () => {
+    const goal = Math.max(1, Math.round(parseFloat(waterGoalInput.replace(',', '.')) || waterGoal));
+    const ml   = Math.max(50, Math.round(parseFloat(glassMlInput.replace(',', '.')) || glassMl));
+    setWaterGoal(goal); setGlassMl(ml); glassMlRef.current = ml;
+    await saveHealthGoals({ waterGoal: goal, glassMl: ml });
+    // keep the habit's own goal in step (it's the source of truth)
+    const id = waterHabitId ?? await ensureWaterHabit();
+    if (id) {
+      const list = await getHabits();
+      await saveHabits(list.map(h => h.id === id ? { ...h, dailyGoal: goal } : h));
+      bumpHabits();
+    }
+    haptic.success(); setWaterCfgOpen(false);
+  };
+
   // Nudge weight. When today isn't logged yet, start from the last known weight
   // (you don't weigh daily) instead of from 0.
   const bumpWeight = (delta: number) => {
@@ -460,7 +484,8 @@ export default function HealthScreen() {
         if (d.weightKg != null) setWeight(d.weightKg); // manual sync: take the watch's weight
         if (d.hydrationMl != null && d.hydrationMl > 0) {
           const ds = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
-          feedWaterHabit(Math.round(d.hydrationMl / GLASS_ML), ds).catch(() => {});
+          setWaterFromWatch(true);
+          feedWaterHabit(Math.round(d.hydrationMl / glassMlRef.current), ds).then(() => { bumpHabits(); loadWater(); }).catch(() => {});
         }
         setHcExtra(prev => ({
           ...prev, // keep manually-entered body composition the watch doesn't report
@@ -533,6 +558,41 @@ export default function HealthScreen() {
             <Text style={styles.summaryLabel}>waga</Text>
           </View>
         </View>
+
+        {/* Water — the top tile. One number shared with the "Woda" habit in Nawyki,
+            fed by Health Connect hydration, and driving the pet's hydration quest. */}
+        <GlassCard padding={spacing[4]} style={styles.tealCard}>
+          <View style={styles.cardRow}>
+            <Droplets size={13} color="#46B0DE" />
+            <Text style={styles.cardLabel}>NAWODNIENIE</Text>
+            <View style={{ flex: 1 }} />
+            {waterFromWatch && (
+              <View style={styles.watchChip}><Activity size={9} color={T.accent} /><Text style={styles.watchChipText}>z zegarka</Text></View>
+            )}
+            <TouchableOpacity
+              onPress={() => { haptic.tap(); setWaterGoalInput(String(waterGoal)); setGlassMlInput(String(glassMl)); setWaterCfgOpen(true); }}
+              style={[styles.goalChip, { marginLeft: 4 }]}
+            >
+              <Text style={styles.goalChipText}>cel {waterGoal} · {glassMl} ml</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.waterBody}>
+            <PressableScale onPress={() => updateWater(water - 1)} style={styles.weightBtn} disabled={water <= 0}>
+              <Minus size={18} color={water <= 0 ? colors.border.default : colors.text.muted} />
+            </PressableScale>
+            <WaterGauge
+              ml={water * glassMl} goalMl={waterGoal * glassMl}
+              accent="#46B0DE" muted={colors.text.muted} textColor={colors.text.primary} size={158}
+            />
+            <PressableScale onPress={() => updateWater(water + 1)} style={styles.weightBtn}>
+              <Plus size={18} color={colors.text.muted} />
+            </PressableScale>
+          </View>
+          <Text style={[styles.waterSub, { textAlign: 'center', marginTop: spacing[3] }]}>
+            {water}/{waterGoal} szklanek{water > 0 ? ` · ${(water * glassMl / 1000).toFixed(1).replace('.', ',')} l` : ''} · dzielone z nawykiem „Woda"
+          </Text>
+        </GlassCard>
 
         {/* Steps hero */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -805,33 +865,6 @@ export default function HealthScreen() {
             })()}
           </GlassCard>
         )}
-
-        {/* Water — one number shared with the "Woda" habit in Nawyki + fed by
-            Health Connect hydration; also drives the pet's hydration quest. */}
-        <GlassCard padding={spacing[4]} style={styles.tealCard}>
-          <View style={styles.cardRow}>
-            <Droplets size={13} color={colors.text.muted} />
-            <Text style={styles.cardLabel}>NAWODNIENIE</Text>
-            <View style={{ flex: 1 }} />
-            <View style={styles.goalChip}>
-              <Text style={styles.goalChipText}>cel {waterGoal} szkl.</Text>
-            </View>
-          </View>
-
-          <View style={styles.waterBody}>
-            <PressableScale onPress={() => updateWater(water - 1)} style={styles.weightBtn} disabled={water <= 0}>
-              <Minus size={16} color={water <= 0 ? colors.border.default : colors.text.muted} />
-            </PressableScale>
-            <WaterGauge
-              ml={water * GLASS_ML} goalMl={waterGoal * GLASS_ML}
-              accent="#46B0DE" muted={colors.text.muted} textColor={colors.text.primary} size={150}
-            />
-            <PressableScale onPress={() => updateWater(water + 1)} style={styles.weightBtn}>
-              <Plus size={16} color={colors.text.muted} />
-            </PressableScale>
-          </View>
-          <Text style={[styles.waterSub, { textAlign: 'center', marginTop: spacing[3] }]}>{water}/{waterGoal} szklanek · dzielone z nawykiem „Woda"</Text>
-        </GlassCard>
 
         {/* Weight */}
         <GlassCard padding={spacing[4]} style={styles.tealCard}>
@@ -1148,6 +1181,47 @@ export default function HealthScreen() {
               }}
               activeOpacity={0.8}
             >
+              <Text style={wm.saveBtnText}>Zapisz</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Water settings — goal (glasses) + glass size (ml) */}
+      <Modal visible={waterCfgOpen} transparent animationType="fade" onRequestClose={() => setWaterCfgOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <Pressable style={wm.overlay} onPress={() => setWaterCfgOpen(false)} />
+          <View style={wm.sheet}>
+            <Text style={wm.title}>Woda</Text>
+            <Text style={[wm.unit, { marginBottom: 4 }]}>Cel dzienny (szklanki)</Text>
+            <TextInput
+              style={wm.input}
+              value={waterGoalInput}
+              onChangeText={setWaterGoalInput}
+              keyboardType="number-pad"
+              placeholder="np. 8"
+              placeholderTextColor={colors.text.muted}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={[wm.unit, { marginTop: spacing[3], marginBottom: 4 }]}>Pojemność szklanki (ml)</Text>
+            <TextInput
+              style={wm.input}
+              value={glassMlInput}
+              onChangeText={setGlassMlInput}
+              keyboardType="number-pad"
+              placeholder="np. 250"
+              placeholderTextColor={colors.text.muted}
+              selectTextOnFocus
+            />
+            <Text style={[wm.unit, { marginTop: spacing[2] }]}>
+              {(() => {
+                const g = Math.max(1, Math.round(parseFloat(waterGoalInput.replace(',', '.')) || waterGoal));
+                const ml = Math.max(50, Math.round(parseFloat(glassMlInput.replace(',', '.')) || glassMl));
+                return `Cel = ${(g * ml / 1000).toFixed(1).replace('.', ',')} l dziennie`;
+              })()}
+            </Text>
+            <TouchableOpacity style={wm.saveBtn} onPress={saveWaterCfg} activeOpacity={0.8}>
               <Text style={wm.saveBtnText}>Zapisz</Text>
             </TouchableOpacity>
           </View>

@@ -2,12 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface HealthGoals {
   stepGoal: number;
-  waterGoal: number;
+  waterGoal: number;  // daily water goal in glasses
+  glassMl: number;    // how many ml one glass holds (for ml ⇄ glasses + watch hydration)
   weightGoal: number; // target weight in kg, 0 = not set
 }
 
 const KEY = 'health_goals';
-const DEFAULTS: HealthGoals = { stepGoal: 10_000, waterGoal: 8, weightGoal: 0 };
+const DEFAULTS: HealthGoals = { stepGoal: 10_000, waterGoal: 8, glassMl: 250, weightGoal: 0 };
 
 export async function getHealthGoals(): Promise<HealthGoals> {
   try {
@@ -17,6 +18,7 @@ export async function getHealthGoals(): Promise<HealthGoals> {
     return {
       stepGoal:  parsed.stepGoal  > 0 ? parsed.stepGoal  : DEFAULTS.stepGoal,
       waterGoal: parsed.waterGoal > 0 ? parsed.waterGoal : DEFAULTS.waterGoal,
+      glassMl:   parsed.glassMl   > 0 ? parsed.glassMl   : DEFAULTS.glassMl,
       weightGoal: parsed.weightGoal > 0 ? parsed.weightGoal : 0,
     };
   } catch {
