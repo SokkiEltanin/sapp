@@ -42,9 +42,27 @@ export default function CatArt({
   const sway = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
   const tailWag = useRef(new Animated.Value(0)).current;
+  const react = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
   const asleep = expression === 'sleeping';
   const closed = blink || asleep;
+
+  // mood transition — when the expression changes, the cat blinks (masking the
+  // instant mouth/eye swap so it reads as a deliberate change) and gives a little
+  // "!" reaction pulse. Skipped on first mount so it doesn't fire on load.
+  const firstMood = useRef(true);
+  useEffect(() => {
+    if (firstMood.current) { firstMood.current = false; return; }
+    if (!animate) return;
+    setBlink(true);
+    const t = setTimeout(() => setBlink(false), 160);
+    react.setValue(0);
+    Animated.sequence([
+      Animated.timing(react, { toValue: 1, duration: 130, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(react, { toValue: 0, friction: 4, tension: 90, useNativeDriver: true }),
+    ]).start();
+    return () => clearTimeout(t);
+  }, [expression, animate]);
 
   // tail wag — a JS-driven SVG rotation around the tail base (native driver can't
   // animate SVG props). Slower + smaller while asleep.
@@ -96,11 +114,13 @@ export default function CatArt({
   const bob = breathe.interpolate({ inputRange: [0, 1], outputRange: [size * 0.012, -size * 0.012] });
   const rot = sway.interpolate({ inputRange: [-1, 1], outputRange: ['-2deg', '2deg'] });
   const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.13] });
+  const reactScale = react.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+  const reactY = react.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.03] });
 
   return (
     <Pressable onPress={onTap} hitSlop={12}>
       <Animated.View style={{ transform: [{ translateY: hopY }] }}>
-        <Animated.View style={{ transform: [{ translateY: bob }, { rotate: rot }, { scale }] }}>
+        <Animated.View style={{ transform: [{ translateY: bob }, { translateY: reactY }, { rotate: rot }, { scale }, { scale: reactScale }] }}>
           <Svg width={size} height={size} viewBox="0 0 2000 2000">
             {/* tail (wags around its base) */}
             <AG rotation={tailRot as any} originX={1200} originY={1240}>
