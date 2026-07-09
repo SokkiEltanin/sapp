@@ -226,7 +226,7 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         if (!inScope(e, ctx.scope) || !pred(e)) continue;
         const items = e.receiptItems ?? [];
         if (items.length > 0) {
-          for (const it of items) if (countsForConsumption(it) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+          for (const it of items) if (countsForConsumption(it) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price;
         } else if (e.tags?.includes('słodycze')) {
           total += e.amount;
         }

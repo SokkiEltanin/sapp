@@ -234,7 +234,7 @@ function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = '
     if (e.type && e.type !== 'expense') continue;
     if (!set.has(e.date.slice(0, 10))) continue;
     for (const it of (e.receiptItems ?? [])) {
-      if (consumesInScope(it, scope) && it.tags.some(t => SWEETS_TAGS.includes(t))) total += it.price;
+      if (consumesInScope(it, scope) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price;
     }
   }
   return total;

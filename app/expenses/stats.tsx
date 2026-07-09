@@ -206,7 +206,7 @@ export default function StatsScreen() {
       if (SKIP_BILL_CATS.includes(e.category as ExpenseCategory)) continue;
       const items = e.receiptItems;
       if (items?.length) {
-        for (const it of items) for (const tag of it.tags) byTag[tag] = (byTag[tag] ?? 0) + it.price;
+        for (const it of items) for (const tag of (it.tags ?? [])) byTag[tag] = (byTag[tag] ?? 0) + it.price;
       } else {
         for (const tag of e.tags) if (tag) byTag[tag] = (byTag[tag] ?? 0) + e.amount;
       }
@@ -276,12 +276,12 @@ export default function StatsScreen() {
 
     for (const e of thisGroc) {
       for (const it of (e.receiptItems ?? [])) {
-        for (const tag of it.tags) { if (byTag[tag]) byTag[tag].curr += it.price; }
+        for (const tag of (it.tags ?? [])) { if (byTag[tag]) byTag[tag].curr += it.price; }
       }
     }
     for (const e of prevGroc) {
       for (const it of (e.receiptItems ?? [])) {
-        for (const tag of it.tags) { if (byTag[tag]) byTag[tag].prev += it.price; }
+        for (const tag of (it.tags ?? [])) { if (byTag[tag]) byTag[tag].prev += it.price; }
       }
     }
     return { thisTotal, prevTotal, weekTotal, dailyRate, projection, daysElapsed, daysInMonth, byTag };
