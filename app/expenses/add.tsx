@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { goBackOrHome } from '@/utils/nav';
 import { X, Check, Tag, TrendingDown, TrendingUp, ClipboardList } from 'lucide-react-native';
 import { haptic } from '@/utils/haptics';
 import * as LucideIcons from 'lucide-react-native';
@@ -244,7 +245,7 @@ export default function AddExpenseModal() {
         }
       }
       haptic.success();
-      router.back();
+      goBackOrHome();
       InteractionManager.runAfterInteractions(async () => {
         addExpense(expense);
         if (txType === 'expense') {
@@ -278,7 +279,7 @@ export default function AddExpenseModal() {
       <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
-          <PressableScale onPress={() => router.back()} style={styles.closeBtn}>
+          <PressableScale onPress={() => goBackOrHome()} style={styles.closeBtn}>
             <X size={20} color={colors.text.secondary} />
           </PressableScale>
           <Text style={styles.headerTitle}>

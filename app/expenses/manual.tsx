@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '@/utils/nav';
 import { X, Plus, Trash2, Check, ShoppingCart } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
@@ -498,7 +499,7 @@ export default function ManualReceiptScreen() {
       addExpense(expense);
       haptic.success();
       toast.success(`Zapisano ${receiptItems.length} pozycji · ${totalAmount.toFixed(2)} zł`);
-      router.back();
+      goBackOrHome();
 
       // Budget alerts - non-blocking, fire after navigation
       getBudgets().then(budgets => {
@@ -527,7 +528,7 @@ export default function ManualReceiptScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); goBackOrHome(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <View style={styles.headerCenter}>

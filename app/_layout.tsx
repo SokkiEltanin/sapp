@@ -3,7 +3,7 @@ import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, ScrollView, StyleSheet, AppState, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, AppState, Alert, Pressable } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
@@ -32,7 +32,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
     if (!error) return this.props.children;
     return (
       <View style={eb.wrap}>
-        <Text style={eb.title}>Crash — skopiuj ten błąd i wyślij</Text>
+        <Text style={eb.title}>Coś się wykrzaczyło</Text>
+        <View style={eb.btnRow}>
+          <Pressable style={[eb.btn, eb.btnPrimary]} onPress={() => { this.setState({ error: null }); try { router.replace('/(tabs)' as any); } catch {} }}>
+            <Text style={eb.btnPrimaryTxt}>Wróć do apki</Text>
+          </Pressable>
+          <Pressable style={eb.btn} onPress={() => { Updates.reloadAsync().catch(() => {}); }}>
+            <Text style={eb.btnTxt}>Przeładuj</Text>
+          </Pressable>
+        </View>
+        <Text style={eb.hint}>Zapis wykonał się przed błędem — dane są bezpieczne. Skopiuj poniższe i wyślij, żebym to naprawił:</Text>
         <ScrollView style={eb.scroll}>
           <Text style={eb.msg}>{(error as Error).message}</Text>
           <Text style={eb.stack}>{(error as Error).stack}</Text>
@@ -44,7 +53,13 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 const eb = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: '#0D0D0D', padding: 20, paddingTop: 60 },
-  title: { color: '#FF5A5F', fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  title: { color: '#FF5A5F', fontSize: 18, fontWeight: '800', marginBottom: 14 },
+  btnRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  btn: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: '#333', backgroundColor: '#1A1A1A' },
+  btnPrimary: { backgroundColor: '#2AC68F', borderColor: '#2AC68F' },
+  btnPrimaryTxt: { color: '#07160F', fontSize: 14, fontWeight: '800' },
+  btnTxt: { color: '#ddd', fontSize: 14, fontWeight: '700' },
+  hint: { color: '#8A93A8', fontSize: 12, lineHeight: 17, marginBottom: 10 },
   scroll: { flex: 1 },
   msg: { color: '#fff', fontSize: 14, fontWeight: '600', marginBottom: 8 },
   stack: { color: '#aaa', fontSize: 11, lineHeight: 16 },

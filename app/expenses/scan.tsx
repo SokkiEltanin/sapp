@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { goBackOrHome } from '@/utils/nav';
 import { X, Check, Tag, PenLine, Plus, Trash2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -435,10 +436,10 @@ export default function ScanReceiptModal() {
         if (taggedCustom.length > 0) saveCustomTagsToMemory(taggedCustom).catch(() => {});
       }
       haptic.success();
-      router.back();
+      goBackOrHome();   // deep-linked scan has no back stack → don't leave a black screen
     } catch (e: any) {
       setSaving(false);
-      Alert.alert('Błąd', e.message);
+      Alert.alert('Błąd', e?.message ?? 'Nie udało się zapisać paragonu');
     }
   };
 
@@ -471,7 +472,7 @@ export default function ScanReceiptModal() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
       <View style={styles.header}>
-        <PressableScale onPress={() => { haptic.tap(); router.back(); }} style={styles.closeBtn}>
+        <PressableScale onPress={() => { haptic.tap(); goBackOrHome(); }} style={styles.closeBtn}>
           <X size={20} color={colors.text.secondary} />
         </PressableScale>
         <Text style={styles.title}>Wklej paragon</Text>
