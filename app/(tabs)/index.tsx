@@ -317,13 +317,15 @@ function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
 const WAVE_W = 320;
 const WAVE_H = 64;
 
-function buildWavePath(data: number[], max: number) {
+function buildWavePath(data: number[], max: number, min = 0) {
   // Plot points at COLUMN CENTRES ((i+0.5)/n) so they line up with the flex:1
   // value/label rows underneath. (Edge-to-edge i/(n-1) drifts out of alignment.)
   const n = data.length;
+  const span = max - min || 1;
+  const yFor = (v: number) => WAVE_H - 6 - (Math.max(0, Math.min(1, (v - min) / span)) * (WAVE_H - 18));
   const pts = data.map((v, i) => ({
     x: ((i + 0.5) / n) * WAVE_W,
-    y: WAVE_H - 6 - ((v / max) * (WAVE_H - 18)),
+    y: yFor(v),
   }));
   let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
   for (let i = 1; i < pts.length; i++) {
@@ -377,12 +379,27 @@ function DualWaveChart({ data1, data2, color1, color2, independent }: {
   );
 }
 
-function WaveChart({ data, color, dotColors, target }: { data: number[]; color: string; dotColors?: (string | null)[]; target?: number }) {
+function WaveChart({ data, color, dotColors, target, zoom }: { data: number[]; color: string; dotColors?: (string | null)[]; target?: number; zoom?: boolean }) {
   if (data.length < 2) return null;
-  const max = Math.max(...data, target ?? 0, 1);
-  const { line, fill, pts } = buildWavePath(data, max);
+  let min = 0;
+  let max = Math.max(...data, target ?? 0, 1);
+  // zoom (e.g. weight): when the values sit in a narrow band well above 0, scale to
+  // that band so small week-to-week changes are actually visible instead of a flat line.
+  if (zoom) {
+    const nz = data.filter(v => v > 0);
+    if (nz.length >= 2) {
+      const lo = Math.min(...nz), hi = Math.max(...nz, target && target > 0 ? target : 0);
+      if (hi - lo > 0 && lo > hi * 0.3) {
+        const pad = (hi - lo) * 0.35;
+        min = Math.max(0, lo - pad);
+        max = hi + pad;
+      }
+    }
+  }
+  const span = max - min || 1;
+  const { line, fill, pts } = buildWavePath(data, max, min);
   const gradId = `wg_${color.replace('#', '')}`;
-  const targetY = target && target > 0 ? WAVE_H - 6 - ((target / max) * (WAVE_H - 18)) : null;
+  const targetY = target && target > 0 ? WAVE_H - 6 - (Math.max(0, Math.min(1, (target - min) / span)) * (WAVE_H - 18)) : null;
   return (
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
       <Defs>
@@ -1288,7 +1305,7 @@ export default function DashboardScreen() {
               </Text>
             ))}
           </View>
-          <WaveChart data={ser.values} color={accentColor} target={t.target} />
+          <WaveChart data={ser.values} color={accentColor} target={t.target} zoom={t.metric === 'weight'} />
           <View style={s.waveLabels}>
             {ser.labels.map((l, i) => (
               <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>
@@ -1337,7 +1354,7 @@ export default function DashboardScreen() {
               )}
               <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(thenV, ser.unit)}</Text><Text style={s.statCmpKey}>{thenL}</Text></View>
             </View>
-            <WaveChart data={ser.values} color={accentColor} />
+            <WaveChart data={ser.values} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>
               {ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, (i === ser.labels.length - 1 || i === thenIdx) && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}
             </View>
@@ -1365,7 +1382,7 @@ export default function DashboardScreen() {
               )}
               <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(avgV, ser.unit)}</Text><Text style={s.statCmpKey}>Twoja średnia</Text></View>
             </View>
-            <WaveChart data={ser.values} color={accentColor} />
+            <WaveChart data={ser.values} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>{ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}</View>
           </View>
         );
@@ -3635,8 +3652,8 @@ export default function DashboardScreen() {
                         const inAvg = !r.excluded && r.hours > 0;
                         return (
                           <View key={r.month} style={s.wmRow}>
-                            <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : ''}</Text>
-                            <Text style={s.wmH}>{Math.round(r.amount)} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
+                            <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]} numberOfLines={1}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : ''}</Text>
+                            <Text style={s.wmH} numberOfLines={1}>{Math.round(r.amount)} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
                             <Text style={[s.wmZl, { color: inAvg ? '#FBBF24' : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)} zł/h` : '—'}</Text>
                           </View>
                         );
@@ -4425,10 +4442,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   wpTotalLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   wpTotalVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.4 },
-  wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 8 },
   wmMonth: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.secondary },
-  wmH: { width: 70, textAlign: 'right', fontSize: 13, fontWeight: '700', color: c.text.primary },
-  wmZl: { width: 90, textAlign: 'right', fontSize: 13, fontWeight: '800', color: c.text.primary },
+  wmH: { width: 118, textAlign: 'right', fontSize: 12.5, fontWeight: '700', color: c.text.primary },
+  wmZl: { width: 72, textAlign: 'right', fontSize: 13, fontWeight: '800', color: c.text.primary },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
