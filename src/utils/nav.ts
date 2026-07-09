@@ -8,5 +8,9 @@ export function goBackOrHome() {
   try {
     if (router.canGoBack()) { router.back(); return; }
   } catch {}
-  try { router.replace('/(tabs)' as any); } catch {}
+  // No back stack (deep-link entry) → replace to the dashboard. '/(tabs)/' is the
+  // form that actually resolves (matches the notification-tap navigation); fall back
+  // to '/' if anything about that path changes.
+  try { router.replace('/(tabs)/' as any); return; } catch {}
+  try { router.replace('/' as any); } catch {}
 }

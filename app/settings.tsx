@@ -1508,6 +1508,28 @@ export default function SettingsScreen() {
               </View>
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
+            <PressableScale
+              onPress={async () => {
+                const raw = await AsyncStorage.getItem('last_crash').catch(() => null);
+                if (!raw) { Alert.alert('Ostatni błąd', 'Brak zapisanego crasha — świetnie.'); return; }
+                try {
+                  const c = JSON.parse(raw);
+                  Alert.alert(`Ostatni błąd · ${new Date(c.at).toLocaleString('pl-PL')}`,
+                    `${c.message}\n\n${(c.stack || c.component || '').slice(0, 1200)}`,
+                    [{ text: 'Wyczyść', onPress: () => AsyncStorage.removeItem('last_crash').catch(() => {}) }, { text: 'OK' }]);
+                } catch { Alert.alert('Ostatni błąd', raw.slice(0, 1400)); }
+              }}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#F59E0B18' }]}>
+                <LucideIcons.Bug size={16} color="#F59E0B" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Pokaż ostatni błąd</Text>
+                <Text style={styles.rowSub}>Po czarnym ekranie — pokaż i wyślij mi treść</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
           </View>
         </CollapsibleSection>
 

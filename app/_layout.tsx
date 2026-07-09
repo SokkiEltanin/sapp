@@ -25,9 +25,35 @@ import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 import { useUiActions } from '@/store/uiActions';
 
+function persistCrash(error: any, extra?: string) {
+  try {
+    AsyncStorage.setItem('last_crash', JSON.stringify({
+      at: new Date().toISOString(),
+      message: error?.message ?? String(error),
+      stack: (error?.stack ?? '').slice(0, 4000),
+      component: (extra ?? '').slice(0, 2000),
+    })).catch(() => {});
+  } catch {}
+}
+
+// Catch JS errors that escape React's render tree (async, event handlers, native
+// bridge) too — those can leave a black screen the ErrorBoundary never sees. We
+// persist them so the user can surface the text from Settings after a restart.
+(() => {
+  const g: any = global as any;
+  if (g.__sappErrHandlerInstalled || !g.ErrorUtils?.setGlobalHandler) return;
+  g.__sappErrHandlerInstalled = true;
+  const prev = g.ErrorUtils.getGlobalHandler?.();
+  g.ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    persistCrash(error, isFatal ? 'FATAL' : '');
+    prev?.(error, isFatal);
+  });
+})();
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: { componentStack?: string }) { persistCrash(error, info?.componentStack); }
   render() {
     const { error } = this.state;
     if (!error) return this.props.children;
