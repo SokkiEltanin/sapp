@@ -58,15 +58,19 @@ export async function getWaterHabit(): Promise<Habit | null> {
     ?? null;
 }
 
-// Set today's count for the water habit (no-op if there's no water habit).
-// Used by the Health screen to feed it from Health Connect hydration.
-export async function feedWaterHabit(glasses: number, date: string): Promise<void> {
+// Feed the water habit from Health Connect hydration. Takes the MAX of what's stored
+// and the watch value, so a background/foreground sync never clobbers water you added
+// by hand (and vice-versa) — within a day the count only ever grows. No-op without a
+// water habit. Returns true if it changed anything.
+export async function feedWaterHabit(glasses: number, date: string): Promise<boolean> {
   const w = await getWaterHabit();
-  if (!w) return;
+  if (!w) return false;
   const counts = await getCounts(date);
-  if ((counts[w.id] ?? 0) === glasses) return;
-  counts[w.id] = Math.max(0, glasses);
+  const next = Math.max(counts[w.id] ?? 0, Math.max(0, glasses));
+  if ((counts[w.id] ?? 0) === next) return false;
+  counts[w.id] = next;
   await setCounts(date, counts);
+  return true;
 }
 
 // A day's water intake in glasses = the water habit's count (0 if no water habit).

@@ -1,5 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isHealthConnectAvailable, readHealthRange } from './healthConnectService';
+import { isHealthConnectAvailable, readHealthRange, readHealthDay } from './healthConnectService';
+import { feedWaterHabit } from '@/utils/habits';
+import { getHealthGoals } from '@/utils/healthGoals';
+import { useHabitsSync } from '@/store/habitsSync';
 
 // Mirrors the Zdrowie screen's per-day cache (`health_YYYY-MM-DD`) from the watch
 // WITHOUT any UI. The screen only ever wrote *today's* key while it was open, so
@@ -63,6 +66,22 @@ export async function autoSyncHealth(days = 30, force = false): Promise<number> 
 
     if (writes.length) await AsyncStorage.multiSet(writes);
     if (latestWeight != null) await AsyncStorage.setItem('health_last_weight', String(latestWeight)).catch(() => {});
+
+    // Water: pull today's Health Connect hydration into the "Woda" habit so it updates
+    // in the background too — not only when Zdrowie is opened + pulled-to-refresh. The
+    // watch can only supply this if water is logged in Samsung Health (no wearable
+    // measures intake); feedWaterHabit uses max, so it never clobbers manual taps.
+    try {
+      const today = await readHealthDay(new Date());
+      if (today?.hydrationMl && today.hydrationMl > 0) {
+        const { glassMl } = await getHealthGoals();
+        const d = new Date();
+        const todayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const changed = await feedWaterHabit(Math.round(today.hydrationMl / (glassMl || 250)), todayKey);
+        if (changed) useHabitsSync.getState().bump();
+      }
+    } catch {}
+
     _lastRun = now;
     return writes.length;
   } catch {

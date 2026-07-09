@@ -368,19 +368,22 @@ export default function ScanReceiptModal() {
       // day + store, enrich THAT one with the receipt instead of adding a duplicate.
       const store0 = receipt.storeName?.toLowerCase().split(/\s+/).filter(Boolean)[0] ?? '';
       const dTime = new Date(dateParsed).getTime();
-      const existingBank = useExpensesStore.getState().expenses.find(e => {
-        if (!(e.bankMatched && !e.receiptItems && (e.type === 'expense' || !e.type))) return false;
-        if (Math.abs(e.amount - roundedTotal) > 0.011) return false;
-        if (!e.date || !sameLocalDay(new Date(e.date).getTime(), dTime)) return false;
-        // store check: match if the receipt has no store, if the bank tx has no store
-        // to compare against (fall back to amount+day), or if either name contains the
-        // other's first word. (Guard the empty string — includes('') is always true.)
-        const eStore0 = (e.storeName ?? '').toLowerCase().split(/\s+/).filter(Boolean)[0] ?? '';
-        return !store0
-          || !eStore0
-          || `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase().includes(store0)
-          || store0.includes(eStore0);
-      });
+      // Match a bank-created expense on AMOUNT + SAME DAY (the bank's merchant string
+      // and the receipt's store name are often totally different — e.g. "ZABKA
+      // Z1234 K.1" vs "Żabka" — so the store name must NOT gate the match, only
+      // break ties when several transactions share the exact amount+day).
+      const candidates = useExpensesStore.getState().expenses.filter(e =>
+        e.bankMatched && !e.receiptItems && (e.type === 'expense' || !e.type) &&
+        Math.abs(e.amount - roundedTotal) <= 0.011 &&
+        !!e.date && sameLocalDay(new Date(e.date).getTime(), dTime),
+      );
+      const storeMatch = store0
+        ? candidates.find(e => {
+            const es = (e.storeName ?? '').toLowerCase().split(/\s+/).filter(Boolean)[0] ?? '';
+            return `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase().includes(store0) || (!!es && store0.includes(es));
+          })
+        : undefined;
+      const existingBank = storeMatch ?? candidates[0];
 
       if (existingBank) {
         const patch: any = {
