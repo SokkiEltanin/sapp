@@ -760,6 +760,12 @@ export default function DashboardScreen() {
   const [paydayDismissedDate, setPaydayDismissedDate] = useState<string | null>(null);
   const [paydayModal, setPaydayModal] = useState(false);
   const [paydayInput, setPaydayInput] = useState('');
+  // Tapping the "Wypłata?" notification opens the add-paycheck modal directly, so it
+  // works even if the on-dashboard prompt tile isn't currently in the day window.
+  const paydayTrigger = useUiActions(s => s.paydayTrigger);
+  useEffect(() => {
+    if (paydayTrigger > 0) { setPaydayInput(''); setPaydayModal(true); useUiActions.setState({ paydayTrigger: 0 }); }
+  }, [paydayTrigger]);
 
   // Debts — ask on the due day whether someone returned the money.
   const [debts, setDebts] = useState<Debt[]>([]);

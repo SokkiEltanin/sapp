@@ -23,6 +23,7 @@ import { drainBankNotifications } from '@/services/bankNotificationDrain';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
+import { useUiActions } from '@/store/uiActions';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
@@ -259,6 +260,9 @@ export default function RootLayout() {
         router.push('/(tabs)/finances' as any);
       } else if (screen === 'index') {
         router.push('/(tabs)/' as any);       // work shift → dashboard (live earnings widget)
+      } else if (screen === 'payday') {
+        router.push('/(tabs)/' as any);       // → dashboard, then open the "add paycheck" modal directly
+        setTimeout(() => useUiActions.getState().openPaydayPrompt(), 400);
       } else if (screen === 'work' || screen === 'stats') {
         router.push('/(tabs)/stats' as any);
       } else if (screen === 'month-cards') {

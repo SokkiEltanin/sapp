@@ -238,13 +238,26 @@ export const useDashboardLayout = create<DashboardLayoutState>()(
 // append any newly-added default sections, keep valid custom-tile ids, and drop
 // ids that no longer exist. This keeps old layouts working across app updates.
 export function effectiveOrder(order: string[], customTiles: CustomTile[]): string[] {
+  const DEFAULTS = DEFAULT_DASHBOARD_SECTIONS as readonly string[];
   const customIds = new Set(customTiles.map(t => t.id));
-  const known = (id: string) =>
-    (DEFAULT_DASHBOARD_SECTIONS as readonly string[]).includes(id) || customIds.has(id);
+  const known = (id: string) => DEFAULTS.includes(id) || customIds.has(id);
   const kept = order.filter(known);
-  // append default sections missing from the stored order (new in an update)
-  for (const id of DEFAULT_DASHBOARD_SECTIONS) if (!kept.includes(id)) kept.push(id);
-  // append custom tiles missing from the order (safety)
+  // Insert default sections missing from the stored order (new in an app update)
+  // at their NATURAL position — right after the nearest earlier default that's
+  // present — instead of dumping them at the bottom (that buried e.g. the payday
+  // prompt for layouts saved before it existed). User-arranged sections don't move.
+  const defIdx = (id: string) => DEFAULTS.indexOf(id);
+  for (const id of DEFAULTS) {
+    if (kept.includes(id)) continue;
+    const di = defIdx(id);
+    let pos = 0;
+    for (let k = 0; k < kept.length; k++) {
+      const kd = defIdx(kept[k]);
+      if (kd !== -1 && kd < di) pos = k + 1;
+    }
+    kept.splice(pos, 0, id);
+  }
+  // prepend custom tiles missing from the order (safety)
   for (const id of customIds) if (!kept.includes(id)) kept.unshift(id);
   return kept;
 }

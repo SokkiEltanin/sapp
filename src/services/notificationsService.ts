@@ -210,7 +210,7 @@ export const notificationsService = {
       if (date.getTime() <= now.getTime()) date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0, 0);
       await Notifications.scheduleNotificationAsync({
         identifier: 'payday',
-        content: { title: 'Wypłata?', body: 'Czy dostałeś już wypłatę? Dotknij, by dodać do przychodów.', data: { screen: 'index' } },
+        content: { title: 'Wypłata?', body: 'Czy dostałeś już wypłatę? Dotknij, by dodać do przychodów.', data: { screen: 'payday' } },
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
       });
     } catch {}
