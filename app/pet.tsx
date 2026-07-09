@@ -194,7 +194,7 @@ export default function Pet() {
               ))}
             </LinearGradient>
           )}
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 56} equipped={worn} />
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} />
         </View>
 
         {/* level */}
@@ -338,8 +338,8 @@ const makeS = (c: any) => StyleSheet.create({
   shopBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A78BFA18', marginLeft: 6 },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[8], alignItems: 'center' },
 
-  stage: { alignItems: 'center', justifyContent: 'center', height: 250, marginTop: spacing[2], width: '100%' },
-  room: { position: 'absolute', width: 250, height: 200, borderRadius: 26, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
+  room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2] },
   name: { fontSize: 24, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
