@@ -106,6 +106,7 @@ export default function HealthScreen() {
   const [goalInput, setGoalInput]       = useState('');
   const [water, setWater]               = useState(0);            // glasses today, sourced from the "Woda" habit
   const [waterHabitId, setWaterHabitId] = useState<string | null>(null);
+  const waterRef                        = useRef(0);                 // authoritative today count (rapid +/- accumulate)
   const [glassMl, setGlassMl]           = useState(DEFAULT_GLASS_ML);
   const glassMlRef                      = useRef(DEFAULT_GLASS_ML);   // for HC callbacks (avoids stale closures)
   const [waterCfgOpen, setWaterCfgOpen] = useState(false);
@@ -394,7 +395,11 @@ export default function HealthScreen() {
     if (w) {
       if (w.dailyGoal && w.dailyGoal > 0) setWaterGoal(w.dailyGoal);   // habit's goal wins, keeps it single-source
       const counts = await getCounts(todayDate());
-      setWater(counts[w.id] ?? 0);
+      const n = counts[w.id] ?? 0;
+      waterRef.current = n;
+      setWater(n);
+    } else {
+      waterRef.current = 0;
     }
   }, []);
   useFocusEffect(useCallback(() => { loadWater(); }, [loadWater]));
@@ -417,16 +422,20 @@ export default function HealthScreen() {
     return habit.id;
   };
 
-  const updateWater = async (v: number) => {
-    const next = Math.max(0, v);   // no upper cap — stays in sync with the habit even past goal
-    setWater(next);
-    if (next === waterGoal && v > water) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
-    else haptic.tap();
+  // delta-based so rapid +/- taps accumulate off the authoritative ref instead of a
+  // stale React value (which made double-taps register only once).
+  const bumpWater = async (delta: number) => {
     const id = waterHabitId ?? await ensureWaterHabit();
     if (!id) return;
+    const next = Math.max(0, waterRef.current + delta);
+    if (next === waterRef.current) return;
+    waterRef.current = next;
+    setWater(next);
+    if (next === waterGoal && delta > 0) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
+    else haptic.tap();
     const date = todayDate();
     const counts = await getCounts(date);
-    counts[id] = next;
+    counts[id] = waterRef.current;   // write the latest authoritative value
     await setCounts(date, counts);
     bumpHabits();   // notify the Habits screen + pet
   };
@@ -578,14 +587,14 @@ export default function HealthScreen() {
           </View>
 
           <View style={styles.waterBody}>
-            <PressableScale onPress={() => updateWater(water - 1)} style={styles.weightBtn} disabled={water <= 0}>
+            <PressableScale onPress={() => bumpWater(-1)} style={styles.weightBtn} disabled={water <= 0}>
               <Minus size={18} color={water <= 0 ? colors.border.default : colors.text.muted} />
             </PressableScale>
             <WaterGauge
               ml={water * glassMl} goalMl={waterGoal * glassMl}
               accent="#46B0DE" muted={colors.text.muted} textColor={colors.text.primary} size={158}
             />
-            <PressableScale onPress={() => updateWater(water + 1)} style={styles.weightBtn}>
+            <PressableScale onPress={() => bumpWater(1)} style={styles.weightBtn}>
               <Plus size={18} color={colors.text.muted} />
             </PressableScale>
           </View>
