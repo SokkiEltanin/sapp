@@ -1,8 +1,9 @@
-// Shop catalogue: things you buy for the blob with coins earned from quests.
-// Wearables (hat / face / held) render as emoji "stickers" on the blob; room items
-// swap the pet-page backdrop. Emoji here are intentional design pieces.
+// Shop catalogue: things you buy for the cat with coins earned from quests + tasks.
+// Hat / face / neck are custom vector accessories drawn to fit the cat (see
+// CatAccessories). Held items render as emoji "stickers"; room items swap the
+// pet-page backdrop. Emoji here are intentional design pieces.
 
-export type CosmeticSlot = 'hat' | 'face' | 'held' | 'room';
+export type CosmeticSlot = 'hat' | 'face' | 'neck' | 'held' | 'room';
 
 // Rarity tiers — the more polished / desirable the item, the higher the tier and
 // the price. Basic bits are cheap impulse buys; legendary pieces (crown, cosmos
@@ -28,17 +29,19 @@ export interface Cosmetic {
 }
 
 export const COSMETICS: Cosmetic[] = [
-  // ── Czapki ──
-  { id: 'hat_cap',    name: 'Czapka',      slot: 'hat', tier: 'basic',     cost: 25,  emoji: '🧢' },
-  { id: 'hat_bow',    name: 'Kokarda',     slot: 'hat', tier: 'basic',     cost: 30,  emoji: '🎀' },
-  { id: 'hat_top',    name: 'Cylinder',    slot: 'hat', tier: 'rare',      cost: 55,  emoji: '🎩' },
-  { id: 'hat_grad',   name: 'Biret',       slot: 'hat', tier: 'rare',      cost: 60,  emoji: '🎓' },
-  { id: 'hat_crown',  name: 'Korona',      slot: 'hat', tier: 'legendary', cost: 180, emoji: '👑' },
+  // ── Czapki (custom, fitted to the cat) ──
+  { id: 'hat_beanie', name: 'Czapka zimowa',      slot: 'hat', tier: 'basic',     cost: 30,  emoji: '🧢' },
+  { id: 'hat_party',  name: 'Czapka urodzinowa',  slot: 'hat', tier: 'rare',      cost: 50,  emoji: '🎉' },
+  { id: 'hat_beret',  name: 'Beret',              slot: 'hat', tier: 'rare',      cost: 60,  emoji: '🎨' },
+  { id: 'hat_crown',  name: 'Korona',             slot: 'hat', tier: 'legendary', cost: 180, emoji: '👑' },
 
-  // ── Twarz ──
-  { id: 'face_glass', name: 'Okularki',    slot: 'face', tier: 'basic',    cost: 25,  emoji: '👓' },
-  { id: 'face_shade', name: 'Słoneczne',   slot: 'face', tier: 'rare',     cost: 50,  emoji: '🕶️' },
-  { id: 'face_dis',   name: 'Przebranie',  slot: 'face', tier: 'epic',     cost: 90,  emoji: '🥸' },
+  // ── Twarz (custom) ──
+  { id: 'face_round',  name: 'Okrągłe okulary',   slot: 'face', tier: 'basic',    cost: 28,  emoji: '👓' },
+  { id: 'face_shades', name: 'Okulary słoneczne', slot: 'face', tier: 'rare',     cost: 55,  emoji: '🕶️' },
+
+  // ── Szyja (custom) ──
+  { id: 'neck_collar', name: 'Obroża z dzwonkiem', slot: 'neck', tier: 'basic',   cost: 35,  emoji: '🔔' },
+  { id: 'neck_bow',    name: 'Muszka',             slot: 'neck', tier: 'rare',    cost: 48,  emoji: '🎀' },
 
   // ── Trzymane ──
   { id: 'held_balloon', name: 'Balonik',   slot: 'held', tier: 'basic',    cost: 18,  emoji: '🎈' },
@@ -56,9 +59,9 @@ export const COSMETICS: Cosmetic[] = [
 ];
 
 export const SLOT_LABEL: Record<CosmeticSlot, string> = {
-  hat: 'Czapki', face: 'Twarz', held: 'Trzymane', room: 'Pokój',
+  hat: 'Czapki', face: 'Twarz', neck: 'Szyja', held: 'Trzymane', room: 'Pokój',
 };
-export const SLOT_ORDER: CosmeticSlot[] = ['hat', 'face', 'held', 'room'];
+export const SLOT_ORDER: CosmeticSlot[] = ['hat', 'face', 'neck', 'held', 'room'];
 
 export function cosmeticById(id?: string): Cosmetic | undefined {
   return id ? COSMETICS.find(c => c.id === id) : undefined;

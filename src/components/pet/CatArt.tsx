@@ -3,7 +3,8 @@ import { Animated, Easing, Pressable, View, StyleSheet, Text } from 'react-nativ
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
-import { HatArt, GlassesArt, HeldArt } from '@/components/pet/BlobItems';
+import { HeldArt } from '@/components/pet/BlobItems';
+import CatAccessories from '@/components/pet/CatAccessories';
 
 // The companion cat — a faithful 1:1 port of the user's own Affinity drawing
 // (pupildoapki.svg), kept in named layers so it can be animated: gentle breathing
@@ -38,7 +39,7 @@ function mouthFor(expr: PetExpression): React.ReactNode {
 
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, equipped,
-}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; held?: string } }) {
+}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string } }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
@@ -148,16 +149,9 @@ export default function CatArt({
             {/* tear when sad / sweat drop when sick — outlined so they read on the blue coat */}
             {expression === 'sad' && <Path d="M726 838 q-40 74 0 116 q40 -40 0 -116 z" fill="#5AB0F0" stroke="#3E93D8" strokeWidth={5} />}
             {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
+            {/* custom accessories drawn to fit the cat (hat / face / neck) */}
+            <CatAccessories equipped={equipped} />
           </Svg>
-          {/* cosmetics — the blob-space items overlaid, aligned to the cat's head */}
-          {(equipped?.hat || equipped?.face) && (
-            <View pointerEvents="none" style={{ position: 'absolute', width: size * 0.47, height: size * 0.47 * 1.05, left: size * 0.242, top: size * 0.15 }}>
-              <Svg viewBox="0 0 100 105" width="100%" height="100%">
-                <GlassesArt id={equipped?.face} />
-                <HatArt id={equipped?.hat} />
-              </Svg>
-            </View>
-          )}
           {equipped?.held && (
             <View pointerEvents="none" style={{ position: 'absolute', width: size * 0.4, height: size * 0.4 * 1.05, left: size * 0.52, top: size * 0.44 }}>
               <Svg viewBox="0 0 100 105" width="100%" height="100%"><HeldArt id={equipped.held} /></Svg>

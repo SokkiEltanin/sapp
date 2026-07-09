@@ -35,7 +35,7 @@ export default function Pet() {
   const s = useMemo(() => makeS(c), [c]);
 
   const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimedQuests, dailyClaims, monthlyClaims, equipped } = usePetStore();
-  const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, held: equipped.held }), [equipped]);
+  const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
   const room = useMemo(() => equippedRoom(equipped), [equipped]);
   const { habits, todayDone, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
