@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, X, Award } from 'lucide-react-native';
@@ -22,7 +22,7 @@ import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration } from '@/services/healthConnectService';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography } from '@/theme';
 
@@ -1241,6 +1241,29 @@ export default function HealthScreen() {
             <TouchableOpacity style={wm.saveBtn} onPress={saveWaterCfg} activeOpacity={0.8}>
               <Text style={wm.saveBtnText}>Zapisz</Text>
             </TouchableOpacity>
+
+            {/* Definitive check: is there ANY hydration data in Health Connect, and who
+                wrote it? Tells Samsung-side gaps apart from our read side. */}
+            <TouchableOpacity
+              style={wm.diagBtn}
+              activeOpacity={0.8}
+              onPress={async () => {
+                haptic.tap();
+                const p = await probeHydration(7);
+                if (!p.permission) {
+                  Alert.alert('Woda — brak dostępu',
+                    'Sapp nie ma dostępu do „Nawodnienie" w Health Connect.\n\nHealth Connect → Uprawnienia aplikacji → Sapp → włącz „Nawodnienie", potem Synchronizuj.');
+                } else if (p.records === 0) {
+                  Alert.alert('Woda — Health Connect jest pusty',
+                    'W Health Connect NIE ma żadnych rekordów nawodnienia z ostatnich 7 dni.\n\nTo znaczy, że Samsung Health nie wysyła wody do Health Connect. Włącz w: Samsung Health → Ustawienia → Health Connect → Zarządzaj danymi → „Woda" (a jeśli nie ma „Woda" na liście — Samsung nie eksportuje tego typu i wodę trzeba wpisywać ręcznie w apce).');
+                } else {
+                  Alert.alert('Woda — znaleziono dane ✓',
+                    `Health Connect ma ${p.records} rekordów nawodnienia (razem ${(p.totalMl / 1000).toFixed(2)} l) z 7 dni.\n\nŹródło: ${p.sources.join(', ') || 'nieznane'}\n\nJeśli apka mimo to pokazuje mało — to po mojej stronie, wyślij mi ten komunikat.`);
+                }
+              }}
+            >
+              <Text style={wm.diagBtnText}>Diagnostyka wody z zegarka</Text>
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1823,4 +1846,6 @@ const makeWm = (c: any, t: any) => StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: t.accent },
+  diagBtn: { width: '100%', paddingVertical: spacing[3], marginTop: spacing[2], alignItems: 'center' },
+  diagBtnText: { fontSize: 13, fontWeight: '600', color: c.text.muted, textDecorationLine: 'underline' },
 });

@@ -122,6 +122,34 @@ export async function isPermissionGranted(recordType: string): Promise<boolean> 
   } catch { return false; }
 }
 
+// Definitive water diagnostic: read the RAW Hydration records Health Connect holds
+// for the last `days` days and report count + total + which app wrote them. This
+// answers the real question — "does Samsung Health actually export water to Health
+// Connect at all?" — instead of guessing. 0 records = nothing is writing hydration
+// (Samsung side), records present but app shows little = our read/parse side.
+export async function probeHydration(days = 7): Promise<{ permission: boolean; records: number; totalMl: number; sources: string[] }> {
+  const permission = await isPermissionGranted('Hydration');
+  const hc = mod();
+  if (!hc) return { permission, records: 0, totalMl: 0, sources: [] };
+  try {
+    if (!(await ensureInit(hc))) return { permission, records: 0, totalMl: 0, sources: [] };
+    const end = new Date();
+    const start = new Date(); start.setDate(start.getDate() - days);
+    const filter = { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() } as const;
+    const recs = await read(hc, 'Hydration', filter);
+    let totalMl = 0;
+    const sources = new Set<string>();
+    for (const r of recs) {
+      totalMl += r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0);
+      const pkg = r?.metadata?.dataOrigin?.packageName ?? r?.metadata?.dataOrigin ?? r?.dataOrigin?.packageName;
+      if (typeof pkg === 'string' && pkg) sources.add(pkg);
+    }
+    return { permission, records: recs.length, totalMl: Math.round(totalMl), sources: Array.from(sources) };
+  } catch {
+    return { permission, records: 0, totalMl: 0, sources: [] };
+  }
+}
+
 function dayFilter(date: Date) {
   const start = new Date(date); start.setHours(0, 0, 0, 0);
   const end = new Date(date); end.setHours(23, 59, 59, 999);
