@@ -176,6 +176,24 @@ export default function RootLayout() {
 
   useEffect(() => { appSettings.loadAll(); }, []);
   useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
+
+  // Surface a FRESH crash right after a restart, so a black-screen crash reports
+  // itself (message + top of stack) instead of the user having to dig into Settings.
+  // Only very recent ones — an old crash shouldn't nag on every launch.
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('last_crash');
+        if (!raw) return;
+        const cr = JSON.parse(raw);
+        const age = Date.now() - new Date(cr.at).getTime();
+        if (!(age >= 0 && age < 15 * 60 * 1000)) return;
+        await AsyncStorage.removeItem('last_crash');
+        const stackTop = String(cr.stack ?? cr.component ?? '').split('\n').slice(0, 6).join('\n');
+        setTimeout(() => Alert.alert('Ostatni błąd (wyślij mi to)', `${cr.message ?? '—'}\n\n${stackTop}`), 1400);
+      } catch {}
+    })();
+  }, []);
   useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);
 
   useEffect(() => {

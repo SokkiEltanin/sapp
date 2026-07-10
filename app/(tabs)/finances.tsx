@@ -168,6 +168,8 @@ export default function FinancesScreen() {
     // inflating the total (a reported cause of the "sum too large" bug).
     const unique = Array.from(new Map(expenses.map(e => [e.id, e])).values());
     let exp = 0, inc = 0;          // current month
+    let expVar = 0;                // current month: VARIABLE spend only (excludes the
+                                   // fixed monthly bills — housing + subscriptions)
     let allExp = 0, allInc = 0;    // all-time (overall balance)
     let cashExp = 0, cashInc = 0;  // all-time CASH-only (for the cash/card split)
     let food = 0, sweets = 0;      // current month: groceries + #słodycze items
@@ -187,7 +189,10 @@ export default function FinancesScreen() {
       const selfT = isSelfTransfer(e);
       if (mine && isIncome) { if (!selfT) inc += e.amount; continue; }
       if (!isExpense) continue;
-      if (mine && !selfT) exp += e.amount;
+      if (mine && !selfT) {
+        exp += e.amount;
+        if (e.category !== 'housing' && e.category !== 'subscriptions') expVar += e.amount;
+      }
       if (selfT) continue;
       // Consumption (food / sweets): everyone or only me, per the scope toggle.
       if (!inScope(e, scope)) continue;
@@ -202,7 +207,7 @@ export default function FinancesScreen() {
         sweets += e.amount;
       }
     }
-    return { exp, inc, allExp, allInc, cashExp, cashInc, food, sweets };
+    return { exp, expVar, inc, allExp, allInc, cashExp, cashInc, food, sweets };
   }, [expenses, scope]);
 
   // Card and cash are independent pots; the total is their sum. Each = its offset
@@ -340,12 +345,14 @@ export default function FinancesScreen() {
               {/* ── This month: income vs spending at a glance (replaces the wave
                     chart nobody read — NA KARCIE above is the headline). ─── */}
               {(() => {
-                const inc = monthTotals.inc, exp = monthTotals.exp;
+                const inc = monthTotals.inc;
+                const exp = monthTotals.expVar;             // VARIABLE spend only (no fixed bills)
+                const fixed = monthTotals.exp - monthTotals.expVar; // housing + subscriptions
                 const mx = Math.max(inc, exp, 1);
                 const net = inc - exp;
                 return (
                   <View style={st.monthCard}>
-                    <Text style={st.monthTitle}>TEN MIESIĄC</Text>
+                    <Text style={st.monthTitle}>TEN MIESIĄC · ZMIENNE</Text>
                     <View style={st.flowRow}>
                       <Text style={st.flowLabel}>Przychody</Text>
                       <View style={st.flowTrack}>
@@ -361,11 +368,14 @@ export default function FinancesScreen() {
                       <Text style={st.flowVal}>{exp.toFixed(0)} zł</Text>
                     </View>
                     <View style={st.flowNetRow}>
-                      <Text style={st.flowNetLabel}>Bilans miesiąca</Text>
+                      <Text style={st.flowNetLabel}>Zostało (bez stałych)</Text>
                       <Text style={[st.flowNet, { color: net >= 0 ? '#2AC68F' : '#E43434' }]}>
                         {net >= 0 ? '+' : '−'}{Math.abs(net).toFixed(0)} zł
                       </Text>
                     </View>
+                    {fixed > 0.5 && (
+                      <Text style={st.flowFixedNote}>Wydatki stałe (mieszkanie, subskrypcje) pominięte: {fixed.toFixed(0)} zł</Text>
+                    )}
                   </View>
                 );
               })()}
@@ -637,6 +647,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   },
   flowNetLabel: { fontSize: 12, color: c.text.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
   flowNet: { fontSize: 18, fontWeight: '800' },
+  flowFixedNote: { fontSize: 10.5, color: c.text.muted, marginTop: 2 },
   chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chartTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
   toggle: {

@@ -73,7 +73,7 @@ export function useExpenses() {
   const grouped = useMemo(() => {
     const map: Record<string, Expense[]> = {};
     for (const e of expenses) {
-      const key = e.date.split('T')[0];
+      const key = (e.date ?? '').split('T')[0] || 'brak-daty';
       if (!map[key]) map[key] = [];
       map[key].push(e);
     }
