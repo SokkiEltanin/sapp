@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, Component, ReactNode } from 'react';
+import { useEffect, useState, Component, ReactNode } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -24,6 +24,7 @@ import { migrateBalanceModel } from '@/utils/accountBalance';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 import { useUiActions } from '@/store/uiActions';
+import { todayISO } from '@/utils/date';
 
 function persistCrash(error: any, extra?: string) {
   try {
@@ -92,11 +93,11 @@ const eb = StyleSheet.create({
   stack: { color: '#aaa', fontSize: 11, lineHeight: 16 },
 });
 
-const MOOD_POPUP_KEY = 'last_mood_auto_popup';
-// Short cooldown only to suppress rapid re-foreground spam — the real gate is
-// "once per foreground session" (shownThisFg), so coming back to the dashboard
-// later actually re-asks (the old 6h throttle made it never re-appear).
-const MOOD_COOLDOWN_MS = 20 * 60 * 1000;
+// One auto-ask per calendar day: store the day we last popped the check-in. This
+// makes "ask me on the first entry of the day" reliable — the old cooldown +
+// once-per-foreground combo sometimes skipped a whole day (or never fired if the
+// 3.5 s timer was cancelled by a quick navigation).
+const MOOD_PROMPT_DAY_KEY = 'mood_prompt_day';
 
 // Cross-component guards (module scope, single app instance):
 // • lastHandledNotifKey — collapses the cold-start double delivery (the listener
@@ -109,12 +110,11 @@ let suppressAutoMoodUntil = 0;
 
 function AutoMoodPopup() {
   const [visible, setVisible] = useState(false);
-  const shownThisFg = useRef(false); // shown once this foreground session; reset on resume
   const pathname = usePathname();
-  // Only nag while actually sitting on the dashboard ('/'). If the app opens and
-  // you immediately tap "+" to add a receipt, you're off the dashboard before the
-  // delay elapses — so the popup never interrupts that quick action; it waits
-  // until you come back.
+  // Ask while sitting on the dashboard ('/'). If the app opens and you immediately
+  // tap "+" to add a receipt, you're off the dashboard before the short delay
+  // elapses — so the popup never interrupts that quick action; it waits until you
+  // come back to the dashboard.
   const onDashboard = pathname === '/' || pathname === '/index';
 
   const check = async () => {
@@ -128,30 +128,29 @@ function AutoMoodPopup() {
       // A mood notification tap is opening the check-in on the mood screen — don't
       // also pop the global modal (that was the "shows twice" bug).
       if (Date.now() < suppressAutoMoodUntil) return;
-      if (shownThisFg.current) return; // already asked this foreground session
-      const lastStr = await AsyncStorage.getItem(MOOD_POPUP_KEY);
-      const now = Date.now();
-      if (!lastStr || now - parseInt(lastStr) > MOOD_COOLDOWN_MS) {
-        await AsyncStorage.setItem(MOOD_POPUP_KEY, String(now));
-        shownThisFg.current = true;
-        setVisible(true);
-      }
+      // Already auto-asked today? Once per day is enough — the scheduled reminder
+      // handles further nagging. This is what makes the daily ask reliable.
+      const today = todayISO();
+      if ((await AsyncStorage.getItem(MOOD_PROMPT_DAY_KEY)) === today) return;
+      await AsyncStorage.setItem(MOOD_PROMPT_DAY_KEY, today);
+      setVisible(true);
     } catch {}
   };
 
-  // (Re)arm whenever we land on the dashboard. Leaving it (e.g. → scan) clears the
-  // pending timer, so the popup is cancelled mid-navigation and re-armed on return.
+  // Ask soon after landing on the dashboard — the first entry of the day. A short
+  // delay lets the dashboard paint first so the sheet slides over a rendered
+  // screen (not a blank one). Leaving the dashboard clears the timer.
   useEffect(() => {
     if (!onDashboard) return;
-    const timer = setTimeout(check, 3500);
+    const timer = setTimeout(check, 900);
     return () => clearTimeout(timer);
   }, [onDashboard]);
 
-  // Returning to the foreground is a fresh session: allow the prompt again, then
-  // re-check (still only fires if on the dashboard + mood unlogged + cooldown).
+  // Re-check on every return to the foreground (still gated to once/day by the
+  // stored flag) so opening the app fresh on a new day always asks.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') { shownThisFg.current = false; check(); }
+      if (state === 'active') check();
     });
     return () => sub.remove();
   }, [onDashboard]);

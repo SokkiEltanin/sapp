@@ -109,6 +109,19 @@ export async function ensureHealthConnect(): Promise<HCResult> {
   }
 }
 
+// Is a specific record type currently readable (permission granted)? Best-effort;
+// lets the UI tell "you never granted Nawodnienie" apart from "granted, but no
+// water data is flowing from Samsung Health". Never throws.
+export async function isPermissionGranted(recordType: string): Promise<boolean> {
+  const hc = mod();
+  if (!hc) return false;
+  try {
+    if (!(await ensureInit(hc))) return false;
+    const granted = await hc.getGrantedPermissions();
+    return (granted ?? []).some((p: any) => p.recordType === recordType);
+  } catch { return false; }
+}
+
 function dayFilter(date: Date) {
   const start = new Date(date); start.setHours(0, 0, 0, 0);
   const end = new Date(date); end.setHours(23, 59, 59, 999);

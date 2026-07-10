@@ -220,6 +220,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
 
           <ScrollView
             ref={scrollRef}
+            style={styles.scrollArea}
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -284,18 +285,21 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
                 textAlignVertical="top"
                 containerStyle={{ minHeight: 100 }}
               />
-
-              <View style={styles.footer}>
-                <AnimatedButton
-                  onPress={handleSave}
-                  label={saving ? 'Zapisuję...' : (existingEntry ? 'Zaktualizuj' : 'Zapisz')}
-                  icon={<Check size={18} color={c.bg.primary} />}
-                  size="lg"
-                  fullWidth
-                  disabled={saving || !mood || !energy || !note.trim()}
-                />
-              </View>
           </ScrollView>
+
+          {/* Save is a PINNED footer (outside the ScrollView) so the keyboard can
+              never bury it — the whole sheet is lifted above the IME by the
+              overlay's paddingBottom:kb, and this bar always sits at the bottom. */}
+          <View style={styles.footer}>
+            <AnimatedButton
+              onPress={handleSave}
+              label={saving ? 'Zapisuję...' : (existingEntry ? 'Zaktualizuj' : 'Zapisz')}
+              icon={<Check size={18} color={c.bg.primary} />}
+              size="lg"
+              fullWidth
+              disabled={saving || !mood || !energy || !note.trim()}
+            />
+          </View>
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -330,6 +334,9 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
     backgroundColor: c.bg.card, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: c.border.default,
   },
+  // flexShrink lets the scroll body give up space to the pinned footer within the
+  // sheet's maxHeight, so Save stays visible instead of being pushed off the bottom.
+  scrollArea: { flexShrink: 1, flexGrow: 0 },
   scroll: { padding: spacing[5], paddingTop: spacing[4], gap: spacing[5], paddingBottom: spacing[4] },
   section: { gap: spacing[3] },
   sectionLabel: {

@@ -22,7 +22,7 @@ import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted } from '@/services/healthConnectService';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography } from '@/theme';
 
@@ -495,6 +495,14 @@ export default function HealthScreen() {
           const ds = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}-${pad(new Date().getDate())}`;
           setWaterFromWatch(true);
           feedWaterHabit(Math.round(d.hydrationMl / glassMlRef.current), ds).then(() => { bumpHabits(); loadWater(); }).catch(() => {});
+        } else {
+          // No hydration came through — say WHY, so the fix is obvious. Either the
+          // "Nawodnienie" read permission was never granted (I added it after the
+          // first grant), or Samsung Health isn't exporting Water to Health Connect.
+          isPermissionGranted('Hydration').then(granted => {
+            if (!granted) toast.info('Woda: w Health Connect przyznaj Sapp dostęp do „Nawodnienie", potem Synchronizuj');
+            else toast.info('Woda: brak danych — w Samsung Health włącz synchronizację „Woda" do Health Connect');
+          }).catch(() => {});
         }
         setHcExtra(prev => ({
           ...prev, // keep manually-entered body composition the watch doesn't report
