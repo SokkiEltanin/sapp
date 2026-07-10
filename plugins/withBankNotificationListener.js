@@ -60,13 +60,50 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
     try {
       val n = sbn ?: return
       val pkg = n.packageName ?: return
-      if (!bankPackages.contains(pkg)) return
+      noteSeen(pkg)   // diagnostics: record every app whose notifications reach us
       val extras = n.notification?.extras ?: return
       val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
       val text = (extras.getCharSequence(Notification.EXTRA_TEXT)
         ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString() ?: ""
       if (title.isEmpty() && text.isEmpty()) return
+      // Capture if it's a known bank app OR the CONTENT looks like a bank payment.
+      // The content path is a safety net for when a bank app's package name isn't in
+      // our hardcoded list (the JS parser is still the final gate, so junk is dropped).
+      if (!bankPackages.contains(pkg) && !looksLikeBankPayment(title + " " + text)) return
       append(pkg, title, text, n.postTime)
+    } catch (e: Exception) {}
+  }
+
+  // Diacritic-free content sniff for a Pekao / PeoPay payment push. Kept broad on the
+  // bank name ("pekao"/"peopay" appear in every one of their notifications) so a wrong
+  // package name can't hide a real payment; narrow otherwise to avoid random noise.
+  private fun looksLikeBankPayment(body: String): Boolean {
+    val b = body.lowercase()
+    if (b.contains("pekao") || b.contains("peopay")) return true
+    val money = b.contains("pln") || b.contains("eur")
+    val ctx = b.contains("kwot") || b.contains("konto") || b.contains("transakcj") ||
+      b.contains("blik") || b.contains("przelew")
+    return money && ctx
+  }
+
+  // Records the set of packages we've seen (deduped, capped) so the in-app diagnostic
+  // can show whether the listener is receiving anything at all, and what PeoPay's real
+  // package name is (so it can be added to the capture list).
+  @Synchronized
+  private fun noteSeen(pkg: String) {
+    try {
+      val file = File(filesDir, SEEN_FILE)
+      val arr = if (file.exists()) {
+        try { JSONArray(file.readText()) } catch (e: Exception) { JSONArray() }
+      } else JSONArray()
+      for (i in 0 until arr.length()) if (arr.optString(i) == pkg) return
+      arr.put(pkg)
+      val out = if (arr.length() > 40) {
+        val t = JSONArray()
+        for (i in (arr.length() - 40) until arr.length()) t.put(arr.get(i))
+        t
+      } else arr
+      file.writeText(out.toString())
     } catch (e: Exception) {}
   }
 
@@ -99,6 +136,7 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
 
   companion object {
     const val FILE_NAME = "bank_notifications.json"
+    const val SEEN_FILE = "seen_packages.json"
     const val MAX = 50
   }
 }

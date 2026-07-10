@@ -40,21 +40,30 @@ export async function drainBankNotifications(): Promise<number> {
   }
 }
 
+const SEEN = `${FileSystem.documentDirectory ?? ''}seen_packages.json`;
+
 // Diagnostics: peek at the raw native capture file WITHOUT clearing it, so the user
 // can tell whether the native listener is actually catching anything (empty file =
 // notifications never reach the app → permission/OEM issue; non-empty but nothing
-// queued = the JS toggle/parse side).
-export async function peekBankCapture(): Promise<{ count: number; samples: string[]; fileExists: boolean }> {
+// queued = the JS toggle/parse side). `seen` lists every package the listener has
+// received a notification from — empty means the service isn't bound/running at all;
+// non-empty tells us the bank app's REAL package (to add to the capture list).
+export async function peekBankCapture(): Promise<{ count: number; samples: string[]; fileExists: boolean; seen: string[] }> {
+  let seen: string[] = [];
   try {
-    if (!FileSystem.documentDirectory) return { count: 0, samples: [], fileExists: false };
+    const si = await FileSystem.getInfoAsync(SEEN);
+    if (si.exists) { const s = JSON.parse(await FileSystem.readAsStringAsync(SEEN)); if (Array.isArray(s)) seen = s.map(String); }
+  } catch {}
+  try {
+    if (!FileSystem.documentDirectory) return { count: 0, samples: [], fileExists: false, seen };
     const info = await FileSystem.getInfoAsync(FILE);
-    if (!info.exists) return { count: 0, samples: [], fileExists: false };
+    if (!info.exists) return { count: 0, samples: [], fileExists: false, seen };
     const raw = await FileSystem.readAsStringAsync(FILE);
     const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return { count: 0, samples: [], fileExists: true };
+    if (!Array.isArray(arr)) return { count: 0, samples: [], fileExists: true, seen };
     const samples = arr.slice(-3).map((it: any) => `${it?.title ?? ''} ${it?.text ?? ''}`.trim().slice(0, 90));
-    return { count: arr.length, samples, fileExists: true };
+    return { count: arr.length, samples, fileExists: true, seen };
   } catch {
-    return { count: 0, samples: [], fileExists: false };
+    return { count: 0, samples: [], fileExists: false, seen };
   }
 }

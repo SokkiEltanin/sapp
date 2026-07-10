@@ -1475,13 +1475,21 @@ export default function SettingsScreen() {
                     const { peekBankCapture, drainBankNotifications } = await import('@/services/bankNotificationDrain');
                     const peek = await peekBankCapture();
                     const queued = await drainBankNotifications();
+                    const seenLine = peek.seen.length > 0
+                      ? '\n\nApki widziane przez nasłuch:\n' + peek.seen.map(p => '• ' + p).join('\n')
+                      : '';
                     if (!peek.fileExists || peek.count === 0) {
-                      Alert.alert('Brak przechwyconych powiadomień',
-                        'Apka NIE dostała żadnego powiadomienia z banku.\n\nTo znaczy, że system nie przekazuje ich do Sappa. Sprawdź:\n1) „Dostęp do powiadomień" → Sapp WŁĄCZONY,\n2) Samsung: wyłącz optymalizację baterii dla Sappa (inaczej ubija nasłuch),\n3) po zmianach zrób jedną testową płatność.');
+                      if (peek.seen.length === 0) {
+                        Alert.alert('Nasłuch nic nie odbiera',
+                          'Usługa nie dostała ŻADNEGO powiadomienia (nawet z innych apek). Nasłuch nie działa:\n1) „Dostęp do powiadomień" → wyłącz i włącz Sapp,\n2) bateria Sappa → Bez ograniczeń,\n3) zrób jedną testową płatność i sprawdź ponownie.');
+                      } else {
+                        Alert.alert('Nasłuch działa, ale nie złapał płatności',
+                          'Usługa odbiera powiadomienia, ale żadne nie zostało uznane za płatność z banku.' + seenLine + '\n\nJeśli jest tu PeoPay/Pekao — wyślij mi tę listę, dodam ten pakiet.');
+                      }
                     } else {
                       Alert.alert('Przechwycono ' + peek.count + ' powiadomień',
                         (queued > 0 ? `Dodano ${queued} do zatwierdzenia (zobacz dashboard).\n\n` : 'Żadne nie wyglądało na płatność do dodania (mogły już być dodane).\n\n') +
-                        'Ostatnie:\n' + peek.samples.map(s => '• ' + s).join('\n'));
+                        'Ostatnie:\n' + peek.samples.map(s => '• ' + s).join('\n') + seenLine);
                     }
                   }}
                   style={{ backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
