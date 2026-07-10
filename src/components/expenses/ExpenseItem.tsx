@@ -36,7 +36,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const subParts: string[] = [];
   if (isReceipt) subParts.push(`${expense.receiptItems!.length} produktów`);
   if (!isIncome) {
-    if (expense.tags.length > 0) subParts.push(expense.tags.slice(0, 2).join(', '));
+    if ((expense.tags?.length ?? 0) > 0) subParts.push(expense.tags!.slice(0, 2).join(', '));
     if (!isReceipt) subParts.push(meta.label);
   }
   if (expense.paymentMethod === 'cash') subParts.push('gotówka');

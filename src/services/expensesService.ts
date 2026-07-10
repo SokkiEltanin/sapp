@@ -1,4 +1,4 @@
-import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { addDoc, updateDoc, deleteDoc, getDocs, query, orderBy, setDoc, doc } from 'firebase/firestore';
 import { userCol, userDoc } from './firebase';
 import { Expense } from '@/types';
 
@@ -25,6 +25,21 @@ export const expensesService = {
     const data = strip({ ...expense, createdAt: now, updatedAt: now });
     const docRef = await addDoc(userCol(COL), data);
     return { ...expense, id: docRef.id, createdAt: now, updatedAt: now };
+  },
+
+  // Offline-safe id: `doc(collection)` mints a Firestore-style random id WITHOUT
+  // touching the network. Lets a caller update the local store + navigate away
+  // instead of awaiting `add()` — the web Firestore SDK's write promise doesn't
+  // resolve until the server acks, so `await add()` froze the screen on weak/no
+  // signal (the receipt-save "black screen", e.g. scanning in-store).
+  newId(): string {
+    return doc(userCol(COL)).id;
+  },
+
+  // Write with a client-generated id. Call it fire-and-forget (`.catch(() => {})`)
+  // right after the local-store update so the UI never blocks on the cloud write.
+  async addWithId(id: string, expense: Omit<Expense, 'id'>): Promise<void> {
+    await setDoc(userDoc(COL, id), strip({ ...(expense as any) }));
   },
 
   async update(id: string, updates: Partial<Expense>): Promise<void> {

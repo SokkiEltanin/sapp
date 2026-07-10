@@ -19,7 +19,7 @@ import { getBudgets } from '@/utils/budgets';
 import { getFoodTags, categorize } from '@/utils/receiptParser';
 import { getPayers, addPayer } from '@/utils/payers';
 import { toast } from '@/store/toastStore';
-import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
+import { Expense, ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -482,7 +482,13 @@ export default function ManualReceiptScreen() {
         ? [store.toLowerCase().split(' ')[0], ...foodTags]
         : foodTags;
 
-      const expense = await expensesService.add({
+      // Local-first: persist to the store (→ AsyncStorage) + navigate immediately,
+      // write to Firestore in the BACKGROUND. The web Firestore SDK's write promise
+      // doesn't resolve until the server acks, so `await`-ing it froze the screen on
+      // weak/no signal (the same "black screen" the scanner had).
+      const nowIso = new Date().toISOString();
+      const expense: Expense = {
+        id: expensesService.newId(),
         type: 'expense',
         amount: Math.round(totalAmount * 100) / 100,
         currency: 'PLN',
@@ -490,13 +496,15 @@ export default function ManualReceiptScreen() {
         tags,
         note: store || 'Paragon ręczny',
         date: dateParsed,
-        payer: payer || undefined,
+        ...(payer ? { payer } : {}),
         paymentMethod,
         ...(store ? { storeName: store } : {}),
         receiptItems,
-      });
-
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
       addExpense(expense);
+      expensesService.addWithId(expense.id, expense).catch(() => {});
       haptic.success();
       toast.success(`Zapisano ${receiptItems.length} pozycji · ${totalAmount.toFixed(2)} zł`);
       goBackOrHome();

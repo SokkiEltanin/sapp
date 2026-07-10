@@ -22,7 +22,7 @@ import {
   loadPriceMemory, savePriceMemory, priceFor, priceAnomaly, PriceMemory, PriceFlag,
   loadNameAliases, suggestSimilarName,
 } from '@/utils/productMemory';
-import { ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
+import { Expense, ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
@@ -396,7 +396,15 @@ export default function ScanReceiptModal() {
         expensesService.update(existingBank.id, patch).catch(() => {});
         toast.success('Dopasowano do płatności z banku — bez duplikatu');
       } else {
-        const expense = await expensesService.add({
+        // Build locally + write to Firestore in the BACKGROUND. The web Firestore
+        // SDK's write promise doesn't resolve until the server acks, so `await`-ing
+        // the add froze this screen on weak/no signal — exactly the receipt-save
+        // "black screen" when scanning in-store. The local store persists to
+        // AsyncStorage immediately, so the expense is safe even if the app is
+        // killed before the cloud write lands; the daily backup captures it too.
+        const now = new Date().toISOString();
+        const expense: Expense = {
+          id: expensesService.newId(),
           type: 'expense',
           amount: roundedTotal,
           currency: 'PLN',
@@ -408,8 +416,11 @@ export default function ScanReceiptModal() {
           ...(payer ? { payer } : {}),
           paymentMethod,
           receiptItems,
-        });
+          createdAt: now,
+          updatedAt: now,
+        };
         addExpense(expense);
+        expensesService.addWithId(expense.id, expense).catch(() => {});
       }
       // Persist corrections to memory for future receipts
       const parsedCats: Record<number, ExpenseCategory> = {};

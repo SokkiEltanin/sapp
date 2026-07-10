@@ -154,7 +154,7 @@ export default function FinancesScreen() {
     const freq: Record<string, number> = {};
     for (const e of expenses) {
       if (!isExp(e)) continue;
-      for (const tag of e.tags) if (tag) freq[tag] = (freq[tag] ?? 0) + 1;
+      for (const tag of (e.tags ?? [])) if (tag) freq[tag] = (freq[tag] ?? 0) + 1;
       if (e.receiptItems) for (const it of e.receiptItems) for (const t of (it.tags ?? [])) freq[t] = (freq[t] ?? 0) + 1;
     }
     return Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 12).map(([tag]) => tag);
@@ -229,6 +229,7 @@ export default function FinancesScreen() {
     const expByDate: Record<string, number> = {};
     const incByDate: Record<string, number> = {};
     for (const e of expenses) {
+      if (!e.date) continue;
       const k = e.date.slice(0, 10);
       if (e.type === 'income') {
         if (isMine(e)) incByDate[k] = (incByDate[k] ?? 0) + e.amount;
@@ -284,7 +285,7 @@ export default function FinancesScreen() {
       if (!isNaN(min) && e.amount < min) return false;
       if (!isNaN(max) && e.amount > max) return false;
       if (activeTagFilter) {
-        if (e.tags.includes(activeTagFilter)) return true;
+        if ((e.tags ?? []).includes(activeTagFilter)) return true;
         if (e.receiptItems?.some(it => (it.tags ?? []).includes(activeTagFilter))) return true;
         return false;
       }
