@@ -11,6 +11,7 @@ export interface Counter {
   date: string;       // until → target date; since → last-done date (YYYY-MM-DD)
   startDate: string;  // until → progress start (creation day); since → baseline for auto
   endDate?: string;   // until only → end of an event window (e.g. trip's last day)
+  emoji?: string;     // until only → marker that hops along the bar instead of the walker
   icon?: string;      // optional lucide key (see counterIcons)
   mode?: 'auto';      // since only: 'days without X' auto-tracked from purchases
   keyword?: string;   // auto: '|'-separated keywords matched against expenses

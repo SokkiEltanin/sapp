@@ -1487,6 +1487,14 @@ export default function SettingsScreen() {
                   style={{ backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default, borderRadius: 10, paddingVertical: 11, alignItems: 'center' }}>
                   <Text style={{ color: colors.text.primary, fontWeight: '800' }}>Sprawdź teraz (diagnostyka)</Text>
                 </PressableScale>
+
+                {/* Always-available door into the review screen — the dashboard tile
+                    only appears when something's queued, so this is the reliable way
+                    in even when nothing was captured. */}
+                <PressableScale onPress={() => { haptic.tap(); router.push('/bank-review' as any); }}
+                  style={{ backgroundColor: '#2AC68F18', borderWidth: 1, borderColor: '#2AC68F55', borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginTop: 2 }}>
+                  <Text style={{ color: '#2AC68F', fontWeight: '800' }}>Płatności do zatwierdzenia{bankPending > 0 ? ` (${bankPending})` : ''} →</Text>
+                </PressableScale>
               </View>
             )}
           </View>

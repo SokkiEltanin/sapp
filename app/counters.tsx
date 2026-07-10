@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, Car } from 'lucide-react-native';
+import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, Car, PersonStanding } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
@@ -20,6 +20,8 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const ACCENT = '#46B0DE';
+// Marker emojis for countdowns — the chosen one hops along the progress bar.
+const EVENT_EMOJIS = ['🎂', '✈️', '🎁', '❤️', '🏖️', '🎄', '🎉', '🎓', '🏠', '🚗', '⚽', '🎸', '💍', '🍼', '🌸', '🎯', '🔥', '💸'];
 
 const untilLabel = (n: number) => n > 1 ? `za ${n} dni` : n === 1 ? 'jutro!' : n === 0 ? 'dziś!' : 'minęło';
 const sinceLabel = (n: number) => n === 0 ? 'dziś' : n === 1 ? '1 dzień temu' : `${n} dni temu`;
@@ -38,6 +40,7 @@ export default function Counters() {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');   // until: optional event-window end (trip)
+  const [emoji, setEmoji] = useState('');       // until: hopping marker (blank = walker)
   const [keyword, setKeyword] = useState('');
   const [onDash, setOnDash] = useState(true);
   const [pickCal, setPickCal] = useState(false);
@@ -51,14 +54,14 @@ export default function Counters() {
     return [...events, ...gcalEvents]
       .filter(e => (e.date ?? '') >= t && e.title)
       .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
-      .slice(0, 30);
+      .slice(0, 10);
   }, [events, gcalEvents]);
 
-  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setKeyword(''); setOnDash(true); setPickCal(false); setOpen(true); };
+  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setEmoji(''); setKeyword(''); setOnDash(true); setPickCal(false); setOpen(true); };
   const openEdit = (cn: Counter) => {
     setEditing(cn);
     setUiKind(cn.mode === 'auto' ? 'avoid' : cn.kind === 'until' ? 'until' : 'since');
-    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setKeyword(cn.keyword ?? ''); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
+    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setEmoji(cn.emoji ?? ''); setKeyword(cn.keyword ?? ''); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
   };
 
   const canSave = !!name.trim() && (uiKind === 'avoid' ? !!keyword.trim() : !!date);
@@ -72,9 +75,10 @@ export default function Counters() {
     } else {
       const kind = uiKind as 'until' | 'since';
       const evEnd = (kind === 'until' && endDate && endDate >= date) ? endDate : undefined;
-      const patch = { kind, name: name.trim(), date, endDate: evEnd, mode: undefined, keyword: undefined, onDashboard: onDash };
+      const evEmoji = kind === 'until' ? (emoji || undefined) : undefined;
+      const patch = { kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, mode: undefined, keyword: undefined, onDashboard: onDash };
       if (editing) update(editing.id, patch);
-      else add({ kind, name: name.trim(), date, endDate: evEnd, startDate: todayStr(), onDashboard: onDash });
+      else add({ kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, startDate: todayStr(), onDashboard: onDash });
     }
     setOpen(false);
   };
@@ -128,7 +132,7 @@ export default function Counters() {
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>
-              <WalkProgress progress={prog} color={during ? '#2AC68F' : ACCENT} mode={during ? 'drive' : 'walk'} />
+              <WalkProgress progress={prog} color={during ? '#2AC68F' : ACCENT} mode={during ? 'drive' : 'walk'} emoji={cn.emoji} />
               <Text style={s.cardMeta}>{meta}</Text>
             </View>
           );
@@ -174,6 +178,7 @@ export default function Counters() {
               <TouchableOpacity onPress={() => setOpen(false)} hitSlop={10}><X size={20} color={c.text.muted} /></TouchableOpacity>
             </View>
 
+            <ScrollView style={s.sheetScroll} contentContainerStyle={s.sheetScrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={s.kindRow}>
               {([['until', 'Odliczanie', CalendarClock], ['since', 'Dni temu', RotateCcw], ['avoid', 'Dni bez', Ban]] as const).map(([k, lbl, Ic]) => {
                 const active = uiKind === k;
@@ -242,6 +247,22 @@ export default function Counters() {
               </>
             )}
 
+            {uiKind === 'until' && (
+              <>
+                <Text style={s.fieldLabel}>Ikonka na pasku (skacze do celu)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.emojiRow} keyboardShouldPersistTaps="handled">
+                  <TouchableOpacity style={[s.emojiChip, !emoji && s.emojiChipOn]} onPress={() => { haptic.tap(); setEmoji(''); }} activeOpacity={0.8}>
+                    <PersonStanding size={18} color={!emoji ? ACCENT : c.text.muted} />
+                  </TouchableOpacity>
+                  {EVENT_EMOJIS.map(em => (
+                    <TouchableOpacity key={em} style={[s.emojiChip, emoji === em && s.emojiChipOn]} onPress={() => { haptic.tap(); setEmoji(em); }} activeOpacity={0.8}>
+                      <Text style={s.emojiChar}>{em}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
             <TouchableOpacity style={s.dashToggle} onPress={() => { haptic.tap(); setOnDash(v => !v); }} activeOpacity={0.8}>
               <LayoutDashboard size={15} color={onDash ? ACCENT : c.text.muted} />
               <Text style={[s.dashToggleText, onDash && { color: ACCENT }]}>Pokaż na dashboardzie</Text>
@@ -251,6 +272,7 @@ export default function Counters() {
             <TouchableOpacity style={[s.saveBtn, { backgroundColor: ACCENT }, !canSave && { opacity: 0.4 }]} onPress={save} disabled={!canSave} activeOpacity={0.85}>
               <Check size={17} color="#fff" /><Text style={s.saveText}>{editing ? 'Zapisz' : 'Dodaj'}</Text>
             </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -285,7 +307,11 @@ const makeS = (c: any) => StyleSheet.create({
   doneBtnText: { fontSize: 12.5, fontWeight: '700' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[5], gap: spacing[2], paddingBottom: spacing[8] },
+  // maxHeight + inner ScrollView so a long form (calendar picker + emoji row) scrolls
+  // instead of spilling its list over the Save button (the old "chaos").
+  sheet: { backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: spacing[5], paddingTop: spacing[5], maxHeight: '90%' },
+  sheetScroll: { marginHorizontal: -spacing[1] },
+  sheetScrollContent: { gap: spacing[2], paddingBottom: spacing[8], paddingHorizontal: spacing[1] },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   sheetTitle: { fontSize: 17, fontWeight: '800', color: c.text.primary },
   kindRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[2] },
@@ -303,7 +329,11 @@ const makeS = (c: any) => StyleSheet.create({
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   calToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, marginTop: spacing[1] },
   calToggleText: { fontSize: 12.5, fontWeight: '700' },
-  calList: { gap: 2, maxHeight: 200 },
+  calList: { gap: 2, overflow: 'hidden' },
+  emojiRow: { flexDirection: 'row', gap: spacing[2], paddingVertical: spacing[1], paddingRight: spacing[2] },
+  emojiChip: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary, alignItems: 'center', justifyContent: 'center' },
+  emojiChipOn: { backgroundColor: ACCENT + '22', borderColor: ACCENT },
+  emojiChar: { fontSize: 22 },
   calItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: spacing[2], borderRadius: radius.sm },
   calItemDate: { fontSize: 12, fontWeight: '800', color: '#46B0DE', width: 44 },
   calItemName: { flex: 1, fontSize: 13, color: c.text.secondary },

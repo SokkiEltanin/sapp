@@ -127,8 +127,6 @@ export default function FinancesScreen() {
   const [amtMin, setAmtMin] = useState('');
   const [amtMax, setAmtMax] = useState('');
   const [filterModal, setFilterModal] = useState(false);
-  const [chartPeriod, setChartPeriod] = useState<'week' | 'month'>('week');
-  const [chartFoodOnly, setChartFoodOnly] = useState(false);
   const [balanceOffset, setBalanceOffset] = useState(0);
   const [cashOffset, setCashOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
@@ -213,57 +211,6 @@ export default function FinancesScreen() {
   const cashBalance = cashOffset + monthTotals.cashInc - monthTotals.cashExp;
   const balance = cardBalance + cashBalance;
 
-  // Chart data: expenses AND income per day (week) or per week-of-month (month).
-  // Expenses respect the scope toggle; income is always mine (my paychecks).
-  // Spend that counts as food for an expense — receipt food items, else the whole
-  // amount if it's a grocery/food expense. Powers the "tylko jedzenie" chart toggle.
-  const foodSpend = (e: Expense): number => {
-    if (e.receiptItems?.length) {
-      return e.receiptItems.reduce((s, it) =>
-        s + (looksLikeFood({ name: it.name, tags: it.tags, category: it.category }) ? (it.price ?? 0) : 0), 0);
-    }
-    return (e.category === 'groceries' || (e.category as string) === 'food') ? e.amount : 0;
-  };
-
-  const chartData = useMemo(() => {
-    const expByDate: Record<string, number> = {};
-    const incByDate: Record<string, number> = {};
-    for (const e of expenses) {
-      if (!e.date) continue;
-      const k = e.date.slice(0, 10);
-      if (e.type === 'income') {
-        if (isMine(e)) incByDate[k] = (incByDate[k] ?? 0) + e.amount;
-      } else if (isExp(e) && inScope(e, scope)) {
-        expByDate[k] = (expByDate[k] ?? 0) + (chartFoodOnly ? foodSpend(e) : e.amount);
-      }
-    }
-    if (chartPeriod === 'week') {
-      const dates = last7Dates();
-      return {
-        values:    dates.map(d => expByDate[d] ?? 0),
-        incValues: dates.map(d => incByDate[d] ?? 0),
-        labels:    dates.map(d => DOW_SHORT[new Date(d + 'T00:00:00').getDay()]),
-        total:    dates.reduce((s, d) => s + (expByDate[d] ?? 0), 0),
-        incTotal: dates.reduce((s, d) => s + (incByDate[d] ?? 0), 0),
-      };
-    } else {
-      const dates = monthDates();
-      const exp: number[] = [0, 0, 0, 0, 0];
-      const inc: number[] = [0, 0, 0, 0, 0];
-      for (const d of dates) {
-        const day = parseInt(d.slice(8, 10), 10);
-        const wi = Math.min(4, Math.floor((day - 1) / 7));
-        exp[wi] += expByDate[d] ?? 0;
-        inc[wi] += incByDate[d] ?? 0;
-      }
-      return {
-        values: exp, incValues: inc,
-        labels: ['T1', 'T2', 'T3', 'T4', 'T5'],
-        total: exp.reduce((s, v) => s + v, 0),
-        incTotal: inc.reduce((s, v) => s + v, 0),
-      };
-    }
-  }, [expenses, chartPeriod, scope, chartFoodOnly]);
 
   const min = parseFloat(amtMin.replace(',', '.'));
   const max = parseFloat(amtMax.replace(',', '.'));
@@ -390,62 +337,38 @@ export default function FinancesScreen() {
                 </View>
               </View>
 
-              {/* ── Spending wave chart + period toggle ─── */}
-              <View style={st.chartCard}>
-                <View style={st.chartHeader}>
-                  <TouchableOpacity onPress={() => { haptic.tap(); setChartFoodOnly(v => !v); }} activeOpacity={0.7}>
-                    <Text style={st.chartTitle}>{chartFoodOnly ? 'JEDZENIE' : 'WYDATKI'} — {chartPeriod === 'week' ? '7 DNI' : 'MIESIĄC'}  ⇄</Text>
-                  </TouchableOpacity>
-                  <View style={st.toggle}>
-                    <TouchableOpacity
-                      style={[st.toggleBtn, chartPeriod === 'week' && st.toggleBtnOn]}
-                      onPress={() => { haptic.tap(); setChartPeriod('week'); }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[st.toggleText, chartPeriod === 'week' && st.toggleTextOn]}>7 dni</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[st.toggleBtn, chartPeriod === 'month' && st.toggleBtnOn]}
-                      onPress={() => { haptic.tap(); setChartPeriod('month'); }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[st.toggleText, chartPeriod === 'month' && st.toggleTextOn]}>Mies.</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <View style={st.chartTotalsRow}>
-                  <Text style={st.chartTotal}>
-                    {chartData.total.toFixed(0)} <Text style={st.chartTotalUnit}>zł</Text>
-                  </Text>
-                  <View style={st.chartLegend}>
-                    <View style={st.legendItem}>
-                      <View style={[st.legendDot, { backgroundColor: '#E43434' }]} />
-                      <Text style={st.legendText}>wydatki</Text>
+              {/* ── This month: income vs spending at a glance (replaces the wave
+                    chart nobody read — NA KARCIE above is the headline). ─── */}
+              {(() => {
+                const inc = monthTotals.inc, exp = monthTotals.exp;
+                const mx = Math.max(inc, exp, 1);
+                const net = inc - exp;
+                return (
+                  <View style={st.monthCard}>
+                    <Text style={st.monthTitle}>TEN MIESIĄC</Text>
+                    <View style={st.flowRow}>
+                      <Text style={st.flowLabel}>Przychody</Text>
+                      <View style={st.flowTrack}>
+                        <View style={[st.flowFill, { width: `${Math.round((inc / mx) * 100)}%`, backgroundColor: '#2AC68F' }]} />
+                      </View>
+                      <Text style={st.flowVal}>{inc.toFixed(0)} zł</Text>
                     </View>
-                    <View style={st.legendItem}>
-                      <View style={[st.legendDash, { backgroundColor: '#2AC68F' }]} />
-                      <Text style={st.legendText}>przychody {chartData.incTotal.toFixed(0)} zł</Text>
+                    <View style={st.flowRow}>
+                      <Text style={st.flowLabel}>Wydatki</Text>
+                      <View style={st.flowTrack}>
+                        <View style={[st.flowFill, { width: `${Math.round((exp / mx) * 100)}%`, backgroundColor: '#E43434' }]} />
+                      </View>
+                      <Text style={st.flowVal}>{exp.toFixed(0)} zł</Text>
+                    </View>
+                    <View style={st.flowNetRow}>
+                      <Text style={st.flowNetLabel}>Bilans miesiąca</Text>
+                      <Text style={[st.flowNet, { color: net >= 0 ? '#2AC68F' : '#E43434' }]}>
+                        {net >= 0 ? '+' : '−'}{Math.abs(net).toFixed(0)} zł
+                      </Text>
                     </View>
                   </View>
-                </View>
-                {/* Expense values above the chart (red), income values below (green) */}
-                <View style={st.chartValues}>
-                  {chartData.values.map((v, i) => (
-                    <Text key={i} style={[st.chartValue, { color: '#E97171' }]}>{v > 0 ? Math.round(v) : ''}</Text>
-                  ))}
-                </View>
-                <DualFinWave exp={chartData.values} inc={chartData.incValues} />
-                <View style={st.chartValues}>
-                  {chartData.incValues.map((v, i) => (
-                    <Text key={i} style={[st.chartValue, { color: '#2AC68F' }]}>{v > 0 ? Math.round(v) : ''}</Text>
-                  ))}
-                </View>
-                <View style={st.chartLabels}>
-                  {chartData.labels.map((l, i) => (
-                    <Text key={i} style={st.chartLabel}>{l}</Text>
-                  ))}
-                </View>
-              </View>
+                );
+              })()}
 
               {/* ── Filters button → popup ─── */}
               <View style={st.filterBar}>
@@ -690,6 +613,30 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     borderWidth: 1, borderColor: f.cardBorder,
     padding: spacing[4], gap: spacing[2],
   },
+
+  // "TEN MIESIĄC" glance card — two proportional bars + net balance.
+  monthCard: {
+    marginHorizontal: spacing[4], marginBottom: spacing[3],
+    backgroundColor: f.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: f.cardBorder,
+    padding: spacing[4], gap: spacing[3],
+  },
+  monthTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
+  flowRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  flowLabel: { width: 72, fontSize: 12, color: c.text.secondary, fontWeight: '600' },
+  flowTrack: {
+    flex: 1, height: 12, borderRadius: 6,
+    backgroundColor: c.bg.elevated, overflow: 'hidden',
+  },
+  flowFill: { height: '100%', borderRadius: 6, minWidth: 3 },
+  flowVal: { width: 78, textAlign: 'right', fontSize: 13, fontWeight: '700', color: c.text.primary },
+  flowNetRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: spacing[1], paddingTop: spacing[2],
+    borderTopWidth: 1, borderTopColor: c.border.subtle,
+  },
+  flowNetLabel: { fontSize: 12, color: c.text.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  flowNet: { fontSize: 18, fontWeight: '800' },
   chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chartTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
   toggle: {

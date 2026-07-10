@@ -1301,15 +1301,27 @@ export default function DashboardScreen() {
 
     if (viz === 'wave') {
       const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
+      // Prominent CURRENT value (last non-zero) on the right; the history stays on
+      // the chart. The old row of 6 tiny numbers above the wave was unreadable for
+      // weight — near-identical values, no way to tell which one is "now".
+      const nz = ser.values.filter(v => v > 0);
+      const latest = nz.length ? nz[nz.length - 1] : 0;
+      const prev   = nz.length > 1 ? nz[nz.length - 2] : 0;
+      const delta  = latest && prev ? latest - prev : 0;
+      const dec    = (ser.unit === 'kg' || ser.unit === 'h') ? 1 : 0;
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
-          {header}
-          <View style={s.waveValues}>
-            {ser.values.map((v, i) => (
-              <Text key={i} style={[s.waveValue, i === ser.values.length - 1 && { color: accentColor, fontWeight: '800' }]}>
-                {fmtWave(v, ser.unit)}
-              </Text>
-            ))}
+          <View style={s.waveHeadRow}>
+            <View style={[s.cardHeader, { flex: 1, marginBottom: 0 }]}>
+              <BarChart2 size={13} color={accentColor} />
+              <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
+            </View>
+            <View style={s.waveNowWrap}>
+              <Text style={[s.waveNow, { color: accentColor }]} numberOfLines={1}>{fmtStat(latest, ser.unit)}</Text>
+              {delta !== 0 && (
+                <Text style={s.waveDelta}>{delta > 0 ? '+' : '−'}{Math.abs(delta).toFixed(dec)}{ser.unit}</Text>
+              )}
+            </View>
           </View>
           <WaveChart data={ser.values} color={accentColor} target={t.target} zoom={t.metric === 'weight'} />
           <View style={s.waveLabels}>
@@ -2740,7 +2752,7 @@ export default function DashboardScreen() {
                           <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
                           <Text style={[s.cdDays, during && { color: '#2AC68F' }]}>{label}</Text>
                         </View>
-                        <WalkProgress progress={during ? eventProgress(cn) : untilProgress(cn)} color={during ? '#2AC68F' : accentColor} mode={during ? 'drive' : 'walk'} />
+                        <WalkProgress progress={during ? eventProgress(cn) : untilProgress(cn)} color={during ? '#2AC68F' : accentColor} mode={during ? 'drive' : 'walk'} emoji={cn.emoji} />
                       </View>
                     );
                   })}
@@ -4492,6 +4504,11 @@ const makeStyles = (c: any) => StyleSheet.create({
   waveLabel: { flex: 1, fontSize: 8, color: c.text.muted, textAlign: 'center' },
   waveValues: { flexDirection: 'row', marginBottom: 2 },
   waveValue: { flex: 1, fontSize: 9, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
+  // Wave tile: title left, prominent current value right.
+  waveHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 },
+  waveNowWrap: { alignItems: 'flex-end' },
+  waveNow: { fontSize: 22, fontWeight: '800', lineHeight: 24 },
+  waveDelta: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginTop: 1 },
 
   // ── Google Calendar ────────────────────────────────────────────────────────
   gcalDayLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
