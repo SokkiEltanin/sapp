@@ -10,6 +10,10 @@ import TabBar from '@/components/ui/TabBar';
 import TopPill from '@/components/ui/TopPill';
 import { useUiPrefs } from '@/store/uiPrefs';
 
+// expo-router uses this for the whole tab segment — a screen render crash is caught
+// here (persisted + recoverable) instead of expo-router's blank production screen.
+export { ErrorBoundary } from '@/components/RouteErrorBoundary';
+
 const TABS = ['/', '/tasks', '/stats', '/finances', '/health'] as const;
 
 function tabIdx(path: string): number {

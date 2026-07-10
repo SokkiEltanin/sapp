@@ -26,17 +26,7 @@ import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
 import { useUiActions } from '@/store/uiActions';
 import { todayISO } from '@/utils/date';
-
-function persistCrash(error: any, extra?: string) {
-  try {
-    AsyncStorage.setItem('last_crash', JSON.stringify({
-      at: new Date().toISOString(),
-      message: error?.message ?? String(error),
-      stack: (error?.stack ?? '').slice(0, 4000),
-      component: (extra ?? '').slice(0, 2000),
-    })).catch(() => {});
-  } catch {}
-}
+import { persistCrash } from '@/utils/crashLog';
 
 // Catch JS errors that escape React's render tree (async, event handlers, native
 // bridge) too — those can leave a black screen the ErrorBoundary never sees. We

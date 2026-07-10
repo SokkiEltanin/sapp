@@ -75,6 +75,9 @@ import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame from '@/components/counters/StreakFlame';
+// Route-level crash boundary — catches a dashboard render crash as a recoverable,
+// persisted screen instead of expo-router's blank production fallback.
+export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';

@@ -18,6 +18,8 @@ import { pl } from 'date-fns/locale';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
+// Route-level crash boundary (persisted + recoverable, not a blank screen).
+export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import PressableScale from '@/components/ui/PressableScale';
 import ExpenseItem from '@/components/expenses/ExpenseItem';
