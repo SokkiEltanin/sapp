@@ -336,7 +336,8 @@ export default function ManualReceiptScreen() {
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   });
-  const addExpense = useExpensesStore(s => s.addExpense);
+  const addPending = useExpensesStore(s => s.addPending);
+  const confirmSync = useExpensesStore(s => s.confirmSync);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0] || ''); }).catch(() => {}); }, []);
 
   function makeItem(): Item {
@@ -503,8 +504,10 @@ export default function ManualReceiptScreen() {
         createdAt: nowIso,
         updatedAt: nowIso,
       };
-      addExpense(expense);
-      expensesService.addWithId(expense.id, expense).catch(() => {});
+      addPending(expense);   // shows immediately + survives a refresh until synced
+      expensesService.addWithId(expense.id, expense)
+        .then(() => confirmSync(expense.id))
+        .catch(() => {}); // stays pending; retried on next foreground
       haptic.success();
       toast.success(`Zapisano ${receiptItems.length} pozycji · ${totalAmount.toFixed(2)} zł`);
       goBackOrHome();

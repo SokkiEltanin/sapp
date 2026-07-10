@@ -20,6 +20,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { drainBankNotifications } from '@/services/bankNotificationDrain';
+import { flushPendingExpenseWrites } from '@/services/expenseSync';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
@@ -226,6 +227,17 @@ export default function RootLayout() {
     const t = setTimeout(() => { drainBankNotifications().catch(() => {}); }, 1500);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') drainBankNotifications().catch(() => {});
+    });
+    return () => { clearTimeout(t); sub.remove(); };
+  }, []);
+
+  // Retry Firestore writes for receipts/expenses saved on weak/no signal (they were
+  // stored locally + flagged pendingSync so they never disappear). Cold start +
+  // every foreground, so a save made offline lands in the cloud once back online.
+  useEffect(() => {
+    const t = setTimeout(() => { flushPendingExpenseWrites().catch(() => {}); }, 2500);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') flushPendingExpenseWrites().catch(() => {});
     });
     return () => { clearTimeout(t); sub.remove(); };
   }, []);

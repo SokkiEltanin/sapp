@@ -83,8 +83,10 @@ export default function ScanReceiptModal() {
   const [payer, setPayer]           = useState<string>('');
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer]     = useState('');
-  const addExpense = useExpensesStore(s => s.addExpense);
+  const addPending = useExpensesStore(s => s.addPending);
   const updateExpense = useExpensesStore(s => s.updateExpense);
+  const markPending = useExpensesStore(s => s.markPending);
+  const confirmSync = useExpensesStore(s => s.confirmSync);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
@@ -393,7 +395,10 @@ export default function ScanReceiptModal() {
           ...(payer ? { payer } : {}),
         };
         updateExpense(existingBank.id, patch);
-        expensesService.update(existingBank.id, patch).catch(() => {});
+        markPending(existingBank.id);   // preserve the receipt on refresh until the cloud confirms
+        expensesService.update(existingBank.id, patch)
+          .then(() => confirmSync(existingBank.id))
+          .catch(() => {}); // stays pending; retried on next foreground
         toast.success('Dopasowano do płatności z banku — bez duplikatu');
       } else {
         // Build locally + write to Firestore in the BACKGROUND. The web Firestore
@@ -419,8 +424,10 @@ export default function ScanReceiptModal() {
           createdAt: now,
           updatedAt: now,
         };
-        addExpense(expense);
-        expensesService.addWithId(expense.id, expense).catch(() => {});
+        addPending(expense);   // shows immediately + survives a refresh until synced
+        expensesService.addWithId(expense.id, expense)
+          .then(() => confirmSync(expense.id))
+          .catch(() => {}); // stays pending; retried on next foreground
       }
       // Persist corrections to memory for future receipts
       const parsedCats: Record<number, ExpenseCategory> = {};
