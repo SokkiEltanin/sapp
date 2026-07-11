@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { weekKeyOf } from '@/utils/quests';
 
 // The companion blob's PERSISTED state: identity, growth (xp), the coin wallet,
 // owned/equipped cosmetics and which quest milestones have already paid out. Its
@@ -22,6 +23,7 @@ interface PetState {
   equipped: Record<string, string>; // slot → itemId (e.g. { hat: 'hat_party' })
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
+  weeklyClaims: Record<string, string>; // weeklyQuestId → week key (Monday) claimed
   monthlyClaims: Record<string, string>; // monthlyQuestId → YYYY-MM claimed
   // ── petting / affection (fills as you tap the cat; resets daily) ──
   affection: number;            // 0..100 for today
@@ -43,6 +45,7 @@ interface PetState {
   equip: (slot: string, id: string | null) => void;
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
+  claimWeekly: (id: string, coins: number, xp: number) => boolean;   // weekly (once/week)
   claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
   petCat: (inc: number, rewardCoins: number, rewardXp: number) => { value: number; justFull: boolean }; // tap-to-pet
@@ -65,6 +68,7 @@ export const usePetStore = create<PetState>()(
       equipped: {},
       claimedQuests: [],
       dailyClaims: {},
+      weeklyClaims: {},
       monthlyClaims: {},
       affection: 0,
       affectionDay: null,
@@ -105,6 +109,12 @@ export const usePetStore = create<PetState>()(
         const t = todayISO();
         if (get().dailyClaims[id] === t) return false;
         set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: t }, coins: s.coins + coins, xp: s.xp + xp }));
+        return true;
+      },
+      claimWeekly: (id, coins, xp) => {
+        const w = weekKeyOf();
+        if (get().weeklyClaims[id] === w) return false;
+        set((s) => ({ weeklyClaims: { ...s.weeklyClaims, [id]: w }, coins: s.coins + coins, xp: s.xp + xp }));
         return true;
       },
       claimMonthly: (id, coins, xp) => {
@@ -168,7 +178,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, monthlyClaims: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -176,7 +186,7 @@ export const usePetStore = create<PetState>()(
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped,
-        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, monthlyClaims: s.monthlyClaims,
+        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,

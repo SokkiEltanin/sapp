@@ -9,7 +9,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { buildQuests, sweetlessDaysFrom, QuestCtx } from '@/utils/quests';
+import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { equippedRoom } from '@/utils/petShop';
 import { useHabits } from '@/hooks/useHabits';
 import { getWaterGlasses } from '@/utils/habits';
@@ -34,7 +34,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimedQuests, dailyClaims, monthlyClaims, equipped, petCat, affection, affectionDay } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
@@ -44,7 +44,7 @@ export default function Pet() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
 
-  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0 });
+  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number; stepsThisWeek: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0, stepsThisWeek: 0 });
   const [stepGoal, setStepGoal] = useState(10000);
   const [waterGoal, setWaterGoal] = useState(8);
   const [waterToday, setWaterToday] = useState(0);
@@ -64,10 +64,12 @@ export default function Pet() {
       const sleep = (h[t]?.sleepMinutes ?? 0) || (yest ? h[yest]?.sleepMinutes ?? 0 : 0);
       const bestStepDay = Object.values(h).reduce((m, d) => Math.max(m, d.steps ?? 0), 0);
       const stepsThisMonth = Object.entries(h).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
+      const wk = weekKeyOf();
+      const stepsThisWeek = Object.entries(h).filter(([d]) => d >= wk).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
       const recent = Object.values(h).map(d => d.steps).filter(x => x > 0).slice(0, 14);
       const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
       const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
-      setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth });
+      setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek });
     }).catch(() => {});
     getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
     getWaterGlasses(t).then(g => setWaterToday(g)).catch(() => {});
@@ -104,11 +106,14 @@ export default function Pet() {
       sleepMinutes: health.sleep,
       moodDaysThisMonth,
       stepsThisMonth: health.stepsThisMonth,
+      moodDaysThisWeek: new Set(moodEntries.filter(e => (e.date ?? '') >= weekKeyOf()).map(e => e.date)).size,
+      stepsThisWeek: health.stepsThisWeek,
+      affectionFull: affToday >= 100,
     };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal]);
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday]);
   const quests = useMemo(
-    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, monthlyClaims, today: todayISO() }),
-    [questCtx, claimedQuests, dailyClaims, monthlyClaims],
+    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }),
+    [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims],
   );
 
   // Tap-to-pet: fills today's affection bar; a full bar pays a one-a-day bonus and
@@ -120,6 +125,9 @@ export default function Pet() {
 
   const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
     if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
+  };
+  const onClaimWeekly = (id: string, c2: number, x: number, label: string) => {
+    if (claimWeekly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
   };
 
   const onClaimDaily = (id: string, c2: number, x: number, label: string) => {
@@ -278,6 +286,31 @@ export default function Pet() {
                     : q.done
                       ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
                       : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* ── Weekly challenges ── */}
+        {quests.weekly.length > 0 && (
+          <>
+            <Text style={s.section}>Tygodniowe</Text>
+            <View style={{ width: '100%', gap: spacing[3] }}>
+              {quests.weekly.map(w => (
+                <View key={w.id} style={s.mCard}>
+                  <View style={s.mTop}>
+                    <Text style={s.mLabel}>{w.label}</Text>
+                    {w.done && !w.claimed
+                      ? <PressableScale onPress={() => onClaimWeekly(w.id, w.coins, w.xp, w.label)}>
+                          <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>Odbierz +{w.coins}</Text></View>
+                        </PressableScale>
+                      : w.claimed
+                        ? <View style={[s.mTier, s.mTierClaimed]}><CheckIcon size={10} color="#2AC68F" /><Text style={[s.mTierTxt, { color: '#2AC68F' }]}>odebrane</Text></View>
+                        : <Text style={s.mVal}>+{w.coins} 🪙</Text>}
+                  </View>
+                  <View style={s.moTrack}><View style={[s.moFill, { width: `${Math.round(w.progress * 100)}%`, backgroundColor: w.done ? '#2AC68F' : '#FBBF24' }]} /></View>
+                  <Text style={s.moVal}>{w.value.toLocaleString('pl-PL')} / {w.target.toLocaleString('pl-PL')} {w.unit}</Text>
                 </View>
               ))}
             </View>

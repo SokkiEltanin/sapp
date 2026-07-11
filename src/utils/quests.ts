@@ -13,12 +13,16 @@ export interface QuestCtx {
   bestStepDay: number;     // all-time best single-day step count on record
   habitBestStreak: number;
   cardsCollected: number;
-  // ── optional (drives dynamic daily + monthly quests when provided) ──
+  // ── optional (drives dynamic daily + weekly + monthly quests when provided) ──
   boughtSweetToday?: boolean;
   stepTarget?: number;         // adaptive "beat your form" step goal
   waterToday?: number;         // glasses drunk today
   waterGoal?: number;          // daily water goal (glasses)
   sleepMinutes?: number;       // last night's sleep (0 = unknown)
+  affectionFull?: boolean;     // petted the cat to a full affection bar today
+  moodDaysThisWeek?: number;   // distinct mood days this (Mon-based) week
+  stepsThisWeek?: number;      // total steps this week
+  habitDaysThisWeek?: number;  // days this week with ALL habits done
   moodDaysThisMonth?: number;  // distinct days with a mood entry this month
   stepsThisMonth?: number;     // total steps this month
 }
@@ -26,8 +30,10 @@ export interface QuestCtx {
 export interface ClaimState {
   claimedMilestones: string[];         // tier ids already claimed
   dailyClaims: Record<string, string>; // dailyId → YYYY-MM-DD
+  weeklyClaims?: Record<string, string>;  // weeklyId → week key (Monday YYYY-MM-DD)
   monthlyClaims?: Record<string, string>; // monthlyId → YYYY-MM
   today: string;                       // YYYY-MM-DD
+  week?: string;                       // Monday of this week, YYYY-MM-DD
   month?: string;                      // YYYY-MM
 }
 
@@ -38,6 +44,7 @@ const DAILY: DailyDef[] = [
   { id: 'd_steps10', label: '10 000 kroków',          coins: 1, xp: 3, done: c => c.stepsToday >= 10000, note: c => `${c.stepsToday}/10000` },
   { id: 'd_steps20', label: '20 000 kroków',          coins: 1, xp: 4, done: c => c.stepsToday >= 20000, note: c => `${c.stepsToday}/20000` },
   { id: 'd_habits',  label: 'Wszystkie nawyki',       coins: 1, xp: 3, done: c => c.habitsTotal > 0 && c.habitsDone >= c.habitsTotal, note: c => c.habitsTotal > 0 ? `${c.habitsDone}/${c.habitsTotal}` : 'brak nawyków' },
+  { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 1, xp: 3, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione ❤️' : 'stuknij kota' },
 ];
 
 export interface DailyQuestState { id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string }
@@ -47,13 +54,13 @@ interface Tier { at: number; coins: number }
 interface MilestoneDef { id: string; label: string; unit: string; value: (c: QuestCtx) => number; tiers: Tier[] }
 const MILESTONES: MilestoneDef[] = [
   { id: 'm_sweetless', label: 'Bez słodyczy', unit: 'dni', value: c => c.sweetlessDays,
-    tiers: [{ at: 10, coins: 1 }, { at: 30, coins: 3 }, { at: 50, coins: 5 }, { at: 100, coins: 12 }] },
+    tiers: [{ at: 10, coins: 1 }, { at: 30, coins: 3 }, { at: 50, coins: 5 }, { at: 100, coins: 12 }, { at: 200, coins: 25 }] },
   { id: 'm_steprec', label: 'Rekord kroków w dniu', unit: 'kroków', value: c => c.bestStepDay,
-    tiers: [{ at: 10000, coins: 1 }, { at: 15000, coins: 2 }, { at: 20000, coins: 3 }] },
+    tiers: [{ at: 10000, coins: 1 }, { at: 15000, coins: 2 }, { at: 20000, coins: 3 }, { at: 25000, coins: 5 }, { at: 30000, coins: 8 }] },
   { id: 'm_streak', label: 'Seria nawyku', unit: 'dni', value: c => c.habitBestStreak,
-    tiers: [{ at: 7, coins: 2 }, { at: 30, coins: 5 }, { at: 100, coins: 15 }] },
+    tiers: [{ at: 7, coins: 2 }, { at: 30, coins: 5 }, { at: 100, coins: 15 }, { at: 200, coins: 30 }] },
   { id: 'm_cards', label: 'Karty miesiąca', unit: 'kart', value: c => c.cardsCollected,
-    tiers: [{ at: 3, coins: 2 }, { at: 6, coins: 3 }, { at: 12, coins: 6 }] },
+    tiers: [{ at: 3, coins: 2 }, { at: 6, coins: 3 }, { at: 12, coins: 6 }, { at: 24, coins: 12 }] },
 ];
 
 export interface MilestoneTierState { id: string; at: number; coins: number; xp: number; reached: boolean; claimed: boolean }
@@ -80,9 +87,19 @@ const MONTHLY: MonthlyDef[] = [
 
 export interface MonthlyQuestState { id: string; label: string; unit: string; value: number; target: number; coins: number; xp: number; done: boolean; claimed: boolean; progress: number }
 
+// ─── Weekly challenges (claim once per Mon-based week) ──────────────────────
+interface WeeklyDef { id: string; label: string; unit: string; coins: number; xp: number; target: number; value: (c: QuestCtx) => number | undefined }
+const WEEKLY: WeeklyDef[] = [
+  { id: 'w_mood',   label: 'Nastrój przez 5 dni w tygodniu', unit: 'dni',    coins: 5, xp: 40, target: 5,     value: c => c.moodDaysThisWeek },
+  { id: 'w_steps',  label: '70 000 kroków w tygodniu',       unit: 'kroków', coins: 6, xp: 45, target: 70000, value: c => c.stepsThisWeek },
+  { id: 'w_habits', label: 'Wszystkie nawyki przez 4 dni',   unit: 'dni',    coins: 5, xp: 40, target: 4,     value: c => c.habitDaysThisWeek },
+];
+export interface WeeklyQuestState { id: string; label: string; unit: string; value: number; target: number; coins: number; xp: number; done: boolean; claimed: boolean; progress: number }
+
 export interface QuestsResult {
   daily: DailyQuestState[];
   bonusDaily: DailyQuestState[];
+  weekly: WeeklyQuestState[];
   milestones: MilestoneQuestState[];
   monthly: MonthlyQuestState[];
   claimableCount: number;   // everything ready-but-unclaimed
@@ -94,6 +111,8 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
   let claimable = 0;
   const month = claim.month ?? claim.today.slice(0, 7);
   const monthlyClaims = claim.monthlyClaims ?? {};
+  const week = claim.week ?? claim.today;
+  const weeklyClaims = claim.weeklyClaims ?? {};
 
   const daily: DailyQuestState[] = DAILY.map(d => {
     const done = d.done(ctx);
@@ -133,7 +152,25 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
     return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: def.coins, xp: def.xp, done, claimed, progress: Math.min(1, value / def.target) };
   });
 
-  return { daily, bonusDaily, milestones, monthly, claimableCount: claimable };
+  const weekly: WeeklyQuestState[] = WEEKLY.map(w => ({ def: w, raw: w.value(ctx) }))
+    .filter(x => x.raw !== undefined)
+    .map(({ def, raw }) => {
+      const value = raw as number;
+      const done = value >= def.target;
+      const claimed = weeklyClaims[def.id] === week;
+      if (done && !claimed) claimable++;
+      return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: def.coins, xp: def.xp, done, claimed, progress: Math.min(1, value / def.target) };
+    });
+
+  return { daily, bonusDaily, weekly, milestones, monthly, claimableCount: claimable };
+}
+
+// Monday (YYYY-MM-DD) of the week a date falls in — the weekly-claim key.
+export function weekKeyOf(d = new Date()): string {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (x.getDay() + 6) % 7; // Mon=0 … Sun=6
+  x.setDate(x.getDate() - dow);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
 }
 
 // Days since the most recent sweet/snack receipt item (for the sweetless ladder).
