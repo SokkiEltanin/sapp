@@ -100,7 +100,7 @@ export const AVOID_PRESETS: { key: string; label: string; keyword: string }[] = 
   { key: 'energy',   label: 'energetyków', keyword: 'monster|red bull|redbull|tiger energy|energetyk|rockstar|burn ' },
 ];
 
-type MatchExpense = { type?: string; date?: string; note?: string; tags?: string[]; storeName?: string; receiptItems?: { name?: string }[] };
+type MatchExpense = { type?: string; date?: string; note?: string; tags?: string[]; storeName?: string; receiptItems?: { name?: string; tags?: string[] }[] };
 
 export function matchesAvoid(text: string, keyword: string): boolean {
   const hay = text.toLowerCase();
@@ -114,7 +114,12 @@ export function autoLastDate(keyword: string, expenses: MatchExpense[]): string 
     if (e.type === 'income') continue;
     const day = (e.date ?? '').slice(0, 10);
     if (!day) continue;
-    const parts = [e.note, (e.tags ?? []).join(' '), e.storeName, ...(e.receiptItems ?? []).map(it => it?.name)].filter(Boolean).join(' ');
+    // Include each receipt item's NAME *and* TAGS — a chocolate bar named "Milka"
+    // won't match the keyword by name, but its "słodycze" tag will.
+    const parts = [
+      e.note, (e.tags ?? []).join(' '), e.storeName,
+      ...(e.receiptItems ?? []).flatMap(it => [it?.name, ...(it?.tags ?? [])]),
+    ].filter(Boolean).join(' ');
     if (matchesAvoid(parts, keyword) && (!last || day > last)) last = day;
   }
   return last;

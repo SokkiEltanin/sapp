@@ -1507,7 +1507,7 @@ export default function DashboardScreen() {
         )}
         {spark && spark.some(v => v > 0) && (
           <View style={{ marginTop: spacing[2], opacity: 0.8 }}>
-            <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} />
+            <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} zoom={t.metric === 'weight'} />
           </View>
         )}
       </View>
