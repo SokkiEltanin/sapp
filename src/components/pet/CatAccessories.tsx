@@ -91,15 +91,64 @@ const NECK_BOW = (
   </G>
 );
 
+// ── New accessories (verified by render on the cat) ──
+const HAT_WIZARD = (
+  <G>
+    <Path d="M953 262 Q1010 470 1096 648 L810 648 Q900 470 953 262 Z" fill="#5B4B9E" />
+    <Path d="M754 640 Q953 712 1152 640 L1152 686 Q953 758 754 686 Z" fill="#4A3D85" />
+    <Circle cx={953} cy={440} r={13} fill="#F5C94E" />
+    <Circle cx={905} cy={545} r={9} fill="#FBE08A" />
+    <Circle cx={1005} cy={560} r={9} fill="#FBE08A" />
+    <Circle cx={953} cy={360} r={10} fill="#FBE08A" />
+  </G>
+);
+
+// A single 6-petal flower with a golden centre.
+function Petals({ cx, cy, col }: { cx: number; cy: number; col: string }) {
+  const pts = [0, 1, 2, 3, 4, 5].map(i => { const a = (i / 6) * Math.PI * 2; return { x: cx + Math.cos(a) * 26, y: cy + Math.sin(a) * 26 }; });
+  return <G>{pts.map((p, i) => <Circle key={i} cx={p.x} cy={p.y} r={18} fill={col} />)}<Circle cx={cx} cy={cy} r={15} fill="#F5C94E" /></G>;
+}
+const HAT_FLOWER = (
+  <G>
+    <Petals cx={722} cy={600} col="#F49AC1" />
+    <Petals cx={842} cy={566} col="#F7C6DE" />
+    <Petals cx={953} cy={556} col="#F49AC1" />
+    <Petals cx={1064} cy={566} col="#F7C6DE" />
+    <Petals cx={1184} cy={600} col="#F49AC1" />
+  </G>
+);
+
+const FACE_MONOCLE = (
+  <G>
+    <Circle cx={1107} cy={762} r={122} fill="rgba(255,255,255,0.12)" stroke="#E7B84B" strokeWidth={16} />
+    <Path d="M1150 872 Q1210 1010 1120 1120" fill="none" stroke="#E7B84B" strokeWidth={9} />
+    <Circle cx={1118} cy={1128} r={14} fill="#E7B84B" />
+  </G>
+);
+
+// warm orange so it pops on the blue coat (a blue scarf vanished into the cat)
+const NECK_SCARF = (
+  <G>
+    <Path d="M690 1044 Q953 1140 1216 1044 Q1224 1112 1180 1168 Q953 1250 726 1168 Q682 1112 690 1044 Z" fill="#E0733A" />
+    <Path d="M1112 1150 L1176 1372 L1052 1372 L1080 1150 Z" fill="#E0733A" />
+    <Path d="M700 1070 Q953 1160 1206 1070" fill="none" stroke="#C25A26" strokeWidth={10} opacity={0.6} />
+    <Path d="M1066 1200 L1160 1360" stroke="#C25A26" strokeWidth={10} opacity={0.6} />
+  </G>
+);
+
 export const CAT_ACCESSORIES: Record<string, React.ReactNode> = {
   hat_crown: HAT_CROWN,
   hat_beret: HAT_BERET,
   hat_beanie: HAT_BEANIE,
   hat_party: HAT_PARTY,
+  hat_wizard: HAT_WIZARD,
+  hat_flower: HAT_FLOWER,
   face_round: FACE_ROUND,
   face_shades: FACE_SHADES,
+  face_monocle: FACE_MONOCLE,
   neck_collar: NECK_COLLAR,
   neck_bow: NECK_BOW,
+  neck_scarf: NECK_SCARF,
 };
 
 export type Worn = { hat?: string; face?: string; neck?: string; held?: string };

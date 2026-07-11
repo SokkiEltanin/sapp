@@ -33,15 +33,19 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'hat_beanie', name: 'Czapka zimowa',      slot: 'hat', tier: 'basic',     cost: 30,  emoji: '🧢' },
   { id: 'hat_party',  name: 'Czapka urodzinowa',  slot: 'hat', tier: 'rare',      cost: 50,  emoji: '🎉' },
   { id: 'hat_beret',  name: 'Beret',              slot: 'hat', tier: 'rare',      cost: 60,  emoji: '🎨' },
+  { id: 'hat_flower', name: 'Wianek z kwiatów',   slot: 'hat', tier: 'rare',      cost: 55,  emoji: '🌸' },
+  { id: 'hat_wizard', name: 'Kapelusz czarodzieja', slot: 'hat', tier: 'epic',   cost: 95,  emoji: '🧙' },
   { id: 'hat_crown',  name: 'Korona',             slot: 'hat', tier: 'legendary', cost: 180, emoji: '👑' },
 
   // ── Twarz (custom) ──
-  { id: 'face_round',  name: 'Okrągłe okulary',   slot: 'face', tier: 'basic',    cost: 28,  emoji: '👓' },
-  { id: 'face_shades', name: 'Okulary słoneczne', slot: 'face', tier: 'rare',     cost: 55,  emoji: '🕶️' },
+  { id: 'face_round',   name: 'Okrągłe okulary',   slot: 'face', tier: 'basic',   cost: 28,  emoji: '👓' },
+  { id: 'face_shades',  name: 'Okulary słoneczne', slot: 'face', tier: 'rare',    cost: 55,  emoji: '🕶️' },
+  { id: 'face_monocle', name: 'Monokl',            slot: 'face', tier: 'epic',    cost: 75,  emoji: '🧐' },
 
   // ── Szyja (custom) ──
   { id: 'neck_collar', name: 'Obroża z dzwonkiem', slot: 'neck', tier: 'basic',   cost: 35,  emoji: '🔔' },
   { id: 'neck_bow',    name: 'Muszka',             slot: 'neck', tier: 'rare',    cost: 48,  emoji: '🎀' },
+  { id: 'neck_scarf',  name: 'Szalik',             slot: 'neck', tier: 'rare',    cost: 45,  emoji: '🧣' },
 
   // ── Trzymane ──
   { id: 'held_balloon', name: 'Balonik',   slot: 'held', tier: 'basic',    cost: 18,  emoji: '🎈' },
