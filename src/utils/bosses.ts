@@ -54,6 +54,30 @@ export const BOSSES: Boss[] = [
     loot: { id: 'loot_dragon', name: 'Trofeum Smoka', emoji: '🐲', desc: '+5% uniku, +3% siły ataku', bonus: { dodge: 0.05, atk: 0.03 } },
     coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…',
   },
+  {
+    id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 2200,
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_hourglass', name: 'Klepsydra Skupienia', emoji: '⏳', desc: '+7% energii z dbania o siebie', bonus: { energyMult: 0.07 } },
+    coins: 45, xp: 450, taunt: 'Jeszcze tylko jeden filmik…',
+  },
+  {
+    id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 3200,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+6% uniku', bonus: { dodge: 0.06 } },
+    coins: 60, xp: 600, taunt: 'Martw się wszystkim naraz…',
+  },
+  {
+    id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 4500,
+    weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
+    loot: { id: 'loot_veg', name: 'Korona Warzyw', emoji: '🥦', desc: '+5% siły ataku, +2% kryt', bonus: { atk: 0.05, crit: 0.02 } },
+    coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…',
+  },
+  {
+    id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 6500,
+    weakness: 'steps', weaknessLabel: 'kroki',
+    loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +5% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.05, energyMult: 0.05 } },
+    coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…',
+  },
 ];
 
 export function bossById(id: string): Boss | undefined { return BOSSES.find(b => b.id === id); }
