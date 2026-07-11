@@ -13,7 +13,12 @@ const MONTH_STEMS = ['stycz', 'lut', 'mar', 'kwie', 'maj', 'czerw', 'lip', 'sier
 
 function monthIndexFromText(text: string): number {
   const t = dePl(text);
-  for (let i = 0; i < MONTH_STEMS.length; i++) if (t.includes(MONTH_STEMS[i])) return i;
+  // Only trust a month name that follows "za " (…WYPŁATA ZA KWIECIEŃ / Wypłata za
+  // maj). A bare stem match false-fired on employer names — e.g. "MARKETING
+  // INVESTMENT GROUP" contains "mar" (marzec) and mis-assigned the paycheck to March.
+  for (let i = 0; i < MONTH_STEMS.length; i++) {
+    if (new RegExp(`za\\s+${MONTH_STEMS[i]}`).test(t)) return i;
+  }
   return -1;
 }
 
