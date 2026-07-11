@@ -1,5 +1,6 @@
 import { parseBankNotification } from '@/utils/bankNotification';
 import { loadMerchantMemory, merchantFor, guessCategory } from '@/utils/merchantMemory';
+import { isKnownPaycheckSender } from '@/utils/paycheckSenders';
 import { useBankQueue } from '@/store/bankQueueStore';
 
 // Turn one bank push notification into a queued, pre-categorised payment. Safe to call
@@ -16,11 +17,14 @@ export async function ingestBankNotification(title: string, text: string): Promi
   // Incoming transfer → income. Default to "[JD] paycheck" when it looks like salary
   // (the common case for a single job); the user can flip it in review.
   if (tx.direction === 'in') {
+    // [JD] if it reads like salary OR it's from a sender the user has confirmed as a
+    // paycheck before (employer transfers rarely say "wynagrodzenie").
+    const jd = !!tx.isSalary || await isKnownPaycheckSender(tx.storeKey);
     return store.enqueue({
       ...tx,
       category: 'other',
       suggestedCategory: 'other',
-      jd: !!tx.isSalary,
+      jd,
       auto: false, // never auto-log income blindly — always review first
     });
   }

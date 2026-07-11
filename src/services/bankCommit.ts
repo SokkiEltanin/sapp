@@ -7,6 +7,7 @@ import { useWorkStore } from '@/store/workStore';
 import { useSubscriptionsStore } from '@/store/subscriptionsStore';
 import { subscriptionsService } from '@/services/subscriptionsService';
 import { matchSubscriptionForPayment, advanceBillingDate, isConfidentSubMatch, queueSubConfirm } from '@/utils/subscriptionAuto';
+import { rememberPaycheckSender } from '@/utils/paycheckSenders';
 
 // A bank payment that settles a subscription: if it's a CONFIDENT match (same
 // currency + close amount) advance the billing date silently, so the "zapłaciłeś?"
@@ -68,6 +69,9 @@ export async function commitBankTx(
         note, date: p.dateISO, paymentMethod: 'card', bankMatched: true,
       } as any);
       st.addExpense(exp);
+      // Teach the paycheck-sender memory so next month's transfer from this employer
+      // auto-flags as [JD] even without a "wynagrodzenie" keyword.
+      if (p.jd) rememberPaycheckSender(p.storeKey).catch(() => {});
       return { ok: true, matched: false };
     } catch {
       return { ok: false, matched: !!dup };
