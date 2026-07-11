@@ -1098,14 +1098,26 @@ export default function DashboardScreen() {
   const [screenFocused, setScreenFocused] = useState(true);
   useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
   const [appActive, setAppActive] = useState(true);
+  // Pull fresh calendar + work data when the app returns to the foreground (screens
+  // stay mounted, so a plain mount effect never re-runs). Health is refreshed via
+  // reloadHealth below; together this keeps the dashboard + pet current "od razu po
+  // włączeniu apki" instead of showing yesterday's state.
+  const refreshOnResume = useCallback(() => {
+    import('@/services/calendarService').then(({ calendarService }) => calendarService.getAllEvents().then(setEvents).catch(() => {})).catch(() => {});
+    googleCalendarService.getStoredToken().then(token => { if (token) googleCalendarService.fetchEvents().then(setGcalEvents).catch(() => {}); }).catch(() => {});
+    workService.getSettings().then(setWorkSettings).catch(() => {});
+    workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
+    reloadHealth();
+  }, [reloadHealth]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => {
       setAppActive(s === 'active');
+      if (s === 'active') refreshOnResume();
       // Don't let a left-open popup greet you on the next resume.
       if (s !== 'active') { setWorkPanel(false); setPaydayModal(false); }
     });
     return () => sub.remove();
-  }, []);
+  }, [refreshOnResume]);
   // Auto-accept queued payments from trusted (auto) merchants once expenses are
   // loaded (so receipt-matching is reliable). Re-runs when the app comes back to
   // the foreground — the native listener may have queued new ones while away.
@@ -2399,7 +2411,13 @@ export default function DashboardScreen() {
                 </View>
               );
 
-              nodes['payday-prompt'] = paydayDue(paydayCfg, paydayHandled, paydayDismissedDate) && (
+              // Don't ask if a paycheck already landed this month — whether logged by
+              // hand, via this prompt, or auto-captured from a [JD]/salary bank credit.
+              const wpLc = (workSettings.workPrefix ?? '').trim().toLowerCase();
+              const gotPaidThisMonth = expenses.some(e =>
+                e.type === 'income' && (e.date ?? '').slice(0, 7) === currentMonth() &&
+                (e.category === 'salary' || (!!wpLc && (e.tags ?? []).some(t => (t ?? '').toLowerCase() === wpLc))));
+              nodes['payday-prompt'] = paydayDue(paydayCfg, paydayHandled, paydayDismissedDate) && !gotPaidThisMonth && (
                 <View style={[s.card, { backgroundColor: cardBgDark }]}>
                   <View style={s.cardHeader}>
                     <Wallet size={13} color={colors.accent.green} />
