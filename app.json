@@ -73,6 +73,7 @@
       "./plugins/withHealthConnectQueries",
       "./plugins/withAppShortcuts",
       "./plugins/withBankNotificationListener",
+      "./plugins/withNativeCrashCatcher",
       "./plugins/withResizeConfig",
       [
         "expo-build-properties",

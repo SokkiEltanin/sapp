@@ -27,6 +27,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { useUiActions } from '@/store/uiActions';
 import { todayISO } from '@/utils/date';
 import { persistCrash } from '@/utils/crashLog';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Catch JS errors that escape React's render tree (async, event handlers, native
 // bridge) too — those can leave a black screen the ErrorBoundary never sees. We
@@ -172,6 +173,23 @@ export default function RootLayout() {
   // Only very recent ones — an old crash shouldn't nag on every launch.
   useEffect(() => {
     (async () => {
+      // 1) NATIVE (JVM) crash caught by the ContentProvider handler — this is the
+      //    black-screen case a JS boundary can't see. Prefer it if present.
+      try {
+        const file = `${FileSystem.documentDirectory ?? ''}native_crash.json`;
+        const info = await FileSystem.getInfoAsync(file);
+        if (info.exists) {
+          const cr = JSON.parse(await FileSystem.readAsStringAsync(file));
+          await FileSystem.deleteAsync(file, { idempotent: true }).catch(() => {});
+          const age = Date.now() - Number(cr.at ?? 0);
+          if (age >= 0 && age < 20 * 60 * 1000) {
+            const stackTop = String(cr.stack ?? '').split('\n').slice(0, 8).join('\n');
+            setTimeout(() => Alert.alert('Natywny crash (wyślij mi to)', `${cr.message ?? '—'}\n\n${stackTop}`), 1400);
+            return;
+          }
+        }
+      } catch {}
+      // 2) JS crash persisted via crashLog (route/root ErrorBoundary or global handler).
       try {
         const raw = await AsyncStorage.getItem('last_crash');
         if (!raw) return;
