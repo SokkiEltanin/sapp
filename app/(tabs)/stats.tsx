@@ -54,9 +54,9 @@ const MODE_ORDER: CalMode[] = ['month-detailed', 'week'];
 
 // Derived "service due" events route to vehicles/items, not /calendar/:id.
 function openCalEntry(id: string) {
-  if (id.startsWith('maint:i:')) { router.push('/items' as any); return; }
-  if (id.startsWith('maint:v:')) { router.push('/vehicles' as any); return; }
-  router.push(`/calendar/${id}` as any);
+  if (id.startsWith('maint:i:')) { router.navigate('/items' as any); return; }
+  if (id.startsWith('maint:v:')) { router.navigate('/vehicles' as any); return; }
+  router.navigate(`/calendar/${id}` as any);
 }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -108,7 +108,7 @@ function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps)
           <View style={dm.headerRight}>
             <TouchableOpacity
               style={[dm.addBtn, { backgroundColor: V + '22', borderColor: V + '55' }]}
-              onPress={() => { onClose(); router.push(`/calendar/add?date=${date}` as any); }}
+              onPress={() => { onClose(); router.navigate(`/calendar/add?date=${date}` as any); }}
               activeOpacity={0.8}
             >
               <Plus size={15} color={V} strokeWidth={2.5} />
@@ -177,7 +177,7 @@ function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps)
                 <TaskItem
                   key={t.id} task={t} index={i}
                   onToggle={onToggleTask}
-                  onPress={(id) => { onClose(); router.push(`/tasks/${id}` as any); }}
+                  onPress={(id) => { onClose(); router.navigate(`/tasks/${id}` as any); }}
                 />
               ))}
             </View>
@@ -470,7 +470,7 @@ export default function CalendarTabScreen() {
                     <RefreshCw size={14} color={gcalSyncing ? colors.text.muted : colors.accent.blue} />
                   </PressableScale>
                 )}
-                <PressableScale onPress={() => router.push('/calendar/add')} style={styles.iconBtn}>
+                <PressableScale onPress={() => router.navigate('/calendar/add')} style={styles.iconBtn}>
                   <Plus size={16} color={colors.text.primary} />
                 </PressableScale>
               </View>
@@ -525,7 +525,7 @@ export default function CalendarTabScreen() {
                 moodEntries={moodEntries}
                 onSelectDate={handleSelectDate}
                 onEventPress={(id) => openCalEntry(id)}
-                onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
+                onTaskPress={(id) => router.navigate(`/tasks/${id}` as any)}
                 detailed
               />
             )}
@@ -576,7 +576,7 @@ export default function CalendarTabScreen() {
                 events={selectedEvents}
                 date={selectedDate}
                 onPress={(id) => openCalEntry(id)}
-                onAddAtTime={(time) => router.push(`/calendar/add?startTime=${time}&type=event` as any)}
+                onAddAtTime={(time) => router.navigate(`/calendar/add?startTime=${time}&type=event` as any)}
               />
             </View>
 
@@ -590,7 +590,7 @@ export default function CalendarTabScreen() {
                   <TaskItem
                     key={t.id} task={t} index={i}
                     onToggle={toggleTask}
-                    onPress={(id) => router.push(`/tasks/${id}` as any)}
+                    onPress={(id) => router.navigate(`/tasks/${id}` as any)}
                   />
                 ))}
               </View>
@@ -612,7 +612,7 @@ export default function CalendarTabScreen() {
                 {selectedExpenses.map(exp => (
                   <Pressable
                     key={exp.id}
-                    onPress={() => router.push(`/expenses/${exp.id}` as any)}
+                    onPress={() => router.navigate(`/expenses/${exp.id}` as any)}
                     style={styles.expenseRow}
                   >
                     <View style={[styles.expenseDot, { backgroundColor: getCategoryMeta(exp.category as any).color }]} />

@@ -1314,6 +1314,41 @@ export default function DashboardScreen() {
       </View>
     );
 
+    // WEIGHT — always a clean, readable tile no matter which viz was picked: big
+    // current weight on the right, delta vs the previous reading (green = toward the
+    // goal when one is set), a zoomed trend line so tiny changes are visible, and the
+    // range. (Weight in a generic 'number'/'compare' tile was the unreadable case.)
+    if (t.metric === 'weight') {
+      const ser = metricSeries('weight', statCtx, period, 8, t.tag);
+      const nz = ser.values.filter(v => v > 0);
+      const latest = nz.length ? nz[nz.length - 1] : 0;
+      const prev   = nz.length > 1 ? nz[nz.length - 2] : 0;
+      const delta  = latest && prev ? latest - prev : 0;
+      const lo = nz.length ? Math.min(...nz) : 0;
+      const hi = nz.length ? Math.max(...nz) : 0;
+      const towardGoal = t.target && t.target > 0 && latest && prev
+        ? Math.abs(latest - t.target) < Math.abs(prev - t.target) : null;
+      const deltaColor = towardGoal == null ? colors.text.muted : towardGoal ? '#2AC68F' : '#F87171';
+      return (
+        <View style={[s.card, { backgroundColor: cardBgDark }]}>
+          <View style={s.waveHeadRow}>
+            <View style={[s.cardHeader, { flex: 1, marginBottom: 0 }]}>
+              <BarChart2 size={13} color={accentColor} />
+              <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
+            </View>
+            <View style={s.waveNowWrap}>
+              <Text style={[s.waveNow, { color: accentColor }]} numberOfLines={1}>{latest > 0 ? `${latest.toFixed(1)} kg` : '—'}</Text>
+              {delta !== 0 && <Text style={[s.waveDelta, { color: deltaColor }]}>{delta > 0 ? '+' : '−'}{Math.abs(delta).toFixed(1)} kg</Text>}
+            </View>
+          </View>
+          <WaveChart data={ser.values} color={accentColor} target={t.target} zoom />
+          {nz.length > 1 && (
+            <Text style={s.statSub}>Zakres {lo.toFixed(1)}–{hi.toFixed(1)} kg{t.target ? ` · cel ${Number(t.target).toFixed(1)} kg` : ''}</Text>
+          )}
+        </View>
+      );
+    }
+
     if (viz === 'wave') {
       const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       // Prominent CURRENT value (last non-zero) on the right; the history stays on
@@ -1555,7 +1590,7 @@ export default function DashboardScreen() {
       return (
         <TouchableOpacity
           style={[s.card, { backgroundColor: cardBgDark, gap: spacing[1] }]}
-          onPress={() => { haptic.tap(); router.push((note ? `/notes?noteId=${note.id}` : '/notes') as any); }}
+          onPress={() => { haptic.tap(); router.navigate((note ? `/notes?noteId=${note.id}` : '/notes') as any); }}
           activeOpacity={0.85}
         >
           <View style={s.cardHeader}>
@@ -1593,7 +1628,7 @@ export default function DashboardScreen() {
     return (
       <TouchableOpacity
         style={[s.card, { backgroundColor: cardBgDark, flexDirection: 'row', alignItems: 'center', gap: spacing[3] }]}
-        onPress={() => { haptic.tap(); if (t.route) router.push(t.route as any); }}
+        onPress={() => { haptic.tap(); if (t.route) router.navigate(t.route as any); }}
         activeOpacity={0.85}
       >
         <View style={s.toolIcon}><Pin size={16} color={accentColor} /></View>
@@ -2365,13 +2400,13 @@ export default function DashboardScreen() {
                   <TouchableOpacity onPress={() => { haptic.tap(); openCheckIn(); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Smile size={18} color={todayEntry ? colors.accent.green : colors.accent.purple} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/counters' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Hourglass size={17} color={colors.text.secondary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/month-cards' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/month-cards' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Layers size={17} color="#A78BFA" />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/achievements' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/achievements' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                     <Trophy size={17} color="#FFC83D" />
                   </TouchableOpacity>
                 </View>
@@ -2400,7 +2435,7 @@ export default function DashboardScreen() {
                     {maintReminders.map(r => {
                       const col = r.overdue ? colors.accent.red : colors.accent.amber;
                       return (
-                        <TouchableOpacity key={r.key} style={s.factRow} activeOpacity={0.7} onPress={() => { haptic.tap(); router.push(r.route as any); }}>
+                        <TouchableOpacity key={r.key} style={s.factRow} activeOpacity={0.7} onPress={() => { haptic.tap(); router.navigate(r.route as any); }}>
                           <View style={[s.insightDot, { backgroundColor: col }]} />
                           <Text style={[s.factText, { flex: 1 }]} numberOfLines={1}>{r.label}</Text>
                           <Text style={{ fontSize: 11, fontWeight: '800', color: col }}>{r.sub}</Text>
@@ -2507,13 +2542,13 @@ export default function DashboardScreen() {
               })();
 
               nodes['pet'] = (
-                <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/pet' as any); }}>
+                <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }}>
                   <PetTile name={petName} pet={petState} level={petLevel} claimable={petClaimable} />
                 </TouchableOpacity>
               );
 
               nodes['month-summary'] = featuredCard && (
-                <MonthWrappedCard card={featuredCard} compact onPress={() => router.push('/month-cards' as any)} />
+                <MonthWrappedCard card={featuredCard} compact onPress={() => router.navigate('/month-cards' as any)} />
               );
 
               nodes['tag-limits'] = tagLimits.map(t => {
@@ -2554,7 +2589,7 @@ export default function DashboardScreen() {
             nodes['budget-warning'] = budgetAlertCard && (
               <TouchableOpacity
                 style={[s.budgetWarnCard, { backgroundColor: cardBgDark }]}
-                onPress={() => { haptic.tap(); router.push('/(tabs)/finances' as any); }}
+                onPress={() => { haptic.tap(); router.navigate('/(tabs)/finances' as any); }}
                 activeOpacity={0.8}
               >
                 <Text style={s.budgetWarnText}>
@@ -2582,7 +2617,7 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     key={n.id}
                     style={s.pinNoteRow}
-                    onPress={() => { haptic.tap(); router.push(`/notes?noteId=${n.id}` as any); }}
+                    onPress={() => { haptic.tap(); router.navigate(`/notes?noteId=${n.id}` as any); }}
                     activeOpacity={0.8}
                   >
                     <FileText size={13} color={accentColor} style={{ marginTop: 1 }} />
@@ -2595,7 +2630,7 @@ export default function DashboardScreen() {
                     </View>
                   </TouchableOpacity>
                 ))}
-                <TouchableOpacity onPress={() => { haptic.tap(); router.push('/notes' as any); }} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/notes' as any); }} activeOpacity={0.7}>
                   <Text style={[s.pinNoteMore, { color: accentColor }]}>Wszystkie notatki →</Text>
                 </TouchableOpacity>
               </View>
@@ -2606,7 +2641,7 @@ export default function DashboardScreen() {
               {/* Tasks tile */}
               <TouchableOpacity
                 style={[s.miniCard, { backgroundColor: cardBgDark }]}
-                onPress={() => router.push('/(tabs)/tasks' as any)}
+                onPress={() => router.navigate('/(tabs)/tasks' as any)}
                 activeOpacity={0.8}
               >
                 <View style={s.miniCardTop}>
@@ -2646,7 +2681,7 @@ export default function DashboardScreen() {
                 /* Budget tile when not working */
                 <TouchableOpacity
                   style={[s.miniCard, { backgroundColor: cardBgDark }]}
-                  onPress={() => router.push('/(tabs)/finances' as any)}
+                  onPress={() => router.navigate('/(tabs)/finances' as any)}
                   activeOpacity={0.8}
                 >
                   <View style={s.miniCardTop}>
@@ -2689,7 +2724,7 @@ export default function DashboardScreen() {
                       <Text style={[s.todayBadgeText, hasOverdue && { color: colors.accent.red }]}>{totalCount}</Text>
                     </View>
                     {totalCount > 4 && (
-                      <TouchableOpacity onPress={() => { haptic.tap(); router.push('/(tabs)/tasks' as any); }} style={s.todayMore}>
+                      <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/(tabs)/tasks' as any); }} style={s.todayMore}>
                         <Text style={[s.todayMoreText, hasOverdue && { color: colors.accent.red }]}>+{totalCount - 4} więcej</Text>
                         <ChevronRight size={11} color={hasOverdue ? colors.accent.red : accentColor} />
                       </TouchableOpacity>
@@ -2702,7 +2737,7 @@ export default function DashboardScreen() {
                       <TouchableOpacity
                         key={task.id}
                         style={s.todayRow}
-                        onPress={() => { haptic.tap(); router.push('/(tabs)/tasks' as any); }}
+                        onPress={() => { haptic.tap(); router.navigate('/(tabs)/tasks' as any); }}
                         activeOpacity={0.7}
                       >
                         <TouchableOpacity
@@ -2731,7 +2766,7 @@ export default function DashboardScreen() {
                             (e as any).stopPropagation?.();
                             haptic.tap();
                             pomodoro.startFor(task.id, task.title);
-                            router.push('/pomodoro' as any);
+                            router.navigate('/pomodoro' as any);
                           }}
                           hitSlop={8}
                           activeOpacity={0.7}
@@ -2755,7 +2790,7 @@ export default function DashboardScreen() {
                 <View style={s.cardHeader}>
                   <CalendarClock size={13} color={accentColor} />
                   <Text style={s.cardTitle}>Odliczania</Text>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
                     <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
                   </TouchableOpacity>
                 </View>
@@ -2783,7 +2818,7 @@ export default function DashboardScreen() {
 
             nodes['bank-queue'] = bankPendingCount > 0 && (
               <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.85}
-                onPress={() => { haptic.tap(); router.push('/bank-review' as any); }}>
+                onPress={() => { haptic.tap(); router.navigate('/bank-review' as any); }}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={colors.accent.green} />
                   <Text style={s.cardTitle}>Płatności z banku</Text>
@@ -2800,7 +2835,7 @@ export default function DashboardScreen() {
                 <View style={s.cardHeader}>
                   <Hourglass size={13} color={accentColor} />
                   <Text style={s.cardTitle}>Liczniki</Text>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.push('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
                     <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
                   </TouchableOpacity>
                 </View>
@@ -2823,7 +2858,7 @@ export default function DashboardScreen() {
               const left = total - earnedBadges;
               return (
                 <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.85}
-                  onPress={() => { haptic.tap(); router.push('/achievements' as any); }}>
+                  onPress={() => { haptic.tap(); router.navigate('/achievements' as any); }}>
                   <View style={s.cardHeader}>
                     <Trophy size={13} color="#FFC83D" />
                     <Text style={s.cardTitle}>Gablota osiągnięć</Text>
@@ -2846,7 +2881,7 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity
                   style={s.habitsNudge}
-                  onPress={() => { haptic.tap(); router.push('/habits' as any); }}
+                  onPress={() => { haptic.tap(); router.navigate('/habits' as any); }}
                   activeOpacity={0.8}
                 >
                   <Flame size={14} color={accentColor} />
@@ -2884,7 +2919,7 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity
                   style={[s.habitsCard, { backgroundColor: cardBgDark }]}
-                  onPress={() => router.push('/habits' as any)}
+                  onPress={() => router.navigate('/habits' as any)}
                   activeOpacity={0.8}
                 >
                   <View style={s.habitsHeader}>
@@ -3419,7 +3454,7 @@ export default function DashboardScreen() {
               const monthActive = calTasks.filter(t => t.status !== 'done').length;
               if (monthDone + monthActive === 0) return null;
               return (
-                <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} onPress={() => router.push('/(tabs)/tasks' as any)} activeOpacity={0.8}>
+                <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} onPress={() => router.navigate('/(tabs)/tasks' as any)} activeOpacity={0.8}>
                   <View style={s.cardHeader}>
                     <CheckCircle2 size={13} color={colors.text.muted} />
                     <Text style={s.cardTitle}>{MONTH_SHORT[now.getMonth()]} — zadania</Text>
@@ -3523,7 +3558,7 @@ export default function DashboardScreen() {
                             { text: 'Anuluj', style: 'cancel' },
                             { text: 'Usuń', style: 'destructive', onPress: () => removeCustomTile(rid) },
                           ])}
-                          onEdit={ct?.type === 'stat' ? () => router.push(`/widget-builder?edit=${id}` as any) : undefined}
+                          onEdit={ct?.type === 'stat' ? () => router.navigate(`/widget-builder?edit=${id}` as any) : undefined}
                         />
                       );
                     })}
@@ -3573,7 +3608,7 @@ export default function DashboardScreen() {
                       );
                     })()}
 
-                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); router.push('/widget-builder' as any); }} activeOpacity={0.85}>
+                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); router.navigate('/widget-builder' as any); }} activeOpacity={0.85}>
                       <BarChart2 size={15} color={accentColor} />
                       <Text style={[s.editAddText, { color: accentColor }]}>Dodaj widget statystyk</Text>
                     </TouchableOpacity>
@@ -3966,7 +4001,7 @@ export default function DashboardScreen() {
                       <View key={`${it.expenseId}-${it.idx}`} style={s.tagItemRow}>
                         <TouchableOpacity
                           style={{ flex: 1 }}
-                          onPress={() => { setTagModal(null); router.push(`/expenses/${it.expenseId}` as any); }}
+                          onPress={() => { setTagModal(null); router.navigate(`/expenses/${it.expenseId}` as any); }}
                           activeOpacity={0.6}
                         >
                           <Text style={s.tagItemName} numberOfLines={1}>{it.name}</Text>
@@ -3974,7 +4009,7 @@ export default function DashboardScreen() {
                             {new Date(it.date).toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {it.price.toFixed(2)} zł{it.kind === 'expense' ? ' · cały wydatek' : ''}
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => { setTagModal(null); router.push(`/expenses/${it.expenseId}` as any); }} style={s.tagItemEdit} activeOpacity={0.7}>
+                        <TouchableOpacity onPress={() => { setTagModal(null); router.navigate(`/expenses/${it.expenseId}` as any); }} style={s.tagItemEdit} activeOpacity={0.7}>
                           <Pencil size={15} color={colors.text.muted} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => removeTagItem(it, ruleTags(tagModal))} style={s.tagItemDel} activeOpacity={0.7}>

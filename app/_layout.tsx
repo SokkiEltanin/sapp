@@ -308,31 +308,31 @@ export default function RootLayout() {
 
       if (screen === 'mood') {
         suppressAutoMoodUntil = Date.now() + 8000; // the mood screen opens the check-in itself
-        router.push({ pathname: '/(tabs)/mood', params: { openCheckIn: 'true' } } as any);
+        router.navigate({ pathname: '/(tabs)/mood', params: { openCheckIn: 'true' } } as any);
       } else if (screen === 'tasks') {
-        if (taskId) router.push(`/tasks/${taskId}` as any);
-        else        router.push('/(tabs)/tasks' as any);
+        if (taskId) router.navigate(`/tasks/${taskId}` as any);
+        else        router.navigate('/(tabs)/tasks' as any);
       } else if (screen === 'calendar' || screen === 'calendar_event') {
-        if (eventId) router.push(`/calendar/${eventId}` as any);
-        else         router.push('/(tabs)/stats' as any); // calendar lives in the stats tab
+        if (eventId) router.navigate(`/calendar/${eventId}` as any);
+        else         router.navigate('/(tabs)/stats' as any); // calendar lives in the stats tab
       } else if (screen === 'habits') {
-        router.push('/habits' as any);
+        router.navigate('/habits' as any);
       } else if (screen === 'subscriptions') {
-        router.push('/expenses/subscriptions' as any);
+        router.navigate('/expenses/subscriptions' as any);
       } else if (screen === 'finances') {
-        router.push('/(tabs)/finances' as any);
+        router.navigate('/(tabs)/finances' as any);
       } else if (screen === 'index') {
-        router.push('/(tabs)/' as any);       // work shift → dashboard (live earnings widget)
+        router.navigate('/(tabs)/' as any);       // work shift → dashboard (live earnings widget)
       } else if (screen === 'payday') {
-        router.push('/(tabs)/' as any);       // → dashboard, then open the "add paycheck" modal directly
+        router.navigate('/(tabs)/' as any);       // → dashboard, then open the "add paycheck" modal directly
         setTimeout(() => useUiActions.getState().openPaydayPrompt(), 400);
       } else if (screen === 'work' || screen === 'stats') {
-        router.push('/(tabs)/stats' as any);
+        router.navigate('/(tabs)/stats' as any);
       } else if (screen === 'month-cards') {
-        router.push('/month-cards' as any);
+        router.navigate('/month-cards' as any);
       } else {
         // Never leave a tap dead — fall back to the dashboard.
-        router.push('/(tabs)/' as any);
+        router.navigate('/(tabs)/' as any);
       }
     }
 

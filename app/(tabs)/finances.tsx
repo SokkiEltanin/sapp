@@ -274,16 +274,16 @@ export default function FinancesScreen() {
                 style={{ borderBottomColor: F.cardBorder }}
                 rightSlot={
                   <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-                    <PressableScale onPress={() => { haptic.tap(); router.push('/products' as any); }} style={st.hBtn}>
+                    <PressableScale onPress={() => { haptic.tap(); router.navigate('/products' as any); }} style={st.hBtn}>
                       <Package size={17} color={colors.text.secondary} />
                     </PressableScale>
-                    <PressableScale onPress={() => { haptic.tap(); router.push('/debts' as any); }} style={st.hBtn}>
+                    <PressableScale onPress={() => { haptic.tap(); router.navigate('/debts' as any); }} style={st.hBtn}>
                       <HandCoins size={17} color={colors.text.secondary} />
                     </PressableScale>
-                    <PressableScale onPress={() => { haptic.tap(); router.push('/vehicles' as any); }} style={st.hBtn}>
+                    <PressableScale onPress={() => { haptic.tap(); router.navigate('/vehicles' as any); }} style={st.hBtn}>
                       <Car size={17} color={colors.text.secondary} />
                     </PressableScale>
-                    <PressableScale onPress={() => { haptic.tap(); router.push('/expenses/subscriptions' as any); }} style={st.hBtn}>
+                    <PressableScale onPress={() => { haptic.tap(); router.navigate('/expenses/subscriptions' as any); }} style={st.hBtn}>
                       <RefreshCcw size={17} color={colors.text.secondary} />
                     </PressableScale>
                   </View>
@@ -298,7 +298,7 @@ export default function FinancesScreen() {
                   </Text>
                   <Text style={st.heroCurrency}> PLN</Text>
                 </View>
-                <PressableScale onPress={() => { haptic.tap(); router.push('/settings' as any); }}>
+                <PressableScale onPress={() => { haptic.tap(); router.navigate('/settings' as any); }}>
                   <View style={st.heroPills}>
                     <View style={st.heroPill}>
                       <Text style={st.heroPillLabel}>Gotówka</Text>
@@ -414,7 +414,7 @@ export default function FinancesScreen() {
               <ExpenseItem
                 expense={item}
                 index={index}
-                onPress={e => { haptic.tap(); router.push(`/expenses/${e.id}` as any); }}
+                onPress={e => { haptic.tap(); router.navigate(`/expenses/${e.id}` as any); }}
               />
             </View>
           )}

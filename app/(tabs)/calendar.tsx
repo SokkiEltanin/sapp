@@ -383,12 +383,12 @@ export default function CalendarScreen() {
             <DayTimeline
               events={selectedEvents}
               date={selectedDate}
-              onPress={(id) => router.push(`/calendar/${id}` as any)}
-              onAddAtTime={(time) => router.push(`/calendar/add?startTime=${time}&type=event` as any)}
+              onPress={(id) => router.navigate(`/calendar/${id}` as any)}
+              onAddAtTime={(time) => router.navigate(`/calendar/add?startTime=${time}&type=event` as any)}
             />
           ) : (
             selectedEvents.map((ev) => (
-              <PressableScale key={ev.id} onPress={() => router.push(`/calendar/${ev.id}` as any)}>
+              <PressableScale key={ev.id} onPress={() => router.navigate(`/calendar/${ev.id}` as any)}>
                 <View style={styles.eventRow}>
                   {ev.color && <View style={[styles.evColorBar, { backgroundColor: ev.color }]} />}
                   <View style={styles.evTime}>
@@ -409,13 +409,13 @@ export default function CalendarScreen() {
             <TaskItem
               key={t.id} task={t} index={selectedEvents.length + i}
               onToggle={toggleTask}
-              onPress={(id) => router.push(`/tasks/${id}` as any)}
+              onPress={(id) => router.navigate(`/tasks/${id}` as any)}
             />
           ))}
         </>
       ) : upcomingTasks.length > 0 ? (
         upcomingTasks.map((t, i) => (
-          <TaskItem key={t.id} task={t} index={i} onToggle={toggleTask} onPress={(id) => router.push(`/tasks/${id}` as any)} />
+          <TaskItem key={t.id} task={t} index={i} onToggle={toggleTask} onPress={(id) => router.navigate(`/tasks/${id}` as any)} />
         ))
       ) : (
         <View style={styles.empty}>
@@ -442,8 +442,8 @@ export default function CalendarScreen() {
         tasks={tasks}
         moodEntries={moodEntries}
         workColor={workSettings.workColor}
-        onEventPress={(id) => router.push(`/calendar/${id}` as any)}
-        onAddEvent={() => { setModalVisible(false); router.push('/calendar/add?type=event' as any); }}
+        onEventPress={(id) => router.navigate(`/calendar/${id}` as any)}
+        onAddEvent={() => { setModalVisible(false); router.navigate('/calendar/add?type=event' as any); }}
       />
 
       <ScreenHeader
@@ -457,7 +457,7 @@ export default function CalendarScreen() {
             <PressableScale onPress={goToday} style={styles.todayBtn}>
               <Text style={styles.todayBtnText}>Dziś</Text>
             </PressableScale>
-            <PressableScale onPress={() => router.push('/calendar/add?type=event' as any)} style={styles.addBtn}>
+            <PressableScale onPress={() => router.navigate('/calendar/add?type=event' as any)} style={styles.addBtn}>
               <Plus size={16} color={colors.text.primary} />
             </PressableScale>
           </View>
@@ -551,8 +551,8 @@ export default function CalendarScreen() {
               tasks={tasks}
               moodEntries={moodEntries}
               onSelectDate={handleSelectDate}
-              onEventPress={(id) => router.push(`/calendar/${id}` as any)}
-              onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
+              onEventPress={(id) => router.navigate(`/calendar/${id}` as any)}
+              onTaskPress={(id) => router.navigate(`/tasks/${id}` as any)}
             />
           </View>
 
@@ -602,8 +602,8 @@ export default function CalendarScreen() {
               tasks={tasks}
               moodEntries={moodEntries}
               onSelectDate={handleSelectDate}
-              onEventPress={(id) => router.push(`/calendar/${id}` as any)}
-              onTaskPress={(id) => router.push(`/tasks/${id}` as any)}
+              onEventPress={(id) => router.navigate(`/calendar/${id}` as any)}
+              onTaskPress={(id) => router.navigate(`/tasks/${id}` as any)}
               detailed
             />
           </View>

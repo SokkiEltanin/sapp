@@ -349,7 +349,7 @@ function TaskDetailModal({ task, visible, onClose, onUpdate, onDelete, onAddSubt
                 <Timer size={15} color='#2BC8E0' />
                 <Text style={[dm.footerBtnText, { color: '#2BC8E0' }]}>Pomodoro</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dm.footerBtn} onPress={() => { haptic.tap(); onClose(); router.push(`/tasks/${task.id}?edit=1` as any); }} activeOpacity={0.8}>
+              <TouchableOpacity style={dm.footerBtn} onPress={() => { haptic.tap(); onClose(); router.navigate(`/tasks/${task.id}?edit=1` as any); }} activeOpacity={0.8}>
                 <Pencil size={15} color={G.accent} />
                 <Text style={dm.footerBtnText}>Edytuj</Text>
               </TouchableOpacity>
@@ -531,9 +531,9 @@ export default function TasksScreen() {
   const handleCompletePress = useCallback((task: Task) => { toggle(task.id); }, [toggle]);
 
   const handleEditPress     = useCallback((task: Task) => { setDetailTask(task); setDetailVisible(true); }, []);
-  const handleEditDirect    = useCallback((task: Task) => { haptic.tap(); router.push(`/tasks/${task.id}?edit=1` as any); }, []);
+  const handleEditDirect    = useCallback((task: Task) => { haptic.tap(); router.navigate(`/tasks/${task.id}?edit=1` as any); }, []);
   const handleDelete        = useCallback((id: string) => { remove(id); toast.info('Usunięto'); }, [remove]);
-  const handlePomodoro      = useCallback((task: Task) => { startPomodoro(task.id, task.title); router.push('/pomodoro' as any); }, [startPomodoro]);
+  const handlePomodoro      = useCallback((task: Task) => { startPomodoro(task.id, task.title); router.navigate('/pomodoro' as any); }, [startPomodoro]);
   const handleQuickSnooze   = useCallback((id: string) => { const d = new Date(); d.setHours(d.getHours() + 1); snooze(id, d); haptic.tap(); toast.info('Odłożono na godzinę'); }, [snooze]);
 
   const listData: ListItem[] = useMemo(() => {
@@ -604,10 +604,10 @@ export default function TasksScreen() {
                     {overdue > 0 ? ` · ${overdue} po terminie` : ''}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => { haptic.tap(); router.push('/focus' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/focus' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                   <Activity size={18} color={colors.tabs.tasks} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => { haptic.tap(); router.push('/pomodoro' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
+                <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/pomodoro' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
                   <Timer size={18} color={colors.tabs.tasks} />
                 </TouchableOpacity>
               </View>
