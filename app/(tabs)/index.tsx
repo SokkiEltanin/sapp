@@ -3653,9 +3653,36 @@ export default function DashboardScreen() {
                       </View>
                     ) : null;
                   })()}
+                  {/* Ile dostałem / ile powinienem dostać — BOTH from the one authoritative
+                      rate (workEarnings.perSecond, the same the live dashboard uses), so this
+                      block never disagrees with the ticking earnings above it. */}
+                  {(() => {
+                    const rate = (workEarnings?.perSecond ?? 0) * 3600;
+                    const pcs = expenses.filter(e => isPaycheck(e, workSettings.workPrefix)).sort((a, b) => b.date.localeCompare(a.date));
+                    const lastPay = pcs[0];
+                    const monthH = workEarnings?.monthWorkHours ?? 0;
+                    const expected = rate * monthH;
+                    if (rate <= 0 && !lastPay) return null;
+                    return (
+                      <View style={{ marginTop: spacing[1] }}>
+                        {lastPay && (
+                          <View style={s.wpTotalRow}>
+                            <Text style={s.wpTotalLabel}>Ostatnia wypłata · {MONTH_SHORT[Number(lastPay.date.slice(5, 7)) - 1]}</Text>
+                            <Text style={[s.wpTotalVal, { color: colors.accent.green }]}>{Math.round(lastPay.amount).toLocaleString('pl-PL')} zł</Text>
+                          </View>
+                        )}
+                        {expected > 0 && (
+                          <View style={s.wpTotalRow}>
+                            <Text style={s.wpTotalLabel}>Powinienem dostać za ten mies. · {monthH.toFixed(0)} h × {rate.toFixed(0)} zł/h</Text>
+                            <Text style={[s.wpTotalVal, { color: '#FBBF24' }]}>{Math.round(expected).toLocaleString('pl-PL')} zł</Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
                   {workAvg.avgRate != null && (
                     <View style={s.wpTotalRow}>
-                      <Text style={s.wpTotalLabel}>Średnia stawka · z {workAvg.includedCount} {workAvg.includedCount === 1 ? 'miesiąca' : 'miesięcy'}</Text>
+                      <Text style={s.wpTotalLabel}>Średnia stawka (historia) · z {workAvg.includedCount} {workAvg.includedCount === 1 ? 'miesiąca' : 'miesięcy'}</Text>
                       <Text style={[s.wpTotalVal, { color: '#FBBF24' }]}>{workAvg.avgRate.toFixed(2)} zł/h</Text>
                     </View>
                   )}
