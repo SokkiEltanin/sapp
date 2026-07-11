@@ -1250,16 +1250,17 @@ export default function HealthScreen() {
               onPress={async () => {
                 haptic.tap();
                 const p = await probeHydration(7);
-                if (!p.permission) {
-                  Alert.alert('Woda — brak dostępu',
-                    'Sapp nie ma dostępu do „Nawodnienie" w Health Connect.\n\nHealth Connect → Uprawnienia aplikacji → Sapp → włącz „Nawodnienie", potem Synchronizuj.');
-                } else if (p.records === 0) {
-                  Alert.alert('Woda — Health Connect jest pusty',
-                    'W Health Connect NIE ma żadnych rekordów nawodnienia z ostatnich 7 dni.\n\nTo znaczy, że Samsung Health nie wysyła wody do Health Connect. Włącz w: Samsung Health → Ustawienia → Health Connect → Zarządzaj danymi → „Woda" (a jeśli nie ma „Woda" na liście — Samsung nie eksportuje tego typu i wodę trzeba wpisywać ręcznie w apce).');
-                } else {
-                  Alert.alert('Woda — znaleziono dane ✓',
-                    `Health Connect ma ${p.records} rekordów nawodnienia (razem ${(p.totalMl / 1000).toFixed(2)} l) z 7 dni.\n\nŹródło: ${p.sources.join(', ') || 'nieznane'}\n\nJeśli apka mimo to pokazuje mało — to po mojej stronie, wyślij mi ten komunikat.`);
-                }
+                const lines = [
+                  `Nawodnienie (Hydration): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.records} rekordów${p.records ? ` (${(p.totalMl / 1000).toFixed(2)} l)` : ''}${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
+                  `Nutrition: ${p.nutriPermission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.nutriRecords} rekordów${p.nutriSources.length ? `\nźródło: ${p.nutriSources.join(', ')}` : ''}`,
+                ];
+                if (p.nutriRecords > 0 && p.nutriKeys.length) lines.push(`Pola Nutrition: ${p.nutriKeys.join(', ')}`);
+                let verdict: string;
+                if (p.records > 0) verdict = 'Woda JEST jako Hydration ✓. Jeśli apka pokazuje mało — to mój odczyt, wyślij mi to.';
+                else if (p.nutriRecords > 0) verdict = 'Hydration puste, ale są rekordy Nutrition. Wyślij mi listę „Pola Nutrition" — sprawdzę, czy woda siedzi tam i podepnę.';
+                else if (!p.permission && !p.nutriPermission) verdict = 'Brak dostępu do obu — w Health Connect włącz dla Sappa „Nawodnienie" i „Odżywianie", potem Synchronizuj.';
+                else verdict = 'Ani Hydration, ani Nutrition — Samsung Health nie wysyła wody do Health Connect. Włącz eksport w Samsung Health → Health Connect (jeśli „Woda" nie ma na liście, Samsung tego nie eksportuje → wpisuj ręcznie).';
+                Alert.alert('Diagnostyka wody', lines.join('\n\n') + '\n\n' + verdict);
               }}
             >
               <Text style={wm.diagBtnText}>Diagnostyka wody z zegarka</Text>

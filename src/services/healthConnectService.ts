@@ -75,6 +75,7 @@ const READ_PERMS = [
   { accessType: 'read', recordType: 'LeanBodyMass' },
   { accessType: 'read', recordType: 'BodyWaterMass' },
   { accessType: 'read', recordType: 'Hydration' },
+  { accessType: 'read', recordType: 'Nutrition' }, // Samsung may log water under Nutrition
 ] as const;
 
 export type HCResult = { ok: boolean; reason?: 'no-module' | 'unavailable' | 'update' | 'init' | 'denied' | 'error' };
@@ -127,26 +128,58 @@ export async function isPermissionGranted(recordType: string): Promise<boolean> 
 // answers the real question — "does Samsung Health actually export water to Health
 // Connect at all?" — instead of guessing. 0 records = nothing is writing hydration
 // (Samsung side), records present but app shows little = our read/parse side.
-export async function probeHydration(days = 7): Promise<{ permission: boolean; records: number; totalMl: number; sources: string[] }> {
+export interface WaterProbe {
+  permission: boolean; records: number; totalMl: number; sources: string[];
+  // Nutrition-record probe: Samsung may log water under the Nutrition record type
+  // (it appears under HC's "Nutrition" category) rather than as Hydration.
+  nutriPermission: boolean; nutriRecords: number; nutriSources: string[]; nutriKeys: string[];
+}
+
+function srcOf(r: any): string | null {
+  const pkg = r?.metadata?.dataOrigin?.packageName ?? r?.metadata?.dataOrigin ?? r?.dataOrigin?.packageName;
+  return typeof pkg === 'string' && pkg ? pkg : null;
+}
+
+export async function probeHydration(days = 7): Promise<WaterProbe> {
   const permission = await isPermissionGranted('Hydration');
+  const nutriPermission = await isPermissionGranted('Nutrition');
+  const empty: WaterProbe = { permission, records: 0, totalMl: 0, sources: [], nutriPermission, nutriRecords: 0, nutriSources: [], nutriKeys: [] };
   const hc = mod();
-  if (!hc) return { permission, records: 0, totalMl: 0, sources: [] };
+  if (!hc) return empty;
   try {
-    if (!(await ensureInit(hc))) return { permission, records: 0, totalMl: 0, sources: [] };
+    if (!(await ensureInit(hc))) return empty;
     const end = new Date();
     const start = new Date(); start.setDate(start.getDate() - days);
     const filter = { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() } as const;
-    const recs = await read(hc, 'Hydration', filter);
-    let totalMl = 0;
-    const sources = new Set<string>();
-    for (const r of recs) {
-      totalMl += r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0);
-      const pkg = r?.metadata?.dataOrigin?.packageName ?? r?.metadata?.dataOrigin ?? r?.dataOrigin?.packageName;
-      if (typeof pkg === 'string' && pkg) sources.add(pkg);
-    }
-    return { permission, records: recs.length, totalMl: Math.round(totalMl), sources: Array.from(sources) };
+
+    let totalMl = 0; const sources = new Set<string>();
+    try {
+      const recs = await read(hc, 'Hydration', filter);
+      for (const r of recs) {
+        totalMl += r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0);
+        const s = srcOf(r); if (s) sources.add(s);
+      }
+      empty.records = recs.length;
+    } catch {}
+    empty.totalMl = Math.round(totalMl);
+    empty.sources = Array.from(sources);
+
+    // Nutrition probe — record count, who wrote them, and the field names present so
+    // we can see whether a water/volume value is hiding in there.
+    try {
+      const nrecs = await read(hc, 'Nutrition', filter);
+      const nsrc = new Set<string>(); const keys = new Set<string>();
+      for (const r of nrecs) {
+        const s = srcOf(r); if (s) nsrc.add(s);
+        for (const k of Object.keys(r ?? {})) if (r[k] != null && k !== 'metadata') keys.add(k);
+      }
+      empty.nutriRecords = nrecs.length;
+      empty.nutriSources = Array.from(nsrc);
+      empty.nutriKeys = Array.from(keys).slice(0, 20);
+    } catch {}
+    return empty;
   } catch {
-    return { permission, records: 0, totalMl: 0, sources: [] };
+    return empty;
   }
 }
 
