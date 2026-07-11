@@ -10,14 +10,16 @@ const INK = '#3B3C4E';
 // ── Hats (sit between / on the ears, x≈780–1130 clear gap; forehead band ≈y600) ──
 const HAT_CROWN = (
   <G>
-    <Path d="M772 588 L800 452 L890 540 L953 430 L1016 540 L1106 452 L1134 588 Z" fill="#F5C94E" stroke="#D9A520" strokeWidth={12} />
-    <Rect x={762} y={576} width={382} height={52} rx={16} fill="#EDB63A" stroke="#D9A520" strokeWidth={10} />
-    <Circle cx={800} cy={452} r={17} fill="#fff" />
-    <Circle cx={953} cy={430} r={20} fill="#E0555F" />
-    <Circle cx={1106} cy={452} r={17} fill="#fff" />
-    <Circle cx={850} cy={602} r={12} fill="#E0555F" />
-    <Circle cx={953} cy={602} r={12} fill="#6FA8E8" />
-    <Circle cx={1056} cy={602} r={12} fill="#E0555F" />
+    <Path d="M760 566 L792 420 L884 508 L953 392 L1022 508 L1114 420 L1146 566 Z" fill="#F6CB4C" stroke="#C0901A" strokeWidth={14} />
+    <Path d="M772 556 L800 430 L884 512 L953 410 L1022 512 L1108 430 L1134 556" fill="none" stroke="#FCE79E" strokeWidth={7} opacity={0.75} />
+    <Rect x={748} y={554} width={410} height={58} rx={20} fill="#EAB935" stroke="#C0901A" strokeWidth={11} />
+    <Rect x={762} y={562} width={382} height={12} rx={6} fill="#FCE79E" opacity={0.6} />
+    <Circle cx={792} cy={420} r={17} fill="#E0555F" stroke="#fff" strokeWidth={5} />
+    <Circle cx={953} cy={392} r={22} fill="#5AA9F0" stroke="#fff" strokeWidth={5} />
+    <Circle cx={1114} cy={420} r={17} fill="#E0555F" stroke="#fff" strokeWidth={5} />
+    <Circle cx={852} cy={584} r={11} fill="#E0555F" />
+    <Circle cx={953} cy={584} r={11} fill="#5AA9F0" />
+    <Circle cx={1054} cy={584} r={11} fill="#E0555F" />
   </G>
 );
 
@@ -31,18 +33,21 @@ const HAT_BERET = (
 
 const HAT_BEANIE = (
   <G>
-    <Path d="M632 662 Q953 280 1274 662 Z" fill="#4FA79C" />
-    <Path d="M624 652 Q953 726 1282 652 L1282 708 Q953 782 624 708 Z" fill="#3C8A80" />
-    <Circle cx={953} cy={452} r={54} fill="#EAF3F1" stroke="#CADED9" strokeWidth={7} />
+    <Path d="M632 654 Q646 316 953 316 Q1260 316 1274 654 Z" fill="#4FA79C" stroke="#3C8A80" strokeWidth={6} />
+    <Path d="M770 350 L748 654 M953 330 L953 654 M1150 350 L1172 654" stroke="#3C8A80" strokeWidth={9} opacity={0.45} />
+    <Path d="M604 636 Q953 726 1302 636 L1302 712 Q953 800 604 712 Z" fill="#3C8A80" />
+    <Path d="M614 652 Q953 730 1292 652" fill="none" stroke="#63BEB2" strokeWidth={7} opacity={0.6} />
+    <Circle cx={953} cy={330} r={54} fill="#EAF3F1" stroke="#CADED9" strokeWidth={8} />
+    <Circle cx={936} cy={315} r={16} fill="#fff" opacity={0.7} />
   </G>
 );
 
 const HAT_PARTY = (
   <G>
-    <Path d="M834 640 L953 356 L1072 640 Z" fill="#6F9BEE" />
-    <Path d="M905 470 L983 470 M872 560 L1034 560" stroke="#fff" strokeWidth={16} strokeLinecap="round" opacity={0.85} />
-    <Path d="M834 640 Q953 690 1072 640 L1072 620 Q953 668 834 620 Z" fill="#4E7FD8" />
-    <Circle cx={953} cy={352} r={30} fill="#F5C94E" />
+    <Path d="M820 652 L953 316 L1086 652 Z" fill="#6F9BEE" stroke="#4E7FD8" strokeWidth={9} />
+    <Path d="M887 404 L1002 404 M861 494 L1046 494 M841 566 L1066 566" stroke="#FBE08A" strokeWidth={19} strokeLinecap="round" opacity={0.92} />
+    <Path d="M820 652 Q953 704 1086 652 L1086 630 Q953 680 820 630 Z" fill="#4E7FD8" />
+    <Circle cx={953} cy={312} r={30} fill="#F5C94E" stroke="#E0A81E" strokeWidth={7} />
   </G>
 );
 
