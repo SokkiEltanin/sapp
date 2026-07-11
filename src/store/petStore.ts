@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weekKeyOf } from '@/utils/quests';
+import { rollCrate, CrateTier } from '@/utils/crates';
 
 // The companion blob's PERSISTED state: identity, growth (xp), the coin wallet,
 // owned/equipped cosmetics and which quest milestones have already paid out. Its
@@ -29,6 +30,7 @@ interface PetState {
   affection: number;            // 0..100 for today
   affectionDay: string | null;  // day the current affection belongs to
   affectionRewardDay: string | null; // day the "full affection" bonus was paid
+  pendingCrates: number;        // unopened sardine crates earned from full affection
   // ── boss battles ──
   energy: number;               // banked attack energy
   energyDate: string | null;    // day the top-up counter belongs to
@@ -48,7 +50,8 @@ interface PetState {
   claimWeekly: (id: string, coins: number, xp: number) => boolean;   // weekly (once/week)
   claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
-  petCat: (inc: number, rewardCoins: number, rewardXp: number) => { value: number; justFull: boolean }; // tap-to-pet
+  petCat: (inc: number) => { value: number; justFull: boolean }; // tap-to-pet; full bar → a crate
+  openCrate: () => { tier: CrateTier; coins: number } | null;    // open one pending crate
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
@@ -73,6 +76,7 @@ export const usePetStore = create<PetState>()(
       affection: 0,
       affectionDay: null,
       affectionRewardDay: null,
+      pendingCrates: 0,
       energy: 0,
       energyDate: null,
       energyToday: 0,
@@ -129,8 +133,9 @@ export const usePetStore = create<PetState>()(
         set((s) => ({ xp: s.xp + xp, lastCareTick: t }));
       },
       // Tap-to-pet: fills the daily affection bar; the first time it hits 100 today
-      // it pays a small bonus. Returns the new value + whether the bonus just fired.
-      petCat: (inc, rewardCoins, rewardXp) => {
+      // it grants a sardine crate to open (+ a little XP). Returns the new value +
+      // whether the crate just dropped.
+      petCat: (inc) => {
         const t = todayISO();
         const s = get();
         const base = s.affectionDay === t ? s.affection : 0; // reset on a new day
@@ -139,9 +144,16 @@ export const usePetStore = create<PetState>()(
         set({
           affection: value,
           affectionDay: t,
-          ...(justFull ? { affectionRewardDay: t, coins: s.coins + rewardCoins, xp: s.xp + rewardXp } : {}),
+          ...(justFull ? { affectionRewardDay: t, xp: s.xp + 8, pendingCrates: (s.pendingCrates ?? 0) + 1 } : {}),
         });
         return { value, justFull };
+      },
+      openCrate: () => {
+        const s = get();
+        if ((s.pendingCrates ?? 0) <= 0) return null;
+        const roll = rollCrate();
+        set({ pendingCrates: s.pendingCrates - 1, coins: s.coins + roll.coins });
+        return roll;
       },
       // Top up the energy bank with today's self-care output (once per amount, tops
       // up as the day's data grows). energyMult from loot boosts the gain.
@@ -178,7 +190,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, claimedQuests: [], dailyClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -187,7 +199,7 @@ export const usePetStore = create<PetState>()(
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
-        affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay,
+        affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
       }),

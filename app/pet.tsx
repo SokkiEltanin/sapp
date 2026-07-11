@@ -7,6 +7,7 @@ import { ChevronLeft, Pencil, Check, Coins, ShoppingBag, Swords } from 'lucide-r
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
+import CrateModal from '@/components/pet/CrateModal';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
@@ -34,8 +35,9 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
+  const [crateOpen, setCrateOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
@@ -119,8 +121,8 @@ export default function Pet() {
   // Tap-to-pet: fills today's affection bar; a full bar pays a one-a-day bonus and
   // the cat throws a little party.
   const handlePet = () => {
-    const r = petCat(4, 15, 8);
-    if (r.justFull) { haptic.success(); toast.success(`❤️ ${name} Cię uwielbia! +15 🪙`); setCelebrate(c => c + 1); }
+    const r = petCat(4);
+    if (r.justFull) { haptic.success(); toast.success(`❤️ ${name} daje Ci skrzynkę sardynek!`); setCelebrate(c => c + 1); setCrateOpen(true); }
   };
 
   const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
@@ -223,6 +225,12 @@ export default function Pet() {
           </View>
           <Text style={s.affTxt}>{affToday >= 100 ? 'głaskany!' : 'głaskanie'}</Text>
         </View>
+        {pendingCrates > 0 && (
+          <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
+            <Text style={{ fontSize: 18 }}>🐟</Text>
+            <Text style={s.crateBtnTxt}>Otwórz skrzynkę sardynek{pendingCrates > 1 ? ` · ${pendingCrates}` : ''}</Text>
+          </PressableScale>
+        )}
 
         {/* level */}
         <View style={s.levelCard}>
@@ -376,6 +384,8 @@ export default function Pet() {
           </Text>
         </View>
       </ScrollView>
+
+      <CrateModal visible={crateOpen} onClose={() => setCrateOpen(false)} onOpened={() => setCelebrate(c => c + 1)} />
     </SafeAreaView>
   );
 }
@@ -407,6 +417,8 @@ const makeS = (c: any) => StyleSheet.create({
   affTrack: { flex: 1, height: 10, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
   affFill: { height: '100%', borderRadius: 5, backgroundColor: '#F472B6' },
   affTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted, width: 68, textAlign: 'right' },
+  crateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 11, borderRadius: radius.lg, backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
+  crateBtnTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
 
   levelCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[4] },
   levelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
