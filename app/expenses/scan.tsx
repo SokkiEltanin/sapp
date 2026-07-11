@@ -84,8 +84,7 @@ export default function ScanReceiptModal() {
   const [addingPayer, setAddingPayer] = useState(false);
   const [newPayer, setNewPayer]     = useState('');
   const addPending = useExpensesStore(s => s.addPending);
-  const updateExpense = useExpensesStore(s => s.updateExpense);
-  const markPending = useExpensesStore(s => s.markPending);
+  const deleteExpense = useExpensesStore(s => s.deleteExpense);
   const confirmSync = useExpensesStore(s => s.confirmSync);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
@@ -387,47 +386,41 @@ export default function ScanReceiptModal() {
         : undefined;
       const existingBank = storeMatch ?? candidates[0];
 
+      // Always add the receipt as its OWN clean expense (identical shape whether or
+      // not a bank payment matched — no special "hybrid" bank+receipt row, which was
+      // the suspected black-screen trigger). Build locally + write to Firestore in the
+      // BACKGROUND: the web SDK's write promise only resolves on server ack, so
+      // awaiting it froze the screen on weak signal. The local store persists to
+      // AsyncStorage immediately (safe even if the app is killed first).
+      const now = new Date().toISOString();
+      const expense: Expense = {
+        id: expensesService.newId(),
+        type: 'expense',
+        amount: roundedTotal,
+        currency: 'PLN',
+        category: dominantCat,
+        tags,
+        note: receipt.storeName || 'Paragon',
+        date: dateParsed,
+        ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
+        ...(payer ? { payer } : {}),
+        paymentMethod,
+        receiptItems,
+        createdAt: now,
+        updatedAt: now,
+      };
+      addPending(expense);   // shows immediately + survives a refresh until synced
+      expensesService.addWithId(expense.id, expense)
+        .then(() => confirmSync(expense.id))
+        .catch(() => {}); // stays pending; retried on next foreground
+
       if (existingBank) {
-        const patch: any = {
-          category: dominantCat, tags, receiptItems,
-          note: receipt.storeName || existingBank.note,
-          ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
-          ...(payer ? { payer } : {}),
-        };
-        updateExpense(existingBank.id, patch);
-        markPending(existingBank.id);   // preserve the receipt on refresh until the cloud confirms
-        expensesService.update(existingBank.id, patch)
-          .then(() => confirmSync(existingBank.id))
-          .catch(() => {}); // stays pending; retried on next foreground
-        toast.success('Dopasowano do płatności z banku — bez duplikatu');
-      } else {
-        // Build locally + write to Firestore in the BACKGROUND. The web Firestore
-        // SDK's write promise doesn't resolve until the server acks, so `await`-ing
-        // the add froze this screen on weak/no signal — exactly the receipt-save
-        // "black screen" when scanning in-store. The local store persists to
-        // AsyncStorage immediately, so the expense is safe even if the app is
-        // killed before the cloud write lands; the daily backup captures it too.
-        const now = new Date().toISOString();
-        const expense: Expense = {
-          id: expensesService.newId(),
-          type: 'expense',
-          amount: roundedTotal,
-          currency: 'PLN',
-          category: dominantCat,
-          tags,
-          note: receipt.storeName || 'Paragon',
-          date: dateParsed,
-          ...(receipt.storeName ? { storeName: receipt.storeName } : {}),
-          ...(payer ? { payer } : {}),
-          paymentMethod,
-          receiptItems,
-          createdAt: now,
-          updatedAt: now,
-        };
-        addPending(expense);   // shows immediately + survives a refresh until synced
-        expensesService.addWithId(expense.id, expense)
-          .then(() => confirmSync(expense.id))
-          .catch(() => {}); // stays pending; retried on next foreground
+        // Auto-merge, done SAFELY: the receipt above now represents this purchase, so
+        // drop the bare bank stub (matched on amount+day, case-insensitive) to avoid a
+        // duplicate — instead of mutating the stub in place.
+        deleteExpense(existingBank.id);
+        expensesService.remove(existingBank.id).catch(() => {});
+        toast.success('Połączono z płatnością z banku — bez duplikatu');
       }
       // Persist corrections to memory for future receipts
       const parsedCats: Record<number, ExpenseCategory> = {};
