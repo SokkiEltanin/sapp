@@ -67,12 +67,14 @@ function mouthFor(expr: PetExpression): React.ReactNode {
 }
 
 export default function CatArt({
-  size = 150, expression = 'happy', animate = true, onPress, equipped,
-}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string } }) {
+  size = 150, expression = 'happy', animate = true, onPress, equipped, celebrate = 0,
+}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string }; celebrate?: number }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
   const wiggle = useRef(new Animated.Value(0)).current;
+  const stretch = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
+  const [lookX, setLookX] = useState(0);   // idle glance: pupils drift left/right
   const [particles, setParticles] = useState<{ id: number; emoji: string; dx: number }[]>([]);
   const pid = useRef(0);
   const taps = useRef(0);
@@ -112,11 +114,59 @@ export default function CatArt({
     return () => clearTimeout(t);
   }, [animate, asleep]);
 
+  // idle glance — the eyes drift left/right now and then, then re-centre, so the cat
+  // feels alive even when you're not touching it. (Toggling state re-renders the SVG,
+  // it does NOT animate an SVG prop, so it stays smooth.)
+  useEffect(() => {
+    if (!animate || asleep) { setLookX(0); return; }
+    let t: any;
+    const loop = () => {
+      t = setTimeout(() => {
+        setLookX((Math.random() < 0.5 ? -1 : 1) * (16 + Math.random() * 22));
+        setTimeout(() => setLookX(0), 750 + Math.random() * 550);
+        loop();
+      }, 3200 + Math.random() * 4200);
+    };
+    loop();
+    return () => clearTimeout(t);
+  }, [animate, asleep]);
+
+  // idle stretch — an occasional gentle "grow taller then settle" (wrapper scaleY).
+  useEffect(() => {
+    if (!animate || asleep) return;
+    let t: any;
+    const loop = () => {
+      t = setTimeout(() => {
+        Animated.sequence([
+          Animated.timing(stretch, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(stretch, { toValue: 0, duration: 560, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        ]).start();
+        loop();
+      }, 9000 + Math.random() * 9000);
+    };
+    loop();
+    return () => clearTimeout(t);
+  }, [animate, asleep]);
+
   const spawn = (emoji: string, dx: number) => {
     const id = ++pid.current;
     setParticles(p => [...p, { id, emoji, dx }]);
     setTimeout(() => setParticles(p => p.filter(x => x.id !== id)), 1100);
   };
+
+  // celebrate — bumped by the pet screen on a quest claim / full affection: a happy
+  // hop + a shower of celebratory emojis. Skipped on first mount.
+  const firstCeleb = useRef(true);
+  useEffect(() => {
+    if (firstCeleb.current) { firstCeleb.current = false; return; }
+    if (!animate) return;
+    Animated.sequence([
+      Animated.timing(hop, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(hop, { toValue: 0, friction: 4, tension: 80, useNativeDriver: true }),
+    ]).start();
+    const pool = ['🎉', '⭐', '❤️', '✨', '🌟'];
+    for (let i = 0; i < 8; i++) setTimeout(() => spawn(pool[i % pool.length], (Math.random() - 0.5) * size * 0.85), i * 45);
+  }, [celebrate]);
 
   const onTap = () => {
     haptic.tap();
@@ -146,6 +196,7 @@ export default function CatArt({
 
   const amp = asleep ? 0.008 : 0.012;   // barely-there breathing, keeps it grounded
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1 - amp, 1 + amp] });
+  const stretchY = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.055] });
   const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.07] });
   const rot = wiggle.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
 
@@ -153,7 +204,7 @@ export default function CatArt({
     <Pressable onPress={onTap} hitSlop={12}>
       <View>
       <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }] }}>
-        <Animated.View style={{ transform: [{ scale }] }}>
+        <Animated.View style={{ transform: [{ scale }, { scaleY: stretchY }] }}>
           <Svg width={size} height={size} viewBox="0 0 2000 2000">
             {/* tail (static) */}
             <G transform="matrix(1,0,0,1,-106.194312,-183.051682)">
@@ -190,13 +241,17 @@ export default function CatArt({
               <>
                 <G id="eye-left">
                   <G transform="matrix(1.091685,0,0,1.184008,4.188232,-192.139452)"><Circle cx={723.316} cy={825.671} r={71.68} fill="#fff" /></G>
-                  <G transform="matrix(1.580175,0,0,1.775546,-402.185722,-711.962057)"><Circle cx={756.882} cy={849.163} r={34.202} fill={INK} /></G>
-                  <G transform="matrix(0.615389,0,0,0.488819,349.091369,339.943831)"><Circle cx={756.882} cy={849.163} r={34.202} fill="#fff" /></G>
+                  <G transform={`translate(${lookX} 0)`}>
+                    <G transform="matrix(1.580175,0,0,1.775546,-402.185722,-711.962057)"><Circle cx={756.882} cy={849.163} r={34.202} fill={INK} /></G>
+                    <G transform="matrix(0.615389,0,0,0.488819,349.091369,339.943831)"><Circle cx={756.882} cy={849.163} r={34.202} fill="#fff" /></G>
+                  </G>
                 </G>
                 <G id="eye-right">
                   <G transform="matrix(1.116362,0,0,1.210772,299.668629,-212.319638)"><Circle cx={723.316} cy={825.671} r={71.68} fill="#fff" /></G>
-                  <G transform="matrix(1.615895,0,-0.037553,1.775546,-84.003122,-710.043581)"><Circle cx={756.882} cy={849.163} r={34.202} fill={INK} /></G>
-                  <G transform="matrix(0.629299,0,0,0.499869,653.865406,332.031541)"><Circle cx={756.882} cy={849.163} r={34.202} fill="#fff" /></G>
+                  <G transform={`translate(${lookX} 0)`}>
+                    <G transform="matrix(1.615895,0,-0.037553,1.775546,-84.003122,-710.043581)"><Circle cx={756.882} cy={849.163} r={34.202} fill={INK} /></G>
+                    <G transform="matrix(0.629299,0,0,0.499869,653.865406,332.031541)"><Circle cx={756.882} cy={849.163} r={34.202} fill="#fff" /></G>
+                  </G>
                 </G>
                 <G transform="matrix(0.881056,0,0,0.515896,679.72648,498.929128)"><Path d="M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z" fill={BLUE} /></G>
                 <G transform="matrix(0.881056,0,0,0.515896,361.996844,497.010652)"><Path d="M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z" fill={BLUE} /></G>

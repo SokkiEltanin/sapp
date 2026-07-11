@@ -23,6 +23,10 @@ interface PetState {
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
   monthlyClaims: Record<string, string>; // monthlyQuestId → YYYY-MM claimed
+  // ── petting / affection (fills as you tap the cat; resets daily) ──
+  affection: number;            // 0..100 for today
+  affectionDay: string | null;  // day the current affection belongs to
+  affectionRewardDay: string | null; // day the "full affection" bonus was paid
   // ── boss battles ──
   energy: number;               // banked attack energy
   energyDate: string | null;    // day the top-up counter belongs to
@@ -41,6 +45,7 @@ interface PetState {
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
   claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
+  petCat: (inc: number, rewardCoins: number, rewardXp: number) => { value: number; justFull: boolean }; // tap-to-pet
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
@@ -61,6 +66,9 @@ export const usePetStore = create<PetState>()(
       claimedQuests: [],
       dailyClaims: {},
       monthlyClaims: {},
+      affection: 0,
+      affectionDay: null,
+      affectionRewardDay: null,
       energy: 0,
       energyDate: null,
       energyToday: 0,
@@ -110,6 +118,21 @@ export const usePetStore = create<PetState>()(
         if (get().lastCareTick === t) return;
         set((s) => ({ xp: s.xp + xp, lastCareTick: t }));
       },
+      // Tap-to-pet: fills the daily affection bar; the first time it hits 100 today
+      // it pays a small bonus. Returns the new value + whether the bonus just fired.
+      petCat: (inc, rewardCoins, rewardXp) => {
+        const t = todayISO();
+        const s = get();
+        const base = s.affectionDay === t ? s.affection : 0; // reset on a new day
+        const value = Math.min(100, base + inc);
+        const justFull = value >= 100 && s.affectionRewardDay !== t;
+        set({
+          affection: value,
+          affectionDay: t,
+          ...(justFull ? { affectionRewardDay: t, coins: s.coins + rewardCoins, xp: s.xp + rewardXp } : {}),
+        });
+        return { value, justFull };
+      },
       // Top up the energy bank with today's self-care output (once per amount, tops
       // up as the day's data grows). energyMult from loot boosts the gain.
       syncEnergy: (todayEnergy, mult) => {
@@ -154,6 +177,7 @@ export const usePetStore = create<PetState>()(
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, monthlyClaims: s.monthlyClaims,
+        affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
       }),

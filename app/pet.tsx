@@ -34,7 +34,10 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimedQuests, dailyClaims, monthlyClaims, equipped } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimedQuests, dailyClaims, monthlyClaims, equipped, petCat, affection, affectionDay } = usePetStore();
+  const [celebrate, setCelebrate] = useState(0);
+  // affection resets each day — show 0 on a fresh day even before the first tap
+  const affToday = affectionDay === todayISO() ? affection : 0;
   const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
   const room = useMemo(() => equippedRoom(equipped), [equipped]);
   const { habits, todayDone, getStreak } = useHabits();
@@ -108,15 +111,22 @@ export default function Pet() {
     [questCtx, claimedQuests, dailyClaims, monthlyClaims],
   );
 
+  // Tap-to-pet: fills today's affection bar; a full bar pays a one-a-day bonus and
+  // the cat throws a little party.
+  const handlePet = () => {
+    const r = petCat(4, 15, 8);
+    if (r.justFull) { haptic.success(); toast.success(`❤️ ${name} Cię uwielbia! +15 🪙`); setCelebrate(c => c + 1); }
+  };
+
   const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
-    if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); }
+    if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
   };
 
   const onClaimDaily = (id: string, c2: number, x: number, label: string) => {
-    if (claimDaily(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); }
+    if (claimDaily(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
   };
   const onClaimTier = (id: string, c2: number, x: number) => {
-    claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`);
+    claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
   };
 
   const input: PetInput = useMemo(() => {
@@ -194,7 +204,16 @@ export default function Pet() {
               ))}
             </LinearGradient>
           )}
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} />
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} />
+        </View>
+
+        {/* Affection — fills as you pet (tap) the cat; full = daily bonus. */}
+        <View style={s.affRow}>
+          <Text style={s.affHeart}>{affToday >= 100 ? '❤️' : affToday > 0 ? '🩵' : '🤍'}</Text>
+          <View style={s.affTrack}>
+            <View style={[s.affFill, { width: `${affToday}%` }]} />
+          </View>
+          <Text style={s.affTxt}>{affToday >= 100 ? 'głaskany!' : 'głaskanie'}</Text>
         </View>
 
         {/* level */}
@@ -349,6 +368,12 @@ const makeS = (c: any) => StyleSheet.create({
   moodChip: { marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
   status: { fontSize: 14, fontWeight: '800' },
   tip: { fontSize: 12.5, color: c.text.muted, marginTop: 6, textAlign: 'center' },
+
+  affRow: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', marginTop: spacing[3] },
+  affHeart: { fontSize: 16 },
+  affTrack: { flex: 1, height: 10, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
+  affFill: { height: '100%', borderRadius: 5, backgroundColor: '#F472B6' },
+  affTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted, width: 68, textAlign: 'right' },
 
   levelCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[4] },
   levelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
