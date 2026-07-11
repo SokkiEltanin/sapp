@@ -14,6 +14,35 @@ import CatAccessories from '@/components/pet/CatAccessories';
 const BLUE = '#A7CCF5';
 const INK = '#3B3C4E';
 
+// Emoji that float up when you tap the cat — mood-aware so a happy cat throws hearts
+// and a sad one gets a comforting one. (Pet stickers/emoji are an intentional design
+// piece, unlike the rest of the UI.)
+const REACTIONS: Record<string, string[]> = {
+  happy:    ['❤️', '💛', '✨', '♪', '😻'],
+  content:  ['❤️', '✨', '♪', '🐾'],
+  meh:      ['🐾', '❔', '♪'],
+  sad:      ['🤍', '🥺', '❤️'],
+  sick:     ['💧', '🤒', '🤍'],
+  sleeping: ['💤', '😴', '💤'],
+};
+
+// One floating reaction emoji: rises, scales in, fades out. Overlay View (not SVG),
+// so it never touches the janky SVG-prop animation path.
+function Particle({ emoji, dx, size }: { emoji: string; dx: number; size: number }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(a, { toValue: 1, duration: 1050, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, []);
+  const y  = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.6] });
+  const op = a.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 1, 1, 0] });
+  const sc = a.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.2, 0.9] });
+  return (
+    <Animated.View pointerEvents="none" style={{ position: 'absolute', left: size * 0.5 + dx, top: size * 0.28, opacity: op, transform: [{ translateY: y }, { scale: sc }] }}>
+      <Text style={{ fontSize: size * 0.15 }}>{emoji}</Text>
+    </Animated.View>
+  );
+}
+
 // eye centres (in the 2000×2000 viewBox) for the closed-eye / blink arcs
 const LX = 794, RX = 1107, EYY = 762;
 
@@ -42,7 +71,12 @@ export default function CatArt({
 }: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string } }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
+  const wiggle = useRef(new Animated.Value(0)).current;
   const [blink, setBlink] = useState(false);
+  const [particles, setParticles] = useState<{ id: number; emoji: string; dx: number }[]>([]);
+  const pid = useRef(0);
+  const taps = useRef(0);
+  const tapReset = useRef<any>(null);
   const asleep = expression === 'sleeping';
   const closed = blink || asleep;
 
@@ -78,22 +112,47 @@ export default function CatArt({
     return () => clearTimeout(t);
   }, [animate, asleep]);
 
+  const spawn = (emoji: string, dx: number) => {
+    const id = ++pid.current;
+    setParticles(p => [...p, { id, emoji, dx }]);
+    setTimeout(() => setParticles(p => p.filter(x => x.id !== id)), 1100);
+  };
+
   const onTap = () => {
     haptic.tap();
+    // hop + a quick wiggle so each tap feels alive
     Animated.sequence([
       Animated.timing(hop, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.spring(hop, { toValue: 0, friction: 5, tension: 90, useNativeDriver: true }),
     ]).start();
+    Animated.sequence([
+      Animated.timing(wiggle, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(wiggle, { toValue: -1, duration: 110, useNativeDriver: true }),
+      Animated.spring(wiggle, { toValue: 0, friction: 4, useNativeDriver: true }),
+    ]).start();
+    // a mood-aware reaction emoji floats up
+    const pool = REACTIONS[expression] ?? REACTIONS.happy;
+    spawn(pool[Math.floor(Math.random() * pool.length)], (Math.random() - 0.5) * size * 0.45);
+    // combo: keep tapping → every 5th tap bursts a shower of hearts + a happy buzz
+    taps.current += 1;
+    clearTimeout(tapReset.current);
+    tapReset.current = setTimeout(() => { taps.current = 0; }, 900);
+    if (taps.current % 5 === 0) {
+      haptic.success();
+      for (let i = 0; i < 6; i++) setTimeout(() => spawn(i % 2 ? '❤️' : '✨', (Math.random() - 0.5) * size * 0.7), i * 55);
+    }
     onPress?.();
   };
 
   const amp = asleep ? 0.008 : 0.012;   // barely-there breathing, keeps it grounded
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1 - amp, 1 + amp] });
   const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.07] });
+  const rot = wiggle.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
 
   return (
     <Pressable onPress={onTap} hitSlop={12}>
-      <Animated.View style={{ transform: [{ translateY: hopY }] }}>
+      <View>
+      <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }] }}>
         <Animated.View style={{ transform: [{ scale }] }}>
           <Svg width={size} height={size} viewBox="0 0 2000 2000">
             {/* tail (static) */}
@@ -160,6 +219,9 @@ export default function CatArt({
           {asleep && <SleepZs size={size} />}
         </Animated.View>
       </Animated.View>
+      {/* tap reaction emojis float up over the cat */}
+      {particles.map(p => <Particle key={p.id} emoji={p.emoji} dx={p.dx} size={size} />)}
+      </View>
     </Pressable>
   );
 }
