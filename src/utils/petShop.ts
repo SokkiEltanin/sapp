@@ -60,6 +60,8 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'room_beach',  name: 'Plaża',      slot: 'room', tier: 'epic',      cost: 90,  colors: ['#2F6270', '#153038'], decor: ['🐚', '🌴'] },
   { id: 'room_candy',  name: 'Cukierkowo', slot: 'room', tier: 'epic',      cost: 110, colors: ['#6B2A52', '#2E1226'], decor: ['🍬', '🧁'] },
   { id: 'room_space',  name: 'Kosmos',     slot: 'room', tier: 'legendary', cost: 200, colors: ['#2A1E52', '#0E0A24'], decor: ['🚀', '✨'] },
+  { id: 'room_winter', name: 'Zima',       slot: 'room', tier: 'epic',      cost: 120, colors: ['#AED4E6', '#5B7BA6'], decor: ['❄️', '⛄'] },
+  { id: 'room_ocean',  name: 'Podwodny świat', slot: 'room', tier: 'legendary', cost: 160, colors: ['#1E6E8C', '#0A2A3E'], decor: ['🐠', '🫧'] },
 ];
 
 // ── Room upgrades: extra elements you buy with coins and add INTO a room's scene
@@ -92,6 +94,14 @@ export const ROOM_ADDONS: RoomAddon[] = [
   { id: 'space_planet2',    room: 'room_space',  name: 'Druga planeta',   tier: 'epic',  cost: 75, emoji: '🪐' },
   { id: 'space_satellite',  room: 'room_space',  name: 'Satelita',        tier: 'rare',  cost: 50, emoji: '🛰️' },
   { id: 'space_ufo',        room: 'room_space',  name: 'UFO',             tier: 'epic',  cost: 85, emoji: '🛸' },
+  // Zima
+  { id: 'winter_snowman',   room: 'room_winter', name: 'Bałwan',          tier: 'basic', cost: 28, emoji: '⛄' },
+  { id: 'winter_igloo',     room: 'room_winter', name: 'Igloo',           tier: 'rare',  cost: 55, emoji: '🏠' },
+  { id: 'winter_aurora',    room: 'room_winter', name: 'Zorza polarna',   tier: 'epic',  cost: 70, emoji: '🌌' },
+  // Podwodny świat
+  { id: 'ocean_fish',       room: 'room_ocean',  name: 'Ławica ryb',      tier: 'rare',  cost: 45, emoji: '🐠' },
+  { id: 'ocean_chest',      room: 'room_ocean',  name: 'Skrzynia skarbów', tier: 'epic', cost: 75, emoji: '🧰' },
+  { id: 'ocean_sub',        room: 'room_ocean',  name: 'Łódź podwodna',   tier: 'epic',  cost: 85, emoji: '🛥️' },
 ];
 
 export function roomAddonsFor(roomId?: string): RoomAddon[] {

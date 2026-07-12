@@ -323,6 +323,100 @@ function GenericScene({ hour, colors }: { hour: number; colors?: [string, string
   );
 }
 
+// ── Zima: falling snow ──
+function Flake({ left, s, dur, delay }: { left: number; s: number; dur: number; delay: number }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => { const l = Animated.loop(Animated.timing(a, { toValue: 1, duration: dur, delay, easing: Easing.linear, useNativeDriver: true })); l.start(); return () => l.stop(); }, []);
+  const ty = a.interpolate({ inputRange: [0, 1], outputRange: [-12, 250] });
+  const tx = a.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, s * 2.5, 0] });
+  const op = a.interpolate({ inputRange: [0, 0.1, 0.85, 1], outputRange: [0, 0.95, 0.95, 0] });
+  return <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, left: `${left}%`, width: s, height: s, borderRadius: s / 2, backgroundColor: '#FFFFFF', opacity: op, transform: [{ translateY: ty }, { translateX: tx }] }} />;
+}
+function Snow({ size }: { size: number }) {
+  const flakes: [number, number, number, number][] = [[8, 3, 7000, 0], [24, 2.2, 9000, 1200], [40, 3.4, 8000, 600], [55, 2.6, 10500, 2100], [70, 3, 7600, 3000], [86, 2.2, 9500, 1500], [94, 2.8, 8200, 4200]];
+  return <>{flakes.map(([l, sc, d, dl], i) => <Flake key={i} left={l} s={size * 0.011 * sc} dur={d} delay={dl} />)}</>;
+}
+// One snow-tipped pine at (x, baseY).
+function Pine({ x, baseY, scale = 1 }: { x: number; baseY: number; scale?: number }) {
+  const h = 20 * scale, w = 18 * scale;
+  return (
+    <G>
+      <Path d={`M${x - 2} ${baseY} h4 v6 h-4 Z`} fill="#5A3A1E" />
+      <Path d={`M${x} ${baseY - h * 2.0} L${x - w} ${baseY} L${x + w} ${baseY} Z`} fill="#2E6E45" />
+      <Path d={`M${x} ${baseY - h * 2.7} L${x - w * 0.8} ${baseY - h * 0.9} L${x + w * 0.8} ${baseY - h * 0.9} Z`} fill="#357C4F" />
+      <Path d={`M${x} ${baseY - h * 3.3} L${x - w * 0.55} ${baseY - h * 1.8} L${x + w * 0.55} ${baseY - h * 1.8} Z`} fill="#3E8A58" />
+      <Path d={`M${x} ${baseY - h * 3.3} L${x - w * 0.24} ${baseY - h * 2.65} L${x + w * 0.24} ${baseY - h * 2.65} Z`} fill="#FFFFFF" opacity={0.9} />
+    </G>
+  );
+}
+function WinterScene({ hour, size }: { hour: number; size: number }) {
+  const phase = phaseFor(hour);
+  const isNight = phase === 'night';
+  const [sky0, sky1] = isNight ? ['#16224A', '#0A1030'] : phase === 'dusk' ? ['#C98BA0', '#7E7BA8'] : ['#AED4E6', '#E8F4FA'];
+  const stars: [number, number][] = [[40, 30], [90, 46], [150, 24], [210, 40], [258, 30], [120, 58]];
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs><LG id="wsky" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={sky0} /><Stop offset="1" stopColor={sky1} /></LG></Defs>
+        <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#wsky)" />
+        {isNight && stars.map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={i % 2 ? 1.1 : 1.7} fill="#FFFFFF" opacity={0.85} />)}
+        {isNight
+          ? <><Circle cx={232} cy={52} r={18} fill="#EAF0FF" /><Circle cx={239} cy={47} r={14} fill={sky0} opacity={0.9} /></>
+          : <Circle cx={232} cy={52} r={16} fill="#FFF3C4" />}
+        <Path d={`M0 176 Q90 150 180 172 Q240 184 300 166 L300 ${VB_H} L0 ${VB_H} Z`} fill="#E9F2F7" />
+        <Path d={`M0 200 Q120 182 300 202 L300 ${VB_H} L0 ${VB_H} Z`} fill="#FBFDFE" />
+        <Pine x={58} baseY={196} scale={1} />
+        <Pine x={96} baseY={202} scale={0.72} />
+        <Pine x={255} baseY={194} scale={1.05} />
+      </Svg>
+      <Snow size={size} />
+    </View>
+  );
+}
+
+// ── Podwodny świat ──
+function RiseBubble({ left, dur, delay, size }: { left: number; dur: number; delay: number; size: number }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => { const l = Animated.loop(Animated.timing(a, { toValue: 1, duration: dur, delay, easing: Easing.linear, useNativeDriver: true })); l.start(); return () => l.stop(); }, []);
+  const ty = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.62] });
+  const op = a.interpolate({ inputRange: [0, 0.1, 0.85, 1], outputRange: [0, 0.6, 0.6, 0] });
+  const d = Math.max(3, size * 0.02);
+  return <Animated.View pointerEvents="none" style={{ position: 'absolute', bottom: '10%', left: `${left}%`, width: d, height: d, borderRadius: d, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)', opacity: op, transform: [{ translateY: ty }] }} />;
+}
+function FishSvg({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size * 0.11} height={size * 0.06} viewBox="0 0 22 12">
+      <Path d="M2 6 Q9 0 16 6 Q9 12 2 6 Z" fill={color} />
+      <Path d="M16 6 L22 2 L22 10 Z" fill={color} />
+      <Circle cx={6} cy={6} r={1} fill="#0A2A3E" />
+    </Svg>
+  );
+}
+function OceanScene({ size }: { size: number }) {
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs><LG id="osea" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#2E86A8" /><Stop offset="1" stopColor="#0A2436" /></LG></Defs>
+        <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#osea)" />
+        {/* light rays from the surface */}
+        <Path d="M40 0 L70 0 L150 250 L90 250 Z" fill="#FFFFFF" opacity={0.06} />
+        <Path d="M150 0 L172 0 L210 250 L168 250 Z" fill="#FFFFFF" opacity={0.05} />
+        {/* seabed */}
+        <Path d={`M0 214 Q80 200 160 212 Q240 222 300 208 L300 ${VB_H} L0 ${VB_H} Z`} fill="#C9B68A" />
+        <Path d="M0 214 Q80 200 160 212 Q240 222 300 208" fill="none" stroke="#EADFC0" strokeWidth="1.4" opacity={0.4} />
+        {/* seaweed */}
+        <Path d="M60 214 Q52 196 62 182 Q54 170 64 156" fill="none" stroke="#2E8B57" strokeWidth="5" strokeLinecap="round" />
+        <Path d="M72 214 Q80 198 71 186 Q79 176 70 164" fill="none" stroke="#3AA06A" strokeWidth="4" strokeLinecap="round" />
+        {/* coral */}
+        <Path d="M228 214 Q224 198 232 196 Q226 190 236 188 Q246 192 240 200 Q248 202 244 214 Z" fill="#E06A8B" opacity={0.9} />
+        <Circle cx={214} cy={210} r={5} fill="#F2A65A" opacity={0.85} />
+      </Svg>
+      {[[20, 6000, 0], [46, 7200, 1500], [78, 6600, 2800]].map(([l, d, dl], i) => <RiseBubble key={i} left={l} dur={d} delay={dl} size={size} />)}
+      <Drift top={40} fromPct={-14} dist={size * 1.3} dur={12000} delay={800}><FishSvg size={size} color="#F4B23E" /></Drift>
+    </View>
+  );
+}
+
 // A gentle vertical bob (for a boat rocking on the sea).
 function Bob({ children, amp = 3, dur = 2800 }: { children: React.ReactNode; amp?: number; dur?: number }) {
   const a = useRef(new Animated.Value(0)).current;
@@ -452,6 +546,69 @@ function AddonLayer({ addons, size }: { addons: string[]; size: number }) {
           <Text style={{ fontSize: size * 0.075 }}>🛸</Text>
         </Drift>
       )}
+
+      {/* ── Zima ── */}
+      {has('winter_snowman') && (
+        <SceneSvg>
+          <G>
+            <Circle cx={205} cy={206} r={11} fill="#FFFFFF" />
+            <Circle cx={205} cy={190} r={8} fill="#FFFFFF" />
+            <Circle cx={205} cy={177} r={6} fill="#FFFFFF" />
+            <Circle cx={203} cy={176} r={0.9} fill="#1A1A1A" /><Circle cx={207} cy={176} r={0.9} fill="#1A1A1A" />
+            <Path d="M205 178 L211 179 L205 180 Z" fill="#E8863B" />
+            <Circle cx={205} cy={188} r={0.9} fill="#1A1A1A" /><Circle cx={205} cy={192} r={0.9} fill="#1A1A1A" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('winter_igloo') && (
+        <SceneSvg>
+          <G>
+            <Path d="M28 204 A 26 20 0 0 1 80 204 Z" fill="#DCE8F0" />
+            <Path d="M46 204 L46 191 A 8 11 0 0 1 62 191 L62 204 Z" fill="#9DB4C8" />
+            <Path d="M35 190 L44 187" stroke="#B9CCDC" strokeWidth="1" />
+            <Path d="M64 187 L73 190" stroke="#B9CCDC" strokeWidth="1" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('winter_aurora') && (
+        <SceneSvg>
+          <G fill="none" strokeLinecap="round">
+            <Path d="M-10 60 Q80 30 160 55 Q240 78 320 48" stroke="#4FE0A8" strokeWidth={10} opacity={0.18} />
+            <Path d="M-10 78 Q80 50 160 74 Q240 96 320 66" stroke="#6AC8FF" strokeWidth={8} opacity={0.16} />
+            <Path d="M-10 96 Q90 72 170 92 Q250 110 320 86" stroke="#B98BFF" strokeWidth={7} opacity={0.14} />
+          </G>
+        </SceneSvg>
+      )}
+
+      {/* ── Podwodny świat ── */}
+      {has('ocean_fish') && (
+        <>
+          <Drift top={26} fromPct={-14} dist={size * 1.3} dur={9000} delay={300}><FishSvg size={size} color="#5AC8E0" /></Drift>
+          <Drift top={54} fromPct={-16} dist={size * 1.35} dur={13000} delay={2400}><FishSvg size={size} color="#F27FA6" /></Drift>
+          <Drift top={68} fromPct={-12} dist={size * 1.25} dur={10500} delay={4200}><FishSvg size={size} color="#F4D03F" /></Drift>
+        </>
+      )}
+      {has('ocean_chest') && (
+        <SceneSvg>
+          <G>
+            <Rect x={140} y={198} width={30} height={14} rx={2} fill="#7A4A22" />
+            <Path d="M140 198 Q155 188 170 198 Z" fill="#8A5A2E" />
+            <Rect x={140} y={202} width={30} height={2.4} fill="#E7B84B" />
+            <Circle cx={155} cy={205} r={2} fill="#E7B84B" />
+            <Circle cx={150} cy={195} r={1.4} fill="#FBE38A" opacity={0.9} /><Circle cx={162} cy={194} r={1.2} fill="#FBE38A" opacity={0.9} />
+          </G>
+        </SceneSvg>
+      )}
+      {has('ocean_sub') && (
+        <Drift top={34} fromPct={-18} dist={size * 1.4} dur={12000} delay={1200}>
+          <Svg width={size * 0.16} height={size * 0.09} viewBox="0 0 40 22">
+            <Path d="M9 11 L9 5" stroke="#F4C430" strokeWidth={1.6} /><Circle cx={9} cy={4} r={2} fill="#F4C430" />
+            <Path d="M6 13 Q6 6 20 6 L30 6 Q40 6 40 13 Q40 20 30 20 L20 20 Q6 20 6 13 Z" fill="#F4C430" />
+            <Circle cx={20} cy={13} r={3.4} fill="#BFEAF5" />
+            <Circle cx={30} cy={13} r={2.6} fill="#BFEAF5" />
+          </Svg>
+        </Drift>
+      )}
     </>
   );
 }
@@ -465,6 +622,8 @@ export default function PetScene({ room, colors, addons = [], size = 290 }: { ro
       case 'room_meadow': return <MeadowScene hour={hour} size={size} />;
       case 'room_candy':  return <CandyScene size={size} />;
       case 'room_space':  return <SpaceScene size={size} />;
+      case 'room_winter': return <WinterScene hour={hour} size={size} />;
+      case 'room_ocean':  return <OceanScene size={size} />;
       default:            return <GenericScene hour={hour} colors={colors} />;
     }
   })();
