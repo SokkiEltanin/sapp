@@ -8,6 +8,7 @@ import { ChevronLeft, Pencil, Check, Coins, ShoppingBag, Swords } from 'lucide-r
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
+import PetScene from '@/components/pet/PetScene';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
@@ -207,12 +208,10 @@ export default function Pet() {
 
         {/* stage (room backdrop if equipped) */}
         <View style={s.stage}>
-          {room?.colors && (
-            <LinearGradient colors={room.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.room}>
-              {room.decor?.map((d, i) => (
-                <Text key={i} style={[s.roomDecor, i === 0 ? { top: 10, left: 14 } : { top: 16, right: 16 }]}>{d}</Text>
-              ))}
-            </LinearGradient>
+          {equipped.room && (
+            <View style={s.room}>
+              <PetScene room={equipped.room} colors={room?.colors as [string, string] | undefined} size={290} />
+            </View>
           )}
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
