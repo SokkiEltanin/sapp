@@ -328,7 +328,6 @@ export default function HealthScreen() {
         const todayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
         const wSteps  = Array(7).fill(0);
         const wWeight = Array(7).fill(0);
-        const wWater  = Array(7).fill(0);
         const wBurn   = Array(7).fill(0);
         const wFat    = Array(7).fill(0);
         const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
@@ -341,7 +340,6 @@ export default function HealthScreen() {
             const parsed = JSON.parse(dayRaw);
             if (parsed.steps != null)  wSteps[i] = parsed.steps;
             if (parsed.weight != null) wWeight[i] = parsed.weight;
-            if (parsed.water != null)  wWater[i]  = parsed.water;
             if (parsed.hc) {
               const hc = parsed.hc;
               wBurn[i] = (hc.totalCalories > 0 ? hc.totalCalories : ((hc.bmr || 0) + (hc.activeCalories || 0)));
@@ -357,9 +355,9 @@ export default function HealthScreen() {
         setWeekSteps(wSteps);
         setWeekSleep(wSleep);
         setWeekWeight(wWeight);
-        setWeekWater(wWater);
         setWeekBurn(wBurn);
         setWeekFat(wFat);
+        // Water week is loaded from the habit in loadWater(), not this blob.
 
         // Most recent logged weight (survives gaps >7 days) — seed for nudging.
         const storedLast = await AsyncStorage.getItem('health_last_weight');
@@ -374,18 +372,19 @@ export default function HealthScreen() {
 
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(todayKey(), JSON.stringify({ water, steps, sleepH, sleepM, sleepQuality, weight, hc: hcExtra })).catch(() => {});
+    // Water is NOT persisted here — it lives solely in the "Woda" habit (loadWater
+    // reads/writes it), so it stays one number across Zdrowie / Nawyki / pet / HC.
+    AsyncStorage.setItem(todayKey(), JSON.stringify({ steps, sleepH, sleepM, sleepQuality, weight, hc: hcExtra })).catch(() => {});
     if (weight > 0) AsyncStorage.setItem('health_last_weight', String(weight)).catch(() => {});
     const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
     setWeekSteps(prev => { const n = [...prev]; n[todayIdx] = steps; return n; });
     setWeekWeight(prev => { const n = [...prev]; n[todayIdx] = weight; return n; });
-    setWeekWater(prev => { const n = [...prev]; n[todayIdx] = water; return n; });
     setWeekSleep(prev => {
       const n = [...prev];
       n[todayIdx] = { h: sleepH, m: sleepM, quality: sleepQuality };
       return n;
     });
-  }, [water, steps, sleepH, sleepM, sleepQuality, weight, hcExtra, loaded]);
+  }, [steps, sleepH, sleepM, sleepQuality, weight, hcExtra, loaded]);
 
   // Water lives in the "Woda" habit (glasses) so the Health screen, the Habits
   // screen, the pet quest and Health Connect hydration all share one number.
@@ -394,12 +393,24 @@ export default function HealthScreen() {
     setWaterHabitId(w?.id ?? null);
     if (w) {
       if (w.dailyGoal && w.dailyGoal > 0) setWaterGoal(w.dailyGoal);   // habit's goal wins, keeps it single-source
-      const counts = await getCounts(todayDate());
-      const n = counts[w.id] ?? 0;
-      waterRef.current = n;
-      setWater(n);
+      // Today AND the weekly chart both come straight from the habit's per-day
+      // counts, so water logged in Nawyki / from Health Connect shows here too
+      // (the old weekly chart read a blob only written while this screen was open).
+      const today = new Date();
+      const todayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
+      const week = Array(7).fill(0);
+      for (let i = 0; i <= todayIdx; i++) {
+        const d = new Date(today); d.setDate(today.getDate() - (todayIdx - i));
+        const counts = await getCounts(dateStr(d));
+        week[i] = Math.max(0, counts[w.id] ?? 0);
+      }
+      waterRef.current = week[todayIdx];
+      setWater(week[todayIdx]);
+      setWeekWater(week);
     } else {
       waterRef.current = 0;
+      setWater(0);
+      setWeekWater(Array(7).fill(0));
     }
   }, []);
   useFocusEffect(useCallback(() => { loadWater(); }, [loadWater]));
