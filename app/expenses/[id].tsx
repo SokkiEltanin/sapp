@@ -655,6 +655,21 @@ export default function ExpenseDetailScreen() {
             </View>
           )}
 
+          {/* ── Attach a receipt to a bare (e.g. bank-logged) payment ────────── */}
+          {!isInc && editedItems.length === 0 && (
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push(`/expenses/scan?attachTo=${id}` as any); }}
+              style={s.scanBtn}
+            >
+              <ShoppingCart size={16} color={colors.accent.blue} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.scanBtnText}>Doskanuj paragon</Text>
+                <Text style={s.scanBtnHint}>Dodaj produkty z paragonu do tej płatności</Text>
+              </View>
+              <LucideIcons.ChevronRight size={16} color={colors.accent.blue} />
+            </PressableScale>
+          )}
+
           {/* ── Type toggle (editing only) ───────────────────────────────────── */}
           {editing && (
             <View style={s.typeToggle}>
@@ -1023,6 +1038,15 @@ const makeS = (c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: c.accent.blue + '30',
   },
   itemTagText: { fontSize: 9, color: c.accent.blue, fontWeight: '600' },
+
+  scanBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    paddingVertical: spacing[3], paddingHorizontal: spacing[4], borderRadius: radius.xl,
+    borderWidth: 1, borderColor: c.accent.blue + '40',
+    backgroundColor: c.accent.blue + '10',
+  },
+  scanBtnText: { fontSize: 14, fontWeight: '700', color: c.accent.blue },
+  scanBtnHint: { fontSize: 11, color: c.text.muted, marginTop: 1 },
 
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
