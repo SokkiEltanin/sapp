@@ -1341,6 +1341,13 @@ export default function DashboardScreen() {
               {delta !== 0 && <Text style={[s.waveDelta, { color: deltaColor }]}>{delta > 0 ? '+' : '−'}{Math.abs(delta).toFixed(1)} kg</Text>}
             </View>
           </View>
+          {/* value above each reading — the user wants the numbers ON the chart, not
+              just a line. Non-zero points only, placed proportionally over the wave. */}
+          <View style={{ height: 13 }}>
+            {ser.values.map((v, i) => v > 0 ? (
+              <Text key={i} style={[s.wDot, { left: `${((i + 0.5) / ser.values.length) * 100}%` }]} numberOfLines={1}>{v.toFixed(1)}</Text>
+            ) : null)}
+          </View>
           <WaveChart data={ser.values} color={accentColor} target={t.target} zoom />
           {nz.length > 1 && (
             <Text style={s.statSub}>Zakres {lo.toFixed(1)}–{hi.toFixed(1)} kg{t.target ? ` · cel ${Number(t.target).toFixed(1)} kg` : ''}</Text>
@@ -4592,6 +4599,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   waveNowWrap: { alignItems: 'flex-end' },
   waveNow: { fontSize: 22, fontWeight: '800', lineHeight: 24 },
   waveDelta: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginTop: 1 },
+  wDot: { position: 'absolute', width: 34, marginLeft: -17, textAlign: 'center', fontSize: 8.5, fontWeight: '700', color: c.text.muted },
 
   // ── Google Calendar ────────────────────────────────────────────────────────
   gcalDayLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, View, StyleSheet, Text } from 'react-native';
+import { Animated, Easing, Pressable, View, StyleSheet, Text, Vibration } from 'react-native';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
@@ -67,8 +67,8 @@ function mouthFor(expr: PetExpression): React.ReactNode {
 }
 
 export default function CatArt({
-  size = 150, expression = 'happy', animate = true, onPress, equipped, celebrate = 0,
-}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string }; celebrate?: number }) {
+  size = 150, expression = 'happy', animate = true, onPress, equipped, celebrate = 0, affection = 0,
+}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string }; celebrate?: number; affection?: number }) {
   const breathe = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
   const wiggle = useRef(new Animated.Value(0)).current;
@@ -180,16 +180,21 @@ export default function CatArt({
       Animated.timing(wiggle, { toValue: -1, duration: 110, useNativeDriver: true }),
       Animated.spring(wiggle, { toValue: 0, friction: 4, useNativeDriver: true }),
     ]).start();
-    // a mood-aware reaction emoji floats up
-    const pool = REACTIONS[expression] ?? REACTIONS.happy;
-    spawn(pool[Math.floor(Math.random() * pool.length)], (Math.random() - 0.5) * size * 0.45);
-    // combo: keep tapping → every 5th tap bursts a shower of hearts + a happy buzz
-    taps.current += 1;
-    clearTimeout(tapReset.current);
-    tapReset.current = setTimeout(() => { taps.current = 0; }, 900);
-    if (taps.current % 5 === 0) {
-      haptic.success();
-      for (let i = 0; i < 6; i++) setTimeout(() => spawn(i % 2 ? '❤️' : '✨', (Math.random() - 0.5) * size * 0.7), i * 55);
+    // Petting reaction ESCALATES with the affection bar — from sparkles when barely
+    // petted, through a warm ✨/💛 mix, to hearts when the cat adores you. Fewer, calmer
+    // emojis (1–3) so it reads as building warmth, not confetti chaos.
+    const a = affection;
+    const pool = a >= 80 ? ['❤️', '💗', '❤️'] : a >= 45 ? ['✨', '💛', '❤️'] : a >= 18 ? ['✨', '💛'] : ['✨'];
+    const n = a >= 80 ? 3 : a >= 45 ? 2 : 1;
+    for (let i = 0; i < n; i++) setTimeout(() => spawn(pool[Math.floor(Math.random() * pool.length)], (Math.random() - 0.5) * size * (0.34 + a / 400)), i * 70);
+    // purr — a soft vibration pattern that lengthens as the cat gets happier
+    if (animate) {
+      try {
+        const pulses = a >= 80 ? 6 : a >= 45 ? 4 : 2;
+        const pat: number[] = [];
+        for (let i = 0; i < pulses; i++) pat.push(14, 26);
+        Vibration.vibrate(pat);
+      } catch {}
     }
     onPress?.();
   };

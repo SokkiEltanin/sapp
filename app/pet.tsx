@@ -214,7 +214,7 @@ export default function Pet() {
               ))}
             </LinearGradient>
           )}
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} />
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
 
         {/* Affection — fills as you pet (tap) the cat; full = daily bonus. */}
