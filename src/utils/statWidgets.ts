@@ -97,6 +97,7 @@ type Period = 'week' | 'month';
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 const MONTHS = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 
 // YYYY-MM for a month `offset` back (0 = current).
@@ -262,14 +263,18 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
     }
     case 'workHours': {
       const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
+      // Only shifts already WORKED (up to today) — a widget shows facts, not the
+      // month's still-scheduled hours (matches the dashboard Praca panel).
+      const today = todayStr();
       return ctx.workEvents
-        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)))
+        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)) && (e.date ?? '').slice(0, 10) <= today)
         .reduce((s, e) => s + shiftHours(e), 0);
     }
     case 'earnings': {
       const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
+      const today = todayStr();
       const h = ctx.workEvents
-        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)))
+        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)) && (e.date ?? '').slice(0, 10) <= today)
         .reduce((s, e) => s + shiftHours(e), 0);
       return h * ctx.ratePerHour;
     }

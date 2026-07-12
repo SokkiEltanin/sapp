@@ -1283,15 +1283,16 @@ export default function DashboardScreen() {
   }, [statCtx, scopedExpenses, habits.length, habitsDoneIds.length]);
 
   const fmtStat = (v: number, unit: string): string => {
-    if (unit === 'zł')   return `${Math.round(v)} zł`;
+    const g = (x: number) => Math.round(x).toLocaleString('pl-PL'); // thousands grouping
+    if (unit === 'zł')   return `${g(v)} zł`;
     if (unit === 'kg')   return `${v.toFixed(1).replace('.0', '')} kg`;
     if (unit === 'h')    return `${v.toFixed(1).replace('.0', '')} h`;
     if (unit === '/5')   return v.toFixed(1);
-    if (unit === 'szt.') return `${Math.round(v)} szt.`;
-    if (unit === '×')    return `×${Math.round(v)}`;
+    if (unit === 'szt.') return `${g(v)} szt.`;
+    if (unit === '×')    return `×${g(v)}`;
     if (unit === 'dni')  return `${Math.round(v)} dni`;
     if (unit.startsWith('/')) return `${Math.round(v)} ${unit}`; // e.g. habits "/ 5"
-    return `${Math.round(v)}`;
+    return g(v);
   };
 
   // Compact value for above wave points (unit-aware, blank when zero).
