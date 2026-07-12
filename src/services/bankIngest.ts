@@ -37,6 +37,8 @@ export async function ingestBankNotification(title: string, text: string): Promi
     store: learned?.name ?? tx.store,
     category,
     suggestedCategory: category,
-    auto: !!learned?.auto,
+    // Full autopilot logs every card payment straight away; otherwise a merchant has to
+    // earn trust (5 clean accepts) before its payments skip review.
+    auto: store.autoAll || !!learned?.auto,
   });
 }

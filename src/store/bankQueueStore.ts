@@ -17,7 +17,9 @@ export interface PendingBankTx extends ParsedBankTx {
 interface BankQueueState {
   pending: PendingBankTx[];
   enabled: boolean;              // master switch for auto-logging from notifications
+  autoAll: boolean;              // full autopilot: log every card payment WITHOUT review
   setEnabled: (v: boolean) => void;
+  setAutoAll: (v: boolean) => void;
   enqueue: (tx: Omit<PendingBankTx, 'id' | 'addedAt'>) => boolean; // false if duplicate
   update: (id: string, patch: Partial<PendingBankTx>) => void;
   remove: (id: string) => void;
@@ -29,7 +31,15 @@ export const useBankQueue = create<BankQueueState>()(
     (set, get) => ({
       pending: [],
       enabled: false,
+      autoAll: false,
       setEnabled: (v) => set({ enabled: v }),
+      // Turning full-auto ON also flips every already-queued CARD payment to `auto` so
+      // the next processor run clears the backlog too. Income (direction 'in') stays
+      // manual — never auto-log a paycheck blindly.
+      setAutoAll: (v) => set((s) => ({
+        autoAll: v,
+        pending: v ? s.pending.map(p => p.direction === 'in' ? p : { ...p, auto: true }) : s.pending,
+      })),
       enqueue: (tx) => {
         // dedupe: same amount + within 3 min + same shop already queued
         const dup = get().pending.some(p =>

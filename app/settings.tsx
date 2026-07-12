@@ -125,6 +125,8 @@ export default function SettingsScreen() {
   const setTabSlide = useUiPrefs(s => s.setTabSlide);
   const bankEnabled = useBankQueue(s => s.enabled);
   const setBankEnabled = useBankQueue(s => s.setEnabled);
+  const bankAutoAll = useBankQueue(s => s.autoAll);
+  const setBankAutoAll = useBankQueue(s => s.setAutoAll);
   const bankPending = useBankQueue(s => s.pending.length);
   const [bankTest, setBankTest] = useState('');
   const setThemeMode = useThemeStore(s => s.setMode);
@@ -1444,6 +1446,18 @@ export default function SettingsScreen() {
               </View>
               <Switch value={bankEnabled} onValueChange={(v) => { setBankEnabled(v); if (v) import('@/services/bankNotificationDrain').then(m => m.drainBankNotifications()).catch(() => {}); }} trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }} thumbColor={bankEnabled ? '#2AC68F' : colors.text.muted} />
             </View>
+            {bankEnabled && (
+              <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
+                <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                  <LucideIcons.Zap size={16} color="#2AC68F" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Dodawaj automatycznie (bez zatwierdzania)</Text>
+                  <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Każda płatność kartą księguje się od razu. Wpłaty/wypłaty i tak sprawdzasz ręcznie.</Text>
+                </View>
+                <Switch value={bankAutoAll} onValueChange={(v) => { setBankAutoAll(v); haptic.tap(); if (v) { import('@/services/bankAutoProcess').then(m => m.processAutoBankQueue()).catch(() => {}); toast.success('Płatności kartą będą dodawane automatycznie'); } }} trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }} thumbColor={bankAutoAll ? '#2AC68F' : colors.text.muted} />
+              </View>
+            )}
             {bankEnabled && Platform.OS === 'android' && (
               <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, flexDirection: 'column', alignItems: 'stretch', gap: 6 }]}>
                 <Text style={[styles.rowLabel, { fontSize: 12, color: colors.text.muted, fontWeight: '400' }]}>Aby łapać płatności automatycznie, włącz Sapp w „Dostęp do powiadomień" (raz).</Text>
