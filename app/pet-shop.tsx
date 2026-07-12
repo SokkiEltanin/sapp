@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
+import PetScene from '@/components/pet/PetScene';
 import { usePetStore } from '@/store/petStore';
 import { COSMETICS, SLOT_ORDER, SLOT_LABEL, Cosmetic, TIER_META } from '@/utils/petShop';
 import { spacing, radius, typography } from '@/theme';
@@ -66,9 +66,8 @@ export default function PetShop() {
                       isEq && { borderColor: '#2AC68F', borderWidth: 2 },
                       !owned && !afford && { opacity: 0.5 },
                     ]}>
-                      {item.colors
-                        ? <><LinearGradient colors={item.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                            <Text style={s.swatchEmoji}>{item.decor?.[0] ?? '🏠'}</Text></>
+                      {item.slot === 'room'
+                        ? <PetScene room={item.id} colors={item.colors as [string, string] | undefined} size={66} />
                         : <CatArt expression="happy" size={66} animate={false} equipped={{ [item.slot]: item.id }} />}
                       {isEq && <View style={s.eqBadge}><Check size={12} color="#fff" /></View>}
                       {!owned && <View style={[s.tierDot, { backgroundColor: tier.color }]} />}
@@ -111,7 +110,6 @@ const makeS = (c: any) => StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
   cell: { width: '22%', alignItems: 'center' },
   swatch: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: c.bg.card },
-  swatchEmoji: { fontSize: 30 },
   eqBadge: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: '#2AC68F', alignItems: 'center', justifyContent: 'center' },
   tierDot: { position: 'absolute', top: 4, left: 4, width: 8, height: 8, borderRadius: 4 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing[3], marginTop: spacing[5] },
