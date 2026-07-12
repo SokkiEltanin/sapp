@@ -344,18 +344,40 @@ function buildWavePath(data: number[], max: number, min = 0) {
   return { line, fill, pts };
 }
 
+// Weight (and other never-zero trends) read 0 for buckets with no reading; carry the
+// last known value forward so a sparse series is a continuous line, not spikes to 0.
+function carryForward(values: number[]): number[] {
+  const first = values.find(v => v > 0) ?? 0;
+  let last = first;
+  return values.map(v => (v > 0 ? (last = v) : last));
+}
+function lastNonZero(values: number[]): number {
+  for (let i = values.length - 1; i >= 0; i--) if (values[i] > 0) return values[i];
+  return 0;
+}
+// A lower bound that zooms a narrow high band (e.g. weight 71–73 kg) so variance shows
+// instead of a flat line pinned to the top. 0 = don't zoom.
+function zoomFloor(values: number[]): number {
+  const nz = values.filter(v => v > 0);
+  if (nz.length < 2) return 0;
+  const lo = Math.min(...nz), hi = Math.max(...nz);
+  return (hi - lo > 0 && lo > hi * 0.3) ? Math.max(0, lo - (hi - lo) * 0.5) : 0;
+}
+
 // Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
-function DualWaveChart({ data1, data2, color1, color2, independent }: {
+function DualWaveChart({ data1, data2, color1, color2, independent, min1 = 0, min2 = 0 }: {
   data1: number[]; data2: number[]; color1: string; color2: string; independent?: boolean;
+  min1?: number; min2?: number;
 }) {
   if (data1.length < 2) return null;
   // Shared scale by default (comparable magnitudes, e.g. food vs sweets); when
   // `independent`, each line uses its own max so cross-unit trends are visible.
+  // min1/min2 zoom a narrow high band (e.g. weight) so its variance is visible.
   const shared = Math.max(...data1, ...data2, 1);
   const max1 = independent ? Math.max(...data1, 1) : shared;
   const max2 = independent ? Math.max(...data2, 1) : shared;
-  const p1  = buildWavePath(data1, max1);
-  const p2  = buildWavePath(data2, max2);
+  const p1  = buildWavePath(data1, max1, min1);
+  const p2  = buildWavePath(data2, max2, min2);
   return (
     <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
       <Defs>
@@ -1319,7 +1341,7 @@ export default function DashboardScreen() {
     // current weight on the right, delta vs the previous reading (green = toward the
     // goal when one is set), a zoomed trend line so tiny changes are visible, and the
     // range. (Weight in a generic 'number'/'compare' tile was the unreadable case.)
-    if (t.metric === 'weight') {
+    if (t.metric === 'weight' && viz !== 'compare') {
       const ser = metricSeries('weight', statCtx, period, 8, t.tag);
       const raw = ser.values;                     // per-bucket latest reading, 0 = no reading
       const nz = raw.filter(v => v > 0);
@@ -1335,9 +1357,7 @@ export default function DashboardScreen() {
       // month) would plunge the line to the axis and look broken. Carry the last
       // known weight forward (and backfill leading gaps with the first reading) so
       // the trend line is continuous; only REAL readings get a dot + a number.
-      const firstNz = raw.find(v => v > 0) ?? 0;
-      let carried = firstNz;
-      const filled = raw.map(v => (v > 0 ? (carried = v) : carried));
+      const filled = carryForward(raw);
       const dotColors = raw.map(v => (v > 0 ? accentColor : 'transparent'));
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -1425,9 +1445,10 @@ export default function DashboardScreen() {
         const off = t.compareOffset ?? 1;
         const n = Math.max(6, off + 1);
         const ser = metricSeries(t.metric!, statCtx, period, n, t.tag);
-        const nowV = ser.values[ser.values.length - 1] ?? 0;
-        const thenIdx = ser.values.length - 1 - off;
-        const thenV = thenIdx >= 0 ? ser.values[thenIdx] : 0;
+        const vals = t.metric === 'weight' ? carryForward(ser.values) : ser.values;
+        const nowV = vals[vals.length - 1] ?? 0;
+        const thenIdx = vals.length - 1 - off;
+        const thenV = thenIdx >= 0 ? vals[thenIdx] : 0;
         const nowL = ser.labels[ser.labels.length - 1] ?? 'teraz';
         const thenL = thenIdx >= 0 ? ser.labels[thenIdx] : '—';
         const dPct = thenV > 0 ? Math.round(((nowV - thenV) / thenV) * 100) : null;
@@ -1445,7 +1466,7 @@ export default function DashboardScreen() {
               )}
               <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(thenV, ser.unit)}</Text><Text style={s.statCmpKey}>{thenL}</Text></View>
             </View>
-            <WaveChart data={ser.values} color={accentColor} zoom={t.metric === 'weight'} />
+            <WaveChart data={vals} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>
               {ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, (i === ser.labels.length - 1 || i === thenIdx) && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}
             </View>
@@ -1455,8 +1476,9 @@ export default function DashboardScreen() {
       // Compare vs your own recent average.
       if (t.metric2 === '__avg__') {
         const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
-        const nowV = ser.values[ser.values.length - 1] ?? 0;
-        const prior = ser.values.slice(0, -1).filter(v => v !== 0);
+        const vals = t.metric === 'weight' ? carryForward(ser.values) : ser.values;
+        const nowV = vals[vals.length - 1] ?? 0;
+        const prior = vals.slice(0, -1).filter(v => v !== 0);
         const avgV = prior.length ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
         const dPct = avgV > 0 ? Math.round(((nowV - avgV) / avgV) * 100) : null;
         const up = nowV >= avgV;
@@ -1473,7 +1495,7 @@ export default function DashboardScreen() {
               )}
               <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(avgV, ser.unit)}</Text><Text style={s.statCmpKey}>Twoja średnia</Text></View>
             </View>
-            <WaveChart data={ser.values} color={accentColor} zoom={t.metric === 'weight'} />
+            <WaveChart data={vals} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>{ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}</View>
           </View>
         );
@@ -1481,19 +1503,28 @@ export default function DashboardScreen() {
       const a = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       const defB = metricById(t.metric2);
       const b = defB ? metricSeries(t.metric2!, statCtx, period, 6) : { values: a.values.map(() => 0), labels: a.labels, unit: '' };
+      // Weight side(s) carry forward so the line is continuous, use the last real
+      // reading for the headline, and zoom their band so variance is visible even
+      // next to a big-magnitude metric like steps.
+      const aW = t.metric === 'weight', bW = t.metric2 === 'weight';
+      const aVals = aW ? carryForward(a.values) : a.values;
+      const bVals = bW ? carryForward(b.values) : b.values;
+      const aNow = aW ? lastNonZero(a.values) : (a.values[a.values.length - 1] ?? 0);
+      const bNow = bW ? lastNonZero(b.values) : (b.values[b.values.length - 1] ?? 0);
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
           <View style={s.statCmpRow}>
-            <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(a.values[a.values.length - 1] ?? 0, a.unit)}</Text><Text style={s.statCmpKey}>{def.label}</Text></View>
-            <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(b.values[b.values.length - 1] ?? 0, b.unit)}</Text><Text style={s.statCmpKey}>{defB?.label ?? '—'}</Text></View>
+            <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(aNow, a.unit)}</Text><Text style={s.statCmpKey}>{def.label}</Text></View>
+            <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(bNow, b.unit)}</Text><Text style={s.statCmpKey}>{defB?.label ?? '—'}</Text></View>
           </View>
-          {defB && (a.values[a.values.length - 1] ?? 0) > 0 && a.unit === b.unit && (
+          {defB && aNow > 0 && a.unit === b.unit && (
             <Text style={[s.statSub, { marginTop: 2 }]}>
-              {defB.label} to {Math.round(((b.values[b.values.length - 1] ?? 0) / (a.values[a.values.length - 1] || 1)) * 100)}% „{def.label}"
+              {defB.label} to {Math.round((bNow / (aNow || 1)) * 100)}% „{def.label}"
             </Text>
           )}
-          <DualWaveChart data1={a.values} data2={b.values} color1={accentColor} color2={'#FBBF24'} independent={a.unit !== b.unit} />
+          <DualWaveChart data1={aVals} data2={bVals} color1={accentColor} color2={'#FBBF24'} independent={a.unit !== b.unit}
+            min1={aW ? zoomFloor(aVals) : 0} min2={bW ? zoomFloor(bVals) : 0} />
           <View style={s.waveLabels}>
             {a.labels.map((l, i) => <Text key={i} style={s.waveLabel}>{l}</Text>)}
           </View>
