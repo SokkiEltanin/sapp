@@ -3226,8 +3226,6 @@ export default function DashboardScreen() {
             nodes['work-hours'] = workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (() => {
               const wm = workMonthly;
               const hasRate = wm.rate > 0;
-              const deltaE = wm.currentEarnings - wm.prevEarnings;
-              const showDelta = hasRate && wm.prevEarnings > 0 && Math.abs(deltaE) > 1;
               return (
                 <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.9}
                   onPress={() => { haptic.tap(); setWorkPanel(true); }}>
@@ -3250,21 +3248,13 @@ export default function DashboardScreen() {
                       <View style={s.workHeroRow}>
                         <View style={{ flex: 1 }}>
                           <Text style={[s.workHoursBig, { color: colors.text.primary }]}>
-                            {hasRate ? wm.currentEarnings.toLocaleString('pl-PL') : wm.currentHours.toFixed(0)}
-                            <Text style={s.workHoursUnit}>{hasRate ? ' zł' : ' h'}</Text>
+                            {wm.workedH.toFixed(0)}
+                            <Text style={s.workHoursUnit}> h</Text>
                           </Text>
                           <Text style={s.workHoursSub}>
-                            {hasRate ? `≈ zarobek · ${wm.currentHours.toFixed(0)} h w tym miesiącu` : 'przepracowane w tym miesiącu'}
+                            przepracowane w tym miesiącu{hasRate ? `  ·  ≈ ${wm.workedEarnings.toLocaleString('pl-PL')} zł` : ''}
                           </Text>
                         </View>
-                        {showDelta && (
-                          <View style={[s.workDelta, { backgroundColor: (deltaE >= 0 ? colors.accent.green : colors.accent.red) + '1E' }]}>
-                            {deltaE >= 0 ? <ChevronUp size={12} color={colors.accent.green} /> : <ChevronDown size={12} color={colors.accent.red} />}
-                            <Text style={[s.workDeltaText, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>
-                              {Math.abs(deltaE).toLocaleString('pl-PL')} zł
-                            </Text>
-                          </View>
-                        )}
                       </View>
 
                       {wm.plannedH > 0 && (
@@ -3678,80 +3668,39 @@ export default function DashboardScreen() {
               <Text style={[s.factText, { marginTop: spacing[2] }]}>Ustaw kolor lub prefiks pracy w kalendarzu, aby liczyć godziny i zarobek.</Text>
             ) : (() => {
               const wm = workMonthly; const hasRate = wm.rate > 0;
-              const deltaE = wm.projectedEarnings - wm.prevEarnings;
               return (
                 <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+                  {/* ── Ten miesiąc: fakt = godziny z kalendarza [JD] ── */}
                   <View style={{ marginTop: spacing[2] }}>
-                    <Text style={s.wpBig}>{hasRate ? wm.workedEarnings.toLocaleString('pl-PL') : wm.workedH.toFixed(0)}<Text style={s.wpUnit}>{hasRate ? ' zł' : ' h'}</Text></Text>
-                    <Text style={s.wpSub}>{hasRate ? `zarobione do teraz · ${wm.workedH.toFixed(0)} h w tym miesiącu` : 'godzin przepracowanych w tym miesiącu'}</Text>
+                    <Text style={s.wpBig}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
+                    <Text style={s.wpSub}>
+                      przepracowane w tym miesiącu
+                      {wm.plannedH > 0 ? ` · +${wm.plannedH.toFixed(0)} h w planie` : ''}
+                      {hasRate ? `  ·  ≈ ${wm.workedEarnings.toLocaleString('pl-PL')} zł do teraz` : ''}
+                    </Text>
                   </View>
-                  {(() => {
-                    const paychecks = expenses.filter(e => isPaycheck(e, workSettings.workPrefix));
-                    const jdTotal = paychecks.reduce((sum, e) => sum + e.amount, 0);
-                    return jdTotal > 0 ? (
-                      <View style={s.wpTotalRow}>
-                        <Text style={s.wpTotalLabel}>Łącznie zarobione{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
-                        <Text style={[s.wpTotalVal, { color: accentColor }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
-                      </View>
-                    ) : null;
-                  })()}
-                  {/* Ile dostałem / ile powinienem dostać — BOTH from the one authoritative
-                      rate (workEarnings.perSecond, the same the live dashboard uses), so this
-                      block never disagrees with the ticking earnings above it. */}
-                  {(() => {
-                    const rate = (workEarnings?.perSecond ?? 0) * 3600;
-                    const pcs = expenses.filter(e => isPaycheck(e, workSettings.workPrefix)).sort((a, b) => b.date.localeCompare(a.date));
-                    const lastPay = pcs[0];
-                    const monthH = workEarnings?.monthWorkHours ?? 0;
-                    const expected = rate * monthH;
-                    if (rate <= 0 && !lastPay) return null;
+
+                  {/* ── Stawka: JEDNA liczba, ta sama co live earnings ── */}
+                  {hasRate ? (() => {
+                    const nowYM = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
+                    const overridden = !!(workSettings.monthRateOverride?.[nowYM] || (workSettings.rateOverride && workSettings.rateOverride > 0));
+                    const lp = workPayMonths[0];
+                    const hint = overridden
+                      ? 'stawka ustawiona ręcznie'
+                      : (workAvg.includedCount <= 1 && lp && lp.hours > 0
+                          ? `${Math.round(lp.amount).toLocaleString('pl-PL')} zł (za ${MONTH_SHORT[Number(lp.month.slice(5, 7)) - 1]}) ÷ ${Math.round(lp.hours)} h`
+                          : `średnia z ${workAvg.includedCount} ${workAvg.includedCount === 1 ? 'wypłaty' : 'wypłat'} · Σ zł ÷ Σ godzin`);
                     return (
-                      <View style={{ marginTop: spacing[1] }}>
-                        {lastPay && (
-                          <View style={s.wpTotalRow}>
-                            <Text style={s.wpTotalLabel}>Ostatnia wypłata · {MONTH_SHORT[Number(lastPay.date.slice(5, 7)) - 1]}</Text>
-                            <Text style={[s.wpTotalVal, { color: colors.accent.green }]}>{Math.round(lastPay.amount).toLocaleString('pl-PL')} zł</Text>
-                          </View>
-                        )}
-                        {expected > 0 && (
-                          <View style={s.wpTotalRow}>
-                            <Text style={s.wpTotalLabel}>Powinienem dostać za ten mies. · {monthH.toFixed(0)} h × {rate.toFixed(0)} zł/h</Text>
-                            <Text style={[s.wpTotalVal, { color: '#FBBF24' }]}>{Math.round(expected).toLocaleString('pl-PL')} zł</Text>
-                          </View>
-                        )}
+                      <View style={s.wpRateCard}>
+                        <Text style={s.wpRateVal}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
+                        <Text style={s.wpRateHint}>{hint}</Text>
                       </View>
                     );
-                  })()}
-                  {workAvg.avgRate != null && (
-                    <View style={s.wpTotalRow}>
-                      <Text style={s.wpTotalLabel}>Średnia stawka (historia) · z {workAvg.includedCount} {workAvg.includedCount === 1 ? 'miesiąca' : 'miesięcy'}</Text>
-                      <Text style={[s.wpTotalVal, { color: '#FBBF24' }]}>{workAvg.avgRate.toFixed(2)} zł/h</Text>
-                    </View>
+                  })() : (
+                    <Text style={[s.factText, { marginTop: spacing[2] }]}>Dodaj wypłatę oznaczoną „{workSettings.workPrefix || '[JD]'}", aby policzyć stawkę zł/h.</Text>
                   )}
-                  {/* Compare: latest paycheck's rate vs your overall average + best/worst month */}
-                  {workAvg.avgRate != null && (() => {
-                    const included = workPayMonths.filter(r => !r.excluded && r.hours > 0);
-                    if (included.length < 2) return null;
-                    const last = included[0]; // most recent (list is date-desc)
-                    const lastRate = last.amount / last.hours;
-                    const dPct = workAvg.avgRate! > 0 ? Math.round(((lastRate - workAvg.avgRate!) / workAvg.avgRate!) * 100) : 0;
-                    const up = lastRate >= workAvg.avgRate!;
-                    const rates = included.map(r => r.amount / r.hours);
-                    const best = Math.max(...rates), worst = Math.min(...rates);
-                    return (
-                      <View style={{ marginTop: spacing[2] }}>
-                        <View style={s.statCmpRow}>
-                          <View><Text style={[s.statCmpVal, { color: accentColor }]}>{lastRate.toFixed(1)} zł/h</Text><Text style={s.statCmpKey}>ost. wypłata · {MONTH_SHORT[Number(last.month.slice(5, 7)) - 1]}</Text></View>
-                          <View style={[s.statDelta, { backgroundColor: (up ? '#2AC68F' : '#FF6B6B') + '1E' }]}>
-                            {up ? <TrendingUp size={11} color="#2AC68F" /> : <TrendingDown size={11} color="#FF6B6B" />}
-                            <Text style={[s.statDeltaText, { color: up ? '#2AC68F' : '#FF6B6B' }]}>{dPct >= 0 ? '+' : ''}{dPct}%</Text>
-                          </View>
-                          <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{workAvg.avgRate!.toFixed(1)} zł/h</Text><Text style={s.statCmpKey}>Twoja średnia</Text></View>
-                        </View>
-                        <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: 4 }]}>Najlepszy miesiąc {best.toFixed(1)} zł/h · najsłabszy {worst.toFixed(1)} zł/h</Text>
-                      </View>
-                    );
-                  })()}
+
+                  {/* ── Wypłaty: realne dane, jedna na miesiąc (wypłata = za poprzedni) ── */}
                   {workPayMonths.length > 0 && (
                     <View style={{ marginTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[2] }}>
                       <Text style={s.wxSection}>Wypłaty · stawka = wypłata ÷ godziny miesiąca</Text>
@@ -3760,62 +3709,47 @@ export default function DashboardScreen() {
                         const inAvg = !r.excluded && r.hours > 0;
                         return (
                           <View key={r.month} style={s.wmRow}>
-                            <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]} numberOfLines={1}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : ''}</Text>
-                            <Text style={s.wmH} numberOfLines={1}>{Math.round(r.amount)} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
-                            <Text style={[s.wmZl, { color: inAvg ? '#FBBF24' : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)} zł/h` : '—'}</Text>
+                            <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]} numberOfLines={1}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : (r.count > 1 ? ` · ${r.count}×` : '')}</Text>
+                            <Text style={s.wmH} numberOfLines={1}>{Math.round(r.amount).toLocaleString('pl-PL')} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
+                            <Text style={[s.wmZl, { color: inAvg ? '#FBBF24' : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)}` : '—'}</Text>
                           </View>
                         );
                       })}
-                      <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: spacing[1] }]}>Miesiące bez godzin w kalendarzu wypadają ze średniej. Wyłącz/włącz je w Ustawienia → Praca.</Text>
+                      {(() => {
+                        const paychecks = expenses.filter(e => isPaycheck(e, workSettings.workPrefix));
+                        const jdTotal = paychecks.reduce((sum, e) => sum + e.amount, 0);
+                        return jdTotal > 0 ? (
+                          <View style={s.wpTotalRow}>
+                            <Text style={s.wpTotalLabel}>Łącznie{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
+                            <Text style={[s.wpTotalVal, { color: accentColor }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
+                          </View>
+                        ) : null;
+                      })()}
+                      <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: spacing[1] }]}>Kolumna po prawej = zł/h. Miesiące bez godzin w kalendarzu wypadają ze średniej — włącz/wyłącz je w Ustawienia → Praca.</Text>
                     </View>
                   )}
-                  {wm.plannedH > 0 && (
-                    <View style={{ marginTop: spacing[3] }}>
-                      <View style={s.workSplitBar}>
-                        <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: accentColor }} />
-                        <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: accentColor + '40' }} />
-                      </View>
-                      <Text style={s.workSplitText}>
-                        <Text style={{ color: accentColor, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h zrobione</Text>
-                        {`  ·  +${wm.plannedH.toFixed(0)} h w planie → prognoza ${hasRate ? `${wm.projectedEarnings.toLocaleString('pl-PL')} zł` : `${wm.projectedH.toFixed(0)} h`}`}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={s.wxChips}>
-                    {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy</Text><Text style={s.wxChipV}>{wm.daysWorked}</Text></View>}
-                    {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Śr. na dzień</Text><Text style={s.wxChipV}>{wm.avgPerDay.toFixed(1)} h{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate)} zł` : ''}</Text></View>}
-                    {hasRate && <View style={s.wxChip}><Text style={s.wxChipK}>Stawka</Text><Text style={s.wxChipV}>{Math.round(wm.rate)} zł/h</Text></View>}
-                    {wm.avgHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Śr. miesiąc</Text><Text style={s.wxChipV}>{hasRate ? `${wm.avgEarnings.toLocaleString('pl-PL')} zł` : `${wm.avgHours.toFixed(0)} h`}</Text></View>}
-                    {hasRate && wm.prevEarnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Prognoza vs poprz.</Text><Text style={[s.wxChipV, { color: deltaE >= 0 ? colors.accent.green : colors.accent.red }]}>{deltaE >= 0 ? '+' : '−'}{Math.abs(deltaE).toLocaleString('pl-PL')} zł</Text></View>}
-                    {wm.shiftCount > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Zmiany w mies.</Text><Text style={s.wxChipV}>{wm.shiftCount}{hasRate ? ` · ${wm.perShift.toLocaleString('pl-PL')} zł/zm.` : ''}</Text></View>}
-                    {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{hasRate ? `${wm.yearEarnings.toLocaleString('pl-PL')} zł · ${wm.yearHours.toFixed(0)} h` : `${wm.yearHours.toFixed(0)} h`}</Text></View>}
-                    {hasRate && wm.bestMonth && wm.bestMonth.earnings > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Najlepszy mies.</Text><Text style={s.wxChipV}>{wm.bestMonth.earnings.toLocaleString('pl-PL')} zł · {wm.bestMonth.label} {String(wm.bestMonth.year).slice(2)}</Text></View>}
-                  </View>
-                  <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
+
+                  {/* ── Godziny: ostatnie 6 miesięcy (najpewniejszy sygnał) ── */}
+                  <Text style={s.wxSection}>Godziny — ostatnie 6 miesięcy</Text>
                   <View style={s.waveValues}>
                     {wm.months.map((m, i) => (
                       <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
-                        {hasRate ? (m.earnings > 0 ? (m.earnings >= 1000 ? `${(m.earnings / 1000).toFixed(1)}k` : String(m.earnings)) : '') : (m.hours > 0 ? `${Math.round(m.hours)}h` : '')}
+                        {m.hours > 0 ? `${Math.round(m.hours)}h` : ''}
                       </Text>
                     ))}
                   </View>
-                  <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={accentColor} />
+                  <WaveChart data={wm.months.map(m => m.hours)} color={accentColor} />
                   <View style={s.waveLabels}>
                     {wm.months.map((m, i) => (
                       <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>{m.label}</Text>
                     ))}
                   </View>
-                  {/* per-month breakdown table */}
-                  <View style={{ marginTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[2] }}>
-                    {wm.months.slice().reverse().map((m, i) => (
-                      <View key={i} style={s.wmRow}>
-                        <Text style={[s.wmMonth, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>{m.label}{m.isCurrent ? ' · teraz' : ''}</Text>
-                        <Text style={s.wmH}>{m.hours > 0 ? `${Math.round(m.hours)} h` : '—'}</Text>
-                        {hasRate && <Text style={s.wmZl}>{m.earnings > 0 ? `${m.earnings.toLocaleString('pl-PL')} zł` : '—'}</Text>}
-                      </View>
-                    ))}
+
+                  {/* ── Rok: fakty łączne ── */}
+                  <View style={s.wxChips}>
+                    {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy (mies.)</Text><Text style={s.wxChipV}>{wm.daysWorked}{wm.avgPerDay > 0 ? ` · ${wm.avgPerDay.toFixed(1)} h/dzień` : ''}</Text></View>}
+                    {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{wm.yearHours.toFixed(0)} h{hasRate ? ` · ${wm.yearEarnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
                   </View>
-                  {hasRate && <Text style={[s.factText, { color: colors.text.muted, fontSize: 10.5, marginTop: spacing[2] }]}>Stawka ~{Math.round(wm.rate)} zł/h liczona z ostatniej wypłaty ÷ godziny jej miesiąca.</Text>}
                 </ScrollView>
               );
             })()}
@@ -4547,6 +4481,10 @@ const makeStyles = (c: any) => StyleSheet.create({
   wpBig: { fontSize: 38, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
   wpUnit: { fontSize: 18, fontWeight: '700', color: c.text.muted },
   wpSub: { fontSize: 12.5, color: c.text.secondary, marginTop: 1 },
+  wpRateCard: { marginTop: spacing[3], backgroundColor: c.fill.subtle, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: '#FBBF2433' },
+  wpRateVal: { fontSize: 26, fontWeight: '900', color: '#FBBF24', letterSpacing: -0.6 },
+  wpRateUnit: { fontSize: 15, fontWeight: '700', color: '#FBBF24AA' },
+  wpRateHint: { fontSize: 11.5, color: c.text.muted, marginTop: 2 },
   wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   wpTotalLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   wpTotalVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.4 },
