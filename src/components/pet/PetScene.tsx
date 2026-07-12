@@ -323,14 +323,155 @@ function GenericScene({ hour, colors }: { hour: number; colors?: [string, string
   );
 }
 
-export default function PetScene({ room, colors, size = 290 }: { room?: string; colors?: [string, string]; size?: number }) {
+// A gentle vertical bob (for a boat rocking on the sea).
+function Bob({ children, amp = 3, dur = 2800 }: { children: React.ReactNode; amp?: number; dur?: number }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const l = Animated.loop(Animated.sequence([
+      Animated.timing(a, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    l.start();
+    return () => l.stop();
+  }, []);
+  const ty = a.interpolate({ inputRange: [0, 1], outputRange: [-amp, amp] });
+  return <Animated.View pointerEvents="none" style={{ ...StyleSheet.absoluteFillObject, transform: [{ translateY: ty }] }}>{children}</Animated.View>;
+}
+
+// A full-scene SVG overlay sharing the room's coordinate system, so add-on vector
+// art lines up with the scene underneath.
+function SceneSvg({ children }: { children: React.ReactNode }) {
+  return <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>{children}</Svg>;
+}
+
+// Buyable per-room extras (ship, lighthouse, satellite…) drawn on top of the scene.
+function AddonLayer({ addons, size }: { addons: string[]; size: number }) {
+  if (!addons.length) return null;
+  const has = (id: string) => addons.includes(id);
+  return (
+    <>
+      {/* ── Plaża ── */}
+      {has('beach_ship') && (
+        <Bob amp={2.4} dur={3000}>
+          <SceneSvg>
+            <G>
+              <Path d="M80 176 L120 176 L112 187 L88 187 Z" fill="#8A5A32" />
+              <Path d="M80 176 L120 176 L118 179 L82 179 Z" fill="#6E4B2A" />
+              <Path d="M100 150 L100 176" stroke="#5A3A1E" strokeWidth="1.6" />
+              <Path d="M100 151 L100 174 L84 172 Z" fill="#FFFFFF" opacity={0.95} />
+              <Path d="M102 152 L102 172 L116 170 Z" fill="#F4C6D6" />
+            </G>
+          </SceneSvg>
+        </Bob>
+      )}
+      {has('beach_lighthouse') && (
+        <SceneSvg>
+          <G>
+            <Path d="M24 206 L29 150 L41 150 L46 206 Z" fill="#F2ECE4" />
+            <Path d="M27 168 L43 168 L44 178 L26 178 Z" fill="#E4534B" opacity={0.9} />
+            <Path d="M28.5 150 L41.5 150 L40 138 L30 138 Z" fill="#33415A" />
+            <Circle cx={35} cy={132} r={7} fill="#FBE38A" />
+            <Circle cx={35} cy={132} r={3.4} fill="#FFF6D6" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('beach_gulls') && (<><Bird startPct={52} top={30} dur={10000} size={size} /><Bird startPct={66} top={22} dur={12500} size={size} /></>)}
+
+      {/* ── Noc ── */}
+      {has('night_shooting') && (
+        <>
+          <Drift top={20} fromPct={-12} dist={size * 1.2} dur={3600} delay={800} fade>
+            <View style={{ width: size * 0.14, height: 2, borderRadius: 2, backgroundColor: '#FFFFFF', transform: [{ rotate: '20deg' }] }} />
+          </Drift>
+          <Drift top={30} fromPct={-12} dist={size * 1.25} dur={4600} delay={3400} fade>
+            <View style={{ width: size * 0.1, height: 2, borderRadius: 2, backgroundColor: '#CFE0FF', transform: [{ rotate: '16deg' }] }} />
+          </Drift>
+        </>
+      )}
+      {has('night_owl') && (
+        <SceneSvg>
+          <G>
+            <Path d="M204 214 Q204 193 214 193 Q224 193 224 214 Z" fill="#0A1220" />
+            <Path d="M206 196 L203 189 L210 194 Z" fill="#0A1220" />
+            <Path d="M222 196 L225 189 L218 194 Z" fill="#0A1220" />
+            <Circle cx={210} cy={202} r={2.4} fill="#FBE38A" />
+            <Circle cx={218} cy={202} r={2.4} fill="#FBE38A" />
+            <Circle cx={210} cy={202} r={1} fill="#0A1220" />
+            <Circle cx={218} cy={202} r={1} fill="#0A1220" />
+          </G>
+        </SceneSvg>
+      )}
+
+      {/* ── Łąka ── */}
+      {has('meadow_rainbow') && (
+        <SceneSvg>
+          <G opacity={0.75}>
+            {([['#E8564B', 92], ['#F2A03D', 84], ['#F6D43D', 76], ['#4FB06A', 68], ['#4C86E0', 60]] as [string, number][]).map(([col, r], i) => (
+              <Path key={i} d={`M${150 - r} 150 A ${r} ${r} 0 0 1 ${150 + r} 150`} fill="none" stroke={col} strokeWidth={4} strokeLinecap="round" />
+            ))}
+          </G>
+        </SceneSvg>
+      )}
+      {has('meadow_balloon') && (
+        <Drift top={18} fromPct={-16} dist={size * 1.3} dur={15000} delay={500}>
+          <Text style={{ fontSize: size * 0.09 }}>🎈</Text>
+        </Drift>
+      )}
+
+      {/* ── Cukierkowo ── */}
+      {has('candy_extra') && (
+        <SceneSvg>
+          <G>
+            <Path d="M135 158 L135 202" stroke="#EBD6E6" strokeWidth={6} strokeLinecap="round" />
+            <Circle cx={135} cy={158} r={18} fill="#8FD98A" />
+            <Path d="M135 158 m -18 0 a 18 18 0 0 1 36 0" fill="#FFFFFF" opacity={0.25} />
+          </G>
+        </SceneSvg>
+      )}
+      {has('candy_cupcake') && (
+        <Text style={{ position: 'absolute', bottom: '14%', left: '8%', fontSize: size * 0.1 }}>🧁</Text>
+      )}
+
+      {/* ── Kosmos ── */}
+      {has('space_planet2') && (
+        <SceneSvg>
+          <G>
+            <Circle cx={96} cy={150} r={18} fill="#6E7BC8" />
+            <Path d="M96 150 m -18 0 a 18 7 0 1 0 36 0 a 18 7 0 1 0 -36 0" fill="none" stroke="#B7C0EA" strokeWidth={2.6} opacity={0.85} transform="rotate(-14 96 150)" />
+            <Circle cx={90} cy={144} r={4} fill="#5763A8" opacity={0.7} />
+          </G>
+        </SceneSvg>
+      )}
+      {has('space_satellite') && (
+        <Drift top={30} fromPct={-14} dist={size * 1.3} dur={11000} delay={600}>
+          <Text style={{ fontSize: size * 0.06 }}>🛰️</Text>
+        </Drift>
+      )}
+      {has('space_ufo') && (
+        <Drift top={44} fromPct={-16} dist={size * 1.35} dur={8000} delay={2000}>
+          <Text style={{ fontSize: size * 0.075 }}>🛸</Text>
+        </Drift>
+      )}
+    </>
+  );
+}
+
+export default function PetScene({ room, colors, addons = [], size = 290 }: { room?: string; colors?: [string, string]; addons?: string[]; size?: number }) {
   const hour = new Date().getHours();
-  switch (room) {
-    case 'room_beach':  return <BeachScene hour={hour} size={size} />;
-    case 'room_night':  return <NightScene size={size} />;
-    case 'room_meadow': return <MeadowScene hour={hour} size={size} />;
-    case 'room_candy':  return <CandyScene size={size} />;
-    case 'room_space':  return <SpaceScene size={size} />;
-    default:            return <GenericScene hour={hour} colors={colors} />;
-  }
+  const scene = (() => {
+    switch (room) {
+      case 'room_beach':  return <BeachScene hour={hour} size={size} />;
+      case 'room_night':  return <NightScene size={size} />;
+      case 'room_meadow': return <MeadowScene hour={hour} size={size} />;
+      case 'room_candy':  return <CandyScene size={size} />;
+      case 'room_space':  return <SpaceScene size={size} />;
+      default:            return <GenericScene hour={hour} colors={colors} />;
+    }
+  })();
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      {scene}
+      <AddonLayer addons={addons} size={size} />
+    </View>
+  );
 }

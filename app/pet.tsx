@@ -12,7 +12,7 @@ import PetScene from '@/components/pet/PetScene';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
-import { equippedRoom } from '@/utils/petShop';
+import { equippedRoom, roomAddonsFor, TIER_META } from '@/utils/petShop';
 import { useHabits } from '@/hooks/useHabits';
 import { getWaterGlasses } from '@/utils/habits';
 import { useMoodStore } from '@/store/moodStore';
@@ -36,13 +36,22 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
   const room = useMemo(() => equippedRoom(equipped), [equipped]);
+  const activeAddons = useMemo(() => (equipped.room ? roomAddons[equipped.room] ?? [] : []), [roomAddons, equipped.room]);
+  const roomAddonList = useMemo(() => roomAddonsFor(equipped.room), [equipped.room]);
+  const onAddonTap = (a: { id: string; name: string; cost: number }) => {
+    if (!equipped.room) return;
+    haptic.tap();
+    if (ownedItems.includes(a.id)) { toggleRoomAddon(equipped.room, a.id); return; }
+    if (buyRoomAddon(equipped.room, a.id, a.cost)) { haptic.success(); toast.success(`Dodano do pokoju: ${a.name}`); }
+    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${a.cost}`); }
+  };
   const { habits, todayDone, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -210,11 +219,40 @@ export default function Pet() {
         <View style={s.stage}>
           {equipped.room && (
             <View style={s.room}>
-              <PetScene room={equipped.room} colors={room?.colors as [string, string] | undefined} size={290} />
+              <PetScene room={equipped.room} colors={room?.colors as [string, string] | undefined} addons={activeAddons} size={290} />
             </View>
           )}
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
+
+        {/* ── Room upgrades: buy extra scene elements, tap to toggle ── */}
+        {equipped.room && roomAddonList.length > 0 && (
+          <View style={s.addonCard}>
+            <View style={s.addonHead}>
+              <Text style={s.section}>Pokój — dodatki</Text>
+              <View style={s.coinPillAdd}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.coinPillTxt}>{coins}</Text></View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+              {roomAddonList.map(a => {
+                const owned = ownedItems.includes(a.id);
+                const active = activeAddons.includes(a.id);
+                const tier = TIER_META[a.tier];
+                return (
+                  <PressableScale key={a.id} onPress={() => onAddonTap(a)}>
+                    <View style={[s.addonChip, active && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
+                      <Text style={{ fontSize: 22 }}>{a.emoji}</Text>
+                      <Text style={s.addonName} numberOfLines={1}>{a.name}</Text>
+                      {owned
+                        ? <Text style={[s.addonState, { color: active ? tier.color : c.text.muted }]}>{active ? '● włączone' : '○ wyłączone'}</Text>
+                        : <View style={s.addonCost}><CoinsIcon size={9} color="#FBBF24" /><Text style={s.addonCostTxt}>{a.cost}</Text></View>}
+                    </View>
+                  </PressableScale>
+                );
+              })}
+            </ScrollView>
+            <Text style={s.addonHint}>Kup dodatek za monety, potem stuknij, aby włączyć/wyłączyć go w scenie.</Text>
+          </View>
+        )}
 
         {/* Affection — fills as you pet (tap) the cat; full = daily bonus. */}
         <View style={s.affRow}>
@@ -427,6 +465,18 @@ const makeS = (c: any) => StyleSheet.create({
   xpFill: { height: '100%', borderRadius: 5, backgroundColor: '#A78BFA' },
 
   section: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[4], marginBottom: spacing[2] },
+
+  // Room add-ons
+  addonCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[4] },
+  addonHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  coinPillAdd: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
+  coinPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
+  addonChip: { width: 92, alignItems: 'center', gap: 3, paddingVertical: 8, paddingHorizontal: 6, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
+  addonName: { fontSize: 11, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
+  addonState: { fontSize: 9.5, fontWeight: '700' },
+  addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
+  addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
+  addonHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6 },
   needs: { width: '100%', gap: spacing[2] },
   needRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   needLabel: { width: 62, fontSize: 13, fontWeight: '700', color: c.text.secondary },
