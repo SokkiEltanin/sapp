@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Animated, Easing, Text } from 'react-native';
 import Svg, { Defs, LinearGradient as LG, Stop, Rect, Circle, Path, G } from 'react-native-svg';
 
 // Illustrated, lightly-animated backdrops for the pet — a real scene (sky by time of
@@ -131,6 +131,177 @@ function BeachScene({ hour, size }: { hour: number; size: number }) {
   );
 }
 
+// A small element that drifts across (clouds, rockets, candies, shooting stars).
+function Drift({ children, top, fromPct, dist, dur, delay = 0, fade }: { children: React.ReactNode; top: number; fromPct: number; dist: number; dur: number; delay?: number; fade?: boolean }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const l = Animated.loop(Animated.timing(a, { toValue: 1, duration: dur, delay, easing: Easing.linear, useNativeDriver: true }));
+    l.start();
+    return () => l.stop();
+  }, []);
+  const tx = a.interpolate({ inputRange: [0, 1], outputRange: [0, dist] });
+  const op = fade ? a.interpolate({ inputRange: [0, 0.12, 0.85, 1], outputRange: [0, 1, 1, 0] }) : (1 as any);
+  return <Animated.View pointerEvents="none" style={{ position: 'absolute', top: `${top}%`, left: `${fromPct}%`, opacity: op, transform: [{ translateX: tx }] }}>{children}</Animated.View>;
+}
+// A twinkling dot (star / candy sparkle).
+function Twinkle({ top, left, s, color = '#FFFFFF', dur = 1800, delay = 0 }: { top: number; left: number; s: number; color?: string; dur?: number; delay?: number }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const l = Animated.loop(Animated.sequence([
+      Animated.timing(a, { toValue: 1, duration: dur, delay, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(a, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    l.start();
+    return () => l.stop();
+  }, []);
+  const op = a.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] });
+  return <Animated.View pointerEvents="none" style={{ position: 'absolute', top: `${top}%`, left: `${left}%`, width: s, height: s, borderRadius: s / 2, backgroundColor: color, opacity: op }} />;
+}
+
+function NightScene({ size }: { size: number }) {
+  const stars: [number, number][] = [[30, 28], [70, 52], [112, 22], [150, 62], [190, 34], [232, 56], [266, 26], [252, 84], [90, 92], [170, 100], [44, 70], [200, 78]];
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs>
+          <LG id="nsky" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#101C48" /><Stop offset="1" stopColor="#070B22" /></LG>
+          <LG id="nhill" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#1A2C4E" /><Stop offset="1" stopColor="#0C1730" /></LG>
+        </Defs>
+        <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#nsky)" />
+        {stars.map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={i % 3 === 0 ? 1.8 : 1.1} fill="#FFFFFF" opacity={0.85} />)}
+        <Circle cx={228} cy={54} r={27} fill="#FBF4D8" opacity={0.22} />
+        <Circle cx={228} cy={54} r={20} fill="#FBF4D8" />
+        <Circle cx={237} cy={48} r={16} fill="#0C1638" opacity={0.92} />
+        <Path d={`M0 196 Q80 166 160 192 Q232 214 300 188 L300 ${VB_H} L0 ${VB_H} Z`} fill="url(#nhill)" />
+        <Path d={`M0 216 Q120 198 300 218 L300 ${VB_H} L0 ${VB_H} Z`} fill="#0A1428" />
+      </Svg>
+      <Twinkle top={11} left={12} s={size * 0.012} dur={1500} />
+      <Twinkle top={22} left={56} s={size * 0.012} dur={2100} delay={600} />
+      <Twinkle top={14} left={82} s={size * 0.012} dur={1800} delay={300} />
+      {/* shooting star */}
+      <Drift top={12} fromPct={-10} dist={size * 1.15} dur={4200} delay={2600} fade>
+        <View style={{ width: size * 0.16, height: 2, borderRadius: 2, backgroundColor: '#FFFFFF', transform: [{ rotate: '18deg' }] }} />
+      </Drift>
+    </View>
+  );
+}
+
+function MeadowScene({ hour, size }: { hour: number; size: number }) {
+  const phase = phaseFor(hour);
+  const [sky0, sky1] = SKY[phase];
+  const t = Math.min(1, Math.max(0, (hour - 6) / 14));
+  const sunX = 44 + t * 212, sunY = 108 - Math.sin(t * Math.PI) * 70;
+  const isMoon = phase === 'night';
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs>
+          <LG id="msky" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={sky0} /><Stop offset="1" stopColor={sky1} /></LG>
+          <LG id="mhill" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#57A85C" /><Stop offset="1" stopColor="#2E6E3A" /></LG>
+        </Defs>
+        <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#msky)" />
+        {isMoon && [[50, 34], [140, 26], [230, 40]].map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={1.4} fill="#fff" opacity={0.8} />)}
+        <Circle cx={sunX} cy={sunY} r={16} fill={isMoon ? '#EAF0FF' : '#FFE27A'} />
+        {/* rolling hills */}
+        <Path d={`M0 168 Q90 138 190 166 Q250 182 300 160 L300 ${VB_H} L0 ${VB_H} Z`} fill="#6FB86E" />
+        <Path d={`M0 196 Q120 168 260 194 Q285 198 300 196 L300 ${VB_H} L0 ${VB_H} Z`} fill="url(#mhill)" />
+        {/* flowers on the near hill */}
+        {[[40, 214], [95, 224], [150, 216], [205, 226], [262, 218]].map(([x, y], i) => (
+          <G key={i}>
+            <Circle cx={x} cy={y} r={3.2} fill={i % 2 ? '#F6C445' : '#F27FA6'} />
+            <Circle cx={x} cy={y} r={1.3} fill="#fff" />
+            <Path d={`M${x} ${y + 3} L${x} ${y + 12}`} stroke="#2E6E3A" strokeWidth="1.4" />
+          </G>
+        ))}
+      </Svg>
+      {/* drifting clouds + a butterfly */}
+      <Drift top={18} fromPct={-20} dist={size * 1.4} dur={16000}>
+        <View style={cloud.wrap}><View style={cloud.a} /><View style={cloud.b} /></View>
+      </Drift>
+      <Drift top={44} fromPct={-14} dist={size * 1.3} dur={7000} delay={1500} fade>
+        <View style={{ width: size * 0.03, height: size * 0.03, borderRadius: 4, backgroundColor: '#F27FA6', opacity: 0.9 }} />
+      </Drift>
+    </View>
+  );
+}
+
+function CandyScene({ size }: { size: number }) {
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs>
+          <LG id="csky" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#F5A9D0" /><Stop offset="1" stopColor="#B061A6" /></LG>
+          <LG id="cgum" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#8E3D7E" /><Stop offset="1" stopColor="#5E2456" /></LG>
+        </Defs>
+        <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#csky)" />
+        {/* candy-cane striped ground */}
+        <Path d={`M0 198 Q150 184 300 198 L300 ${VB_H} L0 ${VB_H} Z`} fill="url(#cgum)" />
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+          <Path key={i} d={`M${-30 + i * 42} 198 l 26 0 l -40 52 l -26 0 Z`} fill="#F7CFE6" opacity={0.5} />
+        ))}
+        {/* lollipop trees */}
+        {[[60, 150, '#F27FA6'], [210, 138, '#7FC8F2']].map(([x, y, c], i) => (
+          <G key={i}>
+            <Path d={`M${x} ${y} L${x} 206`} stroke="#EBD6E6" strokeWidth="6" strokeLinecap="round" />
+            <Circle cx={x as number} cy={y as number} r={22} fill={c as string} />
+            <Path d={`M${x} ${y} m -22 0 a 22 22 0 0 1 44 0`} fill="#fff" opacity={0.25} />
+          </G>
+        ))}
+      </Svg>
+      {/* floating candies rising */}
+      {[[24, 5200, 0], [64, 6400, 1200], [86, 5800, 2600]].map(([left, dur, delay], i) => (
+        <RiseCandy key={i} left={left} dur={dur} delay={delay} size={size} color={i % 2 ? '#7FC8F2' : '#F6C445'} />
+      ))}
+    </View>
+  );
+}
+function RiseCandy({ left, dur, delay, size, color }: { left: number; dur: number; delay: number; size: number; color: string }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => { const l = Animated.loop(Animated.timing(a, { toValue: 1, duration: dur, delay, easing: Easing.linear, useNativeDriver: true })); l.start(); return () => l.stop(); }, []);
+  const ty = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.4] });
+  const op = a.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 0.9, 0.9, 0] });
+  return <Animated.View pointerEvents="none" style={{ position: 'absolute', bottom: '18%', left: `${left}%`, width: size * 0.028, height: size * 0.028, borderRadius: 3, backgroundColor: color, opacity: op, transform: [{ translateY: ty }] }} />;
+}
+
+function SpaceScene({ size }: { size: number }) {
+  const stars: [number, number][] = [[24, 30], [66, 60], [108, 24], [150, 70], [188, 40], [228, 66], [262, 30], [248, 96], [88, 104], [176, 110], [40, 84], [206, 20], [130, 44]];
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs>
+          <LG id="ssky" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#2A1C55" /><Stop offset="1" stopColor="#090620" /></LG>
+        </Defs>
+        <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#ssky)" />
+        {/* nebula glow */}
+        <Circle cx={80} cy={180} r={90} fill="#5B3AA0" opacity={0.22} />
+        <Circle cx={250} cy={210} r={80} fill="#3A6AA0" opacity={0.2} />
+        {stars.map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={i % 4 === 0 ? 1.8 : 1} fill="#FFFFFF" opacity={0.85} />)}
+        {/* ringed planet */}
+        <G>
+          <Circle cx={228} cy={78} r={30} fill="#C88A5A" />
+          <Path d="M228 78 m -30 0 a 30 12 0 1 0 60 0 a 30 12 0 1 0 -60 0" fill="none" stroke="#EBC79A" strokeWidth="4" opacity={0.85} transform="rotate(-18 228 78)" />
+          <Circle cx={218} cy={70} r={7} fill="#B0744A" opacity={0.7} />
+        </G>
+        {/* small moon */}
+        <Circle cx={70} cy={54} r={11} fill="#AEB6C8" />
+        <Circle cx={66} cy={50} r={3} fill="#8A94AA" opacity={0.7} />
+      </Svg>
+      <Twinkle top={16} left={40} s={size * 0.012} dur={1400} />
+      <Twinkle top={30} left={72} s={size * 0.012} dur={1900} delay={500} />
+      {/* rocket drifting across */}
+      <Drift top={62} fromPct={-14} dist={size * 1.35} dur={9000} delay={1000}>
+        <Text style={{ fontSize: size * 0.075, transform: [{ rotate: '42deg' }] }}>🚀</Text>
+      </Drift>
+    </View>
+  );
+}
+
+const cloud = StyleSheet.create({
+  wrap: { width: 46, height: 16 },
+  a: { position: 'absolute', left: 0, top: 4, width: 30, height: 12, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.85)' },
+  b: { position: 'absolute', left: 16, top: 0, width: 24, height: 16, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.9)' },
+});
+
 // Generic time-of-day scene for the non-beach rooms until they get their own art:
 // a proper sky gradient + sun/moon + a coloured ground band, themed by the room's
 // palette. Much less "emoji on a flat fill" than before.
@@ -154,6 +325,12 @@ function GenericScene({ hour, colors }: { hour: number; colors?: [string, string
 
 export default function PetScene({ room, colors, size = 290 }: { room?: string; colors?: [string, string]; size?: number }) {
   const hour = new Date().getHours();
-  if (room === 'room_beach') return <BeachScene hour={hour} size={size} />;
-  return <GenericScene hour={hour} colors={colors} />;
+  switch (room) {
+    case 'room_beach':  return <BeachScene hour={hour} size={size} />;
+    case 'room_night':  return <NightScene size={size} />;
+    case 'room_meadow': return <MeadowScene hour={hour} size={size} />;
+    case 'room_candy':  return <CandyScene size={size} />;
+    case 'room_space':  return <SpaceScene size={size} />;
+    default:            return <GenericScene hour={hour} colors={colors} />;
+  }
 }
