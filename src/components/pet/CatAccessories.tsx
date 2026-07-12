@@ -108,18 +108,26 @@ const HAT_WIZARD = (
   </G>
 );
 
-// A single 6-petal flower with a golden centre.
-function Petals({ cx, cy, col }: { cx: number; cy: number; col: string }) {
-  const pts = [0, 1, 2, 3, 4, 5].map(i => { const a = (i / 6) * Math.PI * 2; return { x: cx + Math.cos(a) * 26, y: cy + Math.sin(a) * 26 }; });
-  return <G>{pts.map((p, i) => <Circle key={i} cx={p.x} cy={p.y} r={18} fill={col} />)}<Circle cx={cx} cy={cy} r={15} fill="#F5C94E" /></G>;
+// A single 6-petal flower with a two-tone golden centre. Bigger + fuller so the
+// crown reads as flowers, not a row of faint dots.
+function Petals({ cx, cy, col, edge }: { cx: number; cy: number; col: string; edge: string }) {
+  const pts = [0, 1, 2, 3, 4, 5].map(i => { const a = (i / 6) * Math.PI * 2; return { x: cx + Math.cos(a) * 33, y: cy + Math.sin(a) * 33 }; });
+  return (
+    <G>
+      {pts.map((p, i) => <Circle key={`e${i}`} cx={p.x} cy={p.y} r={26} fill={edge} />)}
+      {pts.map((p, i) => <Circle key={i} cx={p.x} cy={p.y} r={22} fill={col} />)}
+      <Circle cx={cx} cy={cy} r={18} fill="#F1A73E" />
+      <Circle cx={cx} cy={cy} r={10} fill="#FBD46A" />
+    </G>
+  );
 }
 const HAT_FLOWER = (
   <G>
-    <Petals cx={722} cy={600} col="#F49AC1" />
-    <Petals cx={842} cy={566} col="#F7C6DE" />
-    <Petals cx={953} cy={556} col="#F49AC1" />
-    <Petals cx={1064} cy={566} col="#F7C6DE" />
-    <Petals cx={1184} cy={600} col="#F49AC1" />
+    <Petals cx={716} cy={606} col="#F387B4" edge="#E06AA0" />
+    <Petals cx={838} cy={560} col="#F9BBD6" edge="#EE94BD" />
+    <Petals cx={953} cy={548} col="#F387B4" edge="#E06AA0" />
+    <Petals cx={1068} cy={560} col="#F9BBD6" edge="#EE94BD" />
+    <Petals cx={1190} cy={606} col="#F387B4" edge="#E06AA0" />
   </G>
 );
 
