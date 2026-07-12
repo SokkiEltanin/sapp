@@ -51,8 +51,6 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'held_balloon', name: 'Balonik',   slot: 'held', tier: 'basic',    cost: 18,  emoji: '🎈' },
   { id: 'held_lolly',   name: 'Lizak',     slot: 'held', tier: 'basic',    cost: 22,  emoji: '🍭' },
   { id: 'held_flower',  name: 'Kwiatek',   slot: 'held', tier: 'basic',    cost: 22,  emoji: '🌸' },
-  { id: 'held_guitar',  name: 'Gitara',    slot: 'held', tier: 'epic',     cost: 85,  emoji: '🎸' },
-  { id: 'held_sword',   name: 'Miecz',     slot: 'held', tier: 'epic',     cost: 100, emoji: '⚔️' },
 
   // ── Pokój (tło) — the polished backdrops are the premium tier ──
   { id: 'room_night',  name: 'Noc',        slot: 'room', tier: 'rare',      cost: 50,  colors: ['#1E2A52', '#0B1024'], decor: ['⭐', '🌙'] },

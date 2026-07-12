@@ -114,22 +114,6 @@ export function HeldArt({ id }: { id?: string }) {
           <Line x1="84" y1="56" x2="84" y2="74" stroke="#34A853" strokeWidth="2" />
         </G>
       );
-    case 'held_guitar':
-      return (
-        <G>
-          <Rect x="82" y="40" width="4" height="26" rx="2" fill="#7A4A24" transform="rotate(24 84 53)" />
-          <Ellipse cx="80" cy="66" rx="8" ry="9" fill="#B4703A" />
-          <Circle cx="80" cy="66" r="3" fill="#3B2410" />
-        </G>
-      );
-    case 'held_sword':
-      return (
-        <G>
-          <Rect x="83" y="42" width="3.4" height="24" rx="1.6" fill="#CBD5E1" transform="rotate(18 85 54)" />
-          <Rect x="79" y="62" width="12" height="3" rx="1.5" fill="#FBBF24" transform="rotate(18 85 63)" />
-          <Rect x="84" y="64" width="3" height="7" rx="1.5" fill="#7A4A24" transform="rotate(18 85 67)" />
-        </G>
-      );
     default: return null;
   }
 }
