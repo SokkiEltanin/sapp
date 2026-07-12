@@ -1022,7 +1022,7 @@ export default function DashboardScreen() {
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
   const reloadHealth = useCallback(() => {
     const read = () => {
-      getHealthHistory(70).then(h => {
+      getHealthHistory(250).then(h => {
         const m: StatCtx['healthDays'] = {};
         for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
         setHealthDays(m);
@@ -1320,7 +1320,8 @@ export default function DashboardScreen() {
     // range. (Weight in a generic 'number'/'compare' tile was the unreadable case.)
     if (t.metric === 'weight') {
       const ser = metricSeries('weight', statCtx, period, 8, t.tag);
-      const nz = ser.values.filter(v => v > 0);
+      const raw = ser.values;                     // per-bucket latest reading, 0 = no reading
+      const nz = raw.filter(v => v > 0);
       const latest = nz.length ? nz[nz.length - 1] : 0;
       const prev   = nz.length > 1 ? nz[nz.length - 2] : 0;
       const delta  = latest && prev ? latest - prev : 0;
@@ -1329,6 +1330,14 @@ export default function DashboardScreen() {
       const towardGoal = t.target && t.target > 0 && latest && prev
         ? Math.abs(latest - t.target) < Math.abs(prev - t.target) : null;
       const deltaColor = towardGoal == null ? colors.text.muted : towardGoal ? '#2AC68F' : '#F87171';
+      // Weight never legitimately drops to 0, but empty buckets (no reading that
+      // month) would plunge the line to the axis and look broken. Carry the last
+      // known weight forward (and backfill leading gaps with the first reading) so
+      // the trend line is continuous; only REAL readings get a dot + a number.
+      const firstNz = raw.find(v => v > 0) ?? 0;
+      let carried = firstNz;
+      const filled = raw.map(v => (v > 0 ? (carried = v) : carried));
+      const dotColors = raw.map(v => (v > 0 ? accentColor : 'transparent'));
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           <View style={s.waveHeadRow}>
@@ -1341,16 +1350,22 @@ export default function DashboardScreen() {
               {delta !== 0 && <Text style={[s.waveDelta, { color: deltaColor }]}>{delta > 0 ? '+' : '−'}{Math.abs(delta).toFixed(1)} kg</Text>}
             </View>
           </View>
-          {/* value above each reading — the user wants the numbers ON the chart, not
-              just a line. Non-zero points only, placed proportionally over the wave. */}
-          <View style={{ height: 13 }}>
-            {ser.values.map((v, i) => v > 0 ? (
-              <Text key={i} style={[s.wDot, { left: `${((i + 0.5) / ser.values.length) * 100}%` }]} numberOfLines={1}>{v.toFixed(1)}</Text>
-            ) : null)}
-          </View>
-          <WaveChart data={ser.values} color={accentColor} target={t.target} zoom />
-          {nz.length > 1 && (
-            <Text style={s.statSub}>Zakres {lo.toFixed(1)}–{hi.toFixed(1)} kg{t.target ? ` · cel ${Number(t.target).toFixed(1)} kg` : ''}</Text>
+          {nz.length === 0 ? (
+            <Text style={[s.statSub, { marginTop: spacing[2] }]}>Brak wpisów wagi — dodaj wagę w Zdrowiu lub zsynchronizuj zegarek.</Text>
+          ) : (
+            <>
+              {/* value above each REAL reading — numbers ON the chart, placed
+                  proportionally over the wave (carried-forward points stay unlabelled). */}
+              <View style={{ height: 13 }}>
+                {raw.map((v, i) => v > 0 ? (
+                  <Text key={i} style={[s.wDot, { left: `${((i + 0.5) / raw.length) * 100}%` }]} numberOfLines={1}>{v.toFixed(1)}</Text>
+                ) : null)}
+              </View>
+              <WaveChart data={filled} color={accentColor} dotColors={dotColors} target={t.target} zoom />
+              {nz.length > 1 && (
+                <Text style={s.statSub}>Zakres {lo.toFixed(1)}–{hi.toFixed(1)} kg{t.target ? ` · cel ${Number(t.target).toFixed(1)} kg` : ''}</Text>
+              )}
+            </>
           )}
         </View>
       );
