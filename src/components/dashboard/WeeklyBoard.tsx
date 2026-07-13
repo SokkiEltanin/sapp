@@ -46,7 +46,7 @@ const METRIC_HOME: Record<string, { route: string; label: string }> = {
   sleepAvg:  { route: '/(tabs)/health',    label: 'Zdrowie' },
   moodAvg:   { route: '/(tabs)/mood',      label: 'Nastrój' },
   weight:    { route: '/(tabs)/health',    label: 'Zdrowie' },
-  tasksDone: { route: '/(tabs)/analytics', label: 'Analizy' },
+  tasksDone: { route: '/(tabs)/tasks', label: 'Zadania' },
 };
 
 function fmtVal(v: number, unit: string): string {
