@@ -141,7 +141,7 @@ export const SECTION_GROUP: Record<string, string> = {
 export const SECTION_GROUP_ORDER = ['Przypomnienia', 'Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
 
 export type CustomTileType = 'note' | 'link' | 'stat' | 'weather';
-export type WidgetViz = 'number' | 'wave' | 'list' | 'compare' | 'donut';
+export type WidgetViz = 'number' | 'wave' | 'list' | 'compare' | 'donut' | 'pixels';
 
 export interface CustomTile {
   id: string;            // 'custom:<timestamp>'

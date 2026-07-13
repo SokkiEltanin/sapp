@@ -394,3 +394,49 @@ export function metricList(metric: string, ctx: StatCtx, limit = 5): ListRow[] {
     .filter(([, c]) => c >= 1)
     .map(([key, c]) => ({ label: productGroupLabel(names[key] ?? [key]), value: c, unit: '×' }));
 }
+
+// ─── Year-in-pixels (per-day value for the calendar grid) ───────────────────────
+
+// Metrics meaningful as a per-DAY value → offered with the 'pixels' viz in the builder.
+export const PIXEL_METRICS = new Set([
+  'spend', 'food', 'sweets', 'income', 'moodAvg', 'energyAvg', 'steps', 'sleepAvg', 'weight', 'tasksDone',
+]);
+
+// One metric's value for a single calendar day (YYYY-MM-DD). Feeds the year grid.
+export function dailyValue(metric: string, ctx: StatCtx, day: string): number {
+  const onDay = (d?: string) => (d ?? '').slice(0, 10) === day;
+  switch (metric) {
+    case 'spend':
+      return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
+    case 'food':
+      return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
+    case 'income':
+      return ctx.expenses.filter(e => e.type === 'income' && !isSelfTransfer(e) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
+    case 'sweets': {
+      let total = 0;
+      for (const e of ctx.expenses) {
+        if ((e.type && e.type !== 'expense') || !inScope(e, ctx.scope) || !onDay(e.date)) continue;
+        const items = e.receiptItems ?? [];
+        if (items.length > 0) { for (const it of items) if (countsForConsumption(it) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price; }
+        else if (e.tags?.includes('słodycze')) total += e.amount;
+      }
+      return total;
+    }
+    case 'moodAvg': case 'energyAvg': {
+      const rows = ctx.moodEntries.filter(m => m.date === day);
+      if (!rows.length) return 0;
+      const key = metric === 'moodAvg' ? 'mood' : 'energy';
+      return rows.reduce((s, m) => s + (m as any)[key], 0) / rows.length;
+    }
+    case 'steps':     return ctx.healthDays[day]?.steps ?? 0;
+    case 'sleepAvg':  return (ctx.healthDays[day]?.sleepMinutes ?? 0) / 60;
+    case 'weight':    return ctx.healthDays[day]?.weightKg ?? 0;
+    case 'tasksDone': return ctx.tasks.filter(t => t.status === 'done' && onDay(t.updatedAt)).length;
+    default: return 0;
+  }
+}
+
+// Is this metric mood-like (discrete 1–5 colour) vs a quantity (intensity ramp)?
+export function isMoodPixelMetric(metric: string): boolean {
+  return metric === 'moodAvg' || metric === 'energyAvg';
+}

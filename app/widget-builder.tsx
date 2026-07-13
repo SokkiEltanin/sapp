@@ -2,11 +2,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, Check, Wallet, ShoppingCart, Smile, Briefcase, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, LayoutGrid, Check, Wallet, ShoppingCart, Smile, Briefcase, Trash2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import YearPixels from '@/components/dashboard/YearPixels';
 import { useDashboardLayout, WidgetViz } from '@/store/dashboardLayout';
-import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS, StatCtx, metricNumber, metricSeries, metricList } from '@/utils/statWidgets';
+import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS, StatCtx, metricNumber, metricSeries, metricList, PIXEL_METRICS, dailyValue, isMoodPixelMetric } from '@/utils/statWidgets';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useStatsScope } from '@/store/statsScope';
 import { useMoodStore } from '@/store/moodStore';
@@ -32,6 +33,7 @@ const VIZ_META: { id: WidgetViz; label: string; Icon: any }[] = [
   { id: 'list',    label: 'Lista (top)',   Icon: List },
   { id: 'donut',   label: 'Donut',         Icon: PieChart },
   { id: 'compare', label: 'Porównanie',    Icon: GitCompare },
+  { id: 'pixels',  label: 'Rok w pikselach', Icon: LayoutGrid },
 ];
 
 export default function WidgetBuilder() {
@@ -103,7 +105,10 @@ export default function WidgetBuilder() {
 
   const def = metricById(metric);
   const needsTag = !!def?.needsTag;
-  const vizOptions = useMemo(() => def ? VIZ_META.filter(v => def.viz.includes(v.id)) : [], [def]);
+  const vizOptions = useMemo(
+    () => def ? VIZ_META.filter(v => def.viz.includes(v.id) || (v.id === 'pixels' && PIXEL_METRICS.has(def.id))) : [],
+    [def],
+  );
 
   const labelFor = (m: MetricDef, t?: string) =>
     m.needsTag && t ? `${t.charAt(0).toUpperCase() + t.slice(1)} (${m.unit})` : m.label;
@@ -167,7 +172,7 @@ export default function WidgetBuilder() {
     ]);
   };
 
-  const showPeriod = !!def && def.periodic && viz !== 'list' && viz !== 'donut';
+  const showPeriod = !!def && def.periodic && viz !== 'list' && viz !== 'donut' && viz !== 'pixels';
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -232,6 +237,9 @@ export default function WidgetBuilder() {
                   </View>
                 );
               })()}
+              {viz === 'pixels' && (
+                <YearPixels year={new Date().getFullYear()} valueFor={(d) => dailyValue(def.id, statCtx, d)} mood={isMoodPixelMetric(def.id)} accent={accent} />
+              )}
               {(viz === 'list' || viz === 'donut') && (() => {
                 const rows = metricList(def.id, statCtx, 3);
                 if (rows.length === 0) return <Text style={s.previewEmpty}>Brak danych jeszcze — pojawią się gdy dodasz wpisy</Text>;

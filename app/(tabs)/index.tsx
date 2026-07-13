@@ -83,7 +83,8 @@ import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, CustomTile } from '@/store/dashboardLayout';
-import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer } from '@/utils/statWidgets';
+import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric } from '@/utils/statWidgets';
+import YearPixels from '@/components/dashboard/YearPixels';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -1347,6 +1348,33 @@ export default function DashboardScreen() {
         <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
       </View>
     );
+
+    // PIXELS — a year-in-pixels calendar grid, one square per day coloured by the
+    // metric's daily value. Checked FIRST so a 'weight'/'mood' pixels tile isn't
+    // swallowed by the weight/number branches below.
+    if (viz === 'pixels') {
+      const year = new Date().getFullYear();
+      const mood = isMoodPixelMetric(t.metric!);
+      const valueFor = (d: string) => dailyValue(t.metric!, statCtx, d);
+      return (
+        <View style={[s.card, { backgroundColor: cardBgDark }]}>
+          {header}
+          <YearPixels year={year} valueFor={valueFor} mood={mood} accent={accentColor} />
+          <View style={s.pxLegendRow}>
+            <Text style={s.statSub}>Rok {year}</Text>
+            {!mood && (
+              <View style={s.pxLegend}>
+                <Text style={[s.statSub, { fontSize: 10 }]}>mniej</Text>
+                {[0.28, 0.52, 0.76, 1].map((o, i) => (
+                  <View key={i} style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: accentColor + Math.round(o * 255).toString(16).padStart(2, '0') }} />
+                ))}
+                <Text style={[s.statSub, { fontSize: 10 }]}>więcej</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      );
+    }
 
     // WEIGHT — always a clean, readable tile no matter which viz was picked: big
     // current weight on the right, delta vs the previous reading (green = toward the
@@ -4465,6 +4493,8 @@ const makeStyles = (c: any) => StyleSheet.create({
   statDeltaText: { fontSize: 11, fontWeight: '800' },
   statListRow2: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
   statSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
+  pxLegendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[2] },
+  pxLegend: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, marginTop: 8, overflow: 'hidden' },
   statTargetFill: { height: 6, borderRadius: 3 },
   insightDot: { width: 7, height: 7, borderRadius: 4, marginTop: 5 },
