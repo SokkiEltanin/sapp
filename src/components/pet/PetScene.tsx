@@ -112,15 +112,24 @@ function BeachScene({ hour, size }: { hour: number; size: number }) {
         {/* sand foreground (gentle curve) */}
         <Path d={`M0 206 Q150 192 300 206 L300 ${VB_H} L0 ${VB_H} Z`} fill={sand} />
         <Path d="M0 206 Q150 192 300 206" fill="none" stroke="#FFFFFF" strokeWidth="1.5" opacity={0.2} />
-        {/* palm — trunk + fronds, right side */}
+        {/* palm — tapered banded trunk + a full drooping crown, right side */}
         <G>
-          <Path d="M256 214 Q250 168 262 120" fill="none" stroke="#6E4B2A" strokeWidth="7" strokeLinecap="round" />
-          <Path d="M262 120 Q232 104 208 112 Q234 108 262 120" fill="#2E7D4F" />
-          <Path d="M262 120 Q292 104 300 118 Q286 108 262 120" fill="#2E7D4F" />
-          <Path d="M262 120 Q252 92 234 82 Q256 96 262 120" fill="#33885A" />
-          <Path d="M262 120 Q276 92 296 88 Q278 100 262 120" fill="#33885A" />
-          <Path d="M262 120 Q262 100 262 84 Q268 100 262 120" fill="#3B9A65" />
-          <Circle cx={262} cy={120} r={4.5} fill="#5A3A1E" />
+          <Path d="M250 216 Q246 168 258 122 L269 124 Q260 168 261 216 Z" fill="#7A5230" />
+          <Path d="M250 216 Q246 168 258 122" fill="none" stroke="#8C6238" strokeWidth="1.6" opacity={0.55} />
+          <Path d="M252 204 Q256 206 259 203 M252 186 Q257 188 260 185 M253 166 Q258 167 261 164 M255 146 Q260 147 263 144 M257 130 Q261 131 264 128" fill="none" stroke="#5E3E22" strokeWidth="1.5" opacity={0.6} />
+          {/* coconuts under the crown */}
+          <Circle cx={258} cy={126} r={4} fill="#6E4B2A" /><Circle cx={268} cy={128} r={4} fill="#5E3E22" /><Circle cx={263} cy={131} r={3.6} fill="#6E4B2A" />
+          {/* fronds: arc up then droop, back (dark) → front (light) */}
+          <Path d="M262 116 Q222 96 194 130 Q236 120 262 116 Z" fill="#2A6E46" />
+          <Path d="M262 116 Q302 96 330 130 Q288 120 262 116 Z" fill="#2A6E46" />
+          <Path d="M262 116 Q228 86 206 98 Q244 106 262 116 Z" fill="#318554" />
+          <Path d="M262 116 Q296 86 318 98 Q280 106 262 116 Z" fill="#318554" />
+          <Path d="M262 116 Q242 78 232 72 Q254 92 262 116 Z" fill="#3B9A63" />
+          <Path d="M262 116 Q282 78 292 72 Q270 92 262 116 Z" fill="#3B9A63" />
+          <Path d="M262 116 Q261 80 266 68 Q270 90 262 116 Z" fill="#46AC6F" />
+          {/* leaf ribs */}
+          <Path d="M262 116 Q224 104 196 128 M262 116 Q300 104 328 128 M262 116 Q230 96 208 100 M262 116 Q294 96 316 100 M262 116 Q244 88 233 73 M262 116 Q280 88 291 73 M262 116 Q262 92 265 69" fill="none" stroke="#1F5A38" strokeWidth="0.9" opacity={0.45} />
+          <Circle cx={262} cy={116} r={3.5} fill="#26623E" />
         </G>
       </Svg>
       {/* animated overlays */}
