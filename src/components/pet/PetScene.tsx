@@ -117,19 +117,22 @@ function BeachScene({ hour, size }: { hour: number; size: number }) {
           <Path d="M250 216 Q246 168 258 122 L269 124 Q260 168 261 216 Z" fill="#7A5230" />
           <Path d="M250 216 Q246 168 258 122" fill="none" stroke="#8C6238" strokeWidth="1.6" opacity={0.55} />
           <Path d="M252 204 Q256 206 259 203 M252 186 Q257 188 260 185 M253 166 Q258 167 261 164 M255 146 Q260 147 263 144 M257 130 Q261 131 264 128" fill="none" stroke="#5E3E22" strokeWidth="1.5" opacity={0.6} />
-          {/* coconuts under the crown */}
-          <Circle cx={258} cy={126} r={4} fill="#6E4B2A" /><Circle cx={268} cy={128} r={4} fill="#5E3E22" /><Circle cx={263} cy={131} r={3.6} fill="#6E4B2A" />
-          {/* fronds: arc up then droop, back (dark) → front (light) */}
-          <Path d="M262 116 Q222 96 194 130 Q236 120 262 116 Z" fill="#2A6E46" />
-          <Path d="M262 116 Q302 96 330 130 Q288 120 262 116 Z" fill="#2A6E46" />
-          <Path d="M262 116 Q228 86 206 98 Q244 106 262 116 Z" fill="#318554" />
-          <Path d="M262 116 Q296 86 318 98 Q280 106 262 116 Z" fill="#318554" />
-          <Path d="M262 116 Q242 78 232 72 Q254 92 262 116 Z" fill="#3B9A63" />
-          <Path d="M262 116 Q282 78 292 72 Q270 92 262 116 Z" fill="#3B9A63" />
-          <Path d="M262 116 Q261 80 266 68 Q270 90 262 116 Z" fill="#46AC6F" />
-          {/* leaf ribs */}
-          <Path d="M262 116 Q224 104 196 128 M262 116 Q300 104 328 128 M262 116 Q230 96 208 100 M262 116 Q294 96 316 100 M262 116 Q244 88 233 73 M262 116 Q280 88 291 73 M262 116 Q262 92 265 69" fill="none" stroke="#1F5A38" strokeWidth="0.9" opacity={0.45} />
-          <Circle cx={262} cy={116} r={3.5} fill="#26623E" />
+          {/* crown lowered ~9px so the fronds meet the trunk top instead of floating above it */}
+          <G transform="translate(0 9)">
+            {/* coconuts under the crown */}
+            <Circle cx={258} cy={126} r={4} fill="#6E4B2A" /><Circle cx={268} cy={128} r={4} fill="#5E3E22" /><Circle cx={263} cy={131} r={3.6} fill="#6E4B2A" />
+            {/* fronds: arc up then droop, back (dark) → front (light) */}
+            <Path d="M262 116 Q222 96 194 130 Q236 120 262 116 Z" fill="#2A6E46" />
+            <Path d="M262 116 Q302 96 330 130 Q288 120 262 116 Z" fill="#2A6E46" />
+            <Path d="M262 116 Q228 86 206 98 Q244 106 262 116 Z" fill="#318554" />
+            <Path d="M262 116 Q296 86 318 98 Q280 106 262 116 Z" fill="#318554" />
+            <Path d="M262 116 Q242 78 232 72 Q254 92 262 116 Z" fill="#3B9A63" />
+            <Path d="M262 116 Q282 78 292 72 Q270 92 262 116 Z" fill="#3B9A63" />
+            <Path d="M262 116 Q261 80 266 68 Q270 90 262 116 Z" fill="#46AC6F" />
+            {/* leaf ribs */}
+            <Path d="M262 116 Q224 104 196 128 M262 116 Q300 104 328 128 M262 116 Q230 96 208 100 M262 116 Q294 96 316 100 M262 116 Q244 88 233 73 M262 116 Q280 88 291 73 M262 116 Q262 92 265 69" fill="none" stroke="#1F5A38" strokeWidth="0.9" opacity={0.45} />
+            <Circle cx={262} cy={116} r={3.5} fill="#26623E" />
+          </G>
         </G>
       </Svg>
       {/* animated overlays */}
