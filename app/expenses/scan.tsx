@@ -30,6 +30,12 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { getPayers, addPayer } from '@/utils/payers';
 import * as LucideIcons from 'lucide-react-native';
 
+// Give THIS route its own error boundary (expo-router wraps each route separately).
+// Without it a render crash on the scanner showed as a blank/black screen with no
+// log ("brak zapisanego crasha"); now it's caught, PERSISTED (Diagnostyka → ostatni
+// błąd) and shown with the message + stack so the exact cause is finally visible.
+export { ErrorBoundary } from '@/components/RouteErrorBoundary';
+
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 
 type SortMode = 'order' | 'category' | 'price';

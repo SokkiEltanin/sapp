@@ -28,6 +28,10 @@ import { getPayers, addPayer } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 
+// Per-route error boundary — a render crash here is caught + logged (Diagnostyka),
+// not shown as a blank/black screen.
+export { ErrorBoundary } from '@/components/RouteErrorBoundary';
+
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
 const INCOME_CATS  = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, typeof INCOME_CATEGORY_META[IncomeCategory]][];
 const EXPENSE_TAGS = ['słodycze', 'warzywa', 'mięso', 'napoje', 'fast food', 'apteka', 'paliwo', 'bilety'];
