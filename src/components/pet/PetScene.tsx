@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Easing, Text } from 'react-native';
-import Svg, { Defs, LinearGradient as LG, Stop, Rect, Circle, Path, G } from 'react-native-svg';
+import Svg, { Defs, LinearGradient as LG, Stop, Rect, Circle, Ellipse, Path, G } from 'react-native-svg';
 
 // Illustrated, lightly-animated backdrops for the pet — a real scene (sky by time of
 // day, sun/moon on an arc, sea with drifting shimmer, sand, palm, distant birds)
@@ -302,24 +302,56 @@ const cloud = StyleSheet.create({
   b: { position: 'absolute', left: 16, top: 0, width: 24, height: 16, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.9)' },
 });
 
-// Generic time-of-day scene for the non-beach rooms until they get their own art:
-// a proper sky gradient + sun/moon + a coloured ground band, themed by the room's
-// palette. Much less "emoji on a flat fill" than before.
-function GenericScene({ hour, colors }: { hour: number; colors?: [string, string]; }) {
+// The FREE default backdrop (no room bought): a cosy indoor room — warm wall, wood
+// floor, a window that shows the sky by time of day, a plant, a framed picture and a
+// rug the cat sits on. Premium rooms are upgrades over this.
+function CozyRoomScene({ hour }: { hour: number }) {
   const phase = phaseFor(hour);
-  const [sky0, sky1] = colors ?? SKY[phase];
-  const t = Math.min(1, Math.max(0, (hour - 6) / 14));
-  const sunX = 44 + t * 212;
-  const sunY = 130 - Math.sin(t * Math.PI) * 80;
-  const isMoon = phase === 'night';
+  const isNight = phase === 'night';
+  const [wsky0, wsky1] = SKY[phase];
   return (
-    <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
-      <Defs><LG id="gsky" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={sky0} /><Stop offset="1" stopColor={sky1} /></LG></Defs>
-      <Rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#gsky)" />
-      {isMoon && [[50, 34], [120, 50], [200, 30], [250, 52]].map(([x, y], i) => <Circle key={i} cx={x} cy={y} r={1.4} fill="#fff" opacity={0.8} />)}
-      <Circle cx={sunX} cy={sunY} r={16} fill={isMoon ? '#EAF0FF' : '#FFE27A'} opacity={0.92} />
-      <Path d={`M0 200 Q150 188 300 200 L300 ${VB_H} L0 ${VB_H} Z`} fill="rgba(0,0,0,0.22)" />
-    </Svg>
+    <View style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
+        <Defs>
+          <LG id="cwall" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#F0E2C9" /><Stop offset="1" stopColor="#E0C7A2" /></LG>
+          <LG id="cfloor" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#CDA372" /><Stop offset="1" stopColor="#B98A56" /></LG>
+          <LG id="cwin" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={wsky0} /><Stop offset="1" stopColor={wsky1} /></LG>
+        </Defs>
+        <Rect x="0" y="0" width={VB_W} height="186" fill="url(#cwall)" />
+        <Rect x="0" y="182" width={VB_W} height={VB_H - 182} fill="url(#cfloor)" />
+        <Rect x="0" y="180" width={VB_W} height="6" fill="#A87C4C" />
+        {[40, 120, 200, 280].map((x, i) => <Path key={i} d={`M${x} 188 L${x - 18} ${VB_H}`} stroke="#A87C4C" strokeWidth="1.4" opacity={0.4} />)}
+        {/* window with sky by time of day */}
+        <G>
+          <Rect x="30" y="44" width="78" height="74" rx="8" fill="#8A5A32" />
+          <Rect x="36" y="50" width="66" height="62" rx="5" fill="url(#cwin)" />
+          {isNight
+            ? <><Circle cx={84} cy={68} r={8} fill="#EAF0FF" /><Circle cx={50} cy={62} r={1.2} fill="#fff" /><Circle cx={62} cy={80} r={1.2} fill="#fff" /><Circle cx={92} cy={94} r={1.2} fill="#fff" /></>
+            : <><Circle cx={54} cy={66} r={9} fill="#FFE27A" /><Ellipse cx={82} cy={88} rx={16} ry={7} fill="#FFFFFF" opacity={0.85} /></>}
+          <Rect x="67" y="50" width="4" height="62" fill="#8A5A32" /><Rect x="36" y="78" width="66" height="4" fill="#8A5A32" />
+          <Rect x="26" y="116" width="86" height="7" rx="2" fill="#9C6A3C" />
+        </G>
+        {/* framed picture */}
+        <G>
+          <Rect x="196" y="52" width="52" height="40" rx="4" fill="#9C6A3C" />
+          <Rect x="201" y="57" width="42" height="30" rx="2" fill="#BFE3F0" />
+          <Path d="M201 87 L214 72 L224 82 L234 68 L243 87 Z" fill="#6FB86E" />
+          <Circle cx={236} cy={64} r={3} fill="#FFE27A" />
+        </G>
+        {/* potted plant */}
+        <G>
+          <Path d="M256 168 Q250 140 242 132 Q254 146 256 168" fill="#4FA06A" />
+          <Path d="M256 168 Q266 142 280 138 Q268 152 256 168" fill="#4FA06A" />
+          <Path d="M250 170 L262 170 Q266 150 258 138 Q256 156 250 170" fill="#3E8A58" />
+          <Path d="M244 182 L272 182 L268 204 L248 204 Z" fill="#C86E4A" />
+          <Rect x="242" y="178" width="32" height="7" rx="2" fill="#B45C3A" />
+        </G>
+        {/* rug the cat sits on */}
+        <Ellipse cx={150} cy={224} rx={96} ry={20} fill="#D98C6A" opacity={0.9} />
+        <Ellipse cx={150} cy={224} rx={72} ry={13} fill="none" stroke="#F0C6A6" strokeWidth={3} opacity={0.7} />
+      </Svg>
+      {isNight && <View pointerEvents="none" style={{ position: 'absolute', top: '4%', left: '40%', width: '28%', height: '26%', borderRadius: 999, backgroundColor: '#FFDD99', opacity: 0.14 }} />}
+    </View>
   );
 }
 
@@ -613,7 +645,7 @@ function AddonLayer({ addons, size }: { addons: string[]; size: number }) {
   );
 }
 
-export default function PetScene({ room, colors, addons = [], size = 290 }: { room?: string; colors?: [string, string]; addons?: string[]; size?: number }) {
+export default function PetScene({ room, addons = [], size = 290 }: { room?: string; colors?: [string, string]; addons?: string[]; size?: number }) {
   const hour = new Date().getHours();
   const scene = (() => {
     switch (room) {
@@ -624,7 +656,7 @@ export default function PetScene({ room, colors, addons = [], size = 290 }: { ro
       case 'room_space':  return <SpaceScene size={size} />;
       case 'room_winter': return <WinterScene hour={hour} size={size} />;
       case 'room_ocean':  return <OceanScene size={size} />;
-      default:            return <GenericScene hour={hour} colors={colors} />;
+      default:            return <CozyRoomScene hour={hour} />;
     }
   })();
   return (

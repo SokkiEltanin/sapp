@@ -217,11 +217,9 @@ export default function Pet() {
 
         {/* stage (room backdrop if equipped) */}
         <View style={s.stage}>
-          {equipped.room && (
-            <View style={s.room}>
-              <PetScene room={equipped.room} colors={room?.colors as [string, string] | undefined} addons={activeAddons} size={290} />
-            </View>
-          )}
+          <View style={s.room}>
+            <PetScene room={equipped.room} colors={room?.colors as [string, string] | undefined} addons={activeAddons} size={290} />
+          </View>
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
 
