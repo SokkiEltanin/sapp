@@ -75,6 +75,12 @@ export interface RoomAddon {
 }
 
 export const ROOM_ADDONS: RoomAddon[] = [
+  // Dom (darmowy domyślny pokój)
+  { id: 'home_bed',     room: 'room_home',   name: 'Legowisko',       tier: 'basic', cost: 25, emoji: '🛏️' },
+  { id: 'home_bowl',    room: 'room_home',   name: 'Miska',           tier: 'basic', cost: 20, emoji: '🍽️' },
+  { id: 'home_toy',     room: 'room_home',   name: 'Kłębek',          tier: 'basic', cost: 22, emoji: '🧶' },
+  { id: 'home_scratch', room: 'room_home',   name: 'Drapak',          tier: 'rare',  cost: 45, emoji: '🐾' },
+  { id: 'home_clock',   room: 'room_home',   name: 'Zegar ścienny',   tier: 'rare',  cost: 40, emoji: '🕐' },
   // Plaża
   { id: 'beach_ship',       room: 'room_beach',  name: 'Żaglówka',        tier: 'rare',  cost: 45, emoji: '⛵' },
   { id: 'beach_lighthouse', room: 'room_beach',  name: 'Latarnia morska', tier: 'epic',  cost: 75, emoji: '🗼' },

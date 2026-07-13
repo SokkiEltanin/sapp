@@ -641,6 +641,52 @@ function AddonLayer({ addons, size }: { addons: string[]; size: number }) {
           </Svg>
         </Drift>
       )}
+
+      {/* ── Dom (darmowy pokój) ── */}
+      {has('home_bed') && (
+        <SceneSvg>
+          <G>
+            <Ellipse cx={92} cy={230} rx={46} ry={15} fill="#7FA8CE" />
+            <Ellipse cx={92} cy={226} rx={38} ry={11} fill="#A7C6E4" />
+            <Path d="M54 228 Q54 214 70 214 L114 214 Q130 214 130 228" fill="none" stroke="#6C93B8" strokeWidth={6} strokeLinecap="round" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('home_bowl') && (
+        <SceneSvg>
+          <G>
+            <Path d="M198 229 Q212 241 226 229 Z" fill="#E06A4A" />
+            <Ellipse cx={212} cy={228} rx={15} ry={4} fill="#C85838" />
+            <Ellipse cx={212} cy={227} rx={10} ry={2.6} fill="#E8B24A" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('home_scratch') && (
+        <SceneSvg>
+          <G>
+            <Rect x={266} y={150} width={12} height={58} rx={3} fill="#C9A06A" />
+            <Ellipse cx={272} cy={208} rx={22} ry={7} fill="#8A5A32" />
+            <Circle cx={272} cy={146} r={7} fill="#E06A8B" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('home_clock') && (
+        <SceneSvg>
+          <G>
+            <Circle cx={150} cy={54} r={16} fill="#F2ECE4" stroke="#9C6A3C" strokeWidth={3} />
+            <Path d="M150 54 L150 44 M150 54 L158 58" stroke="#3B3C4E" strokeWidth={2} strokeLinecap="round" />
+            <Circle cx={150} cy={54} r={1.6} fill="#3B3C4E" />
+          </G>
+        </SceneSvg>
+      )}
+      {has('home_toy') && (
+        <Drift top={80} fromPct={-8} dist={size * 1.15} dur={9000} delay={500}>
+          <Svg width={size * 0.05} height={size * 0.05} viewBox="0 0 14 14">
+            <Circle cx={7} cy={7} r={6} fill="#E88AAE" />
+            <Path d="M2 7 Q7 3 12 7 M7 1 Q3 7 7 13 M3 3 Q10 6 11 11" stroke="#C85E86" strokeWidth={0.8} fill="none" />
+          </Svg>
+        </Drift>
+      )}
     </>
   );
 }

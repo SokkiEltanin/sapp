@@ -43,13 +43,15 @@ export default function Pet() {
   const affToday = affectionDay === todayISO() ? affection : 0;
   const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
   const room = useMemo(() => equippedRoom(equipped), [equipped]);
-  const activeAddons = useMemo(() => (equipped.room ? roomAddons[equipped.room] ?? [] : []), [roomAddons, equipped.room]);
-  const roomAddonList = useMemo(() => roomAddonsFor(equipped.room), [equipped.room]);
+  // The free default room has id 'room_home' for add-on purposes (equipped.room is
+  // undefined until a premium room is bought).
+  const roomKey = equipped.room ?? 'room_home';
+  const activeAddons = useMemo(() => roomAddons[roomKey] ?? [], [roomAddons, roomKey]);
+  const roomAddonList = useMemo(() => roomAddonsFor(roomKey), [roomKey]);
   const onAddonTap = (a: { id: string; name: string; cost: number }) => {
-    if (!equipped.room) return;
     haptic.tap();
-    if (ownedItems.includes(a.id)) { toggleRoomAddon(equipped.room, a.id); return; }
-    if (buyRoomAddon(equipped.room, a.id, a.cost)) { haptic.success(); toast.success(`Dodano do pokoju: ${a.name}`); }
+    if (ownedItems.includes(a.id)) { toggleRoomAddon(roomKey, a.id); return; }
+    if (buyRoomAddon(roomKey, a.id, a.cost)) { haptic.success(); toast.success(`Dodano do pokoju: ${a.name}`); }
     else { haptic.error(); toast.error(`Za mało monet — potrzeba ${a.cost}`); }
   };
   const { habits, todayDone, getStreak } = useHabits();
@@ -224,7 +226,7 @@ export default function Pet() {
         </View>
 
         {/* ── Room upgrades: buy extra scene elements, tap to toggle ── */}
-        {equipped.room && roomAddonList.length > 0 && (
+        {roomAddonList.length > 0 && (
           <View style={s.addonCard}>
             <View style={s.addonHead}>
               <Text style={s.section}>Pokój — dodatki</Text>
