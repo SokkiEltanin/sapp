@@ -12,7 +12,8 @@ import { useStatsScope } from '@/store/statsScope';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
-import { useWorkEarnings } from '@/hooks/useWorkEarnings';
+import { useWorkEarnings, isPaycheck } from '@/hooks/useWorkEarnings';
+import { paycheckTargetMonth } from '@/utils/paycheck';
 import { useHabits } from '@/hooks/useHabits';
 import { loadNameAliases, loadWeightMemory, WeightMemory } from '@/utils/productMemory';
 import { getHealthHistory } from '@/utils/healthHistory';
@@ -67,6 +68,14 @@ export default function WidgetBuilder() {
     ratePerHour: (workEarnings?.perSecond ?? 0) * 3600,
     tasks: calTasks, habitsTotal: habits.length, habitsDone: todayDone.length,
     nameAliases, weightMemory, healthDays,
+    // Match the dashboard: earnings preview shows the REAL [JD] paycheck per month.
+    paycheckByMonth: (() => {
+      const m: Record<string, number> = {};
+      const seen = new Set<string>();
+      const pcs = expenses.filter(e => isPaycheck(e, workSettings.workPrefix)).sort((a, b) => b.date.localeCompare(a.date));
+      for (const e of pcs) { const tm = paycheckTargetMonth(e); if (seen.has(tm)) continue; seen.add(tm); m[tm] = e.amount; }
+      return m;
+    })(),
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits.length, todayDone.length, nameAliases, weightMemory, healthDays]);
 
   const fmtVal = (v: number, unit: string): string => {
