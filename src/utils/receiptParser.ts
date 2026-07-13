@@ -705,6 +705,17 @@ function parseKaufland(text: string): ParsedReceipt {
       continue;
     }
 
+    // NAME + price on the SAME line — weighed "luz." goods often copy this way
+    // (e.g. "MakrelaWedz.luz.  12,01"), which the name→price-on-next-line flow
+    // would otherwise drop. Emit directly. Requires a letter in the name so pure
+    // number rows (already handled above) and headers don't match.
+    const inlineM = raw.match(/^(.+?)\s+(\d+[.,]\d{2})$/);
+    if (inlineM && /[A-Za-zżźćńółęąśŻŹĆĄŚĘÓŁŃ]/.test(inlineM[1]) && !SKIP_RE.test(raw)) {
+      flushPending();
+      emit(inlineM[1], parsePrice(inlineM[2]), isDepositName(inlineM[1]));
+      continue;
+    }
+
     // a name line
     if (raw.length < 2 || !/[A-Za-zżźćńółęąśŻŹĆĄŚĘÓŁŃ]/.test(raw)) continue;
     flushPending();                                  // previous name had no own price → try a stray
