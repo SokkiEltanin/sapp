@@ -129,6 +129,7 @@ export default function FinancesScreen() {
   const [amtMin, setAmtMin] = useState('');
   const [amtMax, setAmtMax] = useState('');
   const [filterModal, setFilterModal] = useState(false);
+  const [showAllTx, setShowAllTx] = useState(false); // false = only the recent window in the list
   const [balanceOffset, setBalanceOffset] = useState(0);
   const [cashOffset, setCashOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
@@ -230,6 +231,21 @@ export default function FinancesScreen() {
     setActiveTagFilter(null); setAmtMin(''); setAmtMax('');
   };
 
+  // Cap the DEFAULT (unfiltered) transaction list to a recent window so a long history
+  // doesn't build hundreds of rows at once on scroll; "Pokaż starsze" loads the rest.
+  // Filters always search the WHOLE history, and the money stats (monthTotals/balance)
+  // are computed separately over everything — so they stay correct regardless.
+  const RECENT_TX_DAYS = 31;
+  const recentCutoff = useMemo(() => {
+    const c = new Date(); c.setDate(c.getDate() - RECENT_TX_DAYS);
+    return `${c.getFullYear()}-${pad(c.getMonth() + 1)}-${pad(c.getDate())}`;
+  }, []);
+  const capTx = !showAllTx && activeFilterCount === 0;
+  const hasOlderTx = useMemo(
+    () => activeFilterCount === 0 && grouped.some(([date]) => date < recentCutoff),
+    [grouped, activeFilterCount, recentCutoff],
+  );
+
   const sections = useMemo(() => {
     const matches = (e: Expense) => {
       if (activeType === 'income' && e.type !== 'income') return false;
@@ -245,16 +261,17 @@ export default function FinancesScreen() {
       }
       return true;
     };
+    const base = capTx ? grouped.filter(([date]) => date >= recentCutoff) : grouped;
     const filtered = activeFilterCount > 0
-      ? grouped.map(([date, items]) => [date, items.filter(matches)] as [string, typeof items])
+      ? base.map(([date, items]) => [date, items.filter(matches)] as [string, typeof items])
           .filter(([, items]) => items.length > 0)
-      : grouped;
+      : base;
     return filtered.map(([date, items]) => ({
       title: formatDate(date + 'T12:00:00'),
       data: items,
       total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
     }));
-  }, [grouped, activeTagFilter, activePayer, activePayment, activeType, min, max, activeFilterCount]);
+  }, [grouped, activeTagFilter, activePayer, activePayment, activeType, min, max, activeFilterCount, capTx, recentCutoff]);
 
   return (
     <SafeAreaView style={st.root} edges={[]}>
@@ -424,6 +441,13 @@ export default function FinancesScreen() {
                 <Text style={st.emptyTitle}>Brak transakcji</Text>
                 <Text style={st.emptySub}>Dodaj pierwszą transakcję przyciskiem +</Text>
               </View>
+            ) : null
+          }
+          ListFooterComponent={
+            activeFilterCount === 0 && hasOlderTx ? (
+              <PressableScale onPress={() => { haptic.tap(); setShowAllTx(v => !v); }} style={st.loadOlderBtn}>
+                <Text style={st.loadOlderTxt}>{showAllTx ? 'Pokaż tylko ostatni miesiąc' : 'Pokaż starsze transakcje'}</Text>
+              </PressableScale>
             ) : null
           }
           contentContainerStyle={{ paddingTop: insets.top + 50, paddingBottom: 200 }}
@@ -729,6 +753,8 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   itemPad: { paddingHorizontal: spacing[4] },
 
   // ── Empty state ───────────────────────────────────────────────────────────────
+  loadOlderBtn: { marginHorizontal: spacing[4], marginTop: spacing[3], paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card, alignItems: 'center' },
+  loadOlderTxt: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   empty: { alignItems: 'center', paddingTop: 80, gap: spacing[3] },
   emptyTitle: { fontSize: 17, fontWeight: '800', color: c.text.secondary },
   emptySub:   { fontSize: 13, color: c.text.muted },

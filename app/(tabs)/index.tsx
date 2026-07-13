@@ -1045,7 +1045,7 @@ export default function DashboardScreen() {
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
   const reloadHealth = useCallback(() => {
     const read = () => {
-      getHealthHistory(250).then(h => {
+      getHealthHistory(150).then(h => {
         const m: StatCtx['healthDays'] = {};
         for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null };
         setHealthDays(m);
