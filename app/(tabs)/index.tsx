@@ -65,7 +65,7 @@ import { weatherIconPng } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
-import { fixedVariableMonths } from '@/utils/fixedVariable';
+import { fixedVariableMonths, fixedBreakdown } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
@@ -825,6 +825,10 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
+  const fvFixedItems = useMemo(() => {
+    const cur = fvMonths[fvMonths.length - 1];
+    return cur ? fixedBreakdown(expenses, cur.month) : [];
+  }, [expenses, fvMonths]);
   const [cardPeak, setCardPeak] = useState(0);
   useEffect(() => { updateCardBalancePeak(expenses).then(setCardPeak).catch(() => {}); }, [expenses]);
 
@@ -3222,46 +3226,51 @@ export default function DashboardScreen() {
             nodes['fixed-variable'] = (() => {
               const cur = fvMonths[fvMonths.length - 1];
               if (!cur) return false;
-              const totalCur = cur.fixed + cur.variable;
+              const totalCur = cur.fixed + cur.variable + cur.food;
               if (totalCur === 0) return false;
-              const prev = fvMonths.slice(0, -1).filter(m => m.fixed + m.variable > 0);
-              const avgFixed = prev.length ? Math.round(prev.reduce((a, m) => a + m.fixed, 0) / prev.length) : cur.fixed;
-              const avgVar = prev.length ? Math.round(prev.reduce((a, m) => a + m.variable, 0) / prev.length) : cur.variable;
-              const maxMonth = Math.max(...fvMonths.map(m => m.fixed + m.variable), 1);
+              const prev = fvMonths.slice(0, -1).filter(m => m.fixed + m.variable + m.food > 0);
+              const avg = (sel: (m: typeof cur) => number) => prev.length ? Math.round(prev.reduce((a, m) => a + sel(m), 0) / prev.length) : sel(cur);
+              const maxMonth = Math.max(...fvMonths.map(m => m.fixed + m.variable + m.food), 1);
               const MON = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
-              const fixedC = '#8893A8';
-              const varC = accentColor;
+              const fixedC = '#8893A8', varC = accentColor, foodC = '#4CA96B';
               const H = 46;
+              const prevM = prev[prev.length - 1];
+              const fmt = (n: number) => n.toLocaleString('pl-PL');
               return (
                 <View style={[s.card, { backgroundColor: cardBgDark }]}>
                   <View style={s.cardHeader}>
                     <Wallet size={13} color={accentColor} />
-                    <Text style={s.cardTitle} numberOfLines={1}>Stałe vs zmienne</Text>
+                    <Text style={s.cardTitle} numberOfLines={1}>Na co idą pieniądze</Text>
                     <Text style={s.fvHint}>ten miesiąc</Text>
                   </View>
-                  <View style={s.fvRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.fvAmt, { color: fixedC }]}>{cur.fixed.toLocaleString('pl-PL')} zł</Text>
-                      <Text style={s.fvLbl}>Stałe (czynsz, rachunki, suby)</Text>
-                    </View>
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <Text style={[s.fvAmt, { color: varC }]}>{cur.variable.toLocaleString('pl-PL')} zł</Text>
-                      <Text style={[s.fvLbl, { textAlign: 'right' }]}>Zmienne (codzienne)</Text>
-                    </View>
+                  <View style={s.fvTiles}>
+                    <View style={s.fvTile}><Text style={[s.fvAmt, { color: fixedC }]}>{fmt(cur.fixed)} zł</Text><Text style={s.fvLbl}>Stałe</Text></View>
+                    <View style={s.fvTile}><Text style={[s.fvAmt, { color: varC }]}>{fmt(cur.variable)} zł</Text><Text style={s.fvLbl}>Zmienne</Text></View>
+                    <View style={s.fvTile}><Text style={[s.fvAmt, { color: foodC }]}>{fmt(cur.food)} zł</Text><Text style={s.fvLbl}>Jedzenie</Text></View>
                   </View>
                   <View style={s.fvBar}>
                     <View style={{ flex: Math.max(cur.fixed, 0.001), backgroundColor: fixedC }} />
                     <View style={{ flex: Math.max(cur.variable, 0.001), backgroundColor: varC }} />
+                    <View style={{ flex: Math.max(cur.food, 0.001), backgroundColor: foodC }} />
                   </View>
-                  <Text style={s.fvNote}>
-                    Zmienne to Twoje realne „kieszonkowe" — {Math.round(cur.variable / totalCur * 100)}% wydatków.
-                  </Text>
+                  {fvFixedItems.length > 0 && (
+                    <Text style={s.fvFixedList} numberOfLines={2}>
+                      <Text style={{ color: fixedC, fontWeight: '800' }}>Stałe: </Text>
+                      {fvFixedItems.slice(0, 5).map(it => `${it.label} ${fmt(it.amount)}`).join('  ·  ')}
+                    </Text>
+                  )}
+                  {prevM && (
+                    <Text style={s.fvNote}>
+                      Poprzedni miesiąc: jedzenie {fmt(prevM.food)} zł · zmienne {fmt(prevM.variable)} zł · stałe {fmt(prevM.fixed)} zł
+                    </Text>
+                  )}
                   {prev.length > 0 && (
                     <>
                       <View style={s.fvTrend}>
                         {fvMonths.map((m, i) => (
                           <View key={m.month} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
                             <View style={{ width: 20, height: H, justifyContent: 'flex-end', borderRadius: 4, overflow: 'hidden', backgroundColor: colors.fill.subtle }}>
+                              <View style={{ height: (m.food / maxMonth) * H, backgroundColor: foodC }} />
                               <View style={{ height: (m.variable / maxMonth) * H, backgroundColor: varC }} />
                               <View style={{ height: (m.fixed / maxMonth) * H, backgroundColor: fixedC }} />
                             </View>
@@ -3269,7 +3278,7 @@ export default function DashboardScreen() {
                           </View>
                         ))}
                       </View>
-                      <Text style={s.fvAvg}>śr. {prev.length} mies.: stałe {avgFixed.toLocaleString('pl-PL')} zł · zmienne {avgVar.toLocaleString('pl-PL')} zł</Text>
+                      <Text style={s.fvAvg}>śr. {prev.length} mies.: stałe {fmt(avg(m => m.fixed))} · zmienne {fmt(avg(m => m.variable))} · jedzenie {fmt(avg(m => m.food))} zł</Text>
                     </>
                   )}
                 </View>
@@ -4476,9 +4485,12 @@ const makeStyles = (c: any) => StyleSheet.create({
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
   fvHint: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 'auto' },
   fvRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[2], marginBottom: spacing[2] },
-  fvAmt: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  fvTiles: { flexDirection: 'row', marginTop: spacing[2], marginBottom: spacing[2] },
+  fvTile: { flex: 1, alignItems: 'center' },
+  fvAmt: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
   fvLbl: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: 2 },
   fvBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: c.fill.subtle },
+  fvFixedList: { fontSize: 11, color: c.text.secondary, marginTop: spacing[2], lineHeight: 16 },
   fvNote: { fontSize: 11, color: c.text.secondary, marginTop: spacing[2], lineHeight: 15 },
   fvTrend: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   fvMonthLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
