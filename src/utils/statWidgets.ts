@@ -90,6 +90,7 @@ export interface StatCtx {
   nameAliases: Record<string, string>;
   weightMemory: WeightMemory;
   healthDays: Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>; // date → watch metrics
+  paycheckByMonth?: Record<string, number>; // YYYY-MM (target month) → actual [JD] paycheck total
 }
 
 type Period = 'week' | 'month';
@@ -148,7 +149,7 @@ function itemKg(it: { name?: string; weightKg?: number; quantity?: number }, wme
 // ─── Core numeric metric for one period bucket ────────────────────────────────
 
 function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean,
-                     moodPred: (d: string) => boolean, tag?: string): number {
+                     moodPred: (d: string) => boolean, tag?: string, periodYm?: string): number {
   const exp = ctx.expenses;
   switch (metric) {
     case 'tagSpend': {
@@ -271,6 +272,10 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
         .reduce((s, e) => s + shiftHours(e), 0);
     }
     case 'earnings': {
+      // Real [JD] paycheck FOR this month wins over the hours×rate estimate — a past
+      // month shows what you actually got, not a guess. Falls back to the estimate for
+      // the current/partial month or any month with no paycheck logged yet.
+      if (periodYm && ctx.paycheckByMonth && ctx.paycheckByMonth[periodYm] > 0) return ctx.paycheckByMonth[periodYm];
       const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
       const today = todayStr();
       const h = ctx.workEvents
@@ -304,13 +309,13 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
 }
 
 // Build predicates for a period bucket (offset back).
-function predsFor(period: Period, offset: number): { exp: (e: Expense) => boolean; day: (d: string) => boolean; label: string } {
+function predsFor(period: Period, offset: number): { exp: (e: Expense) => boolean; day: (d: string) => boolean; label: string; ym?: string } {
   if (period === 'month') {
     const ym = monthKey(offset);
-    return { exp: e => inMonth(e, ym), day: d => d.slice(0, 7) === ym, label: monthLabel(offset) };
+    return { exp: e => inMonth(e, ym), day: d => d.slice(0, 7) === ym, label: monthLabel(offset), ym };
   }
   const ds = weekDates(offset); const set = new Set(ds);
-  return { exp: e => inWeek(e, ds), day: d => set.has(d.slice(0, 10)), label: weekLabel(offset) };
+  return { exp: e => inWeek(e, ds), day: d => set.has(d.slice(0, 10)), label: weekLabel(offset), ym: undefined };
 }
 
 // ─── Public compute ───────────────────────────────────────────────────────────
@@ -343,7 +348,7 @@ export function metricNumber(metric: string, ctx: StatCtx, period: Period, tag?:
     };
   }
   const p = predsFor(period, 0);
-  const value = bucketValue(metric, ctx, p.exp, p.day, tag);
+  const value = bucketValue(metric, ctx, p.exp, p.day, tag, p.ym);
   return { value, unit, sub: period === 'month' ? 'ten miesiąc' : 'ten tydzień' };
 }
 
@@ -352,7 +357,7 @@ export function metricSeries(metric: string, ctx: StatCtx, period: Period, n = 6
   const values: number[] = []; const labels: string[] = [];
   for (let i = n - 1; i >= 0; i--) {
     const p = predsFor(period, i);
-    values.push(bucketValue(metric, ctx, p.exp, p.day, tag));
+    values.push(bucketValue(metric, ctx, p.exp, p.day, tag, p.ym));
     labels.push(p.label);
   }
   return { values, labels, unit: def?.unit ?? '' };

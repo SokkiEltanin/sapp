@@ -21,6 +21,7 @@ import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backup
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { drainBankNotifications } from '@/services/bankNotificationDrain';
 import { flushPendingExpenseWrites } from '@/services/expenseSync';
+import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useMoodStore } from '@/store/moodStore';
@@ -250,10 +251,14 @@ export default function RootLayout() {
   // closed/backgrounded, on cold start + every foreground. Enqueued items are then
   // auto-accepted (trusted merchants) or shown for review by the dashboard.
   useEffect(() => {
-    const t = setTimeout(() => { drainBankNotifications().catch(() => {}); }, 1500);
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') drainBankNotifications().catch(() => {});
-    });
+    // Drain, then immediately auto-commit trusted/full-auto items so payments post
+    // without opening the dashboard — but only once expenses are loaded, so receipt
+    // matching stays reliable (the dashboard effect is the fallback otherwise).
+    const drainThenAuto = () => drainBankNotifications()
+      .then(() => { if (useExpensesStore.getState().expenses.length > 0) return import('@/services/bankAutoProcess').then(m => m.processAutoBankQueue()); })
+      .catch(() => {});
+    const t = setTimeout(drainThenAuto, 1500);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') drainThenAuto(); });
     return () => { clearTimeout(t); sub.remove(); };
   }, []);
 

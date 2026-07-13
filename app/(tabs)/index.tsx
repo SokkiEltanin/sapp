@@ -92,6 +92,7 @@ import { useColors } from '@/theme/useColors';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings, isPaycheck } from '@/hooks/useWorkEarnings';
 import { computePayMonths, payMonthsSummary } from '@/utils/workSummary';
+import { paycheckTargetMonth } from '@/utils/paycheck';
 import { workService } from '@/services/workService';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -1203,6 +1204,16 @@ export default function DashboardScreen() {
     nameAliases,
     weightMemory,
     healthDays,
+    // Actual [JD] paycheck per target month (arrears-aware) — lets the earnings widget
+    // show REAL past-month pay instead of an hours×rate estimate. One per month (most
+    // recent), matching the Praca panel.
+    paycheckByMonth: (() => {
+      const m: Record<string, number> = {};
+      const seen = new Set<string>();
+      const pcs = expenses.filter(e => isPaycheck(e, workSettings.workPrefix)).sort((a, b) => b.date.localeCompare(a.date));
+      for (const e of pcs) { const tm = paycheckTargetMonth(e); if (seen.has(tm)) continue; seen.add(tm); m[tm] = e.amount; }
+      return m;
+    })(),
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
 
   // Achievements — evaluate against live data so a newly-earned badge fires a
