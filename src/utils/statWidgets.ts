@@ -263,23 +263,22 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       return rows.reduce((s, m) => s + (m as any)[key], 0) / rows.length;
     }
     case 'workHours': {
+      // ALL [JD] calendar hours in the bucket month (worked + still-scheduled) — the
+      // widget projects the whole month from the calendar; the Praca panel is where
+      // worked-so-far facts live.
       const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
-      // Only shifts already WORKED (up to today) — a widget shows facts, not the
-      // month's still-scheduled hours (matches the dashboard Praca panel).
-      const today = todayStr();
       return ctx.workEvents
-        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)) && (e.date ?? '').slice(0, 10) <= today)
+        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)))
         .reduce((s, e) => s + shiftHours(e), 0);
     }
     case 'earnings': {
-      // Real [JD] paycheck FOR this month wins over the hours×rate estimate — a past
-      // month shows what you actually got, not a guess. Falls back to the estimate for
-      // the current/partial month or any month with no paycheck logged yet.
+      // Past months show the REAL [JD] paycheck for that month. Otherwise ESTIMATE from
+      // ALL calendar hours that month (worked + scheduled) × rate — it's a "(szac.)"
+      // projection of the whole month, not a worked-so-far partial.
       if (periodYm && ctx.paycheckByMonth && ctx.paycheckByMonth[periodYm] > 0) return ctx.paycheckByMonth[periodYm];
       const wp = ctx.workSettings.workPrefix, wc = ctx.workSettings.workColor;
-      const today = todayStr();
       const h = ctx.workEvents
-        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)) && (e.date ?? '').slice(0, 10) <= today)
+        .filter(e => isWorkEvent(e, { workColor: wc, workPrefix: wp }) && moodPred((e.date ?? '').slice(0, 10)))
         .reduce((s, e) => s + shiftHours(e), 0);
       return h * ctx.ratePerHour;
     }
