@@ -326,6 +326,7 @@ function CozyRoomScene({ hour, size }: { hour: number; size: number }) {
   const month = now.getMonth(), day = now.getDate();
   const xmas = month === 11;
   const halloween = month === 9 && day >= 24;
+  const summer = month >= 5 && month <= 7; // Jun–Aug: a warm beachy vibe indoors
   return (
     <View style={StyleSheet.absoluteFill}>
       <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
@@ -381,6 +382,20 @@ function CozyRoomScene({ hour, size }: { hour: number; size: number }) {
             {[[140, 186, '#E8564B'], [161, 190, '#F6D43D'], [133, 205, '#6AC8FF'], [167, 205, '#F27FA6'], [150, 197, '#E8564B']].map(([x, y, col], i) => (
               <Circle key={i} cx={x as number} cy={y as number} r={2.6} fill={col as string} />
             ))}
+          </G>
+        )}
+        {/* ── Lato: promień słońca przez okno + piłka plażowa ── */}
+        {summer && (
+          <G>
+            <Path d="M40 118 L98 118 L168 250 L78 250 Z" fill="#FFE9A8" opacity={0.16} />
+            <G>
+              <Circle cx={196} cy={230} r={12} fill="#FFFFFF" />
+              <Path d="M196 218 Q207 230 196 242" fill="none" stroke="#E8564B" strokeWidth={3} />
+              <Path d="M196 218 Q185 230 196 242" fill="none" stroke="#4C86E0" strokeWidth={3} />
+              <Path d="M184 230 L208 230" stroke="#F6D43D" strokeWidth={2.6} />
+              <Circle cx={196} cy={230} r={12} fill="none" stroke="#DADADA" strokeWidth={0.8} />
+              <Circle cx={192} cy={226} r={2.4} fill="#FFFFFF" opacity={0.7} />
+            </G>
           </G>
         )}
         {/* ── Halloween: dynia ── */}
