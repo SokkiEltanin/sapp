@@ -11,6 +11,7 @@ export interface PendingBankTx extends ParsedBankTx {
   suggestedCategory: ExpenseCategory; // what the reader guessed — to detect a correction
   auto?: boolean;                // trusted merchant → auto-accept on next app open
   jd?: boolean;                  // income: log as a [JD] paycheck (salary + work tag)
+  flagReason?: string;           // set → held for confirmation (something looked off), shown in review
   addedAt: number;
 }
 

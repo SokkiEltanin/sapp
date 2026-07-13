@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Check, X, Landmark, Zap, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Check, X, Landmark, Zap, Sparkles, AlertTriangle } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import { useBankQueue, PendingBankTx } from '@/store/bankQueueStore';
@@ -90,7 +90,13 @@ export default function BankReview() {
           const accepts = info?.cleanAccepts ?? 0;
           const isIn = p.direction === 'in';
           return (
-            <View key={p.id} style={s.card}>
+            <View key={p.id} style={[s.card, p.flagReason && { borderColor: '#FBBF2455' }]}>
+              {p.flagReason && (
+                <View style={s.flagRow}>
+                  <AlertTriangle size={13} color="#FBBF24" />
+                  <Text style={s.flagText}>{p.flagReason}</Text>
+                </View>
+              )}
               <View style={s.cardTop}>
                 <Text style={[s.amount, isIn && { color: '#2AC68F' }]}>{isIn ? '+' : ''}{p.amount.toFixed(2)} zł</Text>
                 <Text style={s.time}>{d.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</Text>
@@ -180,6 +186,8 @@ const makeS = (c: any) => StyleSheet.create({
   empty: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   emptyText: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 280, lineHeight: 19 },
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], marginBottom: spacing[3] },
+  flagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FBBF2414', borderRadius: radius.md, paddingHorizontal: 8, paddingVertical: 6, marginBottom: spacing[2] },
+  flagText: { flex: 1, fontSize: 12, fontWeight: '700', color: '#FBBF24' },
   cardTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   amount: { fontSize: 24, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
   time: { fontSize: 12, color: c.text.muted, fontWeight: '600' },

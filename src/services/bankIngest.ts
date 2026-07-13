@@ -14,31 +14,43 @@ export async function ingestBankNotification(title: string, text: string): Promi
   const tx = parseBankNotification(title, text);
   if (!tx) return false;
 
-  // Incoming transfer → income. Default to "[JD] paycheck" when it looks like salary
-  // (the common case for a single job); the user can flip it in review.
+  // Incoming transfer → income. Auto-book ONLY confident salary-like income (reads
+  // like salary OR a sender you've confirmed as a paycheck before) when full-auto is
+  // on. Anything else (a refund, a friend paying you back, an unknown transfer) is NOT
+  // silently booked as income — it goes to review on the dashboard so you decide.
   if (tx.direction === 'in') {
-    // [JD] if it reads like salary OR it's from a sender the user has confirmed as a
-    // paycheck before (employer transfers rarely say "wynagrodzenie").
     const jd = !!tx.isSalary || await isKnownPaycheckSender(tx.storeKey);
+    const confidentIncome = store.autoAll && jd;
     return store.enqueue({
       ...tx,
       category: 'other',
       suggestedCategory: 'other',
       jd,
-      auto: false, // never auto-log income blindly — always review first
+      auto: confidentIncome,
+      ...(confidentIncome ? {} : { flagReason: jd ? undefined : 'przelew przychodzący — potwierdź, czy to przychód' }),
     });
   }
 
   const mem = await loadMerchantMemory();
   const learned = merchantFor(tx.storeKey, mem);
   const category = learned?.category ?? guessCategory(tx.store);
+  // Verify better, but never critically drop: auto-book the usual card payment, yet if
+  // something looks off — an unusually large amount (a common sign of a mis-parsed
+  // figure, e.g. 10,18 read as 1018) or no merchant name parsed — hold it for a
+  // top-of-dashboard confirmation instead of committing blindly.
+  const bigAmount = tx.amount > 1500;
+  const noStore = !(tx.store ?? '').trim();
+  const uncertain = bigAmount || noStore;
+  const flagReason = bigAmount ? 'nietypowo wysoka kwota — potwierdź' : noStore ? 'nie rozpoznano sklepu — potwierdź' : undefined;
   return store.enqueue({
     ...tx,
     store: learned?.name ?? tx.store,
     category,
     suggestedCategory: category,
     // Full autopilot logs every card payment straight away; otherwise a merchant has to
-    // earn trust (5 clean accepts) before its payments skip review.
-    auto: store.autoAll || !!learned?.auto,
+    // earn trust (5 clean accepts) before its payments skip review — and uncertain ones
+    // always fall back to review regardless.
+    auto: (store.autoAll || !!learned?.auto) && !uncertain,
+    ...(uncertain ? { flagReason } : {}),
   });
 }
