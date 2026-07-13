@@ -13,6 +13,7 @@ import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { equippedRoom, roomAddonsFor, TIER_META } from '@/utils/petShop';
+import { bossById } from '@/utils/bosses';
 import { useHabits } from '@/hooks/useHabits';
 import { getWaterGlasses } from '@/utils/habits';
 import { useMoodStore } from '@/store/moodStore';
@@ -36,7 +37,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
@@ -46,6 +47,11 @@ export default function Pet() {
   // The free default room has id 'room_home' for add-on purposes (equipped.room is
   // undefined until a premium room is bought).
   const roomKey = equipped.room ?? 'room_home';
+  const trophies = useMemo(
+    () => (defeatedBosses ?? []).map(id => bossById(id)).filter((b): b is NonNullable<typeof b> => !!b)
+      .map(b => ({ emoji: b.loot.emoji, boss: b.name, loot: b.loot.name, desc: b.loot.desc })),
+    [defeatedBosses],
+  );
   const activeAddons = useMemo(() => roomAddons[roomKey] ?? [], [roomAddons, roomKey]);
   const roomAddonList = useMemo(() => roomAddonsFor(roomKey), [roomKey]);
   const onAddonTap = (a: { id: string; name: string; cost: number }) => {
@@ -224,6 +230,23 @@ export default function Pet() {
           </View>
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
+
+        {/* ── Gablota trofeów: loot z pokonanych bossów ── */}
+        {trophies.length > 0 && (
+          <View style={s.addonCard}>
+            <Text style={s.section}>🏆 Trofea z bossów ({trophies.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
+              {trophies.map((t, i) => (
+                <View key={i} style={s.trophyItem}>
+                  <View style={s.trophyPedestal}><Text style={{ fontSize: 26 }}>{t.emoji}</Text></View>
+                  <Text style={s.trophyLoot} numberOfLines={1}>{t.loot}</Text>
+                  <Text style={s.trophyBoss} numberOfLines={1}>{t.boss}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <Text style={s.addonHint}>Loot daje pasywne bonusy w walkach. Pokonuj bossów w zakładce ⚔.</Text>
+          </View>
+        )}
 
         {/* ── Room upgrades: buy extra scene elements, tap to toggle ── */}
         {roomAddonList.length > 0 && (
@@ -477,6 +500,12 @@ const makeS = (c: any) => StyleSheet.create({
   addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
   addonHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6 },
+
+  // Trophy cabinet
+  trophyItem: { width: 84, alignItems: 'center', gap: 3 },
+  trophyPedestal: { width: 54, height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
+  trophyLoot: { fontSize: 11, fontWeight: '800', color: c.text.primary, textAlign: 'center' },
+  trophyBoss: { fontSize: 9.5, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
   needs: { width: '100%', gap: spacing[2] },
   needRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   needLabel: { width: 62, fontSize: 13, fontWeight: '700', color: c.text.secondary },
