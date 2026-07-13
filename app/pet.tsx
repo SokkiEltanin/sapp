@@ -14,6 +14,7 @@ import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { equippedRoom, roomAddonsFor, TIER_META } from '@/utils/petShop';
 import { bossById } from '@/utils/bosses';
+import { getBudgets } from '@/utils/budgets';
 import { useHabits } from '@/hooks/useHabits';
 import { getWaterGlasses } from '@/utils/habits';
 import { useMoodStore } from '@/store/moodStore';
@@ -67,6 +68,7 @@ export default function Pet() {
   const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number; stepsThisWeek: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0, stepsThisWeek: 0 });
   const [stepGoal, setStepGoal] = useState(10000);
   const [waterGoal, setWaterGoal] = useState(8);
+  const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [waterToday, setWaterToday] = useState(0);
   const [cardsCollected, setCardsCollected] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -92,6 +94,7 @@ export default function Pet() {
       setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek });
     }).catch(() => {});
     getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
+    getBudgets().then(b => setBudgets(b as Record<string, number>)).catch(() => {});
     getWaterGlasses(t).then(g => setWaterToday(g)).catch(() => {});
     AsyncStorage.getItem('skin_progress').then(raw => { if (raw) setCardsCollected(JSON.parse(raw).cards ?? 0); }).catch(() => {});
   }, []);
@@ -157,6 +160,20 @@ export default function Pet() {
     claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
   };
 
+  // Over budget = any budgeted category exceeded its monthly limit → the pet gives a
+  // gentle money nudge in its status line (it does NOT sadden the pet's core mood).
+  const overBudget = useMemo(() => {
+    const cats = Object.keys(budgets);
+    if (!cats.length) return false;
+    const mk = todayISO().slice(0, 7);
+    const spend: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type === 'income' || (e.date ?? '').slice(0, 7) !== mk) continue;
+      spend[e.category] = (spend[e.category] ?? 0) + e.amount;
+    }
+    return cats.some(cat => (spend[cat] ?? 0) > (budgets[cat] || Infinity));
+  }, [budgets, expenses]);
+
   const input: PetInput = useMemo(() => {
     const t = todayISO();
     const todayMoods = moodEntries.filter(e => e.date === t);
@@ -166,8 +183,9 @@ export default function Pet() {
       habitsDone: todayDone.length, habitsTotal: habits.length,
       moodLoggedToday: todayMoods.length > 0, avgMoodToday: avgMood,
       hour: new Date().getHours(),
+      overBudget,
     };
-  }, [health, stepGoal, todayDone.length, habits.length, moodEntries]);
+  }, [health, stepGoal, todayDone.length, habits.length, moodEntries, overBudget]);
 
   const pet = useMemo(() => computePetState(input), [input]);
   const lvl = levelFromXp(xp);

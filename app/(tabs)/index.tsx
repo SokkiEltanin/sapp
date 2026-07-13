@@ -2008,6 +2008,10 @@ export default function DashboardScreen() {
     const tISO = todayISO();
     const todayMoods = moodEntries.filter(e => e.date === tISO);
     const avgMood = todayMoods.length ? todayMoods.reduce((a, b) => a + b.mood, 0) / todayMoods.length : null;
+    const mk = tISO.slice(0, 7);
+    const spend: Record<string, number> = {};
+    for (const e of expenses) { if (e.type === 'income' || (e.date ?? '').slice(0, 7) !== mk) continue; spend[e.category] = (spend[e.category] ?? 0) + e.amount; }
+    const overBudget = Object.entries(budgets).some(([cat, lim]) => !!lim && (spend[cat] ?? 0) > (lim as number));
     return computePetState({
       stepsToday: healthDays[tISO]?.steps ?? 0,
       stepGoal: healthGoals.stepGoal,
@@ -2015,8 +2019,9 @@ export default function DashboardScreen() {
       habitsDone: habitsDoneIds.length, habitsTotal: habits.length,
       moodLoggedToday: todayMoods.length > 0, avgMoodToday: avgMood,
       hour: new Date().getHours(),
+      overBudget,
     });
-  }, [healthDays, healthGoals, habitsDoneIds.length, habits.length, moodEntries]);
+  }, [healthDays, healthGoals, habitsDoneIds.length, habits.length, moodEntries, budgets, expenses]);
   const petLevel = useMemo(() => levelFromXp(petXp).level, [petXp]);
   const petClaimable = useMemo(() => {
     const tISO = todayISO();

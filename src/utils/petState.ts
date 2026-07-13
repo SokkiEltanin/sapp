@@ -14,6 +14,7 @@ export interface PetInput {
   moodLoggedToday: boolean;
   avgMoodToday: number | null; // 1..5
   hour: number;               // 0..23
+  overBudget?: boolean;       // a budget category is over its limit this month
 }
 
 export interface PetNeed { key: string; label: string; value: number; met: boolean; unknown?: boolean }
@@ -24,6 +25,8 @@ export interface PetState {
   expression: PetExpression;
   label: string;
   color: string;              // body colour
+  overBudget?: boolean;       // surfaced in the status line (does NOT sadden the pet —
+                              // core mood stays self-care, money just gets a comment)
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
@@ -74,17 +77,20 @@ export function computePetState(inp: PetInput): PetState {
   else if (wellbeing >= 22) expression = 'sad';
   else expression = 'sick';
 
-  return { needs, wellbeing, expression, label: LABELS[expression], color: COLORS[expression] };
+  return { needs, wellbeing, expression, label: LABELS[expression], color: COLORS[expression], overBudget: !!inp.overBudget };
 }
 
-// A short, kind status line for the dashboard tile — nudges without shaming.
+// A short, kind status line for the dashboard tile — nudges without shaming. Sleeping
+// and sick win (most urgent); otherwise an over-budget month gets a gentle money nudge.
 export function petStatusLine(st: PetState): string {
+  if (st.expression === 'sleeping') return 'Smacznie śpi 💤';
+  if (st.expression === 'sick')     return 'Kiepsko się czuje — zadbaj o siebie';
+  if (st.overBudget)                return 'Zerka na Twój budżet — jesteś ponad plan 💸';
   switch (st.expression) {
     case 'happy':    return 'Świetnie się czuje!';
     case 'content':  return 'Zadowolony i najedzony';
     case 'meh':      return 'Trochę się nudzi…';
     case 'sad':      return 'Tęskni — zajrzyj do niego';
-    case 'sick':     return 'Kiepsko się czuje — zadbaj o siebie';
-    case 'sleeping': return 'Smacznie śpi 💤';
+    default:         return '';
   }
 }
