@@ -317,10 +317,15 @@ const cloud = StyleSheet.create({
 // The FREE default backdrop (no room bought): a cosy indoor room — warm wall, wood
 // floor, a window that shows the sky by time of day, a plant, a framed picture and a
 // rug the cat sits on. Premium rooms are upgrades over this.
-function CozyRoomScene({ hour }: { hour: number }) {
+function CozyRoomScene({ hour, size }: { hour: number; size: number }) {
   const phase = phaseFor(hour);
   const isNight = phase === 'night';
   const [wsky0, wsky1] = SKY[phase];
+  // Auto-seasonal: December dresses the room for Christmas; late October for Halloween.
+  const now = new Date();
+  const month = now.getMonth(), day = now.getDate();
+  const xmas = month === 11;
+  const halloween = month === 9 && day >= 24;
   return (
     <View style={StyleSheet.absoluteFill}>
       <Svg width="100%" height="100%" viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="xMidYMid slice">
@@ -361,8 +366,36 @@ function CozyRoomScene({ hour }: { hour: number }) {
         {/* rug the cat sits on */}
         <Ellipse cx={150} cy={224} rx={96} ry={20} fill="#D98C6A" opacity={0.9} />
         <Ellipse cx={150} cy={224} rx={72} ry={13} fill="none" stroke="#F0C6A6" strokeWidth={3} opacity={0.7} />
+        {/* ── Grudzień: choinka + girlanda światełek ── */}
+        {xmas && (
+          <G>
+            <Path d="M6 26 Q78 40 150 26 Q222 40 294 26" fill="none" stroke="#6B4A2A" strokeWidth={1.4} opacity={0.55} />
+            {[20, 55, 90, 125, 160, 195, 230, 265].map((x, i) => (
+              <Circle key={i} cx={x} cy={i % 2 ? 34 : 30} r={2.3} fill={['#E8564B', '#F6D43D', '#4FB06A', '#6AC8FF'][i % 4]} />
+            ))}
+            <Path d="M150 150 L132 178 L168 178 Z" fill="#2E6E45" />
+            <Path d="M150 164 L128 196 L172 196 Z" fill="#357C4F" />
+            <Path d="M150 180 L124 210 L176 210 Z" fill="#3E8A58" />
+            <Rect x={146} y={210} width={8} height={9} fill="#7A4A22" />
+            <Path d="M150 145 l2.2 5 l5.4 0.8 l-4 3.6 l1 5.4 l-4.6 -2.6 l-4.6 2.6 l1 -5.4 l-4 -3.6 l5.4 -0.8 z" fill="#FBE38A" />
+            {[[140, 186, '#E8564B'], [161, 190, '#F6D43D'], [133, 205, '#6AC8FF'], [167, 205, '#F27FA6'], [150, 197, '#E8564B']].map(([x, y, col], i) => (
+              <Circle key={i} cx={x as number} cy={y as number} r={2.6} fill={col as string} />
+            ))}
+          </G>
+        )}
+        {/* ── Halloween: dynia ── */}
+        {halloween && (
+          <G>
+            <Path d="M66 224 Q60 218 66 214" fill="none" stroke="#3E8A58" strokeWidth={2} />
+            <Ellipse cx={72} cy={230} rx={13} ry={11} fill="#E8863B" />
+            <Ellipse cx={66} cy={230} rx={5} ry={11} fill="#D2732E" opacity={0.5} />
+            <Path d="M65 227 l3 4 l3 -4 Z M73 227 l3 4 l3 -4 Z" fill="#3A2410" />
+            <Path d="M66 235 q6 5 12 0" fill="none" stroke="#3A2410" strokeWidth={1.6} />
+          </G>
+        )}
       </Svg>
       {isNight && <View pointerEvents="none" style={{ position: 'absolute', top: '4%', left: '40%', width: '28%', height: '26%', borderRadius: 999, backgroundColor: '#FFDD99', opacity: 0.14 }} />}
+      {xmas && <Snow size={size} />}
     </View>
   );
 }
@@ -714,7 +747,7 @@ export default function PetScene({ room, addons = [], size = 290 }: { room?: str
       case 'room_space':  return <SpaceScene size={size} />;
       case 'room_winter': return <WinterScene hour={hour} size={size} />;
       case 'room_ocean':  return <OceanScene size={size} />;
-      default:            return <CozyRoomScene hour={hour} />;
+      default:            return <CozyRoomScene hour={hour} size={size} />;
     }
   })();
   return (
