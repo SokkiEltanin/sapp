@@ -51,3 +51,12 @@ google-services.json
 # generated native folders
 /ios
 /android
+
+# Local scratch dropped in the repo root — not source (installers, scans, data
+# exports, throwaway test images). Keeps a stray `git add -A` from committing 87 MB.
+EpicInstaller-*.exe
+Scanned_*.pdf
+sapp-export-*.json
+iawdawd*.jpg
+imawdaw*.jpg
+imagepij*.jpg
