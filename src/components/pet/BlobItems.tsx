@@ -90,17 +90,19 @@ export function HeldArt({ id }: { id?: string }) {
     case 'held_balloon':
       return (
         <G>
-          <Line x1="86" y1="52" x2="82" y2="72" stroke="#9AA3B2" strokeWidth="1.2" />
-          <Ellipse cx="86" cy="44" rx="8" ry="9.5" fill="#EF4444" />
-          <Ellipse cx="83" cy="40" rx="2.4" ry="3" fill="#fff" opacity={0.4} />
+          <Path d="M32 55 Q28 68 30 82" fill="none" stroke="#9AA3B2" strokeWidth="1.4" />
+          <Ellipse cx="32" cy="42" rx="11" ry="13" fill="#EF4444" />
+          <Path d="M32 55 l-3.5 4.5 l7 0 z" fill="#C43C3C" />
+          <Ellipse cx="27" cy="37" rx="3" ry="4.2" fill="#fff" opacity={0.42} />
         </G>
       );
     case 'held_lolly':
       return (
         <G>
-          <Line x1="85" y1="58" x2="85" y2="74" stroke="#E8D9C0" strokeWidth="2.2" />
-          <Circle cx="85" cy="52" r="7.5" fill="#F472B6" />
-          <Path d="M85 52 m-4 0 a4 4 0 0 1 8 0" stroke="#fff" strokeWidth="1.6" fill="none" opacity={0.7} />
+          <Line x1="31" y1="60" x2="31" y2="82" stroke="#E8D9C0" strokeWidth="2.6" />
+          <Circle cx="31" cy="49" r="11" fill="#F472B6" />
+          <Path d="M31 49 m-6 0 a6 6 0 0 1 12 0" stroke="#fff" strokeWidth="2" fill="none" opacity={0.6} />
+          <Circle cx="31" cy="49" r="11" fill="none" stroke="#DB6BA0" strokeWidth="1.2" opacity={0.5} />
         </G>
       );
     case 'held_flower':
@@ -108,10 +110,10 @@ export function HeldArt({ id }: { id?: string }) {
         <G>
           {[0, 72, 144, 216, 288].map(a => {
             const r = (a * Math.PI) / 180;
-            return <Ellipse key={a} cx={84 + Math.cos(r) * 5} cy={52 + Math.sin(r) * 5} rx="3.4" ry="4.6" fill="#F9A8D4" transform={`rotate(${a} ${84 + Math.cos(r) * 5} ${52 + Math.sin(r) * 5})`} />;
+            return <Ellipse key={a} cx={31 + Math.cos(r) * 7} cy={48 + Math.sin(r) * 7} rx="5" ry="6.6" fill="#F9A8D4" transform={`rotate(${a} ${31 + Math.cos(r) * 7} ${48 + Math.sin(r) * 7})`} />;
           })}
-          <Circle cx="84" cy="52" r="3.2" fill="#FBBF24" />
-          <Line x1="84" y1="56" x2="84" y2="74" stroke="#34A853" strokeWidth="2" />
+          <Circle cx="31" cy="48" r="4.6" fill="#FBBF24" />
+          <Line x1="31" y1="55" x2="31" y2="82" stroke="#34A853" strokeWidth="2.4" />
         </G>
       );
     default: return null;
