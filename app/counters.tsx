@@ -7,7 +7,8 @@ import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
 import WalkProgress from '@/components/counters/WalkProgress';
-import StreakFlame from '@/components/counters/StreakFlame';
+import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
+import { WeekStrip } from '@/components/counters/StreakCard';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -162,6 +163,7 @@ export default function Counters() {
                   </TouchableOpacity>
                 )}
               </View>
+              <View style={{ marginTop: spacing[3] }}><WeekStrip days={n} color={streakColor(n)} /></View>
               <Text style={s.cardMeta}>{auto ? 'liczy się automatycznie z paragonów' : `ostatnio: ${cn.date}`}</Text>
             </View>
           );

@@ -75,6 +75,7 @@ import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame from '@/components/counters/StreakFlame';
+import StreakCard from '@/components/counters/StreakCard';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
 // persisted screen instead of expo-router's blank production fallback.
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
@@ -2956,15 +2957,24 @@ export default function DashboardScreen() {
                     <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
                   </TouchableOpacity>
                 </View>
-                <View style={s.sinceGrid}>
-                  {dashSince.slice(0, 6).map(({ cn, days }) => (
-                    <View key={cn.id} style={s.sinceTile}>
-                      <StreakFlame days={days} size={46} />
-                      <Text style={s.sinceTileUnit}>{days === 1 ? 'dzień' : 'dni'}</Text>
-                      <Text style={s.sinceTileName} numberOfLines={1}>{cn.mode === 'auto' ? `bez ${cn.name}` : cn.name}</Text>
-                    </View>
-                  ))}
-                </View>
+                {/* The longest streak gets the rich card (flame + Mon–Sun strip); the
+                    rest stay in the compact flame grid below it. */}
+                {(() => {
+                  const top = dashSince[0];
+                  const topName = top.cn.mode === 'auto' ? `bez ${top.cn.name}` : top.cn.name;
+                  return <StreakCard name={topName} days={top.days} />;
+                })()}
+                {dashSince.length > 1 && (
+                  <View style={[s.sinceGrid, { marginTop: spacing[3] }]}>
+                    {dashSince.slice(1, 7).map(({ cn, days }) => (
+                      <View key={cn.id} style={s.sinceTile}>
+                        <StreakFlame days={days} size={46} />
+                        <Text style={s.sinceTileUnit}>{days === 1 ? 'dzień' : 'dni'}</Text>
+                        <Text style={s.sinceTileName} numberOfLines={1}>{cn.mode === 'auto' ? `bez ${cn.name}` : cn.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             );
 
