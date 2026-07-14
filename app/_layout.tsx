@@ -28,6 +28,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { useUiActions } from '@/store/uiActions';
 import { todayISO } from '@/utils/date';
 import { persistCrash } from '@/utils/crashLog';
+import { takeDanglingScanSave } from '@/utils/scanBreadcrumb';
 import * as FileSystem from 'expo-file-system/legacy';
 
 // Catch JS errors that escape React's render tree (async, event handlers, native
@@ -215,6 +216,25 @@ export default function RootLayout() {
       } catch {}
     })();
   }, []);
+
+  // A receipt save that started but never finished = the screen froze (an ANR, not a
+  // JS crash — which is why nothing shows in the crash log). Surface it so the freeze
+  // is finally reportable instead of invisible.
+  useEffect(() => {
+    (async () => {
+      try {
+        const d = await takeDanglingScanSave();
+        if (!d) return;
+        const age = Date.now() - Number(d.at ?? 0);
+        if (!(age >= 0 && age < 30 * 60 * 1000)) return;
+        setTimeout(() => Alert.alert(
+          'Zapis paragonu się zaciął (wyślij mi to)',
+          `Ekran zamarł podczas zapisu paragonu (${d.meta ?? '?'}, ostatni krok: ${d.step ?? 'start'}). To zawieszenie, nie błąd — dlatego crash jest pusty.`,
+        ), 1800);
+      } catch {}
+    })();
+  }, []);
+
   useEffect(() => { notificationsService.ensureAndroidChannel().catch(() => {}); }, []);
 
   useEffect(() => {

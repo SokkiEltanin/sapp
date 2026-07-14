@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingV
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/utils/nav';
+import { beginScanSave, markScanStep, clearScanSave } from '@/utils/scanBreadcrumb';
 import { X, Check, Tag, PenLine, Plus, Trash2 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -327,6 +328,9 @@ export default function ScanReceiptModal() {
     const validCustom = customProducts.filter(p => p.name.trim());
     if (!receipt || (selected.size === 0 && validCustom.length === 0)) return;
     setSaving(true);
+    // Drop a breadcrumb: if the screen freezes here (no JS error is thrown), a
+    // force-close leaves this marker and the next launch reports the frozen step.
+    beginScanSave(attachToId ? 'attach' : 'new');
     try {
       let dateParsed = new Date().toISOString();
       if (dateInput) {
@@ -381,6 +385,7 @@ export default function ScanReceiptModal() {
         };
       });
 
+      markScanStep('built');
       const receiptItems = [...parsedItems, ...customItems];
       const total = receiptItems.reduce((s, it) => s + it.price, 0);
 
@@ -510,8 +515,14 @@ export default function ScanReceiptModal() {
         if (taggedCustom.length > 0) saveCustomTagsToMemory(taggedCustom).catch(() => {});
       }
       haptic.success();
-      goBackOrHome();   // deep-linked scan has no back stack → don't leave a black screen
+      markScanStep('nav');
+      clearScanSave();   // save finished cleanly → no dangling freeze marker
+      // Yield a frame before navigating: mutating the expenses store above re-renders
+      // every still-mounted subscriber (incl. the heavy dashboard) — letting that
+      // settle before the transition avoids navigating mid-commit.
+      requestAnimationFrame(() => goBackOrHome());
     } catch (e: any) {
+      clearScanSave();
       setSaving(false);
       Alert.alert('Błąd', e?.message ?? 'Nie udało się zapisać paragonu');
     }
