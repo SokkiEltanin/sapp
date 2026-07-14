@@ -107,6 +107,7 @@ export default function HealthScreen() {
   const [water, setWater]               = useState(0);            // glasses today, sourced from the "Woda" habit
   const [waterHabitId, setWaterHabitId] = useState<string | null>(null);
   const waterRef                        = useRef(0);                 // authoritative today count (rapid +/- accumulate)
+  const waterPersistTimer               = useRef<ReturnType<typeof setTimeout> | null>(null); // debounce storage writes
   const [glassMl, setGlassMl]           = useState(DEFAULT_GLASS_ML);
   const glassMlRef                      = useRef(DEFAULT_GLASS_ML);   // for HC callbacks (avoids stale closures)
   const [waterCfgOpen, setWaterCfgOpen] = useState(false);
@@ -433,22 +434,32 @@ export default function HealthScreen() {
     return habit.id;
   };
 
-  // delta-based so rapid +/- taps accumulate off the authoritative ref instead of a
-  // stale React value (which made double-taps register only once).
-  const bumpWater = async (delta: number) => {
+  // Persist the current water count to storage (+ notify Habits/pet). Debounced by
+  // bumpWater so a burst of taps is ONE async write instead of one per tap — the
+  // per-tap AsyncStorage churn (plus the loadWater reload it triggered) was the lag.
+  const persistWater = async () => {
     const id = waterHabitId ?? await ensureWaterHabit();
     if (!id) return;
-    const next = Math.max(0, waterRef.current + delta);
-    if (next === waterRef.current) return;
-    waterRef.current = next;
-    setWater(next);
-    if (next === waterGoal && delta > 0) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
-    else haptic.tap();
     const date = todayDate();
     const counts = await getCounts(date);
     counts[id] = waterRef.current;   // write the latest authoritative value
     await setCounts(date, counts);
     bumpHabits();   // notify the Habits screen + pet
+  };
+
+  // delta-based so rapid +/- taps accumulate off the authoritative ref instead of a
+  // stale React value (which made double-taps register only once). The visual bump and
+  // haptic fire SYNCHRONOUSLY (no await before them) so the tap feels instant; the
+  // storage write is debounced ~350 ms.
+  const bumpWater = (delta: number) => {
+    const next = Math.max(0, waterRef.current + delta);
+    if (next === waterRef.current) return;
+    waterRef.current = next;
+    setWater(next);
+    if (next === waterGoal && delta > 0) { haptic.success(); toast.success('Cel nawodnienia osiągnięty!'); }
+    else haptic.medium();   // Light impact is barely felt on Android — Medium is a clear tap
+    if (waterPersistTimer.current) clearTimeout(waterPersistTimer.current);
+    waterPersistTimer.current = setTimeout(() => { persistWater().catch(() => {}); }, 350);
   };
 
   const saveWaterCfg = async () => {
@@ -618,7 +629,7 @@ export default function HealthScreen() {
             </PressableScale>
           </View>
           <Text style={[styles.waterSub, { textAlign: 'center', marginTop: spacing[3] }]}>
-            {water}/{waterGoal} szklanek{water > 0 ? ` · ${(water * glassMl / 1000).toFixed(1).replace('.', ',')} l` : ''} · dzielone z nawykiem „Woda"
+            {water}/{waterGoal} szklanek{water > 0 ? ` · ${(Math.round(water * glassMl / 10) / 100).toString().replace('.', ',')} l` : ''} · dzielone z nawykiem „Woda"
           </Text>
         </GlassCard>
 

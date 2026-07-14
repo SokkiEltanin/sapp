@@ -24,7 +24,9 @@ export default function WaterGauge({
     ` C ${x0 + w * 0.75} ${surfaceY + off - amp}, ${x0 + w * 0.75} ${surfaceY + off + amp}, ${x0 + w} ${surfaceY + off}` +
     ` L ${x0 + w} ${cy + innerR} L ${x0} ${cy + innerR} Z`;
 
-  const liters = (ml / 1000).toFixed(ml % 1000 === 0 ? 0 : 1).replace('.', ',');
+  // Up to 2 decimals, trailing zeros trimmed — a single 250 ml glass reads "0,25 L",
+  // not "0,3" (toFixed(1) rounds 0.25 → "0.3" per spec, which looked like a bug).
+  const liters = (Math.round((ml / 1000) * 100) / 100).toString().replace('.', ',');
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>

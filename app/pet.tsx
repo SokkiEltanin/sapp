@@ -257,7 +257,6 @@ export default function Pet() {
             <PressableScale onPress={() => { haptic.tap(); setAddonsOpen(v => !v); }}>
               <View style={s.collapseHead}>
                 <Text style={s.collapseTitle}>🛋 Pokój — dodatki</Text>
-                <View style={s.coinPillAdd}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.coinPillTxt}>{coins}</Text></View>
                 <Text style={s.collapseChev}>{addonsOpen ? '▲' : '▼'}</Text>
               </View>
             </PressableScale>
