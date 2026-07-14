@@ -832,18 +832,33 @@ export default function DashboardScreen() {
   const [cardPeak, setCardPeak] = useState(0);
   useEffect(() => { updateCardBalancePeak(expenses).then(setCardPeak).catch(() => {}); }, [expenses]);
 
-  // Countdowns (event "walk" tiles) — nearest upcoming first.
+  // A day-key that changes when the calendar day rolls over (checked every minute and
+  // on every foreground). The dashboard stays mounted, so the countdown memos below —
+  // whose freshness depends on "now" — would otherwise keep a stale day and let a passed
+  // event linger. Feeding dayKey into their deps makes them re-filter the moment the day
+  // turns. setDayKey only fires a real re-render when the string actually changes.
+  const [dayKey, setDayKey] = useState(todayStr());
+  useEffect(() => {
+    const tick = () => setDayKey(todayStr());
+    const id = setInterval(tick, 60_000);
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') tick(); });
+    return () => { clearInterval(id); sub.remove(); };
+  }, []);
+
+  // Countdowns (event "walk" tiles) — nearest upcoming first. Events disappear once
+  // they're over: a no-end event the day after its date, an end-dated event the day
+  // after its endDate (isOver), while staying visible during a multi-day event.
   const counters = useCounters(st => st.counters);
   const activeCountdowns = useMemo(
     () => counters.filter(cn => cn.kind === 'until' && !isOver(cn) && (daysUntil(cn) >= 0 || isDuringEvent(cn))).sort((a, b) => a.date.localeCompare(b.date)),
-    [counters],
+    [counters, dayKey],
   );
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
   const dashSince = useMemo(
     () => counters.filter(cn => cn.kind === 'since' && cn.onDashboard !== false)
       .map(cn => ({ cn, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses) : daysSince(cn) }))
       .sort((a, b) => b.days - a.days),
-    [counters, expenses],
+    [counters, expenses, dayKey],
   );
 
   // ── Animations ────────────────────────────────────────────────────────────

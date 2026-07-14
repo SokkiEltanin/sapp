@@ -41,6 +41,8 @@ export default function Pet() {
   const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
+  const [addonsOpen, setAddonsOpen] = useState(false);   // room-addons picker collapsed by default
+  const [trophiesOpen, setTrophiesOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
@@ -249,49 +251,39 @@ export default function Pet() {
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
 
-        {/* ── Gablota trofeów: loot z pokonanych bossów ── */}
-        {trophies.length > 0 && (
-          <View style={s.addonCard}>
-            <Text style={s.section}>🏆 Trofea z bossów ({trophies.length})</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
-              {trophies.map((t, i) => (
-                <View key={i} style={s.trophyItem}>
-                  <View style={s.trophyPedestal}><Text style={{ fontSize: 26 }}>{t.emoji}</Text></View>
-                  <Text style={s.trophyLoot} numberOfLines={1}>{t.loot}</Text>
-                  <Text style={s.trophyBoss} numberOfLines={1}>{t.boss}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <Text style={s.addonHint}>Loot daje pasywne bonusy w walkach. Pokonuj bossów w zakładce ⚔.</Text>
-          </View>
-        )}
-
-        {/* ── Room upgrades: buy extra scene elements, tap to toggle ── */}
+        {/* ── Room upgrades: a compact button that expands the picker ── */}
         {roomAddonList.length > 0 && (
-          <View style={s.addonCard}>
-            <View style={s.addonHead}>
-              <Text style={s.section}>Pokój — dodatki</Text>
-              <View style={s.coinPillAdd}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.coinPillTxt}>{coins}</Text></View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-              {roomAddonList.map(a => {
-                const owned = ownedItems.includes(a.id);
-                const active = activeAddons.includes(a.id);
-                const tier = TIER_META[a.tier];
-                return (
-                  <PressableScale key={a.id} onPress={() => onAddonTap(a)}>
-                    <View style={[s.addonChip, active && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
-                      <Text style={{ fontSize: 22 }}>{a.emoji}</Text>
-                      <Text style={s.addonName} numberOfLines={1}>{a.name}</Text>
-                      {owned
-                        ? <Text style={[s.addonState, { color: active ? tier.color : c.text.muted }]}>{active ? '● włączone' : '○ wyłączone'}</Text>
-                        : <View style={s.addonCost}><CoinsIcon size={9} color="#FBBF24" /><Text style={s.addonCostTxt}>{a.cost}</Text></View>}
-                    </View>
-                  </PressableScale>
-                );
-              })}
-            </ScrollView>
-            <Text style={s.addonHint}>Kup dodatek za monety, potem stuknij, aby włączyć/wyłączyć go w scenie.</Text>
+          <View style={s.collapseCard}>
+            <PressableScale onPress={() => { haptic.tap(); setAddonsOpen(v => !v); }}>
+              <View style={s.collapseHead}>
+                <Text style={s.collapseTitle}>🛋 Pokój — dodatki</Text>
+                <View style={s.coinPillAdd}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.coinPillTxt}>{coins}</Text></View>
+                <Text style={s.collapseChev}>{addonsOpen ? '▲' : '▼'}</Text>
+              </View>
+            </PressableScale>
+            {addonsOpen && (
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2, marginTop: spacing[2] }}>
+                  {roomAddonList.map(a => {
+                    const owned = ownedItems.includes(a.id);
+                    const active = activeAddons.includes(a.id);
+                    const tier = TIER_META[a.tier];
+                    return (
+                      <PressableScale key={a.id} onPress={() => onAddonTap(a)}>
+                        <View style={[s.addonChip, active && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
+                          <Text style={{ fontSize: 22 }}>{a.emoji}</Text>
+                          <Text style={s.addonName} numberOfLines={1}>{a.name}</Text>
+                          {owned
+                            ? <Text style={[s.addonState, { color: active ? tier.color : c.text.muted }]}>{active ? '● włączone' : '○ wyłączone'}</Text>
+                            : <View style={s.addonCost}><CoinsIcon size={9} color="#FBBF24" /><Text style={s.addonCostTxt}>{a.cost}</Text></View>}
+                        </View>
+                      </PressableScale>
+                    );
+                  })}
+                </ScrollView>
+                <Text style={s.addonHint}>Kup dodatek za monety, potem stuknij, aby włączyć/wyłączyć go w scenie.</Text>
+              </>
+            )}
           </View>
         )}
 
@@ -461,6 +453,32 @@ export default function Pet() {
             Monety zbierasz questami — za dbanie o SIEBIE. Wydaj je w sklepie 🛍️ na stroje i pokój dla {name}a, a energią z nawyków walcz z bossami ⚔️.
           </Text>
         </View>
+
+        {/* ── Gablota trofeów (na dole, zwijana): loot z pokonanych bossów ── */}
+        {trophies.length > 0 && (
+          <View style={s.collapseCard}>
+            <PressableScale onPress={() => { haptic.tap(); setTrophiesOpen(v => !v); }}>
+              <View style={s.collapseHead}>
+                <Text style={s.collapseTitle}>🏆 Gablota trofeów ({trophies.length})</Text>
+                <Text style={s.collapseChev}>{trophiesOpen ? '▲' : '▼'}</Text>
+              </View>
+            </PressableScale>
+            {trophiesOpen && (
+              <>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2, marginTop: spacing[2] }}>
+                  {trophies.map((t, i) => (
+                    <View key={i} style={s.trophyItem}>
+                      <View style={s.trophyPedestal}><Text style={{ fontSize: 26 }}>{t.emoji}</Text></View>
+                      <Text style={s.trophyLoot} numberOfLines={1}>{t.loot}</Text>
+                      <Text style={s.trophyBoss} numberOfLines={1}>{t.boss}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+                <Text style={s.addonHint}>Loot daje pasywne bonusy w walkach. Pokonuj bossów w zakładce ⚔.</Text>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <CrateModal visible={crateOpen} onClose={() => setCrateOpen(false)} onOpened={() => setCelebrate(c => c + 1)} />
@@ -518,6 +536,12 @@ const makeS = (c: any) => StyleSheet.create({
   addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
   addonHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6 },
+
+  // Collapsible cards (room add-ons + trophies)
+  collapseCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[3] },
+  collapseHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  collapseTitle: { flex: 1, fontSize: 12, fontWeight: '800', color: c.text.secondary, letterSpacing: 0.4, textTransform: 'uppercase' },
+  collapseChev: { fontSize: 11, color: c.text.muted, fontWeight: '700' },
 
   // Trophy cabinet
   trophyItem: { width: 84, alignItems: 'center', gap: 3 },
