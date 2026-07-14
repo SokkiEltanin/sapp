@@ -3730,11 +3730,15 @@ export default function DashboardScreen() {
               // it can't be reordered/buried — it just stays until you confirm it.
               return (
                 <>
+                  {/* Bank payments needing confirmation are PINNED to the very top so a
+                      flagged/uncertain auto-payment is the first thing you see. */}
+                  {!hiddenSet.has('bank-queue') && nodes['bank-queue']}
                   {!hiddenSet.has('payday-prompt') && nodes['payday-prompt']}
                   {!hiddenSet.has('bill-suggest') && nodes['bill-suggest']}
                   {orderedSections.map(id => {
                     if (id === 'payday-prompt') return null; // rendered pinned above
                     if (id === 'bill-suggest') return null;  // rendered pinned above
+                    if (id === 'bank-queue') return null;    // rendered pinned above
                     if (hiddenSet.has(id)) return null;
                     const node = nodes[id];
                     if (node === undefined) return null;

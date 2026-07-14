@@ -1,6 +1,6 @@
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
-import { findMatchingExpense, findMatchingIncome } from '@/utils/bankNotification';
+import { findMatchingExpense, findMatchingIncome, sameLocalDay } from '@/utils/bankNotification';
 import { recordMerchantAccept, MerchantInfo } from '@/utils/merchantMemory';
 import { PendingBankTx } from '@/store/bankQueueStore';
 import { useWorkStore } from '@/store/workStore';
@@ -76,6 +76,29 @@ export async function commitBankTx(
     } catch {
       return { ok: false, matched: !!dup };
     }
+  }
+
+  // Dedup: a re-delivered / re-drained PeoPay notification must NOT book the same
+  // payment twice. If an expense with this exact amount + same day + same merchant is
+  // already there — INCLUDING one we booked from the bank before (findMatchingExpense
+  // skips bankMatched, so it can't catch a re-drain) — skip it.
+  const pTime = new Date(p.dateISO).getTime();
+  const storeMatches = (e: { storeName?: string; note?: string }) => {
+    const hay = `${e.storeName ?? ''} ${e.note ?? ''}`.toLowerCase();
+    return !p.storeKey || hay.includes(p.storeKey) || p.storeKey.includes((e.storeName ?? '').toLowerCase().split(/\s+/)[0] ?? '');
+  };
+  const already = st.expenses.find(e =>
+    (e.type === 'expense' || !e.type) &&
+    Math.abs(e.amount - p.amount) <= 0.011 &&
+    !!e.date && sameLocalDay(new Date(e.date).getTime(), pTime) &&
+    storeMatches(e),
+  );
+  if (already) {
+    if (!already.bankMatched) {
+      st.updateExpense(already.id, { bankMatched: true });
+      expensesService.update(already.id, { bankMatched: true }).catch(() => {});
+    }
+    return { ok: true, matched: true };
   }
 
   const match = findMatchingExpense(p, st.expenses);

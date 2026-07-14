@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/utils/nav';
@@ -98,6 +98,7 @@ export default function ScanReceiptModal() {
   const addPending = useExpensesStore(s => s.addPending);
   const deleteExpense = useExpensesStore(s => s.deleteExpense);
   const updateExpense = useExpensesStore(s => s.updateExpense);
+  const setExpenses = useExpensesStore(s => s.setExpenses);
   const confirmSync = useExpensesStore(s => s.confirmSync);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
@@ -318,6 +319,11 @@ export default function ScanReceiptModal() {
   // ── Save ──────────────────────────────────────────────────────────────────────
 
   const saveSelected = async () => {
+    // Dismiss the keyboard FIRST — navigating away (goBackOrHome) with a focused
+    // TextInput + open keyboard inside a KeyboardAvoidingView can hard-crash to a black
+    // screen on Android, which fits "black screen when I add a manual product" (its name
+    // field autofocuses). Also lets the layout settle before the save re-render.
+    Keyboard.dismiss();
     const validCustom = customProducts.filter(p => p.name.trim());
     if (!receipt || (selected.size === 0 && validCustom.length === 0)) return;
     setSaving(true);
@@ -388,14 +394,12 @@ export default function ScanReceiptModal() {
 
       const roundedTotal = Math.round(total * 100) / 100;
 
-      // Directed attach: the scanner was opened from a specific bare payment (e.g. one
-      // logged from a bank notification). Enrich THAT expense IN PLACE — keep its id so
-      // returning to it shows the products, keep bankMatched, and never make a duplicate.
-      const attachExisting = attachToId
-        ? useExpensesStore.getState().expenses.find(e => e.id === attachToId)
-        : undefined;
-
-      if (attachExisting) {
+      // Directed attach: the scanner was opened from a specific payment ("Doskanuj
+      // paragon"). ALWAYS enrich THAT expense in place — NEVER create a duplicate, even
+      // if the target isn't in the in-memory store yet (persist via the service +
+      // reload). This was the "paragon dodał się jako osobna transakcja" bug: a store
+      // miss fell through to the create-new branch.
+      if (attachToId) {
         const updates: Partial<Expense> = {
           amount: roundedTotal,
           category: dominantCat,
@@ -407,8 +411,11 @@ export default function ScanReceiptModal() {
           ...(payer ? { payer } : {}),
           updatedAt: new Date().toISOString(),
         };
-        updateExpense(attachExisting.id, updates);
-        expensesService.update(attachExisting.id, updates).catch(() => {}); // retried on next foreground
+        const inStore = useExpensesStore.getState().expenses.some(e => e.id === attachToId);
+        if (inStore) updateExpense(attachToId, updates);
+        expensesService.update(attachToId, updates)
+          .then(() => { if (!inStore) expensesService.getAll().then(setExpenses).catch(() => {}); })
+          .catch(() => {});
         toast.success('Dodano paragon do płatności');
       } else {
         // Reverse-merge: a bank notification for this purchase may already have created

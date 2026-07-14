@@ -42,6 +42,18 @@ import * as FileSystem from 'expo-file-system/legacy';
     persistCrash(error, isFatal ? 'FATAL' : '');
     prev?.(error, isFatal);
   });
+  // Unhandled PROMISE REJECTIONS escape both the render ErrorBoundary AND the global
+  // handler above — and an uncaught rejection in a save/async path is exactly what
+  // leaves a black screen with "brak zapisanego crasha". Track them so the cause
+  // finally lands in Diagnostyka → ostatni błąd.
+  try {
+    const tracking = require('promise/setimmediate/rejection-tracking');
+    tracking.enable({
+      allRejections: true,
+      onUnhandled: (_id: any, error: any) => { persistCrash(error, 'UNHANDLED_REJECTION'); },
+      onHandled: () => {},
+    });
+  } catch {}
 })();
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

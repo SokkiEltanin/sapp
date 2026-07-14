@@ -34,14 +34,12 @@ export async function ingestBankNotification(title: string, text: string): Promi
   const mem = await loadMerchantMemory();
   const learned = merchantFor(tx.storeKey, mem);
   const category = learned?.category ?? guessCategory(tx.store);
-  // Verify better, but never critically drop: auto-book the usual card payment, yet if
-  // something looks off — an unusually large amount (a common sign of a mis-parsed
-  // figure, e.g. 10,18 read as 1018) or no merchant name parsed — hold it for a
-  // top-of-dashboard confirmation instead of committing blindly.
-  const bigAmount = tx.amount > 1500;
-  const noStore = !(tx.store ?? '').trim();
-  const uncertain = bigAmount || noStore;
-  const flagReason = bigAmount ? 'nietypowo wysoka kwota — potwierdź' : noStore ? 'nie rozpoznano sklepu — potwierdź' : undefined;
+  // Verify better, but never critically drop: auto-book the usual card payment. Only
+  // genuinely WEIRD ones ask — an unusually large amount (a common sign of a mis-parsed
+  // figure, e.g. 10,18 read as 1018). A missing merchant name is NOT weird enough to
+  // block (it just books as "Płatność"), so it no longer forces a confirmation.
+  const uncertain = tx.amount > 1500;
+  const flagReason = uncertain ? 'nietypowo wysoka kwota — potwierdź' : undefined;
   return store.enqueue({
     ...tx,
     store: learned?.name ?? tx.store,
