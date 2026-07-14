@@ -20,6 +20,7 @@ import {
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronUp, ChevronDown, Eye, EyeOff, Trash2, GripVertical, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock, Layers,
+  PiggyBank, Utensils, Coins, Apple, ListChecks,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -124,6 +125,25 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
 };
 const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
 const WEEKS_BACK  = 8;
+
+// Per-metric icon for custom stat tiles, so each widget's preview is glanceable at a
+// distance instead of every card wearing the same generic bar-chart glyph. Falls back
+// to a per-group icon, then a bar chart.
+const STAT_METRIC_ICON: Record<string, React.ComponentType<any>> = {
+  spend: CreditCard, food: Utensils, sweets: Candy, income: Wallet, net: Scale,
+  savings: PiggyBank, avgExpense: CreditCard, expenseCount: CreditCard, biggestExpense: CreditCard,
+  byCategory: BarChart2, cheeseKg: Package, meatKg: Package, fruitKg: Apple, vegKg: Apple,
+  topProducts: Package, favSweets: Candy, itemsCount: ShoppingCart, tagSpend: Store,
+  tagCount: Package, tagKg: Scale, moodAvg: Smile, energyAvg: Zap, moodStreak: Flame,
+  steps: Footprints, sleepAvg: Moon, weight: Scale, workHours: Briefcase, earnings: Coins,
+  lastShift: Briefcase, tasksDone: ListChecks,
+};
+const STAT_GROUP_ICON: Record<string, React.ComponentType<any>> = {
+  'Finanse': Wallet, 'Konsumpcja': ShoppingCart, 'Nastrój i zdrowie': Heart, 'Praca i zadania': Briefcase,
+};
+function metricIcon(def: { id: string; group: string }): React.ComponentType<any> {
+  return STAT_METRIC_ICON[def.id] ?? STAT_GROUP_ICON[def.group] ?? BarChart2;
+}
 
 const MOOD_EMOJIS: Record<MoodLevel, string> = {
   1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩',
@@ -1362,9 +1382,10 @@ export default function DashboardScreen() {
     if (!def) return <View style={[s.card, { backgroundColor: cardBgDark }]}><Text style={s.cardTitle}>Widget — błąd</Text></View>;
     const period = (t.period ?? 'month') as 'week' | 'month';
     const viz = t.viz ?? 'number';
+    const Ic = metricIcon(def);
     const header = (
       <View style={s.cardHeader}>
-        <BarChart2 size={13} color={accentColor} />
+        <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
         <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
       </View>
     );
@@ -1422,7 +1443,7 @@ export default function DashboardScreen() {
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           <View style={s.waveHeadRow}>
             <View style={[s.cardHeader, { flex: 1, marginBottom: 0 }]}>
-              <BarChart2 size={13} color={accentColor} />
+              <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
               <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
             </View>
             <View style={s.waveNowWrap}>
@@ -1465,7 +1486,7 @@ export default function DashboardScreen() {
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           <View style={s.waveHeadRow}>
             <View style={[s.cardHeader, { flex: 1, marginBottom: 0 }]}>
-              <BarChart2 size={13} color={accentColor} />
+              <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
               <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
             </View>
             <View style={s.waveNowWrap}>
@@ -4514,6 +4535,7 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   cardTitle: { fontSize: 12, fontWeight: '800', color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 1 },
+  statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
   pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
