@@ -22,6 +22,7 @@ import { toast } from '@/store/toastStore';
 import { Expense, ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 interface Item {
@@ -680,7 +681,7 @@ export default function ManualReceiptScreen() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.secondary },
 
   header: {
@@ -892,4 +893,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing[1] },
   totalLabel: { ...typography.label, color: c.text.secondary },
   totalAmount: { fontSize: 20, fontWeight: '800', color: c.text.primary },
-});
+}));

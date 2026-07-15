@@ -4290,7 +4290,21 @@ export default function DashboardScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (c: any) => StyleSheet.create({
+// This sheet has ~319 styles, and EVERY caller used to build the whole thing: the
+// dashboard once, plus each DashEditRow separately. Opening the editor with ~20 visible
+// sections meant ~20 × StyleSheet.create(319) — 6000+ style objects on the JS thread in
+// one render, which is where the ~30s freeze came from.
+//
+// useColors() returns a stable module object (darkColors / lightColors), so the sheet can
+// simply be cached per palette: built once per theme, a Map lookup after that.
+const _styleCache = new Map<any, ReturnType<typeof buildStyles>>();
+const makeStyles = (c: any): ReturnType<typeof buildStyles> => {
+  let s = _styleCache.get(c);
+  if (!s) { s = buildStyles(c); _styleCache.set(c, s); }
+  return s;
+};
+
+const buildStyles = (c: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
   safe: { flex: 1 },
 

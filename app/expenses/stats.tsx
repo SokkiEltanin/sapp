@@ -17,6 +17,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { detectFixedCosts } from '@/utils/fixedCosts';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const MONTHS_BACK = 6;
@@ -869,7 +870,7 @@ export default function StatsScreen() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1052,4 +1053,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   empty:     { alignItems: 'center', paddingVertical: spacing[12], gap: spacing[2] },
   emptyTitle:{ ...typography.h3, color: c.text.secondary },
   emptySub:  { ...typography.body, color: c.text.muted, textAlign: 'center' },
-});
+}));

@@ -26,6 +26,7 @@ import {
 import { Expense, ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { getPayers, addPayer } from '@/utils/payers';
@@ -1328,7 +1329,7 @@ function CustomProductRow({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.secondary },
 
   header: {
@@ -1641,4 +1642,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   tagPickerItemActive: { borderColor: c.accent.blue, backgroundColor: c.accent.blue + '18' },
   tagPickerItemText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
   tagPickerItemTextActive: { color: c.accent.blue },
-});
+}));

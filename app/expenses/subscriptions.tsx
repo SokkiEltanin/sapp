@@ -20,6 +20,7 @@ import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -582,7 +583,7 @@ function SubItem({ sub, onEdit, onDelete, onToggle }: {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -721,4 +722,4 @@ const makeS = (c: any) => StyleSheet.create({
     backgroundColor: c.bg.elevated,
   },
   catItemText: { fontSize: 11, fontWeight: '600', color: c.text.muted },
-});
+}));

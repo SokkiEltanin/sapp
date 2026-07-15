@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { MoodLevel, MOOD_LABELS, MOOD_COLORS, ENERGY_LABELS, ENERGY_COLORS } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const MOOD_EMOJIS: Record<MoodLevel, string> = {
@@ -111,7 +112,7 @@ export default function MoodPicker({ value, onChange, label = 'Jak się czujesz?
   );
 }
 
-const makeStyles = (c: typeof colors) => StyleSheet.create({
+const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   container: { gap: spacing[2] },
   sectionLabel: {
     ...typography.label, color: c.text.muted,
@@ -132,4 +133,4 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
   emoji: { fontSize: 24 },
   selDot: { width: 5, height: 5, borderRadius: 3 },
   selectedLabel: { ...typography.label, fontWeight: '600', textAlign: 'center', fontSize: 13 },
-});
+}));
