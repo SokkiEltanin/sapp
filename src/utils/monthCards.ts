@@ -2,6 +2,8 @@ import { Expense, MoodEntry } from '@/types';
 import { consumesInScope, StatsScope } from '@/store/statsScope';
 import { canonicalProductName } from '@/utils/productMemory';
 import { PayMonthRow } from '@/utils/workSummary';
+import { isFixedExpense } from '@/utils/fixedVariable';
+import { isSelfTransfer } from '@/utils/statWidgets';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // "Wrapped"-style COLLECTIBLE month cards. Each completed month becomes one card
@@ -18,25 +20,27 @@ const MONTH_NAMES = [
 ];
 
 // RARITY TIERS — the card's colour communicates how special the month is, like a
-// graded collectible: copper (common) → silver → gold → diamond → sapphire
-// (legendary). [top, mid, bottom] gradient + accent + medal emoji + label.
-export type MonthTier = 'miedziana' | 'srebrna' | 'zlota' | 'diamentowa' | 'szafirowa';
+// graded collectible. Colour-graded (not metals): graphite (common) → emerald →
+// azure → indigo → amethyst (legendary), drawn from the app's own palette so the
+// cards sit in the dark theme instead of the old glaring copper/gold foil.
+// [top, mid, bottom] gradient + accent + sticker + label.
+export type MonthTier = 'grafitowa' | 'szmaragdowa' | 'lazurowa' | 'indygowa' | 'ametystowa';
 
 const TIER_THEME: Record<MonthTier, { rank: number; palette: [string, string, string]; accent: string; emoji: string; label: string }> = {
-  miedziana:  { rank: 0, palette: ['#8A4B24', '#C87A3C', '#2E1A0D'], accent: '#F0B27A', emoji: '🥉', label: 'MIEDZIANA' },
-  srebrna:    { rank: 1, palette: ['#5B6472', '#AEB7C4', '#23282F'], accent: '#EAF0F7', emoji: '🥈', label: 'SREBRNA' },
-  zlota:      { rank: 2, palette: ['#9A6B08', '#F2B90C', '#2E2205'], accent: '#FDE047', emoji: '🥇', label: 'ZŁOTA' },
-  diamentowa: { rank: 3, palette: ['#2C6E7C', '#68D8E6', '#0B2A31'], accent: '#CFFAFE', emoji: '💎', label: 'DIAMENTOWA' },
-  szafirowa:  { rank: 4, palette: ['#1E3A8A', '#3B6FE0', '#0C1636'], accent: '#93C5FD', emoji: '🔷', label: 'LEGENDARNA · SZAFIR' },
+  grafitowa:   { rank: 0, palette: ['#39424A', '#5A6873', '#161A1D'], accent: '#B6C2CC', emoji: '🪨', label: 'GRAFITOWA' },
+  szmaragdowa: { rank: 1, palette: ['#14614C', '#2AC68F', '#0A241C'], accent: '#7CF3C8', emoji: '🟩', label: 'SZMARAGDOWA' },
+  lazurowa:    { rank: 2, palette: ['#155A7E', '#46B0DE', '#0A2430'], accent: '#A5DEF5', emoji: '🟦', label: 'LAZUROWA' },
+  indygowa:    { rank: 3, palette: ['#31408A', '#5B7BE3', '#141A33'], accent: '#B4C4FF', emoji: '🟪', label: 'INDYGOWA' },
+  ametystowa:  { rank: 4, palette: ['#5B2E86', '#A855F7', '#1B1030'], accent: '#E4CCFF', emoji: '💠', label: 'LEGENDARNA · AMETYST' },
 };
 
 // notable = how many "records" the month holds → its tier on the ladder.
 function tierFor(notable: number): MonthTier {
-  if (notable >= 4) return 'szafirowa';
-  if (notable === 3) return 'diamentowa';
-  if (notable === 2) return 'zlota';
-  if (notable === 1) return 'srebrna';
-  return 'miedziana';
+  if (notable >= 4) return 'ametystowa';
+  if (notable === 3) return 'indygowa';
+  if (notable === 2) return 'lazurowa';
+  if (notable === 1) return 'szmaragdowa';
+  return 'grafitowa';
 }
 
 const SWEET_EMOJI: [RegExp, string][] = [
@@ -94,9 +98,9 @@ export interface MonthCard {
 
   // presentation
   tier: MonthTier;        // rarity tier (drives the colour)
-  tierRank: number;       // 0 (miedziana) … 4 (szafirowa)
-  tierLabel: string;      // "ZŁOTA" etc.
-  tierEmoji: string;      // 🥉🥈🥇💎🔷
+  tierRank: number;       // 0 (grafitowa) … 4 (ametystowa)
+  tierLabel: string;      // "LAZUROWA" etc.
+  tierEmoji: string;      // 🪨🟩🟦🟪💠
   palette: [string, string, string];
   accent: string;
   stickers: string[];     // decorative emoji
@@ -124,6 +128,53 @@ function prevKey(month: string): string {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(y, m - 2, 1);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+// ─── Month-to-date pace ─────────────────────────────────────────────────────
+// "How am I doing this month vs last month AT THE SAME POINT?" — on the 15th this
+// compares days 1–15 of this month against days 1–15 of last month, so a half-finished
+// month isn't measured against a whole one (which always looked like a collapse).
+export interface PaceRow {
+  key: string; label: string; now: number; prev: number;
+  pct: number | null;          // null when there's no previous baseline to compare to
+  unit: string;
+  lowerIsBetter?: boolean;     // spending down = good; steps down = bad
+}
+export interface MonthPace { day: number; prevLabel: string; rows: PaceRow[] }
+
+export function buildMonthPace(ctx: MonthCardCtx): MonthPace | null {
+  const day = new Date().getDate();
+  const cur = currentMonthKey();
+  const prev = prevKey(cur);
+  const inRange = (iso: string, ym: string) =>
+    iso.startsWith(ym) && Number(iso.slice(8, 10)) <= day;
+
+  const steps = (ym: string) => Object.entries(ctx.healthDays)
+    .filter(([d]) => inRange(d, ym))
+    .reduce((s, [, v]) => s + (v.steps ?? 0), 0);
+
+  const spend = (ym: string, pick: (e: Expense) => boolean) => ctx.expenses
+    .filter(e => (e.type === 'expense' || !e.type) && !isSelfTransfer(e)
+      && inRange((e.date ?? '').slice(0, 10), ym) && pick(e))
+    .reduce((s, e) => s + e.amount, 0);
+
+  const variable = (ym: string) => spend(ym, e => !isFixedExpense(e) && e.category !== 'groceries');
+  const food = (ym: string) => spend(ym, e => !isFixedExpense(e) && e.category === 'groceries');
+
+  const mk = (key: string, label: string, n: number, p: number, unit: string, lowerIsBetter?: boolean): PaceRow => ({
+    key, label, now: Math.round(n), prev: Math.round(p),
+    pct: p > 0 ? Math.round(((n - p) / p) * 100) : null, unit, lowerIsBetter,
+  });
+
+  const rows = [
+    mk('steps', 'Kroki', steps(cur), steps(prev), ''),
+    mk('variable', 'Wydatki zmienne', variable(cur), variable(prev), 'zł', true),
+    mk('food', 'Jedzenie', food(cur), food(prev), 'zł', true),
+  ].filter(r => r.now > 0 || r.prev > 0);
+  if (!rows.length) return null;
+
+  const pm = Number(prev.split('-')[1]);
+  return { day, prevLabel: MONTH_NAMES[pm - 1], rows };
 }
 
 // Build the full collection, newest month first.

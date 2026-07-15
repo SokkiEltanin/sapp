@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Footprints, TrendingUp, TrendingDown, Trophy, Coins, Smile, Sparkles, ChevronRight } from 'lucide-react-native';
-import { MonthCard } from '@/utils/monthCards';
+import { MonthCard, MonthPace } from '@/utils/monthCards';
 
 // A Spotify-Wrapped-style COLLECTIBLE card for one month. The gradient + emoji
 // stickers are deliberate decoration; the stats are real (sweets, steps, spend,
@@ -19,9 +19,9 @@ function fmtSteps(n: number): string {
 }
 
 export default function MonthWrappedCard({
-  card, compact = false, onPress, delay = 0,
-}: { card: MonthCard; compact?: boolean; onPress?: () => void; delay?: number }) {
-  // rarity tier drives the colour + foil intensity (0 miedziana … 4 szafirowa).
+  card, compact = false, onPress, delay = 0, pace,
+}: { card: MonthCard; compact?: boolean; onPress?: () => void; delay?: number; pace?: MonthPace | null }) {
+  // rarity tier drives the colour + sheen intensity (0 grafitowa … 4 ametystowa).
   const rank = card.tierRank;
   const legendary = rank >= 4;
 
@@ -30,7 +30,7 @@ export default function MonthWrappedCard({
   const shine = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 440, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-    // Higher tiers catch the light more often (copper rarely, sapphire briskly).
+    // Higher tiers catch the light more often (graphite rarely, amethyst briskly).
     const idle = [6000, 5000, 4000, 3000, 2200][rank] ?? 5000;
     const loop = Animated.loop(Animated.sequence([
       Animated.delay(700 + delay),
@@ -50,9 +50,9 @@ export default function MonthWrappedCard({
   };
   const shineX = shine.interpolate({ inputRange: [0, 1], outputRange: [-320, 470] });
 
-  const chips: { icon: any; text: string; tone?: 'up' | 'down' | 'gold' }[] = [];
+  const chips: { icon: any; text: string; tone?: 'up' | 'down' | 'star' }[] = [];
   if (card.spendRank === 1 && card.monthsTracked >= 2)
-    chips.push({ icon: Trophy, text: 'Rekord wydatków', tone: 'gold' });
+    chips.push({ icon: Trophy, text: 'Rekord wydatków', tone: 'star' });
   else if (card.monthsTracked >= 3)
     chips.push({ icon: card.spendRank <= card.monthsTracked / 2 ? TrendingUp : TrendingDown,
       text: `${card.spendRank}. z ${card.monthsTracked} miesięcy`, tone: card.spendRank <= card.monthsTracked / 2 ? 'up' : 'down' });
@@ -61,7 +61,7 @@ export default function MonthWrappedCard({
       text: `Kroki ${card.stepsVsAvgPct > 0 ? '+' : ''}${card.stepsVsAvgPct}% vs śr.`,
       tone: card.stepsVsAvgPct > 0 ? 'up' : 'down' });
   if (card.isTopMood && card.avgMood != null)
-    chips.push({ icon: Smile, text: `Najlepszy nastrój`, tone: 'gold' });
+    chips.push({ icon: Smile, text: `Najlepszy nastrój`, tone: 'star' });
   if (card.spendVsPrevPct != null && Math.abs(card.spendVsPrevPct) >= 5 && chips.length < 3)
     chips.push({ icon: card.spendVsPrevPct < 0 ? TrendingDown : TrendingUp,
       text: `${card.spendVsPrevPct > 0 ? '+' : ''}${card.spendVsPrevPct}% vs poprz.`,
@@ -121,6 +121,28 @@ export default function MonthWrappedCard({
           )}
         </View>
 
+        {/* pace — only meaningful on the month that's still running: this month so far
+            vs the SAME day range of last month, so half a month isn't judged against a
+            whole one. */}
+        {card.inProgress && pace && pace.rows.length > 0 && (
+          <View style={st.pace}>
+            <Text style={st.sectionLabel}>Do {pace.day}. dnia vs {pace.prevLabel}</Text>
+            {pace.rows.map(r => {
+              const better = r.pct == null ? null : r.lowerIsBetter ? r.pct < 0 : r.pct > 0;
+              const tint = better == null ? 'rgba(255,255,255,0.55)' : better ? '#86EFAC' : '#FCA5A5';
+              return (
+                <View key={r.key} style={st.paceRow}>
+                  <Text style={st.paceLbl} numberOfLines={1}>{r.label}</Text>
+                  <Text style={st.paceNow}>{r.key === 'steps' ? fmtSteps(r.now) : fmt(r.now)}{r.unit ? ` ${r.unit}` : ''}</Text>
+                  <Text style={[st.pacePct, { color: tint }]}>
+                    {r.pct == null ? '—' : `${r.pct > 0 ? '+' : ''}${r.pct}%`}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* favourite sweets */}
         {card.sweets.length > 0 && (
           <View style={st.sweets}>
@@ -140,7 +162,9 @@ export default function MonthWrappedCard({
           <View style={st.chips}>
             {chips.slice(0, 3).map((c, i) => {
               const C = c.icon;
-              const tint = c.tone === 'gold' ? '#FDE047' : c.tone === 'down' ? '#FCA5A5' : '#86EFAC';
+              // "record" chips take the card's own tier accent, so nothing reintroduces
+              // the old glaring gold on a green/azure/indigo card.
+              const tint = c.tone === 'star' ? card.accent : c.tone === 'down' ? '#FCA5A5' : '#86EFAC';
               return (
                 <View key={i} style={[st.chip, { borderColor: tint + '66' }]}>
                   <C size={11} color={tint} />
@@ -205,6 +229,11 @@ const st = StyleSheet.create({
 
   sweets: { marginTop: 15, gap: 6 },
   sectionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 1 },
+  pace: { marginTop: 15, gap: 5 },
+  paceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 10, paddingVertical: 5, paddingHorizontal: 10 },
+  paceLbl: { color: 'rgba(255,255,255,0.85)', fontSize: 12.5, fontWeight: '600', flex: 1 },
+  paceNow: { color: '#fff', fontSize: 12.5, fontWeight: '800', ...shadow },
+  pacePct: { fontSize: 12, fontWeight: '900', width: 52, textAlign: 'right' },
   sweetRow: { flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 11, paddingVertical: 6, paddingHorizontal: 10 },
   sweetEmoji: { fontSize: 18 },
   sweetName: { color: '#fff', fontSize: 13.5, fontWeight: '700', flex: 1, ...shadow },

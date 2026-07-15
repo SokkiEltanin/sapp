@@ -5,10 +5,10 @@ import { Footprints, Coins, Wallet, Crown } from 'lucide-react-native';
 import { YearCard } from '@/utils/yearCards';
 
 // The crown of the collection: one grand card summarising a whole year, built from
-// its month cards. Emoji medals recap the rarity tiers the year's months earned.
+// its month cards. Stickers recap the rarity tiers the year's months earned.
 
 const TIER_MEDALS: [keyof YearCard['tierCounts'], string][] = [
-  ['miedziana', '🥉'], ['srebrna', '🥈'], ['zlota', '🥇'], ['diamentowa', '💎'], ['szafirowa', '🔷'],
+  ['grafitowa', '🪨'], ['szmaragdowa', '🟩'], ['lazurowa', '🟦'], ['indygowa', '🟪'], ['ametystowa', '💠'],
 ];
 
 function fmt(n: number): string { return Math.round(n).toLocaleString('pl-PL'); }

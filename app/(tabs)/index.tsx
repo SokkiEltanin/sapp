@@ -53,7 +53,7 @@ import { getHealthGoals } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
 import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
-import { buildMonthCards, MonthCard } from '@/utils/monthCards';
+import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
@@ -2044,8 +2044,14 @@ export default function DashboardScreen() {
     () => buildMonthCards({ expenses, moodEntries, healthDays, payMonths: workPayMonths, nameAliases, scope }),
     [expenses, moodEntries, healthDays, workPayMonths, nameAliases, scope],
   );
-  // The card to surface on the dashboard = most recent SEALED (completed) month.
-  const featuredCard = useMemo(() => monthCards.find(c => !c.inProgress) ?? monthCards[0], [monthCards]);
+  // The card to surface on the dashboard = the month you're IN (with its pace vs last
+  // month at the same date); the last sealed month is the fallback before this month
+  // has any data.
+  const featuredCard = useMemo(() => monthCards.find(c => c.inProgress) ?? monthCards[0], [monthCards]);
+  const monthPace = useMemo(
+    () => buildMonthPace({ expenses, moodEntries, healthDays, payMonths: workPayMonths, nameAliases, scope }),
+    [expenses, moodEntries, healthDays, workPayMonths, nameAliases, scope],
+  );
 
   // "Nowa karta!" unlock moment: when a freshly-sealed month appears that we
   // haven't celebrated yet. First run just records the baseline (no confetti spam
@@ -2738,7 +2744,7 @@ export default function DashboardScreen() {
               );
 
               nodes['month-summary'] = featuredCard && (
-                <MonthWrappedCard card={featuredCard} compact onPress={() => router.navigate('/month-cards' as any)} />
+                <MonthWrappedCard card={featuredCard} compact pace={monthPace} onPress={() => router.navigate('/month-cards' as any)} />
               );
 
               nodes['tag-limits'] = tagLimits.map(t => {

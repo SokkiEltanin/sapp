@@ -19,8 +19,10 @@ export interface YearCard {
   headline: string;
 }
 
-const YEAR_PALETTE: [string, string, string] = ['#7C3AED', '#F59E0B', '#0B1020']; // regal violet→gold
-const YEAR_ACCENT = '#FDE047';
+// Above the month ladder: a deep violet→magenta that outranks the legendary amethyst
+// tier without falling back to the old glaring gold.
+const YEAR_PALETTE: [string, string, string] = ['#6D28D9', '#C026D3', '#140A24'];
+const YEAR_ACCENT = '#F0CCFF';
 
 function fmtSteps(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.0', '')}M`;
@@ -38,7 +40,7 @@ export function buildYearCards(cards: MonthCard[]): YearCard[] {
     if (list.length < 2) continue; // a year card needs at least a couple of months
 
     let totalSteps = 0, totalSpend = 0, totalEarned = 0;
-    const tierCounts: Record<MonthTier, number> = { miedziana: 0, srebrna: 0, zlota: 0, diamentowa: 0, szafirowa: 0 };
+    const tierCounts: Record<MonthTier, number> = { grafitowa: 0, szmaragdowa: 0, lazurowa: 0, indygowa: 0, ametystowa: 0 };
     const sweetAcc: Record<string, { count: number; emoji: string; name: string }> = {};
     let best: { monthName: string; steps: number } | undefined;
 
@@ -55,10 +57,10 @@ export function buildYearCards(cards: MonthCard[]): YearCard[] {
     }
 
     const topSweet = Object.values(sweetAcc).sort((a, b) => b.count - a.count)[0];
-    const legendaryCount = tierCounts.diamentowa + tierCounts.szafirowa;
+    const legendaryCount = tierCounts.indygowa + tierCounts.ametystowa;
 
     let headline: string;
-    if (tierCounts.szafirowa > 0) headline = `Rok z legendą — ${tierCounts.szafirowa}× karta szafirowa! 🔷`;
+    if (tierCounts.ametystowa > 0) headline = `Rok z legendą — ${tierCounts.ametystowa}× karta ametystowa! 💠`;
     else if (topSweet && topSweet.count >= 6) headline = `Słodki król roku: ${topSweet.name} ×${topSweet.count} ${topSweet.emoji}`;
     else if (totalSteps > 0) headline = `${fmtSteps(totalSteps)} kroków przez cały rok 👣`;
     else if (totalEarned > 0) headline = `Zarobione ${Math.round(totalEarned).toLocaleString('pl-PL')} zł w ${year}`;
