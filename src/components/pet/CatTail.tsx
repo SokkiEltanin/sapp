@@ -73,9 +73,24 @@ function Joint({
         ],
       }}
     >
-      <View style={{ width: w * puff, height: len + w, borderRadius: (w * puff) / 2, backgroundColor: color, alignSelf: 'center' }}>
+      {/* overflow:hidden matters — RN does NOT clip children to a parent's borderRadius,
+          so without it the stripe is a rectangle with square corners poking out of the
+          rounded tail (and the angry puff widens the radius, making it worse). */}
+      <View style={{
+        width: w * puff, height: len + w, borderRadius: (w * puff) / 2,
+        backgroundColor: color, alignSelf: 'center', overflow: 'hidden',
+      }}>
         {stripes && (
-          <View style={{ position: 'absolute', top: len * 0.28, left: 0, right: 0, height: Math.max(1.5, 15 * unit), backgroundColor: markColor }} />
+          <View style={{
+            position: 'absolute',
+            // From the lab: the stripe sits at y = -len*0.72 while the capsule starts at
+            // y = -(len + w/2) — so measured from the capsule's top that's 0.28*len + w/2.
+            // Dropping the w/2 put it 3.4px too high, right in the rounded cap.
+            top: len * 0.28 + w / 2,
+            left: 0, right: 0,
+            height: Math.max(1.5, 15 * unit),
+            backgroundColor: markColor,
+          }} />
         )}
       </View>
       {i < SEGS - 1 && (
