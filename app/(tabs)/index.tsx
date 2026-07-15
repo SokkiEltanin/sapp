@@ -631,7 +631,10 @@ function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: 
 
 // ─── Edit-mode draggable row ──────────────────────────────────────────────────
 
-const EDIT_ROW_H = 68; // fixed height (incl. gap) used to translate drag → index
+// Row pitch used to turn a drag distance into an index. Measured, not guessed:
+// editCtrlBtn2 height 40 + editRow paddingVertical 8×2 + borderWidth 1×2 = 58, plus the
+// list's gap: spacing[2] = 8  →  66. (It was 68, which drifted a row every ~16 rows.)
+const EDIT_ROW_H = 66;
 
 function DashEditRow({
   id, index, count, title, isCustom, hiddenNow, empty, accent, cardBg,
@@ -650,32 +653,51 @@ function DashEditRow({
   const ty = useSharedValue(0);
   const lifted = useSharedValue(0);
 
+  // Dragging used to be unreadable: the row slid freely, every other row stayed put, and
+  // nothing said where it would land — you let go and it teleported. Now it SNAPS to slot
+  // positions, so the row visibly clicks into the slot it will take, and it's clamped to
+  // the list so you can't drag it into nowhere.
   const pan = Gesture.Pan()
     .activateAfterLongPress(120)
     .onStart(() => { lifted.value = 1; })
-    .onUpdate(e => { ty.value = e.translationY; })
-    .onEnd(e => {
-      const delta = Math.round(e.translationY / EDIT_ROW_H);
-      let target = index + delta;
-      if (target < 0) target = 0;
-      if (target > count - 1) target = count - 1;
+    .onUpdate(e => {
+      const minY = -index * EDIT_ROW_H;                 // can't go above the first slot
+      const maxY = (count - 1 - index) * EDIT_ROW_H;    // ...or below the last
+      const raw = Math.max(minY, Math.min(maxY, e.translationY));
+      ty.value = Math.round(raw / EDIT_ROW_H) * EDIT_ROW_H;
+    })
+    .onEnd(() => {
+      const target = index + Math.round(ty.value / EDIT_ROW_H);
       lifted.value = 0;
       ty.value = withTiming(0, { duration: 140 });
       if (target !== index) runOnJS(onMoveTo)(id, target);
     });
 
+  // A lifted row reads as picked up: bigger, opaque, on top, with a real shadow.
   const aStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: ty.value }, { scale: lifted.value ? 1.03 : 1 }],
+    transform: [{ translateY: withTiming(ty.value, { duration: 90 }) }, { scale: lifted.value ? 1.04 : 1 }],
     zIndex: lifted.value ? 20 : 0,
-    opacity: lifted.value ? 0.97 : 1,
+    elevation: lifted.value ? 12 : 0,
+    shadowOpacity: lifted.value ? 0.35 : 0,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowColor: '#000',
+  }));
+
+  // keep the row's normal subtle border when it's down — only the lifted row goes accent
+  const idleBorder = colors.border.subtle;
+  const liftStyle = useAnimatedStyle(() => ({
+    borderColor: lifted.value ? accent : idleBorder,
+    borderWidth: lifted.value ? 1.5 : 1,
   }));
 
   return (
     <Reanimated.View style={aStyle}>
-      <View style={[s.editRow, { backgroundColor: cardBg }]}>
+      <Reanimated.View style={[s.editRow, { backgroundColor: cardBg }, liftStyle]}>
         <GestureDetector gesture={pan}>
-          <View style={s.editCtrlBtn2} hitSlop={10}>
-            <GripVertical size={20} color={colors.text.muted} />
+          {/* the grab handle is the whole left block, not a 20px icon */}
+          <View style={[s.editCtrlBtn2, { width: 44 }]} hitSlop={{ top: 12, bottom: 12, left: 12, right: 6 }}>
+            <GripVertical size={22} color={accent} />
           </View>
         </GestureDetector>
         <View style={s.editArrows}>
@@ -702,7 +724,7 @@ function DashEditRow({
             <Trash2 size={19} color={colors.accent.red} />
           </TouchableOpacity>
         )}
-      </View>
+      </Reanimated.View>
     </Reanimated.View>
   );
 }
