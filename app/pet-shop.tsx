@@ -1,123 +1,120 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
-import PetScene from '@/components/pet/PetScene';
 import { usePetStore } from '@/store/petStore';
-import { COSMETICS, SLOT_ORDER, SLOT_LABEL, Cosmetic, TIER_META } from '@/utils/petShop';
-import { spacing, radius, typography } from '@/theme';
+import { SHOP_COLORS, STRIPES, TIER_META } from '@/utils/petShop';
+import { paletteById } from '@/utils/catPalettes';
+import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
+// Coat colours + tail stripes — that's the whole shop now. Rooms, hats, glasses, collars
+// and held items were cut so the effort goes into the cat itself instead.
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, equipped, buyItem, equip } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes } = usePetStore();
 
-  const act = (item: Cosmetic) => {
-    const owned = ownedItems.includes(item.id);
-    const isEq = equipped[item.slot] === item.id;
-    if (!owned) {
-      if (coins < item.cost) { haptic.error(); toast.info(`Brakuje ${item.cost - coins} 🪙`); return; }
-      buyItem(item.id, item.cost);
-      equip(item.slot, item.id);          // auto-wear on purchase
-      haptic.success(); toast.success(`Kupione: ${item.name}`);
-    } else if (isEq) {
-      equip(item.slot, null); haptic.tap();
+  const onColor = (id: string, cost: number, name: string) => {
+    haptic.tap();
+    const had = ownedItems.includes(id) || cost === 0;
+    if (buyColor(id, cost)) {
+      haptic.success();
+      toast.success(had ? `${name} — założone` : `Kupione: ${name}`);
     } else {
-      equip(item.slot, item.id); haptic.success();
+      haptic.error();
+      toast.error(`Za mało monet — potrzeba ${cost}`);
     }
   };
+  const onStripes = () => {
+    haptic.tap();
+    if (buyStripes(STRIPES.cost)) haptic.success();
+    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${STRIPES.cost}`); }
+  };
+
+  const worn = paletteById(catColor);
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <View style={s.header}>
-        <PressableScale onPress={() => router.back()} style={s.backBtn}>
-          <ChevronLeft size={22} color={c.text.primary} />
-        </PressableScale>
-        <Text style={s.headerTitle}>Sklep</Text>
-        <View style={s.coinPill}>
-          <Coins size={13} color="#FBBF24" />
-          <Text style={s.coinTxt}>{coins}</Text>
-        </View>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <View style={s.head}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
+        <Text style={s.title}>Sklep</Text>
+        <View style={s.coinPill}><Coins size={13} color="#FBBF24" /><Text style={s.coinTxt}>{coins}</Text></View>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {SLOT_ORDER.map(slot => (
-          <View key={slot}>
-            <Text style={s.section}>{SLOT_LABEL[slot]}</Text>
-            <View style={s.grid}>
-              {COSMETICS.filter(i => i.slot === slot).map(item => {
-                const owned = ownedItems.includes(item.id);
-                const isEq = equipped[item.slot] === item.id;
-                const afford = coins >= item.cost;
-                const tier = TIER_META[item.tier];
-                const premium = item.tier === 'epic' || item.tier === 'legendary';
-                return (
-                  <PressableScale key={item.id} onPress={() => act(item)} style={s.cell}>
-                    <View style={[
-                      s.swatch,
-                      { borderColor: tier.color + (premium ? '99' : '55'), borderWidth: premium ? 1.5 : 1 },
-                      isEq && { borderColor: '#2AC68F', borderWidth: 2 },
-                      !owned && !afford && { opacity: 0.5 },
-                    ]}>
-                      {item.slot === 'room'
-                        ? <PetScene room={item.id} colors={item.colors as [string, string] | undefined} size={66} />
-                        : <CatArt expression="happy" size={66} animate={false} equipped={{ [item.slot]: item.id }} />}
-                      {isEq && <View style={s.eqBadge}><Check size={12} color="#fff" /></View>}
-                      {!owned && <View style={[s.tierDot, { backgroundColor: tier.color }]} />}
-                    </View>
-                    <Text style={s.name} numberOfLines={1}>{item.name}</Text>
-                    {owned
-                      ? <Text style={[s.tag, { color: isEq ? '#2AC68F' : c.text.muted }]}>{isEq ? 'Założone' : 'Załóż'}</Text>
-                      : <View style={s.priceRow}><Coins size={10} color={afford ? '#FBBF24' : c.text.muted} /><Text style={[s.price, { color: afford ? '#FBBF24' : c.text.muted }]}>{item.cost}</Text></View>}
-                  </PressableScale>
-                );
-              })}
-            </View>
-          </View>
-        ))}
-
-        <View style={s.legend}>
-          {(['basic', 'rare', 'epic', 'legendary'] as const).map(t => (
-            <View key={t} style={s.legendItem}>
-              <View style={[s.tierDot, { position: 'relative', top: 0, right: 0 }, { backgroundColor: TIER_META[t].color }]} />
-              <Text style={s.legendText}>{TIER_META[t].label}</Text>
-            </View>
-          ))}
+        <View style={s.preview}>
+          <CatArt size={168} expression="happy" palette={worn} stripes={catStripes} animate={false} />
         </View>
-        <Text style={s.foot}>Monety zdobywasz questami pupila i kończąc zadania. Im rzadszy przedmiot, tym droższy.</Text>
+
+        <Text style={s.section}>Kolor futra</Text>
+        <View style={s.grid}>
+          {SHOP_COLORS.map(sc => {
+            const owned = ownedItems.includes(sc.id) || sc.cost === 0;
+            const on = catColor === sc.id;
+            const tier = TIER_META[sc.tier];
+            return (
+              <PressableScale key={sc.id} onPress={() => onColor(sc.id, sc.cost, sc.name)}>
+                <View style={[s.cell, on && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
+                  <View style={[s.swatch, { backgroundColor: sc.palette.coat, borderColor: sc.palette.ear }]}>
+                    {on && <Check size={18} color={sc.palette.ink} />}
+                  </View>
+                  <Text style={s.cellName} numberOfLines={1}>{sc.name}</Text>
+                  {owned
+                    ? <Text style={[s.cellState, { color: on ? tier.color : c.text.muted }]}>{on ? 'założone' : 'kupione'}</Text>
+                    : <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{sc.cost}</Text></View>}
+                </View>
+              </PressableScale>
+            );
+          })}
+        </View>
+
+        <Text style={s.section}>Dodatek</Text>
+        <PressableScale onPress={onStripes}>
+          <View style={[s.stripeRow, catStripes && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.cellName}>{STRIPES.name}</Text>
+              <Text style={s.cellState}>
+                {ownedItems.includes('stripes')
+                  ? (catStripes ? '● włączone — stuknij, aby wyłączyć' : '○ wyłączone — stuknij, aby włączyć')
+                  : 'jedyny wzór, który przeszedł'}
+              </Text>
+            </View>
+            {ownedItems.includes('stripes')
+              ? <Check size={18} color="#4DA8FF" />
+              : <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{STRIPES.cost}</Text></View>}
+          </View>
+        </PressableScale>
+
+        <Text style={s.hint}>Monety zbierasz questami — za dbanie o SIEBIE.</Text>
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const makeS = (c: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.bg.primary },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
-  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#FBBF2440' },
+  safe: { flex: 1, backgroundColor: c.bg.primary },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
+  title: { fontSize: 18, fontWeight: '800', color: c.text.primary, flex: 1 },
+  coinPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#FBBF2440' },
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
-  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[8] },
-
-  section: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[2] },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
-  cell: { width: '22%', alignItems: 'center' },
-  swatch: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: c.bg.card },
-  eqBadge: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: '#2AC68F', alignItems: 'center', justifyContent: 'center' },
-  tierDot: { position: 'absolute', top: 4, left: 4, width: 8, height: 8, borderRadius: 4 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing[3], marginTop: spacing[5] },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendText: { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
-  name: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, marginTop: 5 },
-  tag: { fontSize: 10.5, fontWeight: '800', marginTop: 1 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1 },
-  price: { fontSize: 11, fontWeight: '800' },
-  foot: { fontSize: 11.5, color: c.text.muted, textAlign: 'center', marginTop: spacing[5] },
+  scroll: { paddingHorizontal: spacing[4], gap: spacing[3] },
+  preview: { alignItems: 'center', paddingVertical: spacing[3] },
+  section: { fontSize: 12, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: spacing[2] },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  cell: { width: 96, alignItems: 'center', gap: 5, padding: spacing[2], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  swatch: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
+  cellState: { fontSize: 10, color: c.text.muted },
+  cost: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  costTxt: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
+  stripeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
 });

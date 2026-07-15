@@ -2,15 +2,20 @@ import { View, Text, StyleSheet } from 'react-native';
 import { ChevronRight, Gift } from 'lucide-react-native';
 import CatArt from '@/components/pet/CatArt';
 import { PetState, petStatusLine } from '@/utils/petState';
+import { usePetStore } from '@/store/petStore';
+import { paletteById } from '@/utils/catPalettes';
 import { useColors } from '@/theme/useColors';
 
-// Dashboard companion tile: a live mini blob + its name + a kind status line.
+// Dashboard companion tile: a mini cat + its name + a kind status line.
 // Taps through to the full pet page.
 export default function PetTile({ name, pet, level, claimable = 0 }: { name: string; pet: PetState; level: number; claimable?: number }) {
   const c = useColors();
+  // wear the coat you actually bought — the tile used to always show the default blue
+  const catColor = usePetStore(s => s.catColor);
+  const catStripes = usePetStore(s => s.catStripes);
   return (
     <View style={[st.card, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
-      <CatArt expression={pet.expression} size={70} animate={false} />
+      <CatArt expression={pet.expression} size={70} animate={false} palette={paletteById(catColor)} stripes={catStripes} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>
           <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>

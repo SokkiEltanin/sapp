@@ -1,176 +1,183 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, View, StyleSheet, Text, Vibration } from 'react-native';
-import Svg, { G, Path, Circle } from 'react-native-svg';
+import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
-import { HeldArt } from '@/components/pet/BlobItems';
-import CatAccessories from '@/components/pet/CatAccessories';
+import { CatPalette, DEFAULT_PALETTE, PUPIL } from '@/utils/catPalettes';
+import CatTail from '@/components/pet/CatTail';
 
-// The companion cat — a faithful 1:1 port of the user's own Affinity drawing
-// (pupildoapki.svg), kept in named layers so it can be animated: gentle breathing
-// + sway + blink + a springy hop on tap. Mood is carried by the mouth + closed
-// eyes / tear / zzz, keeping the cat's blue identity.
+// The companion cat — a 1:1 port of the design approved in the HTML lab.
+//
+// Device rule that shapes everything here: JS-driven SVG-prop animation stutters, so
+// ONLY wrapper <Animated.View> transforms animate (native driver) and everything inside
+// the SVG changes by STATE (blink / look / mood / angry). The tail is a separate chain
+// of Animated.Views (see CatTail) for exactly that reason.
+//
+// Two hard-won rules, learned by getting them wrong:
+//  • MASK, don't paint. The cheeks/lids used to be painted in coat colour over the eyes —
+//    invisible on fur, but they showed as blobs over anything else. They're masks now.
+//  • Layer order is a feature. The raised paw draws AFTER the head (it looked like it
+//    never reached the muzzle because the head covered it).
 
-const BLUE = '#A7CCF5';
-const INK = '#3B3C4E';
-
-// Emoji that float up when you tap the cat — mood-aware so a happy cat throws hearts
-// and a sad one gets a comforting one. (Pet stickers/emoji are an intentional design
-// piece, unlike the rest of the UI.)
-const REACTIONS: Record<string, string[]> = {
-  happy:    ['❤️', '💛', '✨', '♪', '😻'],
-  content:  ['❤️', '✨', '♪', '🐾'],
-  meh:      ['🐾', '❔', '♪'],
-  sad:      ['🤍', '🥺', '❤️'],
-  sick:     ['💧', '🤒', '🤍'],
-  sleeping: ['💤', '😴', '💤'],
-};
-
-// One floating reaction emoji: rises, scales in, fades out. Overlay View (not SVG),
-// so it never touches the janky SVG-prop animation path.
-function Particle({ emoji, dx, size }: { emoji: string; dx: number; size: number }) {
-  const a = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(a, { toValue: 1, duration: 1050, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-  }, []);
-  const y  = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.6] });
-  const op = a.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 1, 1, 0] });
-  const sc = a.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.2, 0.9] });
-  return (
-    <Animated.View pointerEvents="none" style={{ position: 'absolute', left: size * 0.5 + dx, top: size * 0.28, opacity: op, transform: [{ translateY: y }, { scale: sc }] }}>
-      <Text style={{ fontSize: size * 0.15 }}>{emoji}</Text>
-    </Animated.View>
-  );
-}
-
-// eye centres (in the 2000×2000 viewBox) for the closed-eye / blink arcs
 const LX = 794, RX = 1107, EYY = 762;
 
-function mouthFor(expr: PetExpression): React.ReactNode {
-  // frown — control point ABOVE the corners so it curves ∩ (was a ∪ smile = bug)
-  if (expr === 'sad') return <Path d="M918 916 Q985 884 1052 916" fill="none" stroke={INK} strokeWidth={15} strokeLinecap="round" />;
-  if (expr === 'meh') return <Path d="M925 905 H1045" fill="none" stroke={INK} strokeWidth={13} strokeLinecap="round" />;
-  // queasy wavy mouth for sick (no longer a smile)
-  if (expr === 'sick') return <Path d="M918 905 q22 -20 44 0 t44 0" fill="none" stroke={INK} strokeWidth={14} strokeLinecap="round" />;
-  if (expr === 'sleeping') return <Path d="M955 902 Q985 916 1015 902" fill="none" stroke={INK} strokeWidth={12} strokeLinecap="round" />;
-  // happy / content → the user's original two-stroke smile
+// cheek shapes — used ONLY as mask geometry, never painted
+const CHEEK_L = 'M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z';
+
+function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: string): React.ReactNode {
+  // angry = mouth SHUT. Tighter + deeper than the sad droop so the two never blur.
+  if (angry) return <Path d="M932 920 Q985 882 1038 920" fill="none" stroke={ink} strokeWidth={16} strokeLinecap="round" />;
+  if (soft) return <Path d="M934 896 Q985 929 1036 896" fill="none" stroke={ink} strokeWidth={12} strokeLinecap="round" />;
+  if (expr === 'sad') return <Path d="M918 916 Q985 884 1052 916" fill="none" stroke={ink} strokeWidth={15} strokeLinecap="round" />;
+  if (expr === 'meh') return <Path d="M925 905 H1045" fill="none" stroke={ink} strokeWidth={13} strokeLinecap="round" />;
+  if (expr === 'sick') return <Path d="M918 905 q22 -20 44 0 t44 0" fill="none" stroke={ink} strokeWidth={14} strokeLinecap="round" />;
+  if (expr === 'sleeping') return <Path d="M955 902 Q985 916 1015 902" fill="none" stroke={ink} strokeWidth={12} strokeLinecap="round" />;
+  // 'content' reads as a calmer cat than 'happy' — soft smile + relaxed lids (see `half`)
+  if (expr === 'content') return <Path d="M934 896 Q985 929 1036 896" fill="none" stroke={ink} strokeWidth={12} strokeLinecap="round" />;
   return (
-    <G id="mouth">
+    <G>
       <G transform="matrix(1,0,0,1.31158,57.033642,-397.041139)">
-        <Path d="M893.229,971.7C895.371,980.267 906.949,1005.466 927.454,1012.301C933.741,1014.396 961.23,1020.803 973.759,1008.274" fill="none" stroke={INK} strokeWidth={10.72} strokeLinecap="round" />
+        <Path d="M893.229,971.7C895.371,980.267 906.949,1005.466 927.454,1012.301C933.741,1014.396 961.23,1020.803 973.759,1008.274" fill="none" stroke={ink} strokeWidth={10.72} strokeLinecap="round" />
       </G>
       <G transform="matrix(0.705861,-0.925793,0.605592,0.794283,-347.53569,978.25465)">
-        <Path d="M893.229,971.7C895.371,980.267 906.949,1005.466 927.454,1012.301C933.741,1014.396 961.23,1020.803 973.759,1008.274" fill="none" stroke={INK} strokeWidth={13.41} strokeLinecap="round" />
+        <Path d="M893.229,971.7C895.371,980.267 906.949,1005.466 927.454,1012.301C933.741,1014.396 961.23,1020.803 973.759,1008.274" fill="none" stroke={ink} strokeWidth={13.41} strokeLinecap="round" />
       </G>
     </G>
   );
 }
 
 export default function CatArt({
-  size = 150, expression = 'happy', animate = true, onPress, equipped, celebrate = 0, affection = 0,
-}: { size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void; equipped?: { hat?: string; face?: string; neck?: string; held?: string }; celebrate?: number; affection?: number }) {
+  size = 150, expression = 'happy', animate = true, onPress, celebrate = 0, affection = 0,
+  palette = DEFAULT_PALETTE, stripes = false, onAngry,
+}: {
+  size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
+  celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean;
+  onAngry?: () => void;
+}) {
+  const p = palette;
   const breathe = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current;
   const wiggle = useRef(new Animated.Value(0)).current;
-  const stretch = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  const arm = useRef(new Animated.Value(0)).current;      // 0 = resting, 1 = raised (lick)
+  const swat = useRef(new Animated.Value(0)).current;
+
   const [blink, setBlink] = useState(false);
-  const [lookX, setLookX] = useState(0);   // idle glance: pupils drift left/right
-  const [particles, setParticles] = useState<{ id: number; emoji: string; dx: number }[]>([]);
-  const pid = useRef(0);
-  const taps = useRef(0);
-  const tapReset = useRef<any>(null);
+  const [look, setLook] = useState({ x: 0, y: 0 });
+  const [petting, setPetting] = useState(false);
+  const [angry, setAngry] = useState(false);
+  const [licking, setLicking] = useState(false);
+  const taps = useRef<number[]>([]);
+  const angryTimer = useRef<any>(null);
+
   const asleep = expression === 'sleeping';
-  const closed = blink || asleep;
+  const shut = blink || asleep || licking;
+  const half = !shut && !angry && (petting || expression === 'content');
 
-  // mood transition — a single blink masks the mouth/eye swap so a mood change
-  // reads as deliberate. No bounce/pulse: the cat stays put. Skipped on first mount.
-  const firstMood = useRef(true);
-  useEffect(() => {
-    if (firstMood.current) { firstMood.current = false; return; }
-    if (!animate || asleep) return;
-    setBlink(true);
-    const t = setTimeout(() => setBlink(false), 150);
-    return () => clearTimeout(t);
-  }, [expression, animate]);
-
-  // (tail is static — a JS-driven SVG rotation stuttered/teleported on-device)
-
-  // very light body breathing only — no floating, no sway.
+  // ── idle: very light breathing (a visible pulse read as wrong) ──
   useEffect(() => {
     if (!animate) return;
-    const b = Animated.loop(Animated.sequence([
-      Animated.timing(breathe, { toValue: 1, duration: asleep ? 3000 : 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(breathe, { toValue: 0, duration: asleep ? 3000 : 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 0, duration: 2100, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
-    b.start();
-    return () => b.stop();
-  }, [animate, asleep]);
+    loop.start();
+    return () => loop.stop();
+  }, [animate]);
 
+  // ── blink (sometimes a double, like a real cat) ──
   useEffect(() => {
-    if (!animate || asleep) return;
-    let t: any;
-    const loop = () => { t = setTimeout(() => { setBlink(true); setTimeout(() => setBlink(false), 130); loop(); }, 2600 + Math.random() * 2800); };
-    loop();
-    return () => clearTimeout(t);
-  }, [animate, asleep]);
-
-  // idle glance — the eyes drift left/right now and then, then re-centre, so the cat
-  // feels alive even when you're not touching it. (Toggling state re-renders the SVG,
-  // it does NOT animate an SVG prop, so it stays smooth.)
-  useEffect(() => {
-    if (!animate || asleep) { setLookX(0); return; }
+    if (!animate || asleep || angry) return;
     let t: any;
     const loop = () => {
       t = setTimeout(() => {
-        setLookX((Math.random() < 0.5 ? -1 : 1) * (16 + Math.random() * 22));
-        setTimeout(() => setLookX(0), 750 + Math.random() * 550);
+        setBlink(true);
+        setTimeout(() => {
+          setBlink(false);
+          if (Math.random() < 0.3) setTimeout(() => { setBlink(true); setTimeout(() => setBlink(false), 105); }, 145);
+        }, 115);
+        loop();
+      }, 2600 + Math.random() * 2800);
+    };
+    loop();
+    return () => clearTimeout(t);
+  }, [animate, asleep, angry]);
+
+  // ── idle glance ──
+  useEffect(() => {
+    if (!animate || asleep || angry || petting) { setLook({ x: 0, y: 0 }); return; }
+    let t: any;
+    const loop = () => {
+      t = setTimeout(() => {
+        setLook({ x: (Math.random() < 0.5 ? -1 : 1) * (12 + Math.random() * 18), y: (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 7) });
+        setTimeout(() => setLook({ x: 0, y: 0 }), 700 + Math.random() * 600);
         loop();
       }, 3200 + Math.random() * 4200);
     };
     loop();
     return () => clearTimeout(t);
-  }, [animate, asleep]);
+  }, [animate, asleep, angry, petting]);
 
-  // idle stretch — an occasional gentle "grow taller then settle" (wrapper scaleY).
+  // ── paw lick ──
+  const doLick = () => {
+    if (licking || asleep || angry) return;
+    setLicking(true);
+    Animated.sequence([
+      Animated.timing(arm, { toValue: 1, duration: 290, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      // three licks
+      ...[0, 1, 2].flatMap(() => [
+        Animated.timing(arm, { toValue: 0.94, duration: 190, useNativeDriver: true }),
+        Animated.timing(arm, { toValue: 1, duration: 190, useNativeDriver: true }),
+      ]),
+      Animated.timing(arm, { toValue: 0, duration: 300, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => setLicking(false));
+  };
   useEffect(() => {
     if (!animate || asleep) return;
     let t: any;
-    const loop = () => {
-      t = setTimeout(() => {
-        Animated.sequence([
-          Animated.timing(stretch, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          Animated.timing(stretch, { toValue: 0, duration: 560, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        ]).start();
-        loop();
-      }, 9000 + Math.random() * 9000);
-    };
+    const loop = () => { t = setTimeout(() => { if (!angry && Math.random() < 0.6) doLick(); loop(); }, 12000 + Math.random() * 10000); };
     loop();
     return () => clearTimeout(t);
-  }, [animate, asleep]);
+  }, [animate, asleep, angry, licking]);
 
-  const spawn = (emoji: string, dx: number) => {
-    const id = ++pid.current;
-    setParticles(p => [...p, { id, emoji, dx }]);
-    setTimeout(() => setParticles(p => p.filter(x => x.id !== id)), 1100);
+  // ── angry ──
+  const doSwat = () => {
+    swat.setValue(0);
+    Animated.sequence([
+      Animated.timing(swat, { toValue: 1, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(swat, { toValue: -1, duration: 90, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(swat, { toValue: 0.85, duration: 110, useNativeDriver: true }),
+      Animated.timing(swat, { toValue: -0.9, duration: 90, useNativeDriver: true }),
+      Animated.timing(swat, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start();
+    try { Vibration.vibrate([0, 25, 45, 25]); } catch {}
+  };
+  const goAngry = () => {
+    if (angry) return;
+    setAngry(true); setPetting(false);
+    try { Vibration.vibrate([0, 55, 40, 55, 40, 130]); } catch {}
+    haptic.warn();
+    const s = Animated.loop(Animated.sequence([
+      Animated.timing(shake, { toValue: 1, duration: 40, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -1, duration: 40, useNativeDriver: true }),
+    ]));
+    s.start();
+    setTimeout(doSwat, 380);
+    setTimeout(doSwat, 1500);
+    onAngry?.();
+    clearTimeout(angryTimer.current);
+    angryTimer.current = setTimeout(() => {
+      s.stop(); shake.setValue(0); setAngry(false); taps.current = [];
+    }, 3000);
   };
 
-  // celebrate — bumped by the pet screen on a quest claim / full affection: a happy
-  // hop + a shower of celebratory emojis. Skipped on first mount.
-  const firstCeleb = useRef(true);
-  useEffect(() => {
-    if (firstCeleb.current) { firstCeleb.current = false; return; }
-    if (!animate) return;
-    Animated.sequence([
-      Animated.timing(hop, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.spring(hop, { toValue: 0, friction: 4, tension: 80, useNativeDriver: true }),
-    ]).start();
-    const pool = ['🎉', '⭐', '❤️', '✨', '🌟'];
-    for (let i = 0; i < 8; i++) setTimeout(() => spawn(pool[i % pool.length], (Math.random() - 0.5) * size * 0.85), i * 45);
-  }, [celebrate]);
-
   const onTap = () => {
+    if (angry) return;
+    const now = Date.now();
+    taps.current = [...taps.current, now].filter(t => now - t < 4000);
+    if (taps.current.length >= 7) { goAngry(); return; }   // poke him enough and he's had enough
+
     haptic.tap();
-    // hop + a quick wiggle so each tap feels alive
     Animated.sequence([
       Animated.timing(hop, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.spring(hop, { toValue: 0, friction: 5, tension: 90, useNativeDriver: true }),
@@ -180,17 +187,11 @@ export default function CatArt({
       Animated.timing(wiggle, { toValue: -1, duration: 110, useNativeDriver: true }),
       Animated.spring(wiggle, { toValue: 0, friction: 4, useNativeDriver: true }),
     ]).start();
-    // Petting reaction ESCALATES with the affection bar — from sparkles when barely
-    // petted, through a warm ✨/💛 mix, to hearts when the cat adores you. Fewer, calmer
-    // emojis (1–3) so it reads as building warmth, not confetti chaos.
-    const a = affection;
-    const pool = a >= 80 ? ['❤️', '💗', '❤️'] : a >= 45 ? ['✨', '💛', '❤️'] : a >= 18 ? ['✨', '💛'] : ['✨'];
-    const n = a >= 80 ? 3 : a >= 45 ? 2 : 1;
-    for (let i = 0; i < n; i++) setTimeout(() => spawn(pool[Math.floor(Math.random() * pool.length)], (Math.random() - 0.5) * size * (0.34 + a / 400)), i * 70);
-    // purr — a soft vibration pattern that lengthens as the cat gets happier
+    setPetting(true);
+    setTimeout(() => setPetting(false), 900);
     if (animate) {
       try {
-        const pulses = a >= 80 ? 6 : a >= 45 ? 4 : 2;
+        const pulses = affection >= 80 ? 6 : affection >= 45 ? 4 : 2;
         const pat: number[] = [];
         for (let i = 0; i < pulses; i++) pat.push(14, 26);
         Vibration.vibrate(pat);
@@ -199,91 +200,206 @@ export default function CatArt({
     onPress?.();
   };
 
-  const amp = asleep ? 0.008 : 0.012;   // barely-there breathing, keeps it grounded
+  const firstCeleb = useRef(true);
+  useEffect(() => {
+    if (firstCeleb.current) { firstCeleb.current = false; return; }
+    if (!animate) return;
+    Animated.sequence([
+      Animated.timing(hop, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(hop, { toValue: 0, friction: 4, tension: 80, useNativeDriver: true }),
+    ]).start();
+  }, [celebrate]);
+
+  const amp = asleep ? 0.0025 : 0.0035;    // barely-there; a real pulse looked wrong
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1 - amp, 1 + amp] });
-  const stretchY = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.055] });
   const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.07] });
   const rot = wiggle.interpolate({ inputRange: [-1, 1], outputRange: ['-5deg', '5deg'] });
+  const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-size * 0.012, size * 0.012] });
+
+  // lick: the arm swings up to the muzzle. Rotating a rigid arm is right HERE (the paw
+  // really does arc up to the face) — unlike the swat, which must go straight down.
+  const armRot = arm.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-147deg'] });
+  const headDip = arm.interpolate({ inputRange: [0, 1], outputRange: [0, 56] });
+  const tongueOp = arm.interpolate({ inputRange: [0, 0.55, 0.94, 1], outputRange: [0, 1, 1, 1] });
+  // swat: mostly TRANSLATION. A rigid rotation threw the paw 257px sideways before it
+  // dropped, which read as a side-swipe; a real cat folds and throws it straight down.
+  const swatY = swat.interpolate({ inputRange: [-1, 0, 1], outputRange: [35, 0, -175] });
+  const swatRot = swat.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-6deg', '0deg', '-20deg'] });
+
+  const tailMood = angry ? 'angry' : petting ? 'purr' : 'idle';
 
   return (
     <Pressable onPress={onTap} hitSlop={12}>
       <View>
-      <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }] }}>
-        <Animated.View style={{ transform: [{ scale }, { scaleY: stretchY }] }}>
-          <Svg width={size} height={size} viewBox="0 0 2000 2000">
-            {/* tail (static) */}
-            <G transform="matrix(1,0,0,1,-106.194312,-183.051682)">
-              <Path d="M1308.567,1421.964C1297.672,1432.859 1279.982,1432.859 1269.087,1421.964C1258.192,1411.069 1258.192,1393.379 1269.087,1382.484C1274.676,1376.895 1277.281,1367.411 1282.899,1357.04C1301.861,1322.036 1336.867,1273.685 1472.244,1256.763C1513.594,1251.594 1538.649,1251.292 1557.619,1235.85C1577.302,1219.829 1589.355,1189.318 1609.223,1129.716C1618.603,1101.577 1623.848,1052.64 1624.601,1045.862C1626.302,1030.548 1640.116,1019.497 1655.43,1021.198C1670.743,1022.9 1681.794,1036.714 1680.093,1052.027C1679.236,1059.741 1672.864,1115.352 1662.191,1147.372C1637.124,1222.574 1617.7,1258.937 1592.866,1279.152C1567.314,1299.95 1534.864,1305.204 1479.169,1312.165C1417.965,1319.816 1382.013,1333.948 1359.888,1350.59C1339.802,1365.699 1332.394,1382.571 1325.987,1395.385C1320.517,1406.322 1315.177,1415.355 1308.567,1421.964Z" fill={BLUE} />
-            </G>
-            {/* body */}
-            <G>
-              <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={BLUE} /></G>
-              <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={BLUE} /></G>
-              <G transform="matrix(1,0,0,1.860595,35.894072,-1501.867858)"><Path d="M1227.275,1647.023L606.308,1647.023C605.249,1636.462 604.719,1625.853 604.719,1615.237C604.719,1523.584 644.172,1436.465 712.809,1376.557L1120.774,1376.557C1189.411,1436.465 1228.864,1523.584 1228.864,1615.237C1228.864,1625.853 1228.334,1636.462 1227.275,1647.023Z" fill="#93C1F4" /></G>
-              <G transform="matrix(1,0,0,1,66.267314,-54.305614)"><Path d="M799.499,1372.998C767.256,1417.604 814.179,1616.88 814.179,1616.88L710.499,1616.88C710.499,1616.88 635.664,1374.925 710.499,1285.047C785.335,1195.169 997.48,1190.035 1062.337,1285.047C1127.195,1380.059 1062.337,1616.88 1062.337,1616.88L958.658,1616.88C958.658,1616.88 1010.6,1424.336 972.289,1372.474C933.979,1320.611 831.742,1328.392 799.499,1372.998Z" fill={BLUE} /></G>
-            </G>
-            {/* head */}
-            <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={BLUE} /></G>
-            {/* ears */}
-            <G id="ear-right">
-              <G transform="matrix(1.041427,1.041427,-0.644296,0.644296,299.104612,-1346.740541)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={BLUE} /></G>
-              <G transform="matrix(0.599735,0.599735,-0.504606,0.504606,795.603559,-629.947691)"><Path d="M1326.238,586.138L1472.912,834.421L1224.629,834.421L1326.238,586.138Z" fill="#8AB5E7" /></G>
-            </G>
-            <G id="ear-left" transform="matrix(0.995551,-0.88133,0.54525,0.615914,-1080.579653,1264.375067)">
-              <Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={BLUE} />
-              <G transform="matrix(0.72388,-0.071206,0.038982,1.035369,340.059015,115.16946)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill="#8AB5E7" /></G>
-            </G>
-            {/* nose */}
-            <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={INK} /></G>
-
-            {/* eyes (open) or closed arcs */}
-            {closed ? (
-              <G>
-                <Path d={`M${LX - 70} ${EYY} Q${LX} ${EYY + 46} ${LX + 70} ${EYY}`} fill="none" stroke={INK} strokeWidth={16} strokeLinecap="round" />
-                <Path d={`M${RX - 70} ${EYY} Q${RX} ${EYY + 46} ${RX + 70} ${EYY}`} fill="none" stroke={INK} strokeWidth={16} strokeLinecap="round" />
-              </G>
-            ) : (
-              <>
-                <G id="eye-left">
-                  <G transform="matrix(1.091685,0,0,1.184008,4.188232,-192.139452)"><Circle cx={723.316} cy={825.671} r={71.68} fill="#fff" /></G>
-                  <G transform={`translate(${lookX} 0)`}>
-                    <G transform="matrix(1.580175,0,0,1.775546,-402.185722,-711.962057)"><Circle cx={756.882} cy={849.163} r={34.202} fill={INK} /></G>
-                    <G transform="matrix(0.615389,0,0,0.488819,349.091369,339.943831)"><Circle cx={756.882} cy={849.163} r={34.202} fill="#fff" /></G>
-                  </G>
-                </G>
-                <G id="eye-right">
-                  <G transform="matrix(1.116362,0,0,1.210772,299.668629,-212.319638)"><Circle cx={723.316} cy={825.671} r={71.68} fill="#fff" /></G>
-                  <G transform={`translate(${lookX} 0)`}>
-                    <G transform="matrix(1.615895,0,-0.037553,1.775546,-84.003122,-710.043581)"><Circle cx={756.882} cy={849.163} r={34.202} fill={INK} /></G>
-                    <G transform="matrix(0.629299,0,0,0.499869,653.865406,332.031541)"><Circle cx={756.882} cy={849.163} r={34.202} fill="#fff" /></G>
-                  </G>
-                </G>
-                <G transform="matrix(0.881056,0,0,0.515896,679.72648,498.929128)"><Path d="M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z" fill={BLUE} /></G>
-                <G transform="matrix(0.881056,0,0,0.515896,361.996844,497.010652)"><Path d="M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z" fill={BLUE} /></G>
-              </>
-            )}
-
-            {/* mouth (mood) */}
-            {mouthFor(expression)}
-            {/* tear when sad / sweat drop when sick — outlined so they read on the blue coat */}
-            {expression === 'sad' && <Path d="M726 838 q-40 74 0 116 q40 -40 0 -116 z" fill="#5AB0F0" stroke="#3E93D8" strokeWidth={5} />}
-            {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
-            {/* custom accessories drawn to fit the cat (hat / face / neck) */}
-            <CatAccessories equipped={equipped} />
-          </Svg>
-          {equipped?.held && (
-            <View pointerEvents="none" style={{ position: 'absolute', width: size * 0.4, height: size * 0.4 * 1.05, left: size * 0.52, top: size * 0.44 }}>
-              <Svg viewBox="0 0 100 105" width="100%" height="100%"><HeldArt id={equipped.held} /></Svg>
+        <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }, { translateX: shakeX }] }}>
+          <Animated.View style={{ transform: [{ scale }] }}>
+            {/* tail sits behind the body; nested Animated.Views, not SVG (see CatTail) */}
+            <View pointerEvents="none" style={{ position: 'absolute', left: size * 0.62, top: size * 0.70 }}>
+              <CatTail color={p.coat} markColor={p.mark} stripes={stripes} animate={animate && !asleep} mood={tailMood} scale={size / 150} />
             </View>
-          )}
-          {asleep && <SleepZs size={size} />}
+
+            <Svg width={size} height={size} viewBox="0 0 2000 2000">
+              <Defs>
+                {/* mask, don't paint — see the note at the top of this file */}
+                <Mask id="eyesFull">
+                  <Rect x="0" y="0" width="2000" height="2000" fill="#fff" />
+                  <G transform="matrix(0.881056,0,0,0.515896,679.72648,498.929128)"><Path d={CHEEK_L} fill="#000" /></G>
+                  <G transform="matrix(0.881056,0,0,0.515896,361.996844,497.010652)"><Path d={CHEEK_L} fill="#000" /></G>
+                </Mask>
+                <Mask id="eyesHalf">
+                  <Rect x="0" y="0" width="2000" height="2000" fill="#fff" />
+                  <G transform="matrix(0.881056,0,0,0.515896,679.72648,498.929128)"><Path d={CHEEK_L} fill="#000" /></G>
+                  <G transform="matrix(0.881056,0,0,0.515896,361.996844,497.010652)"><Path d={CHEEK_L} fill="#000" /></G>
+                  <Rect x="706" y="668" width="180" height="92" fill="#000" />
+                  <Rect x="1018" y="670" width="182" height="92" fill="#000" />
+                </Mask>
+                {/* angry = the same top cut as 'content', but SLANTED to the brow. Wide
+                    round eyes read as startled, not angry. */}
+                <Mask id="eyesAngry">
+                  <Rect x="0" y="0" width="2000" height="2000" fill="#fff" />
+                  <G transform="matrix(0.881056,0,0,0.515896,679.72648,498.929128)"><Path d={CHEEK_L} fill="#000" /></G>
+                  <G transform="matrix(0.881056,0,0,0.515896,361.996844,497.010652)"><Path d={CHEEK_L} fill="#000" /></G>
+                  <Rect x="676" y="608" width="232" height="150" transform="rotate(16 794 758)" fill="#000" />
+                  <Rect x="994" y="610" width="232" height="150" transform="rotate(-16 1107 760)" fill="#000" />
+                </Mask>
+              </Defs>
+
+              {/* bottle-brush halo when angry */}
+              {angry && <Path d={spiky(952, 800, 420, 420, 26, 0.11)} fill={p.mark} opacity={0.55} />}
+
+              {/* body */}
+              <G>
+                <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
+                <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
+                <G transform="matrix(1,0,0,1.860595,35.894072,-1501.867858)"><Path d="M1227.275,1647.023L606.308,1647.023C605.249,1636.462 604.719,1625.853 604.719,1615.237C604.719,1523.584 644.172,1436.465 712.809,1376.557L1120.774,1376.557C1189.411,1436.465 1228.864,1523.584 1228.864,1615.237C1228.864,1625.853 1228.334,1636.462 1227.275,1647.023Z" fill={p.shade} /></G>
+                {/* forelegs WITHOUT the original arch: the arch had to be covered by a
+                    rect to raise a paw, and that rect bit a square notch out of it */}
+                {!licking && <Rect x={777} y={1236} width={104} height={306} rx={52} fill={p.coat} />}
+                <Rect x={1025} y={1236} width={104} height={306} rx={52} fill={p.coat} />
+              </G>
+              {!licking && <Paw cx={829} p={p} />}
+              <Paw cx={1077} p={p} />
+
+              <G>
+                <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>
+                <G>
+                  <G transform="matrix(1.041427,1.041427,-0.644296,0.644296,299.104612,-1346.740541)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={p.coat} /></G>
+                  <G transform="matrix(0.599735,0.599735,-0.504606,0.504606,795.603559,-629.947691)"><Path d="M1326.238,586.138L1472.912,834.421L1224.629,834.421L1326.238,586.138Z" fill={p.ear} /></G>
+                </G>
+                <G transform="matrix(0.995551,-0.88133,0.54525,0.615914,-1080.579653,1264.375067)">
+                  <Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={p.coat} />
+                  <G transform="matrix(0.72388,-0.071206,0.038982,1.035369,340.059015,115.16946)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={p.ear} /></G>
+                </G>
+                <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
+
+                {shut ? (
+                  <G>
+                    <Path d={`M${LX - 70} ${EYY} Q${LX} ${EYY + 46} ${LX + 70} ${EYY}`} fill="none" stroke={p.ink} strokeWidth={16} strokeLinecap="round" />
+                    <Path d={`M${RX - 70} ${EYY} Q${RX} ${EYY + 46} ${RX + 70} ${EYY}`} fill="none" stroke={p.ink} strokeWidth={16} strokeLinecap="round" />
+                  </G>
+                ) : (
+                  <G mask={`url(#${angry ? 'eyesAngry' : half ? 'eyesHalf' : 'eyesFull'})`}>
+                    <Ellipse cx={794} cy={785} rx={78} ry={85} fill="#fff" />
+                    <Ellipse cx={1107} cy={787} rx={80} ry={87} fill="#fff" />
+                    <G transform={`translate(${look.x} ${look.y})`}>
+                      {angry ? (
+                        // slit pupils: a round pupil simply fills the narrowed eye, so all
+                        // you saw was a dark wedge — and slits are what an angry cat has
+                        <G>
+                          <Ellipse cx={794} cy={792} rx={17} ry={55} fill={PUPIL} />
+                          <Ellipse cx={1107} cy={794} rx={17} ry={55} fill={PUPIL} />
+                          <Circle cx={820} cy={762} r={9} fill="#fff" opacity={0.9} />
+                          <Circle cx={1133} cy={764} r={9} fill="#fff" opacity={0.9} />
+                        </G>
+                      ) : (
+                        <G>
+                          <Ellipse cx={794} cy={792} rx={54} ry={61} fill={PUPIL} />
+                          <Ellipse cx={1107} cy={794} rx={55} ry={61} fill={PUPIL} />
+                          <Circle cx={815} cy={758} r={17} fill="#fff" />
+                          <Circle cx={1128} cy={760} r={17} fill="#fff" />
+                        </G>
+                      )}
+                    </G>
+                  </G>
+                )}
+                {half && (
+                  <G>
+                    <Path d="M718 758 Q794 776 870 758" fill="none" stroke={p.ink} strokeWidth={11} strokeLinecap="round" />
+                    <Path d="M1030 760 Q1107 778 1184 760" fill="none" stroke={p.ink} strokeWidth={11} strokeLinecap="round" />
+                  </G>
+                )}
+                {angry && (
+                  <G>
+                    <Path d="M700 664 Q788 680 876 720" fill="none" stroke={p.ink} strokeWidth={19} strokeLinecap="round" />
+                    <Path d="M1202 666 Q1114 682 1026 722" fill="none" stroke={p.ink} strokeWidth={19} strokeLinecap="round" />
+                  </G>
+                )}
+                {mouthFor(expression, angry, petting || licking, p.ink)}
+                {licking && (
+                  <G>
+                    <Ellipse cx={985} cy={906} rx={46} ry={32} fill="#5E3140" />
+                    <Rect x={961} y={884} width={48} height={116} rx={24} fill="#F28BAE" />
+                  </G>
+                )}
+                {expression === 'sick' && (
+                  <G transform="rotate(-17 862 566)">
+                    <Rect x={762} y={536} width={200} height={60} rx={18} fill="#F0D3AE" stroke="#D3B187" strokeWidth={4} />
+                    <Rect x={822} y={546} width={80} height={40} rx={9} fill="#E0BE93" />
+                  </G>
+                )}
+                {expression === 'sad' && <Path d="M726 838 q-40 74 0 116 q40 -40 0 -116 z" fill="#5AB0F0" stroke="#3E93D8" strokeWidth={5} />}
+                {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
+              </G>
+            </Svg>
+
+            {/* The raised foreleg lives OUTSIDE the SVG, in its own wrapper, so it can be
+                animated with the native driver — and it renders ON TOP of the head, which
+                is why the paw now visibly reaches the muzzle. */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                { transform: [{ translateY: Animated.add(Animated.multiply(swatY, size / 2000), 0) }] },
+              ]}
+            >
+              <Animated.View style={{ flex: 1, transform: [{ rotate: licking ? armRot : swatRot }] }}>
+                <Svg width={size} height={size} viewBox="0 0 2000 2000" style={{ position: 'absolute' }}>
+                  {(licking || true) && (
+                    <G opacity={licking ? 1 : 0}>
+                      <Rect x={779} y={1240} width={100} height={300} rx={50} fill={p.coat} />
+                      <Ellipse cx={829} cy={1541} rx={76} ry={48} fill={p.coat} />
+                    </G>
+                  )}
+                </Svg>
+              </Animated.View>
+            </Animated.View>
+
+            {asleep && <SleepZs size={size} />}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
-      {/* tap reaction emojis float up over the cat */}
-      {particles.map(p => <Particle key={p.id} emoji={p.emoji} dx={p.dx} size={size} />)}
       </View>
     </Pressable>
   );
+}
+
+function Paw({ cx, p }: { cx: number; p: CatPalette }) {
+  return (
+    <G>
+      <Ellipse cx={cx} cy={1541} rx={76} ry={48} fill={p.coat} />
+      <Path d={`M${cx - 30} 1516 v26 M${cx} 1511 v31 M${cx + 30} 1516 v26`} stroke={p.ink} strokeWidth={7} strokeLinecap="round" opacity={0.4} />
+    </G>
+  );
+}
+
+// jagged ring for the angry bottle-brush halo
+function spiky(cx: number, cy: number, rx: number, ry: number, spikes: number, amp: number): string {
+  const pts: string[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    const k = i % 2 ? 1 : 1 + amp;
+    pts.push(`${(cx + Math.cos(a) * rx * k).toFixed(1)} ${(cy + Math.sin(a) * ry * k).toFixed(1)}`);
+  }
+  return `M${pts.join('L')}Z`;
 }
 
 function SleepZs({ size }: { size: number }) {

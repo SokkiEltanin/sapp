@@ -20,9 +20,14 @@ interface PetState {
   xp: number;                   // drives level/growth
   coins: number;                // spent in the shop
   lastCareTick: string | null;  // YYYY-MM-DD — one passive care-XP grant per day
-  ownedItems: string[];         // cosmetic ids owned
-  equipped: Record<string, string>; // slot → itemId (e.g. { hat: 'hat_party' })
-  roomAddons: Record<string, string[]>; // roomId → active add-on ids (extra scene elements)
+  ownedItems: string[];         // owned ids — now just coat colours + 'stripes'
+  // Rooms / hats / glasses / collars / held items were all removed; the shop only sells
+  // the coat colour and the tail stripes now. `equipped`/`roomAddons` stay ONLY so old
+  // persisted state still parses — nothing reads them.
+  equipped: Record<string, string>;
+  roomAddons: Record<string, string[]>;
+  catColor: string;             // palette id from catPalettes
+  catStripes: boolean;          // tail stripes on/off
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
   // dailyClaims can only remember ONE date per quest, so claiming yesterday's catch-up
@@ -50,9 +55,9 @@ interface PetState {
   addCoins: (n: number) => void;
   spendCoins: (n: number) => boolean;   // false if not enough
   buyItem: (id: string, cost: number) => boolean;
-  equip: (slot: string, id: string | null) => void;
-  buyRoomAddon: (roomId: string, id: string, cost: number) => boolean; // false if not enough coins
-  toggleRoomAddon: (roomId: string, id: string) => void;               // owned add-on on/off in a room
+  buyColor: (id: string, cost: number) => boolean;  // false if not enough coins
+  setColor: (id: string) => void;
+  buyStripes: (cost: number) => boolean;            // buys, or toggles once owned
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
   claimDailyFor: (id: string, date: string, coins: number, xp: number) => boolean; // catch-up claim for a past day
@@ -77,6 +82,8 @@ export const usePetStore = create<PetState>()(
       coins: 0,
       lastCareTick: null,
       ownedItems: [],
+      catColor: 'blue',
+      catStripes: false,
       roomAddons: {},
       equipped: {},
       claimedQuests: [],
@@ -110,31 +117,22 @@ export const usePetStore = create<PetState>()(
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, id] });
         return true;
       },
-      equip: (slot, id) => set((s) => {
-        const eq = { ...s.equipped };
-        if (id == null) delete eq[slot]; else eq[slot] = id;
-        return { equipped: eq };
-      }),
-      // Buy a room add-on: pay once, own it (in ownedItems) AND switch it on in that
-      // room. Re-buying an owned add-on is free and just turns it back on.
-      buyRoomAddon: (roomId, id, cost) => {
+      // Buy a coat colour (free if already owned) and wear it immediately.
+      buyColor: (id, cost) => {
         const s = get();
-        const active = s.roomAddons[roomId] ?? [];
-        if (active.includes(id)) return true;
-        const owns = s.ownedItems.includes(id);
-        if (!owns && s.coins < cost) return false;
-        set({
-          coins: owns ? s.coins : s.coins - cost,
-          ownedItems: owns ? s.ownedItems : [...s.ownedItems, id],
-          roomAddons: { ...s.roomAddons, [roomId]: [...active, id] },
-        });
+        if (s.ownedItems.includes(id) || cost === 0) { set({ catColor: id }); return true; }
+        if (s.coins < cost) return false;
+        set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, id], catColor: id });
         return true;
       },
-      toggleRoomAddon: (roomId, id) => set((s) => {
-        const active = s.roomAddons[roomId] ?? [];
-        const next = active.includes(id) ? active.filter(x => x !== id) : [...active, id];
-        return { roomAddons: { ...s.roomAddons, [roomId]: next } };
-      }),
+      setColor: (id) => set({ catColor: id }),
+      buyStripes: (cost) => {
+        const s = get();
+        if (s.ownedItems.includes('stripes')) { set({ catStripes: !s.catStripes }); return true; }
+        if (s.coins < cost) return false;
+        set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'stripes'], catStripes: true });
+        return true;
+      },
       claimQuest: (id, coins, xp) => set((s) => s.claimedQuests.includes(id) ? s : ({
         claimedQuests: [...s.claimedQuests, id],
         coins: s.coins + coins,
@@ -238,14 +236,14 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
-        lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped, roomAddons: s.roomAddons,
+        lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
         weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,

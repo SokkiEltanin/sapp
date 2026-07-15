@@ -8,11 +8,10 @@ import { ChevronLeft, Pencil, Check, Coins, ShoppingBag, Swords } from 'lucide-r
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
-import PetScene from '@/components/pet/PetScene';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
-import { equippedRoom, roomAddonsFor, TIER_META } from '@/utils/petShop';
+import { paletteById } from '@/utils/catPalettes';
 import { bossById } from '@/utils/bosses';
 import { getBudgets } from '@/utils/budgets';
 import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
@@ -37,31 +36,18 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
-  const [addonsOpen, setAddonsOpen] = useState(false);   // room-addons picker collapsed by default
   const [trophiesOpen, setTrophiesOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
-  const worn = useMemo(() => ({ hat: equipped.hat, face: equipped.face, neck: equipped.neck, held: equipped.held }), [equipped]);
-  const room = useMemo(() => equippedRoom(equipped), [equipped]);
-  // The free default room has id 'room_home' for add-on purposes (equipped.room is
-  // undefined until a premium room is bought).
-  const roomKey = equipped.room ?? 'room_home';
+  const palette = useMemo(() => paletteById(catColor), [catColor]);
   const trophies = useMemo(
     () => (defeatedBosses ?? []).map(id => bossById(id)).filter((b): b is NonNullable<typeof b> => !!b)
       .map(b => ({ emoji: b.loot.emoji, boss: b.name, loot: b.loot.name, desc: b.loot.desc })),
     [defeatedBosses],
   );
-  const activeAddons = useMemo(() => roomAddons[roomKey] ?? [], [roomAddons, roomKey]);
-  const roomAddonList = useMemo(() => roomAddonsFor(roomKey), [roomKey]);
-  const onAddonTap = (a: { id: string; name: string; cost: number }) => {
-    haptic.tap();
-    if (ownedItems.includes(a.id)) { toggleRoomAddon(roomKey, a.id); return; }
-    if (buyRoomAddon(roomKey, a.id, a.cost)) { haptic.success(); toast.success(`Dodano do pokoju: ${a.name}`); }
-    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${a.cost}`); }
-  };
   const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -285,48 +271,11 @@ export default function Pet() {
         </View>
         <Text style={s.tip}>{petStatusLine(pet)}</Text>
 
-        {/* stage (room backdrop if equipped) */}
+        {/* stage — no room backdrop any more; the cat IS the stage */}
         <View style={s.stage}>
-          <View style={s.room}>
-            <PetScene room={equipped.room} colors={room?.colors as [string, string] | undefined} addons={activeAddons} size={290} />
-          </View>
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} equipped={worn} onPress={handlePet} celebrate={celebrate} affection={affToday} />
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
+            onPress={handlePet} celebrate={celebrate} affection={affToday} />
         </View>
-
-        {/* ── Room upgrades: a compact button that expands the picker ── */}
-        {roomAddonList.length > 0 && (
-          <View style={s.collapseCard}>
-            <PressableScale onPress={() => { haptic.tap(); setAddonsOpen(v => !v); }}>
-              <View style={s.collapseHead}>
-                <Text style={s.collapseTitle}>🛋 Pokój — dodatki</Text>
-                <Text style={s.collapseChev}>{addonsOpen ? '▲' : '▼'}</Text>
-              </View>
-            </PressableScale>
-            {addonsOpen && (
-              <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2, marginTop: spacing[2] }}>
-                  {roomAddonList.map(a => {
-                    const owned = ownedItems.includes(a.id);
-                    const active = activeAddons.includes(a.id);
-                    const tier = TIER_META[a.tier];
-                    return (
-                      <PressableScale key={a.id} onPress={() => onAddonTap(a)}>
-                        <View style={[s.addonChip, active && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
-                          <Text style={{ fontSize: 22 }}>{a.emoji}</Text>
-                          <Text style={s.addonName} numberOfLines={1}>{a.name}</Text>
-                          {owned
-                            ? <Text style={[s.addonState, { color: active ? tier.color : c.text.muted }]}>{active ? '● włączone' : '○ wyłączone'}</Text>
-                            : <View style={s.addonCost}><CoinsIcon size={9} color="#FBBF24" /><Text style={s.addonCostTxt}>{a.cost}</Text></View>}
-                        </View>
-                      </PressableScale>
-                    );
-                  })}
-                </ScrollView>
-                <Text style={s.addonHint}>Kup dodatek za monety, potem stuknij, aby włączyć/wyłączyć go w scenie.</Text>
-              </>
-            )}
-          </View>
-        )}
 
         {/* Affection — fills as you pet (tap) the cat; full = daily bonus. */}
         <View style={s.affRow}>
