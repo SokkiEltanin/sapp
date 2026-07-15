@@ -4,7 +4,7 @@ import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask } from 'react-native-sv
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
 import { CatPalette, DEFAULT_PALETTE, PUPIL } from '@/utils/catPalettes';
-import CatTail from '@/components/pet/CatTail';
+import CatTail, { TAIL_X_U, TAIL_Y_U } from '@/components/pet/CatTail';
 
 // The companion cat — a 1:1 port of the design approved in the HTML lab.
 //
@@ -67,8 +67,17 @@ export default function CatArt({
   const [petting, setPetting] = useState(false);
   const [angry, setAngry] = useState(false);
   const [licking, setLicking] = useState(false);
+  const [swatting, setSwatting] = useState(false);
+  const [particles, setParticles] = useState<{ id: number; kind: 'heart' | 'spark'; dx: number }[]>([]);
+  const pid = useRef(0);
   const taps = useRef<number[]>([]);
   const angryTimer = useRef<any>(null);
+
+  const spawn = (kind: 'heart' | 'spark', dx: number) => {
+    const id = ++pid.current;
+    setParticles(ps => [...ps, { id, kind, dx }]);
+    setTimeout(() => setParticles(ps => ps.filter(x => x.id !== id)), 1050);
+  };
 
   const asleep = expression === 'sleeping';
   const shut = blink || asleep || licking;
@@ -143,13 +152,14 @@ export default function CatArt({
   // ── angry ──
   const doSwat = () => {
     swat.setValue(0);
+    setSwatting(true);   // without this the arm stayed hidden and the swat was invisible
     Animated.sequence([
       Animated.timing(swat, { toValue: 1, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.timing(swat, { toValue: -1, duration: 90, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       Animated.timing(swat, { toValue: 0.85, duration: 110, useNativeDriver: true }),
       Animated.timing(swat, { toValue: -0.9, duration: 90, useNativeDriver: true }),
       Animated.timing(swat, { toValue: 0, duration: 180, useNativeDriver: true }),
-    ]).start();
+    ]).start(() => setSwatting(false));
     try { Vibration.vibrate([0, 25, 45, 25]); } catch {}
   };
   const goAngry = () => {
@@ -189,8 +199,19 @@ export default function CatArt({
     ]).start();
     setPetting(true);
     setTimeout(() => setPetting(false), 900);
+
+    // Reactions escalate with the affection bar: a lone sparkle when barely petted,
+    // warming up to hearts once he adores you. Few and calm (1–3), so it reads as
+    // building warmth rather than confetti.
+    const a = affection;
+    const n = a >= 80 ? 3 : a >= 45 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      setTimeout(() => spawn(a >= 45 ? 'heart' : 'spark', (Math.random() - 0.5) * size * (0.34 + a / 400)), i * 70);
+    }
+
     if (animate) {
       try {
+        // purr: a soft roll that lengthens as he gets happier
         const pulses = affection >= 80 ? 6 : affection >= 45 ? 4 : 2;
         const pat: number[] = [];
         for (let i = 0; i < pulses; i++) pat.push(14, 26);
@@ -210,6 +231,13 @@ export default function CatArt({
     ]).start();
   }, [celebrate]);
 
+  const unit = size / 2000;               // px per viewBox unit — everything derives from this
+  // shoulder (829,1250 in viewBox) expressed relative to the overlay's CENTRE, because RN
+  // rotates about the centre and has no transform-origin
+  const pivotX = 829 * unit - size / 2;
+  const pivotY = 1250 * unit - size / 2;
+  const armOut = licking || swatting;
+
   const amp = asleep ? 0.0025 : 0.0035;    // barely-there; a real pulse looked wrong
   const scale = breathe.interpolate({ inputRange: [0, 1], outputRange: [1 - amp, 1 + amp] });
   const hopY = hop.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.07] });
@@ -223,7 +251,8 @@ export default function CatArt({
   const tongueOp = arm.interpolate({ inputRange: [0, 0.55, 0.94, 1], outputRange: [0, 1, 1, 1] });
   // swat: mostly TRANSLATION. A rigid rotation threw the paw 257px sideways before it
   // dropped, which read as a side-swipe; a real cat folds and throws it straight down.
-  const swatY = swat.interpolate({ inputRange: [-1, 0, 1], outputRange: [35, 0, -175] });
+  // The throw is in viewBox units, so it must be scaled to px like everything else.
+  const swatTY = swat.interpolate({ inputRange: [-1, 0, 1], outputRange: [35 * (size / 2000), 0, -175 * (size / 2000)] });
   const swatRot = swat.interpolate({ inputRange: [-1, 0, 1], outputRange: ['-6deg', '0deg', '-20deg'] });
 
   const tailMood = angry ? 'angry' : petting ? 'purr' : 'idle';
@@ -233,9 +262,11 @@ export default function CatArt({
       <View>
         <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }, { translateX: shakeX }] }}>
           <Animated.View style={{ transform: [{ scale }] }}>
-            {/* tail sits behind the body; nested Animated.Views, not SVG (see CatTail) */}
-            <View pointerEvents="none" style={{ position: 'absolute', left: size * 0.62, top: size * 0.70 }}>
-              <CatTail color={p.coat} markColor={p.mark} stripes={stripes} animate={animate && !asleep} mood={tailMood} scale={size / 150} />
+            {/* Tail sits behind the body; nested Animated.Views, not SVG (see CatTail).
+                Positioned in VIEWBOX units × unit — the same coordinates the lab used, so
+                it lands exactly where the drawing expects it. */}
+            <View pointerEvents="none" style={{ position: 'absolute', left: TAIL_X_U * unit, top: TAIL_Y_U * unit }}>
+              <CatTail color={p.coat} markColor={p.mark} stripes={stripes} animate={animate && !asleep} mood={tailMood} unit={unit} />
             </View>
 
             <Svg width={size} height={size} viewBox="0 0 2000 2000">
@@ -354,31 +385,70 @@ export default function CatArt({
 
             {/* The raised foreleg lives OUTSIDE the SVG, in its own wrapper, so it can be
                 animated with the native driver — and it renders ON TOP of the head, which
-                is why the paw now visibly reaches the muzzle. */}
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFillObject,
-                { transform: [{ translateY: Animated.add(Animated.multiply(swatY, size / 2000), 0) }] },
-              ]}
-            >
-              <Animated.View style={{ flex: 1, transform: [{ rotate: licking ? armRot : swatRot }] }}>
+                is why the paw visibly reaches the muzzle.
+
+                RN rotates about a view's CENTRE and has no transform-origin, so rotating
+                this full-size overlay swung the arm around the middle of the CAT instead
+                of the shoulder. Pivot the same way CatTail does: translate the shoulder to
+                the centre, rotate, translate back. */}
+            {armOut && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  {
+                    transform: [
+                      { translateY: swatTY },
+                      { translateX: pivotX }, { translateY: pivotY },
+                      { rotate: licking ? armRot : swatRot },
+                      { translateX: -pivotX }, { translateY: -pivotY },
+                    ],
+                  },
+                ]}
+              >
                 <Svg width={size} height={size} viewBox="0 0 2000 2000" style={{ position: 'absolute' }}>
-                  {(licking || true) && (
-                    <G opacity={licking ? 1 : 0}>
-                      <Rect x={779} y={1240} width={100} height={300} rx={50} fill={p.coat} />
-                      <Ellipse cx={829} cy={1541} rx={76} ry={48} fill={p.coat} />
-                    </G>
-                  )}
+                  <G>
+                    <Rect x={779} y={1240} width={100} height={300} rx={50} fill={p.coat} />
+                    <Ellipse cx={829} cy={1541} rx={76} ry={48} fill={p.coat} />
+                    <Path d="M799 1516 v26 M829 1511 v31 M859 1516 v26" stroke={p.ink} strokeWidth={7} strokeLinecap="round" opacity={0.4} />
+                  </G>
                 </Svg>
               </Animated.View>
-            </Animated.View>
+            )}
+
+            {/* tap reactions — real vector hearts / sparkles, no emoji */}
+            {particles.map(pt => <Particle key={pt.id} kind={pt.kind} dx={pt.dx} size={size} />)}
 
             {asleep && <SleepZs size={size} />}
           </Animated.View>
         </Animated.View>
       </View>
     </Pressable>
+  );
+}
+
+// One floating reaction: rises, scales in, fades. A real vector heart/sparkle — the old
+// cat threw emoji, which the user cut ("mniej emotek, więcej prawdziwych efektów").
+function Particle({ kind, dx, size }: { kind: 'heart' | 'spark'; dx: number; size: number }) {
+  const a = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(a, { toValue: 1, duration: 1000, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, []);
+  const y = a.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.55] });
+  const op = a.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 1, 1, 0] });
+  const sc = a.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.15, 0.9] });
+  const d = size * 0.13;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{ position: 'absolute', left: size * 0.5 + dx, top: size * 0.3, opacity: op, transform: [{ translateY: y }, { scale: sc }] }}
+    >
+      <Svg width={d} height={d} viewBox="0 0 32 32">
+        {kind === 'heart'
+          ? <Path d="M16 29S1 19.6 1 10.2A8.6 8.6 0 0 1 16 5a8.6 8.6 0 0 1 15 5.2C31 19.6 16 29 16 29z" fill="#F2789F" />
+          : <Path d="M16 0c1.4 8.6 6 13.2 16 16-10 2.8-14.6 7.4-16 16-1.4-8.6-6-13.2-16-16C10 13.2 14.6 8.6 16 0z" fill="#FFD76E" />}
+      </Svg>
+    </Animated.View>
   );
 }
 
