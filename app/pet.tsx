@@ -37,7 +37,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   const [addonsOpen, setAddonsOpen] = useState(false);   // room-addons picker collapsed by default
@@ -166,8 +166,8 @@ export default function Pet() {
       waterToday: yData.water, waterGoal,
       sleepMinutes: yData.sleep,
     };
-    return buildMissedDaily(yCtx, dailyClaims, y);
-  }, [yData, moodEntries, habits, completions, waterGoal, dailyClaims]);
+    return buildMissedDaily(yCtx, dayClaims, y);
+  }, [yData, moodEntries, habits, completions, waterGoal, dayClaims]);
 
   const claimMissed = (q: { id: string; label: string; coins: number; xp: number }) => {
     if (claimDailyFor(q.id, yesterdayISO(), q.coins, q.xp)) {

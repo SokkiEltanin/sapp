@@ -25,6 +25,11 @@ interface PetState {
   roomAddons: Record<string, string[]>; // roomId → active add-on ids (extra scene elements)
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
+  // dailyClaims can only remember ONE date per quest, so claiming yesterday's catch-up
+  // and today's quest kept overwriting each other — each claim made the other look
+  // unclaimed again, and the pair could be farmed forever. dayClaims is the real record:
+  // one key per (quest, day), `${id}:${YYYY-MM-DD}` → true. Nothing can clobber it.
+  dayClaims: Record<string, true>;
   weeklyClaims: Record<string, string>; // weeklyQuestId → week key (Monday) claimed
   monthlyClaims: Record<string, string>; // monthlyQuestId → YYYY-MM claimed
   // ── petting / affection (fills as you tap the cat; resets daily) ──
@@ -76,6 +81,7 @@ export const usePetStore = create<PetState>()(
       equipped: {},
       claimedQuests: [],
       dailyClaims: {},
+      dayClaims: {},
       weeklyClaims: {},
       monthlyClaims: {},
       affection: 0,
@@ -136,15 +142,25 @@ export const usePetStore = create<PetState>()(
       })),
       claimDaily: (id, coins, xp) => {
         const t = todayISO();
-        if (get().dailyClaims[id] === t) return false;
-        set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: t }, coins: s.coins + coins, xp: s.xp + xp }));
+        const st = get();
+        if (st.dailyClaims[id] === t || st.dayClaims[`${id}:${t}`]) return false;
+        set((s) => ({
+          dailyClaims: { ...s.dailyClaims, [id]: t },
+          dayClaims: { ...s.dayClaims, [`${id}:${t}`]: true },
+          coins: s.coins + coins, xp: s.xp + xp,
+        }));
         return true;
       },
-      // Claim a daily for a PAST date (the "nieodebrane z wczoraj" catch-up). Same
-      // once-per-day guard, just keyed to that date instead of today.
+      // Claim a daily for a PAST date (the "nieodebrane z wczoraj" catch-up). Writes ONLY
+      // to dayClaims — touching dailyClaims would overwrite today's claim and make the
+      // pair farmable (that was the bug).
       claimDailyFor: (id, date, coins, xp) => {
-        if (get().dailyClaims[id] === date) return false;
-        set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: date }, coins: s.coins + coins, xp: s.xp + xp }));
+        const st = get();
+        if (st.dayClaims[`${id}:${date}`] || st.dailyClaims[id] === date) return false;
+        set((s) => ({
+          dayClaims: { ...s.dayClaims, [`${id}:${date}`]: true },
+          coins: s.coins + coins, xp: s.xp + xp,
+        }));
         return true;
       },
       claimWeekly: (id, coins, xp) => {
@@ -222,7 +238,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -230,12 +246,22 @@ export const usePetStore = create<PetState>()(
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, equipped: s.equipped, roomAddons: s.roomAddons,
-        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
+        claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
+        weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
       }),
-      onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        state._hydrated = true;
+        // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
+        // quest claimed on the OLD build isn't offered again as "missed" after this update.
+        state.dayClaims = state.dayClaims ?? {};
+        for (const [id, date] of Object.entries(state.dailyClaims ?? {})) {
+          if (date) state.dayClaims[`${id}:${date}`] = true;
+        }
+      },
     },
   ),
 );

@@ -175,16 +175,22 @@ const RETRO_DAILY_IDS = ['d_mood', 'd_steps10', 'd_steps20', 'd_habits', 'b_wate
 
 // Build the list of rewards earned on `date` but never claimed for it. `ctx` must be
 // filled with THAT DAY's values (steps/sleep/water/mood/habits), not today's.
-export function buildMissedDaily(ctx: QuestCtx, dailyClaims: Record<string, string>, date: string): DailyQuestState[] {
+//
+// `dayClaims` is keyed `${questId}:${YYYY-MM-DD}` — NOT the old dailyClaims map. That map
+// holds one date per quest, so claiming yesterday's catch-up overwrote today's claim (and
+// vice-versa): each claim made the other look unclaimed, and the two could be farmed in a
+// loop forever. A per-(quest, day) key can't be clobbered.
+export function buildMissedDaily(ctx: QuestCtx, dayClaims: Record<string, true>, date: string): DailyQuestState[] {
   const out: DailyQuestState[] = [];
+  const claimed = (id: string) => !!dayClaims[`${id}:${date}`];
   for (const d of DAILY) {
     if (!RETRO_DAILY_IDS.includes(d.id)) continue;
-    if (!d.done(ctx) || dailyClaims[d.id] === date) continue;
+    if (!d.done(ctx) || claimed(d.id)) continue;
     out.push({ id: d.id, label: d.label, coins: d.coins, xp: d.xp, done: true, claimed: false, note: d.note?.(ctx) });
   }
   for (const b of BONUS) {
     if (!RETRO_DAILY_IDS.includes(b.id) || !b.available(ctx)) continue;
-    if (!b.done(ctx) || dailyClaims[b.id] === date) continue;
+    if (!b.done(ctx) || claimed(b.id)) continue;
     out.push({ id: b.id, label: b.label(ctx), coins: b.coins, xp: b.xp, done: true, claimed: false, note: b.note?.(ctx) });
   }
   return out;
