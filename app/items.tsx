@@ -17,6 +17,7 @@ import { MaintenanceItem } from '@/types';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 
 const COLORS = ['#46B0DE', '#2AC68F', '#A78BFA', '#FBBF24', '#F472B6', '#FB923C', '#E43434'];
@@ -218,7 +219,7 @@ export default function ItemsScreen() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle },
   backBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
@@ -264,4 +265,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   colorDot: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   colorDotActive: { borderWidth: 2, borderColor: c.text.primary },
-});
+}));

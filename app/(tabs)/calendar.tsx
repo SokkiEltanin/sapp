@@ -21,6 +21,7 @@ import { googleCalendarService } from '@/services/googleCalendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { CalendarEvent, Task, MoodEntry } from '@/types';
 
@@ -223,7 +224,7 @@ function MonthModal({
   );
 }
 
-const makeM = (c: any) => StyleSheet.create({
+const makeM = themedStyles((c: any) => StyleSheet.create({
   safe:       { flex: 1, backgroundColor: c.bg.primary },
   header:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle, gap: spacing[1] },
   navBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default },
@@ -254,7 +255,7 @@ const makeM = (c: any) => StyleSheet.create({
   workBadgeText:{ fontSize: 9, fontWeight: '700' },
   emptyMonth: { alignItems: 'center', paddingVertical: spacing[10], gap: spacing[3] },
   emptyMonthText:{ fontSize: 14, color: c.text.muted, fontWeight: '500' },
-});
+}));
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 

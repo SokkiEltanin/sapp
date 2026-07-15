@@ -7,6 +7,7 @@ import {
 import { router } from 'expo-router';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { StatCtx, metricSeries } from '@/utils/statWidgets';
 import { haptic } from '@/utils/haptics';
 import { useWeeklyBoard } from '@/store/weeklyBoardStore';
@@ -284,7 +285,7 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.subtle },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
   title: { fontSize: 13, fontWeight: '800', color: c.text.primary, letterSpacing: 0.3 },
@@ -344,4 +345,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   noteDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
   noteText: { fontSize: 12, fontWeight: '600', flex: 1, lineHeight: 16 },
-});
+}));

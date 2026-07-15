@@ -19,6 +19,7 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { loadNameAliases } from '@/utils/productMemory';
 import { spacing, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 const ACCENT = '#7C3AED';
 
@@ -103,7 +104,7 @@ export default function MonthCards() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -117,4 +118,4 @@ const makeS = (c: any) => StyleSheet.create({
   introBadge: { width: 30, height: 30, borderRadius: 9, backgroundColor: ACCENT + '22', alignItems: 'center', justifyContent: 'center' },
   introText: { fontSize: 14, color: c.text.secondary, fontWeight: '600' },
   introNum: { color: c.text.primary, fontWeight: '900', fontSize: 16 },
-});
+}));

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
@@ -139,7 +140,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   wrap: {
     backgroundColor: c.bg.card,
     borderRadius: radius.md, marginBottom: spacing[2],
@@ -209,4 +210,4 @@ const makeStyles = (c: any) => StyleSheet.create({
     alignItems: 'center',
   },
   detailBtnText: { fontSize: 11, fontWeight: '600', color: c.accent.blue },
-});
+}));

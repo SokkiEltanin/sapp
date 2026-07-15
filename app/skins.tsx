@@ -11,6 +11,7 @@ import { useSkinStore } from '@/store/skinStore';
 import { SKINS, SkinProgress, EMPTY_PROGRESS, isSkinUnlocked, skinUnlockHint, Skin } from '@/theme/skins';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
@@ -79,7 +80,7 @@ export default function Skins() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -99,4 +100,4 @@ const makeS = (c: any) => StyleSheet.create({
   lock: { position: 'absolute', width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, marginTop: 6 },
   hint: { fontSize: 10, color: c.text.muted, marginTop: 1, textAlign: 'center' },
-});
+}));

@@ -24,6 +24,7 @@ import {
 } from '@/utils/richText';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -130,7 +131,7 @@ function RichToolbar({ block, onToggle, onColor, onSize, onAdd }: {
   );
 }
 
-const makeTb = (c: any) => StyleSheet.create({
+const makeTb = themedStyles((c: any) => StyleSheet.create({
   wrap: {
     borderTopWidth: 1, borderTopColor: c.border.subtle,
     backgroundColor: c.bg.elevated,
@@ -159,7 +160,7 @@ const makeTb = (c: any) => StyleSheet.create({
     borderWidth: 2, borderColor: c.border.default,
   },
   dotActive: { borderWidth: 3, borderColor: c.text.primary },
-});
+}));
 
 // ─── Folder picker (inline dropdown in editor) ────────────────────────────────
 

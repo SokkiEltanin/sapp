@@ -17,6 +17,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 const PRESET_TAGS = [
   'skupiony', 'zmęczony', 'niespokojny', 'radosny', 'smutny',
@@ -306,7 +307,7 @@ export default function MoodCheckInModal({ visible, onClose, existingEntry }: Pr
   );
 }
 
-const makeStyles = (c: typeof colors) => StyleSheet.create({
+const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
@@ -369,4 +370,4 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
     padding: spacing[4], paddingBottom: spacing[8],
     borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
-});
+}));

@@ -5,6 +5,7 @@ import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert, FileDown, Chev
 import PressableScale from '@/components/ui/PressableScale';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import { createBackup, listBackups, restoreBackup, exportSnapshotToFile, BackupMeta } from '@/services/backupService';
@@ -203,7 +204,7 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
   );
 }
 
-const makeStyles = (c: typeof colors) => StyleSheet.create({
+const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   card: {
     backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4],
     gap: spacing[3], borderWidth: 1, borderColor: c.border.default,
@@ -250,4 +251,4 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
   moreText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
   overlay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingTop: spacing[2] },
   overlayText: { fontSize: 12, color: c.text.secondary },
-});
+}));

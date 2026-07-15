@@ -8,6 +8,7 @@ import { expensesService } from '@/services/expensesService';
 import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
 function isExp(e: Expense) { return !e.type || e.type === 'expense'; }
@@ -166,7 +167,7 @@ export default function FinanceAuditScreen() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -235,4 +236,4 @@ const makeS = (c: any) => StyleSheet.create({
   txAmt: { fontSize: 13, fontWeight: '700', color: c.text.primary },
 
   empty: { fontSize: 13, color: c.text.muted, paddingVertical: spacing[3], textAlign: 'center' },
-});
+}));

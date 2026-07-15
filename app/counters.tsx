@@ -14,6 +14,7 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const todayStr = () => {
@@ -282,7 +283,7 @@ export default function Counters() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -341,4 +342,4 @@ const makeS = (c: any) => StyleSheet.create({
   calItemName: { flex: 1, fontSize: 13, color: c.text.secondary },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg, marginTop: spacing[3] },
   saveText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-});
+}));

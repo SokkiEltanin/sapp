@@ -23,6 +23,7 @@ import { getSessionsForDates, PomodoroSession } from '@/utils/pomodoroHistory';
 import { MOOD_COLORS, MOOD_LABELS, ENERGY_LABELS, MoodEntry, Habit, MoodLevel } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ function SCard({ icon, label, children, accent }: {
   );
 }
 
-const makeSc = (c: any) => StyleSheet.create({
+const makeSc = themedStyles((c: any) => StyleSheet.create({
   card: {
     backgroundColor: c.bg.secondary, borderRadius: radius.xl,
     borderWidth: 1, borderColor: c.border.default,
@@ -89,7 +90,7 @@ const makeSc = (c: any) => StyleSheet.create({
     fontSize: 10, fontWeight: '700', color: c.text.muted,
     textTransform: 'uppercase', letterSpacing: 1,
   },
-});
+}));
 
 // ─── Mini bar row (7 days) ────────────────────────────────────────────────────
 

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable } from 'reac
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 interface Props {
   value: string;           // YYYY-MM-DD or ''
@@ -138,7 +139,7 @@ export default function DatePickerField({ value, onChange, placeholder, style }:
   );
 }
 
-const makeDp = (c: typeof colors) => StyleSheet.create({
+const makeDp = themedStyles((c: typeof colors) => StyleSheet.create({
   field: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: c.bg.card, borderRadius: radius.lg,
@@ -184,4 +185,4 @@ const makeDp = (c: typeof colors) => StyleSheet.create({
     borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default,
   },
   todayBtnText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
-});
+}));

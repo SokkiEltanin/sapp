@@ -20,6 +20,7 @@ import { ExpenseTemplate, ExpenseCategory, IncomeCategory, TransactionType } fro
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, any][];
@@ -298,7 +299,7 @@ export default function TemplatesScreen() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center',
@@ -377,4 +378,4 @@ const makeS = (c: any) => StyleSheet.create({
     backgroundColor: c.bg.elevated, marginRight: spacing[2],
   },
   catChipText: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
-});
+}));

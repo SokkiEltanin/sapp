@@ -21,6 +21,7 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const GROUPS: MetricGroup[] = ['Finanse', 'Konsumpcja', 'Nastrój i zdrowie', 'Praca i zadania'];
@@ -454,7 +455,7 @@ export default function WidgetBuilder() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -525,4 +526,4 @@ const makeS = (c: any) => StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg },
   saveText: { fontSize: 15, fontWeight: '800', color: c.bg.primary },
   delBtn: { width: 52, paddingVertical: 14, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.accent.red + '55', backgroundColor: c.accent.red + '14' },
-});
+}));

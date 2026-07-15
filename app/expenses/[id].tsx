@@ -27,6 +27,7 @@ import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } f
 import { getPayers, addPayer } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 // Per-route error boundary — a render crash here is caught + logged (Diagnostyka),
 // not shown as a blank/black screen.
@@ -223,7 +224,7 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
   );
 }
 
-const makeIe = (c: any) => StyleSheet.create({
+const makeIe = themedStyles((c: any) => StyleSheet.create({
   wrap: {
     marginTop: spacing[2], padding: spacing[3],
     backgroundColor: c.bg.elevated,
@@ -276,7 +277,7 @@ const makeIe = (c: any) => StyleSheet.create({
     backgroundColor: c.text.primary, borderRadius: radius.md,
   },
   saveText: { fontSize: 12, fontWeight: '700', color: c.bg.primary },
-});
+}));
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 

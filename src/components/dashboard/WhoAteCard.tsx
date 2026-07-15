@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Users, Info } from 'lucide-react-native';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { PersonConsumption } from '@/utils/personConsumption';
 
 // "Kto zjadł słodycze" — per-person split of sweets consumption this month, with a
@@ -64,7 +65,7 @@ export default function WhoAteCard({ data, monthLabel }: { data: PersonConsumpti
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
   title: { fontSize: 14, fontWeight: '700', color: c.text.primary },
@@ -80,4 +81,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   pct: { fontSize: 11, fontWeight: '700', color: c.text.muted, minWidth: 30, textAlign: 'right' },
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
   noteTxt: { flex: 1, fontSize: 11, color: c.text.muted, lineHeight: 15 },
-});
+}));

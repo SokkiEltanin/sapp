@@ -6,6 +6,7 @@ import { useWorkStore } from '@/store/workStore';
 import { workService } from '@/services/workService';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
@@ -90,7 +91,7 @@ export default function ConfirmedMonths({ payMonths }: { payMonths: PayMonthRow[
   );
 }
 
-const makeStyles = (c: typeof colors) => StyleSheet.create({
+const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   wrap: { borderTopWidth: 1, borderTopColor: c.border.subtle, paddingTop: spacing[3], paddingHorizontal: spacing[4], paddingBottom: spacing[4], gap: spacing[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { fontSize: 13, fontWeight: '700', color: c.text.primary },
@@ -104,4 +105,4 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
   rowMeta: { flex: 1, fontSize: 11, color: c.text.muted },
   avgToggle: { padding: 6, borderRadius: radius.md, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
   avgToggleOn: { backgroundColor: '#2AC68F18', borderColor: '#2AC68F55' },
-});
+}));

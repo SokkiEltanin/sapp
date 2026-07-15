@@ -13,6 +13,7 @@ import {
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
 import { useColors, useIsLight } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -187,7 +188,7 @@ export default function TabBar({ currentIndex }: Props) {
   );
 }
 
-const makeStyles = (c: typeof colors) => StyleSheet.create({
+const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
   container: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
@@ -285,4 +286,4 @@ const makeStyles = (c: typeof colors) => StyleSheet.create({
     fontSize: 13, fontWeight: '700', color: c.text.primary,
     letterSpacing: 0.6, flex: 1,
   },
-});
+}));

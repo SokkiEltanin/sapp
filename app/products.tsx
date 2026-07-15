@@ -24,6 +24,7 @@ import { GitMerge, Check, RotateCcw } from 'lucide-react-native';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 
 type Product = { name: string; key: string; count: number; category: string; tags: string[] };
@@ -319,7 +320,7 @@ function PressableBack({ onPress, color }: { onPress: () => void; color: string 
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], paddingHorizontal: spacing[3], paddingTop: spacing[2], paddingBottom: spacing[2] },
   title: { fontSize: 20, fontWeight: '800', color: c.text.primary },
@@ -376,4 +377,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   catChipText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
   saveBtn: { backgroundColor: '#FB923C', paddingVertical: 13, borderRadius: radius.md, alignItems: 'center', marginTop: spacing[1] },
   saveBtnText: { fontSize: 14, fontWeight: '800', color: c.bg.primary },
-});
+}));

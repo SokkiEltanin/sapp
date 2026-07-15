@@ -26,6 +26,7 @@ import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { todayISO } from '@/utils/date';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 
 const ACCENT = '#55B4FF';
@@ -468,7 +469,7 @@ export default function VehiclesScreen() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle },
   backBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
@@ -548,4 +549,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   pickerCard: { backgroundColor: c.bg.elevated, borderRadius: radius.xl, padding: spacing[4], maxHeight: '78%' },
   pickerClose: { marginTop: spacing[2], paddingVertical: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.card, alignItems: 'center' },
   pickerCloseText: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
-});
+}));

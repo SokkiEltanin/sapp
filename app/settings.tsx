@@ -38,6 +38,7 @@ import { haptic } from '@/utils/haptics';
 import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { Plus, Trash2, Tag, Vibrate } from 'lucide-react-native';
 import { appSettings } from '@/utils/appSettings';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -1597,7 +1598,7 @@ export default function SettingsScreen() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1774,5 +1775,5 @@ const makeStyles = (c: any) => StyleSheet.create({
     paddingHorizontal: spacing[4], paddingVertical: spacing[3],
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-});
+}));
 

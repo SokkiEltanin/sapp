@@ -34,6 +34,7 @@ import { loadProductMemory, applyProductMemory, loadTagMemory, applyTagMemory, g
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 const EXPENSE_CATS = Object.entries(CATEGORY_META) as [ExpenseCategory, typeof CATEGORY_META[ExpenseCategory]][];
 const INCOME_CATS = Object.entries(INCOME_CATEGORY_META) as [IncomeCategory, typeof INCOME_CATEGORY_META[IncomeCategory]][];
@@ -557,7 +558,7 @@ export default function AddExpenseModal() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.secondary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -673,5 +674,5 @@ const makeStyles = (c: any) => StyleSheet.create({
     paddingVertical: spacing[2],
   },
   saveTplText: { fontSize: 12, fontWeight: '600', color: c.text.secondary },
-});
+}));
 

@@ -28,6 +28,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import CompletionMoodModal from '@/components/tasks/CompletionMoodModal';
 import { haptic } from '@/utils/haptics';
 
@@ -75,12 +76,12 @@ function DiffPicker({ value, onChange }: { value?: TaskDifficulty; onChange: (v:
     </View>
   );
 }
-const makeDp = (c: any) => StyleSheet.create({
+const makeDp = themedStyles((c: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   dotWrap: { padding: 4 },
   dot: { width: 16, height: 16, borderRadius: 8 },
   label: { fontSize: 12, fontWeight: '600', marginLeft: spacing[1] },
-});
+}));
 
 // ─── Priority pills ───────────────────────────────────────────────────────────
 

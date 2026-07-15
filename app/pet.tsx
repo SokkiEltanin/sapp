@@ -22,6 +22,7 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -500,7 +501,7 @@ export default function Pet() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -603,4 +604,4 @@ const makeS = (c: any) => StyleSheet.create({
   moTrack: { height: 9, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 2 },
   moFill: { height: '100%', borderRadius: 5 },
   moVal: { fontSize: 11, color: c.text.muted, fontWeight: '600', marginTop: 4 },
-});
+}));

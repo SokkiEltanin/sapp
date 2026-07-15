@@ -17,6 +17,7 @@ import { stepFor } from '@/utils/habits';
 import { HABIT_COLORS, HABIT_ICONS, Habit, HabitType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -64,14 +65,14 @@ function HistoryDots({ days, color }: { days: boolean[]; color: string }) {
   );
 }
 
-const makeHd = (c: any) => StyleSheet.create({
+const makeHd = themedStyles((c: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: 6 },
   col: { alignItems: 'center', gap: 3 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: c.border.subtle },
   dotToday: { borderWidth: 1, borderColor: c.border.default },
   label: { fontSize: 8, color: c.text.muted },
   labelToday: { color: c.text.secondary, fontWeight: '700' },
-});
+}));
 
 // ─── Habit row ────────────────────────────────────────────────────────────────
 

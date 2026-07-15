@@ -18,6 +18,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
@@ -223,7 +224,7 @@ export default function Bosses() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -279,4 +280,4 @@ const makeS = (c: any) => StyleSheet.create({
   vLootDesc: { fontSize: 12, color: '#2AC68F', fontWeight: '700', marginTop: 1 },
   vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047', marginTop: spacing[4] },
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
-});
+}));

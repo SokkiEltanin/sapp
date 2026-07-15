@@ -12,6 +12,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { useMoodStore } from '@/store/moodStore';
 import { haptic } from '@/utils/haptics';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 
 type NotifType = {
@@ -145,7 +146,7 @@ export default function NotificationsScreen() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], paddingHorizontal: spacing[3], paddingTop: spacing[2], paddingBottom: spacing[2] },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -158,4 +159,4 @@ const makeStyles = (c: any) => StyleSheet.create({
   rowLabel: { fontSize: 14, fontWeight: '700', color: c.text.primary },
   rowDesc: { fontSize: 11, color: c.text.muted, marginTop: 2, lineHeight: 15 },
   note: { fontSize: 11, color: c.text.muted, lineHeight: 16, marginTop: spacing[3], paddingHorizontal: spacing[1] },
-});
+}));

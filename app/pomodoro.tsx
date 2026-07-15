@@ -16,6 +16,7 @@ import { useFocusSound, FocusSound, FOCUS_SOUND_LABELS } from '@/hooks/useFocusS
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 const C = {
   accent: '#2BC8E0',
@@ -94,11 +95,11 @@ function RoundDots({ completed }: { completed: number }) {
     </View>
   );
 }
-const makeDots = (c: any) => StyleSheet.create({
+const makeDots = themedStyles((c: any) => StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.border.subtle },
   dotFilled: { backgroundColor: C.accent },
-});
+}));
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 

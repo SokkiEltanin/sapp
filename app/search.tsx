@@ -18,6 +18,7 @@ import { expensesService } from '@/services/expensesService';
 import { calendarService, tasksService } from '@/services/calendarService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 function highlight(text: string, query: string): { part: string; match: boolean }[] {
@@ -43,10 +44,10 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     </Text>
   );
 }
-const makeHl = (c: any) => StyleSheet.create({
+const makeHl = themedStyles((c: any) => StyleSheet.create({
   base: { fontSize: 14, fontWeight: '500', color: c.text.primary },
   match: { color: c.accent.amber, fontWeight: '700' },
-});
+}));
 
 export default function SearchScreen() {
   const colors = useColors();

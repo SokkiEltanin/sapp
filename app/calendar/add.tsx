@@ -17,6 +17,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 type FormType = 'task' | 'event';
@@ -282,7 +283,7 @@ export default function AddCalendarModal() {
   );
 }
 
-const makeStyles = (c: any) => StyleSheet.create({
+const makeStyles = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.secondary },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -332,5 +333,5 @@ const makeStyles = (c: any) => StyleSheet.create({
   },
   colorDotSelected: { borderColor: c.white, transform: [{ scale: 1.15 }] },
   footer: { padding: spacing[4], borderTopWidth: 1, borderTopColor: c.border.subtle },
-});
+}));
 

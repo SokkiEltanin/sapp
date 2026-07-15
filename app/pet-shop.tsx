@@ -11,6 +11,7 @@ import { SHOP_COLORS, STRIPES, TIER_META } from '@/utils/petShop';
 import { paletteById } from '@/utils/catPalettes';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
@@ -99,7 +100,7 @@ export default function PetShop() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
   title: { fontSize: 18, fontWeight: '800', color: c.text.primary, flex: 1 },
@@ -117,4 +118,4 @@ const makeS = (c: any) => StyleSheet.create({
   costTxt: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
   stripeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
-});
+}));

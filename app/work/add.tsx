@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { workService } from '@/services/workService';
 import { useWorkStore } from '@/store/workStore';
@@ -78,7 +79,7 @@ function TimePicker({
   );
 }
 
-const makeTp = (c: any) => StyleSheet.create({
+const makeTp = themedStyles((c: any) => StyleSheet.create({
   wrap:  { flex: 1, alignItems: 'center', gap: spacing[2] },
   label: { fontSize: 10, fontWeight: '600', color: c.text.muted, letterSpacing: 0.8, textTransform: 'uppercase' },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -86,7 +87,7 @@ const makeTp = (c: any) => StyleSheet.create({
   colon: { fontSize: 24, fontWeight: '800', color: c.text.primary, marginTop: -4 },
   digit: { fontSize: 28, fontWeight: '900', color: c.text.primary, letterSpacing: -1, minWidth: 44, textAlign: 'center' },
   btn:   { width: 36, height: 26, alignItems: 'center', justifyContent: 'center' },
-});
+}));
 
 // ─── Date picker (simple +/- day) ────────────────────────────────────────────
 

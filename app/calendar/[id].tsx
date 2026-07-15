@@ -16,6 +16,7 @@ import { toast } from '@/store/toastStore';
 import { EventPriority } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const EVENT_COLORS = [
@@ -41,11 +42,11 @@ function Row({ icon, label, children }: { icon: React.ReactNode; label: string; 
     </View>
   );
 }
-const makeRw = (c: any) => StyleSheet.create({
+const makeRw = themedStyles((c: any) => StyleSheet.create({
   wrap: { gap: spacing[2], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: c.border.subtle },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   label: { fontSize: 10, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-});
+}));
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

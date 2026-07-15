@@ -22,6 +22,7 @@ import {
 } from '@/utils/achievements';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const GROUP_ORDER: AchGroup[] = ['Legendy', 'Nawyki', 'Jedzenie', 'Oszczędzanie', 'Praca', 'Nastrój', 'Zdrowie', 'Życie', 'Konsekwencja', 'Grzeszki'];
@@ -161,7 +162,7 @@ export default function Achievements() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -190,4 +191,4 @@ const makeS = (c: any) => StyleSheet.create({
   detailBar: { width: '80%', height: 8, borderRadius: 4, backgroundColor: c.fill.subtle, marginTop: spacing[2], overflow: 'hidden' },
   detailProg: { fontSize: 12.5, fontWeight: '700', color: c.text.muted },
   detailDate: { fontSize: 11.5, fontWeight: '600', color: c.text.muted, marginTop: 2 },
-});
+}));

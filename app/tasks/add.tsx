@@ -19,6 +19,7 @@ import { taskCoins } from '@/hooks/useTasks';
 import { toast } from '@/store/toastStore';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 // ─── Green palette ────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ function TimePicker({ hour, minute, onChange }: {
   );
 }
 
-const makeTp = (c: any) => StyleSheet.create({
+const makeTp = themedStyles((c: any) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   unit: { alignItems: 'center', gap: 2 },
   arrow: {
@@ -102,7 +103,7 @@ const makeTp = (c: any) => StyleSheet.create({
   },
   digit: { fontSize: 24, fontWeight: '800', color: G.accent, minWidth: 40, textAlign: 'center' },
   sep: { fontSize: 24, fontWeight: '800', color: G.muted, marginBottom: 2 },
-});
+}));
 
 // ─── Section card ────────────────────��───────────────────────────────────���────
 

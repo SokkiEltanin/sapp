@@ -13,6 +13,7 @@ import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
+import { themedStyles } from '@/theme/themedStyles';
 
 const G = {
   card:       '#0C2218',
@@ -292,7 +293,7 @@ export default function FocusScreen() {
   );
 }
 
-const makeS = (c: any) => StyleSheet.create({
+const makeS = themedStyles((c: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
 
   // ── Header ───────────────────────────────────────────────────────────────────
@@ -444,4 +445,4 @@ const makeS = (c: any) => StyleSheet.create({
     borderWidth: 1, borderColor: G.cardBorder,
   },
   backBtnText: { fontSize: 14, fontWeight: '700', color: G.accent },
-});
+}));
