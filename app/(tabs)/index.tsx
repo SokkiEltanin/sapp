@@ -1393,6 +1393,14 @@ export default function DashboardScreen() {
     const period = (t.period ?? 'month') as 'week' | 'month';
     const viz = t.viz ?? 'number';
     const Ic = metricIcon(def);
+    // ZAROBEK: a month is CONFIRMED once its real [JD] paycheck is known; the current
+    // month is only a projection (all calendar hours × rate). Surface that — a lone
+    // big number read as "I'm definitely earning this".
+    const paidBy = statCtx.paycheckByMonth ?? {};
+    const ymBack = (back: number) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - back); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+    // month buckets only — ymBack maps bucket→month, which is meaningless for weeks
+    const isEarnings = t.metric === 'earnings' && period === 'month';
+    const earningsForecast = isEarnings && !((paidBy[ymBack(0)] ?? 0) > 0);
     const header = (
       <View style={s.cardHeader}>
         <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
@@ -1511,12 +1519,20 @@ export default function DashboardScreen() {
               <Text key={i} style={[s.waveValLabel, i === ser.values.length - 1 && { color: accentColor, fontWeight: '800' }]} numberOfLines={1}>{fmtChartPt(v, ser.unit)}</Text>
             ))}
           </View>
-          <WaveChart data={ser.values} color={accentColor} target={t.target} zoom={t.metric === 'weight'} />
+          <WaveChart data={ser.values} color={accentColor} target={t.target} zoom={t.metric === 'weight'}
+            dotColors={isEarnings ? ser.values.map((_, i) => ((paidBy[ymBack(ser.values.length - 1 - i)] ?? 0) > 0 ? '#2AC68F' : '#FBBF24')) : undefined} />
           <View style={s.waveLabels}>
             {ser.labels.map((l, i) => (
               <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>
             ))}
           </View>
+          {isEarnings && (
+            <View style={s.fvLegend}>
+              <View style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: '#2AC68F' }]} /><Text style={s.fvLegTxt}>potwierdzone wypłatą</Text></View>
+              <View style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: '#FBBF24' }]} /><Text style={s.fvLegTxt}>prognoza</Text></View>
+            </View>
+          )}
+          {earningsForecast && <Text style={s.forecastNote}>Bieżący miesiąc to szacunek z kalendarza × stawka — nie potwierdzony wypłatą.</Text>}
           {t.target ? <Text style={s.statSub}>Cel: {fmtStat(t.target, ser.unit)}</Text> : null}
         </View>
       );
@@ -1670,6 +1686,9 @@ export default function DashboardScreen() {
         {header}
         <View style={s.statNumRow}>
           <Text style={[s.statBig, { color: over ? colors.accent.red : accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+          {earningsForecast && (
+            <View style={s.forecastChip}><Text style={s.forecastChipTxt}>PROGNOZA</Text></View>
+          )}
           {deltaPct != null && (
             <View style={[s.statDelta, { backgroundColor: (trendUp ? '#2AC68F' : '#FF6B6B') + '1E' }]}>
               {trendUp ? <TrendingUp size={11} color="#2AC68F" /> : <TrendingDown size={11} color="#FF6B6B" />}
@@ -1677,6 +1696,9 @@ export default function DashboardScreen() {
             </View>
           )}
         </View>
+        {earningsForecast && (
+          <Text style={s.forecastNote}>Szacunek na CAŁY miesiąc (godziny z kalendarza × stawka) — jeszcze nie potwierdzone wypłatą. Poprzednie miesiące to realne wypłaty.</Text>
+        )}
         {pct != null ? (
           <>
             <View style={s.statTargetTrack}>
@@ -1697,8 +1719,15 @@ export default function DashboardScreen() {
               ))}
             </View>
             <View style={{ opacity: 0.85 }}>
-              <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} zoom={t.metric === 'weight'} />
+              <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} zoom={t.metric === 'weight'}
+                dotColors={isEarnings ? spark.map((_, i) => ((paidBy[ymBack(spark!.length - 1 - i)] ?? 0) > 0 ? '#2AC68F' : '#FBBF24')) : undefined} />
             </View>
+            {isEarnings && (
+              <View style={s.fvLegend}>
+                <View style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: '#2AC68F' }]} /><Text style={s.fvLegTxt}>potwierdzone wypłatą</Text></View>
+                <View style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: '#FBBF24' }]} /><Text style={s.fvLegTxt}>prognoza</Text></View>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -4572,6 +4601,9 @@ const makeStyles = (c: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   cardTitle: { fontSize: 12, fontWeight: '800', color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 1 },
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
+  forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },
+  forecastNote: { fontSize: 10.5, color: c.text.muted, lineHeight: 14, fontStyle: 'italic' },
   pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
   pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
