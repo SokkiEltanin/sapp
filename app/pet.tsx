@@ -11,11 +11,11 @@ import CrateModal from '@/components/pet/CrateModal';
 import PetScene from '@/components/pet/PetScene';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { buildQuests, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
+import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { equippedRoom, roomAddonsFor, TIER_META } from '@/utils/petShop';
 import { bossById } from '@/utils/bosses';
 import { getBudgets } from '@/utils/budgets';
-import { useHabits } from '@/hooks/useHabits';
+import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
 import { getWaterGlasses } from '@/utils/habits';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -28,17 +28,16 @@ import { toast } from '@/store/toastStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Coins as CoinsIcon, Check as CheckIcon, Gift } from 'lucide-react-native';
 
-const todayISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayISO = () => ymdOf(new Date());
+const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
 
 export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, equipped, petCat, affection, affectionDay, pendingCrates, roomAddons, buyRoomAddon, toggleRoomAddon, ownedItems, defeatedBosses } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   const [addonsOpen, setAddonsOpen] = useState(false);   // room-addons picker collapsed by default
@@ -63,7 +62,7 @@ export default function Pet() {
     if (buyRoomAddon(roomKey, a.id, a.cost)) { haptic.success(); toast.success(`Dodano do pokoju: ${a.name}`); }
     else { haptic.error(); toast.error(`Za mało monet — potrzeba ${a.cost}`); }
   };
-  const { habits, todayDone, getStreak } = useHabits();
+  const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
 
@@ -72,6 +71,9 @@ export default function Pet() {
   const [waterGoal, setWaterGoal] = useState(8);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [waterToday, setWaterToday] = useState(0);
+  // Yesterday's numbers, so rewards you earned but never opened the app to collect
+  // can still be claimed today (see `missed` below).
+  const [yData, setYData] = useState<{ steps: number; sleep: number; water: number } | null>(null);
   const [cardsCollected, setCardsCollected] = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -82,10 +84,12 @@ export default function Pet() {
     const t = todayISO();
     const month = t.slice(0, 7);
     getHealthHistory(200).then(h => {
-      const days = Object.keys(h).sort();
-      const yest = days[days.length - 2];
       const steps = h[t]?.steps ?? 0;
-      const sleep = (h[t]?.sleepMinutes ?? 0) || (yest ? h[yest]?.sleepMinutes ?? 0 : 0);
+      // TODAY's sleep only. This used to fall back to the previous day on record when
+      // today hadn't synced yet, which silently credited LAST night-but-one's sleep to
+      // today's quest (claimed 7h while today was really 6,5h). No data for today = the
+      // quest simply isn't earned yet.
+      const sleep = h[t]?.sleepMinutes ?? 0;
       const bestStepDay = Object.values(h).reduce((m, d) => Math.max(m, d.steps ?? 0), 0);
       const stepsThisMonth = Object.entries(h).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
       const wk = weekKeyOf();
@@ -94,6 +98,12 @@ export default function Pet() {
       const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
       const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
       setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek });
+      // yesterday's health + water, for the missed-rewards catch-up (habits come from
+      // the useHabits `completions` map, which already holds the last 30 days)
+      const y = yesterdayISO();
+      getWaterGlasses(y)
+        .then(water => setYData({ steps: h[y]?.steps ?? 0, sleep: h[y]?.sleepMinutes ?? 0, water }))
+        .catch(() => {});
     }).catch(() => {});
     getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
     getBudgets().then(b => setBudgets(b as Record<string, number>)).catch(() => {});
@@ -140,6 +150,38 @@ export default function Pet() {
     () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }),
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims],
   );
+
+  // Rewards you actually earned YESTERDAY but never opened the app to collect. Built
+  // from yesterday's stored numbers (not today's), so nothing is credited from the
+  // wrong day. Only reconstructable quests appear — see RETRO_DAILY_IDS in quests.ts.
+  const missed = useMemo(() => {
+    if (!yData) return [];
+    const y = yesterdayISO();
+    const yCtx: QuestCtx = {
+      stepsToday: yData.steps,
+      moodLoggedToday: moodEntries.some(e => e.date === y),
+      habitsDone: habitsDoneOn(habits, completions, y).length,
+      habitsTotal: habits.length,
+      sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0,
+      waterToday: yData.water, waterGoal,
+      sleepMinutes: yData.sleep,
+    };
+    return buildMissedDaily(yCtx, dailyClaims, y);
+  }, [yData, moodEntries, habits, completions, waterGoal, dailyClaims]);
+
+  const claimMissed = (q: { id: string; label: string; coins: number; xp: number }) => {
+    if (claimDailyFor(q.id, yesterdayISO(), q.coins, q.xp)) {
+      haptic.success();
+      setCelebrate(v => v + 1);
+      toast.success(`Odebrano z wczoraj: ${q.label} +${q.coins}🪙`);
+    }
+  };
+  const claimAllMissed = () => {
+    const y = yesterdayISO();
+    let coins = 0;
+    missed.forEach(q => { if (claimDailyFor(q.id, y, q.coins, q.xp)) coins += q.coins; });
+    if (coins > 0) { haptic.success(); setCelebrate(v => v + 1); toast.success(`Odebrano zaległe nagrody +${coins}🪙`); }
+  };
 
   // Tap-to-pet: fills today's affection bar; a full bar pays a one-a-day bonus and
   // the cat throws a little party.
@@ -323,6 +365,30 @@ export default function Pet() {
             </View>
           ))}
         </View>
+
+        {/* ── Missed yesterday: rewards earned but never collected ── */}
+        {missed.length > 0 && (
+          <>
+            <View style={s.qHead}>
+              <Text style={s.section}>Nieodebrane z wczoraj</Text>
+              <PressableScale onPress={claimAllMissed}>
+                <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>Odbierz wszystko</Text></View>
+              </PressableScale>
+            </View>
+            <View style={[s.qCard, s.missedCard]}>
+              {missed.map((q, i) => (
+                <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
+                    {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                  </View>
+                  <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                  <PressableScale onPress={() => claimMissed(q)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* ── Daily quests ── */}
         <View style={s.qHead}>
@@ -561,6 +627,7 @@ const makeS = (c: any) => StyleSheet.create({
   claimBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
   claimBadgeTxt: { fontSize: 10.5, fontWeight: '900', color: '#0B0E1A' },
   qCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3] },
+  missedCard: { borderColor: '#FBBF2466', backgroundColor: '#FBBF240D' },  // gold tint — these expire
   qRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: spacing[3] },
   qRowBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
   qLabel: { fontSize: 13.5, fontWeight: '700', color: c.text.primary },

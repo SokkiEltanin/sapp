@@ -165,6 +165,31 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
   return { daily, bonusDaily, weekly, milestones, monthly, claimableCount: claimable };
 }
 
+// ─── Missed dailies (yesterday's unclaimed rewards) ─────────────────────────
+// If you didn't open the app yesterday you'd silently lose rewards you'd actually
+// earned. These are the dailies whose "done" state can be RECONSTRUCTED from stored
+// history, so they can still be claimed the next day. Excluded on purpose:
+//  • d_pet      — affection isn't recorded per-day, so it can't be reconstructed
+//  • b_stepbeat — its target adapts to your CURRENT form, so it'd be judged unfairly
+const RETRO_DAILY_IDS = ['d_mood', 'd_steps10', 'd_steps20', 'd_habits', 'b_water', 'b_sleep'];
+
+// Build the list of rewards earned on `date` but never claimed for it. `ctx` must be
+// filled with THAT DAY's values (steps/sleep/water/mood/habits), not today's.
+export function buildMissedDaily(ctx: QuestCtx, dailyClaims: Record<string, string>, date: string): DailyQuestState[] {
+  const out: DailyQuestState[] = [];
+  for (const d of DAILY) {
+    if (!RETRO_DAILY_IDS.includes(d.id)) continue;
+    if (!d.done(ctx) || dailyClaims[d.id] === date) continue;
+    out.push({ id: d.id, label: d.label, coins: d.coins, xp: d.xp, done: true, claimed: false, note: d.note?.(ctx) });
+  }
+  for (const b of BONUS) {
+    if (!RETRO_DAILY_IDS.includes(b.id) || !b.available(ctx)) continue;
+    if (!b.done(ctx) || dailyClaims[b.id] === date) continue;
+    out.push({ id: b.id, label: b.label(ctx), coins: b.coins, xp: b.xp, done: true, claimed: false, note: b.note?.(ctx) });
+  }
+  return out;
+}
+
 // Monday (YYYY-MM-DD) of the week a date falls in — the weekly-claim key.
 export function weekKeyOf(d = new Date()): string {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());

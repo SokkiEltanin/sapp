@@ -33,6 +33,26 @@ function isDone(habit: Habit, count: number): boolean {
   return count >= goalFor(habit);
 }
 
+// Which habits count as done on `date` — the single rule behind todayDone (weekly-target
+// habits count when the rolling 7-day target is met). Exported so other screens can
+// reconstruct a PAST day with identical semantics, e.g. the pet's missed-reward catch-up.
+export function habitsDoneOn(
+  habits: Habit[],
+  completions: Record<string, Record<string, number>>,
+  date: string,
+): string[] {
+  return habits
+    .filter((h) => {
+      if (h.weeklyTarget && h.weeklyTarget < 7) {
+        const weekDone = Array.from({ length: 7 }, (_, i) =>
+          isDone(h, completions[offsetDate(date, -i)]?.[h.id] ?? 0)).filter(Boolean).length;
+        return weekDone >= h.weeklyTarget;
+      }
+      return isDone(h, completions[date]?.[h.id] ?? 0);
+    })
+    .map((h) => h.id);
+}
+
 export function useHabits() {
   const [habits, setHabits]       = useState<Habit[]>([]);
   const [completions, setComp]    = useState<Record<string, Record<string, number>>>({});
@@ -189,22 +209,7 @@ export function useHabits() {
     return completions[today]?.[habitId] ?? 0;
   }, [completions, today]);
 
-  const todayDone = useMemo(() => {
-    const counts = completions[today] ?? {};
-    return habits
-      .filter((h) => {
-        // For weekly-target habits, done if target met in rolling 7-day window
-        if (h.weeklyTarget && h.weeklyTarget < 7) {
-          const weekDone = Array.from({ length: 7 }, (_, i) => {
-            const d = offsetDate(today, -i);
-            return isDone(h, completions[d]?.[h.id] ?? 0);
-          }).filter(Boolean).length;
-          return weekDone >= h.weeklyTarget;
-        }
-        return isDone(h, counts[h.id] ?? 0);
-      })
-      .map((h) => h.id);
-  }, [habits, completions, today]);
+  const todayDone = useMemo(() => habitsDoneOn(habits, completions, today), [habits, completions, today]);
 
   return {
     habits, todayDone, completions, isLoading,

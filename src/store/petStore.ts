@@ -50,6 +50,7 @@ interface PetState {
   toggleRoomAddon: (roomId: string, id: string) => void;               // owned add-on on/off in a room
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
+  claimDailyFor: (id: string, date: string, coins: number, xp: number) => boolean; // catch-up claim for a past day
   claimWeekly: (id: string, coins: number, xp: number) => boolean;   // weekly (once/week)
   claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
@@ -137,6 +138,13 @@ export const usePetStore = create<PetState>()(
         const t = todayISO();
         if (get().dailyClaims[id] === t) return false;
         set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: t }, coins: s.coins + coins, xp: s.xp + xp }));
+        return true;
+      },
+      // Claim a daily for a PAST date (the "nieodebrane z wczoraj" catch-up). Same
+      // once-per-day guard, just keyed to that date instead of today.
+      claimDailyFor: (id, date, coins, xp) => {
+        if (get().dailyClaims[id] === date) return false;
+        set((s) => ({ dailyClaims: { ...s.dailyClaims, [id]: date }, coins: s.coins + coins, xp: s.xp + xp }));
         return true;
       },
       claimWeekly: (id, coins, xp) => {
