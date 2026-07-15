@@ -145,6 +145,16 @@ function metricIcon(def: { id: string; group: string }): React.ComponentType<any
   return STAT_METRIC_ICON[def.id] ?? STAT_GROUP_ICON[def.group] ?? BarChart2;
 }
 
+// Compact per-point label for the trend charts (value shown ABOVE each dot). Kept
+// short so 6 across a narrow card stay legible: decimals for kg/h/rating, exact
+// (grouped) number up to 5 digits, then k-notation. Empty for a zero/no-data point.
+function fmtChartPt(v: number, unit: string): string {
+  if (!(v > 0)) return '';
+  if (unit === 'kg' || unit === 'h' || unit === '/5') return v.toFixed(1).replace('.', ',');
+  if (v >= 100000) return `${Math.round(v / 1000)}k`;
+  return Math.round(v).toLocaleString('pl-PL');
+}
+
 const MOOD_EMOJIS: Record<MoodLevel, string> = {
   1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩',
 };
@@ -1496,6 +1506,11 @@ export default function DashboardScreen() {
               )}
             </View>
           </View>
+          <View style={s.waveValRow}>
+            {ser.values.map((v, i) => (
+              <Text key={i} style={[s.waveValLabel, i === ser.values.length - 1 && { color: accentColor, fontWeight: '800' }]} numberOfLines={1}>{fmtChartPt(v, ser.unit)}</Text>
+            ))}
+          </View>
           <WaveChart data={ser.values} color={accentColor} target={t.target} zoom={t.metric === 'weight'} />
           <View style={s.waveLabels}>
             {ser.labels.map((l, i) => (
@@ -1675,8 +1690,15 @@ export default function DashboardScreen() {
           </Text>
         )}
         {spark && spark.some(v => v > 0) && (
-          <View style={{ marginTop: spacing[2], opacity: 0.8 }}>
-            <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} zoom={t.metric === 'weight'} />
+          <View style={{ marginTop: spacing[2] }}>
+            <View style={s.waveValRow}>
+              {spark.map((v, i) => (
+                <Text key={i} style={[s.waveValLabel, i === spark!.length - 1 && { color: over ? colors.accent.red : accentColor, fontWeight: '800' }]} numberOfLines={1}>{fmtChartPt(v, r.unit)}</Text>
+              ))}
+            </View>
+            <View style={{ opacity: 0.85 }}>
+              <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} zoom={t.metric === 'weight'} />
+            </View>
           </View>
         )}
       </View>
@@ -3285,7 +3307,6 @@ export default function DashboardScreen() {
               const MON = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
               const fixedC = '#8893A8', varC = accentColor, foodC = '#4CA96B';
               const H = 46;
-              const prevM = prev[prev.length - 1];
               const fmt = (n: number) => n.toLocaleString('pl-PL');
               return (
                 <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -3294,29 +3315,44 @@ export default function DashboardScreen() {
                     <Text style={s.cardTitle} numberOfLines={1}>Na co idą pieniądze</Text>
                     <Text style={s.fvHint}>ten miesiąc</Text>
                   </View>
-                  <View style={s.fvTiles}>
-                    <View style={s.fvTile}><Text style={[s.fvAmt, { color: fixedC }]}>{fmt(cur.fixed)} zł</Text><Text style={s.fvLbl}>Stałe</Text></View>
-                    <View style={s.fvTile}><Text style={[s.fvAmt, { color: varC }]}>{fmt(cur.variable)} zł</Text><Text style={s.fvLbl}>Zmienne</Text></View>
-                    <View style={s.fvTile}><Text style={[s.fvAmt, { color: foodC }]}>{fmt(cur.food)} zł</Text><Text style={s.fvLbl}>Jedzenie</Text></View>
+                  {/* three categories as readable rows: dot · label · % · amount */}
+                  <View style={{ gap: 7 }}>
+                    {([['Stałe', cur.fixed, fixedC], ['Zmienne', cur.variable, varC], ['Jedzenie', cur.food, foodC]] as const).map(([lbl, val, col]) => (
+                      <View key={lbl} style={s.fvRow}>
+                        <View style={[s.fvDot, { backgroundColor: col }]} />
+                        <Text style={s.fvRowLbl}>{lbl}</Text>
+                        <Text style={s.fvRowPct}>{Math.round((val / totalCur) * 100)}%</Text>
+                        <Text style={[s.fvRowAmt, { color: col }]}>{fmt(val)} zł</Text>
+                      </View>
+                    ))}
                   </View>
                   <View style={s.fvBar}>
                     <View style={{ flex: Math.max(cur.fixed, 0.001), backgroundColor: fixedC }} />
                     <View style={{ flex: Math.max(cur.variable, 0.001), backgroundColor: varC }} />
                     <View style={{ flex: Math.max(cur.food, 0.001), backgroundColor: foodC }} />
                   </View>
+
+                  {/* what the FIXED cost is made of — one item per row, not a cram */}
                   {fvFixedItems.length > 0 && (
-                    <Text style={s.fvFixedList} numberOfLines={2}>
-                      <Text style={{ color: fixedC, fontWeight: '800' }}>Stałe: </Text>
-                      {fvFixedItems.slice(0, 5).map(it => `${it.label} ${fmt(it.amount)}`).join('  ·  ')}
-                    </Text>
+                    <View style={s.fvFixBox}>
+                      <Text style={s.fvFixHead}>STAŁE — SKŁADNIKI</Text>
+                      {fvFixedItems.slice(0, 4).map(it => (
+                        <View key={it.label} style={s.fvFixRow}>
+                          <Text style={s.fvFixLbl} numberOfLines={1}>{it.label}</Text>
+                          <Text style={s.fvFixAmt}>{fmt(it.amount)} zł</Text>
+                        </View>
+                      ))}
+                      {fvFixedItems.length > 4 && <Text style={s.fvFixMore}>+{fvFixedItems.length - 4} więcej</Text>}
+                    </View>
                   )}
-                  {prevM && (
-                    <Text style={s.fvNote}>
-                      Poprzedni miesiąc: jedzenie {fmt(prevM.food)} zł · zmienne {fmt(prevM.variable)} zł · stałe {fmt(prevM.fixed)} zł
-                    </Text>
-                  )}
+
                   {prev.length > 0 && (
                     <>
+                      <View style={s.fvLegend}>
+                        {([['Stałe', fixedC], ['Zmienne', varC], ['Jedzenie', foodC]] as const).map(([lbl, col]) => (
+                          <View key={lbl} style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: col }]} /><Text style={s.fvLegTxt}>{lbl}</Text></View>
+                        ))}
+                      </View>
                       <View style={s.fvTrend}>
                         {fvMonths.map((m, i) => (
                           <View key={m.month} style={{ flex: 1, alignItems: 'center', gap: 5 }}>
@@ -4540,14 +4576,22 @@ const makeStyles = (c: any) => StyleSheet.create({
   pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
   fvHint: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 'auto' },
-  fvRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[2], marginBottom: spacing[2] },
-  fvTiles: { flexDirection: 'row', marginTop: spacing[2], marginBottom: spacing[2] },
-  fvTile: { flex: 1, alignItems: 'center' },
-  fvAmt: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
-  fvLbl: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: 2 },
+  fvRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  fvDot: { width: 9, height: 9, borderRadius: 5 },
+  fvRowLbl: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
+  fvRowPct: { fontSize: 12, fontWeight: '700', color: c.text.muted, width: 40, textAlign: 'right' },
+  fvRowAmt: { fontSize: 14, fontWeight: '800', letterSpacing: -0.3, width: 92, textAlign: 'right' },
   fvBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: c.fill.subtle },
-  fvFixedList: { fontSize: 11, color: c.text.secondary, marginTop: spacing[2], lineHeight: 16 },
-  fvNote: { fontSize: 11, color: c.text.secondary, marginTop: spacing[2], lineHeight: 15 },
+  fvFixBox: { gap: 5, paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  fvFixHead: { fontSize: 9.5, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6 },
+  fvFixRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] },
+  fvFixLbl: { flex: 1, fontSize: 12.5, color: c.text.secondary },
+  fvFixAmt: { fontSize: 12.5, fontWeight: '700', color: c.text.primary },
+  fvFixMore: { fontSize: 11, color: c.text.muted, fontStyle: 'italic' },
+  fvLegend: { flexDirection: 'row', justifyContent: 'center', gap: spacing[3] },
+  fvLegItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  fvDotSm: { width: 7, height: 7, borderRadius: 4 },
+  fvLegTxt: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
   fvTrend: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   fvMonthLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
   fvAvg: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[2], textAlign: 'center' },
@@ -4686,6 +4730,8 @@ const makeStyles = (c: any) => StyleSheet.create({
   avgPillText: { fontSize: 11, fontWeight: '700' },
   waveLabels: { flexDirection: 'row' },
   waveLabel: { flex: 1, fontSize: 8, color: c.text.muted, textAlign: 'center' },
+  waveValRow: { flexDirection: 'row', marginBottom: 3 },
+  waveValLabel: { flex: 1, fontSize: 8.5, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
   waveValues: { flexDirection: 'row', marginBottom: 2 },
   waveValue: { flex: 1, fontSize: 9, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
   // Wave tile: title left, prominent current value right.
