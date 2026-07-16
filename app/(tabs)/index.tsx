@@ -75,7 +75,7 @@ import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
-import StreakFlame from '@/components/counters/StreakFlame';
+import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
 import StreakCard from '@/components/counters/StreakCard';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
 // persisted screen instead of expo-router's blank production fallback.
@@ -3139,17 +3139,18 @@ export default function DashboardScreen() {
               </View>
             );
 
+            // One row per habit: the old widget only had a "how many habits are ticked"
+            // bar + dots, so a count habit like water showed nothing but "not done" —
+            // you couldn't see 3/8 glasses. Now each habit carries its OWN progress and
+            // its streak, the same flame the Liczniki card uses.
             nodes['habits-today'] = habits.length > 0 && (() => {
               const doneCount = habitsDoneIds.length;
               const allDone   = doneCount === habits.length;
-              const pct       = habits.length > 0 ? doneCount / habits.length : 0;
+              const SHOWN = 6;
               return (
-                <TouchableOpacity
-                  style={[s.habitsCard, { backgroundColor: cardBgDark }]}
-                  onPress={() => router.navigate('/habits' as any)}
-                  activeOpacity={0.8}
-                >
-                  <View style={s.habitsHeader}>
+                <View style={[s.habitsCard, { backgroundColor: cardBgDark }]}>
+                  <TouchableOpacity style={s.habitsHeader} activeOpacity={0.8}
+                    onPress={() => { haptic.tap(); router.navigate('/habits' as any); }}>
                     <View style={s.habitsHeaderLeft}>
                       <Flame size={13} color={accentColor} />
                       <Text style={[s.habitsTitle, allDone && { color: accentColor }]}>
@@ -3159,57 +3160,65 @@ export default function DashboardScreen() {
                     <Text style={[s.habitsBadge, allDone && { color: accentColor }]}>
                       {doneCount}/{habits.length}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
 
-                  {/* Progress bar */}
-                  <View style={s.habitsTrack}>
-                    <View style={[s.habitsFill, {
-                      width: `${pct * 100}%` as any,
-                      backgroundColor: accentColor,
-                    }]} />
-                  </View>
-
-                  {/* Per-habit quick dots */}
-                  <View style={s.habitsDotsRow}>
-                    {habits.slice(0, 7).map(h => {
+                  <View style={{ gap: spacing[2] }}>
+                    {habits.slice(0, SHOWN).map(h => {
                       const done = habitsDoneIds.includes(h.id);
                       const isCount = h.type === 'count';
+                      const goal = Math.max(1, h.dailyGoal ?? 1);
                       const count = isCount ? getTodayCount(h.id) : 0;
-                      const goal = h.dailyGoal ?? 1;
+                      // count habits show REAL progress; a check habit is yes/no, so its
+                      // bar is simply empty or full
+                      const pct = isCount ? Math.min(1, count / goal) : (done ? 1 : 0);
+                      const streak = getStreak(h.id);
+                      const sc = streakColor(streak);
                       const HIcon = HABIT_ICON_MAP[h.icon] ?? Zap;
                       return (
                         <TouchableOpacity
                           key={h.id}
-                          onPress={(e) => {
-                            (e as any).stopPropagation?.();
-                            if (isCount && !done) {
-                              haptic.tap();
-                              incrementHabit(h.id);
-                            } else if (!isCount) {
-                              haptic.tap();
-                              toggleHabit(h.id);
-                            }
-                          }}
-                          style={[
-                            s.habitsDot,
-                            { backgroundColor: done ? h.color + 'CC' : h.color + '20', borderColor: h.color + (done ? 'CC' : '40') },
-                          ]}
                           activeOpacity={0.7}
+                          onPress={() => {
+                            haptic.tap();
+                            if (isCount) incrementHabit(h.id); else toggleHabit(h.id);
+                          }}
+                          style={s.hRow}
                         >
-                          <HIcon size={12} color={done ? colors.bg.primary : h.color} strokeWidth={2} />
-                          {isCount && !done && count > 0 && (
-                            <View style={[s.habitCountBadge, { backgroundColor: h.color }]}>
-                              <Text style={s.habitCountText}>{count}</Text>
+                          <View style={[s.hIcon, { backgroundColor: h.color + (done ? 'CC' : '22'), borderColor: h.color + (done ? 'CC' : '44') }]}>
+                            <HIcon size={14} color={done ? colors.bg.primary : h.color} strokeWidth={2} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+                            <View style={s.hTop}>
+                              <Text style={s.hName} numberOfLines={1}>{h.title}</Text>
+                              {streak > 0 && (
+                                <View style={s.hStreak}>
+                                  <Flame size={11} color={sc} fill={sc} />
+                                  <Text style={[s.hStreakTxt, { color: sc }]}>{streak}</Text>
+                                </View>
+                              )}
+                              <Text style={[s.hVal, { color: done ? h.color : colors.text.muted }]}>
+                                {isCount ? `${count}/${goal}${h.unit ? ` ${h.unit}` : ''}` : (done ? 'zrobione' : '—')}
+                              </Text>
                             </View>
-                          )}
+                            <View style={s.hTrack}>
+                              <View style={[s.hFill, { width: `${pct * 100}%` as any, backgroundColor: h.color }]} />
+                            </View>
+                          </View>
+                          <View style={[s.hBtn, { borderColor: h.color + '55', backgroundColor: h.color + '14' }]}>
+                            {isCount
+                              ? <Plus size={15} color={h.color} />
+                              : done
+                                ? <Check size={15} color={h.color} />
+                                : <View style={[s.hEmptyTick, { borderColor: h.color }]} />}
+                          </View>
                         </TouchableOpacity>
                       );
                     })}
-                    {habits.length > 7 && (
-                      <Text style={s.habitsMore}>+{habits.length - 7}</Text>
-                    )}
                   </View>
-                </TouchableOpacity>
+                  {habits.length > SHOWN && (
+                    <Text style={s.habitsMore}>+{habits.length - SHOWN} więcej — stuknij nagłówek</Text>
+                  )}
+                </View>
               );
             })();
 
@@ -4526,19 +4535,19 @@ const buildStyles = (c: any) => StyleSheet.create({
     borderRadius: 4, overflow: 'hidden',
   },
   habitsFill: { height: '100%', borderRadius: 4 },
-  habitsDotsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  habitsDot: {
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  habitCountBadge: {
-    position: 'absolute', bottom: -3, right: -3,
-    minWidth: 14, height: 14, borderRadius: 7,
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  habitCountText: { fontSize: 8, fontWeight: '800', color: c.bg.primary },
+
+  // one row per habit: icon · name + streak + value · own progress bar · tap target
+  hRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  hIcon: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  hTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  hName: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
+  hStreak: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  hStreakTxt: { fontSize: 11, fontWeight: '900' },
+  hVal: { fontSize: 11.5, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  hTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, overflow: 'hidden' },
+  hFill: { height: '100%', borderRadius: 3 },
+  hBtn: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  hEmptyTick: { width: 13, height: 13, borderRadius: 7, borderWidth: 1.5 },
 
   // ── Stats scope toggle (everyone / only me) ─────────────────────────────────
   scopeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
