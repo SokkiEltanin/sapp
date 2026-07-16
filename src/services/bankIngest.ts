@@ -14,20 +14,25 @@ export async function ingestBankNotification(title: string, text: string): Promi
   const tx = parseBankNotification(title, text);
   if (!tx) return false;
 
-  // Incoming transfer → income. Auto-book ONLY confident salary-like income (reads
-  // like salary OR a sender you've confirmed as a paycheck before) when full-auto is
-  // on. Anything else (a refund, a friend paying you back, an unknown transfer) is NOT
-  // silently booked as income — it goes to review on the dashboard so you decide.
+  // Incoming transfer → income. Full-auto means FULL auto: an ordinary credit is booked
+  // straight away, exactly like a card payment. This used to hold back everything that
+  // wasn't salary-like, so a normal transfer ("Wpłynęło 37,00 PLN … od OLESIA NEZHUHA")
+  // just sat in review — which read as "the notification wasn't picked up at all".
+  //
+  // Verify better, but never drop: only genuinely odd ones ASK. `jd` still matters —
+  // it's what tags the income as a paycheck (workPrefix) on commit.
   if (tx.direction === 'in') {
     const jd = !!tx.isSalary || await isKnownPaycheckSender(tx.storeKey);
-    const confidentIncome = store.autoAll && jd;
+    // A large credit that doesn't look like your paycheck is worth one glance — it's
+    // the one case where booking it silently as income could quietly skew the stats.
+    const uncertain = !jd && tx.amount > 1500;
     return store.enqueue({
       ...tx,
       category: 'other',
       suggestedCategory: 'other',
       jd,
-      auto: confidentIncome,
-      ...(confidentIncome ? {} : { flagReason: jd ? undefined : 'przelew przychodzący — potwierdź, czy to przychód' }),
+      auto: store.autoAll && !uncertain,
+      ...(uncertain ? { flagReason: 'duży przelew przychodzący — potwierdź, czy to przychód' } : {}),
     });
   }
 

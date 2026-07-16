@@ -34,12 +34,13 @@ export const useBankQueue = create<BankQueueState>()(
       enabled: false,
       autoAll: false,
       setEnabled: (v) => set({ enabled: v }),
-      // Turning full-auto ON also flips every already-queued CARD payment to `auto` so
-      // the next processor run clears the backlog too. Income (direction 'in') stays
-      // manual — never auto-log a paycheck blindly.
+      // Turning full-auto ON flips the whole queued backlog to `auto` — incoming
+      // transfers included. Income used to be excluded here, which meant even with
+      // full-auto on, a credit still waited for a tap. Anything explicitly flagged
+      // (flagReason) stays manual: that's the "ask me when it looks off" case.
       setAutoAll: (v) => set((s) => ({
         autoAll: v,
-        pending: v ? s.pending.map(p => p.direction === 'in' ? p : { ...p, auto: true }) : s.pending,
+        pending: v ? s.pending.map(p => (p.flagReason ? p : { ...p, auto: true })) : s.pending,
       })),
       enqueue: (tx) => {
         // dedupe: same amount + within 3 min + same shop already queued
