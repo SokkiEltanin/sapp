@@ -30,13 +30,14 @@ export default function MonthWrappedCard({
   const shine = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 440, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-    // Higher tiers catch the light more often (graphite rarely, amethyst briskly).
-    const idle = [6000, 5000, 4000, 3000, 2200][rank] ?? 5000;
+    // The foil sheen is now the LEGENDARY tell — only the top tier sweeps. On every card
+    // it just made common months look special too (and was visual noise).
+    if (!legendary) return;
     const loop = Animated.loop(Animated.sequence([
       Animated.delay(700 + delay),
       Animated.timing(shine, { toValue: 1, duration: 950, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       Animated.timing(shine, { toValue: 0, duration: 0, useNativeDriver: true }),
-      Animated.delay(idle),
+      Animated.delay(2400),
     ]));
     loop.start();
     return () => loop.stop();
@@ -80,11 +81,14 @@ export default function MonthWrappedCard({
         {/* header */}
         <View style={st.head}>
           <View style={{ flex: 1 }}>
+            {/* a filled MIESIĄC pill, mirroring the year card's ROK pill, so the two
+                card types read as clearly different at a glance */}
             <View style={st.kicker}>
-              <Sparkles size={12} color={card.accent} />
-              <Text style={[st.kickerTxt, { color: card.accent }]}>
-                {card.inProgress ? 'Karta w trakcie' : 'Karta miesiąca'} · #{card.index}
-              </Text>
+              <View style={[st.typePill, { backgroundColor: card.accent }]}>
+                <Sparkles size={10} color="#12151b" />
+                <Text style={st.typePillTxt}>{card.inProgress ? 'MIESIĄC · W TRAKCIE' : 'MIESIĄC'}</Text>
+              </View>
+              <Text style={[st.kickerTxt, { color: card.accent }]}>#{card.index}</Text>
             </View>
             {/* rarity tier — always shown so the colour is legible */}
             <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '1F' }]}>
@@ -146,7 +150,9 @@ export default function MonthWrappedCard({
         {/* favourite sweets */}
         {card.sweets.length > 0 && (
           <View style={st.sweets}>
-            <Text style={st.sectionLabel}>Ulubione słodycze</Text>
+            {/* the list is tagged słodycze OR przekąski, so "orzeszki w skorupce" (a snack)
+                can top it — the label must say both, not just "słodycz" */}
+            <Text style={st.sectionLabel}>Ulubione słodycze / przekąski</Text>
             {card.sweets.map((sw, i) => (
               <View key={i} style={st.sweetRow}>
                 <Text style={st.sweetEmoji}>{sw.emoji}</Text>
@@ -184,14 +190,16 @@ export default function MonthWrappedCard({
           </View>
         </View>
 
-        {/* holographic sheen sweep — foil trading-card feel */}
+        {/* holographic sheen sweep — LEGENDARY only, so it actually means something */}
+        {legendary && (
         <Animated.View pointerEvents="none" style={[st.sheen, { transform: [{ translateX: shineX }, { rotate: '18deg' }] }]}>
           <LinearGradient
-            colors={['transparent', `rgba(255,255,255,${(0.18 + rank * 0.05).toFixed(2)})`, 'transparent']}
+            colors={['transparent', 'rgba(255,255,255,0.38)', 'transparent']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={{ flex: 1 }}
           />
         </Animated.View>
+        )}
       </LinearGradient>
     </Animated.View>
   );
@@ -211,8 +219,10 @@ const st = StyleSheet.create({
   sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
 
   head: { flexDirection: 'row', alignItems: 'flex-start' },
-  kicker: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 5 },
+  kicker: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
   kickerTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  typePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  typePillTxt: { fontSize: 10, fontWeight: '900', color: '#12151b', letterSpacing: 0.7 },
   rarityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 7 },
   rarityEmoji: { fontSize: 11 },
   rarityTxt: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },

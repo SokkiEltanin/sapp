@@ -47,9 +47,14 @@ export default function YearWrappedCard({ card }: { card: YearCard }) {
       <LinearGradient colors={card.palette} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[st.card, { borderColor: card.accent + 'AA' }]}>
         <Text style={st.watermark}>👑</Text>
 
+        {/* a filled "ROK" pill + the big year number make this unmistakably the yearly
+            summary, not one of the monthly cards stacked below it */}
         <View style={st.kicker}>
-          <Crown size={13} color={card.accent} />
-          <Text style={[st.kickerTxt, { color: card.accent }]}>Rok w pigułce · {card.months} kart</Text>
+          <View style={[st.typePill, { backgroundColor: card.accent }]}>
+            <Crown size={11} color="#1a1030" />
+            <Text style={st.typePillTxt}>PODSUMOWANIE ROKU</Text>
+          </View>
+          <Text style={[st.kickerTxt, { color: card.accent }]}>{card.months} kart</Text>
         </View>
         <Text style={st.year}>{card.year}</Text>
 
@@ -108,8 +113,10 @@ const st = StyleSheet.create({
   watermark: { position: 'absolute', top: -20, right: -6, fontSize: 104, opacity: 0.16 },
   sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
 
-  kicker: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 },
+  kicker: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
   kickerTxt: { fontSize: 11, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
+  typePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  typePillTxt: { fontSize: 10, fontWeight: '900', color: '#1a1030', letterSpacing: 0.7 },
   year: { color: '#fff', fontSize: 44, fontWeight: '900', letterSpacing: -1.5, ...shadow },
 
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },

@@ -51,7 +51,7 @@ export const WIDGET_METRICS: MetricDef[] = [
   { id: 'fruitKg',    label: 'Owoce (kg)',         group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
   { id: 'vegKg',      label: 'Warzywa (kg)',       group: 'Konsumpcja', unit: 'kg', viz: ['number', 'compare'], periodic: true },
   { id: 'topProducts', label: 'Top produkty',      group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
-  { id: 'favSweets',  label: 'Ulubione słodycze',  group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
+  { id: 'favSweets',  label: 'Ulubione słodycze / przekąski',  group: 'Konsumpcja', unit: '×',  viz: ['list', 'donut'], periodic: false },
   { id: 'itemsCount', label: 'Liczba produktów',   group: 'Konsumpcja', unit: 'szt.', viz: ['number', 'wave'], periodic: true },
   { id: 'tagSpend',   label: 'Wydatki na tag…',    group: 'Konsumpcja', unit: 'zł',   viz: ['number', 'wave', 'compare'], periodic: true, needsTag: true },
   { id: 'tagCount',   label: 'Sztuk z tagiem…',    group: 'Konsumpcja', unit: 'szt.', viz: ['number', 'wave'], periodic: true, needsTag: true },
