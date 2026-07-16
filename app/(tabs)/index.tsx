@@ -55,7 +55,6 @@ import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
 import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
 import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
-import SavingsGoalCard from '@/components/dashboard/SavingsGoalCard';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
@@ -3095,8 +3094,6 @@ export default function DashboardScreen() {
                 )}
               </View>
             );
-
-            nodes['savings-goal'] = <SavingsGoalCard cardBg={cardBgDark} />;
 
             nodes['gablota-card'] = (() => {
               const total = achStates.filter(st => st.a.kind !== 'bad').length;
