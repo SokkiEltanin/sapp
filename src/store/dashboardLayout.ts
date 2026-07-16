@@ -138,7 +138,18 @@ export const SECTION_GROUP: Record<string, string> = {
   'pinned-notes': 'Inne', 'gcal': 'Inne', 'daily-rings': 'Zadania i nawyki', 'month-summary': 'Przegląd i statystyki',
   'pet': 'Inne',
 };
-export const SECTION_GROUP_ORDER = ['Przypomnienia', 'Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
+export const SECTION_GROUP_ORDER = ['Zadania i nawyki', 'Finanse', 'Przegląd i statystyki', 'Nastrój i liczniki', 'Inne'];
+
+// AUTO sections — contextual alerts that appear only when there's something to say
+// (you got paid, a bank payment is waiting, a budget is nearly spent, a bill is due).
+// They are NOT arrangeable content, so the editor hides them entirely: showing them as
+// "brak danych" rows you can drag around was pure confusion. They still render in the
+// dashboard whenever they're relevant; the user just doesn't manage them by hand.
+export const AUTO_SECTIONS = new Set<string>([
+  'payday-prompt', 'debt-prompt', 'bill-suggest', 'sub-confirm', 'bank-queue',
+  'budget-warning', 'habits-nudge',
+]);
+export const isAutoSection = (id: string) => AUTO_SECTIONS.has(id);
 
 export type CustomTileType = 'note' | 'link' | 'stat' | 'weather';
 export type WidgetViz = 'number' | 'wave' | 'list' | 'compare' | 'donut' | 'pixels';

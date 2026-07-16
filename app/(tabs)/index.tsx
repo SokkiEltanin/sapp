@@ -84,7 +84,7 @@ import { vehiclesService } from '@/services/vehiclesService';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
-import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, CustomTile } from '@/store/dashboardLayout';
+import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, isAutoSection, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric } from '@/utils/statWidgets';
 import YearPixels from '@/components/dashboard/YearPixels';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
@@ -637,10 +637,10 @@ function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: 
 const EDIT_ROW_H = 66;
 
 function DashEditRow({
-  id, index, count, title, isCustom, hiddenNow, empty, accent, cardBg,
+  id, index, count, title, desc, isCustom, hiddenNow, empty, accent, cardBg,
   onMoveDir, onMoveTo, onToggleHidden, onRemove, onEdit,
 }: {
-  id: string; index: number; count: number; title: string;
+  id: string; index: number; count: number; title: string; desc?: string;
   isCustom: boolean; hiddenNow: boolean; empty?: boolean; accent: string; cardBg: string;
   onMoveDir: (id: string, dir: -1 | 1) => void;
   onMoveTo: (id: string, target: number) => void;
@@ -708,9 +708,18 @@ function DashEditRow({
             <ChevronDown size={20} color={index === count - 1 ? colors.text.muted + '50' : colors.text.secondary} />
           </TouchableOpacity>
         </View>
-        <Text style={[s.editRowTitle, (hiddenNow || empty) && { opacity: 0.4 }]} numberOfLines={1}>
-          {title}{isCustom ? '  · własny' : ''}{empty && !hiddenNow ? '  · brak danych' : ''}
-        </Text>
+        {/* name + a plain-language "what it shows" line, so rows aren't just cryptic
+            titles you can't tell apart while dragging */}
+        <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+          <Text style={[s.editRowTitle, empty && { opacity: 0.5 }]} numberOfLines={1}>
+            {title}{isCustom ? '  · własny' : ''}
+          </Text>
+          {(desc || empty) ? (
+            <Text style={s.editRowDesc} numberOfLines={1}>
+              {empty ? 'brak danych teraz — pokaże się, gdy będą' : desc}
+            </Text>
+          ) : null}
+        </View>
         {onEdit && (
           <TouchableOpacity onPress={() => { haptic.tap(); onEdit(id); }} style={s.editCtrlBtn2} hitSlop={10}>
             <Pencil size={19} color={accent} />
@@ -804,31 +813,39 @@ export default function DashboardScreen() {
   const [showHiddenPool, setShowHiddenPool] = useState(false);
   const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles), [dashOrder, customTiles]);
   const hiddenSet = useMemo(() => new Set(dashHidden), [dashHidden]);
-  const handleMoveTo = useCallback((id: string, target: number) => {
-    const cur = effectiveOrder(useDashboardLayout.getState().order, useDashboardLayout.getState().customTiles);
-    const from = cur.indexOf(id);
-    if (from < 0 || from === target) return;
-    cur.splice(from, 1);
-    cur.splice(target, 0, id);
-    setSectionOrder(cur);
+  // The editor list shows only VISIBLE sections (not hidden, not auto-managed alerts),
+  // so drag/arrow indices are positions in THAT list. Both handlers reorder the visible
+  // sequence and then write it back into the full order, filling only the visible slots —
+  // hidden and auto sections stay exactly where they are. Doing the splice directly on
+  // the full order was the "drops in the wrong place" bug: a visible index N is not the
+  // same as full-order index N once anything hidden/auto sits between the rows.
+  const reorderVisible = useCallback((id: string, target: number) => {
+    const st = useDashboardLayout.getState();
+    const cur = effectiveOrder(st.order, st.customTiles);
+    const hidden = new Set(st.hidden);
+    const isVis = (x: string) => !hidden.has(x) && !isAutoSection(x);
+    const vis = cur.filter(isVis);
+    const from = vis.indexOf(id);
+    const to = Math.max(0, Math.min(vis.length - 1, target));
+    if (from < 0 || from === to) return;
+    vis.splice(from, 1);
+    vis.splice(to, 0, id);
+    let k = 0;
+    const next = cur.map(x => (isVis(x) ? vis[k++] : x));
+    setSectionOrder(next);
     haptic.tap();
   }, [setSectionOrder]);
 
-  // Move among VISIBLE sections only (skip hidden ones in the order) so the up/down
-  // arrows don't waste taps stepping over hidden sections that aren't in the list.
+  const handleMoveTo = useCallback((id: string, target: number) => reorderVisible(id, target), [reorderVisible]);
   const moveVisible = useCallback((id: string, dir: -1 | 1) => {
     const st = useDashboardLayout.getState();
     const cur = effectiveOrder(st.order, st.customTiles);
     const hidden = new Set(st.hidden);
-    const from = cur.indexOf(id);
+    const vis = cur.filter(x => !hidden.has(x) && !isAutoSection(x));
+    const from = vis.indexOf(id);
     if (from < 0) return;
-    let to = from + dir;
-    while (to >= 0 && to < cur.length && hidden.has(cur[to])) to += dir; // skip hidden neighbours
-    if (to < 0 || to >= cur.length) return;
-    [cur[from], cur[to]] = [cur[to], cur[from]];
-    setSectionOrder(cur);
-    haptic.tap();
-  }, [setSectionOrder]);
+    reorderVisible(id, from + dir);
+  }, [reorderVisible]);
 
   // ── Subscription payment queue ────────────────────────────────────────────
   const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
@@ -3771,19 +3788,22 @@ export default function DashboardScreen() {
                   <View style={{ gap: spacing[2] }}>
                     <View style={s.editBanner}>
                       <Text style={[s.editBannerText, { flex: 1 }]}>
-                        Przeciągaj uchwytem ∥ lub strzałkami, ukryj okiem, dodaj widget.
+                        Trzymaj uchwyt ∥ i przeciągnij, albo strzałki. Oko = ukryj. Alerty
+                        (wypłata, bank, budżet) pojawiają się same — nie ma ich tu.
                       </Text>
                       <TouchableOpacity style={[s.editDoneBtn, { borderColor: accentColor + '66', backgroundColor: accentColor + '20' }]} onPress={() => { haptic.tap(); setEditingDash(false); }}>
                         <Check size={13} color={accentColor} />
                         <Text style={[s.editDoneText, { color: accentColor }]}>Gotowe</Text>
                       </TouchableOpacity>
                     </View>
-                    {/* Only the VISIBLE sections are in the reorder list — no scrolling
-                        past a dozen disabled ones. */}
-                    {orderedSections.filter(id => !hiddenSet.has(id)).map((id, idx, arr) => {
+                    {/* Only VISIBLE, USER-ARRANGEABLE sections here — hidden ones live in the
+                        add pool, and auto alerts (payday/bank/budget…) are managed by the
+                        app, so they never appear in the editor as "brak danych" clutter. */}
+                    {orderedSections.filter(id => !hiddenSet.has(id) && !isAutoSection(id)).map((id, idx, arr) => {
                       const isCustom = id.startsWith('custom:');
                       const ct = isCustom ? customTiles.find(t => t.id === id) : null;
                       const title = isCustom ? (ct?.title ?? 'Kafelek') : (SECTION_TITLES[id] ?? id);
+                      const desc = isCustom ? (ct?.type === 'stat' ? 'Twój widget statystyk' : ct?.type === 'note' ? 'Notatka' : ct?.type === 'weather' ? 'Pogoda' : 'Twój kafelek') : (SECTION_DESC[id] ?? '');
                       return (
                         <DashEditRow
                           key={id}
@@ -3791,6 +3811,7 @@ export default function DashboardScreen() {
                           index={idx}
                           count={arr.length}
                           title={title}
+                          desc={desc}
                           isCustom={isCustom}
                           hiddenNow={false}
                           empty={!nodes[id]}
@@ -3810,7 +3831,8 @@ export default function DashboardScreen() {
 
                     {/* Hidden sections live in a collapsible pool — tap + to bring one back. */}
                     {(() => {
-                      const hidden = orderedSections.filter(id => hiddenSet.has(id));
+                      // auto alerts are never in the pool either — they aren't yours to add
+                      const hidden = orderedSections.filter(id => hiddenSet.has(id) && !isAutoSection(id));
                       if (hidden.length === 0) return null;
                       return (
                         <>
@@ -4730,7 +4752,8 @@ const buildStyles = (c: any) => StyleSheet.create({
   editArrows: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   editArrowBtn: { padding: 2 },
   editArrowBtn2: { width: 32, height: 40, alignItems: 'center', justifyContent: 'center' },
-  editRowTitle: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
+  editRowTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  editRowDesc: { fontSize: 10.5, color: c.text.muted },
   editAddBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     paddingVertical: 11, borderRadius: radius.md,
