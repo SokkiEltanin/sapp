@@ -14,13 +14,17 @@ import { View, Animated, Easing } from 'react-native';
 // the numbers, which made the tail 4.6× too long and 4.4× too wide — it rendered longer
 // than the entire cat. Never re-derive these; they are the lab's values.
 const SEGS = 7;
-const LEN_U = 64;    // segment length, viewBox units
-const W0_U = 48;     // base width
-const W1_U = 32;     // tip width (kept fat on purpose — a needle tip looked wrong)
-const ROOT = 78;     // first joint: leaves the rear almost horizontally
+const LEN_U = 62;    // segment length, viewBox units
+// A cat tail is nearly even-width — it barely tapers. The old 48→32 read as a thin cone
+// ("jakby był coraz cieńszy"); 78→64 is a fuller, cat-like tail.
+const W0_U = 78;     // base width
+const W1_U = 64;     // tip width
+const ROOT = 74;     // first joint: leaves the rear almost horizontally
 const PER = -9;      // each next joint curls the tail upward
-export const TAIL_X_U = 1300;   // root, viewBox units
-export const TAIL_Y_U = 1480;
+// Root sits at the base of the rump. Nudged up + in from the lab value so it connects to
+// the haunch instead of drooping from mid-body.
+export const TAIL_X_U = 1265;   // root, viewBox units
+export const TAIL_Y_U = 1430;
 
 export default function CatTail({
   color, markColor, stripes, animate = true, mood = 'idle', unit,

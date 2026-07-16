@@ -184,8 +184,11 @@ export default function CatArt({
   const onTap = () => {
     if (angry) return;
     const now = Date.now();
-    taps.current = [...taps.current, now].filter(t => now - t < 4000);
-    if (taps.current.length >= 7) { goAngry(); return; }   // poke him enough and he's had enough
+    // Only genuine mashing angers him. Filling the affection bar takes ~25 taps, so the
+    // old "7 taps in 4s" made him snap during normal petting — you could never pet him.
+    // 20 taps inside 2.5s is ~8 taps/sec sustained: real button-mashing, not affection.
+    taps.current = [...taps.current, now].filter(t => now - t < 2500);
+    if (taps.current.length >= 20) { goAngry(); return; }
 
     haptic.tap();
     Animated.sequence([
