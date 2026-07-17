@@ -4,7 +4,7 @@ import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask } from 'react-native-sv
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
 import { CatPalette, DEFAULT_PALETTE, PUPIL } from '@/utils/catPalettes';
-import CatTail, { TAIL_X_U, TAIL_Y_U } from '@/components/pet/CatTail';
+import CatTail from '@/components/pet/CatTail';
 
 // The companion cat — a 1:1 port of the design approved in the HTML lab.
 //
@@ -184,11 +184,11 @@ export default function CatArt({
   const onTap = () => {
     if (angry) return;
     const now = Date.now();
-    // Only genuine mashing angers him. Filling the affection bar takes ~25 taps, so the
-    // old "7 taps in 4s" made him snap during normal petting — you could never pet him.
-    // 20 taps inside 2.5s is ~8 taps/sec sustained: real button-mashing, not affection.
+    // Anger needs deliberate fast tapping but should be reachable. 7-in-4s snapped during
+    // normal petting; 20-in-2.5s (8/sec) was too hard to sustain. 12 in 2.5s (~5/sec) is
+    // the middle: enthusiastic petting (~3/sec → 7-8 in the window) stays under it.
     taps.current = [...taps.current, now].filter(t => now - t < 2500);
-    if (taps.current.length >= 20) { goAngry(); return; }
+    if (taps.current.length >= 12) { goAngry(); return; }
 
     haptic.tap();
     Animated.sequence([
@@ -265,12 +265,9 @@ export default function CatArt({
       <View>
         <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }, { translateX: shakeX }] }}>
           <Animated.View style={{ transform: [{ scale }] }}>
-            {/* Tail sits behind the body; nested Animated.Views, not SVG (see CatTail).
-                Positioned in VIEWBOX units × unit — the same coordinates the lab used, so
-                it lands exactly where the drawing expects it. */}
-            <View pointerEvents="none" style={{ position: 'absolute', left: TAIL_X_U * unit, top: TAIL_Y_U * unit }}>
-              <CatTail color={p.coat} markColor={p.mark} stripes={stripes} animate={animate && !asleep} mood={tailMood} unit={unit} />
-            </View>
+            {/* Tail sits BEHIND the body — a full-overlay SVG of the real tail path,
+                gently swaying (see CatTail). */}
+            <CatTail color={p.coat} markColor={p.mark} stripes={stripes} animate={animate && !asleep} mood={tailMood} size={size} />
 
             <Svg width={size} height={size} viewBox="0 0 2000 2000">
               <Defs>
@@ -307,11 +304,13 @@ export default function CatArt({
                 <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
                 <G transform="matrix(1,0,0,1.860595,35.894072,-1501.867858)"><Path d="M1227.275,1647.023L606.308,1647.023C605.249,1636.462 604.719,1625.853 604.719,1615.237C604.719,1523.584 644.172,1436.465 712.809,1376.557L1120.774,1376.557C1189.411,1436.465 1228.864,1523.584 1228.864,1615.237C1228.864,1625.853 1228.334,1636.462 1227.275,1647.023Z" fill={p.shade} /></G>
                 {/* forelegs WITHOUT the original arch: the arch had to be covered by a
-                    rect to raise a paw, and that rect bit a square notch out of it */}
-                {!licking && <Rect x={777} y={1236} width={104} height={306} rx={52} fill={p.coat} />}
+                    rect to raise a paw, and that rect bit a square notch out of it.
+                    The LEFT leg + paw hide whenever the raised arm is out (lick OR swat) —
+                    tying this to `licking` alone left a third paw during a swat. */}
+                {!armOut && <Rect x={777} y={1236} width={104} height={306} rx={52} fill={p.coat} />}
                 <Rect x={1025} y={1236} width={104} height={306} rx={52} fill={p.coat} />
               </G>
-              {!licking && <Paw cx={829} p={p} />}
+              {!armOut && <Paw cx={829} p={p} />}
               <Paw cx={1077} p={p} />
 
               <G>

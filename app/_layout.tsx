@@ -270,11 +270,13 @@ export default function RootLayout() {
   // Background-ish health sync: pull the watch's recent history into the per-day
   // cache on cold start + every time the app returns to the foreground, so the
   // dashboard / achievements / calories stay current even on days the Zdrowie
-  // screen was never opened. Silent + throttled (10 min) inside autoSyncHealth.
+  // screen was never opened. FORCED (bypasses the 10-min throttle) because the user
+  // wants fresh watch data on app entry — the throttle was leaving widgets stale when
+  // you re-opened the app. Concurrent runs are still deduped inside autoSyncHealth.
   useEffect(() => {
-    const t = setTimeout(() => { autoSyncHealth().catch(() => {}); }, 3000);
+    const t = setTimeout(() => { autoSyncHealth(14, true).catch(() => {}); }, 2000);
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') autoSyncHealth().catch(() => {});
+      if (state === 'active') autoSyncHealth(14, true).catch(() => {});
     });
     return () => { clearTimeout(t); sub.remove(); };
   }, []);

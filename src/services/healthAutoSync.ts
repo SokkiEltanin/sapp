@@ -34,7 +34,11 @@ const THROTTLE_MS = 10 * 60 * 1000; // don't hammer the watch — 10 min between
 export async function autoSyncHealth(days = 30, force = false): Promise<number> {
   if (!isHealthConnectAvailable()) return 0;
   const now = Date.now();
-  if (!force && (_running || now - _lastRun < THROTTLE_MS)) return 0;
+  // A run in flight is always skipped (dedupe rapid tab switches). `force` only bypasses
+  // the 10-min TIME throttle — that throttle was why re-opening the app inside 10 minutes
+  // kept showing stale watch data. Screens that want fresh-on-entry pass force:true.
+  if (_running) return 0;
+  if (!force && now - _lastRun < THROTTLE_MS) return 0;
   _running = true;
   try {
     const range = await readHealthRange(days);

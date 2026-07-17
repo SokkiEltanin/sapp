@@ -1143,8 +1143,9 @@ export default function DashboardScreen() {
       getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
     };
     read();
-    // pull fresh steps/sleep from the watch (throttled), re-read if it wrote anything
-    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(3)).then(n => { if (n > 0) read(); }).catch(() => {});
+    // pull fresh steps/sleep from the watch on every focus (force = bypass the 10-min
+    // throttle so widgets show current data on app entry), re-read if it wrote anything
+    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(7, true)).then(n => { if (n > 0) read(); }).catch(() => {});
   }, []);
   useEffect(() => { reloadHealth(); }, [reloadHealth]);
   // Re-read health on focus so a weight/steps logged elsewhere isn't shown stale.

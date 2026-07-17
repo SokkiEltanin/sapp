@@ -99,9 +99,10 @@ export default function Pet() {
   }, []);
   const reload = useCallback(() => {
     readHealth(); // show cache immediately…
-    // …and pull fresh steps/sleep from the watch, then re-read if anything changed.
+    // …and pull fresh steps/sleep from the watch (force = ignore the 10-min throttle so
+    // the pet's needs reflect current data whenever you open it), re-read if anything changed.
     import('@/services/healthAutoSync')
-      .then(({ autoSyncHealth }) => autoSyncHealth(3))
+      .then(({ autoSyncHealth }) => autoSyncHealth(7, true))
       .then(n => { if (n > 0) readHealth(); })
       .catch(() => {});
   }, [readHealth]);
