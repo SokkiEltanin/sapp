@@ -55,6 +55,9 @@ import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
 import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
 import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
+import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
+import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
+import { buildRecords } from '@/utils/personalRecords';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
@@ -930,6 +933,18 @@ export default function DashboardScreen() {
       .sort((a, b) => b.days - a.days),
     [counters, expenses, dayKey],
   );
+
+  // "Rekordy życiowe" widget — all-time bests from the data already loaded.
+  const records = useMemo(() => buildRecords(healthDays, expenses, moodEntries), [healthDays, expenses, moodEntries]);
+
+  // "Ściana serii" widget — every active streak: habit streaks + "dni bez"/since counters.
+  const streakWall = useMemo<StreakItem[]>(() => {
+    const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id) }));
+    const fromCounters = counters
+      .filter(cn => cn.kind === 'since')
+      .map(cn => ({ key: `c:${cn.id}`, name: cn.mode === 'auto' ? `bez ${cn.name}` : cn.name, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses) : daysSince(cn) }));
+    return [...fromHabits, ...fromCounters];
+  }, [habits, getStreak, counters, expenses, dayKey]);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
@@ -3095,6 +3110,9 @@ export default function DashboardScreen() {
                 )}
               </View>
             );
+
+            nodes['streak-wall'] = streakWall.some(x => x.days > 0) && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
+            nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
 
             nodes['gablota-card'] = (() => {
               const total = achStates.filter(st => st.a.kind !== 'bad').length;
