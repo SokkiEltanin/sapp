@@ -72,6 +72,24 @@ export default function CatArt({
   const pid = useRef(0);
   const taps = useRef<number[]>([]);
   const angryTimer = useRef<any>(null);
+  const earL = useRef(new Animated.Value(0)).current;
+  const earR = useRef(new Animated.Value(0)).current;
+
+  // ear flutter — a real cat twitches one ear several times in a burst (the HTML lab
+  // behaviour the user missed). Smooth because it rotates an overlay wrapper, not an SVG
+  // prop. Negative-only rotation keeps the ear's corner inside the head.
+  const flutterEar = (which: 'L' | 'R') => {
+    if (!animate || asleep) return;
+    const v = which === 'L' ? earL : earR;
+    Animated.sequence([
+      Animated.timing(v, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0.1, duration: 90, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0.8, duration: 90, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0.15, duration: 90, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0.55, duration: 90, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0, duration: 130, useNativeDriver: true }),
+    ]).start();
+  };
 
   const spawn = (kind: 'heart' | 'spark', dx: number) => {
     const id = ++pid.current;
@@ -126,6 +144,15 @@ export default function CatArt({
     loop();
     return () => clearTimeout(t);
   }, [animate, asleep, angry, petting]);
+
+  // ── idle ear flutter — one random ear, now and then ──
+  useEffect(() => {
+    if (!animate || asleep) return;
+    let t: any;
+    const loop = () => { t = setTimeout(() => { flutterEar(Math.random() < 0.5 ? 'L' : 'R'); loop(); }, 4000 + Math.random() * 5000); };
+    loop();
+    return () => clearTimeout(t);
+  }, [animate, asleep]);
 
   // ── paw lick ──
   const doLick = () => {
@@ -191,6 +218,7 @@ export default function CatArt({
     if (taps.current.length >= 12) { goAngry(); return; }
 
     haptic.tap();
+    flutterEar(Math.random() < 0.5 ? 'L' : 'R');   // ears react to being touched
     Animated.sequence([
       Animated.timing(hop, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.spring(hop, { toValue: 0, friction: 5, tension: 90, useNativeDriver: true }),
@@ -313,16 +341,10 @@ export default function CatArt({
               {!armOut && <Paw cx={829} p={p} />}
               <Paw cx={1077} p={p} />
 
+              {/* ears are drawn as separate animated overlays (Ear, below) so they can
+                  flutter — animating them here inside the SVG would stutter */}
               <G>
                 <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>
-                <G>
-                  <G transform="matrix(1.041427,1.041427,-0.644296,0.644296,299.104612,-1346.740541)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={p.coat} /></G>
-                  <G transform="matrix(0.599735,0.599735,-0.504606,0.504606,795.603559,-629.947691)"><Path d="M1326.238,586.138L1472.912,834.421L1224.629,834.421L1326.238,586.138Z" fill={p.ear} /></G>
-                </G>
-                <G transform="matrix(0.995551,-0.88133,0.54525,0.615914,-1080.579653,1264.375067)">
-                  <Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={p.coat} />
-                  <G transform="matrix(0.72388,-0.071206,0.038982,1.035369,340.059015,115.16946)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={p.ear} /></G>
-                </G>
                 <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
 
                 {shut ? (
@@ -384,6 +406,11 @@ export default function CatArt({
                 {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
               </G>
             </Svg>
+
+            {/* ears — overlays on top of the head so they can flutter (native-driver
+                wrapper rotation about the ear base) */}
+            <Ear side="R" anim={earR} size={size} coat={p.coat} inner={p.ear} />
+            <Ear side="L" anim={earL} size={size} coat={p.coat} inner={p.ear} />
 
             {/* The raised foreleg lives OUTSIDE the SVG, in its own wrapper, so it can be
                 animated with the native driver — and it renders ON TOP of the head, which
@@ -449,6 +476,42 @@ function Particle({ kind, dx, size }: { kind: 'heart' | 'spark'; dx: number; siz
         {kind === 'heart'
           ? <Path d="M16 29S1 19.6 1 10.2A8.6 8.6 0 0 1 16 5a8.6 8.6 0 0 1 15 5.2C31 19.6 16 29 16 29z" fill="#F2789F" />
           : <Path d="M16 0c1.4 8.6 6 13.2 16 16-10 2.8-14.6 7.4-16 16-1.4-8.6-6-13.2-16-16C10 13.2 14.6 8.6 16 0z" fill="#FFD76E" />}
+      </Svg>
+    </Animated.View>
+  );
+}
+
+// One ear as an animated overlay. Rotates about its base (RN has no transform-origin →
+// translate/rotate/translate sandwich) so the flutter is smooth. Same paths as the
+// artwork, just lifted out of the body SVG.
+function Ear({ side, anim, size, coat, inner }: {
+  side: 'L' | 'R'; anim: Animated.Value; size: number; coat: string; inner: string;
+}) {
+  const unit = size / 2000;
+  const pivot = side === 'R' ? { x: 1200, y: 815 } : { x: 760, y: 810 };   // ear base
+  const px = pivot.x * unit - size / 2;
+  const py = pivot.y * unit - size / 2;
+  const rotate = anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', side === 'R' ? '-7deg' : '7deg'] });
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: 0, top: 0, width: size, height: size,
+        transform: [{ translateX: px }, { translateY: py }, { rotate }, { translateX: -px }, { translateY: -py }],
+      }}
+    >
+      <Svg width={size} height={size} viewBox="0 0 2000 2000">
+        {side === 'R' ? (
+          <G>
+            <G transform="matrix(1.041427,1.041427,-0.644296,0.644296,299.104612,-1346.740541)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={coat} /></G>
+            <G transform="matrix(0.599735,0.599735,-0.504606,0.504606,795.603559,-629.947691)"><Path d="M1326.238,586.138L1472.912,834.421L1224.629,834.421L1326.238,586.138Z" fill={inner} /></G>
+          </G>
+        ) : (
+          <G transform="matrix(0.995551,-0.88133,0.54525,0.615914,-1080.579653,1264.375067)">
+            <Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={coat} />
+            <G transform="matrix(0.72388,-0.071206,0.038982,1.035369,340.059015,115.16946)"><Path d="M1348.771,586.138L1472.912,834.421L1224.629,834.421L1348.771,586.138Z" fill={inner} /></G>
+          </G>
+        )}
       </Svg>
     </Animated.View>
   );

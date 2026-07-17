@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { G, Path, Defs, ClipPath } from 'react-native-svg';
 
 // The tail — the ORIGINAL single smooth path from the artwork, not a chain of capsules.
 //
@@ -57,17 +57,24 @@ export default function CatTail({
       }}
     >
       <Svg width={size} height={size} viewBox="0 0 2000 2000">
+        <Defs>
+          {/* clip stripes to the tail so bands can't float off it, even if their exact
+              placement is a touch off — the previous free-floating strokes "zjebały się" */}
+          <ClipPath id="tailClip">
+            <Path d={TAIL_D} transform="matrix(1,0,0,1,-106.194312,-183.051682)" />
+          </ClipPath>
+        </Defs>
         <G transform="matrix(1,0,0,1,-106.194312,-183.051682)">
           <Path d={TAIL_D} fill={color} />
         </G>
-        {/* stripes — a few soft bands across the tail, from base toward the tip. Kept
-            simple: short strokes roughly perpendicular to the tail's run. */}
         {stripes && (
-          <G opacity={0.9}>
-            <Path d="M1236 1210 q34 -20 60 -54" stroke={markColor} strokeWidth={26} strokeLinecap="round" fill="none" />
-            <Path d="M1330 1150 q40 -16 74 -40" stroke={markColor} strokeWidth={26} strokeLinecap="round" fill="none" />
-            <Path d="M1430 1075 q34 -8 70 -18" stroke={markColor} strokeWidth={24} strokeLinecap="round" fill="none" />
-            <Path d="M1500 985 q26 4 54 4" stroke={markColor} strokeWidth={22} strokeLinecap="round" fill="none" />
+          // thick bands roughly perpendicular to the tail's run (base→tip), clipped so
+          // only the parts over the tail show → they read as rings on the tail
+          <G clipPath="url(#tailClip)" opacity={0.92}>
+            <Path d="M1150 1240 L1240 1180" stroke={markColor} strokeWidth={34} strokeLinecap="butt" fill="none" />
+            <Path d="M1230 1140 L1320 1080" stroke={markColor} strokeWidth={34} strokeLinecap="butt" fill="none" />
+            <Path d="M1320 1030 L1410 985" stroke={markColor} strokeWidth={32} strokeLinecap="butt" fill="none" />
+            <Path d="M1420 940 L1500 915" stroke={markColor} strokeWidth={30} strokeLinecap="butt" fill="none" />
           </G>
         )}
       </Svg>
