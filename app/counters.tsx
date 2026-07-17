@@ -10,6 +10,7 @@ import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
 import { WeekStrip } from '@/components/counters/StreakCard';
 import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWithout, AVOID_PRESETS, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
+import { WIDGET_TAGS } from '@/utils/statWidgets';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { spacing, radius, typography } from '@/theme';
@@ -201,7 +202,27 @@ export default function Counters() {
 
             {uiKind === 'avoid' ? (
               <>
-                <Text style={s.fieldLabel}>Śledź automatycznie (z paragonów)</Text>
+                {/* Pick from YOUR tags — the counter then catches every receipt item with
+                    that tag. Beats the fixed presets (alcohol/energy you don't buy). */}
+                <Text style={s.fieldLabel}>Śledź po tagach (łapie produkty z paragonów)</Text>
+                <View style={s.presetRow}>
+                  {WIDGET_TAGS.map(tag => {
+                    const parts = keyword.split('|').map(x => x.trim()).filter(Boolean);
+                    const active = parts.includes(tag);
+                    return (
+                      <TouchableOpacity key={tag} style={[s.presetChip, active && { backgroundColor: ACCENT + '22', borderColor: ACCENT }]}
+                        onPress={() => {
+                          haptic.tap();
+                          const next = active ? parts.filter(x => x !== tag) : [...parts, tag];
+                          setKeyword(next.join('|'));
+                          if (!name.trim() && !active) setName(tag);
+                        }} activeOpacity={0.8}>
+                        <Text style={[s.presetText, active && { color: ACCENT }]}>{tag}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={s.fieldLabel}>…lub gotowe zestawy</Text>
                 <View style={s.presetRow}>
                   {AVOID_PRESETS.map(p => {
                     const active = keyword === p.keyword;

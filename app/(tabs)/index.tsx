@@ -3209,9 +3209,9 @@ export default function DashboardScreen() {
                             <View style={s.hTop}>
                               <Text style={s.hName} numberOfLines={1}>{h.title}</Text>
                               {streak > 0 && (
-                                <View style={s.hStreak}>
-                                  <Flame size={11} color={sc} fill={sc} />
-                                  <Text style={[s.hStreakTxt, { color: sc }]}>{streak}</Text>
+                                <View style={[s.hStreak, { backgroundColor: sc + '22', borderColor: sc + '66' }]}>
+                                  <Flame size={12} color={sc} fill={sc} />
+                                  <Text style={[s.hStreakTxt, { color: sc }]}>{streak} {streak === 1 ? 'dzień' : 'dni'}</Text>
                                 </View>
                               )}
                               <Text style={[s.hVal, { color: done ? h.color : colors.text.muted }]}>
@@ -4038,6 +4038,40 @@ export default function DashboardScreen() {
           <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
             {statDetail && (() => {
               const def = metricById(statDetail.metric);
+              // LIST metrics (favSweets, topProducts, byCategory) have no time series — the
+              // detail must show the RANKED LIST, not a 6-month bar chart. Rendering a
+              // series for them was the "coś dziwnego" (a chart of zeros / nonsense).
+              if (def && !def.periodic) {
+                const rows = metricList(statDetail.metric!, statCtx, 12);
+                const maxV = rows[0]?.value || 1;
+                return (
+                  <>
+                    <View style={s.cardHeader}>
+                      <BarChart2 size={14} color={accentColor} />
+                      <Text style={s.cardTitle} numberOfLines={1}>{statDetail.title || def.label || 'Widget'}</Text>
+                      <TouchableOpacity onPress={() => setStatDetail(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
+                    </View>
+                    {rows.length === 0 ? (
+                      <Text style={[s.statSub, { marginTop: spacing[3] }]}>Brak danych jeszcze.</Text>
+                    ) : (
+                      <View style={{ marginTop: spacing[2], gap: spacing[2] }}>
+                        {rows.map((r, i) => (
+                          <View key={r.label + i} style={s.statListRow2}>
+                            <Text style={s.statListRank}>{i + 1}</Text>
+                            <View style={{ flex: 1, gap: 4 }}>
+                              <View style={s.topNameRow}>
+                                <Text style={s.statListLabel} numberOfLines={1}>{r.label}</Text>
+                                <Text style={[s.statListVal, { color: accentColor }]}>{fmtStat(r.value, r.unit)}</Text>
+                              </View>
+                              <View style={s.topBarTrack}><View style={[s.topBarFill, { width: `${Math.max(6, (r.value / maxV) * 100)}%`, backgroundColor: accentColor }]} /></View>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                );
+              }
               const ser = metricSeries(statDetail.metric!, statCtx, 'month', 6, statDetail.tag);
               const cur = metricNumber(statDetail.metric!, statCtx, 'month', statDetail.tag);
               const vals = ser.values;
@@ -4564,7 +4598,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   hIcon: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   hTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   hName: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
-  hStreak: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  hStreak: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20, borderWidth: 1 },
   hStreakTxt: { fontSize: 11, fontWeight: '900' },
   hVal: { fontSize: 11.5, fontWeight: '700', fontVariant: ['tabular-nums'] },
   hTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, overflow: 'hidden' },
