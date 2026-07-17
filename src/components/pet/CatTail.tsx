@@ -68,13 +68,16 @@ export default function CatTail({
           <Path d={TAIL_D} fill={color} />
         </G>
         {stripes && (
-          // thick bands roughly perpendicular to the tail's run (base→tip), clipped so
-          // only the parts over the tail show → they read as rings on the tail
-          <G clipPath="url(#tailClip)" opacity={0.92}>
-            <Path d="M1150 1240 L1240 1180" stroke={markColor} strokeWidth={34} strokeLinecap="butt" fill="none" />
-            <Path d="M1230 1140 L1320 1080" stroke={markColor} strokeWidth={34} strokeLinecap="butt" fill="none" />
-            <Path d="M1320 1030 L1410 985" stroke={markColor} strokeWidth={32} strokeLinecap="butt" fill="none" />
-            <Path d="M1420 940 L1500 915" stroke={markColor} strokeWidth={30} strokeLinecap="butt" fill="none" />
+          // Bands ACROSS the tail (perpendicular to its run), clipped to the tail so they
+          // read as rings. The previous version ran the strokes ALONG the tail — a line
+          // down the middle, "nie paski". Visible tail runs base(1202,1238)→tip(1549,862);
+          // perpendicular unit ≈ (0.73,0.68), so each band is a point on that centreline
+          // ± that vector.
+          <G clipPath="url(#tailClip)" opacity={0.9}>
+            <Path d="M1255 1078 L1357 1172" stroke={markColor} strokeWidth={30} strokeLinecap="butt" fill="none" />
+            <Path d="M1325 1003 L1427 1097" stroke={markColor} strokeWidth={30} strokeLinecap="butt" fill="none" />
+            <Path d="M1394 928 L1496 1022" stroke={markColor} strokeWidth={28} strokeLinecap="butt" fill="none" />
+            <Path d="M1446 871 L1548 965" stroke={markColor} strokeWidth={26} strokeLinecap="butt" fill="none" />
           </G>
         )}
       </Svg>

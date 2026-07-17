@@ -192,7 +192,9 @@ export default function CatArt({
   const goAngry = () => {
     if (angry) return;
     setAngry(true); setPetting(false);
-    try { Vibration.vibrate([0, 55, 40, 55, 40, 130]); } catch {}
+    // an aggressive, hard, uneven buzz — the "he's had ENOUGH" hiss. Long hits, short
+    // gaps, escalating, nothing like the soft purr roll.
+    try { Vibration.vibrate([0, 90, 50, 130, 45, 180, 40, 240]); } catch {}
     haptic.warn();
     const s = Animated.loop(Animated.sequence([
       Animated.timing(shake, { toValue: 1, duration: 40, useNativeDriver: true }),
