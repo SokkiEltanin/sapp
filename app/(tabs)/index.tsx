@@ -57,6 +57,7 @@ import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
+import TriviaCard from '@/components/dashboard/TriviaCard';
 import { buildRecords } from '@/utils/personalRecords';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
@@ -3133,6 +3134,7 @@ export default function DashboardScreen() {
 
             nodes['streak-wall'] = streakWall.some(x => x.days > 0) && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
+            nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
 
             nodes['gablota-card'] = (() => {
               const total = achStates.filter(st => st.a.kind !== 'bad').length;
