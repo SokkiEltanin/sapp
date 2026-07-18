@@ -148,6 +148,16 @@ function metricIcon(def: { id: string; group: string }): React.ComponentType<any
   return STAT_METRIC_ICON[def.id] ?? STAT_GROUP_ICON[def.group] ?? BarChart2;
 }
 
+// A tag metric's registry label is generic ("Wydatki na tag…") — for a widget it must
+// name the actual tag, or a "przekąski vs słodycze" tile shows "Wydatki na tag…".
+function metricTagLabel(def: { label: string; unit: string; needsTag?: boolean } | undefined, tag?: string): string {
+  if (def?.needsTag && tag) {
+    const kind = def.unit === 'zł' ? 'wydatki' : def.unit === 'kg' ? 'kg' : 'szt.';
+    return `${tag.charAt(0).toUpperCase()}${tag.slice(1)} (${kind})`;
+  }
+  return def?.label ?? '';
+}
+
 // Compact per-point label for the trend charts (value shown ABOVE each dot). Kept
 // short so 6 across a narrow card stay legible: decimals for kg/h/rating, exact
 // (grouped) number up to 5 digits, then k-notation. Empty for a zero/no-data point.
@@ -1677,18 +1687,28 @@ export default function DashboardScreen() {
       const bVals = bW ? carryForward(b.values) : b.values;
       const aNow = aW ? lastNonZero(a.values) : (a.values[a.values.length - 1] ?? 0);
       const bNow = bW ? lastNonZero(b.values) : (b.values[b.values.length - 1] ?? 0);
+      // A tag metric's generic label ("Wydatki na tag…") never says WHICH tag, so a
+      // "przekąski vs słodycze" tile read as "Wydatki na tag… vs Słodycze" — unreadable.
+      const aLabel = metricTagLabel(def, t.tag);
+      const bLabel = defB?.label ?? '—';
+      // clearer than "X to 395% Y": name the bigger side and by how many ×
+      const ratio = aNow > 0 && bNow > 0
+        ? (bNow >= aNow ? `${bLabel}: ${(bNow / aNow).toFixed(1)}× tego co „${aLabel}"` : `${aLabel}: ${(aNow / bNow).toFixed(1)}× tego co „${bLabel}"`)
+        : null;
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
           <View style={s.statCmpRow}>
-            <View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(aNow, a.unit)}</Text><Text style={s.statCmpKey}>{def.label}</Text></View>
-            <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(bNow, b.unit)}</Text><Text style={s.statCmpKey}>{defB?.label ?? '—'}</Text></View>
+            <View style={{ flex: 1 }}>
+              <View style={s.cmpDotRow}><View style={[s.cmpDot, { backgroundColor: accentColor }]} /><Text style={s.statCmpKey} numberOfLines={1}>{aLabel}</Text></View>
+              <Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(aNow, a.unit)}</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <View style={s.cmpDotRow}><View style={[s.cmpDot, { backgroundColor: '#FBBF24' }]} /><Text style={s.statCmpKey} numberOfLines={1}>{bLabel}</Text></View>
+              <Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(bNow, b.unit)}</Text>
+            </View>
           </View>
-          {defB && aNow > 0 && a.unit === b.unit && (
-            <Text style={[s.statSub, { marginTop: 2 }]}>
-              {defB.label} to {Math.round((bNow / (aNow || 1)) * 100)}% „{def.label}"
-            </Text>
-          )}
+          {ratio && a.unit === b.unit && <Text style={[s.statSub, { marginTop: 2 }]}>{ratio}</Text>}
           <DualWaveChart data1={aVals} data2={bVals} color1={accentColor} color2={'#FBBF24'} independent={a.unit !== b.unit}
             min1={aW ? zoomFloor(aVals) : 0} min2={bW ? zoomFloor(bVals) : 0} />
           <View style={s.waveLabels}>
@@ -4056,6 +4076,46 @@ export default function DashboardScreen() {
           <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
             {statDetail && (() => {
               const def = metricById(statDetail.metric);
+              // COMPARE of two DIFFERENT metrics (e.g. przekąski vs słodycze): the single
+              // metric detail showed only side A ("9 zł"), which read as nonsense. Show
+              // both, with names, over 6 months.
+              const m2 = statDetail.metric2;
+              if (m2 && m2 !== '__self__' && m2 !== '__avg__') {
+                const defB2 = metricById(m2);
+                const aS = metricSeries(statDetail.metric!, statCtx, 'month', 6, statDetail.tag);
+                const bS = defB2 ? metricSeries(m2, statCtx, 'month', 6) : { values: aS.values.map(() => 0), labels: aS.labels, unit: '' };
+                const aLab = metricTagLabel(def, statDetail.tag);
+                const bLab = defB2?.label ?? '—';
+                const aN = aS.values[aS.values.length - 1] ?? 0;
+                const bN = bS.values[bS.values.length - 1] ?? 0;
+                const maxB = Math.max(...aS.values, ...bS.values, 1);
+                const HB = 60;
+                return (
+                  <>
+                    <View style={s.cardHeader}>
+                      <BarChart2 size={14} color={accentColor} />
+                      <Text style={s.cardTitle} numberOfLines={1}>{statDetail.title || 'Porównanie'}</Text>
+                      <TouchableOpacity onPress={() => setStatDetail(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
+                    </View>
+                    <View style={[s.statCmpRow, { marginTop: spacing[2] }]}>
+                      <View style={{ flex: 1 }}><View style={s.cmpDotRow}><View style={[s.cmpDot, { backgroundColor: accentColor }]} /><Text style={s.statCmpKey} numberOfLines={1}>{aLab}</Text></View><Text style={[s.statCmpVal, { color: accentColor }]}>{fmtStat(aN, aS.unit)}</Text></View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}><View style={s.cmpDotRow}><View style={[s.cmpDot, { backgroundColor: '#FBBF24' }]} /><Text style={s.statCmpKey} numberOfLines={1}>{bLab}</Text></View><Text style={[s.statCmpVal, { color: '#FBBF24' }]}>{fmtStat(bN, bS.unit)}</Text></View>
+                    </View>
+                    <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
+                    <View style={s.tagHistChart}>
+                      {aS.values.map((v, i) => (
+                        <View key={i} style={s.tagHistCol}>
+                          <View style={{ height: HB, width: 26, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
+                            <View style={{ width: 10, height: Math.max(2, (v / maxB) * HB), borderRadius: 3, backgroundColor: accentColor }} />
+                            <View style={{ width: 10, height: Math.max(2, ((bS.values[i] ?? 0) / maxB) * HB), borderRadius: 3, backgroundColor: '#FBBF24' }} />
+                          </View>
+                          <Text style={s.tagHistLbl}>{aS.labels[i]}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                );
+              }
               // LIST metrics (favSweets, topProducts, byCategory) have no time series — the
               // detail must show the RANKED LIST, not a 6-month bar chart. Rendering a
               // series for them was the "coś dziwnego" (a chart of zeros / nonsense).
@@ -4772,9 +4832,11 @@ const buildStyles = (c: any) => StyleSheet.create({
   statListRank: { fontSize: 11, fontWeight: '800', color: c.text.muted, width: 16 },
   statListLabel: { flex: 1, fontSize: 13, color: c.text.primary, fontWeight: '600' },
   statListVal: { fontSize: 13, fontWeight: '800' },
-  statCmpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: spacing[1] },
+  statCmpRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginVertical: spacing[1], gap: spacing[2] },
   statCmpVal: { fontSize: 19, fontWeight: '800', letterSpacing: -0.5 },
   statCmpKey: { fontSize: 10, color: c.text.muted },
+  cmpDotRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 1 },
+  cmpDot: { width: 8, height: 8, borderRadius: 4 },
   weatherTemp: { fontSize: 30, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
   weatherDesc: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.55)', letterSpacing: 0.6 },
 

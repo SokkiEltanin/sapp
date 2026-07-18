@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Footprints, Coins, Wallet, Crown } from 'lucide-react-native';
+import { Footprints, Coins, Wallet, Crown, Sparkles } from 'lucide-react-native';
 import { YearCard } from '@/utils/yearCards';
+import { stepsToDistanceFact } from '@/utils/funComparisons';
 
 // The crown of the collection: one grand card summarising a whole year, built from
 // its month cards. Stickers recap the rarity tiers the year's months earned.
@@ -64,6 +65,13 @@ export default function YearWrappedCard({ card }: { card: YearCard }) {
           <Stat icon={<Wallet size={15} color="#fff" />} val={fmt(card.totalSpend)} key1="zł wydane" />
         </View>
 
+        {stepsToDistanceFact(card.totalSteps) ? (
+          <View style={st.factRow}>
+            <Sparkles size={12} color={card.accent} />
+            <Text style={st.factTxt} numberOfLines={2}>{stepsToDistanceFact(card.totalSteps)}</Text>
+          </View>
+        ) : null}
+
         {card.topSweet && (
           <View style={st.sweetRow}>
             <Text style={st.sweetEmoji}>{card.topSweet.emoji}</Text>
@@ -120,6 +128,8 @@ const st = StyleSheet.create({
   year: { color: '#fff', fontSize: 44, fontWeight: '900', letterSpacing: -1.5, ...shadow },
 
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 12 },
+  factRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: 'rgba(255,255,255,0.11)', borderRadius: 12, paddingVertical: 7, paddingHorizontal: 11 },
+  factTxt: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '600', ...shadow },
   stat: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statIcon: { width: 30, height: 30, borderRadius: 9, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   statVal: { color: '#fff', fontSize: 19, fontWeight: '900', letterSpacing: -0.5, ...shadow },

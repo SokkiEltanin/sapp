@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-nativ
 import { LinearGradient } from 'expo-linear-gradient';
 import { Footprints, TrendingUp, TrendingDown, Trophy, Coins, Smile, Sparkles, ChevronRight } from 'lucide-react-native';
 import { MonthCard, MonthPace } from '@/utils/monthCards';
+import { stepsToDistanceFact } from '@/utils/funComparisons';
 
 // A Spotify-Wrapped-style COLLECTIBLE card for one month. The gradient + emoji
 // stickers are deliberate decoration; the stats are real (sweets, steps, spend,
@@ -125,6 +126,15 @@ export default function MonthWrappedCard({
           )}
         </View>
 
+        {/* fun fact — the steps as a relatable distance ("tyle co z Lublina do Rzeszowa
+            piechotą"), because a raw step count means less than the walk it equals */}
+        {stepsToDistanceFact(card.steps) ? (
+          <View style={st.factRow}>
+            <Sparkles size={12} color={card.accent} />
+            <Text style={st.factTxt} numberOfLines={2}>{stepsToDistanceFact(card.steps)}</Text>
+          </View>
+        ) : null}
+
         {/* pace — only meaningful on the month that's still running: this month so far
             vs the SAME day range of last month, so half a month isn't judged against a
             whole one. */}
@@ -236,6 +246,9 @@ const st = StyleSheet.create({
   heroIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   heroVal: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5, ...shadow },
   heroKey: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '600', marginTop: -1 },
+
+  factRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 11, paddingVertical: 7, paddingHorizontal: 10 },
+  factTxt: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '600', ...shadow },
 
   sweets: { marginTop: 15, gap: 6 },
   sectionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 1 },
