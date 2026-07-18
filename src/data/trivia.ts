@@ -59,4 +59,53 @@ export const TRIVIA: Trivia[] = [
   { cat: 'swiat', text: 'Ludzki nos rozróżnia ok. biliona zapachów — znacznie więcej, niż długo sądzono.' },
   { cat: 'swiat', text: 'Klawiatura QWERTY powstała, by… spowolnić pisanie — dawne maszyny zacinały się przy szybkim stukaniu sąsiednich klawiszy.' },
   { cat: 'swiat', text: 'Pierwszy alarm budzikowy w telefonie i tak Cię nie obudzi lepiej niż stałe pory snu — regularność bije godzinę pobudki.' },
+
+  // ═══ druga porcja ═══
+
+  // ── nauka ──
+  { cat: 'nauka', text: 'Niesporczaki (tardigrady) przetrwają próżnię kosmosu, ekstremalny mróz, ukrop i dawki promieniowania zabójcze dla człowieka. Wysuszone potrafią „ożyć" po latach, gdy trafi na nie kropla wody.' },
+  { cat: 'nauka', text: 'Łyżeczka materii z gwiazdy neutronowej ważyłaby na Ziemi około miliarda ton — tyle, co spora góra.' },
+  { cat: 'nauka', text: 'Kolory nie istnieją „na zewnątrz" — to interpretacja mózgu. Fala światła nie ma barwy; czerwień powstaje dopiero w Twojej głowie.' },
+  { cat: 'nauka', text: 'Największym organizmem na Ziemi jest grzybnia opieńki w Oregonie — rozciąga się pod ziemią na ~9 km² i ma tysiące lat.' },
+  { cat: 'nauka', text: 'Dzielisz ~50% genów z bananem, ~60% z muszką owocową i ~99% z szympansem. Życie korzysta z tego samego zestawu klocków.' },
+  { cat: 'nauka', text: 'Serce kolibra bije nawet ~1200 razy na minutę w locie, a w nocy ptak zapada w odrętwienie i zwalnia metabolizm, by przetrwać.' },
+  { cat: 'nauka', text: 'Gdyby Słońce zgasło, dowiedzielibyśmy się o tym dopiero po ~8 minutach — tyle leci do nas jego światło.' },
+  { cat: 'nauka', text: 'Twoje kości są mocniejsze od betonu na ściskanie, a jednocześnie lżejsze i elastyczniejsze — natura zoptymalizowała je lepiej niż inżynierowie.' },
+  { cat: 'nauka', text: 'Atomy są niemal puste — gdyby jądro atomu powiększyć do wielkości piłki na środku stadionu, elektrony krążyłyby gdzieś przy trybunach.' },
+  { cat: 'nauka', text: 'Krewetka boksująca (raki modliszkowe) uderza tak szybko, że w wodzie powstaje na moment bąbel gorętszy niż powierzchnia Słońca.' },
+  { cat: 'nauka', text: 'Efekt placebo działa nawet gdy pacjent WIE, że dostaje placebo — samo „leczenie się" uruchamia realne procesy w mózgu.' },
+  { cat: 'nauka', text: 'Sekwoje mogą żyć ponad 3000 lat i rosnąć wyżej niż 100 m. Woda pokonuje w ich pniu drogę w górę bez żadnej pompy.' },
+
+  // ── książki (dłuższe fragmenty / idee) ──
+  { cat: 'ksiazka', text: 'Między bodźcem a reakcją jest przestrzeń. W tej przestrzeni leży nasza wolność i moc wyboru reakcji. A w naszej reakcji leży nasz rozwój i wolność. Frankl przeżył obóz, obserwując, że nawet gdy odbierze się człowiekowi wszystko, zostaje mu ostatnia ludzka wolność — wybór własnej postawy.', src: 'Człowiek w poszukiwaniu sensu, V. Frankl' },
+  { cat: 'ksiazka', text: 'Ludzie o „nastawieniu na rozwój" wierzą, że zdolności można wytrenować, więc porażkę traktują jak informację zwrotną, a nie wyrok. Ci o „nastawieniu stałym" unikają wyzwań, bo każda trudność zagraża ich obrazowi „zdolnego". Ta jedna różnica przekłada się na całe życie.', src: 'Nowa psychologia sukcesu, C. Dweck' },
+  { cat: 'ksiazka', text: 'Głęboka praca — skupienie bez rozproszeń nad wymagającym zadaniem — staje się coraz rzadsza i coraz cenniejsza. Kto potrafi ją regularnie osiągać, wygrywa w gospodarce, w której płytkie, ciągle przerywane zajęcia robi już każdy.', src: 'Praca głęboka, C. Newport' },
+  { cat: 'ksiazka', text: 'Wynik decyzji to nie to samo co jej jakość. Możesz podjąć świetną decyzję i przegrać (pech), albo fatalną i wygrać (szczęście). Oceniaj proces, nie tylko rezultat — inaczej uczysz się złych lekcji.', src: 'Myślenie w zakładach, A. Duke' },
+  { cat: 'ksiazka', text: 'Rzeczy antykruche nie tylko znoszą wstrząsy — one na nich zyskują. Mięsień rośnie pod obciążeniem, odporność po chorobie. Zbyt „bezpieczne", wygładzone życie osłabia; trochę stresu i zmienności wzmacnia.', src: 'Antykruchość, N. Taleb' },
+  { cat: 'ksiazka', text: 'W złożonym, zmiennym świecie często wygrywają generaliści — ludzie o szerokich zainteresowaniach, którzy próbowali wielu rzeczy — a nie wąscy specjaliści od jednego. Późny start i „błądzenie" bywają przewagą, nie stratą.', src: 'Zakres, D. Epstein' },
+  { cat: 'ksiazka', text: 'O sukcesie w dłuższej perspektywie decyduje bardziej upór i konsekwencja (grit) niż sam talent. Talent bez wytrwałości to niewykorzystany potencjał; liczy się to, co robisz z nim przez lata.', src: 'Upór, A. Duckworth' },
+  { cat: 'ksiazka', text: 'Nie da się „nadrobić" snu w weekend jak długu w banku. Jedna nieprzespana noc obniża zdolność uczenia się nawet o ~40%, a chroniczny niedobór snu podkopuje odporność, pamięć i nastrój.', src: 'Dlaczego śpimy, M. Walker' },
+  { cat: 'ksiazka', text: 'Nie możesz kontrolować, co Cię spotyka — możesz kontrolować, jak to zinterpretujesz i co z tym zrobisz. Stoicy 2000 lat temu radzili: rozdziel to, co od Ciebie zależy, od tego, co nie, i skup energię tylko na pierwszym.', src: 'Rozmyślania, Marek Aureliusz' },
+  { cat: 'ksiazka', text: 'Twoja uwaga jest ograniczona, więc powiedzieć „tak" jednej rzeczy to powiedzieć „nie" wielu innym. Esencjalizm to zdyscyplinowane robienie mniej, ale lepiej — nie chodzi o to, jak zrobić wszystko, tylko jak zrobić właściwe rzeczy.', src: 'Esencjalizm, G. McKeown' },
+  { cat: 'ksiazka', text: 'Umysł służy do myślenia, nie do przechowywania. Każda niedokończona sprawa trzymana „w głowie" zżera uwagę. Zapisz wszystko poza głową w zaufanym systemie, a odzyskasz spokój i moc skupienia.', src: 'Getting Things Done, D. Allen' },
+  { cat: 'ksiazka', text: 'Nie chodzi o to, żeby o nic się nie martwić, tylko żeby dobrze wybrać, o co warto. Nasza energia jest skończona — mądrość to świadomy wybór problemów, które chcemy w życiu rozwiązywać.', src: 'Subtelna sztuka olewania, M. Manson' },
+
+  // ── rozwój ──
+  { cat: 'rozwoj', text: 'Prawo Parkinsona: praca rozszerza się tak, by wypełnić cały czas, jaki jej damy. Daj sobie na coś 3 godziny zamiast całego dnia, a często zrobisz to w 3 godziny.' },
+  { cat: 'rozwoj', text: 'Efekt Zeigarnik: niedokończone zadania „wiszą" w głowie mocniej niż skończone. Dlatego samo ZACZĘCIE czegoś tworzy napięcie, które ciągnie Cię do dokończenia.' },
+  { cat: 'rozwoj', text: 'Paradoks wyboru: więcej opcji nie znaczy więcej szczęścia — często odwrotnie. Ograniczaj wybory (np. gotowy plan dnia), a zostanie Ci więcej energii na to, co ważne.' },
+  { cat: 'rozwoj', text: 'Reguła 20 sekund: żeby robić dobry nawyk, skróć drogę do niego o 20 sekund (buty przy łóżku); żeby porzucić zły, wydłuż ją (pilot w innym pokoju). Tarcie decyduje.' },
+  { cat: 'rozwoj', text: 'Ucz się „z przypominania", nie z odczytywania: zamknij notatki i spróbuj odtworzyć z pamięci. Wysiłek przypominania utrwala wiedzę o wiele mocniej niż bierne czytanie.' },
+  { cat: 'rozwoj', text: 'Ludzie przeceniają, co zrobią w rok, a nie doceniają, co zrobią w 10 lat. Konsekwencja w małych krokach wygrywa z zrywami.' },
+  { cat: 'rozwoj', text: 'Chcesz coś zrozumieć naprawdę? Wytłumacz to prostymi słowami, jakbyś uczył dziecko (technika Feynmana). Miejsca, gdzie się zacinasz, to Twoje luki w wiedzy.' },
+
+  // ── świat ──
+  { cat: 'swiat', text: 'Liczba Dunbara: człowiek jest w stanie utrzymać ok. 150 stabilnych relacji społecznych. Powyżej tego grupy zwykle się dzielą — tyle „mieści się" w naszym mózgu.' },
+  { cat: 'swiat', text: 'Krowy mają najlepsze przyjaciółki i stresują się, gdy się je rozdzieli — tętno im wtedy rośnie.' },
+  { cat: 'swiat', text: 'Grenlandzki rekin polarny może żyć ponad 300 lat — to najdłużej żyjący kręgowiec. Dojrzałość płciową osiąga dopiero po ~150 latach.' },
+  { cat: 'swiat', text: 'Znaczek „@" ma w różnych językach zabawne nazwy: po polsku „małpa", po włosku „ślimak", po duńsku „trąba słonia", a po hebrajsku „strudel".' },
+  { cat: 'swiat', text: 'W kosmosie astronauci rosną nawet o kilka centymetrów — bez grawitacji kręgosłup się rozciąga. Po powrocie na Ziemię wracają do dawnego wzrostu.' },
+  { cat: 'swiat', text: 'Pierwsza kamera internetowa na świecie podglądała… ekspres do kawy w Cambridge, żeby naukowcy nie chodzili na próżno, gdy dzbanek był pusty.' },
+  { cat: 'swiat', text: 'Ludzie i banany mają wspólnego przodka sprzed setek milionów lat — dlatego mimo pozorów dzielimy z nimi sporą część genów.' },
+  { cat: 'swiat', text: 'W średniowieczu ludzie spali „na dwie tury": kładli się po zmroku, budzili w środku nocy na godzinę-dwie (czuwanie, modlitwa, rozmowy), po czym spali dalej do rana.' },
 ];

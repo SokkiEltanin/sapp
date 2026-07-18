@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FlaskConical, BookOpen, Lightbulb, Globe, Sparkles, RefreshCw } from 'lucide-react-native';
-import { TRIVIA, TriviaCat } from '@/data/trivia';
+import { TRIVIA, Trivia, TriviaCat } from '@/data/trivia';
 import PressableScale from '@/components/ui/PressableScale';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -15,29 +16,73 @@ const META: Record<TriviaCat, { icon: any; label: string; color: string }> = {
   swiat:   { icon: Globe,        label: 'Świat',     color: '#E0A33A' },
 };
 
-// deterministic "trivia of the day" so it's stable across re-renders on the same day
-function dayIndex(): number {
+const KEY = 'trivia_state_v1';
+const MAX_SHOWS = 4;   // each fact appears at most 4× before it's "archived"
+
+// Stable key per fact from its text, so counts survive reordering / adding items.
+function keyOf(t: Trivia): string {
+  let h = 0;
+  for (let i = 0; i < t.text.length; i++) h = (Math.imul(h, 31) + t.text.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+}
+const todayStr = () => {
   const d = new Date();
-  const doy = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86400000);
-  return (doy * 7 + d.getFullYear()) % TRIVIA.length;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+interface Persist { counts: Record<string, number>; currentKey: string | null; day: string | null }
+
+// Pick a fact that hasn't hit MAX_SHOWS yet (the "active pool"), excluding the current
+// one. When everything is archived, reset the counts and start the cycle over — so you
+// see variety and never the same few facts on a loop. Increments the picked fact.
+function advance(counts: Record<string, number>, excludeKey: string | null): { key: string; counts: Record<string, number> } {
+  let pool = TRIVIA.filter(t => (counts[keyOf(t)] ?? 0) < MAX_SHOWS && keyOf(t) !== excludeKey);
+  if (pool.length === 0) {
+    counts = {};                                            // all archived → new cycle
+    pool = TRIVIA.filter(t => keyOf(t) !== excludeKey);
+    if (pool.length === 0) pool = [...TRIVIA];
+  }
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const k = keyOf(pick);
+  return { key: k, counts: { ...counts, [k]: (counts[k] ?? 0) + 1 } };
 }
 
-// "Ciekawostka" — one curated fact (science / book insight / self-dev / world), rotating
-// daily, tap the shuffle button for another. The user asked for this; content in trivia.ts.
+// "Ciekawostka" — one curated fact (science / book insight / self-dev / world). One per
+// day by default (counted once when first shown that day) + a shuffle button, each fact
+// capped at 4 appearances then archived. Content in trivia.ts.
 export default function TriviaCard({ cardBg }: { cardBg: string }) {
   const c = useColors();
   const s = makeS(c);
-  const [idx, setIdx] = useState(dayIndex);
-  const t = TRIVIA[idx];
-  const m = META[t.cat];
-  const Ic = m.icon;
+  const [st, setSt] = useState<Persist | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(KEY).then(raw => {
+      let p: Persist = raw ? JSON.parse(raw) : { counts: {}, currentKey: null, day: null };
+      const today = todayStr();
+      const valid = p.currentKey && TRIVIA.some(t => keyOf(t) === p.currentKey);
+      if (p.day !== today || !valid) {
+        const r = advance(p.counts ?? {}, p.currentKey ?? null);   // new day → fresh fact
+        p = { counts: r.counts, currentKey: r.key, day: today };
+        AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
+      }
+      if (alive) setSt(p);
+    }).catch(() => { if (alive) setSt({ counts: {}, currentKey: keyOf(TRIVIA[0]), day: todayStr() }); });
+    return () => { alive = false; };
+  }, []);
 
   const next = () => {
+    if (!st) return;
     haptic.tap();
-    let n = idx;
-    while (n === idx && TRIVIA.length > 1) n = Math.floor(Math.random() * TRIVIA.length);
-    setIdx(n);
+    const r = advance(st.counts, st.currentKey);
+    const p: Persist = { counts: r.counts, currentKey: r.key, day: todayStr() };
+    setSt(p);
+    AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
   };
+
+  const t = st ? (TRIVIA.find(x => keyOf(x) === st.currentKey) ?? TRIVIA[0]) : TRIVIA[0];
+  const m = META[t.cat];
+  const Ic = m.icon;
 
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
