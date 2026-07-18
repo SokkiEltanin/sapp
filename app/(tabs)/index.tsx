@@ -58,6 +58,7 @@ import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
+import { stepsToDistanceFact } from '@/utils/funComparisons';
 import { buildRecords } from '@/utils/personalRecords';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
@@ -2466,7 +2467,7 @@ export default function DashboardScreen() {
         if ((it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) sweetDays.add(day);
       }
     }
-    type Icon = 'calendar' | 'percent' | 'store' | 'wallet' | 'flame' | 'candy' | 'clock';
+    type Icon = 'calendar' | 'percent' | 'store' | 'wallet' | 'flame' | 'candy' | 'clock' | 'footprints';
     const facts: { icon: Icon; label: string }[] = [];
 
     // shopping cadence
@@ -2519,8 +2520,14 @@ export default function DashboardScreen() {
     // average transaction this month
     if (monthTxCount >= 5) facts.push({ icon: 'wallet', label: `Średni wydatek w tym mies.: ${Math.round(thisMonthTotal / monthTxCount)} zł (${monthTxCount} transakcji)` });
 
+    // steps this month as a relatable distance — the kind of "ciekawostka" the user loves
+    const monthPref = todayStr().slice(0, 7);
+    const stepsMonth = Object.entries(healthDays).filter(([d]) => d.startsWith(monthPref)).reduce((sum, [, v]) => sum + (v.steps || 0), 0);
+    const stepFact = stepsToDistanceFact(stepsMonth);
+    if (stepFact) facts.unshift({ icon: 'footprints', label: `W tym miesiącu przeszedłeś ${stepFact}` });
+
     return facts.slice(0, 8);
-  }, [expenses, nameAliases, scope]);
+  }, [expenses, nameAliases, scope, healthDays]);
 
   // ── Weight ciekawostka: kg per food group THIS MONTH, with top-2 breakdown ──
   // e.g. "10 kg sera — 4 kg gouda, 6 kg cesarski". Best-effort: only weighed
@@ -3676,6 +3683,7 @@ export default function DashboardScreen() {
                       : f.icon === 'store' ? Store
                       : f.icon === 'wallet' ? Wallet
                       : f.icon === 'candy' ? Candy
+                      : f.icon === 'footprints' ? Footprints
                       : f.icon === 'clock' ? Timer : Flame;
                     return (
                       <View key={i} style={s.factRow}>
