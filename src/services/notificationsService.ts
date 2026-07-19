@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Subscription, Task } from '@/types';
+import { PAYDAY_WINDOW_DAYS } from '@/utils/payday';
 
 // Next clock time for hour:minute — today if it's still ahead and we're not
 // skipping today, otherwise tomorrow. Used so the mood reminder can SKIP today
@@ -205,9 +206,19 @@ export const notificationsService = {
       const now = new Date();
       const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       if (handledMonth === thisMonth) return; // already got the paycheck this month
-      // This month's payday at 10:00; if already past and still unhandled, nudge tomorrow.
+      // This month's payday at 10:00. If that moment has passed, nudge the NEXT morning
+      // — but only while we're still inside the ask-window [day .. day+WINDOW]. Past the
+      // window, schedule NEXT month's payday instead of re-nudging tomorrow. Without this
+      // guard the reminder rescheduled to "tomorrow" on every foreground, so it fired
+      // every single day for the rest of the month (user got asked on the 19th).
       let date = new Date(now.getFullYear(), now.getMonth(), day, 10, 0, 0);
-      if (date.getTime() <= now.getTime()) date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0, 0);
+      if (date.getTime() <= now.getTime()) {
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 10, 0, 0);
+        const windowEnd = new Date(now.getFullYear(), now.getMonth(), day + PAYDAY_WINDOW_DAYS, 23, 59, 59);
+        date = tomorrow.getTime() <= windowEnd.getTime()
+          ? tomorrow
+          : new Date(now.getFullYear(), now.getMonth() + 1, day, 10, 0, 0); // past window → next month
+      }
       await Notifications.scheduleNotificationAsync({
         identifier: 'payday',
         content: { title: 'Wypłata?', body: 'Czy dostałeś już wypłatę? Dotknij, by dodać do przychodów.', data: { screen: 'payday' } },

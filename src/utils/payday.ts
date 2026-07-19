@@ -11,8 +11,8 @@ const K_HANDLED = 'payday_handled_month'; // YYYY-MM of the last confirmed paych
 const K_DISMISS = 'payday_dismissed_date'; // YYYY-MM-DD the prompt was waved off "for today"
 
 // Only ask in a short window starting on the payday day (so it doesn't nag every
-// day for the rest of the month).
-const PAYDAY_WINDOW_DAYS = 4;
+// day for the rest of the month). The reminder notification uses the SAME window.
+export const PAYDAY_WINDOW_DAYS = 4;
 
 function dayStr(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

@@ -1259,8 +1259,11 @@ export default function DashboardScreen() {
     const sub = AppState.addEventListener('change', s => {
       setAppActive(s === 'active');
       if (s === 'active') refreshOnResume();
-      // Don't let a left-open popup greet you on the next resume.
-      if (s !== 'active') { setWorkPanel(false); setPaydayModal(false); }
+      // Close the work slide-panel when leaving, but DON'T touch the payday modal here:
+      // tapping the "Wypłata?" notification foregrounds the app (often via a transient
+      // 'inactive' → 'active'), and this handler was firing on that 'inactive' and
+      // closing the modal the tap had just opened — "popup pojawia się i znika".
+      if (s !== 'active') { setWorkPanel(false); }
     });
     return () => sub.remove();
   }, [refreshOnResume]);
