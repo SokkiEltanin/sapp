@@ -795,6 +795,7 @@ export default function DashboardScreen() {
   const [weatherPanel, setWeatherPanel] = useState(false);
   const [workPanel, setWorkPanel]   = useState(false);
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
+  const [detailPeriod, setDetailPeriod] = useState<'week' | 'month'>('month'); // tydzień/miesiąc toggle in the detail view
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
@@ -1941,7 +1942,7 @@ export default function DashboardScreen() {
 
   const renderCustomTile = (t: CustomTile): React.ReactNode => {
     if (t.type === 'stat') return (
-      <TouchableOpacity activeOpacity={0.9} onPress={() => { haptic.tap(); setStatDetail(t); }}>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => { haptic.tap(); setDetailPeriod((t.period as 'week' | 'month') ?? 'month'); setStatDetail(t); }}>
         {renderStatTile(t)}
       </TouchableOpacity>
     );
@@ -4263,8 +4264,8 @@ export default function DashboardScreen() {
                   </>
                 );
               }
-              const ser = metricSeries(statDetail.metric!, statCtx, 'month', 6, statDetail.tag);
-              const cur = metricNumber(statDetail.metric!, statCtx, 'month', statDetail.tag);
+              const ser = metricSeries(statDetail.metric!, statCtx, detailPeriod, 6, statDetail.tag);
+              const cur = metricNumber(statDetail.metric!, statCtx, detailPeriod, statDetail.tag);
               const vals = ser.values;
               const max = Math.max(...vals, statDetail.target ?? 0, 1);
               const H = 64;
@@ -4289,11 +4290,23 @@ export default function DashboardScreen() {
                     <Text style={s.cardTitle} numberOfLines={1}>{statDetail.title || def?.label || 'Widget'}</Text>
                     <TouchableOpacity onPress={() => setStatDetail(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
                   </View>
+                  {/* week/month toggle — flip the same metric between weekly and monthly view */}
+                  <View style={s.detailToggle}>
+                    {(['week', 'month'] as const).map(p => {
+                      const on = detailPeriod === p;
+                      return (
+                        <TouchableOpacity key={p} onPress={() => { haptic.tap(); setDetailPeriod(p); }} activeOpacity={0.8}
+                          style={[s.detailToggleBtn, on && { backgroundColor: accentColor + '22', borderColor: accentColor }]}>
+                          <Text style={[s.detailToggleTxt, on && { color: accentColor, fontWeight: '800' }]}>{p === 'week' ? 'Tydzień' : 'Miesiąc'}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                   <View style={{ marginTop: spacing[2] }}>
                     <Text style={s.wpBig}>{fmt(cur.value)}<Text style={s.wpUnit}>{u}</Text></Text>
-                    <Text style={s.wpSub}>ten miesiąc{statDetail.target ? ` · cel ${fmt(statDetail.target)}${u}` : ''}</Text>
+                    <Text style={s.wpSub}>{detailPeriod === 'week' ? 'ten tydzień' : 'ten miesiąc'}{statDetail.target ? ` · cel ${fmt(statDetail.target)}${u}` : ''}</Text>
                   </View>
-                  <Text style={s.wxSection}>Ostatnie 6 miesięcy</Text>
+                  <Text style={s.wxSection}>{detailPeriod === 'week' ? 'Ostatnie 6 tygodni' : 'Ostatnie 6 miesięcy'}</Text>
                   <View style={s.tagHistChart}>
                     {vals.map((v, i) => {
                       const h = v > 0 ? Math.max(3, ((v - floor) / span) * H) : 0;
@@ -5007,6 +5020,9 @@ const buildStyles = (c: any) => StyleSheet.create({
   weightAddBtn: { paddingHorizontal: spacing[4], paddingVertical: 11, borderRadius: radius.md },
   weightAddBtnTxt: { fontSize: 13, fontWeight: '800' },
   wxSection: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing[3], marginBottom: spacing[1] },
+  detailToggle: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
+  detailToggleBtn: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
+  detailToggleTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.muted },
   wxForecast: { flexDirection: 'row', justifyContent: 'space-between' },
   wxDay: { alignItems: 'center', flex: 1 },
   wxDayLbl: { fontSize: 11, color: c.text.secondary, fontWeight: '700' },
