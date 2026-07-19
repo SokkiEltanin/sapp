@@ -1687,6 +1687,11 @@ export default function DashboardScreen() {
               )}
               <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(thenV, ser.unit)}</Text><Text style={s.statCmpKey}>{thenL}</Text></View>
             </View>
+            <View style={s.waveValRow}>
+              {vals.map((v, i) => (
+                <Text key={i} style={[s.waveValLabel, (i === vals.length - 1 || i === thenIdx) && { color: accentColor, fontWeight: '800' }]} numberOfLines={1}>{fmtChartPt(v, ser.unit)}</Text>
+              ))}
+            </View>
             <WaveChart data={vals} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>
               {ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, (i === ser.labels.length - 1 || i === thenIdx) && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}
@@ -1715,6 +1720,11 @@ export default function DashboardScreen() {
                 </View>
               )}
               <View style={{ alignItems: 'flex-end' }}><Text style={[s.statCmpVal, { color: '#9CA3AF' }]}>{fmtStat(avgV, ser.unit)}</Text><Text style={s.statCmpKey}>Twoja średnia</Text></View>
+            </View>
+            <View style={s.waveValRow}>
+              {vals.map((v, i) => (
+                <Text key={i} style={[s.waveValLabel, i === vals.length - 1 && { color: accentColor, fontWeight: '800' }]} numberOfLines={1}>{fmtChartPt(v, ser.unit)}</Text>
+              ))}
             </View>
             <WaveChart data={vals} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>{ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}</View>
@@ -1754,6 +1764,16 @@ export default function DashboardScreen() {
             </View>
           </View>
           {ratio && a.unit === b.unit && <Text style={[s.statSub, { marginTop: 2 }]}>{ratio}</Text>}
+          <View style={s.waveValRow}>
+            {a.values.map((v, i) => (
+              <Text key={i} style={[s.waveValLabel, { color: accentColor, fontWeight: i === a.values.length - 1 ? '800' : '600' }]} numberOfLines={1}>{fmtChartPt(v, a.unit)}</Text>
+            ))}
+          </View>
+          <View style={s.waveValRow}>
+            {b.values.map((v, i) => (
+              <Text key={i} style={[s.waveValLabel, { color: '#FBBF24', fontWeight: i === b.values.length - 1 ? '800' : '600' }]} numberOfLines={1}>{fmtChartPt(v, b.unit)}</Text>
+            ))}
+          </View>
           <DualWaveChart data1={aVals} data2={bVals} color1={accentColor} color2={'#FBBF24'} independent={a.unit !== b.unit}
             min1={aW ? zoomFloor(aVals) : 0} min2={bW ? zoomFloor(bVals) : 0} />
           <View style={s.waveLabels}>
@@ -4158,6 +4178,10 @@ export default function DashboardScreen() {
                     <View style={s.tagHistChart}>
                       {aS.values.map((v, i) => (
                         <View key={i} style={s.tagHistCol}>
+                          <View style={{ alignItems: 'center' }}>
+                            <Text style={[s.tagHistVal, { color: accentColor }]} numberOfLines={1}>{v > 0 ? fmtChartPt(v, aS.unit) : ''}</Text>
+                            <Text style={[s.tagHistVal, { color: '#FBBF24' }]} numberOfLines={1}>{(bS.values[i] ?? 0) > 0 ? fmtChartPt(bS.values[i] ?? 0, bS.unit) : ''}</Text>
+                          </View>
                           <View style={{ height: HB, width: 26, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
                             <View style={{ width: 10, height: Math.max(2, (v / maxB) * HB), borderRadius: 3, backgroundColor: accentColor }} />
                             <View style={{ width: 10, height: Math.max(2, ((bS.values[i] ?? 0) / maxB) * HB), borderRadius: 3, backgroundColor: '#FBBF24' }} />

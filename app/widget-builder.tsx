@@ -212,9 +212,15 @@ export default function WidgetBuilder() {
                 const max = Math.max(...ser.values, 1);
                 return (
                   <View style={s.pWave}>
-                    {ser.values.map((v, i) => (
-                      <View key={i} style={[s.pWaveBar, { height: v > 0 ? Math.max(4, (v / max) * 40) : 3, backgroundColor: i === ser.values.length - 1 ? accent : accent + '55' }]} />
-                    ))}
+                    {ser.values.map((v, i) => {
+                      const last = i === ser.values.length - 1;
+                      return (
+                        <View key={i} style={s.pWaveCol}>
+                          <Text style={[s.pWaveVal, last && { color: accent, fontWeight: '800' }]} numberOfLines={1}>{v > 0 ? fmtVal(v, def.unit) : ''}</Text>
+                          <View style={{ width: '66%', borderRadius: 3, minHeight: 3, height: v > 0 ? Math.max(4, (v / max) * 40) : 3, backgroundColor: last ? accent : accent + '55' }} />
+                        </View>
+                      );
+                    })}
                   </View>
                 );
               })()}
@@ -476,8 +482,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   pNumberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   pNumber: { fontSize: 30, fontWeight: '800', color: c.text.primary, letterSpacing: -1 },
   pUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted, marginBottom: 5 },
-  pWave: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 46, marginTop: 4 },
+  pWave: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 58, marginTop: 4 },
   pWaveBar: { flex: 1, borderRadius: 3, minHeight: 4 },
+  pWaveCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
+  pWaveVal: { fontSize: 8.5, fontWeight: '600', color: c.text.muted },
   pCmpBar: { width: '70%', borderRadius: 4, minHeight: 10 },
   pCmpVal: { fontSize: 11, fontWeight: '800', color: c.text.primary },
   pListRow: { height: 12, justifyContent: 'center' },
