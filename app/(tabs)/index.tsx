@@ -46,6 +46,7 @@ import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes
 import { useStatsScope, inScope, countsForConsumption, consumesInScope, StatsScope } from '@/store/statsScope';
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
+import { getCategoryMeta } from '@/utils/categories';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
@@ -2777,6 +2778,20 @@ export default function DashboardScreen() {
     return out.sort((a, b) => b.pct - a.pct).slice(0, 4);
   }, [expenses, nameAliases]);
 
+  // "Bąbelki wydatków" — this month's spend per category as sized bubbles.
+  const spendBubbles = useMemo(() => {
+    const now = new Date();
+    const mk = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    const sums: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type === 'income' || isSelfTransfer(e) || !inScope(e, scope)) continue;
+      if ((e.date ?? '').slice(0, 7) !== mk) continue;
+      sums[e.category] = (sums[e.category] ?? 0) + e.amount;
+    }
+    const rows = Object.entries(sums).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    return { rows, max: rows.length ? rows[0][1] : 1, total: rows.reduce((s, [, v]) => s + v, 0) };
+  }, [expenses, scope]);
+
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
@@ -3332,6 +3347,30 @@ export default function DashboardScreen() {
                   {yearAgo.steps > 0 && (
                     <View style={s.yearAgoStat}><Text style={[s.yearAgoVal, { color: accentColor }]}>{yearAgo.steps >= 1000 ? `${(yearAgo.steps / 1000).toFixed(1).replace('.0', '')}k` : yearAgo.steps}</Text><Text style={s.yearAgoKey}>kroków</Text></View>
                   )}
+                </View>
+              </View>
+            );
+
+            nodes['spend-bubbles'] = spendBubbles.rows.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Wallet size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Wydatki — bąbelki</Text>
+                  <Text style={s.bubbleTotal}>{Math.round(spendBubbles.total)} zł</Text>
+                </View>
+                <View style={s.bubbleWrap}>
+                  {spendBubbles.rows.map(([cat, amt]) => {
+                    const meta = getCategoryMeta(cat as any);
+                    const d = 46 + Math.round(Math.sqrt(amt / spendBubbles.max) * 66); // 46..112 px
+                    return (
+                      <View key={cat} style={s.bubbleCol}>
+                        <View style={[s.bubble, { width: d, height: d, borderRadius: d / 2, backgroundColor: meta.color + '24', borderColor: meta.color + '70' }]}>
+                          <Text style={[s.bubbleAmt, { color: meta.color, fontSize: d < 62 ? 11 : 14 }]} numberOfLines={1}>{Math.round(amt)}</Text>
+                        </View>
+                        <Text style={s.bubbleLabel} numberOfLines={1}>{meta.label}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             );
@@ -5196,6 +5235,13 @@ const buildStyles = (c: any) => StyleSheet.create({
   yearAgoStat: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingVertical: spacing[3] },
   yearAgoVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
   yearAgoKey: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
+  // "Bąbelki wydatków"
+  bubbleTotal: { marginLeft: 'auto', fontSize: 12, fontWeight: '800', color: c.text.secondary },
+  bubbleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], justifyContent: 'center', alignItems: 'flex-end', marginTop: spacing[3] },
+  bubbleCol: { alignItems: 'center', gap: 4 },
+  bubble: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
+  bubbleAmt: { fontWeight: '900', letterSpacing: -0.5 },
+  bubbleLabel: { fontSize: 10, color: c.text.muted, fontWeight: '600', maxWidth: 76, textAlign: 'center' },
   // "Co podrożało"
   pwRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.border.subtle },
   pwName: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
