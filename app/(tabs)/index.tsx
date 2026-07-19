@@ -3974,15 +3974,30 @@ export default function DashboardScreen() {
               </View>
             );
 
-            nodes['mood-cal'] = Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (
+            nodes['mood-cal'] = Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (() => {
+              const loggedToday = (moodByDay[todayStr()] ?? []).length > 0;
+              return (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Smile size={13} color={colors.text.muted} />
                   <Text style={s.cardTitle}>Nastrój — ten miesiąc</Text>
+                  {loggedToday ? (
+                    <View style={s.moodDoneChip}>
+                      <Check size={11} color="#2AC68F" />
+                      <Text style={s.moodDoneTxt}>zapisano dziś</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={s.moodTodoChip} activeOpacity={0.8}
+                      onPress={() => { haptic.tap(); router.navigate({ pathname: '/(tabs)/mood', params: { openCheckIn: 'true' } } as any); }}>
+                      <Plus size={11} color={colors.accent.blue} />
+                      <Text style={s.moodTodoTxt}>zapisz nastrój</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <MoodMiniCal moodByDay={moodByDay} />
               </View>
-            );
+              );
+            })();
 
             nodes['mood-wave'] = weekOverview.filter(w => w.avgMood !== null).length >= 3 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -5235,6 +5250,11 @@ const buildStyles = (c: any) => StyleSheet.create({
   waveLabels: { flexDirection: 'row' },
   waveLabel: { flex: 1, fontSize: 8, color: c.text.muted, textAlign: 'center' },
   chartCaption: { fontSize: 9.5, color: c.text.muted, textAlign: 'center', marginTop: 4, fontStyle: 'italic' },
+  // "nastrój zapisany dziś" marker
+  moodDoneChip: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2AC68F1E', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
+  moodDoneTxt: { fontSize: 10.5, fontWeight: '800', color: '#2AC68F' },
+  moodTodoChip: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: radius.full, borderWidth: 1, borderColor: c.accent.blue + '55', paddingHorizontal: 8, paddingVertical: 3 },
+  moodTodoTxt: { fontSize: 10.5, fontWeight: '800', color: c.accent.blue },
   // "Rok temu tego dnia"
   yearAgoRow: { flexDirection: 'row', gap: spacing[2], marginTop: 2 },
   yearAgoStat: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingVertical: spacing[3] },

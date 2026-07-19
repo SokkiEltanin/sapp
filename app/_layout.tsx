@@ -368,6 +368,8 @@ export default function RootLayout() {
         router.navigate('/habits' as any);
       } else if (screen === 'subscriptions') {
         router.navigate('/expenses/subscriptions' as any);
+      } else if (screen === 'vehicles') {
+        router.navigate('/vehicles' as any);   // "Serwis / wymiana" reminder
       } else if (screen === 'finances') {
         router.navigate('/(tabs)/finances' as any);
       } else if (screen === 'index') {
