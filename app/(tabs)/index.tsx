@@ -1160,7 +1160,7 @@ export default function DashboardScreen() {
 
   useEffect(() => { loadPomSessions(); }, []);
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
-  const reloadHealth = useCallback(() => {
+  const reloadHealth = useCallback((force = false) => {
     const read = () => {
       getHealthHistory(150).then(h => {
         const m: StatCtx['healthDays'] = {};
@@ -1170,13 +1170,18 @@ export default function DashboardScreen() {
       getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
     };
     read();
-    // pull fresh steps/sleep from the watch on every focus (force = bypass the 10-min
-    // throttle so widgets show current data on app entry), re-read if it wrote anything
-    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(7, true)).then(n => { if (n > 0) read(); }).catch(() => {});
+    // Pull fresh steps/sleep from the watch. force=true (app ENTRY: cold start + resume)
+    // bypasses the 10-min throttle so widgets show current data straight away. A plain
+    // mid-session TAB FOCUS passes force=false — the throttle then skips the native read
+    // if it ran within 10 min, so switching tabs doesn't re-hit Health Connect + rewrite
+    // the per-day cache every time (that setHealthDays churn kept re-dirtying this frozen
+    // screen, so returning to the dashboard had a bigger thaw to reconcile → the lag).
+    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(7, force)).then(n => { if (n > 0) read(); }).catch(() => {});
   }, []);
-  useEffect(() => { reloadHealth(); }, [reloadHealth]);
-  // Re-read health on focus so a weight/steps logged elsewhere isn't shown stale.
-  useFocusEffect(reloadHealth);
+  useEffect(() => { reloadHealth(true); }, [reloadHealth]);  // cold start → force fresh
+  // Re-read local health on focus (cheap multiGet) so a weight/steps logged elsewhere
+  // isn't stale; the watch sync itself is throttled (force=false) via reloadHealth's default.
+  useFocusEffect(useCallback(() => { reloadHealth(false); }, [reloadHealth]));
   // Quick weight entry from the weight widget's popup.
   const saveWeightEntry = useCallback(async () => {
     const kg = parseFloat(weightInput.replace(',', '.'));
@@ -1248,7 +1253,7 @@ export default function DashboardScreen() {
     googleCalendarService.getStoredToken().then(token => { if (token) googleCalendarService.fetchEvents().then(setGcalEvents).catch(() => {}); }).catch(() => {});
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
-    reloadHealth();
+    reloadHealth(true);   // returning to the app = entry → force fresh watch data
   }, [reloadHealth]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => {
