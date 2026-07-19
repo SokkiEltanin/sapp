@@ -11,11 +11,18 @@ import { MOOD_COLORS } from '@/types';
 const MONTHS = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 function pad(n: number) { return String(n).padStart(2, '0'); }
 
-export default function YearPixels({ year, valueFor, mood, accent }: {
+// Clearly-separated alpha steps for the shade levels (dark/faded → intense accent),
+// so adjacent tiers are distinguishable — not a smooth ramp. Legendary tier is a
+// distinct gold that stands out from every blue/green shade.
+const SHADE_ALPHA = ['26', '3C', '58', '7A', 'A0', 'CC'];
+const LEGENDARY = '#FFCB47';
+
+export default function YearPixels({ year, valueFor, mood, accent, tiers }: {
   year: number;
   valueFor: (day: string) => number;   // metric value for a YYYY-MM-DD
   mood?: boolean;                        // true → colour by mood level 1–5
   accent: string;                        // base colour for the intensity ramp
+  tiers?: number[];                      // absolute thresholds → discrete tiers (+ legendary top)
 }) {
   const c = useColors();
 
@@ -48,9 +55,19 @@ export default function YearPixels({ year, valueFor, mood, accent }: {
   const colorFor = (v: number) => {
     if (v <= 0) return c.fill.subtle;
     if (mood) return (MOOD_COLORS as any)[Math.round(v)] ?? accent;
-    const t = max > 0 ? v / max : 0;
-    const a = Math.round((0.28 + 0.72 * t) * 255).toString(16).padStart(2, '0');
-    return accent + a;
+    let level: number, isLegend: boolean;
+    if (tiers && tiers.length) {
+      // discrete ABSOLUTE tiers: level = how many thresholds the value clears
+      level = tiers.filter(th => v >= th).length;          // 0..tiers.length
+      isLegend = level >= tiers.length;                    // cleared them all → top tier
+    } else {
+      // no absolute scale (money/weight) → discretise the relative ramp into 5 buckets
+      const t = max > 0 ? v / max : 0;
+      level = Math.min(4, Math.floor(t * 5));
+      isLegend = t >= 0.92;                                // near a personal record
+    }
+    if (isLegend) return LEGENDARY;
+    return accent + SHADE_ALPHA[Math.min(level, SHADE_ALPHA.length - 1)];
   };
 
   return (

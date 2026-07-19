@@ -402,6 +402,21 @@ export const PIXEL_METRICS = new Set([
   'spend', 'food', 'sweets', 'income', 'moodAvg', 'energyAvg', 'steps', 'sleepAvg', 'weight', 'tasksDone',
 ]);
 
+// ABSOLUTE colour-tier thresholds for the year-in-pixels grid, per metric. N thresholds
+// → N distinguishable shade levels (0..N-1) + a LEGENDARY top tier (value ≥ last
+// threshold). Gives the grid real meaning (a 20k-step day always looks the same, not
+// relative to your max) with clearly separable steps instead of a smooth ramp. Metrics
+// with no natural absolute scale (money, weight) return undefined → the grid falls back
+// to a discretised relative ramp.
+export function pixelTiers(metric: string): number[] | undefined {
+  switch (metric) {
+    case 'steps':     return [5000, 10000, 15000, 20000, 25000, 30000];  // 30k+ = legendary
+    case 'sleepAvg':  return [4, 5.5, 6.5, 7.5, 8.5];                     // ≥8.5 h = legendary
+    case 'tasksDone': return [1, 2, 3, 5, 8];                             // ≥8 done = legendary
+    default:          return undefined;                                   // money/weight → relative
+  }
+}
+
 // One metric's value for a single calendar day (YYYY-MM-DD). Feeds the year grid.
 export function dailyValue(metric: string, ctx: StatCtx, day: string): number {
   const onDay = (d?: string) => (d ?? '').slice(0, 10) === day;

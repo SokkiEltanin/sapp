@@ -7,7 +7,7 @@ import { ChevronLeft, Hash, BarChart3, List, GitCompare, PieChart, LayoutGrid, C
 import PressableScale from '@/components/ui/PressableScale';
 import YearPixels from '@/components/dashboard/YearPixels';
 import { useDashboardLayout, WidgetViz } from '@/store/dashboardLayout';
-import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS, StatCtx, metricNumber, metricSeries, metricList, PIXEL_METRICS, dailyValue, isMoodPixelMetric } from '@/utils/statWidgets';
+import { WIDGET_METRICS, MetricDef, MetricGroup, metricById, WIDGET_TAGS, StatCtx, metricNumber, metricSeries, metricList, PIXEL_METRICS, dailyValue, isMoodPixelMetric, pixelTiers } from '@/utils/statWidgets';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useStatsScope } from '@/store/statsScope';
 import { useMoodStore } from '@/store/moodStore';
@@ -250,7 +250,7 @@ export default function WidgetBuilder() {
                 );
               })()}
               {viz === 'pixels' && (
-                <YearPixels year={new Date().getFullYear()} valueFor={(d) => dailyValue(def.id, statCtx, d)} mood={isMoodPixelMetric(def.id)} accent={accent} />
+                <YearPixels year={new Date().getFullYear()} valueFor={(d) => dailyValue(def.id, statCtx, d)} mood={isMoodPixelMetric(def.id)} accent={accent} tiers={pixelTiers(def.id)} />
               )}
               {(viz === 'list' || viz === 'donut') && (() => {
                 const rows = metricList(def.id, statCtx, 3);

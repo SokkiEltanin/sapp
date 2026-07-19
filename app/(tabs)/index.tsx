@@ -91,7 +91,7 @@ import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, isAutoSection, CustomTile } from '@/store/dashboardLayout';
-import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric } from '@/utils/statWidgets';
+import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers } from '@/utils/statWidgets';
 import YearPixels from '@/components/dashboard/YearPixels';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
@@ -1549,19 +1549,24 @@ export default function DashboardScreen() {
       const year = new Date().getFullYear();
       const mood = isMoodPixelMetric(t.metric!);
       const valueFor = (d: string) => dailyValue(t.metric!, statCtx, d);
+      const tiers = pixelTiers(t.metric!);
+      // human hint of the absolute tiers (steps: "co 5k · 30k+ złoty")
+      const tierHint = tiers ? (t.metric === 'steps' ? 'co 5k kroków · 30k+ = złoty'
+        : t.metric === 'sleepAvg' ? 'progi snu · ≥8,5 h = złoty'
+        : t.metric === 'tasksDone' ? 'liczba zadań · ≥8 = złoty' : null) : null;
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
-          <YearPixels year={year} valueFor={valueFor} mood={mood} accent={accentColor} />
+          <YearPixels year={year} valueFor={valueFor} mood={mood} accent={accentColor} tiers={tiers} />
           <View style={s.pxLegendRow}>
-            <Text style={s.statSub}>Rok {year}</Text>
+            <Text style={s.statSub}>Rok {year}{tierHint ? ` · ${tierHint}` : ''}</Text>
             {!mood && (
               <View style={s.pxLegend}>
                 <Text style={[s.statSub, { fontSize: 10 }]}>mniej</Text>
-                {[0.28, 0.52, 0.76, 1].map((o, i) => (
-                  <View key={i} style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: accentColor + Math.round(o * 255).toString(16).padStart(2, '0') }} />
+                {['26', '58', 'A0', 'CC'].map((a, i) => (
+                  <View key={i} style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: accentColor + a }} />
                 ))}
-                <Text style={[s.statSub, { fontSize: 10 }]}>więcej</Text>
+                <View style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: '#FFCB47' }} />
               </View>
             )}
           </View>
