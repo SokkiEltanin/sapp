@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, Modal, Alert,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
-  TextInput, KeyboardAvoidingView, Platform, Image, Pressable,
+  TextInput, KeyboardAvoidingView, Platform, Image, Pressable, InteractionManager,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -767,7 +767,18 @@ export default function DashboardScreen() {
   const pomodoro = usePomodoroStore();
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const insets = useSafeAreaInsets();
-  const { expenses, setExpenses } = useExpensesStore();
+  const { expenses: liveExpenses, setExpenses } = useExpensesStore();
+  // ── Trigger-based stats snapshot ────────────────────────────────────────────
+  // Every heavy widget memo below reads THIS `expenses` (a snapshot), NOT the live
+  // store. The store churns constantly (bank sync, other screens calling setExpenses,
+  // reloads) and this screen stays mounted-but-frozen in the background; without the
+  // snapshot, returning to the dashboard THAWED it and every memo recomputed over the
+  // whole history at once → the 4-6s tab-switch freeze. The snapshot refreshes only on
+  // deliberate triggers — landing on the dashboard, and (while we're here) after the
+  // data actually changes — DEFERRED past the tab transition so switching in never
+  // blocks on the recompute. "Aktualizacja raz, na wejściu / po dodaniu paragonu."
+  const [expenses, setStatsExpenses] = useState(() => useExpensesStore.getState().expenses);
+  const refreshStatsSnapshot = useCallback(() => setStatsExpenses(useExpensesStore.getState().expenses), []);
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
   // Consumption stats (food, sweets, spending charts) use this scoped view;
@@ -968,7 +979,7 @@ export default function DashboardScreen() {
         calendarService.getAllEvents().then(setEvents).catch(() => {});
       });
     }
-    if (expenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
+    if (liveExpenses.length === 0) expensesService.getAll().then(setExpenses).catch(() => {});
     if (moodEntries.length === 0) moodService.getAll().then(setMood).catch(() => {});
     getBudgets().then(setBudgets);
     getTagBudgetRules().then(setTagRules).catch(() => {});
@@ -1243,6 +1254,23 @@ export default function DashboardScreen() {
   // other tabs or in the background.
   const [screenFocused, setScreenFocused] = useState(true);
   useFocusEffect(useCallback(() => { setScreenFocused(true); return () => setScreenFocused(false); }, []));
+
+  // Stats-snapshot triggers (see the snapshot declaration up top).
+  // A) Landing on the dashboard → refresh AFTER the tab transition settles, so the
+  //    switch itself never pays for the recompute (this is the 4-6s-freeze fix).
+  useFocusEffect(useCallback(() => {
+    const task = InteractionManager.runAfterInteractions(refreshStatsSnapshot);
+    return () => task.cancel();
+  }, [refreshStatsSnapshot]));
+  // B) Data changed (receipt added/edited, income logged, bank auto-book) WHILE we're on
+  //    the dashboard → reflect it once, debounced. Off-screen changes are ignored until
+  //    the next focus (A) — the frozen screen shouldn't recompute in the background.
+  useEffect(() => {
+    if (!screenFocused) return;
+    const t = setTimeout(refreshStatsSnapshot, 300);
+    return () => clearTimeout(t);
+  }, [liveExpenses, screenFocused, refreshStatsSnapshot]);
+
   const [appActive, setAppActive] = useState(true);
   // Pull fresh calendar + work data when the app returns to the foreground (screens
   // stay mounted, so a plain mount effect never re-runs). Health is refreshed via
@@ -1254,7 +1282,10 @@ export default function DashboardScreen() {
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     reloadHealth(true);   // returning to the app = entry → force fresh watch data
-  }, [reloadHealth]);
+    // Re-snapshot the stats too (deferred), so anything logged while away — a bank
+    // auto-book, a receipt via the shortcut — shows once we're back, not stale.
+    InteractionManager.runAfterInteractions(refreshStatsSnapshot);
+  }, [reloadHealth, refreshStatsSnapshot]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => {
       setAppActive(s === 'active');
@@ -1296,24 +1327,28 @@ export default function DashboardScreen() {
     item: { expenseId: string; idx: number; kind: 'expense' | 'item' },
     ruleTagList: string[],
   ) => {
-    const e = expenses.find(x => x.id === item.expenseId);
+    // Read + write the LIVE store here (not the deferred `expenses` snapshot): mapping a
+    // stale snapshot back into setExpenses would drop anything the store gained since the
+    // last snapshot refresh. The snapshot then catches up via its data-change trigger.
+    const live = useExpensesStore.getState().expenses;
+    const e = live.find(x => x.id === item.expenseId);
     if (!e) return;
     let updates: Partial<Expense>;
     if (item.kind === 'expense') {
       const newTags = (e.tags ?? []).filter(t => !ruleTagList.includes(t));
       updates = { tags: newTags };
-      setExpenses(expenses.map(x => x.id === item.expenseId ? { ...x, tags: newTags } : x));
+      setExpenses(live.map(x => x.id === item.expenseId ? { ...x, tags: newTags } : x));
     } else {
       if (!e.receiptItems) return;
       const newItems = e.receiptItems.map((it, i) => i === item.idx ? { ...it, excluded: true } : it);
       updates = { receiptItems: newItems };
-      setExpenses(expenses.map(x => x.id === item.expenseId ? { ...x, receiptItems: newItems } : x));
+      setExpenses(live.map(x => x.id === item.expenseId ? { ...x, receiptItems: newItems } : x));
     }
     setTagModal((m: any) => m ? { ...m, items: m.items.filter((it: any) => !(it.expenseId === item.expenseId && it.idx === item.idx)) } : m);
     haptic.medium();
     try { await expensesService.update(item.expenseId, updates); }
     catch { haptic.error(); toast.error('Nie usunięto — sprawdź połączenie'); }
-  }, [expenses, setExpenses]);
+  }, [setExpenses]);
 
   // Render a user-added custom tile (a pinned note, or a quick link).
   // Data context for stat widgets (custom tiles of type 'stat').
