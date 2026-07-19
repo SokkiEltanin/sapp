@@ -700,32 +700,46 @@ export default function ExpenseDetailScreen() {
           {/* ── Category ─────────────────────────────────────────────────────── */}
           <View style={s.card}>
             <Text style={s.cardLabel}>Kategoria</Text>
-            <View style={s.catGrid}>
-              {(editIsIncome ? INCOME_CATS : EXPENSE_CATS).map(([key, meta]) => {
+            {editing ? (
+              // Edit mode: the full picker grid (all options selectable).
+              <View style={s.catGrid}>
+                {(editIsIncome ? INCOME_CATS : EXPENSE_CATS).map(([key, meta]) => {
+                  const IconComp = (LucideIcons as any)[meta.icon];
+                  const selected = editIsIncome ? incCat === key : expCat === key;
+                  return (
+                    <PressableScale
+                      key={key}
+                      onPress={() => {
+                        editIsIncome ? setIncCat(key as IncomeCategory) : setExpCat(key as ExpenseCategory);
+                      }}
+                      style={[s.catItem, selected && { borderColor: meta.color + '80', backgroundColor: meta.color + '12' }]}
+                    >
+                      <View style={s.catIcon}>
+                        {IconComp && <IconComp size={14} color={selected ? meta.color : colors.text.muted} />}
+                      </View>
+                      <Text style={[s.catLabel, selected && { color: meta.color, fontWeight: '700' }]}>
+                        {meta.label}
+                      </Text>
+                      {selected && <View style={[s.checkDot, { backgroundColor: meta.color }]}><Check size={8} color="#000" /></View>}
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            ) : (
+              // Read mode: just THIS transaction's category, big and clear — no grid.
+              (() => {
+                const meta = getCategoryMeta(expense.category as any);
                 const IconComp = (LucideIcons as any)[meta.icon];
-                const selected = editing
-                  ? (editIsIncome ? incCat === key : expCat === key)
-                  : expense.category === key;
                 return (
-                  <PressableScale
-                    key={key}
-                    onPress={() => {
-                      if (!editing) return;
-                      editIsIncome ? setIncCat(key as IncomeCategory) : setExpCat(key as ExpenseCategory);
-                    }}
-                    style={[s.catItem, selected && { borderColor: meta.color + '80', backgroundColor: meta.color + '12' }]}
-                  >
-                    <View style={s.catIcon}>
-                      {IconComp && <IconComp size={14} color={selected ? meta.color : colors.text.muted} />}
+                  <View style={[s.catValueChip, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
+                    <View style={[s.catValueIcon, { backgroundColor: meta.color + '26' }]}>
+                      {IconComp && <IconComp size={16} color={meta.color} />}
                     </View>
-                    <Text style={[s.catLabel, selected && { color: meta.color, fontWeight: '700' }]}>
-                      {meta.label}
-                    </Text>
-                    {selected && <View style={[s.checkDot, { backgroundColor: meta.color }]}><Check size={8} color="#000" /></View>}
-                  </PressableScale>
+                    <Text style={[s.catValueText, { color: meta.color }]}>{meta.label}</Text>
+                  </View>
                 );
-              })}
-            </View>
+              })()
+            )}
           </View>
 
           {/* ── Tags ─────────────────────────────────────────────────────────── */}
@@ -970,6 +984,17 @@ const makeS = (c: any) => StyleSheet.create({
     width: 14, height: 14, borderRadius: 7,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Read-mode single-category chip (what this transaction actually is)
+  catValueChip: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2], alignSelf: 'flex-start',
+    paddingLeft: 5, paddingRight: spacing[3], paddingVertical: 5,
+    borderRadius: radius.full, borderWidth: 1,
+  },
+  catValueIcon: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  catValueText: { fontSize: 14, fontWeight: '700' },
 
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   customTagRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
