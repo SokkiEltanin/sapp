@@ -2724,25 +2724,41 @@ export default function DashboardScreen() {
     return { mood, spend, hasSpend, steps, label, has: mood != null || hasSpend || steps > 0 };
   }, [expenses, moodByDay, healthDays, scope]);
 
-  // "Co podrożało" — products whose unit price in RECENT purchases is meaningfully
-  // higher than in earlier ones (split each product's history in half by date). Needs
-  // ≥4 purchases; ignores absurd jumps (mis-scans). Grouped like the top-products tile.
+  // "Co podrożało" — products whose effective unit price in RECENT purchases is
+  // meaningfully higher than in earlier ones.
+  //
+  // ONE observation per (receipt × product): sum the NET price of all same-product
+  // lines on that receipt and divide by their total quantity → the real per-szt cost
+  // paid that day. That folds a "1+1" promo (a full-price line + a 1 gr line) into one
+  // honest price, e.g. (7,99 + 0,01) / 2 = 4,00 — instead of logging the 0,01 zł promo
+  // line as its own absurd observation that wrecks the average. Deposits (kaucja) and
+  // excluded items are skipped; an implausibly low result (a stray lone-grosz line with
+  // no full-price twin) is dropped. Then recent-half vs earlier-half by date, and only a
+  // real, sustained rise (≥8% AND ≥0,30 zł, ≥4 purchases, absurd jumps ignored) shows.
   const priceWatch = useMemo(() => {
     const byKey: Record<string, { names: string[]; obs: { t: number; up: number }[] }> = {};
     for (const e of expenses) {
       if (e.type === 'income') continue;
       const t = new Date(e.date ?? '').getTime();
       if (!t) continue;
+      const perProduct: Record<string, { sum: number; qty: number; names: string[] }> = {};
       for (const it of (e.receiptItems ?? [])) {
-        if (it.excluded) continue;
-        const up = it.unitPrice > 0 ? it.unitPrice : (it.quantity > 0 ? (it.price ?? 0) / it.quantity : 0);
-        if (!(up > 0)) continue;
+        if (it.excluded || it.kind === 'deposit') continue;
         const name = it.name?.trim(); if (!name) continue;
         const canon = canonicalProductName(name, nameAliases);
         const key = productGroupKey(canon);
         if (!key) continue;
-        (byKey[key] ??= { names: [], obs: [] }).names.push(canon);
-        byKey[key].obs.push({ t, up });
+        const p = (perProduct[key] ??= { sum: 0, qty: 0, names: [] });
+        p.sum += it.price ?? 0;                            // price is already net of discounts
+        p.qty += it.quantity > 0 ? it.quantity : 1;
+        p.names.push(canon);
+      }
+      for (const [key, p] of Object.entries(perProduct)) {
+        const up = p.qty > 0 ? p.sum / p.qty : 0;
+        if (up < 0.10) continue;                           // implausible — nothing real is <10 gr/szt
+        const g = (byKey[key] ??= { names: [], obs: [] });
+        g.names.push(...p.names);
+        g.obs.push({ t, up });
       }
     }
     const out: { label: string; from: number; to: number; pct: number }[] = [];
@@ -2753,9 +2769,9 @@ export default function DashboardScreen() {
       const avg = (arr: { up: number }[]) => arr.reduce((s, o) => s + o.up, 0) / arr.length;
       const eAvg = avg(g.obs.slice(0, half));
       const rAvg = avg(g.obs.slice(half));
-      if (!(eAvg > 0) || rAvg > eAvg * 3) continue;      // absurd jump = mis-scan
+      if (!(eAvg > 0) || rAvg > eAvg * 3) continue;        // absurd jump = leftover mis-scan
       const pct = Math.round(((rAvg - eAvg) / eAvg) * 100);
-      if (pct < 8 || rAvg - eAvg < 0.30) continue;       // only a meaningful rise
+      if (pct < 8 || rAvg - eAvg < 0.30) continue;         // only a real, meaningful rise
       out.push({ label: productGroupLabel(g.names), from: eAvg, to: rAvg, pct });
     }
     return out.sort((a, b) => b.pct - a.pct).slice(0, 4);
