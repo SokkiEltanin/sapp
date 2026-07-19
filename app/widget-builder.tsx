@@ -28,13 +28,13 @@ const GROUPS: MetricGroup[] = ['Finanse', 'Konsumpcja', 'Nastrój i zdrowie', 'P
 const GROUP_ICON: Record<MetricGroup, any> = {
   'Finanse': Wallet, 'Konsumpcja': ShoppingCart, 'Nastrój i zdrowie': Smile, 'Praca i zadania': Briefcase,
 };
-const VIZ_META: { id: WidgetViz; label: string; Icon: any }[] = [
-  { id: 'number',  label: 'Wielka liczba', Icon: Hash },
-  { id: 'wave',    label: 'Mini-wykres',   Icon: BarChart3 },
-  { id: 'list',    label: 'Lista (top)',   Icon: List },
-  { id: 'donut',   label: 'Donut',         Icon: PieChart },
-  { id: 'compare', label: 'Porównanie',    Icon: GitCompare },
-  { id: 'pixels',  label: 'Rok w pikselach', Icon: LayoutGrid },
+const VIZ_META: { id: WidgetViz; label: string; Icon: any; desc: string }[] = [
+  { id: 'number',  label: 'Wielka liczba',   Icon: Hash,       desc: 'Jedna duża liczba + zmiana % względem poprzedniego okresu.' },
+  { id: 'wave',    label: 'Mini-wykres',     Icon: BarChart3,  desc: 'Trend z 6 okresów, z liczbami nad każdym punktem.' },
+  { id: 'list',    label: 'Lista (top)',     Icon: List,       desc: 'Ranking pozycji — np. najczęstsze produkty albo kategorie.' },
+  { id: 'donut',   label: 'Donut',           Icon: PieChart,   desc: 'Udział procentowy pozycji, pokazany w kółku.' },
+  { id: 'compare', label: 'Porównanie',      Icon: GitCompare, desc: 'Dwie wartości obok siebie: vs inny okres, Twoja średnia lub inna metryka.' },
+  { id: 'pixels',  label: 'Rok w pikselach', Icon: LayoutGrid, desc: 'Cały rok jako siatka 365 dni, pokolorowana według wartości.' },
 ];
 
 export default function WidgetBuilder() {
@@ -139,6 +139,11 @@ export default function WidgetBuilder() {
   );
 
   const canSave = !!def && (viz !== 'compare' || !!metric2) && (!needsTag || !!tag);
+  // Why the save button is still off — shown so a disabled button never looks broken.
+  const missing = !def ? 'Wybierz metrykę powyżej'
+    : (needsTag && !tag) ? 'Wybierz tag'
+    : (viz === 'compare' && !metric2) ? 'Wybierz, z czym porównać'
+    : null;
   const showTarget = !!def && (viz === 'number' || viz === 'wave') && def.unit !== '/5';
 
   const save = () => {
@@ -186,8 +191,8 @@ export default function WidgetBuilder() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* Live layout preview — shape updates as you configure */}
-        <Text style={s.previewLabel}>PODGLĄD UKŁADU</Text>
+        {/* Live preview on YOUR real data — updates as you configure */}
+        <Text style={s.previewLabel}>PODGLĄD NA ŻYWO · TWOJE DANE</Text>
         <View style={s.previewCard}>
           {!def ? (
             <Text style={s.previewEmpty}>Wybierz metrykę poniżej, aby zobaczyć jak wyjdzie kafelek</Text>
@@ -334,6 +339,7 @@ export default function WidgetBuilder() {
                 );
               })}
             </View>
+            {(() => { const vd = vizOptions.find(v => v.id === viz); return vd ? <Text style={s.vizDesc}>{vd.desc}</Text> : null; })()}
           </>
         )}
 
@@ -443,6 +449,7 @@ export default function WidgetBuilder() {
       </ScrollView>
 
       <View style={s.footer}>
+        {missing && <Text style={s.missingHint}>{missing}, aby dodać widget</Text>}
         <View style={{ flexDirection: 'row', gap: spacing[2] }}>
           {existing && (
             <PressableScale onPress={deleteWidget}>
@@ -468,6 +475,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   scroll: { padding: spacing[4], gap: spacing[2] },
   step: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[1] },
+  vizDesc: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: spacing[2], marginBottom: spacing[1], paddingHorizontal: spacing[1] },
+  missingHint: { fontSize: 12, color: c.text.muted, textAlign: 'center', marginBottom: spacing[2], fontWeight: '600' },
 
   // Live preview
   previewLabel: { fontSize: 10, fontWeight: '800', color: c.text.muted, letterSpacing: 0.8, marginBottom: spacing[2] },
