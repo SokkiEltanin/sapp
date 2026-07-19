@@ -4,24 +4,24 @@
     "slug": "sapp",
     "version": "6.0.0",
     "orientation": "portrait",
-    "icon": "./assets/NowelogoSapp.png",
+    "icon": "./assets/LOGONOWEpupildoapki.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "scheme": "sapp",
     "splash": {
-      "image": "./assets/NowelogoSapp.png",
+      "image": "./assets/LOGONOWEpupildoapki.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#083A64"
     },
     "ios": {
       "supportsTablet": false
     },
     "android": {
-      "backgroundColor": "#0A0A0A",
+      "backgroundColor": "#083A64",
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/NowelogoSapp.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/LOGONOWEpupildoapki.png",
+        "backgroundColor": "#083A64"
       },
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",

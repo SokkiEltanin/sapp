@@ -15,6 +15,7 @@ import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import BadgeCelebration from '@/components/achievements/BadgeCelebration';
+import AnimatedSplash from '@/components/AnimatedSplash';
 import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
@@ -167,6 +168,15 @@ function AutoMoodPopup() {
 
 export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
+  // Animated pet splash: keep it up until auth is ready AND a minimum time has passed,
+  // so the cat animation is actually seen on every launch (auth can resolve instantly).
+  // `splashGone` unmounts it after its fade-out completes.
+  const [minSplashDone, setMinSplashDone] = useState(false);
+  const [splashGone, setSplashGone] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMinSplashDone(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   // Bundled hero greeting fonts — registered by name so react-native-svg can use
   // them. Non-blocking: the app renders immediately, the greeting updates once
@@ -386,17 +396,13 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  if (!authReady) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg.primary }} />
-    );
-  }
-
   return (
     <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={colors.bg.primary} />
+        <StatusBar style="light" backgroundColor={authReady ? colors.bg.primary : '#083A64'} />
+        {authReady && (
+        <>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg.primary }, animation: 'fade' }}>
           <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
           <Stack.Screen name="expenses/add" options={{ animation: 'fade' }} />
@@ -431,6 +437,11 @@ export default function RootLayout() {
         <Toast />
         <BadgeCelebration />
         <AutoMoodPopup />
+        </>
+        )}
+        {!splashGone && (
+          <AnimatedSplash visible={!(authReady && minSplashDone)} onHidden={() => setSplashGone(true)} />
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
     </ErrorBoundary>
