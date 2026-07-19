@@ -12,7 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
-  TrendingUp, TrendingDown, Flame, Smile, Zap, History,
+  TrendingUp, TrendingDown, Flame, Smile, Zap, History, Mail,
   CalendarDays, Wallet,
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
@@ -47,6 +47,7 @@ import { useStatsScope, inScope, countsForConsumption, consumesInScope, StatsSco
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { getCategoryMeta } from '@/utils/categories';
+import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
@@ -797,6 +798,13 @@ export default function DashboardScreen() {
   const [workPanel, setWorkPanel]   = useState(false);
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const [detailPeriod, setDetailPeriod] = useState<'week' | 'month'>('month'); // tydzień/miesiąc toggle in the detail view
+  // Time capsule ("List do przyszłego siebie")
+  const capsuleLetters = useTimeCapsule(st => st.letters);
+  const addCapsule = useTimeCapsule(st => st.add);
+  const markCapsuleRead = useTimeCapsule(st => st.markRead);
+  const [capsuleModal, setCapsuleModal] = useState(false);
+  const [capsuleText, setCapsuleText] = useState('');
+  const [capsuleMonths, setCapsuleMonths] = useState(6);
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
@@ -3353,6 +3361,39 @@ export default function DashboardScreen() {
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
 
+            nodes['time-capsule'] = (() => {
+              const now = Date.now();
+              const opened = capsuleLetters.filter(l => l.unlockAt <= now && !l.read).sort((a, b) => a.unlockAt - b.unlockAt)[0];
+              const sealed = capsuleLetters.filter(l => l.unlockAt > now).sort((a, b) => a.unlockAt - b.unlockAt);
+              const fmtD = (ms: number) => new Date(ms).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+              return (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Mail size={13} color={accentColor} />
+                    <Text style={s.cardTitle}>List do przyszłego siebie</Text>
+                    <TouchableOpacity onPress={() => { haptic.tap(); setCapsuleText(''); setCapsuleMonths(6); setCapsuleModal(true); }} style={[s.capsuleAddBtn, { borderColor: accentColor + '55' }]}>
+                      <Plus size={14} color={accentColor} />
+                    </TouchableOpacity>
+                  </View>
+                  {opened ? (
+                    <View style={[s.capsuleOpen, { borderColor: accentColor + '40' }]}>
+                      <Text style={s.capsuleFrom}>Napisany {fmtD(opened.createdAt)} · dziś się otworzył</Text>
+                      <Text style={s.capsuleText}>{opened.text}</Text>
+                      <TouchableOpacity style={[s.capsuleReadBtn, { backgroundColor: accentColor }]} onPress={() => { haptic.success(); markCapsuleRead(opened.id); }}>
+                        <Text style={s.capsuleReadTxt}>Przeczytane</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : sealed.length > 0 ? (
+                    <Text style={s.statSub}>
+                      {sealed.length} {sealed.length === 1 ? 'zapieczętowany list' : 'zapieczętowane listy'} · najbliższy otwiera się {fmtD(sealed[0].unlockAt)}
+                    </Text>
+                  ) : (
+                    <Text style={s.statSub}>Napisz wiadomość do siebie w przyszłości — odblokuje się za wybrany czas. Stuknij ＋.</Text>
+                  )}
+                </View>
+              );
+            })();
+
             nodes['year-ago'] = yearAgo.has && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
@@ -4692,6 +4733,53 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
+      {/* Time capsule — write a letter to your future self */}
+      <Modal visible={capsuleModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setCapsuleModal(false)}>
+        <View style={s.capsuleOverlay}>
+          <View style={[s.card, { backgroundColor: colors.bg.card, margin: spacing[4] }]}>
+            <View style={s.cardHeader}>
+              <Mail size={14} color={colors.accent.blue} />
+              <Text style={s.cardTitle}>List do przyszłego siebie</Text>
+              <TouchableOpacity onPress={() => setCapsuleModal(false)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
+            </View>
+            <TextInput
+              style={s.capsuleInput}
+              value={capsuleText}
+              onChangeText={setCapsuleText}
+              placeholder="Napisz coś do siebie w przyszłości…"
+              placeholderTextColor={colors.text.muted}
+              multiline
+            />
+            <Text style={[s.statSub, { marginTop: spacing[2] }]}>Otwórz za:</Text>
+            <View style={s.capsuleChips}>
+              {[1, 3, 6, 12].map(m => {
+                const on = capsuleMonths === m;
+                return (
+                  <TouchableOpacity key={m} onPress={() => { haptic.tap(); setCapsuleMonths(m); }} style={[s.capsuleChip, on && { backgroundColor: colors.accent.blue + '22', borderColor: colors.accent.blue }]}>
+                    <Text style={[s.capsuleChipTxt, on && { color: colors.accent.blue, fontWeight: '800' }]}>{m === 12 ? 'rok' : `${m} mies.`}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
+              <TouchableOpacity style={s.capsuleCancel} onPress={() => setCapsuleModal(false)}><Text style={s.capsuleCancelTxt}>Anuluj</Text></TouchableOpacity>
+              <TouchableOpacity
+                style={[s.capsuleSeal, { backgroundColor: colors.accent.blue }, !capsuleText.trim() && { opacity: 0.4 }]}
+                disabled={!capsuleText.trim()}
+                onPress={() => {
+                  const d = new Date(); d.setMonth(d.getMonth() + capsuleMonths);
+                  addCapsule(capsuleText, d.getTime());
+                  haptic.success(); toast.success('Zapieczętowano — do zobaczenia w przyszłości');
+                  setCapsuleModal(false); setCapsuleText('');
+                }}
+              >
+                <Text style={s.capsuleSealTxt}>Zapieczętuj</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Payday — enter the paycheck amount */}
       <Modal visible={paydayModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPaydayModal(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.npOverlay}>
@@ -5316,6 +5404,22 @@ const buildStyles = (c: any) => StyleSheet.create({
   shopChipName: { fontSize: 12, fontWeight: '600', color: c.text.secondary, maxWidth: 120 },
   shopChipCount: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   shopChipCountTxt: { fontSize: 11, fontWeight: '800' },
+  // "List do przyszłego siebie"
+  capsuleAddBtn: { marginLeft: 'auto', width: 28, height: 28, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  capsuleOpen: { marginTop: spacing[2], borderWidth: 1, borderRadius: radius.lg, padding: spacing[3], gap: spacing[2], backgroundColor: c.bg.elevated },
+  capsuleFrom: { fontSize: 10.5, color: c.text.muted, fontWeight: '700' },
+  capsuleText: { fontSize: 14, color: c.text.primary, lineHeight: 20, fontStyle: 'italic' },
+  capsuleReadBtn: { alignSelf: 'flex-start', borderRadius: radius.md, paddingHorizontal: spacing[3], paddingVertical: 7 },
+  capsuleReadTxt: { fontSize: 12, fontWeight: '800', color: c.bg.primary },
+  capsuleOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center' },
+  capsuleInput: { marginTop: spacing[2], minHeight: 90, maxHeight: 180, backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: spacing[2], fontSize: 14, color: c.text.primary, textAlignVertical: 'top' },
+  capsuleChips: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
+  capsuleChip: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
+  capsuleChipTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.muted },
+  capsuleCancel: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default },
+  capsuleCancelTxt: { fontSize: 14, fontWeight: '700', color: c.text.secondary },
+  capsuleSeal: { flex: 1.5, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.lg },
+  capsuleSealTxt: { fontSize: 14, fontWeight: '800', color: c.bg.primary },
   // "Co podrożało"
   pwRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.border.subtle },
   pwName: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
