@@ -48,11 +48,12 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, celebrate = 0, affection = 0,
-  palette = DEFAULT_PALETTE, stripes = false, onAngry,
+  palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean;
   onAngry?: () => void;
+  lively?: boolean;   // eager idle for the loading splash: glance + ear-flutter soon & often
 }) {
   const p = palette;
   const breathe = useRef(new Animated.Value(0)).current;
@@ -132,7 +133,7 @@ export default function CatArt({
 
   // ── idle glance ──
   useEffect(() => {
-    if (!animate || asleep || angry || petting) { setLook({ x: 0, y: 0 }); return; }
+    if (!animate || asleep || angry || petting || lively) { setLook({ x: 0, y: 0 }); return; }
     let t: any;
     const loop = () => {
       t = setTimeout(() => {
@@ -143,16 +144,38 @@ export default function CatArt({
     };
     loop();
     return () => clearTimeout(t);
-  }, [animate, asleep, angry, petting]);
+  }, [animate, asleep, angry, petting, lively]);
 
   // ── idle ear flutter — one random ear, now and then ──
   useEffect(() => {
-    if (!animate || asleep) return;
+    if (!animate || asleep || lively) return;
     let t: any;
     const loop = () => { t = setTimeout(() => { flutterEar(Math.random() < 0.5 ? 'L' : 'R'); loop(); }, 4000 + Math.random() * 5000); };
     loop();
     return () => clearTimeout(t);
-  }, [animate, asleep]);
+  }, [animate, asleep, lively]);
+
+  // ── LIVELY (loading splash): glance around + flutter ears almost immediately and
+  // every ~1.1 s, so the cat is visibly alive in the brief moment it's on screen. Biased
+  // to glance DOWN now and then — toward the "ładowanie" dots — so it reads as the cat
+  // watching the app load, not just twitching in a void. ──
+  useEffect(() => {
+    if (!animate || !lively || asleep) return;
+    let on = true;
+    const beat = (first = false) => {
+      if (!on) return;
+      const down = Math.random() < 0.45;
+      setLook({
+        x: down ? (Math.random() - 0.5) * 14 : (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 16),
+        y: down ? (11 + Math.random() * 6) : (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 6),
+      });
+      flutterEar(Math.random() < 0.5 ? 'L' : 'R');
+      setTimeout(() => { if (on) setLook({ x: 0, y: 0 }); }, 620);
+      setTimeout(() => beat(), (first ? 900 : 1050) + Math.random() * 450);
+    };
+    const t0 = setTimeout(() => beat(true), 220);   // start right after mount
+    return () => { on = false; clearTimeout(t0); };
+  }, [animate, lively, asleep]);
 
   // ── paw lick ──
   const doLick = () => {

@@ -1,42 +1,65 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import CatArt from '@/components/pet/CatArt';
 import { DEFAULT_PALETTE } from '@/utils/catPalettes';
 
-// Animated loading screen = our actual vector pet (CatArt, the RN port of the cat-lab)
-// idle-animating: breathing, blinking, glancing, tail swaying. It renders the SAME art
-// as the native-splash image (the blue coat is DEFAULT_PALETTE + tail stripes, and the
-// PNG was exported from exactly this), at the SAME size (viewBox 0 0 2000 2000 rendered
-// at screen-width, matching the native splash's `contain`), on the SAME navy.
-//
-// Critically it starts at FULL opacity — NO fade-in. The old version faded in over the
-// native splash, so you saw the static cat, then a loader "flew in" (the jump the user
-// hit). Now the static launch image just seamlessly starts moving; only the fade-OUT at
-// the end animates, revealing the dashboard (which mounts behind, hiding first-frame jank).
+// Animated loading screen = our actual vector pet (CatArt) in `lively` mode: it glances
+// around and flutters its ears almost immediately (the normal idle intervals are
+// multi-second, so on a ~1.5 s splash the cat looked static — the user's "SVG się nie
+// rusza"). A row of pulsing "ładowanie" dots sits lower on the screen and the cat keeps
+// glancing DOWN toward them, so it reads as the pet watching the app load, not twitching
+// in a void. Same art/size/navy as the native splash → seamless handoff, no fade-in;
+// only the fade-OUT animates, revealing the dashboard (which mounts behind).
 
 const NAVY = '#083A64';
 
 export default function AnimatedSplash({ visible, onHidden }: { visible: boolean; onHidden: () => void }) {
   const { width, height } = useWindowDimensions();
-  const size = Math.min(width, height);   // native splash contains by the short side (width on portrait)
-  const fade = useRef(new Animated.Value(1)).current;   // START shown — seamless with the native splash
+  const size = Math.min(width, height);
+  const fade = useRef(new Animated.Value(1)).current;   // START shown — seamless with native splash
+  const d0 = useRef(new Animated.Value(0)).current;
+  const d1 = useRef(new Animated.Value(0)).current;
+  const d2 = useRef(new Animated.Value(0)).current;
 
+  // three loading dots pulsing in sequence
+  useEffect(() => {
+    const mk = (v: Animated.Value, delay: number) => Animated.loop(Animated.sequence([
+      Animated.delay(delay),
+      Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.delay(540 - delay),
+    ]));
+    const a = Animated.parallel([mk(d0, 0), mk(d1, 170), mk(d2, 340)]);
+    a.start();
+    return () => a.stop();
+  }, [d0, d1, d2]);
+
+  // fade out once ready, then unmount
   useEffect(() => {
     if (visible) return;
     Animated.timing(fade, { toValue: 0, duration: 440, easing: Easing.in(Easing.quad), useNativeDriver: true })
       .start(({ finished }) => { if (finished) onHidden(); });
   }, [visible, fade, onHidden]);
 
+  const dotStyle = (v: Animated.Value) => ({
+    opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }],
+  });
+
   return (
-    <Animated.View
-      style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]}
-      pointerEvents={visible ? 'auto' : 'none'}
-    >
-      <CatArt size={size} palette={DEFAULT_PALETTE} stripes animate expression="happy" />
+    <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} pointerEvents={visible ? 'auto' : 'none'}>
+      <CatArt size={size} palette={DEFAULT_PALETTE} stripes animate lively expression="happy" />
+      <View style={[styles.dots, { bottom: height * 0.20 }]}>
+        <Animated.View style={[styles.dot, dotStyle(d0)]} />
+        <Animated.View style={[styles.dot, dotStyle(d1)]} />
+        <Animated.View style={[styles.dot, dotStyle(d2)]} />
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center', zIndex: 100 },
+  dots: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#7FB2F0' },
 });
