@@ -36,6 +36,20 @@ export async function ingestBankNotification(title: string, text: string): Promi
     });
   }
 
+  // Self-transfer to your own account (Revolut / savings): book it as a 'transfer' with
+  // the 'revolut' tag so isSelfTransfer treats it as "odłożone" — an outflow from the
+  // main account, NOT income and NOT counted as spending. Auto-book it (it's your own
+  // money moving), never flag.
+  if (tx.selfTransfer) {
+    return store.enqueue({
+      ...tx,
+      category: 'transfer' as any,
+      suggestedCategory: 'transfer' as any,
+      tags: ['revolut'],
+      auto: store.autoAll,
+    });
+  }
+
   const mem = await loadMerchantMemory();
   const learned = merchantFor(tx.storeKey, mem);
   const category = learned?.category ?? guessCategory(tx.store);

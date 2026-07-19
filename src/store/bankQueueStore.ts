@@ -9,6 +9,7 @@ export interface PendingBankTx extends ParsedBankTx {
   id: string;
   category: ExpenseCategory;      // current (possibly user-edited) category — expenses only
   suggestedCategory: ExpenseCategory; // what the reader guessed — to detect a correction
+  tags?: string[];                // extra tags to book with (e.g. ['revolut'] for a self-transfer)
   auto?: boolean;                // trusted merchant → auto-accept on next app open
   jd?: boolean;                  // income: log as a [JD] paycheck (salary + work tag)
   flagReason?: string;           // set → held for confirmation (something looked off), shown in review

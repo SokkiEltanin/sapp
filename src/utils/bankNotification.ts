@@ -15,6 +15,7 @@ export interface ParsedBankTx {
   method: 'card' | 'blik' | 'transfer' | 'cash';
   direction: 'out' | 'in'; // out = expense (payment), in = income (incoming transfer)
   isSalary?: boolean;    // incoming looks like a paycheck (wynagrodzenie / wypłata)
+  selfTransfer?: boolean; // outgoing transfer to your OWN account (Revolut / savings)
   raw: string;
 }
 
@@ -41,8 +42,11 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
   // Incoming triggers. `wp[łl]y[wn]` covers both "Wpływ" (title) and "wpłynęło/wpłynął";
   // "na konto/rachunek" is a diacritic-free fallback for a plain "Wpływ … na konto …".
   const inTrig = /przelew\s+przychodz|uznanie\s+rachunku|wp[łl]y[wn]|wynagrodzen|zasilenie|otrzyma[łl]e[śs]|zaksi[ęe]gowano\s+wp[łl]at|\bwp[łl]ata\b|na\s+(?:konto|rachunek)/i.test(body);
-  const paidOut = /zap[łl]acono/i.test(body);
-  const outTrig = /zap[łl]acono|transakcj|p[łl]atno[śs][cć]|platnosc|blik|zakup/i.test(body);
+  // "Wykonano przelew … z konta … na konto …" is money you SENT — outgoing. Its
+  // "na konto" was wrongly matching the incoming `na konto` fallback, so an outgoing
+  // transfer to your own savings got booked as income. Any of these force outgoing.
+  const paidOut = /zap[łl]acono|wykonano\s+przelew|zlecono\s+przelew|z\s+konta\s+\*?\d/i.test(body);
+  const outTrig = /zap[łl]acono|transakcj|p[łl]atno[śs][cć]|platnosc|blik|zakup|wykonano\s+przelew|zlecono\s+przelew/i.test(body);
   if (!inTrig && !outTrig) return null;
   const direction: 'in' | 'out' = (inTrig && !paidOut) ? 'in' : 'out';
 
@@ -67,7 +71,22 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
     return { amount, currency, dateISO, store, storeKey, method: 'transfer', direction, isSalary, raw: body };
   }
 
-  // ── Outgoing payment → expense ──────────────────────────────────────────────
+  // ── Outgoing TRANSFER (not a card payment) → recipient + self-transfer check ──
+  // "Wykonano przelew … na konto *6284, odbiorca: Wiktor Rudziński Revolut." A transfer
+  // to your OWN account (Revolut / savings) is a self-transfer: it leaves the main
+  // account (so it's NOT income) but isn't real spending either — the app tracks it as
+  // "odłożone", excluded from spend, via a transfer category downstream.
+  const isTransferOut = /wykonano\s+przelew|zlecono\s+przelew|z\s+konta\s+\*?\d/i.test(body);
+  if (isTransferOut) {
+    const rcpM = body.match(/odbiorca:?\s*(.+?)(?:\s*(?:tytu[łl]|tyt\.?|nr\b|rachun|kwot|dnia|\.\s*Bank|$))/i);
+    let store = (rcpM?.[1] ?? 'Przelew wychodzący').replace(/\s+/g, ' ').trim();
+    if (store.length > 40) store = store.slice(0, 40).trim();
+    const selfTransfer = /revolut|oszcz[ęe]dno|w[łl]asne|savings|konto\s+oszcz/i.test(body);
+    const storeKey = (store.split(/\s+/)[0] ?? 'przelew').toLowerCase();
+    return { amount, currency, dateISO, store, storeKey, method: 'transfer', direction: 'out', selfTransfer, raw: body };
+  }
+
+  // ── Outgoing card payment → expense ──────────────────────────────────────────
   // Store: text after " w " up to " POL" / ". Bank" / end.
   let store = '';
   const stM = body.match(/\bw\s+(.+?)(?:\s+POL\b|\.\s*Bank|\.\s*$|$)/i);

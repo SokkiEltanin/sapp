@@ -109,7 +109,7 @@ export async function commitBankTx(
     } else {
       const exp = await expensesService.add({
         type: 'expense', amount: p.amount, currency: p.currency || 'PLN', category: p.category,
-        tags: [], note: p.store || 'Płatność', date: p.dateISO,
+        tags: p.tags ?? [], note: p.store || (p.selfTransfer ? 'Przelew na oszczędności' : 'Płatność'), date: p.dateISO,
         ...(p.store ? { storeName: p.store } : {}),
         paymentMethod: p.method === 'cash' ? 'cash' : 'card', bankMatched: true,
       });
