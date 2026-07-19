@@ -1497,6 +1497,26 @@ export default function DashboardScreen() {
     return `${Math.round(v)}`;
   };
 
+  // A clear, human unit for the header chip — so every tile SAYS what it's counting
+  // (PLN / szt / kg / …), which the bare chart numbers never made obvious.
+  const unitChip = (unit: string): string => {
+    switch (unit) {
+      case 'zł':   return 'PLN';
+      case 'szt.': return 'szt.';
+      case '×':    return 'razy';
+      case 'kg':   return 'kg';
+      case 'h':    return 'godziny';
+      case '/5':   return 'ocena /5';
+      case 'kroki':return 'kroki';
+      case 'dni':  return 'dni';
+      default:     return unit.startsWith('/') ? unit : '';
+    }
+  };
+  // What window the chart covers + what its x-labels mean — kills the "jakie tygodnie?"
+  // ambiguity (week labels are the Monday of each week).
+  const periodCaption = (p: 'week' | 'month', count: number): string =>
+    p === 'month' ? `Ostatnie ${count} mies.` : `Ostatnie ${count} tyg. · etykieta = poniedziałek tygodnia`;
+
   const renderStatTile = (t: CustomTile): React.ReactNode => {
     const def = metricById(t.metric);
     if (!def) return <View style={[s.card, { backgroundColor: cardBgDark }]}><Text style={s.cardTitle}>Widget — błąd</Text></View>;
@@ -1511,10 +1531,12 @@ export default function DashboardScreen() {
     // month buckets only — ymBack maps bucket→month, which is meaningless for weeks
     const isEarnings = t.metric === 'earnings' && period === 'month';
     const earningsForecast = isEarnings && !((paidBy[ymBack(0)] ?? 0) > 0);
+    const uChip = unitChip(def.unit);
     const header = (
       <View style={s.cardHeader}>
         <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
         <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
+        {uChip ? <View style={[s.unitPill, { borderColor: accentColor + '44', backgroundColor: accentColor + '14' }]}><Text style={[s.unitPillTxt, { color: accentColor }]}>{uChip}</Text></View> : null}
       </View>
     );
 
@@ -1573,6 +1595,7 @@ export default function DashboardScreen() {
             <View style={[s.cardHeader, { flex: 1, marginBottom: 0 }]}>
               <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
               <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
+              {uChip ? <View style={[s.unitPill, { borderColor: accentColor + '44', backgroundColor: accentColor + '14' }]}><Text style={[s.unitPillTxt, { color: accentColor }]}>{uChip}</Text></View> : null}
             </View>
             <View style={s.waveNowWrap}>
               <Text style={[s.waveNow, { color: accentColor }]} numberOfLines={1}>{latest > 0 ? `${latest.toFixed(1)} kg` : '—'}</Text>
@@ -1591,6 +1614,7 @@ export default function DashboardScreen() {
                 ) : null)}
               </View>
               <WaveChart data={filled} color={accentColor} dotColors={dotColors} target={t.target} zoom />
+              <Text style={s.chartCaption}>{periodCaption(period, raw.length)}</Text>
               {nz.length > 1 && (
                 <Text style={s.statSub}>Zakres {lo.toFixed(1)}–{hi.toFixed(1)} kg{t.target ? ` · cel ${Number(t.target).toFixed(1)} kg` : ''}</Text>
               )}
@@ -1616,6 +1640,7 @@ export default function DashboardScreen() {
             <View style={[s.cardHeader, { flex: 1, marginBottom: 0 }]}>
               <View style={[s.statIconChip, { backgroundColor: accentColor + '1A' }]}><Ic size={13} color={accentColor} /></View>
               <Text style={s.cardTitle} numberOfLines={1}>{t.title || def.label}</Text>
+              {uChip ? <View style={[s.unitPill, { borderColor: accentColor + '44', backgroundColor: accentColor + '14' }]}><Text style={[s.unitPillTxt, { color: accentColor }]}>{uChip}</Text></View> : null}
             </View>
             <View style={s.waveNowWrap}>
               <Text style={[s.waveNow, { color: accentColor }]} numberOfLines={1}>{fmtStat(latest, ser.unit)}</Text>
@@ -1636,6 +1661,7 @@ export default function DashboardScreen() {
               <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>
             ))}
           </View>
+          <Text style={s.chartCaption}>{periodCaption(period, ser.values.length)}</Text>
           {isEarnings && (
             <View style={s.fvLegend}>
               <View style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: '#2AC68F' }]} /><Text style={s.fvLegTxt}>potwierdzone wypłatą</Text></View>
@@ -1696,6 +1722,7 @@ export default function DashboardScreen() {
             <View style={s.waveLabels}>
               {ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, (i === ser.labels.length - 1 || i === thenIdx) && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}
             </View>
+            <Text style={s.chartCaption}>{periodCaption(period, vals.length)}</Text>
           </View>
         );
       }
@@ -1728,6 +1755,7 @@ export default function DashboardScreen() {
             </View>
             <WaveChart data={vals} color={accentColor} zoom={t.metric === 'weight'} />
             <View style={s.waveLabels}>{ser.labels.map((l, i) => <Text key={i} style={[s.waveLabel, i === ser.labels.length - 1 && { color: accentColor, fontWeight: '700' }]}>{l}</Text>)}</View>
+            <Text style={s.chartCaption}>{periodCaption(period, vals.length)}</Text>
           </View>
         );
       }
@@ -1779,6 +1807,7 @@ export default function DashboardScreen() {
           <View style={s.waveLabels}>
             {a.labels.map((l, i) => <Text key={i} style={s.waveLabel}>{l}</Text>)}
           </View>
+          <Text style={s.chartCaption}>{periodCaption(period, a.values.length)}</Text>
         </View>
       );
     }
@@ -1813,10 +1842,11 @@ export default function DashboardScreen() {
     const r = metricNumber(t.metric!, statCtx, period, t.tag);
     const pct = t.target && t.target > 0 ? Math.min(1, r.value / t.target) : null;
     const over = t.target ? r.value > t.target : false;
-    let deltaPct: number | null = null; let trendUp = false; let spark: number[] | null = null;
+    let deltaPct: number | null = null; let trendUp = false; let spark: number[] | null = null; let sparkLabels: string[] = [];
     if (def.periodic) {
       const ser = metricSeries(t.metric!, statCtx, period, 6, t.tag);
       spark = ser.values;
+      sparkLabels = ser.labels;
       const cur = ser.values[ser.values.length - 1] ?? 0;
       const prev = ser.values[ser.values.length - 2] ?? 0;
       if (prev > 0) { deltaPct = Math.round(((cur - prev) / prev) * 100); trendUp = cur >= prev; }
@@ -1862,6 +1892,12 @@ export default function DashboardScreen() {
               <WaveChart data={spark} color={over ? colors.accent.red : accentColor} target={t.target} zoom={t.metric === 'weight'}
                 dotColors={isEarnings ? spark.map((_, i) => ((paidBy[ymBack(spark!.length - 1 - i)] ?? 0) > 0 ? '#2AC68F' : '#FBBF24')) : undefined} />
             </View>
+            {sparkLabels.length === spark.length && (
+              <View style={s.waveLabels}>
+                {sparkLabels.map((l, i) => <Text key={i} style={[s.waveLabel, i === sparkLabels.length - 1 && { color: over ? colors.accent.red : accentColor, fontWeight: '700' }]}>{l}</Text>)}
+              </View>
+            )}
+            <Text style={s.chartCaption}>{periodCaption(period, spark.length)}</Text>
             {isEarnings && (
               <View style={s.fvLegend}>
                 <View style={s.fvLegItem}><View style={[s.fvDotSm, { backgroundColor: '#2AC68F' }]} /><Text style={s.fvLegTxt}>potwierdzone wypłatą</Text></View>
@@ -5028,6 +5064,9 @@ const buildStyles = (c: any) => StyleSheet.create({
   avgPillText: { fontSize: 11, fontWeight: '700' },
   waveLabels: { flexDirection: 'row' },
   waveLabel: { flex: 1, fontSize: 8, color: c.text.muted, textAlign: 'center' },
+  chartCaption: { fontSize: 9.5, color: c.text.muted, textAlign: 'center', marginTop: 4, fontStyle: 'italic' },
+  unitPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, borderWidth: 1 },
+  unitPillTxt: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.4 },
   waveValRow: { flexDirection: 'row', marginBottom: 3 },
   waveValLabel: { flex: 1, fontSize: 8.5, fontWeight: '700', color: c.text.secondary, textAlign: 'center' },
   waveValues: { flexDirection: 'row', marginBottom: 2 },
