@@ -324,11 +324,11 @@ function buildHeadline(x: {
   isTopSweets: boolean; earned: number; spendVsPrevPct: number | null; avgMood: number | null;
 }): string {
   if (x.isTopSteps && x.steps > 0) return `Twój najbardziej ruchliwy miesiąc — ${fmtSteps(x.steps)} kroków!`;
-  if (x.sweets[0] && x.sweets[0].count >= 3) return `Król słodyczy: ${x.sweets[0].name} ×${x.sweets[0].count} ${x.sweets[0].emoji}`;
-  if (x.isTopMood && x.avgMood != null) return `Najlepszy nastrój na koncie — śr. ${x.avgMood.toFixed(1)}/5 😄`;
-  if (x.isTopSweets) return `Miesiąc na słodko 🍬 — najwięcej łakoci w historii`;
-  if (x.earned > 0) return `Zarobione ${Math.round(x.earned)} zł 💰`;
-  if (x.steps > 0) return `${fmtSteps(x.steps)} kroków w tym miesiącu 👣`;
+  if (x.sweets[0] && x.sweets[0].count >= 3) return `Król słodyczy: ${x.sweets[0].name} ×${x.sweets[0].count}`;
+  if (x.isTopMood && x.avgMood != null) return `Najlepszy nastrój na koncie — śr. ${x.avgMood.toFixed(1)}/5`;
+  if (x.isTopSweets) return `Miesiąc na słodko — najwięcej łakoci w historii`;
+  if (x.earned > 0) return `Zarobione ${Math.round(x.earned)} zł`;
+  if (x.steps > 0) return `${fmtSteps(x.steps)} kroków w tym miesiącu`;
   if (x.spendVsPrevPct != null && x.spendVsPrevPct < -5) return `O ${-x.spendVsPrevPct}% oszczędniej niż miesiąc wcześniej`;
   return `Twoja karta miesiąca`;
 }

@@ -76,8 +76,8 @@ export default function MonthWrappedCard({
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[st.card, compact && st.cardCompact, { borderColor: card.accent + (legendary ? 'CC' : rank >= 2 ? 'AA' : '66') }]}
       >
-        {/* the tier medal as a faint oversized watermark — reads rarity at a glance */}
-        <Text style={st.watermark}>{card.tierEmoji}</Text>
+        {/* No emoji stickers/watermark — they cheapened the card ("wygląda tanio").
+            The gradient + rarity pill + tier accent carry the collectible identity. */}
 
         {/* header */}
         <View style={st.head}>
@@ -93,16 +93,10 @@ export default function MonthWrappedCard({
             </View>
             {/* rarity tier — always shown so the colour is legible */}
             <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '1F' }]}>
-              <Text style={st.rarityEmoji}>{card.tierEmoji}</Text>
               <Text style={[st.rarityTxt, { color: card.accent }]}>{card.tierLabel}</Text>
             </View>
             <Text style={st.month}>{card.monthName}</Text>
             <Text style={st.year}>{card.year}</Text>
-          </View>
-          <View style={st.stickerCol}>
-            {card.stickers.slice(0, 4).map((sx, i) => (
-              <Text key={i} style={[st.sticker, { transform: [{ rotate: `${(i % 2 ? 8 : -8)}deg` }] }]}>{sx}</Text>
-            ))}
           </View>
         </View>
 
@@ -165,7 +159,9 @@ export default function MonthWrappedCard({
             <Text style={st.sectionLabel}>Ulubione słodycze / przekąski</Text>
             {card.sweets.map((sw, i) => (
               <View key={i} style={st.sweetRow}>
-                <Text style={st.sweetEmoji}>{sw.emoji}</Text>
+                <View style={[st.sweetRank, { backgroundColor: card.accent + '2E', borderColor: card.accent + '80' }]}>
+                  <Text style={[st.sweetRankTxt, { color: card.accent }]}>{i + 1}</Text>
+                </View>
                 <Text style={st.sweetName} numberOfLines={1}>{sw.name}</Text>
                 <Text style={st.sweetCount}>×{sw.count}</Text>
               </View>
@@ -225,7 +221,6 @@ const st = StyleSheet.create({
     borderRadius: 22, padding: 18, borderWidth: 1, overflow: 'hidden',
   },
   cardCompact: { padding: 16 },
-  watermark: { position: 'absolute', top: -18, right: -6, fontSize: 96, opacity: 0.14 },
   sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
 
   head: { flexDirection: 'row', alignItems: 'flex-start' },
@@ -233,13 +228,10 @@ const st = StyleSheet.create({
   kickerTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   typePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   typePillTxt: { fontSize: 10, fontWeight: '900', color: '#12151b', letterSpacing: 0.7 },
-  rarityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 7 },
-  rarityEmoji: { fontSize: 11 },
+  rarityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 7 },
   rarityTxt: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   month: { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -1, ...shadow },
   year: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '700', marginTop: -2, ...shadow },
-  stickerCol: { alignItems: 'flex-end', maxWidth: 84, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 2 },
-  sticker: { fontSize: 24 },
 
   heroRow: { flexDirection: 'row', gap: 20, marginTop: 14 },
   heroStat: { flexDirection: 'row', alignItems: 'center', gap: 9 },
@@ -258,7 +250,8 @@ const st = StyleSheet.create({
   paceNow: { color: '#fff', fontSize: 12.5, fontWeight: '800', ...shadow },
   pacePct: { fontSize: 12, fontWeight: '900', width: 52, textAlign: 'right' },
   sweetRow: { flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 11, paddingVertical: 6, paddingHorizontal: 10 },
-  sweetEmoji: { fontSize: 18 },
+  sweetRank: { width: 20, height: 20, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sweetRankTxt: { fontSize: 11, fontWeight: '900' },
   sweetName: { color: '#fff', fontSize: 13.5, fontWeight: '700', flex: 1, ...shadow },
   sweetCount: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '800' },
 

@@ -6,10 +6,11 @@ import { YearCard } from '@/utils/yearCards';
 import { stepsToDistanceFact } from '@/utils/funComparisons';
 
 // The crown of the collection: one grand card summarising a whole year, built from
-// its month cards. Stickers recap the rarity tiers the year's months earned.
+// its month cards. Tier chips recap the rarity tiers the year's months earned —
+// coloured dots, not emoji (emoji cheapened the wrapped cards).
 
 const TIER_MEDALS: [keyof YearCard['tierCounts'], string][] = [
-  ['grafitowa', '🪨'], ['szmaragdowa', '🟩'], ['lazurowa', '🟦'], ['indygowa', '🟪'], ['ametystowa', '💠'],
+  ['grafitowa', '#B6C2CC'], ['szmaragdowa', '#7CF3C8'], ['lazurowa', '#A5DEF5'], ['indygowa', '#B4C4FF'], ['ametystowa', '#E4CCFF'],
 ];
 
 function fmt(n: number): string { return Math.round(n).toLocaleString('pl-PL'); }
@@ -46,7 +47,7 @@ export default function YearWrappedCard({ card }: { card: YearCard }) {
       ],
     }}>
       <LinearGradient colors={card.palette} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[st.card, { borderColor: card.accent + 'AA' }]}>
-        <Text style={st.watermark}>👑</Text>
+        <View style={st.watermark} pointerEvents="none"><Crown size={104} color={card.accent} /></View>
 
         {/* a filled "ROK" pill + the big year number make this unmistakably the yearly
             summary, not one of the monthly cards stacked below it */}
@@ -74,7 +75,6 @@ export default function YearWrappedCard({ card }: { card: YearCard }) {
 
         {card.topSweet && (
           <View style={st.sweetRow}>
-            <Text style={st.sweetEmoji}>{card.topSweet.emoji}</Text>
             <Text style={st.sweetLabel}>Słodycz roku</Text>
             <Text style={st.sweetName} numberOfLines={1}>{card.topSweet.name}</Text>
             <Text style={st.sweetCount}>×{card.topSweet.count}</Text>
@@ -83,9 +83,9 @@ export default function YearWrappedCard({ card }: { card: YearCard }) {
 
         {medals.length > 0 && (
           <View style={st.medals}>
-            {medals.map(([k, e]) => (
+            {medals.map(([k, color]) => (
               <View key={k} style={st.medal}>
-                <Text style={st.medalEmoji}>{e}</Text>
+                <View style={[st.medalDot, { backgroundColor: color }]} />
                 <Text style={st.medalCount}>×{card.tierCounts[k]}</Text>
               </View>
             ))}
@@ -118,7 +118,7 @@ const shadow = { textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width:
 
 const st = StyleSheet.create({
   card: { borderRadius: 22, padding: 18, borderWidth: 1, overflow: 'hidden' },
-  watermark: { position: 'absolute', top: -20, right: -6, fontSize: 104, opacity: 0.16 },
+  watermark: { position: 'absolute', top: -14, right: -8, opacity: 0.16 },
   sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
 
   kicker: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
@@ -136,14 +136,13 @@ const st = StyleSheet.create({
   statKey: { color: 'rgba(255,255,255,0.75)', fontSize: 10.5, fontWeight: '600', marginTop: -1 },
 
   sweetRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: 12, paddingVertical: 7, paddingHorizontal: 11, marginTop: 14 },
-  sweetEmoji: { fontSize: 18 },
   sweetLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
   sweetName: { color: '#fff', fontSize: 13.5, fontWeight: '700', flex: 1, textAlign: 'right', ...shadow },
   sweetCount: { color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: '800' },
 
   medals: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 },
   medal: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8 },
-  medalEmoji: { fontSize: 14 },
+  medalDot: { width: 9, height: 9, borderRadius: 5 },
   medalCount: { color: '#fff', fontSize: 12, fontWeight: '800' },
 
   headline: { color: '#fff', fontSize: 14.5, fontWeight: '800', lineHeight: 19, marginTop: 15, ...shadow },
