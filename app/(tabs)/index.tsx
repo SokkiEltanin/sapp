@@ -12,7 +12,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router, useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, ChevronRight, ChevronLeft,
-  TrendingUp, TrendingDown, Flame, Smile, Zap,
+  TrendingUp, TrendingDown, Flame, Smile, Zap, History,
   CalendarDays, Wallet,
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
@@ -2705,6 +2705,62 @@ export default function DashboardScreen() {
   // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
   // Grouped by CANONICAL identity so OCR variants / cross-store spellings of the
   // same product merge (learned via name aliases when you rename in the scanner).
+  // "Rok temu tego dnia" — a nostalgic snapshot from exactly a year back: that day's
+  // avg mood, my spend, and steps. Hidden unless at least one of them has data.
+  const yearAgo = useMemo(() => {
+    const now = new Date();
+    const d = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const moods = (moodByDay[key] ?? []).map(e => e.mood);
+    const mood = moods.length ? moods.reduce((a, b) => a + b, 0) / moods.length : null;
+    let spend = 0; let hasSpend = false;
+    for (const e of expenses) {
+      if ((e.date ?? '').slice(0, 10) !== key) continue;
+      if (e.type === 'income' || isSelfTransfer(e) || !inScope(e, scope)) continue;
+      spend += e.amount; hasSpend = true;
+    }
+    const steps = healthDays[key]?.steps ?? 0;
+    const label = d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+    return { mood, spend, hasSpend, steps, label, has: mood != null || hasSpend || steps > 0 };
+  }, [expenses, moodByDay, healthDays, scope]);
+
+  // "Co podrożało" — products whose unit price in RECENT purchases is meaningfully
+  // higher than in earlier ones (split each product's history in half by date). Needs
+  // ≥4 purchases; ignores absurd jumps (mis-scans). Grouped like the top-products tile.
+  const priceWatch = useMemo(() => {
+    const byKey: Record<string, { names: string[]; obs: { t: number; up: number }[] }> = {};
+    for (const e of expenses) {
+      if (e.type === 'income') continue;
+      const t = new Date(e.date ?? '').getTime();
+      if (!t) continue;
+      for (const it of (e.receiptItems ?? [])) {
+        if (it.excluded) continue;
+        const up = it.unitPrice > 0 ? it.unitPrice : (it.quantity > 0 ? (it.price ?? 0) / it.quantity : 0);
+        if (!(up > 0)) continue;
+        const name = it.name?.trim(); if (!name) continue;
+        const canon = canonicalProductName(name, nameAliases);
+        const key = productGroupKey(canon);
+        if (!key) continue;
+        (byKey[key] ??= { names: [], obs: [] }).names.push(canon);
+        byKey[key].obs.push({ t, up });
+      }
+    }
+    const out: { label: string; from: number; to: number; pct: number }[] = [];
+    for (const g of Object.values(byKey)) {
+      if (g.obs.length < 4) continue;
+      g.obs.sort((a, b) => a.t - b.t);
+      const half = Math.floor(g.obs.length / 2);
+      const avg = (arr: { up: number }[]) => arr.reduce((s, o) => s + o.up, 0) / arr.length;
+      const eAvg = avg(g.obs.slice(0, half));
+      const rAvg = avg(g.obs.slice(half));
+      if (!(eAvg > 0) || rAvg > eAvg * 3) continue;      // absurd jump = mis-scan
+      const pct = Math.round(((rAvg - eAvg) / eAvg) * 100);
+      if (pct < 8 || rAvg - eAvg < 0.30) continue;       // only a meaningful rise
+      out.push({ label: productGroupLabel(g.names), from: eAvg, to: rAvg, pct });
+    }
+    return out.sort((a, b) => b.pct - a.pct).slice(0, 4);
+  }, [expenses, nameAliases]);
+
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
@@ -3242,6 +3298,44 @@ export default function DashboardScreen() {
             nodes['streak-wall'] = streakWall.some(x => x.days > 0) && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
+
+            nodes['year-ago'] = yearAgo.has && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <History size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Rok temu tego dnia</Text>
+                </View>
+                <Text style={[s.statSub, { marginBottom: spacing[2] }]}>{yearAgo.label}</Text>
+                <View style={s.yearAgoRow}>
+                  {yearAgo.mood != null && (
+                    <View style={s.yearAgoStat}><Text style={[s.yearAgoVal, { color: accentColor }]}>{yearAgo.mood.toFixed(1)}/5</Text><Text style={s.yearAgoKey}>nastrój</Text></View>
+                  )}
+                  {yearAgo.hasSpend && (
+                    <View style={s.yearAgoStat}><Text style={[s.yearAgoVal, { color: accentColor }]}>{Math.round(yearAgo.spend)} zł</Text><Text style={s.yearAgoKey}>wydane</Text></View>
+                  )}
+                  {yearAgo.steps > 0 && (
+                    <View style={s.yearAgoStat}><Text style={[s.yearAgoVal, { color: accentColor }]}>{yearAgo.steps >= 1000 ? `${(yearAgo.steps / 1000).toFixed(1).replace('.0', '')}k` : yearAgo.steps}</Text><Text style={s.yearAgoKey}>kroków</Text></View>
+                  )}
+                </View>
+              </View>
+            );
+
+            nodes['price-watch'] = priceWatch.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <TrendingUp size={13} color="#F87171" />
+                  <Text style={s.cardTitle}>Co podrożało</Text>
+                </View>
+                <Text style={[s.statSub, { marginBottom: spacing[1] }]}>Droższe niż wcześniej — ostatnie zakupy vs starsze</Text>
+                {priceWatch.map((p, i) => (
+                  <View key={i} style={s.pwRow}>
+                    <Text style={s.pwName} numberOfLines={1}>{p.label}</Text>
+                    <Text style={s.pwPrice}>{p.from.toFixed(2)} → {p.to.toFixed(2)} zł</Text>
+                    <View style={s.pwPct}><Text style={s.pwPctTxt}>+{p.pct}%</Text></View>
+                  </View>
+                ))}
+              </View>
+            );
 
             nodes['gablota-card'] = (() => {
               const total = achStates.filter(st => st.a.kind !== 'bad').length;
@@ -5081,6 +5175,17 @@ const buildStyles = (c: any) => StyleSheet.create({
   waveLabels: { flexDirection: 'row' },
   waveLabel: { flex: 1, fontSize: 8, color: c.text.muted, textAlign: 'center' },
   chartCaption: { fontSize: 9.5, color: c.text.muted, textAlign: 'center', marginTop: 4, fontStyle: 'italic' },
+  // "Rok temu tego dnia"
+  yearAgoRow: { flexDirection: 'row', gap: spacing[2], marginTop: 2 },
+  yearAgoStat: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingVertical: spacing[3] },
+  yearAgoVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
+  yearAgoKey: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
+  // "Co podrożało"
+  pwRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.border.subtle },
+  pwName: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
+  pwPrice: { fontSize: 11.5, color: c.text.secondary, fontVariant: ['tabular-nums'] },
+  pwPct: { backgroundColor: '#F8717122', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
+  pwPctTxt: { fontSize: 11, fontWeight: '800', color: '#F87171' },
   unitPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, borderWidth: 1 },
   unitPillTxt: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.4 },
   waveValRow: { flexDirection: 'row', marginBottom: 3 },
