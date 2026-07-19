@@ -2797,6 +2797,24 @@ export default function DashboardScreen() {
     return { rows, max: rows.length ? rows[0][1] : 1, total: rows.reduce((s, [, v]) => s + v, 0) };
   }, [expenses, scope]);
 
+  // "Kolekcja sklepów" — where you shop as a collection: distinct stores, favourite
+  // (most visits), and the most recently discovered new one.
+  const shopsCollection = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const firstSeen: Record<string, string> = {};
+    for (const e of expenses) {
+      if (e.type === 'income' || isSelfTransfer(e)) continue;
+      const s = e.storeName?.trim();
+      if (!s) continue;
+      counts[s] = (counts[s] ?? 0) + 1;
+      const d = (e.date ?? '').slice(0, 10);
+      if (d && (!firstSeen[s] || d < firstSeen[s])) firstSeen[s] = d;
+    }
+    const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const newest = Object.entries(firstSeen).sort((a, b) => b[1].localeCompare(a[1]))[0];
+    return { rows, total: rows.length, fav: rows[0] ?? null, newest: newest ? { name: newest[0], date: newest[1] } : null };
+  }, [expenses]);
+
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
@@ -3376,6 +3394,30 @@ export default function DashboardScreen() {
                       </View>
                     );
                   })}
+                </View>
+              </View>
+            );
+
+            nodes['shops-collection'] = shopsCollection.total > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Store size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Kolekcja sklepów</Text>
+                  <Text style={s.shopTotal}>{shopsCollection.total}</Text>
+                </View>
+                {shopsCollection.fav && (
+                  <Text style={s.statSub}>
+                    Ulubiony: <Text style={{ color: accentColor, fontWeight: '800' }}>{shopsCollection.fav[0]}</Text> · {shopsCollection.fav[1]}×
+                    {shopsCollection.newest ? `   ·   ostatnio nowy: ${shopsCollection.newest.name}` : ''}
+                  </Text>
+                )}
+                <View style={s.shopWrap}>
+                  {shopsCollection.rows.slice(0, 12).map(([name, cnt]) => (
+                    <View key={name} style={s.shopChip}>
+                      <Text style={s.shopChipName} numberOfLines={1}>{name}</Text>
+                      <View style={[s.shopChipCount, { backgroundColor: accentColor + '26' }]}><Text style={[s.shopChipCountTxt, { color: accentColor }]}>{cnt}</Text></View>
+                    </View>
+                  ))}
                 </View>
               </View>
             );
@@ -5267,6 +5309,13 @@ const buildStyles = (c: any) => StyleSheet.create({
   bubble: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
   bubbleAmt: { fontWeight: '900', letterSpacing: -0.5 },
   bubbleLabel: { fontSize: 10, color: c.text.muted, fontWeight: '600', maxWidth: 76, textAlign: 'center' },
+  // "Kolekcja sklepów"
+  shopTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
+  shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
+  shopChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.bg.elevated, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, paddingLeft: spacing[3], paddingRight: 4, paddingVertical: 3, maxWidth: '100%' },
+  shopChipName: { fontSize: 12, fontWeight: '600', color: c.text.secondary, maxWidth: 120 },
+  shopChipCount: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  shopChipCountTxt: { fontSize: 11, fontWeight: '800' },
   // "Co podrożało"
   pwRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.border.subtle },
   pwName: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
