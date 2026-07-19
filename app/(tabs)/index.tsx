@@ -68,7 +68,7 @@ import { usePetStore, levelFromXp } from '@/store/petStore';
 import { buildQuests, sweetlessDaysFrom } from '@/utils/quests';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
-import { weatherIconPng } from '@/utils/weatherIcon';
+import { weatherLucide } from '@/utils/weatherIcon';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { detectRecurringBills, nextBillingDate, getDismissedBills, dismissBill } from '@/utils/recurringBills';
 import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfirm } from '@/utils/subscriptionAuto';
@@ -1929,7 +1929,7 @@ export default function DashboardScreen() {
             <Text style={s.statSub}>Pobieram pogodę…</Text>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] }}>
-              <Image source={weatherIconPng(code)} style={{ width: 52, height: 52 }} resizeMode="contain" />
+              {(() => { const { Icon, color } = weatherLucide(code); return <Icon size={48} color={color} strokeWidth={1.6} />; })()}
               <View style={{ flex: 1 }}>
                 <Text style={s.weatherTemp}>{temp}°C</Text>
                 <Text style={s.weatherDesc}>{(weather?.desc ?? '').toUpperCase()}</Text>
@@ -2858,7 +2858,7 @@ export default function DashboardScreen() {
                 {weather && (
                   <TouchableOpacity style={s.headerMinWeather} activeOpacity={0.7}
                     onPress={() => { haptic.tap(); setWeatherPanel(true); }}>
-                    <Image source={weatherIconPng(weather.wmo ?? -1)} style={{ width: 22, height: 22 }} resizeMode="contain" />
+                    {(() => { const { Icon, color } = weatherLucide(weather.wmo ?? -1); return <Icon size={18} color={color} strokeWidth={1.8} />; })()}
                     <Text style={s.headerMinTemp}>{weather.temp}°</Text>
                   </TouchableOpacity>
                 )}
@@ -4516,7 +4516,7 @@ export default function DashboardScreen() {
             {weather && (
               <>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[2] }}>
-                  <Image source={weatherIconPng(weather.wmo ?? -1)} style={{ width: 68, height: 68 }} resizeMode="contain" />
+                  {(() => { const { Icon, color } = weatherLucide(weather.wmo ?? -1); return <Icon size={60} color={color} strokeWidth={1.5} />; })()}
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 40, fontWeight: '900', color: colors.text.primary, letterSpacing: -1.5 }}>{weather.temp}°</Text>
                     <Text style={{ fontSize: 13, color: colors.text.secondary, fontWeight: '600' }}>{weather.desc}</Text>
@@ -4540,7 +4540,7 @@ export default function DashboardScreen() {
                         return (
                           <View key={fd.date} style={s.wxDay}>
                             <Text style={[s.wxDayLbl, i === 0 && { color: accentColor, fontWeight: '800' }]}>{i === 0 ? 'Dziś' : wd}</Text>
-                            <Image source={weatherIconPng(fd.wmo)} style={{ width: 30, height: 30, marginVertical: 3 }} resizeMode="contain" />
+                            <View style={{ marginVertical: 3 }}>{(() => { const { Icon, color } = weatherLucide(fd.wmo); return <Icon size={26} color={color} strokeWidth={1.7} />; })()}</View>
                             <Text style={s.wxHi}>{fd.hi}°</Text>
                             <Text style={s.wxLo}>{fd.lo}°</Text>
                           </View>

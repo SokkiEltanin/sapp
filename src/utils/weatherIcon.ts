@@ -1,4 +1,20 @@
 import { ImageSourcePropType } from 'react-native';
+import { Sun, CloudSun, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudSnow, CloudLightning } from 'lucide-react-native';
+
+// Minimalist lucide weather icon + a tint, mapped from a WMO code. Replaces the
+// cartoon PNG artwork ("emotki") with clean line icons.
+export function weatherLucide(code: number): { Icon: any; color: string } {
+  if (code < 0)   return { Icon: Cloud,          color: '#9CA3AF' };
+  if (code === 0) return { Icon: Sun,            color: '#FBBF24' };
+  if (code <= 2)  return { Icon: CloudSun,       color: '#FCD34D' };
+  if (code <= 48) return { Icon: code >= 45 ? CloudFog : Cloud, color: '#B7C0CC' };
+  if (code <= 57) return { Icon: CloudDrizzle,   color: '#7FB2F0' };
+  if (code <= 67) return { Icon: CloudRain,      color: '#5B9BE0' };
+  if (code <= 77) return { Icon: CloudSnow,      color: '#CFE3F5' };
+  if (code <= 82) return { Icon: CloudRain,      color: '#5B9BE0' };
+  if (code <= 86) return { Icon: CloudSnow,      color: '#CFE3F5' };
+  return { Icon: CloudLightning, color: '#A78BFA' };
+}
 
 // Custom weather artwork (assets/weather) mapped from WMO weather codes.
 const ICONS = {
