@@ -172,6 +172,23 @@ function fmtChartPt(v: number, unit: string): string {
   return Math.round(v).toLocaleString('pl-PL');
 }
 
+// Do two metric series move together across the SAME periods? Pearson over matched
+// non-zero pairs → a plain-language verdict for the two-metric compare widget.
+function compareVerdict(a: number[], b: number[], mutedColor: string): { text: string; color: string } | null {
+  const pairs: [number, number][] = [];
+  for (let i = 0; i < a.length; i++) if (a[i] > 0 && (b[i] ?? 0) > 0) pairs.push([a[i], b[i]]);
+  if (pairs.length < 3) return null;
+  const n = pairs.length;
+  const mx = pairs.reduce((s, p) => s + p[0], 0) / n;
+  const my = pairs.reduce((s, p) => s + p[1], 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (const [x, y] of pairs) { const dx = x - mx, dy = y - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+  const r = sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : 0;
+  if (r >= 0.4)  return { text: 'Zwykle idą w parze — więcej jednego, więcej drugiego', color: '#2AC68F' };
+  if (r <= -0.4) return { text: 'Zwykle przeciwnie — gdy jedno rośnie, drugie spada', color: '#F87171' };
+  return { text: 'Bez wyraźnego związku w tych okresach', color: mutedColor };
+}
+
 const MOOD_EMOJIS: Record<MoodLevel, string> = {
   1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩',
 };
@@ -1793,6 +1810,10 @@ export default function DashboardScreen() {
       const ratio = aNow > 0 && bNow > 0
         ? (bNow >= aNow ? `${bLabel}: ${(bNow / aNow).toFixed(1)}× tego co „${aLabel}"` : `${aLabel}: ${(aNow / bNow).toFixed(1)}× tego co „${bLabel}"`)
         : null;
+      // The whole point of comparing two metrics: do they move TOGETHER across the same
+      // periods? Pearson over matched non-zero pairs → a plain-language verdict, so a
+      // "sen vs energia" tile says "zwykle idą w parze" instead of two mute bars.
+      const cmpVerdict = compareVerdict(a.values, b.values, colors.text.muted);
       return (
         <View style={[s.card, { backgroundColor: cardBgDark }]}>
           {header}
@@ -1822,7 +1843,13 @@ export default function DashboardScreen() {
           <View style={s.waveLabels}>
             {a.labels.map((l, i) => <Text key={i} style={s.waveLabel}>{l}</Text>)}
           </View>
-          <Text style={s.chartCaption}>{periodCaption(period, a.values.length)}</Text>
+          <Text style={s.chartCaption}>Średnie w tych samych {a.values.length} {period === 'month' ? 'miesiącach' : 'tygodniach'}</Text>
+          {cmpVerdict && (
+            <View style={[s.cmpVerdict, { borderColor: cmpVerdict.color + '40', backgroundColor: cmpVerdict.color + '12' }]}>
+              <Link2 size={12} color={cmpVerdict.color} />
+              <Text style={[s.cmpVerdictTxt, { color: cmpVerdict.color }]}>{cmpVerdict.text}</Text>
+            </View>
+          )}
         </View>
       );
     }
@@ -4380,7 +4407,14 @@ export default function DashboardScreen() {
                 const bLab = defB2?.label ?? '—';
                 const aN = aS.values[aS.values.length - 1] ?? 0;
                 const bN = bS.values[bS.values.length - 1] ?? 0;
-                const maxB = Math.max(...aS.values, ...bS.values, 1);
+                // Same unit → one shared scale (direct compare). Different units (sen h vs
+                // energia /5) → scale EACH to its own max so both are visible and you compare
+                // the SHAPE, not absolute height (the old shared scale = the "durne słupki").
+                const sameUnit = aS.unit === bS.unit;
+                const shared = Math.max(...aS.values, ...bS.values, 1);
+                const aMax = sameUnit ? shared : Math.max(...aS.values, 1);
+                const bMax = sameUnit ? shared : Math.max(...bS.values, 1);
+                const cmpVerdict = compareVerdict(aS.values, bS.values, colors.text.muted);
                 const HB = 60;
                 return (
                   <>
@@ -4402,13 +4436,20 @@ export default function DashboardScreen() {
                             <Text style={[s.tagHistVal, { color: '#FBBF24' }]} numberOfLines={1}>{(bS.values[i] ?? 0) > 0 ? fmtChartPt(bS.values[i] ?? 0, bS.unit) : ''}</Text>
                           </View>
                           <View style={{ height: HB, width: 26, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
-                            <View style={{ width: 10, height: Math.max(2, (v / maxB) * HB), borderRadius: 3, backgroundColor: accentColor }} />
-                            <View style={{ width: 10, height: Math.max(2, ((bS.values[i] ?? 0) / maxB) * HB), borderRadius: 3, backgroundColor: '#FBBF24' }} />
+                            <View style={{ width: 10, height: Math.max(2, (v / aMax) * HB), borderRadius: 3, backgroundColor: accentColor }} />
+                            <View style={{ width: 10, height: Math.max(2, ((bS.values[i] ?? 0) / bMax) * HB), borderRadius: 3, backgroundColor: '#FBBF24' }} />
                           </View>
                           <Text style={s.tagHistLbl}>{aS.labels[i]}</Text>
                         </View>
                       ))}
                     </View>
+                    {!sameUnit && <Text style={[s.statSub, { marginTop: 6 }]}>Słupki skalowane osobno (różne jednostki) — porównuj kształt, nie wysokość.</Text>}
+                    {cmpVerdict && (
+                      <View style={[s.cmpVerdict, { borderColor: cmpVerdict.color + '40', backgroundColor: cmpVerdict.color + '12' }]}>
+                        <Link2 size={12} color={cmpVerdict.color} />
+                        <Text style={[s.cmpVerdictTxt, { color: cmpVerdict.color }]}>{cmpVerdict.text}</Text>
+                      </View>
+                    )}
                   </>
                 );
               }
@@ -5327,6 +5368,9 @@ const buildStyles = (c: any) => StyleSheet.create({
   bubble: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
   bubbleAmt: { fontWeight: '900', letterSpacing: -0.5 },
   bubbleLabel: { fontSize: 10, color: c.text.muted, fontWeight: '600', maxWidth: 76, textAlign: 'center' },
+  // two-metric compare verdict
+  cmpVerdict: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2], borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing[3], paddingVertical: 7 },
+  cmpVerdictTxt: { flex: 1, fontSize: 11.5, fontWeight: '700' },
   // "Kolekcja sklepów"
   shopTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
   shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
