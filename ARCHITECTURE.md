@@ -119,9 +119,14 @@ Tydzień/Miesiąc (`detailPeriod`).
 - Grupowanie produktów: `productMemory.ts` — `canonicalProductName` + `productGroupKey` +
   `productGroupLabel` (warianty typu „serek wiejski *" łączą się w „serek"). Ceny:
   `PriceStat {n,mean,min,max,last}` (`product_price_memory`).
-- Karta „TEN MIESIĄC" w finances.tsx: tempo vs ten sam dzień zeszłego miesiąca, prognoza,
-  ile/dzień zostało, największa kategoria (`monthPulse`). Lista transakcji domyślnie
-  ostatnie 31 dni + „Pokaż starsze" (`capTx`/`showAllTx`).
+- **Saldo = JEDNA liczba** „NA KARCIE" = `balanceOffset + all income − all spending`
+  (2026-07-20: cash/gotówka WYCIĘTE — user nie używa; usunięto pigułki Gotówka/Razem G+K
+  z hero i pola gotówki z Ustawień `getCashOffset`/`setCashOffset`; `paymentMethod` na
+  Expense zostaje). Offset ustawiasz w Ustawieniach → „Saldo konta".
+- Karta „TEN MIESIĄC" w finances.tsx (`monthPulse`): paski Przychody/Wydatki + „Zostało",
+  potem DWIE czytelne linie (tempo vs ten sam dzień zeszłego miesiąca; ile/dzień zostało).
+  Odchudzona z zabałaganionej siatki 2×2. Lista transakcji domyślnie ostatnie 31 dni +
+  „Pokaż starsze" (`capTx`/`showAllTx`).
 
 ## 7. Bank → wydatek (pipeline) — patrz też memory [[bank_auto_expenses]]
 
