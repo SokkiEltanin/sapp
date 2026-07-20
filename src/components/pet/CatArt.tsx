@@ -47,10 +47,11 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 }
 
 export default function CatArt({
-  size = 150, expression = 'happy', animate = true, onPress, celebrate = 0, affection = 0,
+  size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
   palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
+  onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
   celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean;
   onAngry?: () => void;
   lively?: boolean;   // eager idle for the loading splash: glance + ear-flutter soon & often
@@ -233,6 +234,20 @@ export default function CatArt({
     }, 3000);
   };
 
+  // HOLD (long press) = a cuddle: distinct from a tap. The cat licks its paw (a cute,
+  // slower move), a warmer shower of hearts drifts up, a longer soft purr buzzes, and it
+  // keeps content half-lidded eyes for a beat. Reads clearly as "mizianie", not a poke.
+  const doCuddle = () => {
+    if (asleep || angry) return;
+    taps.current = [];                       // a deliberate cuddle shouldn't count toward anger
+    doLick();
+    setPetting(true);
+    setTimeout(() => setPetting(false), 1500);
+    for (let i = 0; i < 6; i++) setTimeout(() => spawn('heart', (Math.random() - 0.5) * size * 0.55), i * 95);
+    if (animate) { try { Vibration.vibrate([0, 18, 55, 18, 55, 18, 55, 22]); } catch {} }
+    onLongPress?.();
+  };
+
   const onTap = () => {
     if (angry) return;
     const now = Date.now();
@@ -314,7 +329,7 @@ export default function CatArt({
   const tailMood = angry ? 'angry' : petting ? 'purr' : 'idle';
 
   return (
-    <Pressable onPress={onTap} hitSlop={12}>
+    <Pressable onPress={onTap} onLongPress={doCuddle} delayLongPress={280} hitSlop={12}>
       <View>
         <Animated.View style={{ transform: [{ translateY: hopY }, { rotate: rot }, { translateX: shakeX }] }}>
           <Animated.View style={{ transform: [{ scale }] }}>

@@ -177,6 +177,11 @@ export default function Pet() {
     const r = petCat(4);
     if (r.justFull) { haptic.success(); toast.success(`❤️ ${name} daje Ci skrzynkę sardynek!`); setCelebrate(c => c + 1); setCrateOpen(true); }
   };
+  // Hold-to-cuddle: worth much more affection than a tap (przytulenie > szturchnięcie).
+  const handleCuddle = () => {
+    const r = petCat(14);
+    if (r.justFull) { haptic.success(); toast.success(`❤️ ${name} daje Ci skrzynkę sardynek!`); setCelebrate(c => c + 1); setCrateOpen(true); }
+  };
 
   const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
     if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
@@ -276,7 +281,7 @@ export default function Pet() {
         {/* stage — no room backdrop any more; the cat IS the stage */}
         <View style={s.stage}>
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
-            onPress={handlePet} celebrate={celebrate} affection={affToday} />
+            onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
         </View>
 
         {/* Affection — fills as you pet (tap) the cat; full = daily bonus. */}
