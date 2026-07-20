@@ -157,17 +157,22 @@ export default function HealthScreen() {
     const todayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
     const monday = new Date(today); monday.setDate(today.getDate() - todayIdx);
     const wSteps = Array(7).fill(0);
+    const wWeightWatch: (number | null)[] = Array(7).fill(null);
     const wSleep: WeekSleep[] = Array(7).fill(null).map(() => ({ h: 0, m: 0 }));
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday); d.setDate(monday.getDate() + i);
       const p = byDate.get(ymd(d));
       if (p) {
         wSteps[i] = p.steps;
+        if (p.weightKg != null) wWeightWatch[i] = p.weightKg;
         wSleep[i] = { h: Math.floor(p.sleepMinutes / 60), m: p.sleepMinutes % 60, quality: qualityFromMinutes(p.sleepMinutes) };
       }
     }
     setWeekSteps(wSteps);
     setWeekSleep(wSleep);
+    // Weight sparkline: fill missing days from the watch, but never clobber a value
+    // already logged for that day (manual override / cache stays source-of-truth).
+    setWeekWeight(prev => prev.map((w, i) => (w > 0 ? w : (wWeightWatch[i] ?? 0))));
     const todayPt = byDate.get(ymd(today));
     if (todayPt) {
       if (todayPt.steps > 0) setSteps(todayPt.steps);
