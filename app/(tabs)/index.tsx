@@ -47,6 +47,7 @@ import { useStatsScope, inScope, countsForConsumption, consumesInScope, StatsSco
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { getCategoryMeta } from '@/utils/categories';
+import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META } from '@/utils/food';
 import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
@@ -822,6 +823,7 @@ export default function DashboardScreen() {
   const [capsuleModal, setCapsuleModal] = useState(false);
   const [capsuleText, setCapsuleText] = useState('');
   const [capsuleMonths, setCapsuleMonths] = useState(6);
+  const [foodView, setFoodView] = useState<'week' | 'day'>('week'); // food widget: tygodnie vs dni
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
@@ -2765,6 +2767,42 @@ export default function DashboardScreen() {
     return { mood, spend, hasSpend, steps, label, has: mood != null || hasSpend || steps > 0 };
   }, [expenses, moodByDay, healthDays, scope]);
 
+  // "Jedzenie — rozkład": this month's FOOD spend (food lines only) split by week-of-month,
+  // by day-of-week, and by food subcategory (mięso/nabiał/…).
+  const foodBreakdown = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear(), mo = now.getMonth();
+    const mk = `${y}-${pad(mo + 1)}`;
+    const pm = new Date(y, mo - 1, 1);
+    const prevMk = `${pm.getFullYear()}-${pad(pm.getMonth() + 1)}`;
+    let total = 0, prevTotal = 0;
+    const weeks = [0, 0, 0, 0, 0];
+    const dow = [0, 0, 0, 0, 0, 0, 0];            // Mon..Sun
+    const subs: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type === 'income' || !inScope(e, scope)) continue;
+      const ym = (e.date ?? '').slice(0, 7);
+      if (ym === prevMk) { prevTotal += foodAmountOf(e); continue; }
+      if (ym !== mk) continue;
+      const amt = foodAmountOf(e);
+      if (amt <= 0) continue;
+      total += amt;
+      const dayNum = parseInt((e.date ?? '').slice(8, 10), 10) || 1;
+      weeks[Math.min(4, Math.floor((dayNum - 1) / 7))] += amt;
+      const js = new Date((e.date ?? '').slice(0, 10) + 'T12:00:00').getDay();
+      dow[(js + 6) % 7] += amt;
+      const items = e.receiptItems ?? [];
+      if (items.length > 0) {
+        for (const it of items) if (isFoodItem(it)) subs[foodSubcat(it)] = (subs[foodSubcat(it)] ?? 0) + (it.price ?? 0);
+      } else if (e.category === 'groceries') {
+        subs.inne = (subs.inne ?? 0) + amt;
+      }
+    }
+    const weeksUsed = Math.ceil(new Date(y, mo + 1, 0).getDate() / 7);
+    const subRows = Object.entries(subs).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
+    return { total, prevTotal, weeks: weeks.slice(0, weeksUsed), dow, subRows, monthName: now.toLocaleDateString('pl-PL', { month: 'long' }) };
+  }, [expenses, scope]);
+
   // "Bąbelki wydatków" — this month's spend per category as sized bubbles.
   const spendBubbles = useMemo(() => {
     const now = new Date();
@@ -3388,6 +3426,60 @@ export default function DashboardScreen() {
                 </View>
               </View>
             );
+
+            nodes['food-breakdown'] = foodBreakdown.total > 0 && (() => {
+              const fb = foodBreakdown;
+              const deltaPct = fb.prevTotal > 5 ? Math.round(((fb.total - fb.prevTotal) / fb.prevTotal) * 100) : null;
+              const series = foodView === 'week' ? fb.weeks : fb.dow;
+              const seriesLabels = foodView === 'week' ? fb.weeks.map((_, i) => `T${i + 1}`) : ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
+              const smax = Math.max(...series, 1);
+              const submax = fb.subRows[0]?.[1] ?? 1;
+              return (
+                <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                  <View style={s.cardHeader}>
+                    <Utensils size={13} color={accentColor} />
+                    <Text style={s.cardTitle}>Jedzenie · {fb.monthName}</Text>
+                    <Text style={s.foodTotal}>{Math.round(fb.total)} zł</Text>
+                  </View>
+                  {deltaPct != null && (
+                    <Text style={s.statSub}>{deltaPct > 0 ? '+' : ''}{deltaPct}% vs miesiąc temu ({Math.round(fb.prevTotal)} zł)</Text>
+                  )}
+                  <View style={s.foodToggle}>
+                    {(['week', 'day'] as const).map(v => (
+                      <TouchableOpacity key={v} onPress={() => { haptic.tap(); setFoodView(v); }} activeOpacity={0.8}
+                        style={[s.foodToggleBtn, foodView === v && { backgroundColor: accentColor + '22', borderColor: accentColor }]}>
+                        <Text style={[s.foodToggleTxt, foodView === v && { color: accentColor, fontWeight: '800' }]}>{v === 'week' ? 'Tygodnie' : 'Dni tygodnia'}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={s.foodBars}>
+                    {series.map((v, i) => (
+                      <View key={i} style={s.foodBarCol}>
+                        <Text style={s.foodBarVal} numberOfLines={1}>{v > 0 ? Math.round(v) : ''}</Text>
+                        <View style={s.foodBarTrack}><View style={{ width: '100%', height: `${Math.max(v > 0 ? 5 : 0, (v / smax) * 100)}%`, borderRadius: 3, backgroundColor: accentColor + 'CC' }} /></View>
+                        <Text style={s.foodBarLbl}>{seriesLabels[i]}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {fb.subRows.length > 0 && (
+                    <>
+                      <Text style={[s.statSub, { marginTop: spacing[3], marginBottom: spacing[1] }]}>Co składa się na jedzenie</Text>
+                      {fb.subRows.map(([tag, amt]) => {
+                        const meta = FOOD_SUBCAT_META[tag] ?? { label: tag, color: '#9CA3AF' };
+                        return (
+                          <View key={tag} style={s.foodSubRow}>
+                            <View style={[s.foodSubDot, { backgroundColor: meta.color }]} />
+                            <Text style={s.foodSubName} numberOfLines={1}>{meta.label}</Text>
+                            <View style={s.foodSubTrack}><View style={{ width: `${Math.max(4, (amt / submax) * 100)}%`, height: '100%', borderRadius: 3, backgroundColor: meta.color }} /></View>
+                            <Text style={s.foodSubAmt}>{Math.round(amt)} zł</Text>
+                          </View>
+                        );
+                      })}
+                    </>
+                  )}
+                </View>
+              );
+            })();
 
             nodes['spend-bubbles'] = spendBubbles.rows.length > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -5371,6 +5463,21 @@ const buildStyles = (c: any) => StyleSheet.create({
   // two-metric compare verdict
   cmpVerdict: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2], borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing[3], paddingVertical: 7 },
   cmpVerdictTxt: { flex: 1, fontSize: 11.5, fontWeight: '700' },
+  // "Jedzenie — rozkład"
+  foodTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
+  foodToggle: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
+  foodToggleBtn: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
+  foodToggleTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  foodBars: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[2], marginTop: spacing[3], height: 78 },
+  foodBarCol: { flex: 1, alignItems: 'center', gap: 3, justifyContent: 'flex-end' },
+  foodBarVal: { fontSize: 8.5, fontWeight: '700', color: c.text.secondary },
+  foodBarTrack: { width: '64%', height: 50, backgroundColor: c.border.subtle, borderRadius: 3, justifyContent: 'flex-end', overflow: 'hidden' },
+  foodBarLbl: { fontSize: 9, fontWeight: '600', color: c.text.muted },
+  foodSubRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 4 },
+  foodSubDot: { width: 9, height: 9, borderRadius: 5 },
+  foodSubName: { width: 92, fontSize: 12, fontWeight: '600', color: c.text.secondary },
+  foodSubTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: c.border.subtle, overflow: 'hidden' },
+  foodSubAmt: { width: 54, textAlign: 'right', fontSize: 12, fontWeight: '800', color: c.text.primary },
   // "Kolekcja sklepów"
   shopTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
   shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
