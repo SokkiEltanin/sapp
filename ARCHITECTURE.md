@@ -20,8 +20,12 @@ ciemny motyw. APK budowany przez GitHub Actions/Releases. Dystrybucja: jeden uż
   Cały drzewo appki jest bramkowane na `authReady`; splash nakłada się aż do `splashGone`.
 - **`app/(tabs)/_layout.tsx`** — nawigator zakładek. **KLUCZOWE flagi:** `lazy:false`,
   `detachInactiveScreens:false`, `freezeOnBlur:true` → wszystkie ekrany zostają
-  zamontowane, nieaktywne są „zamrożone". Zakładki: `/` (Dziś), `/tasks`, `/stats`
-  (to KALENDARZ), `/finances`, plus `href:null`: `calendar`, `mood`, `health`.
+  zamontowane, nieaktywne są „zamrożone". Zakładki (6): `/` (Dziś), `/tasks`, `/stats`
+  (to KALENDARZ), `/finances`, `/health` (Zdrowie = zegarek/ciało), `/food` (Jedzenie =
+  kalorie/produkty/waga/woda). Ekrany `href:null` (poza paskiem): `calendar`, `mood`.
+  **Dodając zakładkę:** `TABS` w `(tabs)/_layout.tsx` + `<Tabs.Screen>` ORAZ `TAB_PATHS`
+  / `TABS` / `TAB_ACCENTS` (+ ewentualnie `ACTIONS`) w `TabBar.tsx` — inaczej pasek i
+  swipe się rozjadą.
 - Pasek zakładek: `src/components/ui/TabBar.tsx` (własny, nie natywny). Górna pigułka:
   `TopPill`. „+” = overlay w drzewie (NIE natywny Modal).
 
@@ -145,8 +149,31 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
 - `healthConnectService.ts` (natywny odczyt), `healthAutoSync.ts` (`autoSyncHealth(days,
   force)` — cache per-dzień `health_YYYY-MM-DD`; `force` omija throttle 10 min).
   Dashboard forsuje TYLKO na wejściu do appki (cold start + resume), nie na każdy tab-focus.
-- `healthHistory.ts` `getHealthHistory(n)` = jeden `multiGet`. Zegarek = źródło prawdy;
-  tylko wagę można nadpisać ręcznie. Uprawnienia w app.json (patrz §11).
+- `healthHistory.ts` `getHealthHistory(n)` = jeden `multiGet` (sen/waga/kroki/**burn**).
+  `dailyBurnFromHc(hc)` = dzienne całkowite spalanie (total ≥1200, inaczej BMR+aktywne) —
+  wspólne dla karty energii w Zdrowiu i kafelka kalorii w Jedzeniu. Zegarek = źródło
+  prawdy; tylko wagę można nadpisać ręcznie. Uprawnienia w app.json (patrz §11).
+
+## 8b. Jedzenie / liczenie kalorii — MANUALNE, ODDZIELNE od paragonów
+
+- **Zasada:** apka NIGDY nie zakłada „kupione=zjedzone", nie odejmuje spiżarni, nie zgaduje.
+  Paragony i kalorie to osobne światy; paragon co najwyżej PODbija świeżo kupiony produkt w
+  podpowiedziach (`fresh`). **Tylko user dodaje/zatwierdza produkt liczony.**
+- `src/store/foodStore.ts` (persist `food-store-v1`, w backupie): `products` (FoodProduct —
+  kcalPer100g LUB kcalPerPortion „na oko" + uczone `unitGrams`), `meals` (MealEntry: date,
+  type, items z ROZWIĄZANYMI grams+kcal), `presets` (MealPreset — UI w Etapie 2), `goalMode`.
+  Helpery: `unitToGrams`, `computeItemKcal`, `targetIntake(burn,mode,manual)`, `UNIT_META`
+  (jednostki domowe: plaster/kromka/łyżka/garść/szklanka/porcja z domyślnymi gramami).
+- `src/data/foodBase.ts` — wbudowana OFFLINE baza kcal/100g (~150 polskich produktów) +
+  porcje domowe; `searchFoodBase(q)`. Startowa — to co user doda/zweryfikuje w foodStore wygrywa.
+- `app/(tabs)/food.tsx` — kafelek pierścienia (zjedzone vs cel + spalone + zostało), wybór
+  celu (redukcja/utrzymanie/masa), lista dzisiejszych posiłków wg typu. FAB „Co zjadłem" =
+  `ACTIONS[5]` w TabBar → `app/food/add.tsx` (szukaj w bazie/moich/ostatnich → picker
+  jednostki+ilości z podglądem kcal + override gram który UCZY porcję; „Wpisz ręcznie" =
+  produkt kcalPerPortion który się zapamiętuje). Reużywa `productMemory` (KcalMemory) i
+  `normalizeProductName` do tożsamości.
+- **TODO (etapy):** kreator kanapki/dania + presety (Etap 2), przeniesienie Waga+Woda z
+  Zdrowia (Etap 2/3), porządne spalanie + widgety OUT-vs-IN + prognoza wagi (Etap 3).
 
 ## 9. Pupil (kot) — patrz memory [[pet_blob_design]]
 

@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, ScanLine, Settings,
   Briefcase, Flame, FileText, CalendarPlus, TrendingUp, TrendingDown, CheckSquare,
+  Utensils, UtensilsCrossed,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -21,7 +22,7 @@ import { haptic } from '@/utils/haptics';
 
 type Props = { currentIndex: number };
 
-const TAB_PATHS = ['/', '/tasks', '/stats', '/finances', '/health'] as const;
+const TAB_PATHS = ['/', '/tasks', '/stats', '/finances', '/health', '/food'] as const;
 
 const TABS = [
   { Icon: LayoutDashboard },
@@ -29,6 +30,7 @@ const TABS = [
   { Icon: CalendarDays    },
   { Icon: Wallet          },
   { Icon: HeartPulse      },
+  { Icon: Utensils        },
 ];
 
 const TAB_ACCENTS = [
@@ -37,6 +39,7 @@ const TAB_ACCENTS = [
   colors.tabs.calendar,
   colors.tabs.finances,
   '#8B5CF6',
+  '#F59E0B',
 ] as const;
 
 const PILL_H = 52;
@@ -88,6 +91,8 @@ export default function TabBar({ currentIndex }: Props) {
       { icon: TrendingDown, color: colors.tabs.finances, onPress: () => router.push('/expenses/add?type=expense' as any) },
       { icon: TrendingUp,   color: colors.tabs.tasks,    onPress: () => router.push('/expenses/add?type=income' as any) },
       { icon: ScanLine,     color: colors.accent.blue,   onPress: () => router.push('/expenses/scan' as any) },
+    ] : currentIndex === 5 ? [
+      { icon: UtensilsCrossed, color: '#F59E0B', onPress: () => router.push('/food/add' as any) },
     ] : [];
 
   const badgeColor = overdueCount > 0 ? colors.accent.red

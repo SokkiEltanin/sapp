@@ -7,6 +7,21 @@ export interface HealthDayHistory {
   sleepMinutes: number;   // 0 = not logged
   weight: number;         // kg, 0 = not logged
   steps: number;
+  burn: number;           // total kcal burned that day (0 = unknown)
+}
+
+// The day's total burn from the stored Health Connect blob. Samsung often shares
+// only the EXERCISE calories as "total" (a few hundred), which is a nonsense whole
+// -day figure — so we only trust totalCalories when it's plausibly a full day
+// (>=1200); otherwise BMR + active. Mirrors the Zdrowie energy card so the food
+// tab and burn widgets agree with it. 0 = no usable burn data.
+export function dailyBurnFromHc(hc: any): number {
+  if (!hc) return 0;
+  const total = Number(hc.totalCalories) || 0;
+  if (total >= 1200) return Math.round(total);
+  const bmr = Number(hc.bmr) || 0;
+  const active = Number(hc.activeCalories) || 0;
+  return bmr > 0 ? Math.round(bmr + active) : 0;
 }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -46,7 +61,7 @@ export async function getHealthHistory(days = 60): Promise<Record<string, Health
         // the sleep average.
         const isFakeSleep = Number(d.sleepH) === 7 && Number(d.sleepM) === 30 && !d.sleepQuality;
         const sleepMinutes = isFakeSleep ? 0 : (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
-        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: Number(d.steps) || 0 };
+        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: Number(d.steps) || 0, burn: dailyBurnFromHc(d.hc) };
       } catch {}
     });
   } catch {}

@@ -14,7 +14,7 @@ import { useUiPrefs } from '@/store/uiPrefs';
 // here (persisted + recoverable) instead of expo-router's blank production screen.
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 
-const TABS = ['/', '/tasks', '/stats', '/finances', '/health'] as const;
+const TABS = ['/', '/tasks', '/stats', '/finances', '/health', '/food'] as const;
 
 function tabIdx(path: string): number {
   const i = (TABS as readonly string[]).indexOf(path);
@@ -86,6 +86,7 @@ export default function TabsLayout() {
             <Tabs.Screen name="calendar"  options={{ href: null }} />
             <Tabs.Screen name="mood"      options={{ href: null }} />
             <Tabs.Screen name="health"    options={{ href: null }} />
+            <Tabs.Screen name="food"      options={{ href: null }} />
           </Tabs>
         </View>
       </GestureDetector>
