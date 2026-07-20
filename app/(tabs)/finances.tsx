@@ -5,14 +5,14 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { getBalanceOffset, getCashOffset } from '@/utils/accountBalance';
+import { getBalanceOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
-import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X, TrendingUp, TrendingDown, Gauge, CalendarClock, Wallet } from 'lucide-react-native';
+import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X, TrendingUp, TrendingDown, Wallet } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
@@ -27,7 +27,6 @@ import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
-import { CATEGORY_META } from '@/utils/categories';
 import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -132,7 +131,6 @@ export default function FinancesScreen() {
   const [filterModal, setFilterModal] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false); // false = only the recent window in the list
   const [balanceOffset, setBalanceOffset] = useState(0);
-  const [cashOffset, setCashOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
 
@@ -149,7 +147,6 @@ export default function FinancesScreen() {
   // Re-read the offset on focus so a value set in Settings shows immediately.
   useFocusEffect(useCallback(() => {
     getBalanceOffset().then(setBalanceOffset).catch(() => {});
-    getCashOffset().then(setCashOffset).catch(() => {});
   }, []));
 
   const availableTags = useMemo(() => {
@@ -261,9 +258,9 @@ export default function FinancesScreen() {
 
   // Card and cash are independent pots; the total is their sum. Each = its offset
   // (money there before tracking) + its own net flow (all-time).
-  const cardBalance = balanceOffset + (monthTotals.allInc - monthTotals.cashInc) - (monthTotals.allExp - monthTotals.cashExp);
-  const cashBalance = cashOffset + monthTotals.cashInc - monthTotals.cashExp;
-  const balance = cardBalance + cashBalance;
+  // One balance (cash tracking dropped — the user only cares about NA KARCIE):
+  // starting offset + all income − all spending.
+  const balance = balanceOffset + monthTotals.allInc - monthTotals.allExp;
 
 
   const min = parseFloat(amtMin.replace(',', '.'));
@@ -352,36 +349,26 @@ export default function FinancesScreen() {
                   </View>
                 }
               />
-              {/* ── Balance: card is the headline; cash + total are smaller pills ─── */}
+              {/* ── Balance: one number (NA KARCIE). Tap to adjust the starting offset. ─── */}
               <View style={st.heroMin}>
                 <Text style={st.heroDate}>NA KARCIE</Text>
-                <View style={st.heroAmountRow}>
-                  <Text style={[st.heroAmount, { color: cardBalance >= 0 ? colors.text.primary : colors.accent.red }]}>
-                    {cardBalance < 0 ? '−' : ''}{Math.abs(cardBalance).toFixed(2)}
-                  </Text>
-                  <Text style={st.heroCurrency}> PLN</Text>
-                </View>
                 <PressableScale onPress={() => { haptic.tap(); router.navigate('/settings' as any); }}>
-                  <View style={st.heroPills}>
-                    <View style={st.heroPill}>
-                      <Text style={st.heroPillLabel}>Gotówka</Text>
-                      <Text style={[st.heroPillVal, cashBalance < 0 && { color: colors.accent.red }]}>{cashBalance.toFixed(2)} zł</Text>
-                    </View>
-                    <View style={st.heroPill}>
-                      <Text style={st.heroPillLabel}>Razem G+K</Text>
-                      <Text style={[st.heroPillVal, balance < 0 && { color: colors.accent.red }]}>{balance.toFixed(2)} zł</Text>
-                    </View>
+                  <View style={st.heroAmountRow}>
+                    <Text style={[st.heroAmount, { color: balance >= 0 ? colors.text.primary : colors.accent.red }]}>
+                      {balance < 0 ? '−' : ''}{Math.abs(balance).toFixed(2)}
+                    </Text>
+                    <Text style={st.heroCurrency}> PLN</Text>
                   </View>
                 </PressableScale>
                 <Text style={st.heroSub}>
                   W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
                   {'   ·   '}
-                  Przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
+                  przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
                 </Text>
                 <Text style={st.heroSub2}>
                   Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
                   {'   ·   '}
-                  Słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
+                  słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
                   {'  '}<Text style={st.heroScopeTag}>({scope === 'all' ? 'wszyscy' : 'ja'})</Text>
                 </Text>
               </View>
@@ -419,9 +406,6 @@ export default function FinancesScreen() {
                 const p = monthPulse;
                 const paceBetter = p.paceVsPrevPct != null && p.paceVsPrevPct < 0;   // spending LESS = good
                 const paceTint = p.paceVsPrevPct == null ? colors.text.muted : paceBetter ? '#2AC68F' : '#E43434';
-                const forecastOver = p.forecast > inc && inc > 0;
-                const topMeta = p.topCat ? (CATEGORY_META as any)[p.topCat] : null;
-                const showForecast = p.day >= 4 && p.spendThis > 0;
                 return (
                   <View style={st.monthCard}>
                     <View style={st.monthHead}>
@@ -450,69 +434,31 @@ export default function FinancesScreen() {
                       </Text>
                     </View>
 
-                    {/* ── insight tiles (2×2): tempo · prognoza · dziennie · najwięcej ── */}
-                    <View style={st.pulseGrid}>
-                      {/* Tempo vs last month, same day-of-month */}
-                      <View style={st.pulseTile}>
-                        <View style={st.pulseTop}>
-                          {p.paceVsPrevPct != null
-                            ? (paceBetter ? <TrendingDown size={13} color={paceTint} /> : <TrendingUp size={13} color={paceTint} />)
-                            : <Gauge size={13} color={paceTint} />}
-                          <Text style={st.pulseLabel}>TEMPO</Text>
-                        </View>
-                        <Text style={[st.pulseVal, { color: paceTint }]}>
-                          {p.paceVsPrevPct == null ? `${p.spendThis.toFixed(0)} zł` : `${p.paceVsPrevPct > 0 ? '+' : ''}${p.paceVsPrevPct}%`}
-                        </Text>
-                        <Text style={st.pulseSub} numberOfLines={2}>
-                          {p.paceVsPrevPct == null
-                            ? `wydane do ${p.day}. dnia`
-                            : `${p.spendThis.toFixed(0)} zł vs ${p.spendPrevToDate.toFixed(0)} zł miesiąc temu`}
-                        </Text>
-                      </View>
-
-                      {/* Forecast to month end */}
-                      {showForecast && (
-                        <View style={st.pulseTile}>
-                          <View style={st.pulseTop}>
-                            <CalendarClock size={13} color={forecastOver ? '#E43434' : colors.text.secondary} />
-                            <Text style={st.pulseLabel}>PROGNOZA</Text>
-                          </View>
-                          <Text style={[st.pulseVal, { color: forecastOver ? '#E43434' : colors.text.primary }]}>~{p.forecast.toFixed(0)} zł</Text>
-                          <Text style={st.pulseSub} numberOfLines={2}>koniec mies. · ~{p.dailyRate.toFixed(0)} zł/dzień</Text>
+                    {/* Two clean insight lines (was a busy 2×2 grid nobody read) */}
+                    <View style={st.pulseLines}>
+                      {p.paceVsPrevPct != null && (
+                        <View style={st.pulseLineRow}>
+                          {paceBetter ? <TrendingDown size={14} color={paceTint} /> : <TrendingUp size={14} color={paceTint} />}
+                          <Text style={st.pulseLineTxt}>
+                            <Text style={{ color: paceTint, fontWeight: '800' }}>{Math.abs(p.paceVsPrevPct)}% {paceBetter ? 'mniej' : 'więcej'}</Text> niż o tej porze miesiąc temu
+                            <Text style={st.pulseLineDim}>  ({p.spendThis.toFixed(0)} vs {p.spendPrevToDate.toFixed(0)} zł)</Text>
+                          </Text>
                         </View>
                       )}
-
-                      {/* Daily budget left to stay within income */}
                       {p.daysLeft > 0 && inc > 0 && (
-                        <View style={st.pulseTile}>
-                          <View style={st.pulseTop}>
-                            <Wallet size={13} color={p.perDayLeft > 0 ? '#2AC68F' : '#E43434'} />
-                            <Text style={st.pulseLabel}>DZIENNIE</Text>
-                          </View>
-                          <Text style={[st.pulseVal, { color: p.perDayLeft > 0 ? '#2AC68F' : '#E43434' }]}>
-                            {p.perDayLeft > 0 ? `~${p.perDayLeft.toFixed(0)} zł` : '0 zł'}
+                        <View style={st.pulseLineRow}>
+                          <Wallet size={14} color={p.perDayLeft > 0 ? '#2AC68F' : '#E43434'} />
+                          <Text style={st.pulseLineTxt}>
+                            {p.perDayLeft > 0
+                              ? <>Możesz jeszcze <Text style={{ color: '#2AC68F', fontWeight: '800' }}>~{p.perDayLeft.toFixed(0)} zł/dzień</Text> przez {p.daysLeft} dni</>
+                              : <Text style={{ color: '#E43434', fontWeight: '800' }}>Przekroczono tegomiesięczne przychody</Text>}
                           </Text>
-                          <Text style={st.pulseSub} numberOfLines={2}>
-                            {p.perDayLeft > 0 ? `przez ${p.daysLeft} dni w ramach przychodów` : 'przekroczono przychody'}
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Top category this month */}
-                      {topMeta && p.topCatAmt > 0 && (
-                        <View style={st.pulseTile}>
-                          <View style={st.pulseTop}>
-                            <View style={[st.pulseDot, { backgroundColor: topMeta.color }]} />
-                            <Text style={st.pulseLabel}>NAJWIĘCEJ</Text>
-                          </View>
-                          <Text style={[st.pulseVal, { color: colors.text.primary }]} numberOfLines={1}>{topMeta.label}</Text>
-                          <Text style={st.pulseSub} numberOfLines={2}>{p.topCatAmt.toFixed(0)} zł w tym miesiącu</Text>
                         </View>
                       )}
                     </View>
 
                     {fixed > 0.5 && (
-                      <Text style={st.flowFixedNote}>Wydatki stałe (mieszkanie, subskrypcje) pominięte: {fixed.toFixed(0)} zł</Text>
+                      <Text style={st.flowFixedNote}>Bez wydatków stałych (mieszkanie, subskrypcje): {fixed.toFixed(0)} zł</Text>
                     )}
                   </View>
                 );
@@ -779,7 +725,12 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   monthTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
   monthHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthDayTag: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 0.3 },
-  // 2×2 insight tiles under the flow bars
+  // clean insight lines under the flow bars
+  pulseLines: { gap: spacing[2], marginTop: spacing[1], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  pulseLineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  pulseLineTxt: { flex: 1, fontSize: 12.5, color: c.text.secondary, lineHeight: 18 },
+  pulseLineDim: { color: c.text.muted },
+  // (legacy 2×2 tile styles kept — harmless)
   pulseGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2],
     marginTop: spacing[1], paddingTop: spacing[3],

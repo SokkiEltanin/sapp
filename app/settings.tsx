@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBalanceOffset, setBalanceOffset, getCashOffset, setCashOffset } from '@/utils/accountBalance';
+import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { computePayMonths } from '@/utils/workSummary';
@@ -313,30 +313,17 @@ export default function SettingsScreen() {
   }, [expenses]);
   const [balanceOffset, setBalanceOffsetState] = useState(0);
   const [balanceInput, setBalanceInput] = useState('');
-  const [cashOffset, setCashOffsetState] = useState(0);
-  const [cashInput, setCashInput] = useState('');
   useEffect(() => { getBalanceOffset().then(setBalanceOffsetState).catch(() => {}); }, []);
-  useEffect(() => { getCashOffset().then(setCashOffsetState).catch(() => {}); }, []);
   useEffect(() => { AsyncStorage.getItem('notif_enabled').then(v => { if (v != null) setNotifEnabled(v === 'true'); }).catch(() => {}); }, []);
   const saveAccountBalance = async () => {
     const real = parseFloat(balanceInput.replace(/\s/g, '').replace(',', '.'));
     if (isNaN(real)) return;
-    // Field is the CARD balance now → offset = real card − card net (non-cash flow).
-    const cardNet = accountNet.net - accountNet.cashNet;
-    const offset = real - cardNet;
+    // One balance now → offset = real balance − all net flow.
+    const offset = real - accountNet.net;
     setBalanceOffsetState(offset);
     await setBalanceOffset(offset);
     setBalanceInput('');
-    toast.success('Zapisano saldo karty');
-  };
-  const saveCash = async () => {
-    const real = parseFloat(cashInput.replace(/\s/g, '').replace(',', '.'));
-    if (isNaN(real)) return;
-    const offset = real - accountNet.cashNet;
-    setCashOffsetState(offset);
-    await setCashOffset(offset);
-    setCashInput('');
-    toast.success('Zapisano stan gotówki');
+    toast.success('Zapisano saldo');
   };
 
   const [hapticsOn, setHapticsOn]     = useState(appSettings.isHapticsEnabled());
@@ -796,7 +783,7 @@ export default function SettingsScreen() {
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Ile mam na karcie</Text>
                 <Text style={styles.rowSub}>
-                  App liczy teraz: {(balanceOffset + accountNet.net - accountNet.cashNet).toFixed(2)} zł.{'\n'}
+                  App liczy teraz: {(balanceOffset + accountNet.net).toFixed(2)} zł.{'\n'}
                   Wpisz ile masz realnie na karcie — reszta liczy się sama.
                 </Text>
               </View>
@@ -815,40 +802,6 @@ export default function SettingsScreen() {
                   borderWidth: 1, borderColor: '#5B7BE330',
                 }}
               />
-            </View>
-            {/* Cash on hand — card balance is then total − cash */}
-            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3], marginTop: spacing[1] }]}>
-              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
-                <Wallet size={16} color="#2AC68F" />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>Ile mam gotówki</Text>
-                <Text style={styles.rowSub}>
-                  App liczy teraz: {(cashOffset + accountNet.cashNet).toFixed(2)} zł.{'\n'}
-                  Osobna pula. Wydatki gotówką ją zmniejszają.
-                </Text>
-              </View>
-              <TextInput
-                value={cashInput}
-                onChangeText={setCashInput}
-                onBlur={saveCash}
-                keyboardType="numeric"
-                placeholder="np. 120"
-                placeholderTextColor={colors.text.muted}
-                style={{
-                  fontSize: 14, fontWeight: '700', color: '#2AC68F',
-                  minWidth: 90, textAlign: 'right',
-                  paddingVertical: 4, paddingHorizontal: spacing[2],
-                  backgroundColor: '#2AC68F12', borderRadius: radius.md,
-                  borderWidth: 1, borderColor: '#2AC68F30',
-                }}
-              />
-            </View>
-            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[3], justifyContent: 'space-between' }]}>
-              <Text style={[styles.rowLabel, { fontWeight: '700' }]}>Razem (karta + gotówka)</Text>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text.primary }}>
-                {(balanceOffset + cashOffset + accountNet.net).toFixed(2)} zł
-              </Text>
             </View>
           </View>
         </CollapsibleSection>
