@@ -2,6 +2,7 @@ import { Expense, MoodEntry, CalendarEvent, WorkSettings, Task } from '@/types';
 import { countsForConsumption, inScope, StatsScope } from '@/store/statsScope';
 import { canonicalProductName, productGroupKey, productGroupLabel, weightFor, WeightMemory } from '@/utils/productMemory';
 import { isWorkEvent, shiftHours } from '@/utils/workEvents';
+import { foodAmountOf } from '@/utils/food';
 import { WidgetViz } from '@/store/dashboardLayout';
 
 // A "self-transfer" is moving your own money (to savings / Revolut / another
@@ -218,8 +219,11 @@ function bucketValue(metric: string, ctx: StatCtx, pred: (e: Expense) => boolean
       return exp.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && pred(e))
         .reduce((m, e) => Math.max(m, e.amount), 0);
     case 'food':
-      return exp.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && inScope(e, ctx.scope) && pred(e))
-        .reduce((s, e) => s + e.amount, 0);
+      // FOOD ONLY — sum food receipt lines, not the whole grocery receipt (papier
+      // toaletowy / chemia z Lidla nie liczy się do jedzenia). foodAmountOf handles the
+      // no-items fallback (a plain groceries entry counts whole).
+      return exp.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && pred(e))
+        .reduce((s, e) => s + foodAmountOf(e), 0);
     case 'sweets': {
       let total = 0;
       for (const e of exp) {
@@ -424,7 +428,7 @@ export function dailyValue(metric: string, ctx: StatCtx, day: string): number {
     case 'spend':
       return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && !isSelfTransfer(e) && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
     case 'food':
-      return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
+      return ctx.expenses.filter(e => (!e.type || e.type === 'expense') && inScope(e, ctx.scope) && onDay(e.date)).reduce((s, e) => s + foodAmountOf(e), 0);
     case 'income':
       return ctx.expenses.filter(e => e.type === 'income' && !isSelfTransfer(e) && onDay(e.date)).reduce((s, e) => s + e.amount, 0);
     case 'sweets': {

@@ -9,6 +9,7 @@ import { getBalanceOffset } from '@/utils/accountBalance';
 import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
+import { foodAmountOf } from '@/utils/food';
 import { isSelfTransfer } from '@/utils/statWidgets';
 import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
@@ -197,7 +198,7 @@ export default function FinancesScreen() {
       if (selfT) continue;
       // Consumption (food / sweets): everyone or only me, per the scope toggle.
       if (!inScope(e, scope)) continue;
-      if (e.category === 'groceries') food += e.amount;
+      food += foodAmountOf(e);   // FOOD lines only — nie cały paragon (papier/chemia out)
       // sweets = ONLY the items tagged "słodycze". A receipt is summed by its
       // items (never the whole shop); the top-level tag only counts a plain,
       // non-itemised expense.
