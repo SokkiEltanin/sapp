@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   Modal, Pressable, KeyboardAvoidingView, Platform,
@@ -44,7 +45,20 @@ export default function ProductsScreen() {
   const [editWeightG, setEditWeightG] = useState('');
   const [editTags, setEditTags] = useState('');
   const [editCat, setEditCat]   = useState<ExpenseCategory>('groceries');
+  // Pairs the user said are NOT the same — MUST persist, else the same pair keeps
+  // reappearing every time you reopen the screen ("klikam że to nie to samo, nie zapisuje").
   const [dismissedDup, setDismissedDup] = useState<Set<string>>(new Set());
+  const DUP_KEY = 'dismissed_dup_pairs_v1';
+  useEffect(() => {
+    AsyncStorage.getItem(DUP_KEY).then(raw => { if (raw) setDismissedDup(new Set(JSON.parse(raw))); }).catch(() => {});
+  }, []);
+  const dismissDup = useCallback((id: string) => {
+    setDismissedDup(prev => {
+      const next = new Set(prev).add(id);
+      AsyncStorage.setItem(DUP_KEY, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  }, []);
   const [dupOpen, setDupOpen] = useState(false);
   const [mergeHistory, setMergeHistory] = useState<{ loser: string; winner: string }[]>([]);
 
@@ -90,7 +104,7 @@ export default function ProductsScreen() {
         if (sim >= 0.62 && sim < 0.99) {
           // higher count is the "winner" the other folds into
           const [a, b] = products[i].count >= products[j].count ? [products[i], products[j]] : [products[j], products[i]];
-          const id = `${a.key}|${b.key}`;
+          const id = [a.key, b.key].sort().join('|');   // order-stable so a dismissal sticks
           if (!dismissedDup.has(id)) out.push({ a, b, id });
         }
       }
@@ -102,7 +116,7 @@ export default function ProductsScreen() {
     haptic.success();
     try {
       await saveNameAliases([{ name: b.name }], { 0: a.name }); // b folds into a
-      setDismissedDup(prev => new Set(prev).add(id));
+      dismissDup(id);
       setMergeHistory(prev => [{ loser: b.name, winner: a.name }, ...prev].slice(0, 20));
       await loadNameAliases().then(setAliases);
       reload();
@@ -287,7 +301,7 @@ export default function ProductsScreen() {
                   </View>
                   <Text style={s.dupHintModal}>Scalenie złączy „{b.name}" w „{a.name}".</Text>
                   <View style={s.dupActions}>
-                    <TouchableOpacity style={[s.dupAct, { borderColor: c.accent.red + '66', backgroundColor: c.accent.red + '14' }]} onPress={() => { haptic.tap(); setDismissedDup(prev => new Set(prev).add(id)); }} activeOpacity={0.85}>
+                    <TouchableOpacity style={[s.dupAct, { borderColor: c.accent.red + '66', backgroundColor: c.accent.red + '14' }]} onPress={() => { haptic.tap(); dismissDup(id); }} activeOpacity={0.85}>
                       <X size={20} color={c.accent.red} /><Text style={[s.dupActText, { color: c.accent.red }]}>Różne</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[s.dupAct, { borderColor: c.accent.green + '66', backgroundColor: c.accent.green + '18' }]} onPress={() => mergePair(a, b, id)} activeOpacity={0.85}>

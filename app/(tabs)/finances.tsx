@@ -6,7 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { getBalanceOffset } from '@/utils/accountBalance';
-import { useStatsScope, isMine, inScope, countsForConsumption } from '@/store/statsScope';
+import { useStatsScope, isMine, inScope, countsForConsumption, MY_PAYER } from '@/store/statsScope';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
 import { foodAmountOf } from '@/utils/food';
@@ -134,6 +134,16 @@ export default function FinancesScreen() {
   const [balanceOffset, setBalanceOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
+  // The Ja/Wszyscy toggle only DOES anything when there's a household split (someone
+  // else paid, or an item is tagged with who ate it). Solo → it's a no-op that reads as
+  // "broken", so hide it until there's actually something to split.
+  const hasHouseholdSplit = useMemo(() => {
+    for (const e of expenses) {
+      if (e.payer && e.payer !== MY_PAYER) return true;
+      for (const it of (e.receiptItems ?? [])) if ((it.eaters?.length ?? 0) > 0) return true;
+    }
+    return false;
+  }, [expenses]);
 
   // Distinct payers that actually appear in the data (for the filter row).
   const payersInData = useMemo(() => {
@@ -370,11 +380,12 @@ export default function FinancesScreen() {
                   Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
                   {'   ·   '}
                   słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
-                  {'  '}<Text style={st.heroScopeTag}>({scope === 'all' ? 'wszyscy' : 'ja'})</Text>
+                  {hasHouseholdSplit ? <Text style={st.heroScopeTag}>{'  '}({scope === 'all' ? 'wszyscy' : 'ja'})</Text> : null}
                 </Text>
               </View>
 
-              {/* ── Stats scope toggle: everyone vs only me ─── */}
+              {/* ── Stats scope toggle: everyone vs only me (only when there's a split) ─── */}
+              {hasHouseholdSplit && (
               <View style={st.scopeRow}>
                 <Text style={st.scopeLabel}>Statystyki:</Text>
                 <View style={st.scopeToggle}>
@@ -394,6 +405,7 @@ export default function FinancesScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+              )}
 
               {/* ── TEN MIESIĄC — the one card that says where the month stands:
                     income vs variable spend + net, then pace vs the same point last
