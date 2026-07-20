@@ -10,13 +10,15 @@ import {
   Check, Pencil, Plus, SlidersHorizontal,
   ChevronRight, Trash2, X,
   Square, CheckSquare2, Clock, Timer, RefreshCw, Activity, Coins,
+  Zap, Target, Hourglass,
 } from 'lucide-react-native';
 import ReanimatedSwipeable, { SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { useTasks, taskCoins } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
-import { Task } from '@/types';
+import { Task, TaskKind } from '@/types';
+import { KIND_META, KIND_ORDER, resolveKind, inferKind } from '@/utils/taskKind';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { notificationsService } from '@/services/notificationsService';
@@ -164,6 +166,24 @@ function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem
     result.push(...tasks);
   }
   if (done.length > 0) { result.push('done-header'); result.push(...done); }
+  return result;
+}
+
+// ─── Kind grouping (the new primary view: Szybkie / Do skupienia / Poczekalnia) ──
+
+const KIND_ICON: Record<TaskKind, any> = { quick: Zap, deep: Target, waiting: Hourglass };
+
+function buildKindGroupedList(sorted: Task[]): ListItem[] {
+  const buckets: Record<TaskKind, Task[]> = { quick: [], deep: [], waiting: [] };
+  for (const t of sorted) buckets[resolveKind(t)].push(t);
+  const result: ListItem[] = [];
+  for (const k of KIND_ORDER) {
+    const arr = buckets[k];
+    if (arr.length === 0) continue;
+    const m = KIND_META[k];
+    result.push({ type: 'section', key: `kind-${k}`, label: `${m.label} · ${m.hint}`.toUpperCase(), color: m.color, count: arr.length });
+    result.push(...arr);
+  }
   return result;
 }
 
@@ -536,12 +556,33 @@ export default function TasksScreen() {
   const handlePomodoro      = useCallback((task: Task) => { startPomodoro(task.id, task.title); router.navigate('/pomodoro' as any); }, [startPomodoro]);
   const handleQuickSnooze   = useCallback((id: string) => { const d = new Date(); d.setHours(d.getHours() + 1); snooze(id, d); haptic.tap(); toast.info('Odłożono na godzinę'); }, [snooze]);
 
+  // Primary view groups by KIND (Szybkie / Do skupienia / Poczekalnia); the sort sheet
+  // orders within each group.
   const listData: ListItem[] = useMemo(() => {
     const shownDone  = doneCollapsed ? [] : done;
     const doneBlock: ListItem[] = done.length > 0 ? ['done-header' as const, ...shownDone] : [];
-    if (sort === 'deadline') return [...buildGroupedList(sorted, [], today), ...doneBlock];
-    return [...sorted, ...doneBlock];
-  }, [sorted, done, today, sort, doneCollapsed]);
+    return [...buildKindGroupedList(sorted), ...doneBlock];
+  }, [sorted, done, doneCollapsed]);
+
+  // One-line quick capture: type → Enter → task created with an auto-inferred kind you
+  // can cycle with a tap. Zero-friction so you actually jot things down.
+  const [quickText, setQuickText] = useState('');
+  const [quickKind, setQuickKind] = useState<TaskKind | null>(null);   // null = auto-infer
+  const effectiveQuickKind = quickKind ?? inferKind(quickText || '');
+  const submitQuick = useCallback(() => {
+    const title = quickText.trim();
+    if (!title) return;
+    const kind = quickKind ?? inferKind(title);
+    create({ title, status: 'pending', priority: 'normal', tags: [], kind } as any);
+    haptic.success();
+    setQuickText(''); setQuickKind(null);
+  }, [quickText, quickKind, create]);
+  const cycleQuickKind = useCallback(() => {
+    haptic.tap();
+    const cur = effectiveQuickKind;
+    const idx = KIND_ORDER.indexOf(cur);
+    setQuickKind(KIND_ORDER[(idx + 1) % KIND_ORDER.length]);
+  }, [effectiveQuickKind]);
 
   return (
     <SafeAreaView style={s.root} edges={[]}>
@@ -611,6 +652,29 @@ export default function TasksScreen() {
                   <Timer size={18} color={colors.tabs.tasks} />
                 </TouchableOpacity>
               </View>
+              {/* One-line quick capture (tap the chip to change the auto-picked kind) */}
+              <View style={s.quickAddRow}>
+                <TouchableOpacity onPress={cycleQuickKind} activeOpacity={0.8}
+                  style={[s.quickKindChip, { borderColor: KIND_META[effectiveQuickKind].color + '70', backgroundColor: KIND_META[effectiveQuickKind].color + '1A' }]}>
+                  {(() => { const Ic = KIND_ICON[effectiveQuickKind]; return <Ic size={13} color={KIND_META[effectiveQuickKind].color} />; })()}
+                  <Text style={[s.quickKindTxt, { color: KIND_META[effectiveQuickKind].color }]}>{KIND_META[effectiveQuickKind].short}</Text>
+                </TouchableOpacity>
+                <TextInput
+                  value={quickText}
+                  onChangeText={setQuickText}
+                  placeholder="Dodaj zadanie — Enter"
+                  placeholderTextColor={colors.text.muted}
+                  style={s.quickInput}
+                  returnKeyType="done"
+                  onSubmitEditing={submitQuick}
+                  blurOnSubmit={false}
+                />
+                {quickText.trim().length > 0 && (
+                  <TouchableOpacity onPress={submitQuick} style={[s.quickSubmit, { backgroundColor: G.accent }]} activeOpacity={0.85}>
+                    <Plus size={16} color={colors.bg.primary} strokeWidth={2.6} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           }
           ListEmptyComponent={
@@ -646,6 +710,13 @@ const makeS = (c: any, g: any) => StyleSheet.create({
   hdrIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: g.cardBorder },
   title:    { fontSize: 28, fontWeight: '800', color: c.white, letterSpacing: -0.5 },
   subtitle: { fontSize: 12, color: c.text.muted, marginTop: 2 },
+
+  // quick capture
+  quickAddRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], marginTop: 2 },
+  quickKindChip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 8 },
+  quickKindTxt: { fontSize: 11, fontWeight: '800' },
+  quickInput: { flex: 1, fontSize: 14, color: c.text.primary, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: g.cardBorder, paddingHorizontal: spacing[3], paddingVertical: 9 },
+  quickSubmit: { width: 38, height: 38, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
 
   list: { paddingHorizontal: spacing[4], paddingBottom: 180, gap: spacing[2] },
 

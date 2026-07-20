@@ -173,6 +173,12 @@ export type EventPriority = 'high' | 'normal' | 'low';
 export type TaskStatus = 'pending' | 'done' | 'snoozed';
 export type TaskDifficulty = 1 | 2 | 3 | 4 | 5;
 export type TaskRecurring = 'none' | 'daily' | 'weekly' | 'monthly';
+// How a task is worked, which changes how the Tasks tab groups + treats it:
+//  quick   — "wynieś śmieci": fast, just needs a nudge to do it NOW.
+//  deep    — "napisać sprawozdanie": needs time → ties to Focus/Pomodoro.
+//  waiting — "zwrócić kasę gdy projekt się rozliczy": no clear deadline, blocked;
+//            parked in the Poczekalnia so it doesn't nag, with an optional wake.
+export type TaskKind = 'quick' | 'deep' | 'waiting';
 
 export interface CalendarEvent {
   id: string;
@@ -202,6 +208,9 @@ export interface Task {
   scheduledTime?: string;   // HH:MM — optional time slot
   status: TaskStatus;
   priority: EventPriority;
+  kind?: TaskKind;          // quick | deep | waiting (undefined = quick, for old tasks)
+  waitingFor?: string;      // waiting: what you're blocked on ("rozliczenie projektu")
+  wakeAt?: string;          // waiting: YYYY-MM-DD to auto-surface it as active again
   difficulty?: TaskDifficulty;
   estimatedPomodoros?: number;
   completedPomodoros?: number;
