@@ -186,6 +186,10 @@ export default function HealthScreen() {
   useFocusEffect(useCallback(() => {
     let active = true;
     (async () => {
+      // Weight is now edited in the Jedzenie tab too — re-read the stored value on
+      // focus so this screen mirrors it (freezeOnBlur means Zdrowie can't write while
+      // blurred, so keeping state fresh on entry prevents a stale write clobbering it).
+      try { const raw = await AsyncStorage.getItem(todayKey()); const w = raw ? JSON.parse(raw).weight : 0; if (active && w > 0) setWeight(w); } catch {}
       if (Platform.OS !== 'android' || !isHealthConnectAvailable()) return;
       try {
         const [day, range] = await Promise.all([readHealthDay(new Date()), readHealthRange(30)]);

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale, Settings, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil } from 'lucide-react-native';
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
-import { getHealthHistory } from '@/utils/healthHistory';
+import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
 import { getHealthGoals, saveHealthGoals, bmrMifflin } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import DatePickerField from '@/components/ui/DatePickerField';
@@ -78,11 +78,30 @@ export default function Food() {
   // ── Woda — single source = the "Woda" habit (shared with Zdrowie/Nawyki/pet) ──
   const water = useWaterTracker();
 
-  // ── Waga — READ-ONLY here for now (edycja w Zdrowiu). Krok B przeniesie edycję i
-  // usunie ją ze Zdrowia, żeby był JEDEN zapisujący (blob health_YYYY-MM-DD + goals).
+  // ── Waga — EDYTOWALNA tutaj (Krok B). Jedyny zapisujący = saveTodayWeight (blob
+  // health_YYYY-MM-DD + health_last_weight); Zdrowie już nie zapisuje wagi.
   const [weightKg, setWeightKg]         = useState(0);   // today / last known
   const [weightGoal, setWeightGoal]     = useState(0);
   const [weightSeries, setWeightSeries] = useState<{ d: string; w: number }[]>([]);
+  const weightRef   = useRef(0);
+  const weightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [wModal, setWModal] = useState<null | 'set' | 'goal'>(null);
+  const [wInput, setWInput] = useState('');
+  const nudgeWeight = (delta: number) => {
+    const base = weightRef.current > 0 ? weightRef.current : (weightKg > 0 ? weightKg : 0);
+    if (base <= 0) { setWInput(''); setWModal('set'); return; }
+    const next = Math.max(0, +(base + delta).toFixed(1));
+    weightRef.current = next; setWeightKg(next); haptic.medium();
+    if (weightTimer.current) clearTimeout(weightTimer.current);
+    weightTimer.current = setTimeout(() => { saveTodayWeight(next).catch(() => {}); }, 400);
+  };
+  const commitWeightModal = () => {
+    const v = parseFloat(wInput.replace(',', '.'));
+    if (!(v > 0)) return;
+    if (wModal === 'goal') { setWeightGoal(v); saveHealthGoals({ weightGoal: v }).catch(() => {}); }
+    else { weightRef.current = v; setWeightKg(v); saveTodayWeight(v).catch(() => {}); }
+    setWModal(null); setWInput('');
+  };
 
   const loadBody = useCallback(async () => {
     const [hist, goals] = await Promise.all([getHealthHistory(30), getHealthGoals()]);
@@ -93,7 +112,7 @@ export default function Food() {
     for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); bbd[d] = hist[d].burn; }
     let last = series.length ? series[series.length - 1].w : 0;
     if (!(last > 0)) { const s = await AsyncStorage.getItem('health_last_weight'); const v = s ? parseFloat(s) : 0; if (v > 0) last = v; }
-    setWeightKg(last); setWeightSeries(series); setBurnByDay(bbd);
+    weightRef.current = last; setWeightKg(last); setWeightSeries(series); setBurnByDay(bbd);
     // today's watch active + BMR (for the resting+movement breakdown)
     try {
       const raw = await AsyncStorage.getItem(`health_${today}`);
@@ -307,13 +326,19 @@ export default function Food() {
             </View>
           </View>
 
-          <TouchableOpacity style={[s.card, s.trackCard]} activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/health' as any); }}>
+          <View style={[s.card, s.trackCard]}>
             <View style={s.trackHead}><Scale size={15} color="#A78BFA" /><Text style={s.trackTitle}>Waga</Text></View>
-            <Text style={s.trackVal}>{weightKg > 0 ? weightKg.toFixed(1) : '—'}<Text style={s.trackUnit}> kg</Text></Text>
-            {weightGoal > 0
-              ? <Text style={s.trackGoal} numberOfLines={1}>cel {weightGoal} kg{weightEta ? ` · ${weightEta}` : ''}</Text>
-              : <Text style={s.trackGoal} numberOfLines={1}>edytuj w Zdrowiu</Text>}
-          </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setWInput(weightKg > 0 ? weightKg.toFixed(1) : ''); setWModal('set'); }}>
+              <Text style={s.trackVal}>{weightKg > 0 ? weightKg.toFixed(1) : '—'}<Text style={s.trackUnit}> kg</Text></Text>
+            </TouchableOpacity>
+            <View style={s.trackBtns}>
+              <TouchableOpacity style={s.trackBtn} onPress={() => nudgeWeight(-0.1)}><Minus size={16} color={c.text.primary} /></TouchableOpacity>
+              <TouchableOpacity style={s.trackBtn} onPress={() => nudgeWeight(0.1)}><Plus size={16} color={c.text.primary} /></TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => { haptic.tap(); setWInput(weightGoal > 0 ? String(weightGoal) : ''); setWModal('goal'); }}>
+              <Text style={s.trackGoal} numberOfLines={1}>{weightGoal > 0 ? `cel ${weightGoal} kg${weightEta ? ` · ${weightEta}` : ''}` : 'ustaw cel wagi'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         )}
 
@@ -419,6 +444,23 @@ export default function Food() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Waga: wpisz dokładnie / ustaw cel */}
+      <Modal visible={wModal !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWModal(null)}>
+        <TouchableOpacity style={s.pfOverlay} activeOpacity={1} onPress={() => setWModal(null)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <TouchableOpacity activeOpacity={1} style={[s.card, s.pfSheet]} onPress={() => {}}>
+              <Text style={s.pfTitle}>{wModal === 'goal' ? 'Cel wagi (kg)' : 'Waga dziś (kg)'}</Text>
+              <TextInput style={s.wInput} value={wInput} onChangeText={setWInput} keyboardType="numeric" placeholder="np. 78.5" placeholderTextColor={c.text.muted} autoFocus />
+              <TouchableOpacity style={[s.sheetSave, { backgroundColor: +wInput.replace(',', '.') > 0 ? ACCENT : c.fill.subtle }]}
+                disabled={!(+wInput.replace(',', '.') > 0)} onPress={commitWeightModal}>
+                <Check size={17} color={+wInput.replace(',', '.') > 0 ? '#1A1206' : c.text.muted} />
+                <Text style={[s.sheetSaveTxt, { color: +wInput.replace(',', '.') > 0 ? '#1A1206' : c.text.muted }]}>Zapisz</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -460,6 +502,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   pfRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   pfLabel:    { fontSize: 13, fontWeight: '700', color: c.text.secondary, width: 64 },
   pfInput:    { width: 90, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 17, fontWeight: '700', color: c.text.primary },
+  wInput:     { height: 48, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], fontSize: 18, fontWeight: '700', color: c.text.primary, textAlign: 'center' },
   pfUnit:     { fontSize: 13, fontWeight: '600', color: c.text.muted },
   sexChip:    { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   sexTxt:     { fontSize: 13, fontWeight: '700', color: c.text.secondary },
