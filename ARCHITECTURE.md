@@ -176,8 +176,17 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   na zakładce Jedzenie (7 słupków deficyt/nadwyżka + ≈kg) ORAZ sekcja dashboardu
   `calorie-balance` (memo `calorieBalance`; StatCtx.healthDays ma teraz `burn?`). Deficyt
   liczony tylko z dni, w które faktycznie logowano jedzenie.
+- **Produkty liczone + makra:** `FoodProduct` ma kcal/100g + makra `protein100/carbs100/
+  fat100` (B/W/T) + `cat` (FOOD_SUBCATS) + `linkedName` (powiązanie z kupionym). Formularz
+  `app/food/product.tsx` (kategoria/nazwa/waga/kcal/makra/link), lista `app/food/products.tsx`
+  („Moje produkty"), wejścia = druga akcja FAB przy zakładce (Apple). **Kalorie edytuje się
+  TYLKO tu** — w `app/products.tsx` zostało samo matchowanie/scalanie + tagi/waga/kategoria.
+  MealItem niesie rozwiązane makra; presety/dania je sumują; zakładka pokazuje dzienne B/W/T.
+- **Zapotrzebowanie:** `bmrMifflin(kg,cm,age,sex)` (profil w `health_goals`: heightCm/ageYears/
+  sex, modal Profil na zakładce) → spalanie = BMR (spoczynek) + active (ruch z zegarka).
+  `foodBase.ts` = TYLKO warzywa+owoce (resztę user dodaje sam).
 - **TODO (etapy):** przeniesienie EDYCJI wagi z Zdrowia (Krok B — jeden zapisujący),
-  prognoza wagi z realnego jedzenia, makra (białko), kreator DANIA ze składników (PURÉE).
+  prognoza wagi z realnego jedzenia, podmiana/pominięcie składnika w presecie przy jedzeniu.
 
 ## 9. Pupil (kot) — patrz memory [[pet_blob_design]]
 
