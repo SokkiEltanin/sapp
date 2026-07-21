@@ -2788,6 +2788,11 @@ export default function DashboardScreen() {
     const dow = [0, 0, 0, 0, 0, 0, 0];            // Mon..Sun
     const subs: Record<string, number> = {};
     const subItems: Record<string, Record<string, number>> = {};   // subcat → product name → zł
+    const subSrc: Record<string, Record<string, { id: string; date: string }[]>> = {}; // subcat → product → receipts it came from
+    const pushSrc = (sc: string, nm: string, id: string, date: string) => {
+      const arr = ((subSrc[sc] ??= {})[nm] ??= []);
+      if (!arr.some(x => x.id === id)) arr.push({ id, date });
+    };
     // last 6 months food totals (oldest → newest)
     const monthKeys: string[] = [];
     for (let i = 5; i >= 0; i--) { const d = new Date(y, mo - i, 1); monthKeys.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`); }
@@ -2814,16 +2819,19 @@ export default function DashboardScreen() {
           subs[sc] = (subs[sc] ?? 0) + (it.price ?? 0);
           const nm = canonicalProductName(it.name ?? '', nameAliases) || (it.name ?? '?');
           (subItems[sc] ??= {})[nm] = (subItems[sc][nm] ?? 0) + (it.price ?? 0);
+          pushSrc(sc, nm, e.id, e.date ?? '');
         }
       } else if (e.category === 'groceries') {
         subs.inne = (subs.inne ?? 0) + amt;
-        (subItems.inne ??= {})[e.storeName || 'Zakupy (bez pozycji)'] = (subItems.inne['Zakupy (bez pozycji)'] ?? 0) + amt;
+        const nm = e.storeName || 'Zakupy (bez pozycji)';
+        (subItems.inne ??= {})[nm] = (subItems.inne[nm] ?? 0) + amt;
+        pushSrc('inne', nm, e.id, e.date ?? '');
       }
     }
     const weeksUsed = Math.ceil(new Date(y, mo + 1, 0).getDate() / 7);
     const subRows = Object.entries(subs).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
     const months = monthKeys.map(k => ({ label: MONTH_SHORT[parseInt(k.slice(5, 7), 10) - 1], total: monthSum[k] }));
-    return { total, prevTotal, weeks: weeks.slice(0, weeksUsed), dow, months, subRows, subItems, monthName: now.toLocaleDateString('pl-PL', { month: 'long' }) };
+    return { total, prevTotal, weeks: weeks.slice(0, weeksUsed), dow, months, subRows, subItems, subSrc, monthName: now.toLocaleDateString('pl-PL', { month: 'long' }) };
   }, [expenses, scope, nameAliases, nonFoodVer]);
 
   // Bilans kalorii — spalone (zegarek, healthDays.burn) vs zjedzone (dziennik jedzenia).
@@ -4941,13 +4949,22 @@ export default function DashboardScreen() {
                     <Text style={s.cardTitle}>{meta.label} · {foodBreakdown.monthName}</Text>
                     <TouchableOpacity onPress={() => setFoodCat(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
                   </View>
-                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'pozycja' : 'pozycji'} · stuknij nazwę, by poprawić w „Produktach"; <Text style={{ color: colors.accent.red }}>⦸</Text> = to nie jedzenie (wyłącz z liczenia).</Text>
+                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'pozycja' : 'pozycji'} · stuknij, by otworzyć paragon; <Text style={{ color: colors.accent.red }}>⦸</Text> = to nie jedzenie (wyłącz z liczenia).</Text>
                   <ScrollView style={{ maxHeight: 300, marginTop: spacing[2] }} showsVerticalScrollIndicator={false}>
-                    {items.map(([name, amt]) => (
+                    {items.map(([name, amt]) => {
+                      const srcs = (foodBreakdown.subSrc[foodCat!]?.[name] ?? []).slice().sort((a, b) => b.date.localeCompare(a.date));
+                      return (
                       <View key={name} style={s.foodItemRow}>
                         <TouchableOpacity style={s.foodItemTap} activeOpacity={0.7}
-                          onPress={() => { haptic.tap(); setFoodCat(null); router.navigate(`/products?q=${encodeURIComponent(name)}` as any); }}>
-                          <Text style={s.foodItemName} numberOfLines={1}>{name}</Text>
+                          onPress={() => {
+                            haptic.tap(); setFoodCat(null);
+                            if (srcs.length) router.navigate(`/expenses/${srcs[0].id}` as any);
+                            else router.navigate(`/products?q=${encodeURIComponent(name)}` as any);
+                          }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.foodItemName} numberOfLines={1}>{name}</Text>
+                            {srcs.length > 1 && <Text style={s.foodItemSub}>{srcs.length} paragony</Text>}
+                          </View>
                           <Text style={s.foodItemAmt}>{amt.toFixed(2)} zł</Text>
                           <ChevronRight size={13} color={colors.text.muted} />
                         </TouchableOpacity>
@@ -4955,7 +4972,8 @@ export default function DashboardScreen() {
                           <Ban size={15} color={colors.accent.red} />
                         </TouchableOpacity>
                       </View>
-                    ))}
+                      );
+                    })}
                     {items.length === 0 && <Text style={s.statSub}>Brak pozycji w tej kategorii (wykluczone lub bez pozycji).</Text>}
                   </ScrollView>
                   <TouchableOpacity style={[s.capsuleSeal, { backgroundColor: colors.accent.blue, marginTop: spacing[3] }]} activeOpacity={0.9}
@@ -5606,7 +5624,8 @@ const buildStyles = (c: any) => StyleSheet.create({
   foodSubAmt: { width: 50, textAlign: 'right', fontSize: 12, fontWeight: '800', color: c.text.primary },
   foodItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   foodItemTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 9 },
-  foodItemName: { flex: 1, fontSize: 13, fontWeight: '500', color: c.text.primary },
+  foodItemName: { fontSize: 13, fontWeight: '500', color: c.text.primary },
+  foodItemSub: { fontSize: 10, color: c.text.muted, marginTop: 1 },
   foodItemAmt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
   notFoodBtn: { paddingVertical: 8, paddingLeft: spacing[2] },
   // "Kolekcja sklepów"
