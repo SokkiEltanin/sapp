@@ -49,6 +49,7 @@ export default function FoodAdd() {
   const removePreset        = useFoodStore(st => st.removePreset);
   const bumpPreset          = useFoodStore(st => st.bumpPreset);
   const upsertProductByName = useFoodStore(st => st.upsertProductByName);
+  const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
   const [mealType, setMealType] = useState<MealType>(defaultMealType());
@@ -60,7 +61,8 @@ export default function FoodAdd() {
   const [sel, setSel]           = useState<Candidate | null>(null);
   const [unit, setUnit]         = useState<FoodUnit>('g');
   const [qty, setQty]           = useState(1);
-  const [gramsOverride, setGramsOverride] = useState('');
+  const [gramsOverride, setGramsOverride] = useState('');   // for unit 'g' this IS the grams (from the scale)
+  const [kcal100, setKcal100]             = useState('');   // kcal per 100 g used for the calc (prefilled if known)
 
   // manual entry
   const [manual, setManual] = useState(false);
@@ -142,38 +144,63 @@ export default function FoodAdd() {
 
   const openPicker = (cand: Candidate) => {
     haptic.tap();
-    const u = cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g';
+    // With a kitchen scale the grams path is the accurate one, so default to 'g' when
+    // the food is density-based (kcal/100g); otherwise its household unit.
+    const u: FoodUnit = cand.kcalPer100g != null ? 'g' : (cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g');
     setSel(cand); setUnit(u); setQty(1); setGramsOverride('');
+    setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
   };
 
+  const density = () => {
+    const k = parseFloat(kcal100.replace(',', '.'));
+    return k > 0 ? k : (sel?.kcalPer100g ?? 0);
+  };
   const pickerGrams = () => {
     if (!sel) return 0;
-    const ov = parseFloat(gramsOverride.replace(',', '.'));
-    if (ov > 0) return ov;
+    const g = parseFloat(gramsOverride.replace(',', '.'));   // the grams field ('g' unit) or exact-override
+    if (unit === 'g') return g > 0 ? g : 0;
+    if (g > 0) return g;
     return qty * unitToGrams(sel as any, unit);
   };
   const pickerKcal = () => {
     if (!sel) return 0;
-    return computeItemKcal({ kcalPer100g: sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion } as any, unit, qty, pickerGrams());
+    const d = density();
+    if (d > 0) return Math.round(pickerGrams() / 100 * d);
+    if (sel.kcalPerPortion != null) return Math.round(sel.kcalPerPortion * qty);   // fixed-kcal fallback
+    return 0;
   };
 
   const confirmPicker = () => {
     if (!sel) return;
     const grams = pickerGrams();
     const kcal = pickerKcal();
+    const k100 = parseFloat(kcal100.replace(',', '.'));
     let productId = sel.productId;
     if (!productId) {
       const p = upsertProductByName(sel.name, {
-        kcalPer100g: sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
+        kcalPer100g: k100 > 0 ? k100 : sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
         unitGrams: sel.unitGrams, defaultUnit: unit, fromBase: sel.source === 'base',
       });
       productId = p.id;
+    } else if (k100 > 0 && k100 !== sel.kcalPer100g) {
+      updateProduct(productId, { kcalPer100g: k100 });   // user set/corrected the density → remember it
     }
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
-    setItems(prev => [...prev, { name: sel.name, productId, qty, unit, grams: Math.round(grams), kcal }]);
+    setItems(prev => [...prev, { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal }]);
     setSel(null);
   };
+
+  // add a brand-new product straight from the search box → the grams+kcal/100g picker
+  const addNew = () => {
+    const name = query.trim();
+    if (!name) return;
+    openPicker({ name, source: 'base' });
+  };
+  const exactExists = useMemo(() => {
+    const nq = normalizeProductName(query);
+    return !!nq && candidates.some(x => normalizeProductName(x.name) === nq);
+  }, [query, candidates]);
 
   const confirmManual = () => {
     const name = mName.trim();
@@ -247,6 +274,7 @@ export default function FoodAdd() {
                   </Text>
                   <Text style={s.itemMeta} numberOfLines={1}>
                     {it.parts ? it.parts.map(p => p.name).join(', ')
+                      : it.unit === 'g' ? `${it.grams} g`
                       : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}
                   </Text>
                 </View>
@@ -276,6 +304,14 @@ export default function FoodAdd() {
         </TouchableOpacity>
 
         {!query && <Text style={s.sectionHint}>{products.length > 0 ? 'Ostatnie i baza' : 'Baza produktów'}</Text>}
+
+        {/* add a brand-new product straight from the search → grams + kcal/100g picker */}
+        {query.trim().length > 0 && !exactExists && (
+          <TouchableOpacity style={s.addNewRow} onPress={addNew}>
+            <Plus size={17} color={ACCENT} />
+            <Text style={s.addNewTxt}>Dodaj nowy: „{query.trim()}" (gramy + kcal/100g)</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={s.card}>
           {candidates.map((cand, i) => (
@@ -309,43 +345,62 @@ export default function FoodAdd() {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
               {sel && (
-                <>
+                <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
                   <Text style={s.sheetTitle}>{sel.name}</Text>
-                  {/* unit chips */}
+                  {/* unit chips — 'g' first for the scale workflow */}
                   <View style={s.unitWrap}>
                     {pickerUnits.map(u => {
                       const on = unit === u;
                       return (
                         <TouchableOpacity key={u} onPress={() => { haptic.tap(); setUnit(u); setGramsOverride(''); }}
                           style={[s.unitChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
-                          <Text style={[s.unitTxt, on && { color: ACCENT }]}>{unitLabel(u)}</Text>
+                          <Text style={[s.unitTxt, on && { color: ACCENT }]}>{u === 'g' ? 'gramy (waga)' : unitLabel(u)}</Text>
                         </TouchableOpacity>
                       );
                     })}
                   </View>
-                  {/* qty stepper */}
-                  <View style={s.qtyRow}>
-                    <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => Math.max(0.5, +(q - (q > 2 ? 1 : 0.5)).toFixed(1))); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
-                    <View style={s.qtyCenter}>
-                      <Text style={s.qtyVal}>{qty % 1 === 0 ? qty : qty.toFixed(1)}</Text>
-                      <Text style={s.qtyUnit}>{unitLabel(unit)}{qty !== 1 && unit !== 'g' ? '' : ''}</Text>
+
+                  {unit === 'g' ? (
+                    /* grams straight from the scale */
+                    <View style={s.fieldRow}>
+                      <Text style={s.fieldLabel}>Ile gramów</Text>
+                      <TextInput style={s.bigInput} value={gramsOverride} onChangeText={setGramsOverride}
+                        keyboardType="numeric" placeholder="np. 15" placeholderTextColor={c.text.muted} autoFocus />
+                      <Text style={s.fieldUnit}>g</Text>
                     </View>
-                    <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => +(q + (q >= 2 ? 1 : 0.5)).toFixed(1)); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
-                  </View>
-                  {/* optional exact grams */}
-                  {unit !== 'g' && (
-                    <View style={s.gramsRow}>
-                      <Text style={s.gramsLabel}>Dokładnie (g):</Text>
-                      <TextInput style={s.gramsInput} value={gramsOverride} onChangeText={setGramsOverride}
-                        keyboardType="numeric" placeholder={`${Math.round(pickerGrams())}`} placeholderTextColor={c.text.muted} />
-                      <Text style={s.gramsHint}>zapamięta „{unitLabel(unit)}"</Text>
-                    </View>
+                  ) : (
+                    <>
+                      <View style={s.qtyRow}>
+                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => Math.max(0.5, +(q - (q > 2 ? 1 : 0.5)).toFixed(1))); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
+                        <View style={s.qtyCenter}>
+                          <Text style={s.qtyVal}>{qty % 1 === 0 ? qty : qty.toFixed(1)}</Text>
+                          <Text style={s.qtyUnit}>{unitLabel(unit)}</Text>
+                        </View>
+                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => +(q + (q >= 2 ? 1 : 0.5)).toFixed(1)); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
+                      </View>
+                      <View style={s.fieldRow}>
+                        <Text style={s.fieldLabel}>Dokładnie (g)</Text>
+                        <TextInput style={s.smInput} value={gramsOverride} onChangeText={setGramsOverride}
+                          keyboardType="numeric" placeholder={`${Math.round(pickerGrams())}`} placeholderTextColor={c.text.muted} />
+                        <Text style={s.fieldHint}>zapamięta „{unitLabel(unit)}"</Text>
+                      </View>
+                    </>
                   )}
-                  <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>≈ {Math.round(pickerGrams())} g</Text></View>
-                  <TouchableOpacity style={[s.sheetAdd, { backgroundColor: ACCENT }]} onPress={confirmPicker}>
+
+                  {/* kcal per 100 g — prefilled if known, else fill from the packaging */}
+                  <View style={s.fieldRow}>
+                    <Text style={s.fieldLabel}>kcal / 100 g</Text>
+                    <TextInput style={s.smInput} value={kcal100} onChangeText={setKcal100}
+                      keyboardType="numeric" placeholder="np. 350" placeholderTextColor={c.text.muted} />
+                    <Text style={s.fieldHint}>{sel.kcalPer100g != null ? 'znane — możesz poprawić' : 'zapamięta się'}</Text>
+                  </View>
+
+                  <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {density() || '—'}/100g</Text></View>
+                  <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerKcal() > 0 || pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
+                    disabled={!(pickerGrams() > 0 && (density() > 0 || sel.kcalPerPortion != null))} onPress={confirmPicker}>
                     <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
                   </TouchableOpacity>
-                </>
+                </ScrollView>
               )}
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -484,10 +539,15 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   qtyVal:    { fontSize: 30, fontWeight: '800', color: c.text.primary },
   qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted },
 
-  gramsRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  gramsLabel: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },
-  gramsInput: { width: 70, height: 38, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 15, fontWeight: '700', color: c.text.primary },
-  gramsHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
+  fieldRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1] },
+  fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },
+  fieldUnit:  { fontSize: 14, fontWeight: '700', color: c.text.muted },
+  fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
+  bigInput:   { flex: 1, height: 48, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 22, fontWeight: '800', color: c.text.primary },
+  smInput:    { width: 76, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary },
+
+  addNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '55', borderStyle: 'dashed' },
+  addNewTxt: { fontSize: 13, fontWeight: '700', color: ACCENT, flex: 1 },
 
   sheetKcal:    { alignItems: 'center', gap: 1 },
   sheetKcalVal: { fontSize: 22, fontWeight: '800', color: ACCENT },
