@@ -40,7 +40,11 @@ export interface FoodProduct {
   name: string;
   kcalPer100g?: number;
   kcalPerPortion?: number;                       // fixed-kcal foods
-  protein100?: number;                           // g/100g — optional (Etap 3)
+  protein100?: number;                           // białko  g/100g
+  carbs100?: number;                             // węglowodany g/100g
+  fat100?: number;                               // tłuszcze g/100g
+  cat?: string;                                  // food category tag (FOOD_SUBCATS)
+  linkedName?: string;                           // purchased-product name this represents (manual link)
   unitGrams?: Partial<Record<FoodUnit, number>>; // learned per-product portion grams
   defaultUnit?: FoodUnit;
   fresh?: number;                                // ms of last purchase → suggest higher
@@ -61,8 +65,21 @@ export interface MealItem {
   unit: FoodUnit;
   grams: number;
   kcal: number;
+  protein?: number;     // resolved grams of macro for this line (if product carries them)
+  carbs?: number;
+  fat?: number;
   parts?: MealItem[];   // set for composite/preset lines
   presetId?: string;
+}
+
+// Resolved macro grams for a portion of a product (density × grams). 0s when unknown.
+export function computeItemMacros(p: FoodProduct | undefined, grams: number): { protein: number; carbs: number; fat: number } {
+  const g = grams / 100;
+  return {
+    protein: p?.protein100 != null ? Math.round(p.protein100 * g * 10) / 10 : 0,
+    carbs:   p?.carbs100   != null ? Math.round(p.carbs100 * g * 10) / 10 : 0,
+    fat:     p?.fat100     != null ? Math.round(p.fat100 * g * 10) / 10 : 0,
+  };
 }
 
 export type MealType = 'sniadanie' | 'obiad' | 'kolacja' | 'przekaska';

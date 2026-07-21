@@ -1,14 +1,14 @@
 import { useMemo, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale } from 'lucide-react-native';
+import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale, Settings, Check } from 'lucide-react-native';
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
 import { getHealthHistory } from '@/utils/healthHistory';
-import { getHealthGoals } from '@/utils/healthGoals';
+import { getHealthGoals, saveHealthGoals, bmrMifflin } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -45,8 +45,12 @@ export default function Food() {
   const setGoal    = useFoodStore(st => st.setGoal);
   const removeMeal = useFoodStore(st => st.removeMeal);
 
-  const [burn, setBurn] = useState(0);
-  const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned
+  const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned (watch)
+  const [activeToday, setActiveToday] = useState(0);   // ruch (spalone w ruchu, z zegarka)
+  const [watchBmr, setWatchBmr] = useState(0);         // BMR z zegarka (fallback)
+  const [profile, setProfile] = useState<{ heightCm: number; ageYears: number; sex: 'm' | 'f' | '' }>({ heightCm: 0, ageYears: 0, sex: '' });
+  const [profileModal, setProfileModal] = useState(false);
+  const [pfH, setPfH] = useState(''); const [pfA, setPfA] = useState(''); const [pfSex, setPfSex] = useState<'m' | 'f' | ''>('');
   const today = todayStr();
 
   const todayMeals = useMemo(
@@ -67,15 +71,40 @@ export default function Food() {
   const loadBody = useCallback(async () => {
     const [hist, goals] = await Promise.all([getHealthHistory(30), getHealthGoals()]);
     setWeightGoal(goals.weightGoal);
+    setProfile({ heightCm: goals.heightCm, ageYears: goals.ageYears, sex: goals.sex });
     const series: { d: string; w: number }[] = [];
     const bbd: Record<string, number> = {};
     for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); bbd[d] = hist[d].burn; }
     let last = series.length ? series[series.length - 1].w : 0;
     if (!(last > 0)) { const s = await AsyncStorage.getItem('health_last_weight'); const v = s ? parseFloat(s) : 0; if (v > 0) last = v; }
-    setWeightKg(last); setWeightSeries(series);
-    setBurnByDay(bbd); setBurn(bbd[today] ?? 0);
+    setWeightKg(last); setWeightSeries(series); setBurnByDay(bbd);
+    // today's watch active + BMR (for the resting+movement breakdown)
+    try {
+      const raw = await AsyncStorage.getItem(`health_${today}`);
+      const hc = raw ? JSON.parse(raw).hc : null;
+      setActiveToday(Number(hc?.activeCalories) || 0);
+      setWatchBmr(Number(hc?.bmr) || 0);
+    } catch {}
   }, [today]);
   useFocusEffect(useCallback(() => { loadBody(); }, [loadBody]));
+
+  // Spalanie = spoczynek (BMR z profilu, inaczej z zegarka) + ruch (z zegarka).
+  const burnModel = useMemo(() => {
+    const bmr = bmrMifflin(weightKg, profile.heightCm, profile.ageYears, profile.sex) || watchBmr || 0;
+    const active = activeToday;
+    const total = bmr > 0 ? bmr + active : (burnByDay[today] ?? 0);
+    return { bmr, active, total, fromProfile: bmrMifflin(weightKg, profile.heightCm, profile.ageYears, profile.sex) > 0 };
+  }, [weightKg, profile, activeToday, watchBmr, burnByDay, today]);
+  const burn = burnModel.total;
+  const profileComplete = burnModel.fromProfile;
+
+  const openProfile = () => { haptic.tap(); setPfH(profile.heightCm ? String(profile.heightCm) : ''); setPfA(profile.ageYears ? String(profile.ageYears) : ''); setPfSex(profile.sex); setProfileModal(true); };
+  const saveProfile = () => {
+    const h = parseInt(pfH, 10) || 0, a = parseInt(pfA, 10) || 0;
+    setProfile({ heightCm: h, ageYears: a, sex: pfSex });
+    saveHealthGoals({ heightCm: h, ageYears: a, sex: pfSex }).catch(() => {});
+    setProfileModal(false);
+  };
 
   // ── Bilans tygodnia: spalone (zegarek) vs zjedzone (dziennik) ──────────────
   const weekBalance = useMemo(() => {
@@ -87,13 +116,13 @@ export default function Food() {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
       const eatenD = meals.filter(m => m.date === key).reduce((s, m) => s + m.kcal, 0);
-      const burnD = burnByDay[key] ?? 0;
+      const burnD = key === today ? burn : (burnByDay[key] ?? 0);   // today uses the resting+movement model
       days.push({ key, label: dow[d.getDay()], eaten: eatenD, burn: burnD, balance: burnD - eatenD });
     }
     const logged = days.filter(x => x.eaten > 0);                 // only count days you actually logged food
     const cumDeficit = logged.reduce((s, x) => s + x.balance, 0);
     return { days, loggedCount: logged.length, cumDeficit, kg: cumDeficit / 7700 };
-  }, [meals, burnByDay]);
+  }, [meals, burnByDay, burn, today]);
 
   // simple ETA to weight goal from the logged trend over the window
   const weightEta = useMemo(() => {
@@ -161,9 +190,17 @@ export default function Food() {
             </View>
           </View>
 
-          {burn === 0 && (
-            <Text style={s.burnHint}>Brak spalania z zegarka — cel liczony od 2200 kcal. Wejdź w Zdrowie i odśwież, by wziąć realne spalanie.</Text>
-          )}
+          {/* Zapotrzebowanie: resting (BMR) + movement — tap to set the body profile */}
+          <TouchableOpacity style={s.needsRow} activeOpacity={0.7} onPress={openProfile}>
+            {profileComplete ? (
+              <Text style={s.needsTxt}>
+                Spoczynek <Text style={s.needsB}>{burnModel.bmr}</Text> + ruch <Text style={s.needsB}>{burnModel.active}</Text> = <Text style={s.needsB}>{burnModel.total}</Text> spalone
+              </Text>
+            ) : (
+              <Text style={[s.needsTxt, { color: ACCENT }]}>Ustaw profil (wzrost, wiek, płeć) → policzę Twoje zapotrzebowanie</Text>
+            )}
+            <Settings size={13} color={colors.text.muted} />
+          </TouchableOpacity>
 
           {/* Goal mode */}
           <View style={s.goalRow}>
@@ -272,6 +309,49 @@ export default function Food() {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Profil ciała → BMR (zapotrzebowanie spoczynkowe) */}
+      <Modal visible={profileModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setProfileModal(false)}>
+        <TouchableOpacity style={s.pfOverlay} activeOpacity={1} onPress={() => setProfileModal(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <TouchableOpacity activeOpacity={1} style={[s.card, s.pfSheet]} onPress={() => {}}>
+              <Text style={s.pfTitle}>Twój profil</Text>
+              <Text style={s.pfSub}>Wzrost, wiek i płeć → policzę spalanie spoczynkowe (BMR). Waga bierze się z karty Waga / zegarka; ruch z zegarka.</Text>
+              <View style={s.pfRow}>
+                <Text style={s.pfLabel}>Wzrost</Text>
+                <TextInput style={s.pfInput} value={pfH} onChangeText={setPfH} keyboardType="numeric" placeholder="np. 178" placeholderTextColor={c.text.muted} />
+                <Text style={s.pfUnit}>cm</Text>
+              </View>
+              <View style={s.pfRow}>
+                <Text style={s.pfLabel}>Wiek</Text>
+                <TextInput style={s.pfInput} value={pfA} onChangeText={setPfA} keyboardType="numeric" placeholder="np. 30" placeholderTextColor={c.text.muted} />
+                <Text style={s.pfUnit}>lat</Text>
+              </View>
+              <View style={s.pfRow}>
+                <Text style={s.pfLabel}>Płeć</Text>
+                {([['m', 'Mężczyzna'], ['f', 'Kobieta']] as const).map(([v, lbl]) => (
+                  <TouchableOpacity key={v} onPress={() => { haptic.tap(); setPfSex(v); }}
+                    style={[s.sexChip, pfSex === v && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                    <Text style={[s.sexTxt, pfSex === v && { color: ACCENT }]}>{lbl}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {(() => {
+                const h = parseInt(pfH, 10) || 0, a = parseInt(pfA, 10) || 0;
+                const bmr = bmrMifflin(weightKg, h, a, pfSex);
+                return bmr > 0
+                  ? <Text style={s.pfBmr}>BMR ≈ {bmr} kcal/dzień (spoczynek, przy {weightKg.toFixed(1)} kg)</Text>
+                  : <Text style={s.pfSub}>{weightKg > 0 ? 'Uzupełnij wzrost, wiek i płeć.' : 'Najpierw ustaw wagę (karta Waga / zegarek).'}</Text>;
+              })()}
+              <TouchableOpacity style={[s.sheetSave, { backgroundColor: (parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex) ? ACCENT : c.fill.subtle }]}
+                disabled={!(parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex)} onPress={saveProfile}>
+                <Check size={17} color={(parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex) ? '#1A1206' : c.text.muted} />
+                <Text style={[s.sheetSaveTxt, { color: (parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex) ? '#1A1206' : c.text.muted }]}>Zapisz profil</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -295,7 +375,23 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   heroStatLabel: { fontSize: 11, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   heroDivider: { width: 1, height: 30, backgroundColor: c.border.subtle },
 
-  burnHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', lineHeight: 15 },
+  needsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 2 },
+  needsTxt: { fontSize: 12, color: c.text.secondary, textAlign: 'center' },
+  needsB:   { fontWeight: '800', color: c.text.primary },
+
+  pfOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing[4] },
+  pfSheet:    { gap: spacing[3] },
+  pfTitle:    { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  pfSub:      { fontSize: 12, color: c.text.muted, lineHeight: 16 },
+  pfRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  pfLabel:    { fontSize: 13, fontWeight: '700', color: c.text.secondary, width: 64 },
+  pfInput:    { width: 90, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 17, fontWeight: '700', color: c.text.primary },
+  pfUnit:     { fontSize: 13, fontWeight: '600', color: c.text.muted },
+  sexChip:    { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
+  sexTxt:     { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  pfBmr:      { fontSize: 13, fontWeight: '800', color: '#F59E0B' },
+  sheetSave:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: radius.full, marginTop: 2 },
+  sheetSaveTxt: { fontSize: 14, fontWeight: '800' },
 
   goalRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
   goalChip:    { paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
