@@ -11,6 +11,7 @@ import { ChevronLeft, Search, Flame, X } from 'lucide-react-native';
 import { expensesService } from '@/services/expensesService';
 import { Expense } from '@/types';
 import { countsForConsumption } from '@/store/statsScope';
+import { useFoodStore } from '@/store/foodStore';
 import {
   canonicalProductName, normalizeProductName, loadNameAliases,
   loadKcalMemory, saveKcalMemory, kcalFor, KcalMemory,
@@ -168,7 +169,15 @@ export default function ProductsScreen() {
       if (newName.toLowerCase() !== editing.name.toLowerCase()) {
         await saveNameAliases([{ name: editing.name }], { 0: newName });
       }
-      if (!isNaN(kcal) && kcal > 0) await saveKcalMemory([{ name: newName, kcal }]);
+      if (!isNaN(kcal) && kcal > 0) {
+        await saveKcalMemory([{ name: newName, kcal }]);
+        // Promote into the calorie logger's counted DB (shows as "moje" when logging).
+        // A set weight seeds its default szt portion. Never happens without a kcal — so
+        // only products you deliberately price enter counting ("tylko user dodaje").
+        const seed: any = { kcalPer100g: kcal };
+        if (!isNaN(wG) && wG > 0) seed.unitGrams = { szt: Math.round(wG) };
+        useFoodStore.getState().upsertProductByName(newName, seed);
+      }
       if (!isNaN(wG) && wG > 0) await saveWeightMemory([{ name: newName, kg: wG / 1000 }]);
       await saveCustomProductsToMemory([{ name: newName, category: editCat }]);
       if (tags.length > 0) await saveCustomTagsToMemory([{ name: newName, tags }]);
@@ -253,6 +262,7 @@ export default function ProductsScreen() {
 
               <Text style={s.sheetLabel}>Kalorie na 100 g</Text>
               <TextInput value={editKcal} onChangeText={setEditKcal} keyboardType="number-pad" placeholder="np. 350" placeholderTextColor={c.text.muted} style={s.fieldInput} />
+              <Text style={s.kcalHint}>Ustawienie kcal doda produkt do liczenia kalorii (będzie „moje" w zakładce Jedzenie).</Text>
 
               <Text style={s.sheetLabel}>Waga domyślna (g/szt, opcjonalnie)</Text>
               <TextInput value={editWeightG} onChangeText={setEditWeightG} keyboardType="number-pad" placeholder="np. 250" placeholderTextColor={c.text.muted} style={s.fieldInput} />
@@ -383,6 +393,7 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   sheetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
   sheetTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: c.text.primary },
   sheetLabel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing[2] },
+  kcalHint: { fontSize: 11, color: '#FB923C', marginTop: 4, lineHeight: 15 },
   sheetInput: { backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 12, fontSize: 18, fontWeight: '700', color: c.text.primary, textAlign: 'center' },
   sheetHint: { fontSize: 10.5, color: c.text.muted, lineHeight: 14 },
   fieldInput: { backgroundColor: c.bg.elevated, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 14, color: c.text.primary, marginTop: 4 },
