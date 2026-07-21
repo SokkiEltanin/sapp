@@ -5,7 +5,7 @@ import {
   Modal, Pressable, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Search, Flame, X } from 'lucide-react-native';
 
 import { expensesService } from '@/services/expensesService';
@@ -40,6 +40,10 @@ export default function ProductsScreen() {
   const [kcalMem, setKcalMem]   = useState<KcalMemory>({});
   const [weightMem, setWeightMem] = useState<WeightMemory>({});
   const [query, setQuery]       = useState('');
+  // Prefill search when arrived via /products?q=… (e.g. tapping a product in the
+  // dashboard food-breakdown drill-down → jump straight to fixing it).
+  const params = useLocalSearchParams<{ q?: string }>();
+  useEffect(() => { if (typeof params.q === 'string' && params.q) setQuery(params.q); }, [params.q]);
   const [editing, setEditing]   = useState<Product | null>(null);
   const [editName, setEditName] = useState('');
   const [editKcal, setEditKcal] = useState('');

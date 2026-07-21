@@ -4876,19 +4876,21 @@ export default function DashboardScreen() {
                     <Text style={s.cardTitle}>{meta.label} · {foodBreakdown.monthName}</Text>
                     <TouchableOpacity onPress={() => setFoodCat(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
                   </View>
-                  <Text style={[s.statSub, { marginTop: 2 }]}>Coś tu nie pasuje (albo brakuje)? Popraw w „Produktach" — kategoria/tag zapamiętają się na przyszłość.</Text>
+                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'produkt' : 'pozycji'} · stuknij, by poprawić kategorię/kcal w „Produktach".</Text>
                   <ScrollView style={{ maxHeight: 300, marginTop: spacing[2] }} showsVerticalScrollIndicator={false}>
                     {items.map(([name, amt]) => (
-                      <View key={name} style={s.foodItemRow}>
+                      <TouchableOpacity key={name} style={s.foodItemRow} activeOpacity={0.7}
+                        onPress={() => { haptic.tap(); setFoodCat(null); router.navigate(`/products?q=${encodeURIComponent(name)}` as any); }}>
                         <Text style={s.foodItemName} numberOfLines={1}>{name}</Text>
                         <Text style={s.foodItemAmt}>{amt.toFixed(2)} zł</Text>
-                      </View>
+                        <ChevronRight size={13} color={colors.text.muted} />
+                      </TouchableOpacity>
                     ))}
                     {items.length === 0 && <Text style={s.statSub}>Brak wyszczególnionych produktów (zakupy bez pozycji).</Text>}
                   </ScrollView>
                   <TouchableOpacity style={[s.capsuleSeal, { backgroundColor: colors.accent.blue, marginTop: spacing[3] }]} activeOpacity={0.9}
                     onPress={() => { haptic.tap(); setFoodCat(null); router.navigate('/products' as any); }}>
-                    <Text style={s.capsuleSealTxt}>Popraw w Produktach</Text>
+                    <Text style={s.capsuleSealTxt}>Otwórz Produkty</Text>
                   </TouchableOpacity>
                 </>
               );
