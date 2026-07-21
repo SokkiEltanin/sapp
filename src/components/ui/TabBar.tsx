@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, ScanLine, Settings,
   Briefcase, Flame, FileText, CalendarPlus, TrendingUp, TrendingDown, CheckSquare,
-  Utensils, UtensilsCrossed, Apple,
+  Utensils, UtensilsCrossed, Apple, Smile,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -80,6 +80,7 @@ export default function TabBar({ currentIndex }: Props) {
   const ACTIONS: { icon: any; color: string; onPress: () => void }[] =
     currentIndex === 0 ? [
       { icon: Briefcase,   color: '#2AC68F',            onPress: () => openWorkPanel() },
+      { icon: Smile,       color: '#F472B6',            onPress: () => router.push('/mood' as any) },
       { icon: Flame,       color: '#F97316',            onPress: () => router.push('/habits' as any) },
       { icon: Settings,    color: '#8A93A8',            onPress: () => router.push('/settings' as any) },
     ] : currentIndex === 1 ? [

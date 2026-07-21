@@ -2216,11 +2216,12 @@ export default function DashboardScreen() {
     const ymCur = months[5].ym;
     let workedH = 0, plannedH = 0;
     const dayset = new Set<string>();
+    const planset = new Set<string>();   // distinct FUTURE work days left this month
     for (const e of allEvents) {
       if (!isWork(e) || (e.date ?? '').slice(0, 7) !== ymCur) continue;
       const h = dur(e); const day = (e.date ?? '').slice(0, 10);
       if (day <= today) { workedH += h; if (h > 0) dayset.add(day); }
-      else plannedH += h;
+      else { plannedH += h; if (h > 0) planset.add(day); }
     }
     const currentHours = months[5].hours;
     const projectedH = workedH + plannedH;
@@ -2248,6 +2249,7 @@ export default function DashboardScreen() {
       months, currentHours, rate,
       currentEarnings: Math.round(currentHours * rate),
       workedH, plannedH, workedEarnings: Math.round(workedH * rate),
+      plannedDays: planset.size,
       projectedH, projectedEarnings: Math.round(projectedH * rate),
       daysWorked: dayset.size,
       avgPerDay: dayset.size > 0 ? workedH / dayset.size : 0,
@@ -4491,10 +4493,41 @@ export default function DashboardScreen() {
                     <Text style={s.wpBig}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
                     <Text style={s.wpSub}>
                       przepracowane w tym miesiącu
-                      {wm.plannedH > 0 ? ` · +${wm.plannedH.toFixed(0)} h w planie` : ''}
                       {hasRate ? `  ·  ≈ ${wm.workedEarnings.toLocaleString('pl-PL')} zł do teraz` : ''}
                     </Text>
                   </View>
+
+                  {/* ── WAŻNE NA GÓRZE: ile zostało do przepracowania ── */}
+                  {(wm.plannedDays > 0 || wm.plannedH > 0) && (
+                    <View style={s.wpLeftCard}>
+                      <View style={s.wpLeftItem}>
+                        <Text style={s.wpLeftVal}>{wm.plannedDays}</Text>
+                        <Text style={s.wpLeftLbl}>dni zostało</Text>
+                      </View>
+                      <View style={s.wpLeftDivider} />
+                      <View style={s.wpLeftItem}>
+                        <Text style={s.wpLeftVal}>{wm.plannedH.toFixed(0)}<Text style={s.wpLeftUnit}> h</Text></Text>
+                        <Text style={s.wpLeftLbl}>do przepracowania</Text>
+                      </View>
+                      {hasRate && (
+                        <>
+                          <View style={s.wpLeftDivider} />
+                          <View style={s.wpLeftItem}>
+                            <Text style={[s.wpLeftVal, { color: accentColor }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
+                            <Text style={s.wpLeftLbl}>zł prognoza mies.</Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  )}
+
+                  {/* ── Średnie z przeszłości ── */}
+                  {wm.avgHours > 0 && (
+                    <Text style={s.wpAvgLine}>
+                      Średnio <Text style={s.wpAvgB}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={s.wpAvgB}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
+                      {wm.projectedH > 0 ? <> · w tym mies. plan <Text style={s.wpAvgB}>{wm.projectedH.toFixed(0)} h</Text></> : null}
+                    </Text>
+                  )}
 
                   {/* ── Stawka: JEDNA liczba, ta sama co live earnings ── */}
                   {hasRate ? (() => {
@@ -5537,6 +5570,14 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpBig: { fontSize: 38, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
   wpUnit: { fontSize: 18, fontWeight: '700', color: c.text.muted },
   wpSub: { fontSize: 12.5, color: c.text.secondary, marginTop: 1 },
+  wpLeftCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3], backgroundColor: c.fill.subtle, borderRadius: radius.lg, paddingVertical: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
+  wpLeftItem: { flex: 1, alignItems: 'center', gap: 2 },
+  wpLeftVal: { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  wpLeftUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted },
+  wpLeftLbl: { fontSize: 10.5, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
+  wpLeftDivider: { width: 1, height: 32, backgroundColor: c.border.default },
+  wpAvgLine: { fontSize: 12, color: c.text.secondary, marginTop: spacing[2], lineHeight: 17 },
+  wpAvgB: { fontWeight: '800', color: c.text.primary },
   wpRateCard: { marginTop: spacing[3], backgroundColor: c.fill.subtle, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: '#FBBF2433' },
   wpRateVal: { fontSize: 26, fontWeight: '900', color: '#FBBF24', letterSpacing: -0.6 },
   wpRateUnit: { fontSize: 15, fontWeight: '700', color: '#FBBF24AA' },
