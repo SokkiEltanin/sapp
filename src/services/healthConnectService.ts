@@ -328,6 +328,9 @@ export interface HealthDayPoint {
   steps: number;
   sleepMinutes: number;
   weightKg: number | null;
+  activeCalories: number;  // kcal spalone w ruchu tego dnia
+  totalCalories: number;   // kcal spalone łącznie (jeśli zegarek podaje)
+  bmr: number;             // kcal/dzień (spoczynek) — 0 gdy brak
 }
 
 function localKey(d: Date): string {
@@ -346,7 +349,7 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
   const byDay = new Map<string, HealthDayPoint>();
   for (let i = 0; i < days; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
-    const p: HealthDayPoint = { date: localKey(d), steps: 0, sleepMinutes: 0, weightKg: null };
+    const p: HealthDayPoint = { date: localKey(d), steps: 0, sleepMinutes: 0, weightKg: null, activeCalories: 0, totalCalories: 0, bmr: 0 };
     byDay.set(p.date, p); out.push(p);
   }
 
@@ -382,6 +385,30 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
       if (p && kg != null) p.weightKg = Math.round(kg * 10) / 10;   // last reading of the day wins
     }
   } catch {}
+
+  // Calories per day (so the food tab / calorie widgets have the watch burn EVERY day,
+  // not only when Zdrowie is opened). Active + total summed by their start day; BMR is
+  // a daily rate, last reading of the day wins.
+  try {
+    for (const r of await read(hc, 'ActiveCaloriesBurned', filter)) {
+      const p = byDay.get(localKey(new Date(r.startTime)));
+      if (p) p.activeCalories += r.energy?.inKilocalories ?? 0;
+    }
+  } catch {}
+  try {
+    for (const r of await read(hc, 'TotalCaloriesBurned', filter)) {
+      const p = byDay.get(localKey(new Date(r.startTime)));
+      if (p) p.totalCalories += r.energy?.inKilocalories ?? 0;
+    }
+  } catch {}
+  try {
+    for (const r of await read(hc, 'BasalMetabolicRate', filter)) {
+      const p = byDay.get(localKey(new Date(r.time ?? r.startTime)));
+      const v = r.basalMetabolicRate?.inKilocaloriesPerDay ?? 0;
+      if (p && v > 0) p.bmr = Math.round(v);
+    }
+  } catch {}
+  for (const p of out) { p.activeCalories = Math.round(p.activeCalories); p.totalCalories = Math.round(p.totalCalories); }
 
   return out;
 }

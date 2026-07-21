@@ -121,7 +121,12 @@ export default function Food() {
       setWatchBmr(Number(hc?.bmr) || 0);
     } catch {}
   }, [today]);
-  useFocusEffect(useCallback(() => { loadBody(); }, [loadBody]));
+  useFocusEffect(useCallback(() => {
+    loadBody();
+    // Pull fresh watch data (steps/sleep/calories) so burn shows even without opening
+    // Zdrowie; throttled inside autoSyncHealth. Reload the cache if it wrote anything.
+    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(30)).then(n => { if (n > 0) loadBody(); }).catch(() => {});
+  }, [loadBody]));
 
   // Spalanie = spoczynek (BMR z profilu, inaczej z zegarka) + ruch (z zegarka).
   const burnModel = useMemo(() => {
