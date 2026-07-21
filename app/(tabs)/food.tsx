@@ -164,6 +164,31 @@ export default function Food() {
     return { days, loggedCount: logged.length, cumDeficit, kg: cumDeficit / 7700 };
   }, [meals, burnByDay, burn, today]);
 
+  // 30-day averages — "ile ze średnich": ile spalasz / jesz / deficyt na dzień, i ile
+  // POWINIENEŚ jeść przy swoim celu (target liczony od średniego spalania).
+  const avgStats = useMemo(() => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    const now = new Date();
+    let burnSum = 0, burnDays = 0, eatSum = 0, eatDays = 0, balSum = 0, balDays = 0;
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      const b = key === today ? burn : (burnByDay[key] ?? 0);
+      const eatenD = meals.filter(m => m.date === key).reduce((s, m) => s + m.kcal, 0);
+      if (b > 0) { burnSum += b; burnDays++; }
+      if (eatenD > 0) { eatSum += eatenD; eatDays++; }
+      if (b > 0 && eatenD > 0) { balSum += b - eatenD; balDays++; }
+    }
+    const avgBurn = burnDays ? Math.round(burnSum / burnDays) : 0;
+    return {
+      avgBurn,
+      avgEaten: eatDays ? Math.round(eatSum / eatDays) : 0,
+      avgBal: balDays ? Math.round(balSum / balDays) : 0,
+      recommended: avgBurn > 0 ? targetIntake(avgBurn, goalMode, manualGoal) : 0,
+      eatDays,
+    };
+  }, [meals, burnByDay, burn, today, goalMode, manualGoal]);
+
   // simple ETA to weight goal from the logged trend over the window
   const weightEta = useMemo(() => {
     if (!(weightGoal > 0) || weightSeries.length < 2 || !(weightKg > 0)) return null;
@@ -315,6 +340,26 @@ export default function Food() {
               {weekBalance.cumDeficit >= 0
                 ? `Deficyt przez ${weekBalance.loggedCount} ${weekBalance.loggedCount === 1 ? 'dzień' : 'dni'} ≈ −${Math.abs(weekBalance.kg).toFixed(2)} kg · zielony = deficyt`
                 : `Nadwyżka przez ${weekBalance.loggedCount} ${weekBalance.loggedCount === 1 ? 'dzień' : 'dni'} ≈ +${Math.abs(weekBalance.kg).toFixed(2)} kg · czerwony = nadwyżka`}
+            </Text>
+          </View>
+        )}
+
+        {/* ── Średnie (30 dni) + ile powinieneś jeść ─────────────────── */}
+        {isToday && avgStats.avgBurn > 0 && (
+          <View style={[s.card, { gap: spacing[2] }]}>
+            <Text style={s.balTitle}>Średnie (30 dni)</Text>
+            <View style={s.avgRow}>
+              <View style={s.avgItem}><Text style={s.avgVal}>{avgStats.avgBurn.toLocaleString('pl-PL')}</Text><Text style={s.avgLbl}>spalasz/dzień</Text></View>
+              <View style={s.avgDivider} />
+              <View style={s.avgItem}><Text style={s.avgVal}>{avgStats.avgEaten > 0 ? avgStats.avgEaten.toLocaleString('pl-PL') : '—'}</Text><Text style={s.avgLbl}>jesz/dzień</Text></View>
+              <View style={s.avgDivider} />
+              <View style={s.avgItem}>
+                <Text style={[s.avgVal, { color: avgStats.avgBal >= 0 ? colors.accent.green : colors.accent.red }]}>{avgStats.eatDays > 0 ? `${avgStats.avgBal >= 0 ? '−' : '+'}${Math.abs(avgStats.avgBal).toLocaleString('pl-PL')}` : '—'}</Text>
+                <Text style={s.avgLbl}>{avgStats.avgBal >= 0 ? 'deficyt/dzień' : 'nadwyżka/dzień'}</Text>
+              </View>
+            </View>
+            <Text style={s.avgRec}>
+              {goalMode === 'cut' ? 'Aby chudnąć (−0,5 kg/tydz.)' : goalMode === 'bulk' ? 'Na masę' : 'Aby utrzymać wagę'}: jedz <Text style={s.avgRecB}>~{avgStats.recommended.toLocaleString('pl-PL')} kcal/dzień</Text> (od średniego spalania {avgStats.avgBurn.toLocaleString('pl-PL')})
             </Text>
           </View>
         )}
@@ -541,6 +586,14 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   balTrack:   { width: '100%', height: 44, borderRadius: 3, backgroundColor: c.fill.subtle, justifyContent: 'flex-end', overflow: 'hidden' },
   balLbl:     { fontSize: 10, fontWeight: '700', color: c.text.muted },
   balNote:    { fontSize: 11.5, color: c.text.muted },
+
+  avgRow:     { flexDirection: 'row', alignItems: 'center' },
+  avgItem:    { flex: 1, alignItems: 'center', gap: 2 },
+  avgVal:     { fontSize: 18, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  avgLbl:     { fontSize: 10, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
+  avgDivider: { width: 1, height: 28, backgroundColor: c.border.default },
+  avgRec:     { fontSize: 12, color: c.text.secondary, lineHeight: 17, marginTop: 2 },
+  avgRecB:    { fontWeight: '800', color: ACCENT },
 
   empty:      { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[5] },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
