@@ -90,7 +90,7 @@ export interface StatCtx {
   habitsDone: number;
   nameAliases: Record<string, string>;
   weightMemory: WeightMemory;
-  healthDays: Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>; // date → watch metrics
+  healthDays: Record<string, { steps: number; sleepMinutes: number; weightKg: number | null; burn?: number }>; // date → watch metrics
   paycheckByMonth?: Record<string, number>; // YYYY-MM (target month) → actual [JD] paycheck total
 }
 

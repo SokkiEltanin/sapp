@@ -172,8 +172,12 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   jednostki+ilości z podglądem kcal + override gram który UCZY porcję; „Wpisz ręcznie" =
   produkt kcalPerPortion który się zapamiętuje). Reużywa `productMemory` (KcalMemory) i
   `normalizeProductName` do tożsamości.
-- **TODO (etapy):** kreator kanapki/dania + presety (Etap 2), przeniesienie Waga+Woda z
-  Zdrowia (Etap 2/3), porządne spalanie + widgety OUT-vs-IN + prognoza wagi (Etap 3).
+- **Bilans kalorii:** `getHealthHistory` niesie `burn` per dzień → karta „Bilans tygodnia"
+  na zakładce Jedzenie (7 słupków deficyt/nadwyżka + ≈kg) ORAZ sekcja dashboardu
+  `calorie-balance` (memo `calorieBalance`; StatCtx.healthDays ma teraz `burn?`). Deficyt
+  liczony tylko z dni, w które faktycznie logowano jedzenie.
+- **TODO (etapy):** przeniesienie EDYCJI wagi z Zdrowia (Krok B — jeden zapisujący),
+  prognoza wagi z realnego jedzenia, makra (białko), kreator DANIA ze składników (PURÉE).
 
 ## 9. Pupil (kot) — patrz memory [[pet_blob_design]]
 
