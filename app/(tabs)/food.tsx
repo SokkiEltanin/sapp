@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale } from 'lucide-react-native';
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
-import { dailyBurnFromHc, getHealthHistory } from '@/utils/healthHistory';
+import { getHealthHistory } from '@/utils/healthHistory';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import { spacing, radius, colors } from '@/theme';
@@ -46,6 +46,7 @@ export default function Food() {
   const removeMeal = useFoodStore(st => st.removeMeal);
 
   const [burn, setBurn] = useState(0);
+  const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned
   const today = todayStr();
 
   const todayMeals = useMemo(
@@ -53,16 +54,6 @@ export default function Food() {
     [meals, today],
   );
   const eaten = useMemo(() => todayMeals.reduce((sum, m) => sum + m.kcal, 0), [todayMeals]);
-
-  // Burn comes from the watch cache the Zdrowie screen / autoSync write.
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    AsyncStorage.getItem(`health_${today}`).then(raw => {
-      if (!active || !raw) return;
-      try { setBurn(dailyBurnFromHc(JSON.parse(raw).hc)); } catch {}
-    });
-    return () => { active = false; };
-  }, [today]));
 
   // ── Woda — single source = the "Woda" habit (shared with Zdrowie/Nawyki/pet) ──
   const water = useWaterTracker();
@@ -77,12 +68,32 @@ export default function Food() {
     const [hist, goals] = await Promise.all([getHealthHistory(30), getHealthGoals()]);
     setWeightGoal(goals.weightGoal);
     const series: { d: string; w: number }[] = [];
-    for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); }
+    const bbd: Record<string, number> = {};
+    for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); bbd[d] = hist[d].burn; }
     let last = series.length ? series[series.length - 1].w : 0;
     if (!(last > 0)) { const s = await AsyncStorage.getItem('health_last_weight'); const v = s ? parseFloat(s) : 0; if (v > 0) last = v; }
     setWeightKg(last); setWeightSeries(series);
-  }, []);
+    setBurnByDay(bbd); setBurn(bbd[today] ?? 0);
+  }, [today]);
   useFocusEffect(useCallback(() => { loadBody(); }, [loadBody]));
+
+  // ── Bilans tygodnia: spalone (zegarek) vs zjedzone (dziennik) ──────────────
+  const weekBalance = useMemo(() => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    const dow = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So'];
+    const now = new Date();
+    const days: { key: string; label: string; eaten: number; burn: number; balance: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const key = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      const eatenD = meals.filter(m => m.date === key).reduce((s, m) => s + m.kcal, 0);
+      const burnD = burnByDay[key] ?? 0;
+      days.push({ key, label: dow[d.getDay()], eaten: eatenD, burn: burnD, balance: burnD - eatenD });
+    }
+    const logged = days.filter(x => x.eaten > 0);                 // only count days you actually logged food
+    const cumDeficit = logged.reduce((s, x) => s + x.balance, 0);
+    return { days, loggedCount: logged.length, cumDeficit, kg: cumDeficit / 7700 };
+  }, [meals, burnByDay]);
 
   // simple ETA to weight goal from the logged trend over the window
   const weightEta = useMemo(() => {
@@ -168,6 +179,36 @@ export default function Food() {
             })}
           </View>
         </View>
+
+        {/* ── Bilans tygodnia: spalone vs zjedzone ──────────────────── */}
+        {weekBalance.loggedCount > 0 && (
+          <View style={[s.card, { gap: spacing[2] }]}>
+            <View style={s.balRow}>
+              <Text style={s.balTitle}>Bilans tygodnia</Text>
+              <Text style={[s.balSummary, { color: weekBalance.cumDeficit >= 0 ? colors.accent.green : colors.accent.red }]}>
+                {weekBalance.cumDeficit >= 0 ? '−' : '+'}{Math.abs(Math.round(weekBalance.cumDeficit)).toLocaleString('pl-PL')} kcal
+              </Text>
+            </View>
+            <View style={s.balBars}>
+              {weekBalance.days.map(d => {
+                const has = d.eaten > 0;
+                const mag = Math.min(1, Math.abs(d.balance) / 1500);
+                const col = !has ? c.fill.subtle : d.balance >= 0 ? colors.accent.green : colors.accent.red;
+                return (
+                  <View key={d.key} style={s.balCol}>
+                    <View style={s.balTrack}><View style={{ width: '100%', height: `${has ? Math.max(6, mag * 100) : 0}%`, backgroundColor: col, borderRadius: 3 }} /></View>
+                    <Text style={s.balLbl}>{d.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={s.balNote}>
+              {weekBalance.cumDeficit >= 0
+                ? `Deficyt przez ${weekBalance.loggedCount} ${weekBalance.loggedCount === 1 ? 'dzień' : 'dni'} ≈ −${Math.abs(weekBalance.kg).toFixed(2)} kg · zielony = deficyt`
+                : `Nadwyżka przez ${weekBalance.loggedCount} ${weekBalance.loggedCount === 1 ? 'dzień' : 'dni'} ≈ +${Math.abs(weekBalance.kg).toFixed(2)} kg · czerwony = nadwyżka`}
+            </Text>
+          </View>
+        )}
 
         {/* ── Woda + Waga (shared source with Zdrowie) ──────────────── */}
         <View style={s.trackRow}>
@@ -269,6 +310,15 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   trackBtns:  { flexDirection: 'row', gap: spacing[2] },
   trackBtn:   { flex: 1, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   trackGoal:  { fontSize: 11.5, fontWeight: '700', color: c.text.muted, marginTop: 1 },
+
+  balRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  balTitle:   { fontSize: 14, fontWeight: '800', color: c.text.primary },
+  balSummary: { fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  balBars:    { flexDirection: 'row', gap: spacing[2], height: 56, alignItems: 'flex-end', marginTop: 2 },
+  balCol:     { flex: 1, alignItems: 'center', gap: 4 },
+  balTrack:   { width: '100%', height: 44, borderRadius: 3, backgroundColor: c.fill.subtle, justifyContent: 'flex-end', overflow: 'hidden' },
+  balLbl:     { fontSize: 10, fontWeight: '700', color: c.text.muted },
+  balNote:    { fontSize: 11.5, color: c.text.muted },
 
   empty:      { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[5] },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
