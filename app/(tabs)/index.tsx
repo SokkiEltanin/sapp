@@ -825,6 +825,7 @@ export default function DashboardScreen() {
   const [capsuleText, setCapsuleText] = useState('');
   const [capsuleMonths, setCapsuleMonths] = useState(6);
   const [foodView, setFoodView] = useState<'week' | 'day' | 'month'>('week'); // food widget: tygodnie/dni/miesiące
+  const [foodMonthSel, setFoodMonthSel] = useState<string | null>(null);       // browsed month (null = bieżący)
   const [foodCat, setFoodCat] = useState<string | null>(null); // tapped food subcategory → products modal
   const [nonFoodVer, setNonFoodVer] = useState(0);             // bumps when the "nie jedzenie" list changes
   useEffect(() => { loadNonFood().then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
@@ -2783,58 +2784,65 @@ export default function DashboardScreen() {
     const now = new Date();
     const y = now.getFullYear(), mo = now.getMonth();
     const mk = `${y}-${pad(mo + 1)}`;
-    const pm = new Date(y, mo - 1, 1);
-    const prevMk = `${pm.getFullYear()}-${pad(pm.getMonth() + 1)}`;
-    let total = 0, prevTotal = 0;
-    const weeks = [0, 0, 0, 0, 0];
-    const dow = [0, 0, 0, 0, 0, 0, 0];            // Mon..Sun
-    const subs: Record<string, number> = {};
-    const subItems: Record<string, Record<string, number>> = {};   // subcat → product name → zł
-    const subSrc: Record<string, Record<string, { id: string; date: string }[]>> = {}; // subcat → product → receipts it came from
-    const pushSrc = (sc: string, nm: string, id: string, date: string) => {
-      const arr = ((subSrc[sc] ??= {})[nm] ??= []);
-      if (!arr.some(x => x.id === id)) arr.push({ id, date });
-    };
-    // last 6 months food totals (oldest → newest)
     const monthKeys: string[] = [];
     for (let i = 5; i >= 0; i--) { const d = new Date(y, mo - i, 1); monthKeys.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`); }
-    const monthSum: Record<string, number> = Object.fromEntries(monthKeys.map(k => [k, 0]));
+    type Src = { id: string; date: string };
+    type Agg = { total: number; weeks: number[]; dow: number[]; subs: Record<string, number>; subItems: Record<string, Record<string, number>>; subSrc: Record<string, Record<string, Src[]>> };
+    const perMonth: Record<string, Agg> = {};
+    for (const k of monthKeys) perMonth[k] = { total: 0, weeks: [0, 0, 0, 0, 0], dow: [0, 0, 0, 0, 0, 0, 0], subs: {}, subItems: {}, subSrc: {} };
     for (const e of expenses) {
       if (e.type === 'income' || !inScope(e, scope)) continue;
       const ym = (e.date ?? '').slice(0, 7);
-      const amtAny = foodAmountOf(e);
-      if (ym in monthSum && amtAny > 0) monthSum[ym] += amtAny;
-      if (ym === prevMk) { prevTotal += amtAny; continue; }
-      if (ym !== mk) continue;
-      const amt = amtAny;
+      const a = perMonth[ym];
+      if (!a) continue;
+      const amt = foodAmountOf(e);
       if (amt <= 0) continue;
-      total += amt;
+      a.total += amt;
       const dayNum = parseInt((e.date ?? '').slice(8, 10), 10) || 1;
-      weeks[Math.min(4, Math.floor((dayNum - 1) / 7))] += amt;
+      a.weeks[Math.min(4, Math.floor((dayNum - 1) / 7))] += amt;
       const js = new Date((e.date ?? '').slice(0, 10) + 'T12:00:00').getDay();
-      dow[(js + 6) % 7] += amt;
+      a.dow[(js + 6) % 7] += amt;
+      const pushSrc = (sc: string, nm: string) => { const arr = ((a.subSrc[sc] ??= {})[nm] ??= []); if (!arr.some(x => x.id === e.id)) arr.push({ id: e.id, date: e.date ?? '' }); };
       const items = e.receiptItems ?? [];
       if (items.length > 0) {
         for (const it of items) {
           if (!isFoodItem(it)) continue;
           const sc = foodSubcat(it);
-          subs[sc] = (subs[sc] ?? 0) + (it.price ?? 0);
+          a.subs[sc] = (a.subs[sc] ?? 0) + (it.price ?? 0);
           const nm = canonicalProductName(it.name ?? '', nameAliases) || (it.name ?? '?');
-          (subItems[sc] ??= {})[nm] = (subItems[sc][nm] ?? 0) + (it.price ?? 0);
-          pushSrc(sc, nm, e.id, e.date ?? '');
+          (a.subItems[sc] ??= {})[nm] = (a.subItems[sc][nm] ?? 0) + (it.price ?? 0);
+          pushSrc(sc, nm);
         }
       } else if (e.category === 'groceries') {
-        subs.inne = (subs.inne ?? 0) + amt;
+        a.subs.inne = (a.subs.inne ?? 0) + amt;
         const nm = e.storeName || 'Zakupy (bez pozycji)';
-        (subItems.inne ??= {})[nm] = (subItems.inne[nm] ?? 0) + amt;
-        pushSrc('inne', nm, e.id, e.date ?? '');
+        (a.subItems.inne ??= {})[nm] = (a.subItems.inne[nm] ?? 0) + amt;
+        pushSrc('inne', nm);
       }
     }
-    const weeksUsed = Math.ceil(new Date(y, mo + 1, 0).getDate() / 7);
-    const subRows = Object.entries(subs).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
-    const months = monthKeys.map(k => ({ label: MONTH_SHORT[parseInt(k.slice(5, 7), 10) - 1], total: monthSum[k] }));
-    return { total, prevTotal, weeks: weeks.slice(0, weeksUsed), dow, months, subRows, subItems, subSrc, monthName: now.toLocaleDateString('pl-PL', { month: 'long' }) };
+    // Precompute a display object per month (any month is selectable/drillable).
+    const display: Record<string, { total: number; weeks: number[]; dow: number[]; subRows: [string, number][]; subItems: Agg['subItems']; subSrc: Agg['subSrc']; name: string }> = {};
+    for (const k of monthKeys) {
+      const a = perMonth[k];
+      const [yy, mm] = k.split('-').map(Number);
+      const wUsed = Math.ceil(new Date(yy, mm, 0).getDate() / 7);
+      display[k] = {
+        total: a.total,
+        weeks: a.weeks.slice(0, wUsed),
+        dow: a.dow,
+        subRows: Object.entries(a.subs).filter(([, v]) => v > 0.5).sort((x, z) => z[1] - x[1]) as [string, number][],
+        subItems: a.subItems, subSrc: a.subSrc,
+        name: new Date(yy, mm - 1, 1).toLocaleDateString('pl-PL', { month: 'long', year: yy === y ? undefined : 'numeric' }),
+      };
+    }
+    const months = monthKeys.map(k => ({ ym: k, label: MONTH_SHORT[parseInt(k.slice(5, 7), 10) - 1], total: perMonth[k].total }));
+    const prevMk = monthKeys[4];
+    return { months, mk, display, prevTotal: perMonth[prevMk]?.total ?? 0 };
   }, [expenses, scope, nameAliases, nonFoodVer]);
+
+  // The month the food widget is currently showing (null = bieżący).
+  const foodSelYm = foodMonthSel ?? foodBreakdown.mk;
+  const foodSel = foodBreakdown.display[foodSelYm] ?? foodBreakdown.display[foodBreakdown.mk];
 
   // Bilans kalorii — spalone (zegarek, healthDays.burn) vs zjedzone (dziennik jedzenia).
   const calorieBalance = useMemo(() => {
@@ -3480,21 +3488,29 @@ export default function DashboardScreen() {
               </View>
             );
 
-            nodes['food-breakdown'] = foodBreakdown.total > 0 && (() => {
+            nodes['food-breakdown'] = foodBreakdown.months.some(m => m.total > 0) && (() => {
               const fb = foodBreakdown;
-              const deltaPct = fb.prevTotal > 5 ? Math.round(((fb.total - fb.prevTotal) / fb.prevTotal) * 100) : null;
-              const series = foodView === 'week' ? fb.weeks : foodView === 'day' ? fb.dow : fb.months.map(m => m.total);
-              const seriesLabels = foodView === 'week' ? fb.weeks.map((_, i) => `T${i + 1}`)
+              const sel = foodSel;
+              const isCurrent = foodSelYm === fb.mk;
+              const deltaPct = (isCurrent && fb.prevTotal > 5) ? Math.round(((sel.total - fb.prevTotal) / fb.prevTotal) * 100) : null;
+              const isMonthView = foodView === 'month';
+              const series = foodView === 'week' ? sel.weeks : foodView === 'day' ? sel.dow : fb.months.map(m => m.total);
+              const seriesLabels = foodView === 'week' ? sel.weeks.map((_, i) => `T${i + 1}`)
                 : foodView === 'day' ? ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd']
                 : fb.months.map(m => m.label);
               const smax = Math.max(...series, 1);
-              const submax = fb.subRows[0]?.[1] ?? 1;
+              const submax = sel.subRows[0]?.[1] ?? 1;
               return (
                 <View style={[s.card, { backgroundColor: cardBgDark }]}>
                   <View style={s.cardHeader}>
                     <Utensils size={13} color={accentColor} />
-                    <Text style={s.cardTitle}>Jedzenie · {fb.monthName}</Text>
-                    <Text style={s.foodTotal}>{Math.round(fb.total)} zł</Text>
+                    <Text style={s.cardTitle}>Jedzenie · {sel.name}</Text>
+                    {!isCurrent && (
+                      <TouchableOpacity onPress={() => { haptic.tap(); setFoodMonthSel(null); }} hitSlop={8} style={s.foodNowChip}>
+                        <Text style={s.foodNowTxt}>bieżący</Text>
+                      </TouchableOpacity>
+                    )}
+                    <Text style={s.foodTotal}>{Math.round(sel.total)} zł</Text>
                   </View>
                   {deltaPct != null && (
                     <Text style={s.statSub}>{deltaPct > 0 ? '+' : ''}{deltaPct}% vs miesiąc temu ({Math.round(fb.prevTotal)} zł)</Text>
@@ -3507,19 +3523,28 @@ export default function DashboardScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
+                  {isMonthView && <Text style={[s.statSub, { marginBottom: 2 }]}>Stuknij miesiąc, by zobaczyć jego rozkład</Text>}
                   <View style={s.foodBars}>
-                    {series.map((v, i) => (
-                      <View key={i} style={s.foodBarCol}>
-                        <Text style={s.foodBarVal} numberOfLines={1}>{v > 0 ? Math.round(v) : ''}</Text>
-                        <View style={s.foodBarTrack}><View style={{ width: '100%', height: `${Math.max(v > 0 ? 5 : 0, (v / smax) * 100)}%`, borderRadius: 3, backgroundColor: accentColor + 'CC' }} /></View>
-                        <Text style={s.foodBarLbl}>{seriesLabels[i]}</Text>
-                      </View>
-                    ))}
+                    {series.map((v, i) => {
+                      const ym = isMonthView ? fb.months[i]?.ym : null;
+                      const selectedBar = isMonthView && ym === foodSelYm;
+                      const barColor = selectedBar ? accentColor : accentColor + (isMonthView ? '77' : 'CC');
+                      const inner = (
+                        <>
+                          <Text style={s.foodBarVal} numberOfLines={1}>{v > 0 ? Math.round(v) : ''}</Text>
+                          <View style={s.foodBarTrack}><View style={{ width: '100%', height: `${Math.max(v > 0 ? 5 : 0, (v / smax) * 100)}%`, borderRadius: 3, backgroundColor: barColor }} /></View>
+                          <Text style={[s.foodBarLbl, selectedBar && { color: accentColor, fontWeight: '800' }]}>{seriesLabels[i]}</Text>
+                        </>
+                      );
+                      return isMonthView && ym
+                        ? <TouchableOpacity key={i} style={s.foodBarCol} activeOpacity={0.7} onPress={() => { haptic.tap(); setFoodMonthSel(ym === fb.mk ? null : ym); }}>{inner}</TouchableOpacity>
+                        : <View key={i} style={s.foodBarCol}>{inner}</View>;
+                    })}
                   </View>
-                  {fb.subRows.length > 0 && (
+                  {sel.subRows.length > 0 ? (
                     <>
-                      <Text style={[s.statSub, { marginTop: spacing[3], marginBottom: spacing[1] }]}>Co składa się na jedzenie · stuknij, by sprawdzić produkty</Text>
-                      {fb.subRows.map(([tag, amt]) => {
+                      <Text style={[s.statSub, { marginTop: spacing[3], marginBottom: spacing[1] }]}>Co składa się na jedzenie ({sel.name}) · stuknij, by sprawdzić produkty</Text>
+                      {sel.subRows.map(([tag, amt]) => {
                         const meta = FOOD_SUBCAT_META[tag] ?? { label: tag, color: '#9CA3AF' };
                         return (
                           <TouchableOpacity key={tag} style={s.foodSubRow} activeOpacity={0.7} onPress={() => { haptic.tap(); setFoodCat(tag); }}>
@@ -3532,6 +3557,8 @@ export default function DashboardScreen() {
                         );
                       })}
                     </>
+                  ) : (
+                    <Text style={[s.statSub, { marginTop: spacing[3] }]}>Brak wyszczególnionych produktów w {sel.name}.</Text>
                   )}
                 </View>
               );
@@ -4974,18 +5001,18 @@ export default function DashboardScreen() {
           <TouchableOpacity activeOpacity={1} style={[s.card, { backgroundColor: colors.bg.card }]} onPress={() => {}}>
             {foodCat && (() => {
               const meta = FOOD_SUBCAT_META[foodCat] ?? { label: foodCat, color: '#9CA3AF' };
-              const items = Object.entries(foodBreakdown.subItems[foodCat] ?? {}).sort((a, b) => b[1] - a[1]);
+              const items = Object.entries(foodSel.subItems[foodCat] ?? {}).sort((a, b) => b[1] - a[1]);
               return (
                 <>
                   <View style={s.cardHeader}>
                     <View style={[s.foodSubDot, { backgroundColor: meta.color }]} />
-                    <Text style={s.cardTitle}>{meta.label} · {foodBreakdown.monthName}</Text>
+                    <Text style={s.cardTitle}>{meta.label} · {foodSel.name}</Text>
                     <TouchableOpacity onPress={() => setFoodCat(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
                   </View>
                   <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'pozycja' : 'pozycji'} · stuknij, by otworzyć paragon; <Text style={{ color: colors.accent.red }}>⦸</Text> = to nie jedzenie (wyłącz z liczenia).</Text>
                   <ScrollView style={{ maxHeight: 300, marginTop: spacing[2] }} showsVerticalScrollIndicator={false}>
                     {items.map(([name, amt]) => {
-                      const srcs = (foodBreakdown.subSrc[foodCat!]?.[name] ?? []).slice().sort((a, b) => b.date.localeCompare(a.date));
+                      const srcs = (foodSel.subSrc[foodCat!]?.[name] ?? []).slice().sort((a, b) => b.date.localeCompare(a.date));
                       return (
                       <View key={name} style={s.foodItemRow}>
                         <TouchableOpacity style={s.foodItemTap} activeOpacity={0.7}
@@ -5001,7 +5028,11 @@ export default function DashboardScreen() {
                           <Text style={s.foodItemAmt}>{amt.toFixed(2)} zł</Text>
                           <ChevronRight size={13} color={colors.text.muted} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={s.notFoodBtn} onPress={() => markNotFood(name)} hitSlop={6}>
+                        <TouchableOpacity style={s.notFoodBtn} hitSlop={6}
+                          onPress={() => Alert.alert('To nie jedzenie?', `„${name}" zniknie z liczenia jedzenia (wszędzie). Można cofnąć w paragonie.`, [
+                            { text: 'Anuluj', style: 'cancel' },
+                            { text: 'Nie jedzenie', style: 'destructive', onPress: () => markNotFood(name) },
+                          ])}>
                           <Ban size={15} color={colors.accent.red} />
                         </TouchableOpacity>
                       </View>
@@ -5009,9 +5040,10 @@ export default function DashboardScreen() {
                     })}
                     {items.length === 0 && <Text style={s.statSub}>Brak pozycji w tej kategorii (wykluczone lub bez pozycji).</Text>}
                   </ScrollView>
-                  <TouchableOpacity style={[s.capsuleSeal, { backgroundColor: colors.accent.blue, marginTop: spacing[3] }]} activeOpacity={0.9}
+                  <TouchableOpacity style={[s.capsuleSeal, { backgroundColor: colors.accent.blue, marginTop: spacing[3], flexDirection: 'row', gap: 8 }]} activeOpacity={0.9}
                     onPress={() => { haptic.tap(); setFoodCat(null); router.navigate('/products' as any); }}>
-                    <Text style={s.capsuleSealTxt}>Otwórz Produkty</Text>
+                    <ShoppingCart size={15} color="#fff" />
+                    <Text style={[s.capsuleSealTxt, { color: '#fff' }]}>Zarządzaj produktami (scal / popraw)</Text>
                   </TouchableOpacity>
                 </>
               );
@@ -5650,6 +5682,8 @@ const buildStyles = (c: any) => StyleSheet.create({
   cmpVerdictTxt: { flex: 1, fontSize: 11.5, fontWeight: '700' },
   // "Jedzenie — rozkład"
   foodTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
+  foodNowChip: { marginLeft: spacing[2], paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
+  foodNowTxt: { fontSize: 10, fontWeight: '700', color: c.text.muted },
   foodToggle: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
   foodToggleBtn: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
   foodToggleTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
