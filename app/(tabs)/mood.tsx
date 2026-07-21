@@ -949,6 +949,15 @@ export default function MoodScreen() {
   const last30 = useMemo(() => entries.filter(e => e.date >= dateMinusDays(30)), [entries]);
   const avgMood = avg(last30.map(e => e.mood));
   const avgEnergy = avg(last30.map(e => e.energy));
+  // 7-day trend vs the previous 7 days (past-info / average, na górze).
+  const trend7 = useMemo(() => {
+    const d7 = dateMinusDays(7), d14 = dateMinusDays(14);
+    const last7 = entries.filter(e => e.date >= d7);
+    const prev7 = entries.filter(e => e.date >= d14 && e.date < d7);
+    const m7 = avg(last7.map(e => e.mood)), mP = avg(prev7.map(e => e.mood));
+    const e7 = avg(last7.map(e => e.energy));
+    return { count: last7.length, mood: m7, energy: e7, delta: (m7 > 0 && mP > 0) ? +(m7 - mP).toFixed(1) : 0 };
+  }, [entries]);
 
   // Work hours per day (local + Google), for the mood↔work correlations.
   const calEvents = useCalendarStore(s => s.events);
@@ -1112,6 +1121,17 @@ export default function MoodScreen() {
           ))}
         </View>
 
+        {/* 7-day trend (past-info on top) */}
+        {trend7.count > 0 && (
+          <View style={styles.trendRow}>
+            <Text style={styles.trendTxt}>
+              Ostatnie 7 dni: nastrój <Text style={styles.trendB}>{trend7.mood.toFixed(1)}</Text>
+              {trend7.delta !== 0 ? <Text style={{ color: trend7.delta > 0 ? '#34D399' : '#F87171', fontWeight: '800' }}>{` ${trend7.delta > 0 ? '↑' : '↓'}${Math.abs(trend7.delta)} `}</Text> : ' '}
+              {trend7.delta !== 0 ? 'vs poprzednie 7 · ' : '· '}energia <Text style={styles.trendB}>{trend7.energy.toFixed(1)}</Text>
+            </Text>
+          </View>
+        )}
+
         {/* Mood + energy wave (30 days) */}
         <MoodEnergyWave entries={entries} />
 
@@ -1229,6 +1249,9 @@ const makeStyles = (c: any, p: any) => StyleSheet.create({
   },
   statVal: { fontSize: 18, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
   statLabel: { ...typography.caption, color: c.text.muted, fontSize: 9, textAlign: 'center' },
+  trendRow: { backgroundColor: p.card, borderRadius: radius.lg, borderWidth: 1, borderColor: p.cardBorder, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
+  trendTxt: { fontSize: 12.5, color: c.text.secondary, lineHeight: 17 },
+  trendB: { fontWeight: '800', color: c.text.primary },
 
   card: {
     backgroundColor: p.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3],
