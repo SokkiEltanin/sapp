@@ -4,12 +4,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, router } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale, Settings, Check } from 'lucide-react-native';
+import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale, Settings, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil } from 'lucide-react-native';
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { getHealthGoals, saveHealthGoals, bmrMifflin } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
+import DatePickerField from '@/components/ui/DatePickerField';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -52,17 +53,27 @@ export default function Food() {
   const [profileModal, setProfileModal] = useState(false);
   const [pfH, setPfH] = useState(''); const [pfA, setPfA] = useState(''); const [pfSex, setPfSex] = useState<'m' | 'f' | ''>('');
   const today = todayStr();
+  const [viewDate, setViewDate] = useState(today);   // browsed day (default today)
+  const [dateModal, setDateModal] = useState(false);
+  const isToday = viewDate === today;
+  const shiftDay = (delta: number) => {
+    const [y, m, d] = viewDate.split('-').map(Number);
+    const nd = new Date(y, m - 1, d + delta);
+    const key = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`;
+    if (key > today) return;   // no future
+    haptic.tap(); setViewDate(key);
+  };
 
-  const todayMeals = useMemo(
-    () => meals.filter(m => m.date === today).sort((a, b) => a.ts - b.ts),
-    [meals, today],
+  const dayMeals = useMemo(
+    () => meals.filter(m => m.date === viewDate).sort((a, b) => a.ts - b.ts),
+    [meals, viewDate],
   );
-  const eaten = useMemo(() => todayMeals.reduce((sum, m) => sum + m.kcal, 0), [todayMeals]);
+  const eaten = useMemo(() => dayMeals.reduce((sum, m) => sum + m.kcal, 0), [dayMeals]);
   const macrosToday = useMemo(() => {
     let protein = 0, carbs = 0, fat = 0;
-    for (const m of todayMeals) for (const it of m.items) { protein += it.protein || 0; carbs += it.carbs || 0; fat += it.fat || 0; }
+    for (const m of dayMeals) for (const it of m.items) { protein += it.protein || 0; carbs += it.carbs || 0; fat += it.fat || 0; }
     return { protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat), any: protein + carbs + fat > 0 };
-  }, [todayMeals]);
+  }, [dayMeals]);
 
   // ── Woda — single source = the "Woda" habit (shared with Zdrowie/Nawyki/pet) ──
   const water = useWaterTracker();
@@ -145,7 +156,8 @@ export default function Food() {
     return `~${eta.toLocaleDateString('pl-PL', { month: 'short', year: 'numeric' })}`;
   }, [weightGoal, weightSeries, weightKg]);
 
-  const target    = targetIntake(burn, goalMode, manualGoal);
+  const dayBurn   = isToday ? burn : (burnByDay[viewDate] ?? 0);   // watch burn for the browsed day
+  const target    = targetIntake(dayBurn, goalMode, manualGoal);
   const remaining = target - eaten;
   const pct       = target > 0 ? Math.min(1, eaten / target) : 0;
   const ratio     = target > 0 ? eaten / target : 0;
@@ -156,13 +168,34 @@ export default function Food() {
 
   const byType = useMemo(() => {
     const map: Record<MealType, MealEntry[]> = { sniadanie: [], obiad: [], kolacja: [], przekaska: [] };
-    for (const m of todayMeals) map[m.type].push(m);
+    for (const m of dayMeals) map[m.type].push(m);
     return map;
-  }, [todayMeals]);
+  }, [dayMeals]);
+
+  const dateLabel = (() => {
+    if (isToday) return 'Dziś';
+    const [y, m, d] = viewDate.split('-').map(Number);
+    const dd = new Date(y, m - 1, d);
+    const yd = new Date(); yd.setDate(yd.getDate() - 1);
+    const ydKey = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
+    if (viewDate === ydKey) return 'Wczoraj';
+    return dd.toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short', year: y === new Date().getFullYear() ? undefined : 'numeric' });
+  })();
 
   return (
     <SafeAreaView style={s.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[s.scroll, { paddingTop: insets.top + 50 }]}>
+
+        {/* ── Date navigator ────────────────────────────────────────── */}
+        <View style={s.dateNav}>
+          <TouchableOpacity style={s.dateArrow} onPress={() => shiftDay(-1)}><ChevronLeft size={20} color={c.text.primary} /></TouchableOpacity>
+          <TouchableOpacity style={s.dateLabelBtn} activeOpacity={0.7} onPress={() => { haptic.tap(); setDateModal(true); }}>
+            <CalendarIcon size={14} color={c.text.muted} />
+            <Text style={s.dateLabel}>{dateLabel}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.dateArrow, isToday && { opacity: 0.3 }]} disabled={isToday} onPress={() => shiftDay(1)}><ChevronRight size={20} color={c.text.primary} /></TouchableOpacity>
+          {!isToday && <TouchableOpacity style={s.todayChip} onPress={() => { haptic.tap(); setViewDate(today); }}><Text style={s.todayChipTxt}>dziś</Text></TouchableOpacity>}
+        </View>
 
         {/* ── Kalorie: eaten vs target ring ─────────────────────────── */}
         <View style={[s.card, s.heroCard]}>
@@ -190,12 +223,13 @@ export default function Food() {
             </View>
             <View style={s.heroDivider} />
             <View style={s.heroStat}>
-              <View style={s.heroBurnRow}><Flame size={13} color={ACCENT} /><Text style={s.heroStatVal}>{burn > 0 ? burn.toLocaleString('pl-PL') : '—'}</Text></View>
+              <View style={s.heroBurnRow}><Flame size={13} color={ACCENT} /><Text style={s.heroStatVal}>{dayBurn > 0 ? dayBurn.toLocaleString('pl-PL') : '—'}</Text></View>
               <Text style={s.heroStatLabel}>spalone</Text>
             </View>
           </View>
 
-          {/* Zapotrzebowanie: resting (BMR) + movement — tap to set the body profile */}
+          {/* Zapotrzebowanie: resting (BMR) + movement — tap to set the body profile (today only) */}
+          {isToday && (
           <TouchableOpacity style={s.needsRow} activeOpacity={0.7} onPress={openProfile}>
             {profileComplete ? (
               <Text style={s.needsTxt}>
@@ -206,6 +240,7 @@ export default function Food() {
             )}
             <Settings size={13} color={colors.text.muted} />
           </TouchableOpacity>
+          )}
 
           {/* Goal mode */}
           <View style={s.goalRow}>
@@ -230,8 +265,8 @@ export default function Food() {
           )}
         </View>
 
-        {/* ── Bilans tygodnia: spalone vs zjedzone ──────────────────── */}
-        {weekBalance.loggedCount > 0 && (
+        {/* ── Bilans tygodnia: spalone vs zjedzone (dziś) ────────────── */}
+        {isToday && weekBalance.loggedCount > 0 && (
           <View style={[s.card, { gap: spacing[2] }]}>
             <View style={s.balRow}>
               <Text style={s.balTitle}>Bilans tygodnia</Text>
@@ -260,7 +295,8 @@ export default function Food() {
           </View>
         )}
 
-        {/* ── Woda + Waga (shared source with Zdrowie) ──────────────── */}
+        {/* ── Woda + Waga (shared source with Zdrowie) — today only ──── */}
+        {isToday && (
         <View style={s.trackRow}>
           <View style={[s.card, s.trackCard]}>
             <View style={s.trackHead}><Droplets size={15} color="#60A5FA" /><Text style={s.trackTitle}>Woda</Text></View>
@@ -279,14 +315,15 @@ export default function Food() {
               : <Text style={s.trackGoal} numberOfLines={1}>edytuj w Zdrowiu</Text>}
           </TouchableOpacity>
         </View>
+        )}
 
-        {/* ── Today's meals ─────────────────────────────────────────── */}
-        {todayMeals.length === 0 ? (
-          <TouchableOpacity style={[s.card, s.empty]} activeOpacity={0.9} onPress={() => { haptic.tap(); router.push('/food/add' as any); }}>
+        {/* ── Meals for the viewed day ──────────────────────────────── */}
+        {dayMeals.length === 0 ? (
+          <TouchableOpacity style={[s.card, s.empty]} activeOpacity={0.9} onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}` as any); }}>
             <UtensilsCrossed size={30} color={c.text.muted} />
-            <Text style={s.emptyTitle}>Nic dziś nie zapisane</Text>
-            <Text style={s.emptySub}>Stuknij, żeby dodać co zjadłeś — z bazy, ostatnich albo ręcznie.</Text>
-            <View style={[s.emptyBtn, { backgroundColor: ACCENT }]}><Plus size={16} color="#1A1206" /><Text style={s.emptyBtnTxt}>Co zjadłem</Text></View>
+            <Text style={s.emptyTitle}>{isToday ? 'Nic dziś nie zapisane' : 'Nic tego dnia nie zapisane'}</Text>
+            <Text style={s.emptySub}>Stuknij, żeby dodać {isToday ? 'co zjadłeś' : 'posiłek do tego dnia'} — z bazy, ostatnich albo ręcznie.</Text>
+            <View style={[s.emptyBtn, { backgroundColor: ACCENT }]}><Plus size={16} color="#1A1206" /><Text style={s.emptyBtnTxt}>{isToday ? 'Co zjadłem' : 'Dodaj posiłek'}</Text></View>
           </TouchableOpacity>
         ) : (
           MEAL_TYPES.filter(mt => byType[mt.id].length > 0).map(mt => {
@@ -300,12 +337,16 @@ export default function Food() {
                 </View>
                 {entries.map(m => (
                   <View key={m.id} style={s.mealRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.mealName} numberOfLines={1}>{mealSummary(m)}</Text>
-                      {m.note ? <Text style={s.mealNote} numberOfLines={1}>{m.note}</Text> : null}
-                    </View>
-                    <Text style={s.mealKcal}>{m.kcal.toLocaleString('pl-PL')}</Text>
-                    <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); removeMeal(m.id); }}>
+                    <TouchableOpacity style={s.mealTap} activeOpacity={0.7}
+                      onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}&edit=${m.id}` as any); }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.mealName} numberOfLines={1}>{mealSummary(m)}</Text>
+                        {m.note ? <Text style={s.mealNote} numberOfLines={1}>{m.note}</Text> : null}
+                      </View>
+                      <Text style={s.mealKcal}>{m.kcal.toLocaleString('pl-PL')}</Text>
+                      <Pencil size={13} color={c.text.muted} />
+                    </TouchableOpacity>
+                    <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); removeMeal(m.id); }}>
                       <Trash2 size={15} color={c.text.muted} />
                     </TouchableOpacity>
                   </View>
@@ -315,9 +356,9 @@ export default function Food() {
           })
         )}
 
-        {todayMeals.length > 0 && (
+        {dayMeals.length > 0 && (
           <TouchableOpacity style={[s.addMore, { borderColor: ACCENT + '55' }]} activeOpacity={0.85}
-            onPress={() => { haptic.tap(); router.push('/food/add' as any); }}>
+            onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}` as any); }}>
             <Plus size={16} color={ACCENT} /><Text style={[s.addMoreTxt, { color: ACCENT }]}>Dodaj kolejny posiłek</Text>
           </TouchableOpacity>
         )}
@@ -365,6 +406,19 @@ export default function Food() {
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
+
+      {/* Skok do dowolnej daty */}
+      <Modal visible={dateModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setDateModal(false)}>
+        <TouchableOpacity style={s.pfOverlay} activeOpacity={1} onPress={() => setDateModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={[s.card, s.pfSheet]} onPress={() => {}}>
+            <Text style={s.pfTitle}>Wybierz dzień</Text>
+            <DatePickerField value={viewDate} onChange={(d) => { if (d && d <= today) setViewDate(d); }} placeholder="Data" />
+            <TouchableOpacity style={[s.sheetSave, { backgroundColor: ACCENT }]} onPress={() => { haptic.tap(); setDateModal(false); }}>
+              <Check size={17} color="#1A1206" /><Text style={[s.sheetSaveTxt, { color: '#1A1206' }]}>Pokaż</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -372,6 +426,13 @@ export default function Food() {
 const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   scroll:    { padding: spacing[4], gap: spacing[3], paddingBottom: 180 },
+
+  dateNav:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dateArrow:    { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
+  dateLabelBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, borderRadius: radius.md, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.subtle },
+  dateLabel:    { fontSize: 14, fontWeight: '800', color: c.text.primary },
+  todayChip:    { paddingHorizontal: spacing[3], height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: ACCENT + '77', backgroundColor: ACCENT + '22', alignItems: 'center', justifyContent: 'center' },
+  todayChipTxt: { fontSize: 12.5, fontWeight: '800', color: ACCENT },
 
   card: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.subtle },
 
@@ -442,7 +503,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   mealHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   mealTitle:  { fontSize: 14, fontWeight: '800', color: c.text.primary },
   mealSub:    { fontSize: 12, fontWeight: '700', color: c.text.secondary },
-  mealRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 7, borderTopWidth: 1, borderTopColor: c.border.subtle },
+  mealRow:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderTopWidth: 1, borderTopColor: c.border.subtle },
+  mealTap:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   mealName:   { fontSize: 13.5, fontWeight: '600', color: c.text.primary },
   mealNote:   { fontSize: 11, color: c.text.muted, marginTop: 1 },
   mealKcal:   { fontSize: 13, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },

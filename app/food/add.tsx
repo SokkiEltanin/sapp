@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers } from 'lucide-react-native';
 
 import {
@@ -48,6 +48,7 @@ export default function FoodAdd() {
   const presets             = useFoodStore(st => st.presets);
   const storeMeals          = useFoodStore(st => st.meals);
   const addMeal             = useFoodStore(st => st.addMeal);
+  const updateMeal          = useFoodStore(st => st.updateMeal);
   const addPreset           = useFoodStore(st => st.addPreset);
   const removePreset        = useFoodStore(st => st.removePreset);
   const bumpPreset          = useFoodStore(st => st.bumpPreset);
@@ -55,10 +56,22 @@ export default function FoodAdd() {
   const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
+  const params = useLocalSearchParams<{ date?: string; edit?: string }>();
+  const mealDate = typeof params.date === 'string' && params.date ? params.date
+    : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+  const editId = typeof params.edit === 'string' ? params.edit : undefined;
+
   const [mealType, setMealType] = useState<MealType>(defaultMealType());
   const [items, setItems]       = useState<MealItem[]>([]);
   const [note, setNote]         = useState('');
   const [query, setQuery]       = useState('');
+
+  // Editing an existing meal → prefill from the store (once).
+  useEffect(() => {
+    if (!editId) return;
+    const m = storeMeals.find(x => x.id === editId);
+    if (m) { setMealType(m.type); setItems(m.items.map(it => ({ ...it }))); setNote(m.note ?? ''); }
+  }, [editId]);
 
   // portion picker (for a selected candidate)
   const [sel, setSel]           = useState<Candidate | null>(null);
@@ -236,7 +249,8 @@ export default function FoodAdd() {
   const save = () => {
     if (items.length === 0) return;
     haptic.success();
-    addMeal(mealType, items, note.trim() || undefined);
+    if (editId) updateMeal(editId, mealType, items, note.trim() || undefined);
+    else addMeal(mealType, items, note.trim() || undefined, mealDate);
     router.back();
   };
 
@@ -246,7 +260,7 @@ export default function FoodAdd() {
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={26} color={c.text.primary} /></TouchableOpacity>
-        <Text style={s.headerTitle}>Co zjadłem</Text>
+        <Text style={s.headerTitle}>{editId ? 'Edytuj posiłek' : 'Co zjadłem'}</Text>
         <View style={{ width: 26 }} />
       </View>
 
