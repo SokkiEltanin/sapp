@@ -330,6 +330,9 @@ export default function CalendarTabScreen() {
           .then(([vs, its]) => { if (alive) { setVehicles(vs); setMaintItems(its); } })
           .catch(() => {});
       })();
+      // Re-pull Google Calendar on EVERY entry to the tab (not just first mount) — the
+      // screen stays mounted, so a failed/empty first sync used to never retry.
+      checkGcal();
       return () => { alive = false; };
     }, [setEvents, setTasks]),
   );

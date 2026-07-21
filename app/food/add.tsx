@@ -10,6 +10,7 @@ import {
   presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
+import { FOOD_SUBCATS, FOOD_SUBCAT_META } from '@/utils/food';
 import { normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -34,6 +35,7 @@ interface Candidate {
   protein100?: number;
   carbs100?: number;
   fat100?: number;
+  cat?: string;
   unitGrams?: Partial<Record<FoodUnit, number>>;
   defaultUnit?: FoodUnit;
   productId?: string;
@@ -144,7 +146,7 @@ export default function FoodAdd() {
   const candidates: Candidate[] = useMemo(() => {
     const curated: Candidate[] = products.map(p => ({
       name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
-      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100,
+      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
       unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated',
       _rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
     } as any));
@@ -165,6 +167,29 @@ export default function FoodAdd() {
       .filter(f => !seen.has(normalizeProductName(f.name)))
       .map(f => ({ name: f.name, kcalPer100g: f.kcal, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
     return [...curatedMatch, ...base];
+  }, [products, query]);
+
+  // When NOT searching, group products by category so your own items are easy to
+  // find (intuitive category picking). Search still uses the flat ranked list.
+  const catGroups = useMemo(() => {
+    if (query.trim()) return null;
+    const curated = products.map(p => ({
+      name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
+      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
+      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated' as const,
+      rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
+    })).sort((a, b) => b.rank - a.rank);
+    const map: Record<string, Candidate[]> = {};
+    for (const c of curated) { const k = c.cat || 'inne'; (map[k] ??= []).push(c); }
+    const order = [...FOOD_SUBCATS.map(s => s.tag), 'inne'];
+    const sections = order.filter(k => map[k]?.length).map(k => ({
+      tag: k, label: FOOD_SUBCAT_META[k]?.label ?? k, color: FOOD_SUBCAT_META[k]?.color ?? '#9CA3AF', items: map[k],
+    }));
+    const seen = new Set(curated.map(x => normalizeProductName(x.name)));
+    const base: Candidate[] = searchFoodBase('', 40).filter(f => !seen.has(normalizeProductName(f.name)))
+      .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' as const }));
+    if (base.length) sections.push({ tag: 'baza', label: 'Baza (warzywa i owoce)', color: '#9CA3AF', items: base });
+    return sections;
   }, [products, query]);
 
   // ── picker helpers ───────────────────────────────────────────────────────
@@ -339,7 +364,7 @@ export default function FoodAdd() {
           <Pencil size={15} color={ACCENT} /><Text style={s.manualTxt}>Wpisz ręcznie (kcal na oko)</Text>
         </TouchableOpacity>
 
-        {!query && <Text style={s.sectionHint}>{products.length > 0 ? 'Ostatnie i baza' : 'Baza produktów'}</Text>}
+        {!query && <Text style={s.sectionHint}>{products.length > 0 ? 'Twoje produkty · po kategoriach' : 'Baza produktów'}</Text>}
 
         {/* add a brand-new product straight from the search → grams + kcal/100g picker */}
         {query.trim().length > 0 && !exactExists && (
@@ -349,22 +374,47 @@ export default function FoodAdd() {
           </TouchableOpacity>
         )}
 
-        <View style={s.card}>
-          {candidates.map((cand, i) => (
-            <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)}
-              style={[s.candRow, i > 0 && s.itemBorder]}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
-                <Text style={s.candMeta}>
-                  {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
-                  {cand.source === 'curated' ? '  ·  moje' : ''}
-                </Text>
+        {catGroups ? (
+          catGroups.map(sec => (
+            <View key={sec.tag} style={{ gap: 4 }}>
+              <View style={s.catHead}>
+                <View style={[s.catHeadDot, { backgroundColor: sec.color }]} />
+                <Text style={s.catHeadTxt}>{sec.label}</Text>
+                <Text style={s.catHeadCount}>{sec.items.length}</Text>
               </View>
-              <Plus size={18} color={ACCENT} />
-            </TouchableOpacity>
-          ))}
-          {candidates.length === 0 && <Text style={s.candMeta}>Brak trafień — użyj „Wpisz ręcznie".</Text>}
-        </View>
+              <View style={s.card}>
+                {sec.items.map((cand, i) => (
+                  <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                      <Text style={s.candMeta}>
+                        {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
+                        {cand.source === 'curated' ? '  ·  moje' : ''}
+                      </Text>
+                    </View>
+                    <Plus size={18} color={ACCENT} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))
+        ) : (
+          <View style={s.card}>
+            {candidates.map((cand, i) => (
+              <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                  <Text style={s.candMeta}>
+                    {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
+                    {cand.source === 'curated' ? '  ·  moje' : ''}
+                  </Text>
+                </View>
+                <Plus size={18} color={ACCENT} />
+              </TouchableOpacity>
+            ))}
+            {candidates.length === 0 && <Text style={s.candMeta}>Brak trafień — użyj „Wpisz ręcznie".</Text>}
+          </View>
+        )}
       </ScrollView>
 
       {/* save bar */}
@@ -574,6 +624,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   manualTxt: { fontSize: 13, fontWeight: '700', color: ACCENT },
 
   sectionHint: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 2 },
+  catHead:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2], marginLeft: 2 },
+  catHeadDot:   { width: 9, height: 9, borderRadius: 5 },
+  catHeadTxt:   { fontSize: 13, fontWeight: '800', color: c.text.primary },
+  catHeadCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 
   candRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 9 },
   candName: { fontSize: 14, fontWeight: '600', color: c.text.primary },
