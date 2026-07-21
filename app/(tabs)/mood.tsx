@@ -960,6 +960,18 @@ export default function MoodScreen() {
     return { count: last7.length, mood: m7, energy: e7, delta: (m7 > 0 && mP > 0) ? +(m7 - mP).toFixed(1) : 0 };
   }, [entries]);
 
+  // Best / worst weekday over the last ~60 days — a "past pattern" callout on top.
+  const weekdayInsight = useMemo(() => {
+    const win = entries.filter(e => e.date >= dateMinusDays(60));
+    if (win.length < 5) return null;
+    const b: { sum: number; n: number }[] = Array.from({ length: 7 }, () => ({ sum: 0, n: 0 }));
+    for (const e of win) { const idx = (new Date(e.date + 'T12:00:00').getDay() + 6) % 7; b[idx].sum += e.mood; b[idx].n++; }
+    const names = ['poniedziałki', 'wtorki', 'środy', 'czwartki', 'piątki', 'soboty', 'niedziele'];
+    let best = -1, bestV = -1, worst = -1, worstV = 99;
+    b.forEach((x, i) => { if (x.n < 2) return; const a = x.sum / x.n; if (a > bestV) { bestV = a; best = i; } if (a < worstV) { worstV = a; worst = i; } });
+    return best >= 0 && best !== worst ? { best: names[best], bestV, worst: names[worst], worstV } : null;
+  }, [entries]);
+
   // Work hours per day (local + Google), for the mood↔work correlations.
   const calEvents = useCalendarStore(s => s.events);
   const gcalEvents = useCalendarStore(s => s.gcalEvents);
@@ -1123,7 +1135,7 @@ export default function MoodScreen() {
           ))}
         </View>
 
-        {/* 7-day trend (past-info on top) */}
+        {/* 7-day trend + weekday pattern (past-info on top) */}
         {trend7.count > 0 && (
           <View style={styles.trendRow}>
             <Text style={styles.trendTxt}>
@@ -1131,6 +1143,11 @@ export default function MoodScreen() {
               {trend7.delta !== 0 ? <Text style={{ color: trend7.delta > 0 ? '#34D399' : '#F87171', fontWeight: '800' }}>{` ${trend7.delta > 0 ? '↑' : '↓'}${Math.abs(trend7.delta)} `}</Text> : ' '}
               {trend7.delta !== 0 ? 'vs poprzednie 7 · ' : '· '}energia <Text style={styles.trendB}>{trend7.energy.toFixed(1)}</Text>
             </Text>
+            {weekdayInsight && (
+              <Text style={[styles.trendTxt, { marginTop: 4 }]}>
+                Najlepszy nastrój zwykle w <Text style={styles.trendB}>{weekdayInsight.best}</Text> · najsłabszy w <Text style={styles.trendB}>{weekdayInsight.worst}</Text>
+              </Text>
+            )}
           </View>
         )}
 

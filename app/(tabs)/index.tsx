@@ -4621,9 +4621,15 @@ export default function DashboardScreen() {
                     ))}
                   </View>
 
-                  {/* ── Rok: fakty łączne ── */}
+                  {/* ── Rok / porównania: fakty łączne ── */}
                   <View style={s.wxChips}>
                     {wm.daysWorked > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Dni w pracy (mies.)</Text><Text style={s.wxChipV}>{wm.daysWorked}{wm.avgPerDay > 0 ? ` · ${wm.avgPerDay.toFixed(1)} h/dzień` : ''}</Text></View>}
+                    {wm.avgHours > 0 && (() => {
+                      const diff = Math.round(wm.projectedH - wm.avgHours);
+                      const pct = Math.round((wm.projectedH / wm.avgHours - 1) * 100);
+                      return <View style={s.wxChip}><Text style={s.wxChipK}>Ten mies. vs średnia</Text><Text style={[s.wxChipV, { color: diff >= 0 ? '#34D399' : '#F87171' }]}>{diff >= 0 ? '+' : ''}{diff} h ({pct >= 0 ? '+' : ''}{pct}%)</Text></View>;
+                    })()}
+                    {wm.bestMonth && wm.bestMonth.hours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Najlepszy miesiąc</Text><Text style={s.wxChipV}>{wm.bestMonth.label} {wm.bestMonth.year} · {Math.round(wm.bestMonth.hours)} h{hasRate ? ` · ${wm.bestMonth.earnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
                     {wm.yearHours > 0 && <View style={s.wxChip}><Text style={s.wxChipK}>Rok {new Date().getFullYear()}</Text><Text style={s.wxChipV}>{wm.yearHours.toFixed(0)} h{hasRate ? ` · ${wm.yearEarnings.toLocaleString('pl-PL')} zł` : ''}</Text></View>}
                   </View>
                 </ScrollView>
