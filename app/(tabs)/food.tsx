@@ -58,6 +58,11 @@ export default function Food() {
     [meals, today],
   );
   const eaten = useMemo(() => todayMeals.reduce((sum, m) => sum + m.kcal, 0), [todayMeals]);
+  const macrosToday = useMemo(() => {
+    let protein = 0, carbs = 0, fat = 0;
+    for (const m of todayMeals) for (const it of m.items) { protein += it.protein || 0; carbs += it.carbs || 0; fat += it.fat || 0; }
+    return { protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat), any: protein + carbs + fat > 0 };
+  }, [todayMeals]);
 
   // ── Woda — single source = the "Woda" habit (shared with Zdrowie/Nawyki/pet) ──
   const water = useWaterTracker();
@@ -215,6 +220,14 @@ export default function Food() {
               );
             })}
           </View>
+
+          {macrosToday.any && (
+            <View style={s.macroLine}>
+              <Text style={s.macroChip}>B <Text style={s.macroChipV}>{macrosToday.protein} g</Text></Text>
+              <Text style={s.macroChip}>W <Text style={s.macroChipV}>{macrosToday.carbs} g</Text></Text>
+              <Text style={s.macroChip}>T <Text style={s.macroChipV}>{macrosToday.fat} g</Text></Text>
+            </View>
+          )}
         </View>
 
         {/* ── Bilans tygodnia: spalone vs zjedzone ──────────────────── */}
@@ -396,6 +409,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   goalRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
   goalChip:    { paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   goalChipTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+
+  macroLine:  { flexDirection: 'row', justifyContent: 'center', gap: spacing[3], marginTop: 2 },
+  macroChip:  { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  macroChipV: { color: c.text.primary, fontWeight: '800' },
 
   trackRow:   { flexDirection: 'row', gap: spacing[3] },
   trackCard:  { flex: 1, gap: spacing[2] },

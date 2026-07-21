@@ -7,7 +7,7 @@ import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, Rotat
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
   MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry,
-  presetKcal, presetGrams, presetToItem,
+  presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
@@ -31,6 +31,9 @@ interface Candidate {
   name: string;
   kcalPer100g?: number;
   kcalPerPortion?: number;
+  protein100?: number;
+  carbs100?: number;
+  fat100?: number;
   unitGrams?: Partial<Record<FoodUnit, number>>;
   defaultUnit?: FoodUnit;
   productId?: string;
@@ -97,9 +100,12 @@ export default function FoodAdd() {
     const isDish = !!(applying.yields && applying.yields > 1);
     if (isDish) {
       const factor = dishPortions / applying.yields!;          // fraction of the whole batch
+      const mm = presetMacros(applying);
+      const r1 = (n: number) => Math.round(n * factor * 10) / 10 || undefined;
       setItems(prev => [...prev, {
         name: applying.name, qty: dishPortions, unit: 'porcja' as FoodUnit,
         grams: Math.round(presetGrams(applying) * factor), kcal: Math.round(presetKcal(applying) * factor),
+        protein: r1(mm.protein), carbs: r1(mm.carbs), fat: r1(mm.fat),
         parts: applying.items.map(it => ({ ...it })), presetId: applying.id,
       }]);
     } else {
@@ -125,6 +131,7 @@ export default function FoodAdd() {
   const candidates: Candidate[] = useMemo(() => {
     const curated: Candidate[] = products.map(p => ({
       name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
+      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100,
       unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated',
       _rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
     } as any));
@@ -135,7 +142,7 @@ export default function FoodAdd() {
       const seen = new Set(curated.map(x => normalizeProductName(x.name)));
       const base: Candidate[] = searchFoodBase('', 14)
         .filter(f => !seen.has(normalizeProductName(f.name)))
-        .map(f => ({ name: f.name, kcalPer100g: f.kcal, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
+        .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
       return [...curated.slice(0, 10), ...base];
     }
     const nq = normalizeProductName(q);
@@ -192,6 +199,7 @@ export default function FoodAdd() {
     if (!productId) {
       const p = upsertProductByName(sel.name, {
         kcalPer100g: k100 > 0 ? k100 : sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
+        protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100,
         unitGrams: sel.unitGrams, defaultUnit: unit, fromBase: sel.source === 'base',
       });
       productId = p.id;
@@ -200,7 +208,8 @@ export default function FoodAdd() {
     }
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
-    setItems(prev => [...prev, { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal }]);
+    const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100 } as any, grams);
+    setItems(prev => [...prev, { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined }]);
     setSel(null);
   };
 

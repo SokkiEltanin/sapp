@@ -155,15 +155,25 @@ export function presetKcal(p: MealPreset): number {
 export function presetGrams(p: MealPreset): number {
   return p.items.reduce((s, it) => s + (it.grams || 0), 0);
 }
-// A composite meal line from a preset applied ×mult ("Kanapka ×2"): summed kcal,
-// components kept in `parts` for the breakdown.
+export function presetMacros(p: MealPreset): { protein: number; carbs: number; fat: number } {
+  return p.items.reduce((a, it) => ({
+    protein: a.protein + (it.protein || 0), carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0),
+  }), { protein: 0, carbs: 0, fat: 0 });
+}
+const r1 = (n: number) => Math.round(n * 10) / 10;
+// A composite meal line from a preset applied ×mult ("Kanapka ×2"): summed kcal +
+// macros; components kept in `parts` for the breakdown.
 export function presetToItem(p: MealPreset, mult: number): MealItem {
+  const m = presetMacros(p);
   return {
     name: p.name,
     qty: mult,
     unit: 'porcja',
     grams: Math.round(presetGrams(p) * mult),
     kcal: Math.round(presetKcal(p) * mult),
+    protein: r1(m.protein * mult) || undefined,
+    carbs: r1(m.carbs * mult) || undefined,
+    fat: r1(m.fat * mult) || undefined,
     parts: p.items.map(it => ({ ...it })),
     presetId: p.id,
   };
