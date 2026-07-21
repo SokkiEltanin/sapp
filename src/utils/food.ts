@@ -25,7 +25,7 @@ export const FOOD_SUBCAT_META: Record<string, { label: string; color: string }> 
 };
 
 const FOOD_TAG_SET = new Set(FOOD_SUBCATS.map(s => s.tag));
-export const NONFOOD_TAGS = new Set(['chemia', 'higiena']);
+export const NONFOOD_TAGS = new Set(['chemia', 'higiena', 'nie jedzenie']);
 
 // ── User "to nie jedzenie" list ───────────────────────────────────────────────
 // Names (products or store/expense names) the user explicitly marked as NOT food

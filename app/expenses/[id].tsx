@@ -24,6 +24,7 @@ import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentM
 import { vehiclesService } from '@/services/vehiclesService';
 import { getCategoryMeta, CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { saveCustomProductsToMemory, saveCustomTagsToMemory, saveNameAliases } from '@/utils/productMemory';
+import { isFoodItem, NONFOOD_TAGS, removeNonFood } from '@/utils/food';
 import { getPayers, addPayer } from '@/utils/payers';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -41,7 +42,7 @@ const INCOME_TAGS  = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
 const ITEM_TAGS = [
   'mięso', 'nabiał', 'ryby', 'warzywa', 'owoce',
   'słodycze', 'pieczywo', 'napoje', 'przekąski',
-  'chemia', 'higiena', 'dania gotowe',
+  'dania gotowe', 'chemia', 'higiena', 'nie jedzenie',
 ];
 
 // ─── Inline item editor ───────────────────────────────────────────────────────
@@ -438,6 +439,19 @@ export default function ExpenseDetailScreen() {
     }
   };
 
+  // Quick "jedzenie / nie jedzenie" toggle on a receipt line. Adds/removes the
+  // 'nie jedzenie' tag (excluded by isFoodItem) and persists + learns via handleItemSave.
+  const toggleItemFood = (idx: number) => {
+    haptic.tap();
+    const it = editedItems[idx];
+    const food = isFoodItem(it);
+    const nextTags = food
+      ? [...(it.tags ?? []), 'nie jedzenie']
+      : (it.tags ?? []).filter(t => !NONFOOD_TAGS.has(t.toLowerCase()));
+    if (!food) removeNonFood(it.name).catch(() => {});   // also clear any global name exclusion
+    handleItemSave(idx, { ...it, tags: nextTags });
+  };
+
   const handleSave = async () => {
     const parsed = parseFloat(amount.replace(',', '.'));
     if (!parsed || isNaN(parsed) || parsed <= 0) {
@@ -493,6 +507,8 @@ export default function ExpenseDetailScreen() {
   };
 
   const displayAmt = editing ? amount : expense.amount.toFixed(2);
+  const itemsSum = editedItems.reduce((sm, it) => sm + (it.price ?? 0), 0);
+  const foodSum  = editedItems.reduce((sm, it) => sm + (isFoodItem(it) ? (it.price ?? 0) : 0), 0);
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -612,9 +628,18 @@ export default function ExpenseDetailScreen() {
                   : <ChevronDown size={14} color={colors.text.muted} />
                 }
               </TouchableOpacity>
+              {itemsExpanded && (
+                <Text style={s.foodSummary}>
+                  <Text style={{ color: colors.accent.green, fontWeight: '700' }}>Jedzenie {foodSum.toFixed(2)} zł</Text>
+                  {itemsSum - foodSum > 0.005 ? `  ·  nie-jedzenie ${(itemsSum - foodSum).toFixed(2)} zł` : ''}
+                  {'  ·  stuknij plakietkę, by zmienić'}
+                </Text>
+              )}
               {itemsExpanded && editedItems.map((it, idx) => {
                 const meta = getCategoryMeta(it.category);
                 const isEditing = editingItemIdx === idx;
+                const food = isFoodItem(it);
+                const foodColor = food ? colors.accent.green : colors.text.muted;
                 return (
                   <View key={idx}>
                     <TouchableOpacity
@@ -643,7 +668,10 @@ export default function ExpenseDetailScreen() {
                       </View>
                       <View style={s.itemRight}>
                         <Text style={s.receiptItemPrice}>{it.price.toFixed(2)} zł</Text>
-                        <Pencil size={11} color={isEditing ? colors.accent.blue : colors.text.muted} />
+                        <TouchableOpacity onPress={() => toggleItemFood(idx)} hitSlop={6}
+                          style={[s.foodPill, { borderColor: foodColor + '55', backgroundColor: foodColor + '18' }]}>
+                          <Text style={[s.foodPillTxt, { color: foodColor }]}>{food ? 'jedzenie' : 'nie jedz.'}</Text>
+                        </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
 
@@ -1059,8 +1087,11 @@ const makeS = (c: any) => StyleSheet.create({
   receiptItemLeft: { flex: 1, gap: 2 },
   receiptItemName: { fontSize: 13, fontWeight: '500', color: c.text.primary },
   receiptItemMeta: { fontSize: 10, color: c.text.muted },
-  itemRight: { alignItems: 'flex-end', gap: 3 },
+  itemRight: { alignItems: 'flex-end', gap: 4 },
   receiptItemPrice: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  foodSummary: { fontSize: 11, color: c.text.muted, marginTop: 2 },
+  foodPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1 },
+  foodPillTxt: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.2 },
   itemTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 3 },
   itemTagBadge: {
     paddingHorizontal: 6, paddingVertical: 2,
