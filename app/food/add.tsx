@@ -52,6 +52,7 @@ export default function FoodAdd() {
   const addMeal             = useFoodStore(st => st.addMeal);
   const updateMeal          = useFoodStore(st => st.updateMeal);
   const addPreset           = useFoodStore(st => st.addPreset);
+  const updatePreset        = useFoodStore(st => st.updatePreset);
   const removePreset        = useFoodStore(st => st.removePreset);
   const bumpPreset          = useFoodStore(st => st.bumpPreset);
   const upsertProductByName = useFoodStore(st => st.upsertProductByName);
@@ -94,6 +95,7 @@ export default function FoodAdd() {
   const [saveP, setSaveP]       = useState(false);
   const [pName, setPName]       = useState('');
   const [pYields, setPYields]   = useState('');         // "ile porcji wychodzi" (dish)
+  const [editPresetId, setEditPresetId] = useState<string | null>(null);   // editing an existing preset
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
 
@@ -138,8 +140,18 @@ export default function FoodAdd() {
     const nm = pName.trim();
     if (!nm || items.length === 0) return;
     const yields = parseFloat(pYields.replace(',', '.'));
-    addPreset(nm, items.map(it => ({ ...it })), mealType, yields > 1 ? Math.round(yields) : undefined);
-    setSaveP(false); setPName(''); setPYields('');
+    const y = yields > 1 ? Math.round(yields) : undefined;
+    if (editPresetId) updatePreset(editPresetId, nm, items.map(it => ({ ...it })), mealType, y);
+    else addPreset(nm, items.map(it => ({ ...it })), mealType, y);
+    setSaveP(false); setPName(''); setPYields(''); setEditPresetId(null);
+  };
+  // Load a preset's ingredients into the builder to change składniki / proporcje.
+  const editPreset = (p: MealPreset) => {
+    haptic.tap();
+    setItems(p.items.map(it => ({ ...it })));
+    if (p.type) setMealType(p.type);
+    setEditPresetId(p.id); setPName(p.name); setPYields(p.yields ? String(p.yields) : '');
+    setApplying(null);
   };
 
   // ── candidate list ───────────────────────────────────────────────────────
@@ -290,6 +302,13 @@ export default function FoodAdd() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        {editPresetId && (
+          <View style={s.editBanner}>
+            <Pencil size={14} color={ACCENT} />
+            <Text style={s.editBannerTxt}>Edytujesz preset „{pName}" — zmień składniki/proporcje i Zaktualizuj</Text>
+            <TouchableOpacity onPress={() => { haptic.tap(); setEditPresetId(null); setItems([]); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
+          </View>
+        )}
         {/* meal type */}
         <View style={s.typeRow}>
           {MEAL_TYPES.map(mt => {
@@ -344,8 +363,8 @@ export default function FoodAdd() {
               </View>
             ))}
             <View style={s.totalRow}>
-              <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setPName(''); setSaveP(true); }}>
-                <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>Zapisz jako preset</Text>
+              <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); if (!editPresetId) setPName(''); setSaveP(true); }}>
+                <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
               </TouchableOpacity>
               <Text style={s.totalVal}>{total} kcal</Text>
             </View>
@@ -552,6 +571,9 @@ export default function FoodAdd() {
                 <TouchableOpacity style={[s.sheetAdd, { backgroundColor: ACCENT }]} onPress={applyPreset}>
                   <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={s.presetEditBtn} onPress={() => editPreset(applying)}>
+                  <Pencil size={14} color={c.text.secondary} /><Text style={s.presetEditTxt}>Edytuj składniki / proporcje</Text>
+                </TouchableOpacity>
               </>
               );
             })()}
@@ -564,8 +586,8 @@ export default function FoodAdd() {
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setSaveP(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
-              <Text style={s.sheetTitle}>Zapisz jako preset</Text>
-              <Text style={s.sheetSub}>{items.map(i => i.name).join(', ')} · {total} kcal — dodasz to jednym stuknięciem następnym razem.</Text>
+              <Text style={s.sheetTitle}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
+              <Text style={s.sheetSub}>{items.map(i => i.name).join(', ')} · {total} kcal — {editPresetId ? 'nadpiszę zapisany preset.' : 'dodasz to jednym stuknięciem następnym razem.'}</Text>
               <TextInput style={s.mInput} value={pName} onChangeText={setPName} placeholder="Nazwa (np. Kanapka / Puree)" placeholderTextColor={c.text.muted} autoFocus />
               <View style={s.fieldRow}>
                 <Text style={s.fieldLabel}>Porcji wychodzi</Text>
@@ -574,7 +596,7 @@ export default function FoodAdd() {
               </View>
               <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pName.trim() ? ACCENT : c.fill.subtle }]} disabled={!pName.trim()} onPress={saveAsPreset}>
                 <Star size={16} color={pName.trim() ? '#1A1206' : c.text.muted} />
-                <Text style={[s.sheetAddTxt, { color: pName.trim() ? '#1A1206' : c.text.muted }]}>Zapisz preset</Text>
+                <Text style={[s.sheetAddTxt, { color: pName.trim() ? '#1A1206' : c.text.muted }]}>{editPresetId ? 'Zaktualizuj' : 'Zapisz preset'}</Text>
               </TouchableOpacity>
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -601,6 +623,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   quickTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.primary, flexShrink: 1 },
   quickKcal: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 
+  presetEditBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10 },
+  presetEditTxt: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  editBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '66', backgroundColor: ACCENT + '18' },
+  editBannerTxt: { flex: 1, fontSize: 12.5, fontWeight: '700', color: ACCENT },
   savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   savePresetTxt: { fontSize: 12.5, fontWeight: '700', color: ACCENT },
 

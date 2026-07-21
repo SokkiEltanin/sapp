@@ -210,6 +210,7 @@ interface FoodState {
 
   // presets
   addPreset: (name: string, items: MealItem[], type?: MealType, yields?: number) => void;
+  updatePreset: (id: string, name: string, items: MealItem[], type?: MealType, yields?: number) => void;
   removePreset: (id: string) => void;
   bumpPreset: (id: string) => void;
 
@@ -299,6 +300,9 @@ export const useFoodStore = create<FoodState>()(
 
       addPreset: (name, items, type, yields) => set(s => ({
         presets: [...s.presets, { id: rid('preset'), name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined, uses: 0, createdAt: Date.now() }],
+      })),
+      updatePreset: (id, name, items, type, yields) => set(s => ({
+        presets: s.presets.map(p => (p.id === id ? { ...p, name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined } : p)),
       })),
       removePreset: (id) => set(s => ({ presets: s.presets.filter(p => p.id !== id) })),
       bumpPreset: (id) => set(s => ({ presets: s.presets.map(p => (p.id === id ? { ...p, uses: p.uses + 1 } : p)) })),
