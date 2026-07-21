@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Smile, Zap, Flame, BookOpen, Plus, TrendingUp, TrendingDown, Tag, CalendarDays, Clock, BarChart3, Sunrise, Sun, Sunset, Moon, Sparkles } from 'lucide-react-native';
 import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -915,6 +915,7 @@ const makePat = (c: any, p: any) => StyleSheet.create({
 
 export default function MoodScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const P = useMemo(() => pFor(colors), [colors]);
   const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
   const { entries, setEntries, setLoading, deleteEntry } = useMoodStore();
@@ -1058,6 +1059,7 @@ export default function MoodScreen() {
         title="Nastrój"
         subtitle="Twoje samopoczucie"
         accentColor={P.accent}
+        style={{ paddingTop: insets.top + spacing[3] }}
         rightSlot={
           <PressableScale onPress={() => { haptic.tap(); openCheckin(null); }} style={styles.addBtn}>
             <Plus size={17} color={colors.bg.primary} />
