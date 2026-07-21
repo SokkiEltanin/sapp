@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers } from 'lucide-react-native';
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
-  MealItem, MealType, MEAL_TYPES, FoodUnit,
+  MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry,
+  presetKcal, presetToItem,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
@@ -41,7 +42,12 @@ export default function FoodAdd() {
   const s = useMemo(() => makeS(c), [c]);
 
   const products            = useFoodStore(st => st.products);
+  const presets             = useFoodStore(st => st.presets);
+  const storeMeals          = useFoodStore(st => st.meals);
   const addMeal             = useFoodStore(st => st.addMeal);
+  const addPreset           = useFoodStore(st => st.addPreset);
+  const removePreset        = useFoodStore(st => st.removePreset);
+  const bumpPreset          = useFoodStore(st => st.bumpPreset);
   const upsertProductByName = useFoodStore(st => st.upsertProductByName);
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
@@ -61,7 +67,44 @@ export default function FoodAdd() {
   const [mName, setMName]   = useState('');
   const [mKcal, setMKcal]   = useState('');
 
+  // preset apply (×1/2/3) + save-as-preset
+  const [applying, setApplying] = useState<MealPreset | null>(null);
+  const [mult, setMult]         = useState(1);
+  const [saveP, setSaveP]       = useState(false);
+  const [pName, setPName]       = useState('');
+
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
+
+  // recent meals to repeat ("to samo co wczoraj") — distinct by summary, newest first
+  const recentMeals: MealEntry[] = useMemo(() => {
+    const seen = new Set<string>();
+    const out: MealEntry[] = [];
+    for (const m of [...storeMeals].sort((a, b) => b.ts - a.ts)) {
+      const sig = m.items.map(i => i.name).join('|');
+      if (!sig || seen.has(sig)) continue;
+      seen.add(sig); out.push(m);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }, [storeMeals]);
+
+  const applyPreset = () => {
+    if (!applying) return;
+    setItems(prev => [...prev, presetToItem(applying, mult)]);
+    bumpPreset(applying.id);
+    setApplying(null);
+  };
+  const repeatMeal = (m: MealEntry) => {
+    haptic.tap();
+    setItems(prev => [...prev, ...m.items.map(it => ({ ...it }))]);
+    setMealType(m.type);
+  };
+  const saveAsPreset = () => {
+    const nm = pName.trim();
+    if (!nm || items.length === 0) return;
+    addPreset(nm, items.map(it => ({ ...it })), mealType);
+    setSaveP(false); setPName('');
+  };
 
   // ── candidate list ───────────────────────────────────────────────────────
   const candidates: Candidate[] = useMemo(() => {
@@ -172,20 +215,51 @@ export default function FoodAdd() {
           })}
         </View>
 
+        {/* quick: presets + repeat recent */}
+        {(presets.length > 0 || recentMeals.length > 0) && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
+            {presets.map(p => (
+              <TouchableOpacity key={p.id} style={s.quickChip} onPress={() => { haptic.tap(); setMult(1); setApplying(p); }}
+                onLongPress={() => { haptic.tap(); removePreset(p.id); }} delayLongPress={450}>
+                <Star size={13} color={ACCENT} fill={ACCENT} />
+                <Text style={s.quickTxt} numberOfLines={1}>{p.name}</Text>
+                <Text style={s.quickKcal}>{presetKcal(p)}</Text>
+              </TouchableOpacity>
+            ))}
+            {recentMeals.map(m => (
+              <TouchableOpacity key={m.id} style={[s.quickChip, { borderStyle: 'dashed' }]} onPress={() => repeatMeal(m)}>
+                <RotateCcw size={13} color={c.text.muted} />
+                <Text style={s.quickTxt} numberOfLines={1}>{m.items.map(i => i.name).slice(0, 2).join(', ')}</Text>
+                <Text style={s.quickKcal}>{m.kcal}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
         {/* added items */}
         {items.length > 0 && (
           <View style={s.card}>
             {items.map((it, i) => (
               <View key={i} style={[s.itemRow, i > 0 && s.itemBorder]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.itemName} numberOfLines={1}>{it.name}</Text>
-                  <Text style={s.itemMeta}>{it.qty > 1 ? `${it.qty} × ` : ''}{unitLabel(it.unit)}{it.grams > 0 ? ` · ${it.grams} g` : ''}</Text>
+                  <Text style={s.itemName} numberOfLines={1}>
+                    {it.parts ? <Layers size={12} color={ACCENT} /> : null}{it.parts ? ' ' : ''}{it.name}{it.parts && it.qty > 1 ? ` ×${it.qty}` : ''}
+                  </Text>
+                  <Text style={s.itemMeta} numberOfLines={1}>
+                    {it.parts ? it.parts.map(p => p.name).join(', ')
+                      : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}
+                  </Text>
                 </View>
                 <Text style={s.itemKcal}>{it.kcal} kcal</Text>
                 <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setItems(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
               </View>
             ))}
-            <View style={s.totalRow}><Text style={s.totalLabel}>Razem</Text><Text style={s.totalVal}>{total} kcal</Text></View>
+            <View style={s.totalRow}>
+              <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setPName(''); setSaveP(true); }}>
+                <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>Zapisz jako preset</Text>
+              </TouchableOpacity>
+              <Text style={s.totalVal}>{total} kcal</Text>
+            </View>
           </View>
         )}
 
@@ -296,6 +370,52 @@ export default function FoodAdd() {
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
+
+      {/* ── apply preset ×1/2/3 ────────────────────────────────────── */}
+      <Modal visible={!!applying} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setApplying(null)}>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setApplying(null)}>
+          <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
+            {applying && (
+              <>
+                <Text style={s.sheetTitle}>{applying.name}</Text>
+                <Text style={s.sheetSub}>{applying.items.map(i => i.name).join(', ')}</Text>
+                <View style={s.multRow}>
+                  {[1, 2, 3].map(n => {
+                    const on = mult === n;
+                    return (
+                      <TouchableOpacity key={n} onPress={() => { haptic.tap(); setMult(n); }}
+                        style={[s.multChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                        <Text style={[s.multTxt, on && { color: ACCENT }]}>×{n}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{Math.round(presetKcal(applying) * mult)} kcal</Text></View>
+                <TouchableOpacity style={[s.sheetAdd, { backgroundColor: ACCENT }]} onPress={applyPreset}>
+                  <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── save current items as preset ───────────────────────────── */}
+      <Modal visible={saveP} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setSaveP(false)}>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setSaveP(false)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
+              <Text style={s.sheetTitle}>Zapisz jako preset</Text>
+              <Text style={s.sheetSub}>{items.map(i => i.name).join(', ')} · {total} kcal — dodasz to jednym stuknięciem następnym razem.</Text>
+              <TextInput style={s.mInput} value={pName} onChangeText={setPName} placeholder="Nazwa (np. Kanapka standard)" placeholderTextColor={c.text.muted} autoFocus />
+              <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pName.trim() ? ACCENT : c.fill.subtle }]} disabled={!pName.trim()} onPress={saveAsPreset}>
+                <Star size={16} color={pName.trim() ? '#1A1206' : c.text.muted} />
+                <Text style={[s.sheetAddTxt, { color: pName.trim() ? '#1A1206' : c.text.muted }]}>Zapisz preset</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -311,6 +431,18 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   typeRow:  { flexDirection: 'row', gap: spacing[2] },
   typeChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   typeTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+
+  quickRow:  { gap: spacing[2], paddingVertical: 2 },
+  quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 190, paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  quickTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.primary, flexShrink: 1 },
+  quickKcal: { fontSize: 11, fontWeight: '700', color: c.text.muted },
+
+  savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  savePresetTxt: { fontSize: 12.5, fontWeight: '700', color: ACCENT },
+
+  multRow:  { flexDirection: 'row', gap: spacing[2], justifyContent: 'center' },
+  multChip: { minWidth: 56, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
+  multTxt:  { fontSize: 15, fontWeight: '800', color: c.text.secondary },
 
   itemRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 8 },
   itemBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },

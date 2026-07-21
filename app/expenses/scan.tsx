@@ -14,6 +14,7 @@ import { sameLocalDay } from '@/utils/bankNotification';
 import { toast } from '@/store/toastStore';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useFoodStore } from '@/store/foodStore';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import {
   loadProductMemory, applyProductMemory, saveProductCategories, saveCustomProductsToMemory,
@@ -510,6 +511,9 @@ export default function ScanReceiptModal() {
         .filter(({ p }) => p.suspect)
         .map(({ p, i }) => ({ name: (editedNames[i]?.trim() || p.name), verdict: (selected.has(i) ? 'product' : 'ignore') as 'product' | 'ignore' }));
       saveLineVerdicts(receipt.storeName, verdicts).catch(() => {});
+      // Float freshly-bought products up in the calorie-logger's suggestions (only
+      // ones you already count — never creates a product from a receipt).
+      try { useFoodStore.getState().markFreshMany(receiptItems.map(it => it.name)); } catch {}
       if (validCustom.length > 0) {
         saveCustomProductsToMemory(validCustom.map(p => ({ name: p.name.trim(), category: p.category }))).catch(() => {});
         const taggedCustom = validCustom.filter(p => p.tags.length > 0).map(p => ({ name: p.name.trim(), tags: p.tags }));

@@ -51,7 +51,9 @@ export interface FoodProduct {
 }
 
 // One line inside a logged meal — grams & kcal are RESOLVED at log time and stored,
-// so historical totals never shift if a product's density is later edited.
+// so historical totals never shift if a product's density is later edited. A
+// COMPOSITE line (a preset applied, e.g. "Kanapka") keeps its components in `parts`
+// and carries a `presetId`, so the breakdown stays visible and editable.
 export interface MealItem {
   name: string;
   productId?: string;
@@ -59,6 +61,8 @@ export interface MealItem {
   unit: FoodUnit;
   grams: number;
   kcal: number;
+  parts?: MealItem[];   // set for composite/preset lines
+  presetId?: string;
 }
 
 export type MealType = 'sniadanie' | 'obiad' | 'kolacja' | 'przekaska';
@@ -125,6 +129,26 @@ export function targetIntake(burnKcal: number, mode: GoalMode, manual?: number):
   return Math.round(base);
 }
 
+export function presetKcal(p: MealPreset): number {
+  return p.items.reduce((s, it) => s + (it.kcal || 0), 0);
+}
+export function presetGrams(p: MealPreset): number {
+  return p.items.reduce((s, it) => s + (it.grams || 0), 0);
+}
+// A composite meal line from a preset applied ×mult ("Kanapka ×2"): summed kcal,
+// components kept in `parts` for the breakdown.
+export function presetToItem(p: MealPreset, mult: number): MealItem {
+  return {
+    name: p.name,
+    qty: mult,
+    unit: 'porcja',
+    grams: Math.round(presetGrams(p) * mult),
+    kcal: Math.round(presetKcal(p) * mult),
+    parts: p.items.map(it => ({ ...it })),
+    presetId: p.id,
+  };
+}
+
 const rid = (p: string) => `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 // ── store ───────────────────────────────────────────────────────────────────
@@ -144,7 +168,8 @@ interface FoodState {
   upsertProductByName: (name: string, seed?: Partial<FoodProduct>) => FoodProduct;
   findProductByName: (name: string) => FoodProduct | undefined;
   learnPortion: (id: string, unit: FoodUnit, grams: number) => void;
-  markFresh: (name: string) => void;   // called when a matching product is bought
+  markFresh: (name: string) => void;            // one product bought
+  markFreshMany: (names: string[]) => void;     // a receipt's worth (already-counted only)
 
   // meals
   addMeal: (type: MealType, items: MealItem[], note?: string, date?: string) => void;
@@ -204,6 +229,21 @@ export const useFoodStore = create<FoodState>()(
         set(s => ({
           products: s.products.map(p => (normalizeProductName(p.name) === key ? { ...p, fresh: Date.now() } : p)),
         }));
+      },
+      // Bump `fresh` on every counted product a receipt just bought. Never CREATES a
+      // product (only the user adds those) — it just floats already-counted ones up.
+      markFreshMany: (names) => {
+        const keys = new Set(names.map(n => normalizeProductName(n)).filter(Boolean));
+        if (keys.size === 0) return;
+        const now = Date.now();
+        set(s => {
+          let changed = false;
+          const products = s.products.map(p => {
+            if (keys.has(normalizeProductName(p.name))) { changed = true; return { ...p, fresh: now }; }
+            return p;
+          });
+          return changed ? { products } : {};
+        });
       },
 
       addMeal: (type, items, note, date) => {
