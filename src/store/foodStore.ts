@@ -259,7 +259,8 @@ export const useFoodStore = create<FoodState>()(
         set(s => {
           let changed = false;
           const products = s.products.map(p => {
-            if (keys.has(normalizeProductName(p.name))) { changed = true; return { ...p, fresh: now }; }
+            const hit = keys.has(normalizeProductName(p.name)) || (p.linkedName && keys.has(normalizeProductName(p.linkedName)));
+            if (hit) { changed = true; return { ...p, fresh: now }; }
             return p;
           });
           return changed ? { products } : {};

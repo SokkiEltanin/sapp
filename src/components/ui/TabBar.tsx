@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, ScanLine, Settings,
   Briefcase, Flame, FileText, CalendarPlus, TrendingUp, TrendingDown, CheckSquare,
-  Utensils, UtensilsCrossed,
+  Utensils, UtensilsCrossed, Apple,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
 import { colors, spacing, radius } from '@/theme';
@@ -92,6 +92,7 @@ export default function TabBar({ currentIndex }: Props) {
       { icon: TrendingUp,   color: colors.tabs.tasks,    onPress: () => router.push('/expenses/add?type=income' as any) },
       { icon: ScanLine,     color: colors.accent.blue,   onPress: () => router.push('/expenses/scan' as any) },
     ] : currentIndex === 5 ? [
+      { icon: Apple,           color: '#34D399', onPress: () => router.push('/food/products' as any) },
       { icon: UtensilsCrossed, color: '#F59E0B', onPress: () => router.push('/food/add' as any) },
     ] : [];
 
