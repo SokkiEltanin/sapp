@@ -86,13 +86,16 @@ export interface MealEntry {
   note?: string;
 }
 
-// A reusable meal template (e.g. "Kanapka standard"). Etap 2 builds the editor UI;
-// the store already supports them so the log can save/apply presets.
+// A reusable meal template. Two flavours:
+//  • an ASSEMBLED meal ("Kanapka") — applied ×1/2/3 as a whole; `yields` unset/1.
+//  • a cooked DISH ("Puree z ziemniaków+marchwi") — `yields` = how many portions the
+//    batch makes; logging picks how many portions you ate (kcal = total × eaten/yields).
 export interface MealPreset {
   id: string;
   name: string;
   type?: MealType;
   items: MealItem[];
+  yields?: number;   // >1 = a dish that makes N portions
   uses: number;
   createdAt: number;
 }
@@ -178,7 +181,7 @@ interface FoodState {
   kcalForDate: (date: string) => number;
 
   // presets
-  addPreset: (name: string, items: MealItem[], type?: MealType) => void;
+  addPreset: (name: string, items: MealItem[], type?: MealType, yields?: number) => void;
   removePreset: (id: string) => void;
   bumpPreset: (id: string) => void;
 
@@ -262,8 +265,8 @@ export const useFoodStore = create<FoodState>()(
       mealsForDate: (date) => get().meals.filter(m => m.date === date),
       kcalForDate: (date) => get().meals.filter(m => m.date === date).reduce((s, m) => s + m.kcal, 0),
 
-      addPreset: (name, items, type) => set(s => ({
-        presets: [...s.presets, { id: rid('preset'), name: name.trim(), items, type, uses: 0, createdAt: Date.now() }],
+      addPreset: (name, items, type, yields) => set(s => ({
+        presets: [...s.presets, { id: rid('preset'), name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined, uses: 0, createdAt: Date.now() }],
       })),
       removePreset: (id) => set(s => ({ presets: s.presets.filter(p => p.id !== id) })),
       bumpPreset: (id) => set(s => ({ presets: s.presets.map(p => (p.id === id ? { ...p, uses: p.uses + 1 } : p)) })),

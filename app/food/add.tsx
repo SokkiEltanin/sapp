@@ -7,7 +7,7 @@ import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, Rotat
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
   MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry,
-  presetKcal, presetToItem,
+  presetKcal, presetGrams, presetToItem,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
@@ -69,11 +69,13 @@ export default function FoodAdd() {
   const [mName, setMName]   = useState('');
   const [mKcal, setMKcal]   = useState('');
 
-  // preset apply (×1/2/3) + save-as-preset
+  // preset apply (×1/2/3, or portions for a dish) + save-as-preset
   const [applying, setApplying] = useState<MealPreset | null>(null);
-  const [mult, setMult]         = useState(1);
+  const [mult, setMult]         = useState(1);          // assembled meal ×N
+  const [dishPortions, setDishPortions] = useState(1);  // dish: portions eaten (of its `yields`)
   const [saveP, setSaveP]       = useState(false);
   const [pName, setPName]       = useState('');
+  const [pYields, setPYields]   = useState('');         // "ile porcji wychodzi" (dish)
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
 
@@ -92,7 +94,17 @@ export default function FoodAdd() {
 
   const applyPreset = () => {
     if (!applying) return;
-    setItems(prev => [...prev, presetToItem(applying, mult)]);
+    const isDish = !!(applying.yields && applying.yields > 1);
+    if (isDish) {
+      const factor = dishPortions / applying.yields!;          // fraction of the whole batch
+      setItems(prev => [...prev, {
+        name: applying.name, qty: dishPortions, unit: 'porcja' as FoodUnit,
+        grams: Math.round(presetGrams(applying) * factor), kcal: Math.round(presetKcal(applying) * factor),
+        parts: applying.items.map(it => ({ ...it })), presetId: applying.id,
+      }]);
+    } else {
+      setItems(prev => [...prev, presetToItem(applying, mult)]);
+    }
     bumpPreset(applying.id);
     setApplying(null);
   };
@@ -104,8 +116,9 @@ export default function FoodAdd() {
   const saveAsPreset = () => {
     const nm = pName.trim();
     if (!nm || items.length === 0) return;
-    addPreset(nm, items.map(it => ({ ...it })), mealType);
-    setSaveP(false); setPName('');
+    const yields = parseFloat(pYields.replace(',', '.'));
+    addPreset(nm, items.map(it => ({ ...it })), mealType, yields > 1 ? Math.round(yields) : undefined);
+    setSaveP(false); setPName(''); setPYields('');
   };
 
   // ── candidate list ───────────────────────────────────────────────────────
@@ -246,11 +259,11 @@ export default function FoodAdd() {
         {(presets.length > 0 || recentMeals.length > 0) && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
             {presets.map(p => (
-              <TouchableOpacity key={p.id} style={s.quickChip} onPress={() => { haptic.tap(); setMult(1); setApplying(p); }}
+              <TouchableOpacity key={p.id} style={s.quickChip} onPress={() => { haptic.tap(); setMult(1); setDishPortions(1); setApplying(p); }}
                 onLongPress={() => { haptic.tap(); removePreset(p.id); }} delayLongPress={450}>
                 <Star size={13} color={ACCENT} fill={ACCENT} />
-                <Text style={s.quickTxt} numberOfLines={1}>{p.name}</Text>
-                <Text style={s.quickKcal}>{presetKcal(p)}</Text>
+                <Text style={s.quickTxt} numberOfLines={1}>{p.name}{p.yields && p.yields > 1 ? ` · ${p.yields} porcji` : ''}</Text>
+                <Text style={s.quickKcal}>{p.yields && p.yields > 1 ? Math.round(presetKcal(p) / p.yields) : presetKcal(p)}</Text>
               </TouchableOpacity>
             ))}
             {recentMeals.map(m => (
@@ -430,27 +443,45 @@ export default function FoodAdd() {
       <Modal visible={!!applying} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setApplying(null)}>
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setApplying(null)}>
           <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
-            {applying && (
+            {applying && (() => {
+              const isDish = !!(applying.yields && applying.yields > 1);
+              const total = presetKcal(applying);
+              const kcalNow = isDish ? Math.round(total * (dishPortions / applying.yields!)) : Math.round(total * mult);
+              return (
               <>
                 <Text style={s.sheetTitle}>{applying.name}</Text>
-                <Text style={s.sheetSub}>{applying.items.map(i => i.name).join(', ')}</Text>
-                <View style={s.multRow}>
-                  {[1, 2, 3].map(n => {
-                    const on = mult === n;
-                    return (
-                      <TouchableOpacity key={n} onPress={() => { haptic.tap(); setMult(n); }}
-                        style={[s.multChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
-                        <Text style={[s.multTxt, on && { color: ACCENT }]}>×{n}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{Math.round(presetKcal(applying) * mult)} kcal</Text></View>
+                <Text style={s.sheetSub}>{applying.items.map(i => i.name).join(', ')}{isDish ? `  ·  całość ${total} kcal / ${applying.yields} porcji` : ''}</Text>
+                {isDish ? (
+                  <>
+                    <View style={s.qtyRow}>
+                      <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setDishPortions(q => Math.max(0.5, +(q - 0.5).toFixed(1))); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
+                      <View style={s.qtyCenter}>
+                        <Text style={s.qtyVal}>{dishPortions % 1 === 0 ? dishPortions : dishPortions.toFixed(1)}</Text>
+                        <Text style={s.qtyUnit}>z {applying.yields} porcji</Text>
+                      </View>
+                      <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setDishPortions(q => Math.min(applying.yields!, +(q + 0.5).toFixed(1))); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <View style={s.multRow}>
+                    {[1, 2, 3].map(n => {
+                      const on = mult === n;
+                      return (
+                        <TouchableOpacity key={n} onPress={() => { haptic.tap(); setMult(n); }}
+                          style={[s.multChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                          <Text style={[s.multTxt, on && { color: ACCENT }]}>×{n}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+                <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{kcalNow} kcal</Text></View>
                 <TouchableOpacity style={[s.sheetAdd, { backgroundColor: ACCENT }]} onPress={applyPreset}>
                   <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
                 </TouchableOpacity>
               </>
-            )}
+              );
+            })()}
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -462,7 +493,12 @@ export default function FoodAdd() {
             <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
               <Text style={s.sheetTitle}>Zapisz jako preset</Text>
               <Text style={s.sheetSub}>{items.map(i => i.name).join(', ')} · {total} kcal — dodasz to jednym stuknięciem następnym razem.</Text>
-              <TextInput style={s.mInput} value={pName} onChangeText={setPName} placeholder="Nazwa (np. Kanapka standard)" placeholderTextColor={c.text.muted} autoFocus />
+              <TextInput style={s.mInput} value={pName} onChangeText={setPName} placeholder="Nazwa (np. Kanapka / Puree)" placeholderTextColor={c.text.muted} autoFocus />
+              <View style={s.fieldRow}>
+                <Text style={s.fieldLabel}>Porcji wychodzi</Text>
+                <TextInput style={s.smInput} value={pYields} onChangeText={setPYields} keyboardType="numeric" placeholder="1" placeholderTextColor={c.text.muted} />
+                <Text style={s.fieldHint}>danie na kilka porcji (np. puree) — puste = całość</Text>
+              </View>
               <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pName.trim() ? ACCENT : c.fill.subtle }]} disabled={!pName.trim()} onPress={saveAsPreset}>
                 <Star size={16} color={pName.trim() ? '#1A1206' : c.text.muted} />
                 <Text style={[s.sheetAddTxt, { color: pName.trim() ? '#1A1206' : c.text.muted }]}>Zapisz preset</Text>
