@@ -4,10 +4,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, router } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Flame, UtensilsCrossed, Trash2, Target, Plus } from 'lucide-react-native';
+import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale } from 'lucide-react-native';
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
-import { dailyBurnFromHc } from '@/utils/healthHistory';
+import { dailyBurnFromHc, getHealthHistory } from '@/utils/healthHistory';
+import { getHealthGoals } from '@/utils/healthGoals';
+import { useWaterTracker } from '@/hooks/useWaterTracker';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -61,6 +63,42 @@ export default function Food() {
     });
     return () => { active = false; };
   }, [today]));
+
+  // ── Woda — single source = the "Woda" habit (shared with Zdrowie/Nawyki/pet) ──
+  const water = useWaterTracker();
+
+  // ── Waga — READ-ONLY here for now (edycja w Zdrowiu). Krok B przeniesie edycję i
+  // usunie ją ze Zdrowia, żeby był JEDEN zapisujący (blob health_YYYY-MM-DD + goals).
+  const [weightKg, setWeightKg]         = useState(0);   // today / last known
+  const [weightGoal, setWeightGoal]     = useState(0);
+  const [weightSeries, setWeightSeries] = useState<{ d: string; w: number }[]>([]);
+
+  const loadBody = useCallback(async () => {
+    const [hist, goals] = await Promise.all([getHealthHistory(30), getHealthGoals()]);
+    setWeightGoal(goals.weightGoal);
+    const series: { d: string; w: number }[] = [];
+    for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); }
+    let last = series.length ? series[series.length - 1].w : 0;
+    if (!(last > 0)) { const s = await AsyncStorage.getItem('health_last_weight'); const v = s ? parseFloat(s) : 0; if (v > 0) last = v; }
+    setWeightKg(last); setWeightSeries(series);
+  }, []);
+  useFocusEffect(useCallback(() => { loadBody(); }, [loadBody]));
+
+  // simple ETA to weight goal from the logged trend over the window
+  const weightEta = useMemo(() => {
+    if (!(weightGoal > 0) || weightSeries.length < 2 || !(weightKg > 0)) return null;
+    const first = weightSeries[0], last = weightSeries[weightSeries.length - 1];
+    const days = (new Date(last.d).getTime() - new Date(first.d).getTime()) / 864e5;
+    if (days < 3) return null;
+    const perWeek = (last.w - first.w) / days * 7;                 // kg/week (signed)
+    const remaining = weightKg - weightGoal;                       // >0 = need to lose
+    if (Math.abs(perWeek) < 0.05) return null;
+    if (Math.sign(perWeek) === Math.sign(remaining)) return null;  // trending away from goal
+    const weeks = Math.abs(remaining / perWeek);
+    if (weeks > 104) return null;
+    const eta = new Date(Date.now() + weeks * 7 * 864e5);
+    return `~${eta.toLocaleDateString('pl-PL', { month: 'short', year: 'numeric' })}`;
+  }, [weightGoal, weightSeries, weightKg]);
 
   const target    = targetIntake(burn, goalMode, manualGoal);
   const remaining = target - eaten;
@@ -129,6 +167,26 @@ export default function Food() {
               );
             })}
           </View>
+        </View>
+
+        {/* ── Woda + Waga (shared source with Zdrowie) ──────────────── */}
+        <View style={s.trackRow}>
+          <View style={[s.card, s.trackCard]}>
+            <View style={s.trackHead}><Droplets size={15} color="#60A5FA" /><Text style={s.trackTitle}>Woda</Text></View>
+            <Text style={s.trackVal}>{water.glasses}<Text style={s.trackUnit}> / {water.goal} szkl.</Text></Text>
+            <View style={s.trackBtns}>
+              <TouchableOpacity style={s.trackBtn} onPress={() => water.change(-1)} disabled={water.glasses <= 0}><Minus size={16} color={water.glasses <= 0 ? c.text.muted : c.text.primary} /></TouchableOpacity>
+              <TouchableOpacity style={[s.trackBtn, { backgroundColor: '#60A5FA', borderColor: '#60A5FA' }]} onPress={() => water.change(1)}><Plus size={16} color="#fff" /></TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity style={[s.card, s.trackCard]} activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/health' as any); }}>
+            <View style={s.trackHead}><Scale size={15} color="#A78BFA" /><Text style={s.trackTitle}>Waga</Text></View>
+            <Text style={s.trackVal}>{weightKg > 0 ? weightKg.toFixed(1) : '—'}<Text style={s.trackUnit}> kg</Text></Text>
+            {weightGoal > 0
+              ? <Text style={s.trackGoal} numberOfLines={1}>cel {weightGoal} kg{weightEta ? ` · ${weightEta}` : ''}</Text>
+              : <Text style={s.trackGoal} numberOfLines={1}>edytuj w Zdrowiu</Text>}
+          </TouchableOpacity>
         </View>
 
         {/* ── Today's meals ─────────────────────────────────────────── */}
@@ -201,6 +259,16 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   goalRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
   goalChip:    { paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   goalChipTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+
+  trackRow:   { flexDirection: 'row', gap: spacing[3] },
+  trackCard:  { flex: 1, gap: spacing[2] },
+  trackHead:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trackTitle: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  trackVal:   { fontSize: 26, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  trackUnit:  { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  trackBtns:  { flexDirection: 'row', gap: spacing[2] },
+  trackBtn:   { flex: 1, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
+  trackGoal:  { fontSize: 11.5, fontWeight: '700', color: c.text.muted, marginTop: 1 },
 
   empty:      { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[5] },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
