@@ -11,7 +11,7 @@ import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Text as Svg
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import {
-  CheckCircle2, ChevronRight, ChevronLeft,
+  CheckCircle2, ChevronRight, ChevronLeft, Ban,
   TrendingUp, TrendingDown, Flame, Smile, Zap, History, Mail,
   CalendarDays, Wallet,
   Briefcase, CreditCard, Check, Plus,
@@ -47,7 +47,7 @@ import { useStatsScope, inScope, countsForConsumption, consumesInScope, StatsSco
 import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { getCategoryMeta } from '@/utils/categories';
-import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META } from '@/utils/food';
+import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META, addNonFood, loadNonFood } from '@/utils/food';
 import { useFoodStore, targetIntake } from '@/store/foodStore';
 import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
@@ -826,6 +826,9 @@ export default function DashboardScreen() {
   const [capsuleMonths, setCapsuleMonths] = useState(6);
   const [foodView, setFoodView] = useState<'week' | 'day' | 'month'>('week'); // food widget: tygodnie/dni/miesiące
   const [foodCat, setFoodCat] = useState<string | null>(null); // tapped food subcategory → products modal
+  const [nonFoodVer, setNonFoodVer] = useState(0);             // bumps when the "nie jedzenie" list changes
+  useEffect(() => { loadNonFood().then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
+  const markNotFood = useCallback((name: string) => { haptic.tap(); addNonFood(name).then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
   const foodMeals    = useFoodStore(st => st.meals);           // calorie log (for the balance widget)
   const foodGoalMode = useFoodStore(st => st.goalMode);
   const foodManualGoal = useFoodStore(st => st.manualGoal);
@@ -2821,7 +2824,7 @@ export default function DashboardScreen() {
     const subRows = Object.entries(subs).filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]);
     const months = monthKeys.map(k => ({ label: MONTH_SHORT[parseInt(k.slice(5, 7), 10) - 1], total: monthSum[k] }));
     return { total, prevTotal, weeks: weeks.slice(0, weeksUsed), dow, months, subRows, subItems, monthName: now.toLocaleDateString('pl-PL', { month: 'long' }) };
-  }, [expenses, scope, nameAliases]);
+  }, [expenses, scope, nameAliases, nonFoodVer]);
 
   // Bilans kalorii — spalone (zegarek, healthDays.burn) vs zjedzone (dziennik jedzenia).
   const calorieBalance = useMemo(() => {
@@ -4938,17 +4941,22 @@ export default function DashboardScreen() {
                     <Text style={s.cardTitle}>{meta.label} · {foodBreakdown.monthName}</Text>
                     <TouchableOpacity onPress={() => setFoodCat(null)} hitSlop={10} style={{ marginLeft: 'auto' }}><X size={18} color={colors.text.muted} /></TouchableOpacity>
                   </View>
-                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'produkt' : 'pozycji'} · stuknij, by poprawić kategorię/kcal w „Produktach".</Text>
+                  <Text style={[s.statSub, { marginTop: 2 }]}>{items.length} {items.length === 1 ? 'pozycja' : 'pozycji'} · stuknij nazwę, by poprawić w „Produktach"; <Text style={{ color: colors.accent.red }}>⦸</Text> = to nie jedzenie (wyłącz z liczenia).</Text>
                   <ScrollView style={{ maxHeight: 300, marginTop: spacing[2] }} showsVerticalScrollIndicator={false}>
                     {items.map(([name, amt]) => (
-                      <TouchableOpacity key={name} style={s.foodItemRow} activeOpacity={0.7}
-                        onPress={() => { haptic.tap(); setFoodCat(null); router.navigate(`/products?q=${encodeURIComponent(name)}` as any); }}>
-                        <Text style={s.foodItemName} numberOfLines={1}>{name}</Text>
-                        <Text style={s.foodItemAmt}>{amt.toFixed(2)} zł</Text>
-                        <ChevronRight size={13} color={colors.text.muted} />
-                      </TouchableOpacity>
+                      <View key={name} style={s.foodItemRow}>
+                        <TouchableOpacity style={s.foodItemTap} activeOpacity={0.7}
+                          onPress={() => { haptic.tap(); setFoodCat(null); router.navigate(`/products?q=${encodeURIComponent(name)}` as any); }}>
+                          <Text style={s.foodItemName} numberOfLines={1}>{name}</Text>
+                          <Text style={s.foodItemAmt}>{amt.toFixed(2)} zł</Text>
+                          <ChevronRight size={13} color={colors.text.muted} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={s.notFoodBtn} onPress={() => markNotFood(name)} hitSlop={6}>
+                          <Ban size={15} color={colors.accent.red} />
+                        </TouchableOpacity>
+                      </View>
                     ))}
-                    {items.length === 0 && <Text style={s.statSub}>Brak wyszczególnionych produktów (zakupy bez pozycji).</Text>}
+                    {items.length === 0 && <Text style={s.statSub}>Brak pozycji w tej kategorii (wykluczone lub bez pozycji).</Text>}
                   </ScrollView>
                   <TouchableOpacity style={[s.capsuleSeal, { backgroundColor: colors.accent.blue, marginTop: spacing[3] }]} activeOpacity={0.9}
                     onPress={() => { haptic.tap(); setFoodCat(null); router.navigate('/products' as any); }}>
@@ -5596,9 +5604,11 @@ const buildStyles = (c: any) => StyleSheet.create({
   foodSubName: { width: 92, fontSize: 12, fontWeight: '600', color: c.text.secondary },
   foodSubTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: c.border.subtle, overflow: 'hidden' },
   foodSubAmt: { width: 50, textAlign: 'right', fontSize: 12, fontWeight: '800', color: c.text.primary },
-  foodItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 7, borderTopWidth: 1, borderTopColor: c.border.subtle },
+  foodItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  foodItemTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 9 },
   foodItemName: { flex: 1, fontSize: 13, fontWeight: '500', color: c.text.primary },
   foodItemAmt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
+  notFoodBtn: { paddingVertical: 8, paddingLeft: spacing[2] },
   // "Kolekcja sklepów"
   shopTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
   shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
