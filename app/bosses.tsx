@@ -13,6 +13,7 @@ import {
 } from '@/utils/bosses';
 import { sweetlessDaysFrom } from '@/utils/quests';
 import { useHabits } from '@/hooks/useHabits';
+import { getCounts } from '@/utils/habits';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getHealthHistory } from '@/utils/healthHistory';
@@ -48,24 +49,32 @@ export default function Bosses() {
   const habitsRatio = habits.length ? todayDone.length / habits.length : 0;
   const wc = { stepsToday: steps, sweetlessDays, habitsRatio, moodLoggedToday };
 
-  // top up energy from the last 24 h of self-care whenever we open the screen.
-  // Steps are stored per calendar day, so approximate a rolling 24 h window: all of
-  // today's steps + yesterday's steps for the slice of the day still inside the last
-  // 24 h. That way a morning attack still uses last night's walking instead of 0.
+  // Energy = self-care over a ROLLING window, NOT the calendar day. The old version
+  // reset to ~0 every morning (today's habits/mood are empty right after midnight) even
+  // though you were active yesterday — nonsense that nagged you at dawn. Now energy is
+  // max(today, 70% of yesterday): yesterday's activity carries you into the morning and
+  // today's takes over as it builds up. Steps already use a rolling ~24 h estimate.
   const reload = useCallback(() => {
-    getHealthHistory(3).then(h => {
+    getHealthHistory(3).then(async h => {
       const today = new Date();
       const y = new Date(today); y.setDate(y.getDate() - 1);
       const yISO = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
       const stepsToday = h[todayISO()]?.steps ?? 0;
       const stepsYest  = h[yISO]?.steps ?? 0;
-      const dayFrac = (today.getHours() * 60 + today.getMinutes()) / 1440;   // how much of today has passed
+      const dayFrac = (today.getHours() * 60 + today.getMinutes()) / 1440;
       const st = Math.round(stepsToday + stepsYest * (1 - dayFrac));          // rolling ~24 h estimate
       setSteps(st);
-      const e = energyFromData({ stepsToday: st, habitsDone: todayDone.length, moodLoggedToday: moodEntries.some(m => m.date === todayISO()), boughtSweetToday });
-      syncEnergy(e, bonuses.energyMult);
+      const todayE = energyFromData({ stepsToday: st, habitsDone: todayDone.length, moodLoggedToday: moodEntries.some(m => m.date === todayISO()), boughtSweetToday });
+      // Yesterday's completed self-care as a floor (decayed), so a fresh morning ≠ 0.
+      let yestE = 0;
+      try {
+        const yc = await getCounts(yISO);
+        const yHabits = habits.filter(hb => (yc[hb.id] ?? 0) >= (hb.type === 'count' ? (hb.dailyGoal ?? 1) : 1)).length;
+        yestE = energyFromData({ stepsToday: stepsYest, habitsDone: yHabits, moodLoggedToday: moodEntries.some(m => m.date === yISO), boughtSweetToday: false });
+      } catch {}
+      syncEnergy(Math.max(todayE, Math.round(yestE * 0.7)), bonuses.energyMult);
     }).catch(() => {});
-  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy]);
+  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, habits]);
   useFocusEffect(reload);
 
   // sequential campaign: current = first not-yet-defeated boss

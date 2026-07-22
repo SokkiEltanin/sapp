@@ -40,10 +40,14 @@ export default function CatTail({
 
   useEffect(() => {
     if (!animate) { sway.setValue(0.5); return; }
+    // Start at an endpoint (0) so the seamless up/down sequence never has to "jump" to
+    // a start value. resetBeforeIteration:false is CRITICAL — the default (true) snaps
+    // the value back to its loop-start each iteration, which teleported the tail.
+    sway.setValue(0);
     const loop = Animated.loop(Animated.sequence([
       Animated.timing(sway, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       Animated.timing(sway, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
+    ]), { resetBeforeIteration: false });
     loop.start();
     return () => loop.stop();
   }, [animate, dur]);

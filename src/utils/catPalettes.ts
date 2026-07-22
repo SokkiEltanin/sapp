@@ -37,7 +37,12 @@ export function markFor(coat: string): string {
   return luma(coat) > 0.55 ? shade(coat, -0.19) : shade(coat, 0.27);
 }
 
-// Natural coats only — the user rejected pink/mint/violet as "too weird".
+// Natural coats only — the user rejected pink/mint/violet as "too weird". Shade/ear are
+// derived tones of the coat (same hue, darker steps) so new coats can't look wrong.
+const dark = (hex: string, a: number) => shade(hex, -a);
+const nat = (id: string, name: string, coat: string, ink: string, cost: number): Omit<CatPalette, 'mark'> =>
+  ({ id, name, coat, shade: dark(coat, 0.07), ear: dark(coat, 0.16), ink, cost });
+
 const BASE: Omit<CatPalette, 'mark'>[] = [
   { id: 'blue',   name: 'Niebieski', coat: '#A7CCF5', shade: '#93C1F4', ear: '#8AB5E7', ink: '#3B3C4E', cost: 0 },
   { id: 'grey',   name: 'Szary',     coat: '#B9BFC7', shade: '#A7AEB7', ear: '#8F97A1', ink: '#3B3C4E', cost: 60 },
@@ -46,6 +51,15 @@ const BASE: Omit<CatPalette, 'mark'>[] = [
   { id: 'brown',  name: 'Brązowy',   coat: '#A97B54', shade: '#986C48', ear: '#85593A', ink: '#38281B', cost: 80 },
   { id: 'black',  name: 'Czarny',    coat: '#4A4F5C', shade: '#40444F', ear: '#363A44', ink: '#9BA3B4', cost: 120 },
   { id: 'white',  name: 'Biały',     coat: '#F1F3F6', shade: '#E3E7EC', ear: '#CFD6DE', ink: '#3B3C4E', cost: 120 },
+  // ── więcej naturalnych futer (dłuższy cel na monety) ──
+  nat('silver',   'Srebrny',       '#C6CCD4', '#3B3C4E', 70),
+  nat('honey',    'Miodowy',       '#E9C078', '#4A3A20', 75),
+  nat('slate',    'Popielaty',     '#7E8A99', '#E4E9EF', 90),
+  nat('chocolate','Czekoladowy',   '#6E4B34', '#E7D8CC', 100),
+  nat('smoke',    'Dymny',         '#6B717D', '#DDE1E8', 110),
+  nat('caramel',  'Karmelowy',     '#C88A4E', '#3A2818', 130),
+  nat('charcoal', 'Grafitowy',     '#363B45', '#AEB6C4', 150),
+  nat('snow',     'Śnieżny',       '#FBFCFE', '#3B3C4E', 160),
 ];
 
 export const CAT_PALETTES: CatPalette[] = BASE.map(p => ({ ...p, mark: markFor(p.coat) }));
