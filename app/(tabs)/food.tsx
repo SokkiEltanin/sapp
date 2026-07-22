@@ -49,6 +49,7 @@ export default function Food() {
   const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned (watch)
   const [activeToday, setActiveToday] = useState(0);   // ruch (spalone w ruchu, z zegarka)
   const [watchBmr, setWatchBmr] = useState(0);         // BMR z zegarka (fallback)
+  const [watchTotal, setWatchTotal] = useState(0);     // CAŁKOWITE spalanie z zegarka (najlepsze — pełny dzień)
   const [profile, setProfile] = useState<{ heightCm: number; ageYears: number; sex: 'm' | 'f' | '' }>({ heightCm: 0, ageYears: 0, sex: '' });
   const [profileModal, setProfileModal] = useState(false);
   const [pfH, setPfH] = useState(''); const [pfA, setPfA] = useState(''); const [pfSex, setPfSex] = useState<'m' | 'f' | ''>('');
@@ -125,6 +126,7 @@ export default function Food() {
       const hc = raw ? JSON.parse(raw).hc : null;
       setActiveToday(Number(hc?.activeCalories) || 0);
       setWatchBmr(Number(hc?.bmr) || 0);
+      setWatchTotal(Number(hc?.totalCalories) || 0);
     } catch {}
   }, [today]);
   useFocusEffect(useCallback(() => {
@@ -134,13 +136,24 @@ export default function Food() {
     import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(30)).then(n => { if (n > 0) loadBody(); }).catch(() => {});
   }, [loadBody]));
 
-  // Spalanie = spoczynek (BMR z profilu, inaczej z zegarka) + ruch (z zegarka).
+  // Spalanie. PRIORYTET: całkowity wydatek z zegarka (pełny dzień, np. 2061) — bo Samsung
+  // często NIE eksportuje aktywnych kalorii, ale eksportuje TotalCaloriesBurned. Inaczej
+  // BMR (profil/zegarek) + aktywne, a w ostateczności to co jest w cache.
   const burnModel = useMemo(() => {
-    const bmr = bmrMifflin(weightKg, profile.heightCm, profile.ageYears, profile.sex) || watchBmr || 0;
-    const active = activeToday;
-    const total = bmr > 0 ? bmr + active : (burnByDay[today] ?? 0);
-    return { bmr, active, total, fromProfile: bmrMifflin(weightKg, profile.heightCm, profile.ageYears, profile.sex) > 0 };
-  }, [weightKg, profile, activeToday, watchBmr, burnByDay, today]);
+    const profileBmr = bmrMifflin(weightKg, profile.heightCm, profile.ageYears, profile.sex);
+    const bmr = profileBmr || watchBmr || 0;
+    let total: number, active: number, source: 'total' | 'bmr' | 'fallback';
+    if (watchTotal >= 1200) {
+      total = watchTotal;
+      active = bmr > 0 ? Math.max(0, watchTotal - bmr) : 0;   // ruch = całość − spoczynek
+      source = 'total';
+    } else if (bmr > 0) {
+      active = activeToday; total = bmr + active; source = 'bmr';
+    } else {
+      total = burnByDay[today] ?? 0; active = activeToday; source = 'fallback';
+    }
+    return { bmr, active, total, source, fromProfile: profileBmr > 0, hasWatchTotal: watchTotal >= 1200 };
+  }, [weightKg, profile, activeToday, watchBmr, watchTotal, burnByDay, today]);
   const burn = burnModel.total;
   const profileComplete = burnModel.fromProfile;
 
@@ -161,9 +174,11 @@ export default function Food() {
         + `Całkowite: ${p.totalKcal} kcal (${p.totalRecords} rek.)\n`
         + `BMR: ${p.bmrKcal || '—'} kcal/dzień (${p.bmrRecords} rek.)\n`
         + `Źródła: ${p.sources.join(', ') || 'brak'}\n\n`
-        + (p.activeRecords === 0
-          ? '⚠ Samsung NIE eksportuje aktywnych kalorii do Health Connect. Włącz: Samsung Health → Ustawienia → Health Connect → udostępnianie → „Kalorie aktywne".'
-          : 'OK — apka to czyta. Ustaw profil (wzrost/wiek/płeć), by doliczyć spoczynek (BMR).'));
+        + (p.totalKcal >= 1200
+          ? `✔ OK — apka użyje CAŁKOWITEGO spalania z zegarka (${p.totalKcal} kcal, pełny dzień). Aktywnych Samsung nie eksportuje osobno, ale total to obejmuje.`
+          : p.activeRecords > 0
+          ? '✔ Są aktywne kalorie — apka doda je do BMR z profilu (ustaw wzrost/wiek/płeć).'
+          : '⚠ Zegarek nie eksportuje spalania do Health Connect. Włącz w Samsung Health → Health Connect → udostępnianie (Kalorie / Aktywność).'));
     } catch { Alert.alert('Diagnostyka', 'Nie udało się odczytać (brak Health Connect?).'); }
   };
 
@@ -298,10 +313,20 @@ export default function Food() {
             </View>
           </View>
 
-          {/* Zapotrzebowanie: resting (BMR) + movement — tap to set the body profile (today only) */}
+          {/* Zapotrzebowanie: pełny wydatek z zegarka, albo BMR + ruch — tap to set profile */}
           {isToday && (
           <TouchableOpacity style={s.needsRow} activeOpacity={0.7} onPress={openProfile}>
-            {profileComplete ? (
+            {burnModel.hasWatchTotal ? (
+              burnModel.bmr > 0 ? (
+                <Text style={s.needsTxt}>
+                  Spoczynek <Text style={s.needsB}>{burnModel.bmr}</Text> + ruch <Text style={s.needsB}>{burnModel.active}</Text> = <Text style={s.needsB}>{burnModel.total}</Text> spalone (zegarek)
+                </Text>
+              ) : (
+                <Text style={s.needsTxt}>
+                  <Text style={s.needsB}>{burnModel.total}</Text> spalone dziś (pełny dzień z zegarka) · ustaw profil dla celu
+                </Text>
+              )
+            ) : profileComplete ? (
               <Text style={s.needsTxt}>
                 Spoczynek <Text style={s.needsB}>{burnModel.bmr}</Text> + ruch <Text style={s.needsB}>{burnModel.active}</Text> = <Text style={s.needsB}>{burnModel.total}</Text> spalone
               </Text>
