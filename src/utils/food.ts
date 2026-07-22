@@ -17,6 +17,7 @@ export const FOOD_SUBCATS: { tag: string; label: string; color: string }[] = [
   { tag: 'słodycze',     label: 'Słodycze',     color: '#C084FC' },
   { tag: 'napoje',       label: 'Napoje',       color: '#22D3EE' },
   { tag: 'przekąski',    label: 'Przekąski',    color: '#F59E0B' },
+  { tag: 'sosy',         label: 'Sosy',         color: '#FB923C' },
   { tag: 'dania gotowe', label: 'Dania gotowe', color: '#A3E635' },
 ];
 export const FOOD_SUBCAT_META: Record<string, { label: string; color: string }> = {

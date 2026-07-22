@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
@@ -104,14 +104,20 @@ export default function Food() {
   };
 
   const loadBody = useCallback(async () => {
-    const [hist, goals] = await Promise.all([getHealthHistory(30), getHealthGoals()]);
+    const goals = await getHealthGoals();
     setWeightGoal(goals.weightGoal);
     setProfile({ heightCm: goals.heightCm, ageYears: goals.ageYears, sex: goals.sex });
+    // BMR from the profile (last known weight) → passed to the history so EVERY day's burn
+    // = resting (BMR) + active, even when the watch reports only activity calories.
+    const lwRaw = await AsyncStorage.getItem('health_last_weight');
+    const lw = lwRaw ? parseFloat(lwRaw) : 0;
+    const pbmr = bmrMifflin(lw, goals.heightCm, goals.ageYears, goals.sex);
+    const hist = await getHealthHistory(30, pbmr);
     const series: { d: string; w: number }[] = [];
     const bbd: Record<string, number> = {};
     for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); bbd[d] = hist[d].burn; }
     let last = series.length ? series[series.length - 1].w : 0;
-    if (!(last > 0)) { const s = await AsyncStorage.getItem('health_last_weight'); const v = s ? parseFloat(s) : 0; if (v > 0) last = v; }
+    if (!(last > 0) && lw > 0) last = lw;
     weightRef.current = last; setWeightKg(last); setWeightSeries(series); setBurnByDay(bbd);
     // today's watch active + BMR (for the resting+movement breakdown)
     try {
@@ -144,6 +150,21 @@ export default function Food() {
     setProfile({ heightCm: h, ageYears: a, sex: pfSex });
     saveHealthGoals({ heightCm: h, ageYears: a, sex: pfSex }).catch(() => {});
     setProfileModal(false);
+  };
+  const checkWatch = async () => {
+    haptic.tap();
+    try {
+      const { probeCalories } = await import('@/services/healthConnectService');
+      const p = await probeCalories(2);
+      Alert.alert('Kalorie z zegarka (Health Connect)',
+        `Aktywne: ${p.activeKcal} kcal (${p.activeRecords} rek.)\n`
+        + `Całkowite: ${p.totalKcal} kcal (${p.totalRecords} rek.)\n`
+        + `BMR: ${p.bmrKcal || '—'} kcal/dzień (${p.bmrRecords} rek.)\n`
+        + `Źródła: ${p.sources.join(', ') || 'brak'}\n\n`
+        + (p.activeRecords === 0
+          ? '⚠ Samsung NIE eksportuje aktywnych kalorii do Health Connect. Włącz: Samsung Health → Ustawienia → Health Connect → udostępnianie → „Kalorie aktywne".'
+          : 'OK — apka to czyta. Ustaw profil (wzrost/wiek/płeć), by doliczyć spoczynek (BMR).'));
+    } catch { Alert.alert('Diagnostyka', 'Nie udało się odczytać (brak Health Connect?).'); }
   };
 
   // ── Bilans tygodnia: spalone (zegarek) vs zjedzone (dziennik) ──────────────
@@ -477,6 +498,9 @@ export default function Food() {
                 <Check size={17} color={(parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex) ? '#1A1206' : c.text.muted} />
                 <Text style={[s.sheetSaveTxt, { color: (parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex) ? '#1A1206' : c.text.muted }]}>Zapisz profil</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={s.pfProbe} onPress={checkWatch}>
+                <Text style={s.pfProbeTxt}>Sprawdź kalorie z zegarka (diagnostyka)</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           </KeyboardAvoidingView>
         </TouchableOpacity>
@@ -557,6 +581,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   sexChip:    { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   sexTxt:     { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   pfBmr:      { fontSize: 13, fontWeight: '800', color: '#F59E0B' },
+  pfProbe:    { alignItems: 'center', paddingVertical: 6 },
+  pfProbeTxt: { fontSize: 12, fontWeight: '600', color: c.text.muted, textDecorationLine: 'underline' },
   sheetSave:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: radius.full, marginTop: 2 },
   sheetSaveTxt: { fontSize: 14, fontWeight: '800' },
 

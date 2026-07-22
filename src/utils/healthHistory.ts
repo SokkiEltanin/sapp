@@ -15,13 +15,17 @@ export interface HealthDayHistory {
 // -day figure — so we only trust totalCalories when it's plausibly a full day
 // (>=1200); otherwise BMR + active. Mirrors the Zdrowie energy card so the food
 // tab and burn widgets agree with it. 0 = no usable burn data.
-export function dailyBurnFromHc(hc: any): number {
-  if (!hc) return 0;
+export function dailyBurnFromHc(hc: any, fallbackBmr = 0): number {
+  if (!hc) return fallbackBmr > 0 ? Math.round(fallbackBmr) : 0;
   const total = Number(hc.totalCalories) || 0;
   if (total >= 1200) return Math.round(total);
-  const bmr = Number(hc.bmr) || 0;
+  const bmr = Number(hc.bmr) || fallbackBmr || 0;
   const active = Number(hc.activeCalories) || 0;
-  return bmr > 0 ? Math.round(bmr + active) : 0;
+  // Watch often gives ONLY the activity calories (e.g. 77) with no BMR record. Before,
+  // that returned 0 ("nie czyta z zegarka"). Now: BMR (watch or profile) + active, or at
+  // least the active/movement calories so the watch value always shows.
+  if (bmr > 0) return Math.round(bmr + active);
+  return Math.round(active);
 }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -40,7 +44,7 @@ export async function saveTodayWeight(kg: number): Promise<void> {
   await AsyncStorage.setItem('health_last_weight', String(kg)).catch(() => {});
 }
 
-export async function getHealthHistory(days = 60): Promise<Record<string, HealthDayHistory>> {
+export async function getHealthHistory(days = 60, fallbackBmr = 0): Promise<Record<string, HealthDayHistory>> {
   const keys: string[] = [];
   const dates: string[] = [];
   const today = new Date();
@@ -61,7 +65,7 @@ export async function getHealthHistory(days = 60): Promise<Record<string, Health
         // the sleep average.
         const isFakeSleep = Number(d.sleepH) === 7 && Number(d.sleepM) === 30 && !d.sleepQuality;
         const sleepMinutes = isFakeSleep ? 0 : (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
-        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: Number(d.steps) || 0, burn: dailyBurnFromHc(d.hc) };
+        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: Number(d.steps) || 0, burn: dailyBurnFromHc(d.hc, fallbackBmr) };
       } catch {}
     });
   } catch {}

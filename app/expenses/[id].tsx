@@ -41,7 +41,7 @@ const INCOME_TAGS  = ['premia', 'nadgodziny', 'zwrot', 'gotówka', 'przelew'];
 
 const ITEM_TAGS = [
   'mięso', 'nabiał', 'ryby', 'warzywa', 'owoce',
-  'słodycze', 'pieczywo', 'napoje', 'przekąski',
+  'słodycze', 'pieczywo', 'napoje', 'przekąski', 'sosy',
   'dania gotowe', 'chemia', 'higiena', 'nie jedzenie',
 ];
 

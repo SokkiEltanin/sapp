@@ -183,6 +183,36 @@ export async function probeHydration(days = 7): Promise<WaterProbe> {
   }
 }
 
+// Calorie diagnostic — reads RAW Active/Total/BMR records HC holds for the last `days`
+// so we can see whether Samsung actually exports activity calories to Health Connect
+// ("nie czyta z zegarka"). activeRecords 0 = Samsung isn't exporting active calories.
+export interface CalorieProbe {
+  permission: boolean;
+  activeRecords: number; activeKcal: number;
+  totalRecords: number; totalKcal: number;
+  bmrRecords: number; bmrKcal: number;
+  sources: string[];
+}
+export async function probeCalories(days = 2): Promise<CalorieProbe> {
+  const permission = await isPermissionGranted('ActiveCaloriesBurned');
+  const out: CalorieProbe = { permission, activeRecords: 0, activeKcal: 0, totalRecords: 0, totalKcal: 0, bmrRecords: 0, bmrKcal: 0, sources: [] };
+  const hc = mod();
+  if (!hc) return out;
+  try {
+    if (!(await ensureInit(hc))) return out;
+    const end = new Date();
+    const start = new Date(); start.setDate(start.getDate() - days); start.setHours(0, 0, 0, 0);
+    const filter = { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() } as const;
+    const sources = new Set<string>();
+    try { const recs = await read(hc, 'ActiveCaloriesBurned', filter); out.activeRecords = recs.length; for (const r of recs) { out.activeKcal += r.energy?.inKilocalories ?? 0; const s = srcOf(r); if (s) sources.add(s); } } catch {}
+    try { const recs = await read(hc, 'TotalCaloriesBurned', filter); out.totalRecords = recs.length; for (const r of recs) { out.totalKcal += r.energy?.inKilocalories ?? 0; const s = srcOf(r); if (s) sources.add(s); } } catch {}
+    try { const recs = await read(hc, 'BasalMetabolicRate', filter); out.bmrRecords = recs.length; if (recs.length) out.bmrKcal = Math.round(recs[recs.length - 1]?.basalMetabolicRate?.inKilocaloriesPerDay ?? 0); } catch {}
+    out.activeKcal = Math.round(out.activeKcal); out.totalKcal = Math.round(out.totalKcal);
+    out.sources = Array.from(sources);
+  } catch {}
+  return out;
+}
+
 function dayFilter(date: Date) {
   const start = new Date(date); start.setHours(0, 0, 0, 0);
   const end = new Date(date); end.setHours(23, 59, 59, 999);
