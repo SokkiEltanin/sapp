@@ -74,6 +74,19 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Mango',                kcal: 60,  protein: 0.8, unit: 'szt',   unitGrams: { szt: 200 } },
   { name: 'Granat',               kcal: 83,  protein: 1.7, unit: 'szt',   unitGrams: { szt: 200 } },
   { name: 'Awokado (owoc)',       kcal: 160, protein: 2,   unit: 'szt',   unitGrams: { szt: 150 } },
+
+  // ── Podstawy do wypieków / gotowania ──────────────────────────────────────
+  // Dodane po to, by PRZEPISY (naleśniki, ciasta) liczyły się od razu: kluczowe są
+  // poprawne gramy na jednostkę (szklanka mąki ≈ 130 g, nie 250; jajko ≈ 55 g).
+  { name: 'Jajko',                kcal: 143, protein: 13,  unit: 'szt',      unitGrams: { szt: 55 } },
+  { name: 'Mąka pszenna',         kcal: 364, protein: 10,  unit: 'szklanka', unitGrams: { szklanka: 130, lyzka: 9 } },
+  { name: 'Mąka pełnoziarnista',  kcal: 340, protein: 13,  unit: 'szklanka', unitGrams: { szklanka: 120, lyzka: 8 } },
+  { name: 'Mąka ziemniaczana',    kcal: 343, protein: 0.4, unit: 'lyzka',    unitGrams: { szklanka: 160, lyzka: 12 } },
+  { name: 'Mleko 2%',             kcal: 50,  protein: 3.4, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Olej rzepakowy',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 13, lyzeczka: 5 } },
+  { name: 'Cukier',               kcal: 400, protein: 0,   unit: 'lyzka',    unitGrams: { szklanka: 220, lyzka: 12, lyzeczka: 5 } },
+  { name: 'Masło',                kcal: 735, protein: 0.9, unit: 'lyzka',    unitGrams: { lyzka: 15, lyzeczka: 5, szt: 200 } },
+  { name: 'Woda',                 kcal: 0,   protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
 ];
 
 // Fuzzy-ish search over the base: normalized substring + token match, ranked so a

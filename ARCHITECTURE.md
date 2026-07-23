@@ -184,9 +184,26 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   MealItem niesie rozwiązane makra; presety/dania je sumują; zakładka pokazuje dzienne B/W/T.
 - **Zapotrzebowanie:** `bmrMifflin(kg,cm,age,sex)` (profil w `health_goals`: heightCm/ageYears/
   sex, modal Profil na zakładce) → spalanie = BMR (spoczynek) + active (ruch z zegarka).
-  `foodBase.ts` = TYLKO warzywa+owoce (resztę user dodaje sam).
+  `foodBase.ts` = warzywa+owoce + **podstawy do wypieków** (jajko 55 g/szt, mąka 130 g/szkl,
+  olej 13 g/łyżkę…) — kluczowe są poprawne gramy na jednostkę, by PRZEPISY liczyły się od razu.
+- **Biblioteka: PRODUKTY vs KOMPOZYCJE I DANIA.** Dwa ekrany-siostry z przełącznikiem u góry:
+  `app/food/products.tsx` (Produkty = surowe składniki; dania odfiltrowane) ↔ `app/food/library.tsx`
+  (Kompozycje i dania = presety + dania-z-przepisu, grupowane wg `PRESET_CATS`, ULUBIONE na górze,
+  wyszukiwarka, przytrzymaj=usuń). Przełącznik = `router.replace` między nimi. FAB zakładki (index 5):
+  Apple→products, ChefHat→library, UtensilsCrossed→add.
+- **PRZEPIS = PRODUKT (ważysz ugotowane).** `app/food/recipe.tsx`: dodajesz surowe składniki w
+  dowolnych jednostkach (reużywa picker z add), wpisujesz **wagę GOTOWEGO dania** (g), a store liczy
+  gęstość: `recipeDensity(ings, cookedWeight)` → `kcalPer100g = Σkcal/waga·100` (+ makra/100g).
+  `saveRecipeProduct(name, ings, cookedWeight, cat?, id?)` tworzy/aktualizuje `FoodProduct` z polem
+  `recipe:{ingredients, cookedWeight}` (`isRecipeProduct(p)` = ma recipe). Dzięki temu danie logujesz
+  jak każdy produkt — WAŻĄC porcję — a odparowana woda liczy się sama (kcal nie parują, waga tak).
+  Danie ma znacznik ChefHat w wyszukiwarce add; edycja = `/food/recipe?edit=<id>`; presety edytujesz
+  przez `/food/add?preset=<id>`. `FoodProduct.pinned` + `togglePinProduct` = ulubione też dla dań.
+- **Biblioteka presetów:** `MealPreset.cat` (PRESET_CATS: kanapki/naleśniki/dania/wypieki/sałatki/
+  napoje/przekąski/inne) + `pinned` + `togglePinPreset`; w add.tsx quick-row przypięte na górze,
+  wyszukiwarka gdy >6, long-press=przypnij; okno presetu: Przypnij/Edytuj/Usuń + pomijanie składników.
 - **TODO (etapy):** przeniesienie EDYCJI wagi z Zdrowia (Krok B — jeden zapisujący),
-  prognoza wagi z realnego jedzenia, podmiana/pominięcie składnika w presecie przy jedzeniu.
+  prognoza wagi z realnego jedzenia, jednoprzyciskowa PODMIANA sosu w daniu (dziś: pomiń + dodaj nowy).
 
 ## 9. Pupil (kot) — patrz memory [[pet_blob_design]]
 

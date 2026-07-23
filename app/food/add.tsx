@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers } from 'lucide-react-native';
+import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers, ChefHat } from 'lucide-react-native';
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
   MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry,
   presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
-  PRESET_CATS, presetCatLabel,
+  PRESET_CATS, presetCatLabel, isRecipeProduct,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { FOOD_SUBCATS, FOOD_SUBCAT_META } from '@/utils/food';
@@ -40,6 +40,7 @@ interface Candidate {
   unitGrams?: Partial<Record<FoodUnit, number>>;
   defaultUnit?: FoodUnit;
   productId?: string;
+  isRecipe?: boolean;
   source: 'curated' | 'base';
 }
 
@@ -61,10 +62,11 @@ export default function FoodAdd() {
   const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
-  const params = useLocalSearchParams<{ date?: string; edit?: string }>();
+  const params = useLocalSearchParams<{ date?: string; edit?: string; preset?: string }>();
   const mealDate = typeof params.date === 'string' && params.date ? params.date
     : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
   const editId = typeof params.edit === 'string' ? params.edit : undefined;
+  const editPresetParam = typeof params.preset === 'string' ? params.preset : undefined;
 
   const [mealType, setMealType] = useState<MealType>(defaultMealType());
   const [items, setItems]       = useState<MealItem[]>([]);
@@ -77,6 +79,17 @@ export default function FoodAdd() {
     const m = storeMeals.find(x => x.id === editId);
     if (m) { setMealType(m.type); setItems(m.items.map(it => ({ ...it }))); setNote(m.note ?? ''); }
   }, [editId]);
+
+  // Opened from the library to edit a preset → load its ingredients into the builder.
+  useEffect(() => {
+    if (!editPresetParam) return;
+    const p = presets.find(x => x.id === editPresetParam);
+    if (p) {
+      setItems(p.items.map(it => ({ ...it })));
+      if (p.type) setMealType(p.type);
+      setEditPresetId(p.id); setPName(p.name); setPYields(p.yields ? String(p.yields) : ''); setPCat(p.cat ?? '');
+    }
+  }, [editPresetParam]);
 
   // portion picker (for a selected candidate)
   const [sel, setSel]           = useState<Candidate | null>(null);
@@ -171,7 +184,7 @@ export default function FoodAdd() {
     const curated: Candidate[] = products.map(p => ({
       name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
       protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
-      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated',
+      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: isRecipeProduct(p), source: 'curated',
       _rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
     } as any));
     const q = query.trim();
@@ -197,7 +210,8 @@ export default function FoodAdd() {
   // find (intuitive category picking). Search still uses the flat ranked list.
   const catGroups = useMemo(() => {
     if (query.trim()) return null;
-    const curated = products.map(p => ({
+    // Browse-by-category = raw ingredients only; cooked dishes surface via search.
+    const curated = products.filter(p => !isRecipeProduct(p)).map(p => ({
       name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
       protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
       unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated' as const,
@@ -402,9 +416,14 @@ export default function FoodAdd() {
           {query.length > 0 && <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}><X size={16} color={c.text.muted} /></TouchableOpacity>}
         </View>
 
-        <TouchableOpacity style={s.manualBtn} onPress={() => { haptic.tap(); setMName(query); setMKcal(''); setManual(true); }}>
-          <Pencil size={15} color={ACCENT} /><Text style={s.manualTxt}>Wpisz ręcznie (kcal na oko)</Text>
-        </TouchableOpacity>
+        <View style={s.linkRow}>
+          <TouchableOpacity style={s.manualBtn} onPress={() => { haptic.tap(); setMName(query); setMKcal(''); setManual(true); }}>
+            <Pencil size={15} color={ACCENT} /><Text style={s.manualTxt}>Wpisz ręcznie</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.manualBtn} onPress={() => { haptic.tap(); router.push('/food/recipe' as any); }}>
+            <ChefHat size={15} color={ACCENT} /><Text style={s.manualTxt}>Nowy przepis / danie</Text>
+          </TouchableOpacity>
+        </View>
 
         {!query && <Text style={s.sectionHint}>{products.length > 0 ? 'Twoje produkty · po kategoriach' : 'Baza produktów'}</Text>}
 
@@ -445,10 +464,13 @@ export default function FoodAdd() {
             {candidates.map((cand, i) => (
               <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                  <View style={s.candNameRow}>
+                    {cand.isRecipe ? <ChefHat size={13} color={ACCENT} /> : null}
+                    <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                  </View>
                   <Text style={s.candMeta}>
                     {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
-                    {cand.source === 'curated' ? '  ·  moje' : ''}
+                    {cand.isRecipe ? '  ·  danie' : cand.source === 'curated' ? '  ·  moje' : ''}
                   </Text>
                 </View>
                 <Plus size={18} color={ACCENT} />
@@ -719,6 +741,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   searchBox:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 46 },
   searchInput: { flex: 1, fontSize: 15, color: c.text.primary },
 
+  linkRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[4], flexWrap: 'wrap' },
   manualBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4 },
   manualTxt: { fontSize: 13, fontWeight: '700', color: ACCENT },
 
@@ -729,7 +752,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   catHeadCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 
   candRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 9 },
-  candName: { fontSize: 14, fontWeight: '600', color: c.text.primary },
+  candNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  candName: { fontSize: 14, fontWeight: '600', color: c.text.primary, flexShrink: 1 },
   candMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
 
   saveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing[4], paddingBottom: spacing[5], backgroundColor: c.bg.primary + 'F2' },

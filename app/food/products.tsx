@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Plus, Search, X, Utensils } from 'lucide-react-native';
 
-import { useFoodStore } from '@/store/foodStore';
+import { useFoodStore, isRecipeProduct } from '@/store/foodStore';
 import { FOOD_SUBCAT_META } from '@/utils/food';
 import { normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
@@ -21,9 +21,11 @@ export default function FoodProducts() {
   const [query, setQuery] = useState('');
 
   const list = useMemo(() => {
+    // Raw ingredients only — cooked dishes (recipes) live under "Kompozycje i dania".
+    const base = products.filter(p => !isRecipeProduct(p));
     const q = normalizeProductName(query);
-    const filtered = q ? products.filter(p => normalizeProductName(p.name).includes(q)) : products;
-    return [...filtered].sort((a, b) => (b.uses - a.uses) || a.name.localeCompare(b.name, 'pl'));
+    const filtered = q ? base.filter(p => normalizeProductName(p.name).includes(q)) : base;
+    return [...filtered].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || (b.uses - a.uses) || a.name.localeCompare(b.name, 'pl'));
   }, [products, query]);
 
   return (
@@ -32,6 +34,16 @@ export default function FoodProducts() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={26} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.headerTitle}>Moje produkty</Text>
         <TouchableOpacity onPress={() => { haptic.tap(); router.push('/food/product' as any); }} hitSlop={10}><Plus size={24} color={ACCENT} /></TouchableOpacity>
+      </View>
+
+      {/* Produkty | Kompozycje i dania */}
+      <View style={s.segment}>
+        <View style={[s.segBtn, s.segOn]}>
+          <Text style={[s.segTxt, s.segTxtOn]}>Produkty</Text>
+        </View>
+        <TouchableOpacity style={s.segBtn} onPress={() => { haptic.tap(); router.replace('/food/library' as any); }}>
+          <Text style={s.segTxt}>Kompozycje i dania</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={s.searchBox}>
@@ -73,6 +85,11 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
   headerTitle: { fontSize: 17, fontWeight: '800', color: c.text.primary },
+  segment: { flexDirection: 'row', marginHorizontal: spacing[4], marginBottom: spacing[2], backgroundColor: c.fill.subtle, borderRadius: radius.full, padding: 3 },
+  segBtn:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: radius.full },
+  segOn:   { backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.default },
+  segTxt:  { fontSize: 13, fontWeight: '700', color: c.text.muted },
+  segTxtOn: { color: c.text.primary },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginHorizontal: spacing[4], marginBottom: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 44 },
   searchInput: { flex: 1, fontSize: 15, color: c.text.primary },
   scroll: { paddingHorizontal: spacing[4], paddingBottom: 40, gap: 2 },

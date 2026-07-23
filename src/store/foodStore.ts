@@ -52,6 +52,8 @@ export interface FoodProduct {
   lastUsed?: number;
   createdAt: number;
   fromBase?: boolean;                            // seeded from the offline base
+  pinned?: boolean;                              // favourite — floats to the top of the library
+  recipe?: RecipeMeta;                           // set → a cooked dish; kcal/100g is DERIVED from it
 }
 
 // One line inside a logged meal — grams & kcal are RESOLVED at log time and stored,
@@ -70,6 +72,15 @@ export interface MealItem {
   fat?: number;
   parts?: MealItem[];   // set for composite/preset lines
   presetId?: string;
+}
+
+// A cooked dish stored ON a product: the raw ingredients you cooked from + the weight
+// of the FINISHED dish (weighed after frying/baking). kcal/100g is DERIVED — total
+// ingredient kcal ÷ cooked weight — so you log the dish by WEIGHING your portion, and
+// water lost to evaporation is handled for free (calories don't evaporate, weight does).
+export interface RecipeMeta {
+  ingredients: MealItem[];
+  cookedWeight: number;   // g of the finished dish
 }
 
 // Resolved macro grams for a portion of a product (density × grams). 0s when unknown.
@@ -124,6 +135,7 @@ export const PRESET_CATS: { tag: string; label: string }[] = [
   { tag: 'kanapki',   label: 'Kanapki' },
   { tag: 'nalesniki', label: 'Naleśniki' },
   { tag: 'dania',     label: 'Dania' },
+  { tag: 'wypieki',   label: 'Ciasta / wypieki' },
   { tag: 'salatki',   label: 'Sałatki' },
   { tag: 'napoje',    label: 'Napoje / shaki' },
   { tag: 'przekaski', label: 'Przekąski' },
@@ -177,6 +189,29 @@ export function presetMacros(p: MealPreset): { protein: number; carbs: number; f
   }), { protein: 0, carbs: 0, fat: 0 });
 }
 const r1 = (n: number) => Math.round(n * 10) / 10;
+
+// ── cooked-recipe maths ───────────────────────────────────────────────────────
+export function recipeTotals(ings: MealItem[]): { kcal: number; protein: number; carbs: number; fat: number; grams: number } {
+  return ings.reduce((a, it) => ({
+    kcal: a.kcal + (it.kcal || 0), protein: a.protein + (it.protein || 0),
+    carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0), grams: a.grams + (it.grams || 0),
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, grams: 0 });
+}
+// Per-100 g density of a cooked dish. Falls back to the raw ingredient weight when the
+// cooked weight isn't set yet (live preview while you're still building the recipe).
+export function recipeDensity(ings: MealItem[], cookedWeight: number): {
+  kcalPer100g: number; protein100?: number; carbs100?: number; fat100?: number; totalKcal: number; weight: number;
+} {
+  const t = recipeTotals(ings);
+  const w = cookedWeight > 0 ? cookedWeight : (t.grams > 0 ? t.grams : 0);
+  if (!(w > 0)) return { kcalPer100g: 0, totalKcal: t.kcal, weight: 0 };
+  const per = (v: number) => { const x = Math.round((v / w) * 1000) / 10; return x > 0 ? x : undefined; };
+  return { kcalPer100g: Math.round((t.kcal / w) * 100), protein100: per(t.protein), carbs100: per(t.carbs), fat100: per(t.fat), totalKcal: t.kcal, weight: w };
+}
+export function isRecipeProduct(p: FoodProduct): boolean {
+  return !!p.recipe && p.recipe.ingredients.length > 0;
+}
+
 // A composite meal line from a preset applied ×mult ("Kanapka ×2"): summed kcal +
 // macros; components kept in `parts` for the breakdown.
 export function presetToItem(p: MealPreset, mult: number): MealItem {
@@ -214,6 +249,9 @@ interface FoodState {
   upsertProductByName: (name: string, seed?: Partial<FoodProduct>) => FoodProduct;
   findProductByName: (name: string) => FoodProduct | undefined;
   learnPortion: (id: string, unit: FoodUnit, grams: number) => void;
+  togglePinProduct: (id: string) => void;
+  // create/update a cooked-dish product: kcal/100g derived from ingredients ÷ cooked weight
+  saveRecipeProduct: (name: string, ingredients: MealItem[], cookedWeight: number, cat?: string, id?: string) => FoodProduct;
   markFresh: (name: string) => void;            // one product bought
   markFreshMany: (names: string[]) => void;     // a receipt's worth (already-counted only)
 
@@ -272,6 +310,20 @@ export const useFoodStore = create<FoodState>()(
           products: s.products.map(p =>
             p.id === id ? { ...p, unitGrams: { ...(p.unitGrams ?? {}), [unit]: Math.round(grams) }, defaultUnit: unit } : p),
         }));
+      },
+      togglePinProduct: (id) => set(s => ({ products: s.products.map(p => (p.id === id ? { ...p, pinned: !p.pinned } : p)) })),
+      saveRecipeProduct: (name, ingredients, cookedWeight, cat, id) => {
+        const d = recipeDensity(ingredients, cookedWeight);
+        const patch: Partial<FoodProduct> = {
+          name: name.trim(),
+          kcalPer100g: d.kcalPer100g, kcalPerPortion: undefined,
+          protein100: d.protein100, carbs100: d.carbs100, fat100: d.fat100,
+          cat: cat || 'inne', defaultUnit: 'g',
+          recipe: { ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(cookedWeight) },
+        };
+        const existing = id ? get().products.find(p => p.id === id) : undefined;
+        if (existing) { get().updateProduct(existing.id, patch); return get().products.find(p => p.id === existing.id)!; }
+        return get().upsertProductByName(name, patch);
       },
       markFresh: (name) => {
         const key = normalizeProductName(name);
