@@ -60,6 +60,12 @@ const BASE: Omit<CatPalette, 'mark'>[] = [
   nat('caramel',  'Karmelowy',     '#C88A4E', '#3A2818', 130),
   nat('charcoal', 'Grafitowy',     '#363B45', '#AEB6C4', 150),
   nat('snow',     'Śnieżny',       '#FBFCFE', '#3B3C4E', 160),
+  // ── premium (długoterminowe cele na monety) ──
+  nat('rose',     'Różany szary',  '#C9AEB0', '#4A3A3C', 180),
+  nat('coffee',   'Kawowy',        '#5A4636', '#E6DAD0', 190),
+  nat('platinum', 'Platynowy',     '#DDE1E7', '#3B3C4E', 210),
+  nat('midnight', 'Nocny',         '#2C3140', '#9FB0D0', 240),
+  nat('sand',     'Piaskowy',      '#DCC9A6', '#4A3E2A', 200),
 ];
 
 export const CAT_PALETTES: CatPalette[] = BASE.map(p => ({ ...p, mark: markFor(p.coat) }));

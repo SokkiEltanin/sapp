@@ -225,6 +225,19 @@ export default function Food() {
     };
   }, [meals, burnByDay, burn, today, goalMode, manualGoal]);
 
+  // Prognoza wagi z REALNEGO jedzenia: przy średnim dziennym bilansie ile ważysz do celu.
+  const weightProjection = useMemo(() => {
+    if (!(weightGoal > 0) || !(weightKg > 0) || avgStats.eatDays < 3) return null;
+    const kgPerWeek = (avgStats.avgBal * 7) / 7700;            // >0 = deficyt = spadek wagi
+    const remaining = weightKg - weightGoal;                    // >0 = trzeba schudnąć
+    const toward = (remaining > 0 && kgPerWeek > 0) || (remaining < 0 && kgPerWeek < 0);
+    if (!toward || Math.abs(kgPerWeek) < 0.03) return { stalled: true as const };
+    const weeks = Math.abs(remaining) / Math.abs(kgPerWeek);
+    if (weeks > 156) return { stalled: true as const };
+    const eta = new Date(Date.now() + weeks * 7 * 864e5);
+    return { stalled: false as const, kgPerWeek: +kgPerWeek.toFixed(2), eta: eta.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' }) };
+  }, [weightGoal, weightKg, avgStats]);
+
   // simple ETA to weight goal from the logged trend over the window
   const weightEta = useMemo(() => {
     if (!(weightGoal > 0) || weightSeries.length < 2 || !(weightKg > 0)) return null;
@@ -407,6 +420,11 @@ export default function Food() {
             <Text style={s.avgRec}>
               {goalMode === 'cut' ? 'Aby chudnąć (−0,5 kg/tydz.)' : goalMode === 'bulk' ? 'Na masę' : 'Aby utrzymać wagę'}: jedz <Text style={s.avgRecB}>~{avgStats.recommended.toLocaleString('pl-PL')} kcal/dzień</Text> (od średniego spalania {avgStats.avgBurn.toLocaleString('pl-PL')})
             </Text>
+            {weightProjection && (
+              weightProjection.stalled
+                ? <Text style={[s.avgRec, { color: c.text.muted }]}>Prognoza wagi: w tym tempie cel {weightGoal} kg jest daleko / w drugą stronę — dostosuj jedzenie.</Text>
+                : <Text style={s.avgRec}>Przy tym tempie ({weightProjection.kgPerWeek > 0 ? '−' : '+'}{Math.abs(weightProjection.kgPerWeek)} kg/tydz.) osiągniesz <Text style={s.avgRecB}>{weightGoal} kg</Text> ok. <Text style={s.avgRecB}>{weightProjection.eta}</Text></Text>
+            )}
           </View>
         )}
 

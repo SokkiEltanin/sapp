@@ -92,6 +92,7 @@ export default function FoodAdd() {
   const [applying, setApplying] = useState<MealPreset | null>(null);
   const [mult, setMult]         = useState(1);          // assembled meal ×N
   const [dishPortions, setDishPortions] = useState(1);  // dish: portions eaten (of its `yields`)
+  const [excludedParts, setExcludedParts] = useState<Set<number>>(new Set()); // składniki pominięte przy jedzeniu
   const [saveP, setSaveP]       = useState(false);
   const [pName, setPName]       = useState('');
   const [pYields, setPYields]   = useState('');         // "ile porcji wychodzi" (dish)
@@ -114,20 +115,20 @@ export default function FoodAdd() {
 
   const applyPreset = () => {
     if (!applying) return;
+    const inc = applying.items.filter((_, i) => !excludedParts.has(i));   // only what you actually ate
+    if (inc.length === 0) { setApplying(null); return; }
+    const sum = (f: (it: MealItem) => number) => inc.reduce((s, it) => s + (f(it) || 0), 0);
     const isDish = !!(applying.yields && applying.yields > 1);
-    if (isDish) {
-      const factor = dishPortions / applying.yields!;          // fraction of the whole batch
-      const mm = presetMacros(applying);
-      const r1 = (n: number) => Math.round(n * factor * 10) / 10 || undefined;
-      setItems(prev => [...prev, {
-        name: applying.name, qty: dishPortions, unit: 'porcja' as FoodUnit,
-        grams: Math.round(presetGrams(applying) * factor), kcal: Math.round(presetKcal(applying) * factor),
-        protein: r1(mm.protein), carbs: r1(mm.carbs), fat: r1(mm.fat),
-        parts: applying.items.map(it => ({ ...it })), presetId: applying.id,
-      }]);
-    } else {
-      setItems(prev => [...prev, presetToItem(applying, mult)]);
-    }
+    const factor = isDish ? (dishPortions / applying.yields!) : mult;
+    const r1 = (n: number) => Math.round(n * factor * 10) / 10 || undefined;
+    const changed = excludedParts.size > 0;
+    setItems(prev => [...prev, {
+      name: applying.name + (changed ? ' (bez części)' : ''),
+      qty: isDish ? dishPortions : mult, unit: 'porcja' as FoodUnit,
+      grams: Math.round(sum(it => it.grams) * factor), kcal: Math.round(sum(it => it.kcal) * factor),
+      protein: r1(sum(it => it.protein ?? 0)), carbs: r1(sum(it => it.carbs ?? 0)), fat: r1(sum(it => it.fat ?? 0)),
+      parts: inc.map(it => ({ ...it })), presetId: applying.id,
+    }]);
     bumpPreset(applying.id);
     setApplying(null);
   };
@@ -326,7 +327,7 @@ export default function FoodAdd() {
         {(presets.length > 0 || recentMeals.length > 0) && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
             {presets.map(p => (
-              <TouchableOpacity key={p.id} style={s.quickChip} onPress={() => { haptic.tap(); setMult(1); setDishPortions(1); setApplying(p); }}
+              <TouchableOpacity key={p.id} style={s.quickChip} onPress={() => { haptic.tap(); setMult(1); setDishPortions(1); setExcludedParts(new Set()); setApplying(p); }}
                 onLongPress={() => { haptic.tap(); removePreset(p.id); }} delayLongPress={450}>
                 <Star size={13} color={ACCENT} fill={ACCENT} />
                 <Text style={s.quickTxt} numberOfLines={1}>{p.name}{p.yields && p.yields > 1 ? ` · ${p.yields} porcji` : ''}</Text>
@@ -537,12 +538,29 @@ export default function FoodAdd() {
           <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
             {applying && (() => {
               const isDish = !!(applying.yields && applying.yields > 1);
-              const total = presetKcal(applying);
-              const kcalNow = isDish ? Math.round(total * (dishPortions / applying.yields!)) : Math.round(total * mult);
+              const factor = isDish ? (dishPortions / applying.yields!) : mult;
+              const incTotal = applying.items.reduce((sm, it, i) => sm + (excludedParts.has(i) ? 0 : it.kcal), 0);
+              const kcalNow = Math.round(incTotal * factor);
               return (
               <>
                 <Text style={s.sheetTitle}>{applying.name}</Text>
-                <Text style={s.sheetSub}>{applying.items.map(i => i.name).join(', ')}{isDish ? `  ·  całość ${total} kcal / ${applying.yields} porcji` : ''}</Text>
+                {isDish && <Text style={s.sheetSub}>Całość {presetKcal(applying)} kcal / {applying.yields} porcji</Text>}
+                {applying.items.length > 1 && (
+                  <View style={s.partsBox}>
+                    {applying.items.map((it, i) => {
+                      const off = excludedParts.has(i);
+                      return (
+                        <TouchableOpacity key={i} style={s.partRow} activeOpacity={0.7}
+                          onPress={() => { haptic.tap(); setExcludedParts(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; }); }}>
+                          <Text style={[s.partName, off && { color: c.text.muted, textDecorationLine: 'line-through' }]} numberOfLines={1}>{it.name}</Text>
+                          <Text style={[s.partKcal, off && { color: c.text.muted }]}>{it.kcal} kcal</Text>
+                          {off ? <Plus size={14} color={c.text.muted} /> : <X size={14} color={colors.accent.red} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <Text style={s.partsHint}>Stuknij składnik, by pominąć (np. kanapka bez sera)</Text>
+                  </View>
+                )}
                 {isDish ? (
                   <>
                     <View style={s.qtyRow}>
@@ -630,6 +648,11 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   savePresetTxt: { fontSize: 12.5, fontWeight: '700', color: ACCENT },
 
+  partsBox:  { gap: 2, backgroundColor: c.fill.subtle, borderRadius: radius.lg, padding: spacing[2] },
+  partRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6, paddingHorizontal: spacing[2] },
+  partName:  { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.primary },
+  partKcal:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  partsHint: { fontSize: 11, color: c.text.muted, paddingHorizontal: spacing[2], paddingTop: 2 },
   multRow:  { flexDirection: 'row', gap: spacing[2], justifyContent: 'center' },
   multChip: { minWidth: 56, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   multTxt:  { fontSize: 15, fontWeight: '800', color: c.text.secondary },
