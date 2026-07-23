@@ -54,9 +54,16 @@ export default function RecipeBuilder() {
   // ingredient portion picker
   const [sel, setSel]           = useState<Candidate | null>(null);
   const [unit, setUnit]         = useState<FoodUnit>('g');
-  const [qty, setQty]           = useState(1);
+  const [qtyText, setQtyText]   = useState('1');       // wpisywana ilość (0,5 / 1,5 szklanki)
   const [gramsOverride, setGramsOverride] = useState('');
   const [kcal100, setKcal100]   = useState('');
+  const qty = parseFloat(qtyText.replace(',', '.')) || 0;
+  const bumpQty = (dir: 1 | -1) => setQtyText(prev => {
+    const q = parseFloat(prev.replace(',', '.')) || 0;
+    const step = q >= 2 ? 1 : 0.5;
+    const nq = Math.max(0.5, +(q + dir * step).toFixed(2));
+    return nq % 1 === 0 ? String(nq) : String(nq);
+  });
 
   // prefill when editing an existing recipe product
   useEffect(() => {
@@ -116,7 +123,7 @@ export default function RecipeBuilder() {
   const openPicker = (cand: Candidate) => {
     haptic.tap();
     const u: FoodUnit = cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g';
-    setSel(cand); setUnit(u); setQty(1); setGramsOverride('');
+    setSel(cand); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
   };
   const addNew = () => { const nm = query.trim(); if (nm) openPicker({ name: nm, source: 'base' }); };
@@ -310,10 +317,14 @@ export default function RecipeBuilder() {
                   ) : (
                     <>
                       <View style={s.qtyRow}>
-                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => Math.max(0.5, +(q - (q > 2 ? 1 : 0.5)).toFixed(1))); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
-                        <View style={s.qtyCenter}><Text style={s.qtyVal}>{qty % 1 === 0 ? qty : qty.toFixed(1)}</Text><Text style={s.qtyUnit}>{unitLabel(unit)}</Text></View>
-                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => +(q + (q >= 2 ? 1 : 0.5)).toFixed(1)); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
+                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); bumpQty(-1); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
+                        <View style={s.qtyCenter}>
+                          <TextInput style={s.qtyValInput} value={qtyText} onChangeText={t => setQtyText(t.replace(/[^0-9.,]/g, ''))} keyboardType="numeric" selectTextOnFocus />
+                          <Text style={s.qtyUnit}>{unitLabel(unit)}</Text>
+                        </View>
+                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); bumpQty(1); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
                       </View>
+                      <Text style={s.qtyHint}>możesz wpisać ułamek — np. 0,5 albo 1,5 szklanki</Text>
                       <View style={s.fieldRow}>
                         <Text style={s.fieldLabel}>Dokładnie (g)</Text>
                         <TextInput style={s.smInput} value={gramsOverride} onChangeText={setGramsOverride} keyboardType="numeric" placeholder={`${Math.round(pickerGrams())}`} placeholderTextColor={c.text.muted} />
@@ -407,9 +418,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   qtyRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
   qtyBtn:    { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
-  qtyCenter: { alignItems: 'center', minWidth: 90 },
-  qtyVal:    { fontSize: 30, fontWeight: '800', color: c.text.primary },
-  qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  qtyCenter: { alignItems: 'center', minWidth: 96 },
+  qtyValInput: { minWidth: 74, height: 44, textAlign: 'center', fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
+  qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 2 },
+  qtyHint:   { fontSize: 11, color: c.text.muted, textAlign: 'center' },
 
   fieldRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1] },
   fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },

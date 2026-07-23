@@ -168,10 +168,12 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   porcje domowe; `searchFoodBase(q)`. Startowa — to co user doda/zweryfikuje w foodStore wygrywa.
 - `app/(tabs)/food.tsx` — kafelek pierścienia (zjedzone vs cel + spalone + zostało), wybór
   celu (redukcja/utrzymanie/masa), lista dzisiejszych posiłków wg typu. FAB „Co zjadłem" =
-  `ACTIONS[5]` w TabBar → `app/food/add.tsx` (szukaj w bazie/moich/ostatnich → picker
-  jednostki+ilości z podglądem kcal + override gram który UCZY porcję; „Wpisz ręcznie" =
-  produkt kcalPerPortion który się zapamiętuje). Reużywa `productMemory` (KcalMemory) i
-  `normalizeProductName` do tożsamości.
+  `ACTIONS[5]` w TabBar → `app/food/add.tsx`. **Domyślny widok = KOMPOZYCJE I DANIA** (ulubione
+  na górze, potem wg PRESET_CATS; presety→okno apply, dania→picker gramów; gwiazdka/long-press
+  przypina). **Pojedyncze produkty TYLKO pod wyszukiwarką** (`libMatches` = presety+dania,
+  reszta z `candidates` odfiltrowana z isRecipe). Picker jednostki+ilości: ilość EDYTOWALNA
+  (ułamki 0,5/1,5 — `qtyText`+`bumpQty`), podgląd kcal, override gram UCZY porcję; „Wpisz
+  ręcznie" = produkt kcalPerPortion. Reużywa `productMemory` + `normalizeProductName`.
 - **Bilans kalorii:** `getHealthHistory` niesie `burn` per dzień → karta „Bilans tygodnia"
   na zakładce Jedzenie (7 słupków deficyt/nadwyżka + ≈kg) ORAZ sekcja dashboardu
   `calorie-balance` (memo `calorieBalance`; StatCtx.healthDays ma teraz `burn?`). Deficyt

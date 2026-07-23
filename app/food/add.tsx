@@ -6,12 +6,11 @@ import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, Rotat
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
-  MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry,
+  MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry, FoodProduct,
   presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
   PRESET_CATS, presetCatLabel, isRecipeProduct,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
-import { FOOD_SUBCATS, FOOD_SUBCAT_META } from '@/utils/food';
 import { normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -44,6 +43,13 @@ interface Candidate {
   source: 'curated' | 'base';
 }
 
+// One row in the meal library (the main browse): a saved composition (preset) or a
+// cooked dish (recipe product). Tapping logs it; long-press pins it.
+interface LibEntry {
+  key: string; kind: 'preset' | 'dish'; id: string; name: string; cat: string;
+  pinned: boolean; uses: number; meta: string; preset?: MealPreset; product?: FoodProduct;
+}
+
 export default function FoodAdd() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -58,6 +64,7 @@ export default function FoodAdd() {
   const removePreset        = useFoodStore(st => st.removePreset);
   const bumpPreset          = useFoodStore(st => st.bumpPreset);
   const togglePinPreset     = useFoodStore(st => st.togglePinPreset);
+  const togglePinProduct    = useFoodStore(st => st.togglePinProduct);
   const upsertProductByName = useFoodStore(st => st.upsertProductByName);
   const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
@@ -94,8 +101,14 @@ export default function FoodAdd() {
   // portion picker (for a selected candidate)
   const [sel, setSel]           = useState<Candidate | null>(null);
   const [unit, setUnit]         = useState<FoodUnit>('g');
-  const [qty, setQty]           = useState(1);
+  const [qtyText, setQtyText]   = useState('1');            // wpisywana ilość (0,5 / 1,5 jednostki)
   const [gramsOverride, setGramsOverride] = useState('');   // for unit 'g' this IS the grams (from the scale)
+  const qty = parseFloat(qtyText.replace(',', '.')) || 0;
+  const bumpQty = (dir: 1 | -1) => setQtyText(prev => {
+    const q = parseFloat(prev.replace(',', '.')) || 0;
+    const step = q >= 2 ? 1 : 0.5;
+    return String(Math.max(0.5, +(q + dir * step).toFixed(2)));
+  });
   const [kcal100, setKcal100]             = useState('');   // kcal per 100 g used for the calc (prefilled if known)
 
   // manual entry
@@ -112,7 +125,6 @@ export default function FoodAdd() {
   const [pName, setPName]       = useState('');
   const [pYields, setPYields]   = useState('');         // "ile porcji wychodzi" (dish)
   const [pCat, setPCat]         = useState('');         // library category
-  const [presetQuery, setPresetQuery] = useState('');   // search presets in the quick row
   const [editPresetId, setEditPresetId] = useState<string | null>(null);   // editing an existing preset
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
@@ -130,12 +142,46 @@ export default function FoodAdd() {
     return out;
   }, [storeMeals]);
 
-  // Preset library view: pinned first, then most-used; filtered by search.
-  const sortedPresets = useMemo(() => {
-    const q = normalizeProductName(presetQuery);
-    const list = q ? presets.filter(p => normalizeProductName(p.name).includes(q) || normalizeProductName(presetCatLabel(p.cat)).includes(q)) : presets;
-    return [...list].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || (b.uses - a.uses) || a.name.localeCompare(b.name, 'pl'));
-  }, [presets, presetQuery]);
+  // ── meal library: kompozycje (presety) + dania (przepisy) = GŁÓWNY widok ──
+  const dishes = useMemo(() => products.filter(isRecipeProduct), [products]);
+  const libEntries: LibEntry[] = useMemo(() => {
+    const fromPresets: LibEntry[] = presets.map(p => ({
+      key: 'p-' + p.id, kind: 'preset', id: p.id, name: p.name, cat: p.cat || 'inne', pinned: !!p.pinned, uses: p.uses,
+      meta: p.yields && p.yields > 1 ? `${Math.round(presetKcal(p) / p.yields)} kcal/porcja · ${p.yields} porcji` : `${presetKcal(p)} kcal · ${p.items.length} skł.`,
+      preset: p,
+    }));
+    const fromDishes: LibEntry[] = dishes.map(p => ({
+      key: 'd-' + p.id, kind: 'dish', id: p.id, name: p.name, cat: p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania', pinned: !!p.pinned, uses: p.uses,
+      meta: `${p.kcalPer100g ?? 0} kcal/100g · danie`,
+      product: p,
+    }));
+    return [...fromPresets, ...fromDishes];
+  }, [presets, dishes]);
+
+  const byRank = (a: LibEntry, b: LibEntry) => (b.uses - a.uses) || a.name.localeCompare(b.name, 'pl');
+
+  // Default browse (no search): favourites first, then by category.
+  const librarySections = useMemo(() => {
+    const pinned = libEntries.filter(e => e.pinned).sort(byRank);
+    const rest = libEntries.filter(e => !e.pinned);
+    const out: { tag: string; label: string; items: LibEntry[] }[] = [];
+    if (pinned.length) out.push({ tag: '_fav', label: 'Ulubione', items: pinned });
+    for (const pc of PRESET_CATS) {
+      const its = rest.filter(e => e.cat === pc.tag).sort(byRank);
+      if (its.length) out.push({ tag: pc.tag, label: pc.label, items: its });
+    }
+    const known = new Set(PRESET_CATS.map(p => p.tag));
+    const other = rest.filter(e => !known.has(e.cat)).sort(byRank);
+    if (other.length) out.push({ tag: '_inne', label: 'Inne', items: other });
+    return out;
+  }, [libEntries]);
+
+  // Search: matching compositions AND dishes (single products come from `candidates`).
+  const libMatches = useMemo(() => {
+    const q = normalizeProductName(query);
+    if (!q) return [] as LibEntry[];
+    return libEntries.filter(e => normalizeProductName(e.name).includes(q) || normalizeProductName(presetCatLabel(e.cat)).includes(q)).sort(byRank);
+  }, [libEntries, query]);
 
   const applyPreset = () => {
     if (!applying) return;
@@ -206,30 +252,6 @@ export default function FoodAdd() {
     return [...curatedMatch, ...base];
   }, [products, query]);
 
-  // When NOT searching, group products by category so your own items are easy to
-  // find (intuitive category picking). Search still uses the flat ranked list.
-  const catGroups = useMemo(() => {
-    if (query.trim()) return null;
-    // Browse-by-category = raw ingredients only; cooked dishes surface via search.
-    const curated = products.filter(p => !isRecipeProduct(p)).map(p => ({
-      name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
-      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
-      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated' as const,
-      rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
-    })).sort((a, b) => b.rank - a.rank);
-    const map: Record<string, Candidate[]> = {};
-    for (const c of curated) { const k = c.cat || 'inne'; (map[k] ??= []).push(c); }
-    const order = [...FOOD_SUBCATS.map(s => s.tag), 'inne'];
-    const sections = order.filter(k => map[k]?.length).map(k => ({
-      tag: k, label: FOOD_SUBCAT_META[k]?.label ?? k, color: FOOD_SUBCAT_META[k]?.color ?? '#9CA3AF', items: map[k],
-    }));
-    const seen = new Set(curated.map(x => normalizeProductName(x.name)));
-    const base: Candidate[] = searchFoodBase('', 40).filter(f => !seen.has(normalizeProductName(f.name)))
-      .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' as const }));
-    if (base.length) sections.push({ tag: 'baza', label: 'Baza (warzywa i owoce)', color: '#9CA3AF', items: base });
-    return sections;
-  }, [products, query]);
-
   // ── picker helpers ───────────────────────────────────────────────────────
   const pickerUnits = useMemo(() => {
     if (!sel) return ['g'] as FoodUnit[];
@@ -243,9 +265,22 @@ export default function FoodAdd() {
     // With a kitchen scale the grams path is the accurate one, so default to 'g' when
     // the food is density-based (kcal/100g); otherwise its household unit.
     const u: FoodUnit = cand.kcalPer100g != null ? 'g' : (cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g');
-    setSel(cand); setUnit(u); setQty(1); setGramsOverride('');
+    setSel(cand); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
   };
+
+  // A cooked dish (recipe product) → the normal grams picker (weigh your portion).
+  const productToCandidate = (p: FoodProduct): Candidate => ({
+    name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
+    protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
+    unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: true, source: 'curated',
+  });
+  const tapEntry = (e: LibEntry) => {
+    haptic.tap();
+    if (e.kind === 'preset' && e.preset) { setMult(1); setDishPortions(1); setExcludedParts(new Set()); setApplying(e.preset); }
+    else if (e.kind === 'dish' && e.product) openPicker(productToCandidate(e.product));
+  };
+  const pinEntry = (e: LibEntry) => { haptic.tap(); e.kind === 'dish' ? togglePinProduct(e.id) : togglePinPreset(e.id); };
 
   const density = () => {
     const k = parseFloat(kcal100.replace(',', '.'));
@@ -348,38 +383,6 @@ export default function FoodAdd() {
           })}
         </View>
 
-        {/* quick: preset library (pinned first + search) + repeat recent */}
-        {(presets.length > 0 || recentMeals.length > 0) && (
-          <View style={{ gap: spacing[2] }}>
-            {presets.length > 6 && (
-              <View style={s.presetSearch}>
-                <Search size={15} color={c.text.muted} />
-                <TextInput style={s.searchInput} value={presetQuery} onChangeText={setPresetQuery} placeholder="Szukaj presetu / kategorii…" placeholderTextColor={c.text.muted} />
-                {presetQuery.length > 0 && <TouchableOpacity onPress={() => setPresetQuery('')} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>}
-              </View>
-            )}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
-              {sortedPresets.map(p => (
-                <TouchableOpacity key={p.id} style={[s.quickChip, p.pinned && { borderColor: ACCENT, backgroundColor: ACCENT + '14' }]}
-                  onPress={() => { haptic.tap(); setMult(1); setDishPortions(1); setExcludedParts(new Set()); setApplying(p); }}
-                  onLongPress={() => { haptic.tap(); togglePinPreset(p.id); }} delayLongPress={400}>
-                  <Star size={13} color={ACCENT} fill={p.pinned ? ACCENT : 'transparent'} />
-                  <Text style={s.quickTxt} numberOfLines={1}>{p.name}{p.yields && p.yields > 1 ? ` · ${p.yields} porcji` : ''}</Text>
-                  <Text style={s.quickKcal}>{p.yields && p.yields > 1 ? Math.round(presetKcal(p) / p.yields) : presetKcal(p)}</Text>
-                </TouchableOpacity>
-              ))}
-              {!presetQuery && recentMeals.map(m => (
-                <TouchableOpacity key={m.id} style={[s.quickChip, { borderStyle: 'dashed' }]} onPress={() => repeatMeal(m)}>
-                  <RotateCcw size={13} color={c.text.muted} />
-                  <Text style={s.quickTxt} numberOfLines={1}>{m.items.map(i => i.name).slice(0, 2).join(', ')}</Text>
-                  <Text style={s.quickKcal}>{m.kcal}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {presets.length > 0 && <Text style={s.presetHint}>Przytrzymaj preset, by przypiąć/odpiąć (przypięte na górze).</Text>}
-          </View>
-        )}
-
         {/* added items */}
         {items.length > 0 && (
           <View style={s.card}>
@@ -408,11 +411,11 @@ export default function FoodAdd() {
           </View>
         )}
 
-        {/* search */}
+        {/* search — pojedyncze produkty pod szukajką; domyślnie kompozycje i dania */}
         <View style={s.searchBox}>
           <Search size={17} color={c.text.muted} />
           <TextInput style={s.searchInput} value={query} onChangeText={setQuery}
-            placeholder="Szukaj jedzenia…" placeholderTextColor={c.text.muted} />
+            placeholder="Szukaj produktu / dania…" placeholderTextColor={c.text.muted} />
           {query.length > 0 && <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}><X size={16} color={c.text.muted} /></TouchableOpacity>}
         </View>
 
@@ -425,59 +428,107 @@ export default function FoodAdd() {
           </TouchableOpacity>
         </View>
 
-        {!query && <Text style={s.sectionHint}>{products.length > 0 ? 'Twoje produkty · po kategoriach' : 'Baza produktów'}</Text>}
-
-        {/* add a brand-new product straight from the search → grams + kcal/100g picker */}
-        {query.trim().length > 0 && !exactExists && (
-          <TouchableOpacity style={s.addNewRow} onPress={addNew}>
-            <Plus size={17} color={ACCENT} />
-            <Text style={s.addNewTxt}>Dodaj nowy: „{query.trim()}" (gramy + kcal/100g)</Text>
-          </TouchableOpacity>
-        )}
-
-        {catGroups ? (
-          catGroups.map(sec => (
-            <View key={sec.tag} style={{ gap: 4 }}>
-              <View style={s.catHead}>
-                <View style={[s.catHeadDot, { backgroundColor: sec.color }]} />
-                <Text style={s.catHeadTxt}>{sec.label}</Text>
-                <Text style={s.catHeadCount}>{sec.items.length}</Text>
-              </View>
-              <View style={s.card}>
-                {sec.items.map((cand, i) => (
-                  <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
-                      <Text style={s.candMeta}>
-                        {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
-                        {cand.source === 'curated' ? '  ·  moje' : ''}
-                      </Text>
-                    </View>
-                    <Plus size={18} color={ACCENT} />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          ))
-        ) : (
-          <View style={s.card}>
-            {candidates.map((cand, i) => (
-              <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
-                <View style={{ flex: 1 }}>
-                  <View style={s.candNameRow}>
-                    {cand.isRecipe ? <ChefHat size={13} color={ACCENT} /> : null}
-                    <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
-                  </View>
-                  <Text style={s.candMeta}>
-                    {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
-                    {cand.isRecipe ? '  ·  danie' : cand.source === 'curated' ? '  ·  moje' : ''}
-                  </Text>
-                </View>
-                <Plus size={18} color={ACCENT} />
+        {query.trim() ? (
+          /* ── SZUKANIE: pasujące kompozycje/dania + pojedyncze produkty ── */
+          <>
+            {!exactExists && (
+              <TouchableOpacity style={s.addNewRow} onPress={addNew}>
+                <Plus size={17} color={ACCENT} />
+                <Text style={s.addNewTxt}>Dodaj nowy: „{query.trim()}" (gramy + kcal/100g)</Text>
               </TouchableOpacity>
+            )}
+            {libMatches.length > 0 && (
+              <View style={{ gap: 4 }}>
+                <Text style={s.sectionHint}>Kompozycje i dania</Text>
+                <View style={s.card}>
+                  {libMatches.map((e, i) => (
+                    <TouchableOpacity key={e.key} onPress={() => tapEntry(e)} onLongPress={() => pinEntry(e)} delayLongPress={400} style={[s.candRow, i > 0 && s.itemBorder]}>
+                      <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
+                      <View style={{ flex: 1 }}>
+                        <View style={s.candNameRow}>
+                          {e.kind === 'dish' ? <ChefHat size={13} color={ACCENT} /> : <Layers size={13} color={c.text.muted} />}
+                          <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
+                        </View>
+                        <Text style={s.candMeta}>{e.meta}</Text>
+                      </View>
+                      <Plus size={18} color={ACCENT} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            {(() => {
+              const singles = candidates.filter(cand => !cand.isRecipe);   // dania są wyżej w „Kompozycje i dania"
+              return (
+                <View style={{ gap: 4 }}>
+                  <Text style={s.sectionHint}>Pojedyncze produkty</Text>
+                  <View style={s.card}>
+                    {singles.map((cand, i) => (
+                      <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                          <Text style={s.candMeta}>
+                            {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
+                            {cand.source === 'curated' ? '  ·  moje' : ''}
+                          </Text>
+                        </View>
+                        <Plus size={18} color={ACCENT} />
+                      </TouchableOpacity>
+                    ))}
+                    {singles.length === 0 && <Text style={s.candMeta}>Brak pojedynczych produktów — użyj „Wpisz ręcznie" albo „Dodaj nowy".</Text>}
+                  </View>
+                </View>
+              );
+            })()}
+          </>
+        ) : (
+          /* ── DOMYŚLNIE: kompozycje i dania — ulubione, potem kategoriami ── */
+          <>
+            {librarySections.map(sec => (
+              <View key={sec.tag} style={{ gap: 4 }}>
+                <View style={s.catHead}>
+                  {sec.tag === '_fav' && <Star size={13} color={ACCENT} fill={ACCENT} />}
+                  <Text style={s.catHeadTxt}>{sec.label}</Text>
+                  <Text style={s.catHeadCount}>{sec.items.length}</Text>
+                </View>
+                <View style={s.card}>
+                  {sec.items.map((e, i) => (
+                    <TouchableOpacity key={e.key} onPress={() => tapEntry(e)} onLongPress={() => pinEntry(e)} delayLongPress={400} style={[s.candRow, i > 0 && s.itemBorder]}>
+                      <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
+                      <View style={{ flex: 1 }}>
+                        <View style={s.candNameRow}>
+                          {e.kind === 'dish' ? <ChefHat size={13} color={ACCENT} /> : <Layers size={13} color={c.text.muted} />}
+                          <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
+                        </View>
+                        <Text style={s.candMeta}>{e.meta}</Text>
+                      </View>
+                      <Plus size={18} color={ACCENT} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             ))}
-            {candidates.length === 0 && <Text style={s.candMeta}>Brak trafień — użyj „Wpisz ręcznie".</Text>}
-          </View>
+            {librarySections.length === 0 && (
+              <View style={s.card}>
+                <Text style={s.candMeta}>Brak kompozycji i dań. Zapisz posiłek jako preset (poniżej, gdy dodasz pozycje) albo „Nowy przepis / danie". Pojedyncze produkty znajdziesz przez wyszukiwarkę wyżej.</Text>
+              </View>
+            )}
+            {recentMeals.length > 0 && (
+              <View style={{ gap: 4 }}>
+                <Text style={s.sectionHint}>Ostatnie posiłki</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
+                  {recentMeals.map(m => (
+                    <TouchableOpacity key={m.id} style={[s.quickChip, { borderStyle: 'dashed' }]} onPress={() => repeatMeal(m)}>
+                      <RotateCcw size={13} color={c.text.muted} />
+                      <Text style={s.quickTxt} numberOfLines={1}>{m.items.map(i => i.name).slice(0, 2).join(', ')}</Text>
+                      <Text style={s.quickKcal}>{m.kcal}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            <Text style={s.presetHint}>Pojedynczy produkt (banan, jogurt) — wpisz w wyszukiwarkę. Gwiazdka przypina na górę.</Text>
+          </>
         )}
       </ScrollView>
 
@@ -521,13 +572,14 @@ export default function FoodAdd() {
                   ) : (
                     <>
                       <View style={s.qtyRow}>
-                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => Math.max(0.5, +(q - (q > 2 ? 1 : 0.5)).toFixed(1))); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
+                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); bumpQty(-1); }}><Minus size={18} color={c.text.primary} /></TouchableOpacity>
                         <View style={s.qtyCenter}>
-                          <Text style={s.qtyVal}>{qty % 1 === 0 ? qty : qty.toFixed(1)}</Text>
+                          <TextInput style={s.qtyValInput} value={qtyText} onChangeText={t => setQtyText(t.replace(/[^0-9.,]/g, ''))} keyboardType="numeric" selectTextOnFocus />
                           <Text style={s.qtyUnit}>{unitLabel(unit)}</Text>
                         </View>
-                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); setQty(q => +(q + (q >= 2 ? 1 : 0.5)).toFixed(1)); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
+                        <TouchableOpacity style={s.qtyBtn} onPress={() => { haptic.tap(); bumpQty(1); }}><Plus size={18} color={c.text.primary} /></TouchableOpacity>
                       </View>
+                      <Text style={s.qtyHint}>możesz wpisać ułamek — np. 0,5 albo 1,5</Text>
                       <View style={s.fieldRow}>
                         <Text style={s.fieldLabel}>Dokładnie (g)</Text>
                         <TextInput style={s.smInput} value={gramsOverride} onChangeText={setGramsOverride}
@@ -771,9 +823,11 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   qtyRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
   qtyBtn:    { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
-  qtyCenter: { alignItems: 'center', minWidth: 90 },
+  qtyCenter: { alignItems: 'center', minWidth: 96 },
   qtyVal:    { fontSize: 30, fontWeight: '800', color: c.text.primary },
-  qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  qtyValInput: { minWidth: 74, height: 44, textAlign: 'center', fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
+  qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 2 },
+  qtyHint:   { fontSize: 11, color: c.text.muted, textAlign: 'center' },
 
   fieldRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1] },
   fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },
