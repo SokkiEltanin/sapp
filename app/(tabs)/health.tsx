@@ -988,32 +988,15 @@ export default function HealthScreen() {
             );
           })()}
 
-          <View style={styles.weightRow}>
-            <PressableScale onPress={() => bumpWeight(-1)} style={styles.weightBtn}>
-              <Minus size={13} color={colors.text.muted} />
-            </PressableScale>
-            <PressableScale onPress={() => bumpWeight(-0.1)} style={styles.weightBtnSm}>
-              <Text style={styles.weightBtnSmText}>-0.1</Text>
-            </PressableScale>
-            <TouchableOpacity
-              style={styles.weightCenter}
-              onPress={() => { setWeightInput((weight > 0 ? weight : lastWeight) > 0 ? (weight > 0 ? weight : lastWeight).toFixed(1) : ''); setWeightModal(true); }}
-              activeOpacity={0.7}
-            >
+          {/* Waga jest edytowana w zakładce Jedzenie (jeden zapisujący) — tu tylko podgląd. */}
+          <TouchableOpacity style={styles.weightRow} activeOpacity={0.7} onPress={() => { haptic.tap(); router.push('/food' as any); }}>
+            <View style={styles.weightCenter}>
               <Text style={[styles.weightNum, weight === 0 && lastWeight > 0 && { opacity: 0.45 }]}>
                 {weight > 0 ? weight.toFixed(1) : lastWeight > 0 ? lastWeight.toFixed(1) : '—'}
               </Text>
-              <Text style={styles.weightUnit}>
-                {weight > 0 ? 'kg · dotknij' : lastWeight > 0 ? 'kg · ostatnia — zmień +/−' : 'kg · ustaw'}
-              </Text>
-            </TouchableOpacity>
-            <PressableScale onPress={() => bumpWeight(0.1)} style={styles.weightBtnSm}>
-              <Text style={styles.weightBtnSmText}>+0.1</Text>
-            </PressableScale>
-            <PressableScale onPress={() => bumpWeight(1)} style={styles.weightBtn}>
-              <Plus size={13} color={colors.text.muted} />
-            </PressableScale>
-          </View>
+              <Text style={styles.weightUnit}>kg · edytuj w Jedzeniu →</Text>
+            </View>
+          </TouchableOpacity>
 
           {/* 7-day weight sparkline */}
           {loggedWeights.length > 0 && (
@@ -1040,104 +1023,19 @@ export default function HealthScreen() {
           )}
         </GlassCard>
 
-        {/* Energy balance (estimate) */}
-        {(energy.burned > 0 || energy.intakeAvg > 0) && (
+        {/* Kalorie przeniesione do zakładki Jedzenie — dokładne liczenie, bez szacowania. */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/food' as any); }}>
           <GlassCard padding={spacing[4]} style={styles.tealCard}>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setEnergyOpen(o => !o); }} style={styles.cardRow}>
-              <Flame size={13} color={colors.text.muted} />
-              <Text style={[styles.cardLabel, { flexShrink: 1 }]} numberOfLines={1}>BILANS ENERGII</Text>
-              <View style={{ flex: 1, minWidth: spacing[2] }} />
-              {!energyOpen && energy.burned > 0 && energy.intakeAvg > 0 && (
-                <Text style={{ fontSize: 12, fontWeight: '800', color: energy.balance >= 0 ? T.accent : colors.accent.red, marginRight: spacing[2] }} numberOfLines={1}>
-                  {energy.balance >= 0 ? 'deficyt ' : 'nadwyżka '}{Math.abs(energy.balance).toLocaleString('pl-PL')}
-                </Text>
-              )}
-              <Text style={styles.energyTag} numberOfLines={1}>szacunek</Text>
-              <ChevronRight size={13} color={colors.text.muted} style={[{ marginLeft: 4 }, energyOpen && { transform: [{ rotate: '90deg' }] }]} />
-            </TouchableOpacity>
-
-            {energyOpen && (<>
-            <View style={styles.energyRow}>
-              <View style={styles.energyTile}>
-                <Text style={styles.energyVal}>{energy.burned > 0 ? energy.burned.toLocaleString('pl-PL') : '—'}</Text>
-                <Text style={styles.energyLabel}>spalono dziś</Text>
-              </View>
-              <View style={styles.energyOp}><Text style={styles.energyOpText}>−</Text></View>
-              <View style={styles.energyTile}>
-                <Text style={styles.energyVal}>{energy.intakeAvg > 0 ? energy.intakeAvg.toLocaleString('pl-PL') : '—'}</Text>
-                <Text style={styles.energyLabel}>jedzenie śr./dzień</Text>
-              </View>
+            <View style={styles.cardRow}>
+              <Flame size={13} color={T.accent} />
+              <Text style={[styles.cardLabel, { flexShrink: 1 }]} numberOfLines={1}>KALORIE</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: T.accent, marginRight: 4 }} numberOfLines={1}>→ Jedzenie</Text>
+              <ChevronRight size={14} color={colors.text.muted} />
             </View>
-
-            {energy.burned > 0 && energy.intakeAvg > 0 && (
-              <View style={[styles.energyBalance, { borderColor: energy.balance >= 0 ? T.cardBorder : colors.accent.red + '40' }]}>
-                <Text style={[styles.energyBalanceVal, { color: energy.balance >= 0 ? T.accent : colors.accent.red }]}>
-                  {energy.balance >= 0 ? '−' : '+'}{Math.abs(energy.balance).toLocaleString('pl-PL')} kcal
-                </Text>
-                <Text style={styles.energyBalanceLabel}>
-                  {energy.balance >= 0 ? 'deficyt — sprzyja spadkowi wagi' : 'nadwyżka — sprzyja przyrostowi'}
-                </Text>
-              </View>
-            )}
-
-            {energy.maintain > 0 && (
-              <View style={styles.energyTargetRow}>
-                <View style={styles.energyTarget}>
-                  <Text style={styles.energyTargetVal}>~{energy.maintain.toLocaleString('pl-PL')}</Text>
-                  <Text style={styles.energyTargetLabel}>utrzymanie /dzień</Text>
-                </View>
-                {energy.cut > 0 && (
-                  <View style={styles.energyTarget}>
-                    <Text style={[styles.energyTargetVal, { color: T.accent }]}>~{energy.cut.toLocaleString('pl-PL')}</Text>
-                    <Text style={styles.energyTargetLabel}>cel na spadek (≈0,5 kg/tydz.)</Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {energy.weightDelta != null && (
-              <Text style={styles.energyWeight}>
-                Waga w tym tyg.: <Text style={{ color: energy.weightDelta <= 0 ? T.accent : colors.accent.red, fontWeight: '800' }}>{energy.weightDelta > 0 ? '+' : ''}{energy.weightDelta} kg</Text>
-                {energy.burned > 0 && energy.intakeAvg > 0
-                  ? ((energy.balance >= 0) === (energy.weightDelta <= 0) ? '  ·  zgodne z bilansem' : '  ·  rozjazd z bilansem — popraw szacunek')
-                  : ''}
-              </Text>
-            )}
-
-            {(() => {
-              const tIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
-              const days = energy.week.map(d => (d.burn > 0 && d.intake > 0) ? d.balance : null);
-              if (!days.some(b => b != null)) return null;
-              const maxAbs = Math.max(...days.map(b => (b == null ? 0 : Math.abs(b))), 1);
-              return (
-                <>
-                  <Text style={styles.detailSectionLabel}>BILANS · 7 DNI</Text>
-                  <View style={styles.energyWeekRow}>
-                    {days.map((b, i) => (
-                      <View key={i} style={styles.energyWeekCol}>
-                        <View style={styles.energyWeekBarWrap}>
-                          <View style={[styles.energyWeekBar, {
-                            height: b == null ? 2 : Math.max(3, (Math.abs(b) / maxAbs) * 40),
-                            backgroundColor: b == null ? colors.fill.medium : b >= 0 ? T.accent : colors.accent.red,
-                            opacity: b == null ? 0.4 : 1,
-                          }]} />
-                        </View>
-                        <Text style={[styles.energyWeekLabel, i === tIdx && { color: T.accent, fontWeight: '700' }]}>{WEEK_DAYS[i]}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              );
-            })()}
-
-            <Text style={styles.energyNote}>
-              {energy.burned === 0 ? 'Brak spalania z zegarka. W Samsung Health → Ustawienia → Health Connect włącz udostępnianie „Spalone kalorie" (aktywne + całkowite), potem odśwież tutaj.'
-                : energy.intakeAvg === 0 ? 'Brak danych o jedzeniu — skanuj paragony, by oszacować.'
-                : 'Spalanie z zegarka · jedzenie szacowane z paragonów (nie liczy dokładnych posiłków).'}
-            </Text>
-            </>)}
+            <Text style={[styles.energyNote, { marginTop: spacing[2] }]}>Liczenie kalorii, spalanie z zegarka, waga i cel są teraz w zakładce Jedzenie — dokładnie zamiast szacowania z paragonów.</Text>
           </GlassCard>
-        )}
+        </TouchableOpacity>
 
         {/* Mood trend */}
         {recentMood.length > 0 && (
