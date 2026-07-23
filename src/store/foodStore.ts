@@ -180,6 +180,16 @@ export function targetIntake(burnKcal: number, mode: GoalMode, manual?: number):
 export function presetKcal(p: MealPreset): number {
   return p.items.reduce((s, it) => s + (it.kcal || 0), 0);
 }
+// All ingredient names in a preset (incl. components of composite lines) — for
+// "search by ingredient" (find every meal that contains X).
+export function presetIngredientNames(p: MealPreset): string[] {
+  const out: string[] = [];
+  for (const it of p.items) {
+    out.push(it.name);
+    if (it.parts) for (const pt of it.parts) out.push(pt.name);
+  }
+  return out;
+}
 export function presetGrams(p: MealPreset): number {
   return p.items.reduce((s, it) => s + (it.grams || 0), 0);
 }

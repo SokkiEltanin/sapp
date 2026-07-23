@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers, ChefHat } from 'lucide-react-native';
+import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers, ChefHat, Copy } from 'lucide-react-native';
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
   MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry, FoodProduct,
   presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
-  PRESET_CATS, presetCatLabel, isRecipeProduct,
+  PRESET_CATS, presetCatLabel, isRecipeProduct, presetIngredientNames,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
@@ -48,6 +48,8 @@ interface Candidate {
 interface LibEntry {
   key: string; kind: 'preset' | 'dish'; id: string; name: string; cat: string;
   pinned: boolean; uses: number; meta: string; preset?: MealPreset; product?: FoodProduct;
+  ingredients: string[];   // składniki (do szukania „po składniku")
+  ingHay: string;          // znormalizowane składniki, sklejone (haystack)
 }
 
 export default function FoodAdd() {
@@ -69,11 +71,12 @@ export default function FoodAdd() {
   const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
-  const params = useLocalSearchParams<{ date?: string; edit?: string; preset?: string }>();
+  const params = useLocalSearchParams<{ date?: string; edit?: string; preset?: string; dupPreset?: string }>();
   const mealDate = typeof params.date === 'string' && params.date ? params.date
     : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
   const editId = typeof params.edit === 'string' ? params.edit : undefined;
   const editPresetParam = typeof params.preset === 'string' ? params.preset : undefined;
+  const dupPresetParam = typeof params.dupPreset === 'string' ? params.dupPreset : undefined;
 
   const [mealType, setMealType] = useState<MealType>(defaultMealType());
   const [items, setItems]       = useState<MealItem[]>([]);
@@ -97,6 +100,18 @@ export default function FoodAdd() {
       setEditPresetId(p.id); setPName(p.name); setPYields(p.yields ? String(p.yields) : ''); setPCat(p.cat ?? '');
     }
   }, [editPresetParam]);
+
+  // Duplicate a preset → load its ingredients as a NEW preset (edit the copy, swap the bun…).
+  useEffect(() => {
+    if (!dupPresetParam) return;
+    const p = presets.find(x => x.id === dupPresetParam);
+    if (p) {
+      setItems(p.items.map(it => ({ ...it })));
+      if (p.type) setMealType(p.type);
+      setEditPresetId(null); setPName(p.name + ' (kopia)'); setPYields(p.yields ? String(p.yields) : ''); setPCat(p.cat ?? '');
+      setDupNotice(true);   // składniki wczytane jako NOWY preset — zmień/dodaj i „Zapisz jako preset"
+    }
+  }, [dupPresetParam]);
 
   // portion picker (for a selected candidate)
   const [sel, setSel]           = useState<Candidate | null>(null);
@@ -126,6 +141,7 @@ export default function FoodAdd() {
   const [pYields, setPYields]   = useState('');         // "ile porcji wychodzi" (dish)
   const [pCat, setPCat]         = useState('');         // library category
   const [editPresetId, setEditPresetId] = useState<string | null>(null);   // editing an existing preset
+  const [dupNotice, setDupNotice] = useState(false);    // building a COPY of a preset
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
 
@@ -145,16 +161,22 @@ export default function FoodAdd() {
   // ── meal library: kompozycje (presety) + dania (przepisy) = GŁÓWNY widok ──
   const dishes = useMemo(() => products.filter(isRecipeProduct), [products]);
   const libEntries: LibEntry[] = useMemo(() => {
-    const fromPresets: LibEntry[] = presets.map(p => ({
-      key: 'p-' + p.id, kind: 'preset', id: p.id, name: p.name, cat: p.cat || 'inne', pinned: !!p.pinned, uses: p.uses,
-      meta: p.yields && p.yields > 1 ? `${Math.round(presetKcal(p) / p.yields)} kcal/porcja · ${p.yields} porcji` : `${presetKcal(p)} kcal · ${p.items.length} skł.`,
-      preset: p,
-    }));
-    const fromDishes: LibEntry[] = dishes.map(p => ({
-      key: 'd-' + p.id, kind: 'dish', id: p.id, name: p.name, cat: p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania', pinned: !!p.pinned, uses: p.uses,
-      meta: `${p.kcalPer100g ?? 0} kcal/100g · danie`,
-      product: p,
-    }));
+    const fromPresets: LibEntry[] = presets.map(p => {
+      const ingredients = presetIngredientNames(p);
+      return {
+        key: 'p-' + p.id, kind: 'preset', id: p.id, name: p.name, cat: p.cat || 'inne', pinned: !!p.pinned, uses: p.uses,
+        meta: p.yields && p.yields > 1 ? `${Math.round(presetKcal(p) / p.yields)} kcal/porcja · ${p.yields} porcji` : `${presetKcal(p)} kcal · ${p.items.length} skł.`,
+        preset: p, ingredients, ingHay: normalizeProductName(ingredients.join(' ')),
+      };
+    });
+    const fromDishes: LibEntry[] = dishes.map(p => {
+      const ingredients = p.recipe?.ingredients.map(i => i.name) ?? [];
+      return {
+        key: 'd-' + p.id, kind: 'dish', id: p.id, name: p.name, cat: p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania', pinned: !!p.pinned, uses: p.uses,
+        meta: `${p.kcalPer100g ?? 0} kcal/100g · danie`,
+        product: p, ingredients, ingHay: normalizeProductName(ingredients.join(' ')),
+      };
+    });
     return [...fromPresets, ...fromDishes];
   }, [presets, dishes]);
 
@@ -176,11 +198,27 @@ export default function FoodAdd() {
     return out;
   }, [libEntries]);
 
-  // Search: matching compositions AND dishes (single products come from `candidates`).
-  const libMatches = useMemo(() => {
-    const q = normalizeProductName(query);
-    if (!q) return [] as LibEntry[];
-    return libEntries.filter(e => normalizeProductName(e.name).includes(q) || normalizeProductName(presetCatLabel(e.cat)).includes(q)).sort(byRank);
+  // Search: matches by NAME/kategoria OR by INGREDIENT ("napisz składnik → znajdzie dania
+  // które go mają"). Multi-word = wszystkie tokeny muszą trafić (nazwa/kategoria/składniki).
+  const libMatches = useMemo((): (LibEntry & { note?: string })[] => {
+    const nq = normalizeProductName(query);
+    if (!nq) return [];
+    const toks = nq.split(' ').filter(Boolean);
+    const out: (LibEntry & { note?: string })[] = [];
+    for (const e of libEntries) {
+      const nameHay = normalizeProductName(e.name + ' ' + presetCatLabel(e.cat));
+      const hit = (hay: string) => hay.includes(nq) || (toks.length > 1 && toks.every(t => hay.includes(t)));
+      const nameHit = hit(nameHay);
+      const ingHit = hit(e.ingHay);
+      if (!nameHit && !ingHit) continue;
+      let note: string | undefined;
+      if (!nameHit && ingHit) {
+        const found = e.ingredients.find(n => { const nn = normalizeProductName(n); return toks.some(t => nn.includes(t)); });
+        if (found) note = 'zawiera ' + found;
+      }
+      out.push({ ...e, note });
+    }
+    return out.sort(byRank);
   }, [libEntries, query]);
 
   const applyPreset = () => {
@@ -214,7 +252,15 @@ export default function FoodAdd() {
     const y = yields > 1 ? Math.round(yields) : undefined;
     if (editPresetId) updatePreset(editPresetId, nm, items.map(it => ({ ...it })), mealType, y, pCat);
     else addPreset(nm, items.map(it => ({ ...it })), mealType, y, pCat);
-    setSaveP(false); setPName(''); setPYields(''); setPCat(''); setEditPresetId(null);
+    setSaveP(false); setPName(''); setPYields(''); setPCat(''); setEditPresetId(null); setDupNotice(false);
+  };
+  // Load a preset's ingredients as a NEW preset (a copy) — change the bun / add stuff, then save.
+  const loadPresetAsCopy = (p: MealPreset) => {
+    haptic.tap();
+    setItems(p.items.map(it => ({ ...it })));
+    if (p.type) setMealType(p.type);
+    setEditPresetId(null); setPName(p.name + ' (kopia)'); setPYields(p.yields ? String(p.yields) : ''); setPCat(p.cat ?? '');
+    setDupNotice(true); setApplying(null);
   };
   // Load a preset's ingredients into the builder to change składniki / proporcje.
   const editPreset = (p: MealPreset) => {
@@ -222,7 +268,7 @@ export default function FoodAdd() {
     setItems(p.items.map(it => ({ ...it })));
     if (p.type) setMealType(p.type);
     setEditPresetId(p.id); setPName(p.name); setPYields(p.yields ? String(p.yields) : ''); setPCat(p.cat ?? '');
-    setApplying(null);
+    setDupNotice(false); setApplying(null);
   };
 
   // ── candidate list ───────────────────────────────────────────────────────
@@ -367,7 +413,14 @@ export default function FoodAdd() {
           <View style={s.editBanner}>
             <Pencil size={14} color={ACCENT} />
             <Text style={s.editBannerTxt}>Edytujesz preset „{pName}" — zmień składniki/proporcje i Zaktualizuj</Text>
-            <TouchableOpacity onPress={() => { haptic.tap(); setEditPresetId(null); setItems([]); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
+            <TouchableOpacity onPress={() => { haptic.tap(); setEditPresetId(null); setItems([]); setPName(''); setPYields(''); setPCat(''); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
+          </View>
+        )}
+        {dupNotice && !editPresetId && (
+          <View style={s.editBanner}>
+            <Copy size={14} color={ACCENT} />
+            <Text style={s.editBannerTxt}>Kopia — zmień co chcesz (np. bułkę) i „Zapisz jako preset"</Text>
+            <TouchableOpacity onPress={() => { haptic.tap(); setDupNotice(false); setItems([]); setPName(''); setPYields(''); setPCat(''); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
           </View>
         )}
         {/* meal type */}
@@ -403,7 +456,7 @@ export default function FoodAdd() {
               </View>
             ))}
             <View style={s.totalRow}>
-              <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); if (!editPresetId) setPName(''); setSaveP(true); }}>
+              <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setSaveP(true); }}>
                 <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
               </TouchableOpacity>
               <Text style={s.totalVal}>{total} kcal</Text>
@@ -449,7 +502,7 @@ export default function FoodAdd() {
                           {e.kind === 'dish' ? <ChefHat size={13} color={ACCENT} /> : <Layers size={13} color={c.text.muted} />}
                           <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
                         </View>
-                        <Text style={s.candMeta}>{e.meta}</Text>
+                        <Text style={s.candMeta}>{e.meta}{e.note ? `  ·  ${e.note}` : ''}</Text>
                       </View>
                       <Plus size={18} color={ACCENT} />
                     </TouchableOpacity>
@@ -692,6 +745,9 @@ export default function FoodAdd() {
                   <TouchableOpacity style={s.presetActBtn} onPress={() => editPreset(applying)}>
                     <Pencil size={13} color={c.text.secondary} /><Text style={s.presetActTxt}>Edytuj</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity style={s.presetActBtn} onPress={() => loadPresetAsCopy(applying)}>
+                    <Copy size={13} color={c.text.secondary} /><Text style={s.presetActTxt}>Kopia</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={s.presetActBtn} onPress={() => { haptic.tap(); removePreset(applying.id); setApplying(null); }}>
                     <Trash2 size={13} color={colors.accent.red} /><Text style={[s.presetActTxt, { color: colors.accent.red }]}>Usuń</Text>
                   </TouchableOpacity>
@@ -764,9 +820,9 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   presetCatWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing[2] },
   presetCatChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
   presetCatTxt:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
-  presetActions: { flexDirection: 'row', gap: spacing[2], marginTop: 4 },
-  presetActBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
-  presetActTxt:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  presetActions: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  presetActBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 2, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  presetActTxt:  { fontSize: 11, fontWeight: '700', color: c.text.secondary },
   editBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '66', backgroundColor: ACCENT + '18' },
   editBannerTxt: { flex: 1, fontSize: 12.5, fontWeight: '700', color: ACCENT },
   savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },

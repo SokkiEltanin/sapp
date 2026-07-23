@@ -202,8 +202,16 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   Danie ma znacznik ChefHat w wyszukiwarce add; edycja = `/food/recipe?edit=<id>`; presety edytujesz
   przez `/food/add?preset=<id>`. `FoodProduct.pinned` + `togglePinProduct` = ulubione też dla dań.
 - **Biblioteka presetów:** `MealPreset.cat` (PRESET_CATS: kanapki/naleśniki/dania/wypieki/sałatki/
-  napoje/przekąski/inne) + `pinned` + `togglePinPreset`; w add.tsx quick-row przypięte na górze,
-  wyszukiwarka gdy >6, long-press=przypnij; okno presetu: Przypnij/Edytuj/Usuń + pomijanie składników.
+  napoje/przekąski/inne) + `pinned` + `togglePinPreset`; okno presetu: Przypnij/Edytuj/Kopia/Usuń
+  + pomijanie składników.
+- **Duplikowanie (warianty):** „Kopia" wczytuje danie/kompozycję jako NOWĄ (zmień bułkę/składnik →
+  zapisz). Presety: `/food/add?dupPreset=<id>` (efekt ładuje items, `editPresetId=null`, nazwa
+  „ (kopia)", baner `dupNotice`); dania: `/food/recipe?dup=<id>` (editId puste → save tworzy nowe).
+  Wejścia: library long-press→menu (Duplikuj/Przypnij/Usuń) + ikona Copy w wierszu, okno presetu
+  „Kopia", nagłówek recipe (Copy→router.replace dup).
+- **Szukanie PO SKŁADNIKU:** `presetIngredientNames(p)` (z częściami composite) + `recipe.ingredients`
+  → `ingHay`. W add.tsx (`libMatches`) i library.tsx filtr trafia po nazwie/kategorii LUB składniku
+  (multi-słowo = wszystkie tokeny); przy trafieniu tylko po składniku pokazuje „zawiera X".
 - **TODO (etapy):** przeniesienie EDYCJI wagi z Zdrowia (Krok B — jeden zapisujący),
   prognoza wagi z realnego jedzenia, jednoprzyciskowa PODMIANA sosu w daniu (dziś: pomiń + dodaj nowy).
 

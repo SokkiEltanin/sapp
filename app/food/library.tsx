@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Plus, Search, X, Star, ChefHat, Layers, UtensilsCrossed } from 'lucide-react-native';
+import { ChevronLeft, Plus, Search, X, Star, ChefHat, Layers, UtensilsCrossed, Copy } from 'lucide-react-native';
 
 import {
-  useFoodStore, PRESET_CATS, presetCatLabel, presetKcal, isRecipeProduct,
+  useFoodStore, PRESET_CATS, presetCatLabel, presetKcal, isRecipeProduct, presetIngredientNames,
 } from '@/store/foodStore';
 import { normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
@@ -18,6 +18,7 @@ const ACCENT = '#F59E0B';
 interface Entry {
   key: string; id: string; kind: 'preset' | 'recipe';
   name: string; cat: string; pinned: boolean; uses: number; sub: string;
+  ingredients: string[]; ingHay: string; note?: string;
 }
 
 export default function FoodLibrary() {
@@ -34,19 +35,44 @@ export default function FoodLibrary() {
   const [query, setQuery] = useState('');
 
   const entries: Entry[] = useMemo(() => {
-    const fromPresets: Entry[] = presets.map(p => ({
-      key: 'p-' + p.id, id: p.id, kind: 'preset' as const, name: p.name, cat: p.cat || 'inne',
-      pinned: !!p.pinned, uses: p.uses,
-      sub: p.yields && p.yields > 1 ? `${p.yields} porcji · ${Math.round(presetKcal(p) / p.yields)} kcal/porcja` : `${presetKcal(p)} kcal · ${p.items.length} skł.`,
-    }));
-    const fromRecipes: Entry[] = products.filter(isRecipeProduct).map(p => ({
-      key: 'r-' + p.id, id: p.id, kind: 'recipe' as const, name: p.name, cat: p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania',
-      pinned: !!p.pinned, uses: p.uses,
-      sub: `${p.kcalPer100g ?? 0} kcal/100g · z ${p.recipe!.ingredients.length} skł. · ${p.recipe!.cookedWeight} g`,
-    }));
+    const fromPresets: Entry[] = presets.map(p => {
+      const ingredients = presetIngredientNames(p);
+      return {
+        key: 'p-' + p.id, id: p.id, kind: 'preset' as const, name: p.name, cat: p.cat || 'inne',
+        pinned: !!p.pinned, uses: p.uses,
+        sub: p.yields && p.yields > 1 ? `${p.yields} porcji · ${Math.round(presetKcal(p) / p.yields)} kcal/porcja` : `${presetKcal(p)} kcal · ${p.items.length} skł.`,
+        ingredients, ingHay: normalizeProductName(ingredients.join(' ')),
+      };
+    });
+    const fromRecipes: Entry[] = products.filter(isRecipeProduct).map(p => {
+      const ingredients = p.recipe!.ingredients.map(i => i.name);
+      return {
+        key: 'r-' + p.id, id: p.id, kind: 'recipe' as const, name: p.name, cat: p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania',
+        pinned: !!p.pinned, uses: p.uses,
+        sub: `${p.kcalPer100g ?? 0} kcal/100g · z ${ingredients.length} skł. · ${p.recipe!.cookedWeight} g`,
+        ingredients, ingHay: normalizeProductName(ingredients.join(' ')),
+      };
+    });
     const all = [...fromPresets, ...fromRecipes];
-    const q = normalizeProductName(query);
-    return q ? all.filter(e => normalizeProductName(e.name).includes(q) || normalizeProductName(presetCatLabel(e.cat)).includes(q)) : all;
+    // Szukanie: po nazwie/kategorii ORAZ po SKŁADNIKU (znajdź dania, które mają dany składnik).
+    const nq = normalizeProductName(query);
+    if (!nq) return all;
+    const toks = nq.split(' ').filter(Boolean);
+    const hit = (hay: string) => hay.includes(nq) || (toks.length > 1 && toks.every(t => hay.includes(t)));
+    const out: Entry[] = [];
+    for (const e of all) {
+      const nameHay = normalizeProductName(e.name + ' ' + presetCatLabel(e.cat));
+      const nameHit = hit(nameHay);
+      const ingHit = hit(e.ingHay);
+      if (!nameHit && !ingHit) continue;
+      let note: string | undefined;
+      if (!nameHit && ingHit) {
+        const found = e.ingredients.find(n => { const nn = normalizeProductName(n); return toks.some(t => nn.includes(t)); });
+        if (found) note = 'zawiera ' + found;
+      }
+      out.push({ ...e, note });
+    }
+    return out;
   }, [presets, products, query]);
 
   // pinned flat first, then grouped by category (PRESET_CATS order)
@@ -71,10 +97,25 @@ export default function FoodLibrary() {
     else router.push(`/food/add?preset=${e.id}` as any);
   };
   const togglePin = (e: Entry) => { haptic.tap(); e.kind === 'recipe' ? togglePinProduct(e.id) : togglePinPreset(e.id); };
+  const dup = (e: Entry) => {
+    haptic.tap();
+    if (e.kind === 'recipe') router.push(`/food/recipe?dup=${e.id}` as any);
+    else router.push(`/food/add?dupPreset=${e.id}` as any);
+  };
   const del = (e: Entry) => {
     Alert.alert('Usunąć „' + e.name + '"?', e.kind === 'recipe' ? 'Usuniesz to danie z biblioteki. Zjedzone wcześniej porcje zostają w historii.' : 'Usuniesz ten preset.', [
       { text: 'Anuluj', style: 'cancel' },
       { text: 'Usuń', style: 'destructive', onPress: () => { haptic.tap(); e.kind === 'recipe' ? removeProduct(e.id) : removePreset(e.id); } },
+    ]);
+  };
+  // long-press → menu: duplikuj (zrób wariant — zmień bułkę/składnik) / usuń
+  const rowMenu = (e: Entry) => {
+    haptic.tap();
+    Alert.alert(e.name, e.kind === 'recipe' ? 'Danie z przepisu' : 'Kompozycja', [
+      { text: 'Duplikuj (zrób wariant)', onPress: () => dup(e) },
+      { text: e.pinned ? 'Odepnij' : 'Przypnij', onPress: () => togglePin(e) },
+      { text: 'Usuń', style: 'destructive', onPress: () => del(e) },
+      { text: 'Anuluj', style: 'cancel' },
     ]);
   };
 
@@ -98,7 +139,7 @@ export default function FoodLibrary() {
 
       <View style={s.searchBox}>
         <Search size={17} color={c.text.muted} />
-        <TextInput style={s.searchInput} value={query} onChangeText={setQuery} placeholder="Szukaj kompozycji / dania…" placeholderTextColor={c.text.muted} />
+        <TextInput style={s.searchInput} value={query} onChangeText={setQuery} placeholder="Szukaj nazwy lub składnika (np. ser)…" placeholderTextColor={c.text.muted} />
         {query.length > 0 && <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}><X size={16} color={c.text.muted} /></TouchableOpacity>}
       </View>
 
@@ -122,7 +163,7 @@ export default function FoodLibrary() {
               <Text style={s.catHeadCount}>{sec.items.length}</Text>
             </View>
             {sec.items.map(e => (
-              <TouchableOpacity key={e.key} style={s.row} activeOpacity={0.75} onPress={() => openEntry(e)} onLongPress={() => del(e)} delayLongPress={450}>
+              <TouchableOpacity key={e.key} style={s.row} activeOpacity={0.75} onPress={() => openEntry(e)} onLongPress={() => rowMenu(e)} delayLongPress={400}>
                 <TouchableOpacity hitSlop={8} onPress={() => togglePin(e)}>
                   <Star size={17} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
                 </TouchableOpacity>
@@ -131,13 +172,14 @@ export default function FoodLibrary() {
                     {e.kind === 'recipe' ? <ChefHat size={13} color={ACCENT} /> : <Layers size={13} color={c.text.muted} />}
                     <Text style={s.name} numberOfLines={1}>{e.name}</Text>
                   </View>
-                  <Text style={s.meta} numberOfLines={1}>{e.sub}</Text>
+                  <Text style={s.meta} numberOfLines={1}>{e.sub}{e.note ? `  ·  ${e.note}` : ''}</Text>
                 </View>
+                <TouchableOpacity hitSlop={10} onPress={() => rowMenu(e)}><Copy size={16} color={c.text.muted} /></TouchableOpacity>
               </TouchableOpacity>
             ))}
           </View>
         ))}
-        <Text style={s.hint}>Stuknij, by edytować · gwiazdka przypina na górę · przytrzymaj, by usunąć.</Text>
+        <Text style={s.hint}>Stuknij = edytuj · gwiazdka = przypnij · ikona kopii / przytrzymaj = Duplikuj lub Usuń. Szukaj też po składniku (np. „bułka") — znajdzie wszystko, co go zawiera.</Text>
       </ScrollView>
     </SafeAreaView>
   );

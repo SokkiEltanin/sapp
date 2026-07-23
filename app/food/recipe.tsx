@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Search, Plus, Minus, X, Check, Trash2, ChefHat, Scale } from 'lucide-react-native';
+import { ChevronLeft, Search, Plus, Minus, X, Check, Trash2, ChefHat, Scale, Copy } from 'lucide-react-native';
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemMacros,
@@ -42,8 +42,9 @@ export default function RecipeBuilder() {
   const learnPortion        = useFoodStore(st => st.learnPortion);
   const saveRecipeProduct   = useFoodStore(st => st.saveRecipeProduct);
 
-  const params = useLocalSearchParams<{ edit?: string; name?: string }>();
+  const params = useLocalSearchParams<{ edit?: string; name?: string; dup?: string }>();
   const editId = typeof params.edit === 'string' ? params.edit : undefined;
+  const dupId  = typeof params.dup === 'string' ? params.dup : undefined;
 
   const [name, setName]     = useState('');
   const [cat, setCat]       = useState('nalesniki');
@@ -67,7 +68,7 @@ export default function RecipeBuilder() {
 
   // prefill when editing an existing recipe product
   useEffect(() => {
-    if (!editId) { if (params.name) setName(params.name); return; }
+    if (!editId) { if (params.name && !dupId) setName(params.name); return; }
     const p = products.find(x => x.id === editId);
     if (p?.recipe) {
       setName(p.name);
@@ -76,6 +77,18 @@ export default function RecipeBuilder() {
       setIngs(p.recipe.ingredients.map(it => ({ ...it })));
     }
   }, [editId]);
+
+  // duplicate → load an existing dish as a NEW one (change an ingredient, swap the flour…)
+  useEffect(() => {
+    if (!dupId) return;
+    const p = products.find(x => x.id === dupId);
+    if (p?.recipe) {
+      setName(p.name + ' (kopia)');
+      setCat(p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania');
+      setCooked(String(p.recipe.cookedWeight || ''));
+      setIngs(p.recipe.ingredients.map(it => ({ ...it })));
+    }
+  }, [dupId]);
 
   const totals  = useMemo(() => recipeTotals(ings), [ings]);
   const cookedG = parseFloat(cooked.replace(',', '.')) || 0;
@@ -191,8 +204,13 @@ export default function RecipeBuilder() {
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={26} color={c.text.primary} /></TouchableOpacity>
-        <Text style={s.headerTitle}>{editId ? 'Edytuj danie' : 'Nowy przepis / danie'}</Text>
-        {editId ? <TouchableOpacity onPress={del} hitSlop={10}><Trash2 size={20} color={colors.accent.red} /></TouchableOpacity> : <View style={{ width: 26 }} />}
+        <Text style={s.headerTitle}>{editId ? 'Edytuj danie' : dupId ? 'Kopia dania' : 'Nowy przepis / danie'}</Text>
+        {editId ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <TouchableOpacity onPress={() => { haptic.tap(); router.replace(`/food/recipe?dup=${editId}` as any); }} hitSlop={10}><Copy size={19} color={c.text.secondary} /></TouchableOpacity>
+            <TouchableOpacity onPress={del} hitSlop={10}><Trash2 size={20} color={colors.accent.red} /></TouchableOpacity>
+          </View>
+        ) : <View style={{ width: 26 }} />}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
