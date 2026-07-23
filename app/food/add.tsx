@@ -8,6 +8,7 @@ import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
   MealItem, MealType, MEAL_TYPES, FoodUnit, MealPreset, MealEntry,
   presetKcal, presetGrams, presetMacros, presetToItem, computeItemMacros,
+  PRESET_CATS, presetCatLabel,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { FOOD_SUBCATS, FOOD_SUBCAT_META } from '@/utils/food';
@@ -55,6 +56,7 @@ export default function FoodAdd() {
   const updatePreset        = useFoodStore(st => st.updatePreset);
   const removePreset        = useFoodStore(st => st.removePreset);
   const bumpPreset          = useFoodStore(st => st.bumpPreset);
+  const togglePinPreset     = useFoodStore(st => st.togglePinPreset);
   const upsertProductByName = useFoodStore(st => st.upsertProductByName);
   const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
@@ -96,6 +98,8 @@ export default function FoodAdd() {
   const [saveP, setSaveP]       = useState(false);
   const [pName, setPName]       = useState('');
   const [pYields, setPYields]   = useState('');         // "ile porcji wychodzi" (dish)
+  const [pCat, setPCat]         = useState('');         // library category
+  const [presetQuery, setPresetQuery] = useState('');   // search presets in the quick row
   const [editPresetId, setEditPresetId] = useState<string | null>(null);   // editing an existing preset
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
@@ -112,6 +116,13 @@ export default function FoodAdd() {
     }
     return out;
   }, [storeMeals]);
+
+  // Preset library view: pinned first, then most-used; filtered by search.
+  const sortedPresets = useMemo(() => {
+    const q = normalizeProductName(presetQuery);
+    const list = q ? presets.filter(p => normalizeProductName(p.name).includes(q) || normalizeProductName(presetCatLabel(p.cat)).includes(q)) : presets;
+    return [...list].sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || (b.uses - a.uses) || a.name.localeCompare(b.name, 'pl'));
+  }, [presets, presetQuery]);
 
   const applyPreset = () => {
     if (!applying) return;
@@ -142,16 +153,16 @@ export default function FoodAdd() {
     if (!nm || items.length === 0) return;
     const yields = parseFloat(pYields.replace(',', '.'));
     const y = yields > 1 ? Math.round(yields) : undefined;
-    if (editPresetId) updatePreset(editPresetId, nm, items.map(it => ({ ...it })), mealType, y);
-    else addPreset(nm, items.map(it => ({ ...it })), mealType, y);
-    setSaveP(false); setPName(''); setPYields(''); setEditPresetId(null);
+    if (editPresetId) updatePreset(editPresetId, nm, items.map(it => ({ ...it })), mealType, y, pCat);
+    else addPreset(nm, items.map(it => ({ ...it })), mealType, y, pCat);
+    setSaveP(false); setPName(''); setPYields(''); setPCat(''); setEditPresetId(null);
   };
   // Load a preset's ingredients into the builder to change składniki / proporcje.
   const editPreset = (p: MealPreset) => {
     haptic.tap();
     setItems(p.items.map(it => ({ ...it })));
     if (p.type) setMealType(p.type);
-    setEditPresetId(p.id); setPName(p.name); setPYields(p.yields ? String(p.yields) : '');
+    setEditPresetId(p.id); setPName(p.name); setPYields(p.yields ? String(p.yields) : ''); setPCat(p.cat ?? '');
     setApplying(null);
   };
 
@@ -323,25 +334,36 @@ export default function FoodAdd() {
           })}
         </View>
 
-        {/* quick: presets + repeat recent */}
+        {/* quick: preset library (pinned first + search) + repeat recent */}
         {(presets.length > 0 || recentMeals.length > 0) && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
-            {presets.map(p => (
-              <TouchableOpacity key={p.id} style={s.quickChip} onPress={() => { haptic.tap(); setMult(1); setDishPortions(1); setExcludedParts(new Set()); setApplying(p); }}
-                onLongPress={() => { haptic.tap(); removePreset(p.id); }} delayLongPress={450}>
-                <Star size={13} color={ACCENT} fill={ACCENT} />
-                <Text style={s.quickTxt} numberOfLines={1}>{p.name}{p.yields && p.yields > 1 ? ` · ${p.yields} porcji` : ''}</Text>
-                <Text style={s.quickKcal}>{p.yields && p.yields > 1 ? Math.round(presetKcal(p) / p.yields) : presetKcal(p)}</Text>
-              </TouchableOpacity>
-            ))}
-            {recentMeals.map(m => (
-              <TouchableOpacity key={m.id} style={[s.quickChip, { borderStyle: 'dashed' }]} onPress={() => repeatMeal(m)}>
-                <RotateCcw size={13} color={c.text.muted} />
-                <Text style={s.quickTxt} numberOfLines={1}>{m.items.map(i => i.name).slice(0, 2).join(', ')}</Text>
-                <Text style={s.quickKcal}>{m.kcal}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={{ gap: spacing[2] }}>
+            {presets.length > 6 && (
+              <View style={s.presetSearch}>
+                <Search size={15} color={c.text.muted} />
+                <TextInput style={s.searchInput} value={presetQuery} onChangeText={setPresetQuery} placeholder="Szukaj presetu / kategorii…" placeholderTextColor={c.text.muted} />
+                {presetQuery.length > 0 && <TouchableOpacity onPress={() => setPresetQuery('')} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>}
+              </View>
+            )}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
+              {sortedPresets.map(p => (
+                <TouchableOpacity key={p.id} style={[s.quickChip, p.pinned && { borderColor: ACCENT, backgroundColor: ACCENT + '14' }]}
+                  onPress={() => { haptic.tap(); setMult(1); setDishPortions(1); setExcludedParts(new Set()); setApplying(p); }}
+                  onLongPress={() => { haptic.tap(); togglePinPreset(p.id); }} delayLongPress={400}>
+                  <Star size={13} color={ACCENT} fill={p.pinned ? ACCENT : 'transparent'} />
+                  <Text style={s.quickTxt} numberOfLines={1}>{p.name}{p.yields && p.yields > 1 ? ` · ${p.yields} porcji` : ''}</Text>
+                  <Text style={s.quickKcal}>{p.yields && p.yields > 1 ? Math.round(presetKcal(p) / p.yields) : presetKcal(p)}</Text>
+                </TouchableOpacity>
+              ))}
+              {!presetQuery && recentMeals.map(m => (
+                <TouchableOpacity key={m.id} style={[s.quickChip, { borderStyle: 'dashed' }]} onPress={() => repeatMeal(m)}>
+                  <RotateCcw size={13} color={c.text.muted} />
+                  <Text style={s.quickTxt} numberOfLines={1}>{m.items.map(i => i.name).slice(0, 2).join(', ')}</Text>
+                  <Text style={s.quickKcal}>{m.kcal}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            {presets.length > 0 && <Text style={s.presetHint}>Przytrzymaj preset, by przypiąć/odpiąć (przypięte na górze).</Text>}
+          </View>
         )}
 
         {/* added items */}
@@ -589,9 +611,17 @@ export default function FoodAdd() {
                 <TouchableOpacity style={[s.sheetAdd, { backgroundColor: ACCENT }]} onPress={applyPreset}>
                   <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={s.presetEditBtn} onPress={() => editPreset(applying)}>
-                  <Pencil size={14} color={c.text.secondary} /><Text style={s.presetEditTxt}>Edytuj składniki / proporcje</Text>
-                </TouchableOpacity>
+                <View style={s.presetActions}>
+                  <TouchableOpacity style={s.presetActBtn} onPress={() => { haptic.tap(); togglePinPreset(applying.id); }}>
+                    <Star size={13} color={ACCENT} fill={applying.pinned ? ACCENT : 'transparent'} /><Text style={s.presetActTxt}>{applying.pinned ? 'Odepnij' : 'Przypnij'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.presetActBtn} onPress={() => editPreset(applying)}>
+                    <Pencil size={13} color={c.text.secondary} /><Text style={s.presetActTxt}>Edytuj</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.presetActBtn} onPress={() => { haptic.tap(); removePreset(applying.id); setApplying(null); }}>
+                    <Trash2 size={13} color={colors.accent.red} /><Text style={[s.presetActTxt, { color: colors.accent.red }]}>Usuń</Text>
+                  </TouchableOpacity>
+                </View>
               </>
               );
             })()}
@@ -611,6 +641,18 @@ export default function FoodAdd() {
                 <Text style={s.fieldLabel}>Porcji wychodzi</Text>
                 <TextInput style={s.smInput} value={pYields} onChangeText={setPYields} keyboardType="numeric" placeholder="1" placeholderTextColor={c.text.muted} />
                 <Text style={s.fieldHint}>danie na kilka porcji (np. puree) — puste = całość</Text>
+              </View>
+              <Text style={s.fieldLabel}>Kategoria (biblioteka)</Text>
+              <View style={s.presetCatWrap}>
+                {PRESET_CATS.map(pc => {
+                  const on = pCat === pc.tag;
+                  return (
+                    <TouchableOpacity key={pc.tag} onPress={() => { haptic.tap(); setPCat(on ? '' : pc.tag); }}
+                      style={[s.presetCatChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                      <Text style={[s.presetCatTxt, on && { color: ACCENT }]}>{pc.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pName.trim() ? ACCENT : c.fill.subtle }]} disabled={!pName.trim()} onPress={saveAsPreset}>
                 <Star size={16} color={pName.trim() ? '#1A1206' : c.text.muted} />
@@ -643,6 +685,14 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   presetEditBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10 },
   presetEditTxt: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  presetSearch:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.fill.subtle, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 42, marginBottom: spacing[2] },
+  presetHint:    { fontSize: 11, color: c.text.muted, marginTop: 6, lineHeight: 15 },
+  presetCatWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: spacing[2] },
+  presetCatChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  presetCatTxt:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  presetActions: { flexDirection: 'row', gap: spacing[2], marginTop: 4 },
+  presetActBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  presetActTxt:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
   editBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '66', backgroundColor: ACCENT + '18' },
   editBannerTxt: { flex: 1, fontSize: 12.5, fontWeight: '700', color: ACCENT },
   savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },

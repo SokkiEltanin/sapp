@@ -113,8 +113,24 @@ export interface MealPreset {
   type?: MealType;
   items: MealItem[];
   yields?: number;   // >1 = a dish that makes N portions
+  cat?: string;      // library category (kanapki / naleśniki / dania / …)
+  pinned?: boolean;  // favourites float to the top
   uses: number;
   createdAt: number;
+}
+
+// Library categories for presets — pin favourites, group, search.
+export const PRESET_CATS: { tag: string; label: string }[] = [
+  { tag: 'kanapki',   label: 'Kanapki' },
+  { tag: 'nalesniki', label: 'Naleśniki' },
+  { tag: 'dania',     label: 'Dania' },
+  { tag: 'salatki',   label: 'Sałatki' },
+  { tag: 'napoje',    label: 'Napoje / shaki' },
+  { tag: 'przekaski', label: 'Przekąski' },
+  { tag: 'inne',      label: 'Inne' },
+];
+export function presetCatLabel(tag?: string): string {
+  return PRESET_CATS.find(c => c.tag === tag)?.label ?? 'Inne';
 }
 
 export type GoalMode = 'cut' | 'maintain' | 'bulk';
@@ -209,10 +225,11 @@ interface FoodState {
   kcalForDate: (date: string) => number;
 
   // presets
-  addPreset: (name: string, items: MealItem[], type?: MealType, yields?: number) => void;
-  updatePreset: (id: string, name: string, items: MealItem[], type?: MealType, yields?: number) => void;
+  addPreset: (name: string, items: MealItem[], type?: MealType, yields?: number, cat?: string) => void;
+  updatePreset: (id: string, name: string, items: MealItem[], type?: MealType, yields?: number, cat?: string) => void;
   removePreset: (id: string) => void;
   bumpPreset: (id: string) => void;
+  togglePinPreset: (id: string) => void;
 
   // goal
   setGoal: (mode: GoalMode, manual?: number) => void;
@@ -298,14 +315,15 @@ export const useFoodStore = create<FoodState>()(
       mealsForDate: (date) => get().meals.filter(m => m.date === date),
       kcalForDate: (date) => get().meals.filter(m => m.date === date).reduce((s, m) => s + m.kcal, 0),
 
-      addPreset: (name, items, type, yields) => set(s => ({
-        presets: [...s.presets, { id: rid('preset'), name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined, uses: 0, createdAt: Date.now() }],
+      addPreset: (name, items, type, yields, cat) => set(s => ({
+        presets: [...s.presets, { id: rid('preset'), name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined, cat: cat || undefined, uses: 0, createdAt: Date.now() }],
       })),
-      updatePreset: (id, name, items, type, yields) => set(s => ({
-        presets: s.presets.map(p => (p.id === id ? { ...p, name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined } : p)),
+      updatePreset: (id, name, items, type, yields, cat) => set(s => ({
+        presets: s.presets.map(p => (p.id === id ? { ...p, name: name.trim(), items, type, yields: yields && yields > 1 ? yields : undefined, cat: cat || p.cat } : p)),
       })),
       removePreset: (id) => set(s => ({ presets: s.presets.filter(p => p.id !== id) })),
       bumpPreset: (id) => set(s => ({ presets: s.presets.map(p => (p.id === id ? { ...p, uses: p.uses + 1 } : p)) })),
+      togglePinPreset: (id) => set(s => ({ presets: s.presets.map(p => (p.id === id ? { ...p, pinned: !p.pinned } : p)) })),
 
       setGoal: (mode, manual) => set({ goalMode: mode, manualGoal: manual && manual > 0 ? Math.round(manual) : undefined }),
     }),
