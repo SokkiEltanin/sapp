@@ -74,13 +74,23 @@ export interface MealItem {
   presetId?: string;
 }
 
-// A cooked dish stored ON a product: the raw ingredients you cooked from + the weight
-// of the FINISHED dish (weighed after frying/baking). kcal/100g is DERIVED — total
-// ingredient kcal ÷ cooked weight — so you log the dish by WEIGHING your portion, and
-// water lost to evaporation is handled for free (calories don't evaporate, weight does).
+// How a dish is prepared — drives whether a finished weight is needed:
+//  • raw    = a MIXTURE (salad, batter, shake): weight = sum of ingredient weights
+//             (auto, editable). No evaporation, kcal = Σ ingredients.
+//  • cooked = boiled/baked: you WEIGH the finished dish (water evaporated).
+//  • fried  = like cooked + a frying fat is absorbed → adds that fat's calories.
+export type PrepType = 'raw' | 'cooked' | 'fried';
+
+// A dish stored ON a product: the ingredients + how it was prepared. kcal/100g is
+// DERIVED — total kcal ÷ weight — so you log it by WEIGHING your portion. `addons`
+// are things eaten WITH it (nutella on a pancake) — counted separately at log time,
+// never divided into the density.
 export interface RecipeMeta {
   ingredients: MealItem[];
-  cookedWeight: number;   // g of the finished dish
+  cookedWeight: number;   // g of the finished dish (for raw = the summed/edited weight)
+  prep?: PrepType;        // undefined = 'cooked' (back-compat with dishes saved earlier)
+  fryFat?: { name: string; grams: number; kcal: number };  // fried: the fat that got added
+  addons?: MealItem[];    // "eaten with" toppings — appended (not divided) when logging
 }
 
 // Resolved macro grams for a portion of a product (density × grams). 0s when unknown.
@@ -207,16 +217,18 @@ export function recipeTotals(ings: MealItem[]): { kcal: number; protein: number;
     carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0), grams: a.grams + (it.grams || 0),
   }), { kcal: 0, protein: 0, carbs: 0, fat: 0, grams: 0 });
 }
-// Per-100 g density of a cooked dish. Falls back to the raw ingredient weight when the
-// cooked weight isn't set yet (live preview while you're still building the recipe).
-export function recipeDensity(ings: MealItem[], cookedWeight: number): {
+// Per-100 g density of a dish. `weight` is the finished weight (cooked/fried) or the
+// summed ingredient weight (raw). `extraKcal`/`extraFatG` add a frying fat. Falls back
+// to the raw ingredient weight when no weight is set yet (live preview while building).
+export function recipeDensity(ings: MealItem[], weight: number, extraKcal = 0, extraFatG = 0): {
   kcalPer100g: number; protein100?: number; carbs100?: number; fat100?: number; totalKcal: number; weight: number;
 } {
   const t = recipeTotals(ings);
-  const w = cookedWeight > 0 ? cookedWeight : (t.grams > 0 ? t.grams : 0);
-  if (!(w > 0)) return { kcalPer100g: 0, totalKcal: t.kcal, weight: 0 };
+  const w = weight > 0 ? weight : (t.grams > 0 ? t.grams : 0);
+  const totalKcal = t.kcal + extraKcal;
+  if (!(w > 0)) return { kcalPer100g: 0, totalKcal, weight: 0 };
   const per = (v: number) => { const x = Math.round((v / w) * 1000) / 10; return x > 0 ? x : undefined; };
-  return { kcalPer100g: Math.round((t.kcal / w) * 100), protein100: per(t.protein), carbs100: per(t.carbs), fat100: per(t.fat), totalKcal: t.kcal, weight: w };
+  return { kcalPer100g: Math.round((totalKcal / w) * 100), protein100: per(t.protein), carbs100: per(t.carbs), fat100: per(t.fat + extraFatG), totalKcal, weight: w };
 }
 export function isRecipeProduct(p: FoodProduct): boolean {
   return !!p.recipe && p.recipe.ingredients.length > 0;
@@ -260,8 +272,11 @@ interface FoodState {
   findProductByName: (name: string) => FoodProduct | undefined;
   learnPortion: (id: string, unit: FoodUnit, grams: number) => void;
   togglePinProduct: (id: string) => void;
-  // create/update a cooked-dish product: kcal/100g derived from ingredients ÷ cooked weight
-  saveRecipeProduct: (name: string, ingredients: MealItem[], cookedWeight: number, cat?: string, id?: string) => FoodProduct;
+  // create/update a dish product: kcal/100g derived from ingredients (+fry fat) ÷ weight
+  saveRecipeProduct: (input: {
+    name: string; ingredients: MealItem[]; weight: number; cat?: string; id?: string;
+    prep?: PrepType; fryFat?: { name: string; grams: number; kcal: number }; addons?: MealItem[];
+  }) => FoodProduct;
   markFresh: (name: string) => void;            // one product bought
   markFreshMany: (names: string[]) => void;     // a receipt's worth (already-counted only)
 
@@ -322,14 +337,21 @@ export const useFoodStore = create<FoodState>()(
         }));
       },
       togglePinProduct: (id) => set(s => ({ products: s.products.map(p => (p.id === id ? { ...p, pinned: !p.pinned } : p)) })),
-      saveRecipeProduct: (name, ingredients, cookedWeight, cat, id) => {
-        const d = recipeDensity(ingredients, cookedWeight);
+      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, addons }) => {
+        const t = recipeTotals(ingredients);
+        // raw = a mixture → weight is the summed ingredient weight (unless the user set one)
+        const w = prep === 'raw' ? (weight > 0 ? weight : t.grams) : weight;
+        const d = recipeDensity(ingredients, w, fryFat?.kcal ?? 0, fryFat?.grams ?? 0);
         const patch: Partial<FoodProduct> = {
           name: name.trim(),
           kcalPer100g: d.kcalPer100g, kcalPerPortion: undefined,
           protein100: d.protein100, carbs100: d.carbs100, fat100: d.fat100,
           cat: cat || 'inne', defaultUnit: 'g',
-          recipe: { ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(cookedWeight) },
+          recipe: {
+            ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(d.weight),
+            prep, fryFat: fryFat && fryFat.grams > 0 ? fryFat : undefined,
+            addons: addons && addons.length ? addons.map(it => ({ ...it })) : undefined,
+          },
         };
         const existing = id ? get().products.find(p => p.id === id) : undefined;
         if (existing) { get().updateProduct(existing.id, patch); return get().products.find(p => p.id === existing.id)!; }

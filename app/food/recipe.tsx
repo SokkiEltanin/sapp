@@ -6,7 +6,7 @@ import { ChevronLeft, Search, Plus, Minus, X, Check, Trash2, ChefHat, Scale, Cop
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemMacros,
-  MealItem, FoodUnit, PRESET_CATS, recipeDensity, recipeTotals,
+  MealItem, FoodUnit, PRESET_CATS, recipeDensity, recipeTotals, PrepType,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
@@ -16,6 +16,19 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
 const ACCENT = '#F59E0B';
+
+const PREP_TYPES: { id: PrepType; label: string; hint: string }[] = [
+  { id: 'raw',    label: 'Mieszanka', hint: 'sałatka / ciasto na surowo / shake — waga = suma składników' },
+  { id: 'cooked', label: 'Gotowane',  hint: 'ugotowane / upieczone — zważ gotowe (woda odparowała)' },
+  { id: 'fried',  label: 'Smażone',   hint: 'zważ gotowe + wybierz na czym (tłuszcz = więcej kcal)' },
+];
+// Frying fats — quick pick + amount in spoons. Absorbed fat adds calories.
+const FRY_FATS: { id: string; name: string; kcal100: number; gPerSpoon: number }[] = [
+  { id: 'olej',   name: 'Olej',   kcal100: 884, gPerSpoon: 13 },
+  { id: 'oliwa',  name: 'Oliwa',  kcal100: 884, gPerSpoon: 13 },
+  { id: 'maslo',  name: 'Masło',  kcal100: 735, gPerSpoon: 15 },
+  { id: 'smalec', name: 'Smalec', kcal100: 900, gPerSpoon: 13 },
+];
 
 // A pickable ingredient — from the user's counted DB or the offline base.
 interface Candidate {
@@ -48,12 +61,17 @@ export default function RecipeBuilder() {
 
   const [name, setName]     = useState('');
   const [cat, setCat]       = useState('nalesniki');
-  const [cooked, setCooked] = useState('');            // waga gotowego dania (g)
+  const [prep, setPrep]     = useState<PrepType>('raw');   // domyślnie mieszanka (bez wagi całości)
+  const [cooked, setCooked] = useState('');            // waga gotowego dania (g) — dla gotowane/smażone
+  const [fryFatId, setFryFatId] = useState('');        // '' = bez tłuszczu
+  const [fatSpoons, setFatSpoons] = useState('1');     // łyżki tłuszczu
   const [ings, setIngs]     = useState<MealItem[]>([]);
+  const [addons, setAddons] = useState<MealItem[]>([]);    // dodatki jedzone RAZEM (nutella…)
   const [query, setQuery]   = useState('');
 
   // ingredient portion picker
   const [sel, setSel]           = useState<Candidate | null>(null);
+  const [pickRole, setPickRole] = useState<'ing' | 'addon'>('ing');   // gdzie trafi wybrany produkt
   const [unit, setUnit]         = useState<FoodUnit>('g');
   const [qtyText, setQtyText]   = useState('1');       // wpisywana ilość (0,5 / 1,5 szklanki)
   const [gramsOverride, setGramsOverride] = useState('');
@@ -66,33 +84,44 @@ export default function RecipeBuilder() {
     return nq % 1 === 0 ? String(nq) : String(nq);
   });
 
-  // prefill when editing an existing recipe product
+  const loadFrom = (p: any, copy: boolean) => {
+    if (!p?.recipe) return;
+    setName(copy ? p.name + ' (kopia)' : p.name);
+    setCat(p.cat && PRESET_CATS.some((pc: any) => pc.tag === p.cat) ? p.cat : 'dania');
+    const pr: PrepType = p.recipe.prep ?? 'cooked';
+    setPrep(pr);
+    setCooked(pr === 'raw' ? '' : String(p.recipe.cookedWeight || ''));
+    setIngs(p.recipe.ingredients.map((it: MealItem) => ({ ...it })));
+    setAddons((p.recipe.addons ?? []).map((it: MealItem) => ({ ...it })));
+    if (p.recipe.fryFat) {
+      const f = FRY_FATS.find(x => x.name === p.recipe.fryFat.name);
+      if (f) { setFryFatId(f.id); setFatSpoons(String(Math.max(1, Math.round(p.recipe.fryFat.grams / f.gPerSpoon)))); }
+    }
+  };
+  // prefill when editing an existing dish
   useEffect(() => {
     if (!editId) { if (params.name && !dupId) setName(params.name); return; }
-    const p = products.find(x => x.id === editId);
-    if (p?.recipe) {
-      setName(p.name);
-      setCat(p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania');
-      setCooked(String(p.recipe.cookedWeight || ''));
-      setIngs(p.recipe.ingredients.map(it => ({ ...it })));
-    }
+    loadFrom(products.find(x => x.id === editId), false);
   }, [editId]);
-
   // duplicate → load an existing dish as a NEW one (change an ingredient, swap the flour…)
   useEffect(() => {
     if (!dupId) return;
-    const p = products.find(x => x.id === dupId);
-    if (p?.recipe) {
-      setName(p.name + ' (kopia)');
-      setCat(p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania');
-      setCooked(String(p.recipe.cookedWeight || ''));
-      setIngs(p.recipe.ingredients.map(it => ({ ...it })));
-    }
+    loadFrom(products.find(x => x.id === dupId), true);
   }, [dupId]);
 
   const totals  = useMemo(() => recipeTotals(ings), [ings]);
   const cookedG = parseFloat(cooked.replace(',', '.')) || 0;
-  const density = useMemo(() => recipeDensity(ings, cookedG), [ings, cookedG]);
+  // frying fat (only when smażone + a fat picked)
+  const fry = useMemo(() => {
+    if (prep !== 'fried' || !fryFatId) return undefined;
+    const f = FRY_FATS.find(x => x.id === fryFatId); if (!f) return undefined;
+    const spoons = parseFloat(fatSpoons.replace(',', '.')) || 0;
+    const grams = Math.round(spoons * f.gPerSpoon);
+    return grams > 0 ? { name: f.name, grams, kcal: Math.round(grams / 100 * f.kcal100) } : undefined;
+  }, [prep, fryFatId, fatSpoons]);
+  // raw = mixture → weight is the summed ingredient weight unless the user typed one
+  const effWeight = prep === 'raw' ? (cookedG > 0 ? cookedG : totals.grams) : cookedG;
+  const density = useMemo(() => recipeDensity(ings, effWeight, fry?.kcal ?? 0, fry?.grams ?? 0), [ings, effWeight, fry]);
 
   // ── candidates (own products first, then base) ─────────────────────────────
   const candidates: Candidate[] = useMemo(() => {
@@ -133,10 +162,10 @@ export default function RecipeBuilder() {
     return Array.from(new Set(list));
   }, [sel]);
 
-  const openPicker = (cand: Candidate) => {
+  const openPicker = (cand: Candidate, role: 'ing' | 'addon' = 'ing') => {
     haptic.tap();
     const u: FoodUnit = cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g';
-    setSel(cand); setUnit(u); setQtyText('1'); setGramsOverride('');
+    setSel(cand); setPickRole(role); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
   };
   const addNew = () => { const nm = query.trim(); if (nm) openPicker({ name: nm, source: 'base' }); };
@@ -176,18 +205,20 @@ export default function RecipeBuilder() {
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
     const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100 } as any, grams);
-    setIngs(prev => [...prev, {
+    const item: MealItem = {
       name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal,
       protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined,
-    }]);
+    };
+    if (pickRole === 'addon') setAddons(prev => [...prev, item]);
+    else setIngs(prev => [...prev, item]);
     setSel(null); setQuery('');
   };
 
-  const canSave = !!name.trim() && ings.length > 0 && cookedG > 0;
+  const canSave = !!name.trim() && ings.length > 0 && (prep === 'raw' || cookedG > 0);
   const save = () => {
     if (!canSave) return;
     haptic.success();
-    saveRecipeProduct(name.trim(), ings, cookedG, cat, editId);
+    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry, addons });
     router.back();
   };
   const del = () => {
@@ -217,7 +248,7 @@ export default function RecipeBuilder() {
         {/* jak to działa */}
         <View style={s.explain}>
           <ChefHat size={16} color={ACCENT} />
-          <Text style={s.explainTxt}>Dodaj składniki (w szklankach, jajkach, łyżkach — jak chcesz), potem zważ CAŁE gotowe danie. Policzę kcal na gram, a Ty zjesz ważąc porcję. Wodę i przyprawy bez kalorii możesz pominąć — waga gotowego dania i tak je uwzględnia.</Text>
+          <Text style={s.explainTxt}>Dodaj składniki (w szklankach, jajkach, łyżkach — jak chcesz). Mieszanka = waga liczy się sama z sumy. Gotowane/Smażone = zważ gotowe danie. Policzę kcal na gram, a Ty zjesz ważąc porcję.</Text>
         </View>
 
         {/* nazwa + kategoria */}
@@ -234,6 +265,21 @@ export default function RecipeBuilder() {
             );
           })}
         </View>
+
+        {/* typ przygotowania */}
+        <Text style={s.label}>Jak przygotowane?</Text>
+        <View style={s.prepRow}>
+          {PREP_TYPES.map(pt => {
+            const on = prep === pt.id;
+            return (
+              <TouchableOpacity key={pt.id} onPress={() => { haptic.tap(); setPrep(pt.id); }}
+                style={[s.prepChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                <Text style={[s.prepTxt, on && { color: ACCENT }]}>{pt.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={s.prepHint}>{PREP_TYPES.find(p => p.id === prep)?.hint}</Text>
 
         {/* składniki */}
         <View style={s.sectionHead}><Text style={s.sectionTitle}>Składniki</Text><Text style={s.sectionSum}>{totals.kcal} kcal · {Math.round(totals.grams)} g surowych</Text></View>
@@ -275,13 +321,73 @@ export default function RecipeBuilder() {
           ))}
         </View>
 
-        {/* waga gotowego dania */}
-        <View style={s.sectionHead}><Scale size={15} color={ACCENT} /><Text style={s.sectionTitle}>Waga gotowego dania</Text></View>
-        <View style={s.weightCard}>
-          <TextInput style={s.weightInput} value={cooked} onChangeText={setCooked} keyboardType="numeric" placeholder="np. 780" placeholderTextColor={c.text.muted} />
-          <Text style={s.weightUnit}>g</Text>
-          <Text style={s.weightHint}>zważ całość po usmażeniu / upieczeniu (bez oleju do smażenia)</Text>
-        </View>
+        {/* dodatki (jedzone razem — nutella, banan…) */}
+        <View style={s.sectionHead}><Text style={s.sectionTitle}>Dodatki (jedzone razem)</Text><Text style={s.sectionSum}>osobno, nie w wadze</Text></View>
+        {addons.length > 0 && (
+          <View style={s.card}>
+            {addons.map((it, i) => (
+              <View key={i} style={[s.ingRow, i > 0 && s.itemBorder]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.ingName} numberOfLines={1}>{it.name}</Text>
+                  <Text style={s.ingMeta} numberOfLines={1}>{it.unit === 'g' ? `${it.grams} g` : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}</Text>
+                </View>
+                <Text style={s.ingKcal}>{it.kcal} kcal</Text>
+                <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setAddons(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+        <Text style={s.prepHint}>Dodatki dokłada się przy jedzeniu (np. naleśnik + nutella) — jak ser do bułki. Wybierz produkt wyżej i w okienku zaznacz „Dodatek".</Text>
+
+        {/* waga — tylko gdy gotowane / smażone */}
+        {prep === 'raw' ? (
+          <>
+            <View style={s.sectionHead}><Scale size={15} color={ACCENT} /><Text style={s.sectionTitle}>Waga całości</Text></View>
+            <View style={s.weightCard}>
+              <TextInput style={s.weightInput} value={cooked} onChangeText={setCooked} keyboardType="numeric" placeholder={`${Math.round(totals.grams)}`} placeholderTextColor={c.text.muted} />
+              <Text style={s.weightUnit}>g</Text>
+              <Text style={s.weightHint}>liczy się sama z sumy składników ({Math.round(totals.grams)} g) — zmień tylko jeśli inna</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={s.sectionHead}><Scale size={15} color={ACCENT} /><Text style={s.sectionTitle}>Waga gotowego dania</Text></View>
+            <View style={s.weightCard}>
+              <TextInput style={s.weightInput} value={cooked} onChangeText={setCooked} keyboardType="numeric" placeholder="np. 780" placeholderTextColor={c.text.muted} />
+              <Text style={s.weightUnit}>g</Text>
+              <Text style={s.weightHint}>zważ całość po {prep === 'fried' ? 'usmażeniu' : 'ugotowaniu / upieczeniu'}</Text>
+            </View>
+          </>
+        )}
+
+        {/* na czym smażone (tłuszcz = więcej kcal) */}
+        {prep === 'fried' && (
+          <>
+            <Text style={s.label}>Na czym smażone?</Text>
+            <View style={s.prepRow}>
+              <TouchableOpacity onPress={() => { haptic.tap(); setFryFatId(''); }}
+                style={[s.prepChip, !fryFatId && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                <Text style={[s.prepTxt, !fryFatId && { color: ACCENT }]}>Bez tłuszczu</Text>
+              </TouchableOpacity>
+              {FRY_FATS.map(f => {
+                const on = fryFatId === f.id;
+                return (
+                  <TouchableOpacity key={f.id} onPress={() => { haptic.tap(); setFryFatId(f.id); }}
+                    style={[s.prepChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                    <Text style={[s.prepTxt, on && { color: ACCENT }]}>{f.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {fryFatId ? (
+              <View style={s.fatRow}>
+                <Text style={s.fatLabel}>Ile łyżek</Text>
+                <TextInput style={s.fatInput} value={fatSpoons} onChangeText={t => setFatSpoons(t.replace(/[^0-9.,]/g, ''))} keyboardType="numeric" placeholder="1" placeholderTextColor={c.text.muted} />
+                <Text style={s.fatHint}>{fry ? `+${fry.kcal} kcal (${fry.grams} g tłuszczu)` : 'tłuszcz dolicza kalorie'}</Text>
+              </View>
+            ) : null}
+          </>
+        )}
 
         {/* wynik */}
         <View style={s.resultCard}>
@@ -293,8 +399,8 @@ export default function RecipeBuilder() {
           {(density.protein100 || density.carbs100 || density.fat100) ? (
             <Text style={s.resultMacros}>na 100 g:  B {density.protein100 ?? 0}  ·  W {density.carbs100 ?? 0}  ·  T {density.fat100 ?? 0}</Text>
           ) : null}
-          {cookedG > 0 && density.kcalPer100g > 0 && (
-            <Text style={s.resultExample}>przykład: porcja 150 g ≈ {Math.round(density.kcalPer100g * 1.5)} kcal</Text>
+          {density.kcalPer100g > 0 && (
+            <Text style={s.resultExample}>przykład: porcja 150 g ≈ {Math.round(density.kcalPer100g * 1.5)} kcal{addons.length ? ` + dodatki` : ''}</Text>
           )}
         </View>
       </ScrollView>
@@ -314,6 +420,18 @@ export default function RecipeBuilder() {
               {sel && (
                 <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
                   <Text style={s.sheetTitle}>{sel.name}</Text>
+                  {/* rola: składnik ciasta (dzielony przez wagę) vs dodatek (jedzony razem) */}
+                  <View style={s.roleRow}>
+                    {(['ing', 'addon'] as const).map(r => {
+                      const on = pickRole === r;
+                      return (
+                        <TouchableOpacity key={r} onPress={() => { haptic.tap(); setPickRole(r); }}
+                          style={[s.roleChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                          <Text style={[s.roleTxt, on && { color: ACCENT }]}>{r === 'ing' ? 'Składnik' : 'Dodatek'}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                   <View style={s.unitWrap}>
                     {pickerUnits.map(u => {
                       const on = unit === u;
@@ -360,7 +478,7 @@ export default function RecipeBuilder() {
                   <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {dens() || '—'}/100g</Text></View>
                   <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
                     disabled={!(pickerGrams() > 0)} onPress={confirmPicker}>
-                    <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj składnik</Text>
+                    <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>{pickRole === 'addon' ? 'Dodaj dodatek' : 'Dodaj składnik'}</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -387,6 +505,18 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   catWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   catChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   catTxt:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
+
+  prepRow:  { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
+  prepChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  prepTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+  prepHint: { fontSize: 11.5, color: c.text.muted, lineHeight: 15, marginTop: -2 },
+  fatRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 2 },
+  fatLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+  fatInput: { width: 60, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary },
+  fatHint:  { flex: 1, fontSize: 11.5, color: c.text.muted },
+  roleRow:  { flexDirection: 'row', gap: spacing[2] },
+  roleChip: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
+  roleTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
 
   sectionHead:  { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2] },
   sectionTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary, flex: 1 },

@@ -379,7 +379,11 @@ export default function FoodAdd() {
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
     const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100 } as any, grams);
-    setItems(prev => [...prev, { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined }]);
+    const dishItem: MealItem = { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined };
+    // A dish with typical add-ons (naleśnik + nutella) → drop them in too (delete any you skipped).
+    const dishProduct = products.find(p => p.id === productId);
+    const dishAddons = dishProduct?.recipe?.addons ?? [];
+    setItems(prev => [...prev, dishItem, ...dishAddons.map(a => ({ ...a }))]);
     setSel(null);
   };
 
