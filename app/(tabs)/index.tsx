@@ -882,7 +882,9 @@ export default function DashboardScreen() {
   const [editingDash, setEditingDash] = useState(false);
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [showHiddenPool, setShowHiddenPool] = useState(false);
-  const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles), [dashOrder, customTiles]);
+  // Custom widgety STATYSTYK usunięte (user: „wywal system custom widgetów" — były
+  // niedopracowane). Proste piny (notatka/pogoda) zostają. Filtrujemy 'stat' wszędzie.
+  const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles.filter(t => t.type !== 'stat')), [dashOrder, customTiles]);
   const hiddenSet = useMemo(() => new Set(dashHidden), [dashHidden]);
   // The editor list shows only VISIBLE sections (not hidden, not auto-managed alerts),
   // so drag/arrow indices are positions in THAT list. Both handlers reorder the visible
@@ -892,7 +894,7 @@ export default function DashboardScreen() {
   // same as full-order index N once anything hidden/auto sits between the rows.
   const reorderVisible = useCallback((id: string, target: number) => {
     const st = useDashboardLayout.getState();
-    const cur = effectiveOrder(st.order, st.customTiles);
+    const cur = effectiveOrder(st.order, st.customTiles.filter(t => t.type !== 'stat'));
     const hidden = new Set(st.hidden);
     const isVis = (x: string) => !hidden.has(x) && !isAutoSection(x);
     const vis = cur.filter(isVis);
@@ -910,7 +912,7 @@ export default function DashboardScreen() {
   const handleMoveTo = useCallback((id: string, target: number) => reorderVisible(id, target), [reorderVisible]);
   const moveVisible = useCallback((id: string, dir: -1 | 1) => {
     const st = useDashboardLayout.getState();
-    const cur = effectiveOrder(st.order, st.customTiles);
+    const cur = effectiveOrder(st.order, st.customTiles.filter(t => t.type !== 'stat'));
     const hidden = new Set(st.hidden);
     const vis = cur.filter(x => !hidden.has(x) && !isAutoSection(x));
     const from = vis.indexOf(id);
@@ -4391,7 +4393,7 @@ export default function DashboardScreen() {
             );
 
               // custom user tiles
-              for (const t of customTiles) nodes[t.id] = renderCustomTile(t);
+              for (const t of customTiles) if (t.type !== 'stat') nodes[t.id] = renderCustomTile(t);
 
               // ── Edit mode: reorder / hide / add / reset ──────────────────
               if (editingDash) {
@@ -4486,10 +4488,6 @@ export default function DashboardScreen() {
                       );
                     })()}
 
-                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); router.navigate('/widget-builder' as any); }} activeOpacity={0.85}>
-                      <BarChart2 size={15} color={accentColor} />
-                      <Text style={[s.editAddText, { color: accentColor }]}>Dodaj widget statystyk</Text>
-                    </TouchableOpacity>
                     <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); setNotePickerOpen(true); }} activeOpacity={0.85}>
                       <Plus size={15} color={accentColor} />
                       <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek z notatką</Text>
