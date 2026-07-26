@@ -14,12 +14,18 @@ interface TimeAccent {
   timeOfDay: TimeOfDay;
 }
 
+// AKCENT = MONO (czarno-biały) — user: „akcent apki czarno-biały, kolory tylko dodatki".
+// `color` (emfaza: ikony/paski/wykresy/liczby) = near-white na ciemnym. Hero wash
+// (gradientTop/cardBg) = neutralny dark (bez niebieskiego) dla clean look. Greeting time-based.
+// Skiny NADAL nadpisują kolorem (opcjonalne „dodatki"). Kalendarz ma swoje kolory osobno.
+const MONO = '#ECEEEE';
+const HERO_TOP = '#0B0D0F', HERO_CARD = '#20242A', HERO_CARD_DARK = '#171B20';
 const ACCENTS: Record<TimeOfDay, Omit<TimeAccent, 'timeOfDay'>> = {
-  night:     { color: '#5B7BE3', greeting: 'Dobranoc',      gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
-  dawn:      { color: '#5B7BE3', greeting: 'Dzień dobry',   gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
-  morning:   { color: '#46B0DE', greeting: 'Dzień dobry',   gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
-  afternoon: { color: '#46B0DE', greeting: 'Dzień dobry',   gradientTop: '#091820', cardBg: '#1B3947', cardBgDark: '#132A34' },
-  evening:   { color: '#5B7BE3', greeting: 'Dobry wieczór', gradientTop: '#0B0E1A', cardBg: '#282F44', cardBgDark: '#1E2333' },
+  night:     { color: MONO, greeting: 'Dobranoc',      gradientTop: HERO_TOP, cardBg: HERO_CARD, cardBgDark: HERO_CARD_DARK },
+  dawn:      { color: MONO, greeting: 'Dzień dobry',   gradientTop: HERO_TOP, cardBg: HERO_CARD, cardBgDark: HERO_CARD_DARK },
+  morning:   { color: MONO, greeting: 'Dzień dobry',   gradientTop: HERO_TOP, cardBg: HERO_CARD, cardBgDark: HERO_CARD_DARK },
+  afternoon: { color: MONO, greeting: 'Dzień dobry',   gradientTop: HERO_TOP, cardBg: HERO_CARD, cardBgDark: HERO_CARD_DARK },
+  evening:   { color: MONO, greeting: 'Dobry wieczór', gradientTop: HERO_TOP, cardBg: HERO_CARD, cardBgDark: HERO_CARD_DARK },
 };
 
 // Fixed-hour fallback when real sun times aren't known yet.
