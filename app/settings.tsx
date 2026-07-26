@@ -46,6 +46,7 @@ import { useWorkStore } from '@/store/workStore';
 import { useDashboardLayout } from '@/store/dashboardLayout';
 import { useHeroFont, HERO_FONTS } from '@/store/heroFont';
 import { useUiPrefs } from '@/store/uiPrefs';
+import { runSamsungBackfill, backfillRange, isBackfillDone } from '@/utils/samsungBackfill';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { ingestBankNotification } from '@/services/bankIngest';
 import { workService } from '@/services/workService';
@@ -126,6 +127,24 @@ export default function SettingsScreen() {
   const setTabSlide = useUiPrefs(s => s.setTabSlide);
   const liteMode = useUiPrefs(s => s.liteMode);
   const setLiteMode = useUiPrefs(s => s.setLiteMode);
+
+  const [backfillBusy, setBackfillBusy] = useState(false);
+  const [backfillDone, setBackfillDone] = useState(false);
+  useEffect(() => { isBackfillDone().then(setBackfillDone).catch(() => {}); }, []);
+  const doBackfill = () => {
+    const r = backfillRange();
+    Alert.alert('Zaległe dane z Samsung Health',
+      `${backfillDone ? 'Już wgrane raz. Wgrać ponownie? ' : ''}Wypełni ${r.days} dni (${r.from} → ${r.to}) — tylko PUSTE dni, nie nadpisze ręcznych ani nowszych.`,
+      [
+        { text: 'Anuluj', style: 'cancel' },
+        { text: 'Wgraj', onPress: async () => {
+          haptic.tap(); setBackfillBusy(true);
+          try { const res = await runSamsungBackfill(); setBackfillDone(true); Alert.alert('Gotowe', `Uzupełniono ${res.filled} dni. Kroki/sen/waga/kalorie ze starych dni są teraz w wykresach i trendzie wagi.`); }
+          catch { Alert.alert('Błąd', 'Nie udało się wgrać danych.'); }
+          finally { setBackfillBusy(false); }
+        } },
+      ]);
+  };
   const bankEnabled = useBankQueue(s => s.enabled);
   const setBankEnabled = useBankQueue(s => s.setEnabled);
   const bankAutoAll = useBankQueue(s => s.autoAll);
@@ -1506,6 +1525,19 @@ export default function SettingsScreen() {
               <View style={styles.rowText}>
                 <Text style={styles.rowLabel}>Test połączeń zdrowia</Text>
                 <Text style={styles.rowSub}>Sprawdza kroki (wg źródła), sen, wagę, kalorie, wodę — raport do wysłania</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+            <PressableScale
+              onPress={doBackfill} disabled={backfillBusy}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
+                {backfillBusy ? <ActivityIndicator size="small" color="#2AC68F" /> : <LucideIcons.DownloadCloud size={16} color="#2AC68F" />}
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Wgraj zaległe dane z Samsung Health{backfillDone ? ' ✓' : ''}</Text>
+                <Text style={styles.rowSub}>Historyczne kroki/sen/waga/kalorie ({backfillRange().days} dni) do wykresów — jednorazowo, wypełnia luki</Text>
               </View>
               <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
             </PressableScale>
