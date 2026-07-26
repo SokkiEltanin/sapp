@@ -134,6 +134,9 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   bike:        Bike,
 };
 const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
+// Proposed SINGLE app accent (redesign „dark clean · jeden akcent"). Pilot = panel Pracy;
+// docelowo rozlać na resztę zamiast per-zakładka. Zmień w JEDNYM miejscu.
+const WORK_ACCENT = '#2AC68F';
 const WEEKS_BACK  = 8;
 
 // Per-metric icon for custom stat tiles, so each widget's preview is glanceable at a
@@ -4539,7 +4542,7 @@ export default function DashboardScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setWorkPanel(false)} />
           <View style={[s.card, { backgroundColor: colors.bg.card }]}>
             <View style={s.cardHeader}>
-              <Briefcase size={14} color={accentColor} />
+              <Briefcase size={15} color={WORK_ACCENT} />
               <Text style={s.cardTitle}>Praca</Text>
               <TouchableOpacity onPress={() => setWorkPanel(false)} hitSlop={10} style={{ marginLeft: 'auto' }}>
                 <X size={18} color={colors.text.muted} />
@@ -4576,7 +4579,7 @@ export default function DashboardScreen() {
                         <>
                           <View style={s.wpLeftDivider} />
                           <View style={s.wpLeftItem}>
-                            <Text style={[s.wpLeftVal, { color: accentColor }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
+                            <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
                             <Text style={s.wpLeftLbl}>zł prognoza mies.</Text>
                           </View>
                         </>
@@ -4623,7 +4626,7 @@ export default function DashboardScreen() {
                           <View key={r.month} style={s.wmRow}>
                             <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]} numberOfLines={1}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : (r.count > 1 ? ` · ${r.count}×` : '')}</Text>
                             <Text style={s.wmH} numberOfLines={1}>{Math.round(r.amount).toLocaleString('pl-PL')} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
-                            <Text style={[s.wmZl, { color: inAvg ? '#FBBF24' : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)}` : '—'}</Text>
+                            <Text style={[s.wmZl, { color: inAvg ? WORK_ACCENT : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)}` : '—'}</Text>
                           </View>
                         );
                       })}
@@ -4633,7 +4636,7 @@ export default function DashboardScreen() {
                         return jdTotal > 0 ? (
                           <View style={s.wpTotalRow}>
                             <Text style={s.wpTotalLabel}>Łącznie{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
-                            <Text style={[s.wpTotalVal, { color: accentColor }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
+                            <Text style={[s.wpTotalVal, { color: WORK_ACCENT }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
                           </View>
                         ) : null;
                       })()}
@@ -5632,7 +5635,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   weightAddInput: { flex: 1, backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], paddingVertical: 10, fontSize: 16, fontWeight: '700', color: c.text.primary },
   weightAddBtn: { paddingHorizontal: spacing[4], paddingVertical: 11, borderRadius: radius.md },
   weightAddBtnTxt: { fontSize: 13, fontWeight: '800' },
-  wxSection: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: spacing[3], marginBottom: spacing[1] },
+  wxSection: { fontSize: 11, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: spacing[5], marginBottom: spacing[2] },
   detailToggle: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] },
   detailToggleBtn: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
   detailToggleTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.muted },
@@ -5641,28 +5644,29 @@ const buildStyles = (c: any) => StyleSheet.create({
   wxDayLbl: { fontSize: 11, color: c.text.secondary, fontWeight: '700' },
   wxHi: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
   wxLo: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
-  wpBig: { fontSize: 38, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2 },
-  wpUnit: { fontSize: 18, fontWeight: '700', color: c.text.muted },
-  wpSub: { fontSize: 12.5, color: c.text.secondary, marginTop: 1 },
-  wpLeftCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3], backgroundColor: c.fill.subtle, borderRadius: radius.lg, paddingVertical: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
-  wpLeftItem: { flex: 1, alignItems: 'center', gap: 2 },
-  wpLeftVal: { fontSize: 22, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  // ── Praca (pilot „clean": oddech + jeden akcent = WORK_ACCENT) ──
+  wpBig: { fontSize: 44, fontWeight: '900', color: c.text.primary, letterSpacing: -1.4, marginTop: spacing[2] },
+  wpUnit: { fontSize: 19, fontWeight: '700', color: c.text.muted },
+  wpSub: { fontSize: 13, color: c.text.secondary, marginTop: 4, lineHeight: 18 },
+  wpLeftCard: { flexDirection: 'row', alignItems: 'center', marginTop: spacing[5], backgroundColor: c.fill.subtle, borderRadius: radius.xl, paddingVertical: spacing[4], paddingHorizontal: spacing[2], borderWidth: 1, borderColor: c.border.subtle },
+  wpLeftItem: { flex: 1, alignItems: 'center', gap: 5 },
+  wpLeftVal: { fontSize: 24, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
   wpLeftUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted },
-  wpLeftLbl: { fontSize: 10.5, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
-  wpLeftDivider: { width: 1, height: 32, backgroundColor: c.border.default },
-  wpAvgLine: { fontSize: 12, color: c.text.secondary, marginTop: spacing[2], lineHeight: 17 },
+  wpLeftLbl: { fontSize: 10.5, fontWeight: '600', color: c.text.muted, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
+  wpLeftDivider: { width: 1, height: 40, backgroundColor: c.border.default },
+  wpAvgLine: { fontSize: 12.5, color: c.text.secondary, marginTop: spacing[4], lineHeight: 18 },
   wpAvgB: { fontWeight: '800', color: c.text.primary },
-  wpRateCard: { marginTop: spacing[3], backgroundColor: c.fill.subtle, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: '#FBBF2433' },
-  wpRateVal: { fontSize: 26, fontWeight: '900', color: '#FBBF24', letterSpacing: -0.6 },
-  wpRateUnit: { fontSize: 15, fontWeight: '700', color: '#FBBF24AA' },
-  wpRateHint: { fontSize: 11.5, color: c.text.muted, marginTop: 2 },
-  wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  wpRateCard: { marginTop: spacing[5], backgroundColor: WORK_ACCENT + '14', borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: WORK_ACCENT + '33' },
+  wpRateVal: { fontSize: 30, fontWeight: '900', color: WORK_ACCENT, letterSpacing: -0.6 },
+  wpRateUnit: { fontSize: 16, fontWeight: '700', color: WORK_ACCENT + 'AA' },
+  wpRateHint: { fontSize: 11.5, color: c.text.muted, marginTop: 4 },
+  wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
   wpTotalLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
-  wpTotalVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.4 },
-  wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 8 },
+  wpTotalVal: { fontSize: 18, fontWeight: '900', letterSpacing: -0.4 },
+  wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 },
   wmMonth: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.secondary },
   wmH: { width: 118, textAlign: 'right', fontSize: 12.5, fontWeight: '700', color: c.text.primary },
-  wmZl: { width: 72, textAlign: 'right', fontSize: 13, fontWeight: '800', color: c.text.primary },
+  wmZl: { width: 72, textAlign: 'right', fontSize: 13, fontWeight: '800', color: WORK_ACCENT },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
