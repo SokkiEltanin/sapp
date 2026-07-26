@@ -31,7 +31,7 @@ import { haptic } from '@/utils/haptics';
 const V = {
   card:       '#1A1226',
   cardBorder: 'rgba(167,139,250,0.20)',
-  accent:     '#A78BFA',
+  accent:     '#ECEEEE',
   accentDim:  'rgba(167,139,250,0.14)',
   muted:      'rgba(167,139,250,0.45)',
 };

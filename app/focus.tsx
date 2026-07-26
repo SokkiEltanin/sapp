@@ -18,7 +18,7 @@ import { themedStyles } from '@/theme/themedStyles';
 const G = {
   card:       '#0C2218',
   cardBorder: 'rgba(46,222,160,0.20)',
-  accent:     '#2EDEA0',
+  accent:     '#ECEEEE',
   accentDim:  'rgba(46,222,160,0.18)',
   muted:      'rgba(46,222,160,0.50)',
 };

@@ -19,7 +19,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 
 const C = {
-  accent: '#2BC8E0',
+  accent: '#ECEEEE',
   dim:    'rgba(43,200,224,0.14)',
   border: 'rgba(43,200,224,0.22)',
   muted:  'rgba(43,200,224,0.45)',
