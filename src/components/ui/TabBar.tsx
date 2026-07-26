@@ -4,7 +4,6 @@ import {
   Pressable, Animated,
 } from 'react-native';
 import { router } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   LayoutDashboard, ListTodo, CalendarDays, Wallet, HeartPulse, ScanLine, Settings,
@@ -136,7 +135,8 @@ export default function TabBar({ currentIndex }: Props) {
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={s.pillBorder}
         >
-        <BlurView intensity={isLight ? 40 : 32} tint={isLight ? 'light' : 'dark'} style={s.pill}>
+        {/* solidny pasek (bez BlurView) — czyściej + płynniej na Androidzie */}
+        <View style={[s.pill, { backgroundColor: c.bg.elevated }]}>
           {/* Sliding island under the active tab */}
           {tabW > 0 && (
             <Animated.View
@@ -183,7 +183,7 @@ export default function TabBar({ currentIndex }: Props) {
               );
             })}
           </View>
-        </BlurView>
+        </View>
         </LinearGradient>
       </View>
     </>
