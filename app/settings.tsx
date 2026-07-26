@@ -124,6 +124,8 @@ export default function SettingsScreen() {
   const themeMode = useThemeStore(s => s.mode);
   const tabSlide = useUiPrefs(s => s.tabSlide);
   const setTabSlide = useUiPrefs(s => s.setTabSlide);
+  const liteMode = useUiPrefs(s => s.liteMode);
+  const setLiteMode = useUiPrefs(s => s.setLiteMode);
   const bankEnabled = useBankQueue(s => s.enabled);
   const setBankEnabled = useBankQueue(s => s.setEnabled);
   const bankAutoAll = useBankQueue(s => s.autoAll);
@@ -608,6 +610,21 @@ export default function SettingsScreen() {
                 onValueChange={setTabSlide}
                 trackColor={{ false: colors.fill.strong, true: '#46B0DE99' }}
                 thumbColor={tabSlide ? '#46B0DE' : colors.text.muted}
+              />
+            </View>
+            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
+              <View style={styles.iconWrap}>
+                <LucideIcons.Zap size={16} color={colors.text.secondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>Ogranicz animacje (płynność)</Text>
+                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Wyłącza animowane tło (chmury/gwiazdy/pogoda) — najcięższy efekt. Włącz, jeśli apka klatkuje.</Text>
+              </View>
+              <Switch
+                value={liteMode}
+                onValueChange={(v) => { haptic.tap(); setLiteMode(v); }}
+                trackColor={{ false: colors.fill.strong, true: '#2AC68F99' }}
+                thumbColor={liteMode ? '#2AC68F' : colors.text.muted}
               />
             </View>
           </View>

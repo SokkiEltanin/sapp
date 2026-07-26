@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 import Svg, { Circle, G, Defs, Filter, FeGaussianBlur, RadialGradient, Stop } from 'react-native-svg';
 import type { TimeOfDay } from '@/hooks/useTimeAccent';
+import { useUiPrefs } from '@/store/uiPrefs';
 
 // ─── Stars (night / dawn / evening) ──────────────────────────────────────────
 
@@ -294,6 +295,11 @@ function conditionFor(code: number | undefined, isNight: boolean): Condition {
 interface Props { timeOfDay: TimeOfDay; layer?: 'back' | 'front'; weatherCode?: number; active?: boolean; }
 
 export default function AnimatedCardBg({ timeOfDay, layer = 'back', weatherCode, active = true }: Props) {
+  // Perf: "Ogranicz animacje" drops this whole layer — animated blurred-SVG clouds +
+  // particles are the single most expensive decorative effect on Android.
+  const liteMode = useUiPrefs(s => s.liteMode);
+  if (liteMode) return null;
+
   const isNight = timeOfDay === 'night' || timeOfDay === 'evening' || timeOfDay === 'dawn';
   const cond = conditionFor(weatherCode, isNight);
 
