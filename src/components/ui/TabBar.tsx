@@ -33,16 +33,9 @@ const TABS = [
   { Icon: Utensils        },
 ];
 
-// MONO: wszystkie zakładki dziedziczą mono timeAccent (null). Wyjątek = KALENDARZ
-// (user: „zostaw dla kalendarza kolory") — jedyny kolorowy akcent w pasku.
-const TAB_ACCENTS = [
-  null,
-  null,
-  colors.tabs.calendar,
-  null,
-  null,
-  null,
-] as const;
+// MONO: wszystkie zakładki dziedziczą mono timeAccent. (Kalendarz też mono — user:
+// „eventy tak kolor, ale mono reszta"; kolor zostaje TYLKO na eventach w ekranie kalendarza.)
+const TAB_ACCENTS = [null, null, null, null, null, null] as const;
 
 const PILL_H = 52;
 

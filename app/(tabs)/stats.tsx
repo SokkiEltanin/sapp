@@ -32,14 +32,17 @@ import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
+// mono (redesign) — chrome kalendarza = biel; KOLOR zostaje TYLKO na eventach (ev.color
+// + domyślny EVENT_DEFAULT poniżej), jak prosił user („eventy tak kolor, reszta mono").
 const VP = {
-  card:       '#0E1428',
-  cardBorder: 'rgba(58,76,156,0.22)',
-  accent:     '#3A4C9C',
-  accentDim:  'rgba(58,76,156,0.18)',
-  muted:      'rgba(58,76,156,0.55)',
+  card:       '#0F1012',
+  cardBorder: 'rgba(255,255,255,0.10)',
+  accent:     '#ECEEEE',
+  accentDim:  'rgba(236,238,238,0.12)',
+  muted:      'rgba(236,238,238,0.5)',
 };
-const V = VP.accent; // kept for existing inline expressions
+const V = VP.accent;            // chrome (mono)
+const EVENT_DEFAULT = '#3A4C9C'; // domyślny kolor eventu bez własnego (zostaje kolorowy)
 
 const MONTH_NAMES = [
   'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
@@ -84,7 +87,7 @@ interface DayModalProps {
 
 function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps) {
   const colors = useColors();
-  const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(58,76,156,0.24)', accent: '#3A4C9C', accentDim: 'rgba(58,76,156,0.18)', muted: 'rgba(58,76,156,0.55)' }), [colors]);
+  const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(255,255,255,0.10)', accent: '#ECEEEE', accentDim: 'rgba(236,238,238,0.12)', muted: 'rgba(236,238,238,0.5)' }), [colors]);
   const dm = useMemo(() => makeDm(colors, VP), [colors, VP]);
   const insets = useSafeAreaInsets();
   const isToday = date === todayStr();
@@ -136,7 +139,7 @@ function DayModal({ date, events, tasks, onClose, onToggleTask }: DayModalProps)
               <Text style={dm.sectionLabel}>WYDARZENIA</Text>
               {events.map(ev => {
                 const isGCal = ev.id.startsWith('gcal-');
-                const evColor = ev.color ?? (isGCal ? '#039BE5' : V);
+                const evColor = ev.color ?? (isGCal ? '#039BE5' : EVENT_DEFAULT);
                 return (
                   <TouchableOpacity
                     key={ev.id}
@@ -263,7 +266,7 @@ const makeDm = (c: any, vp: any) => StyleSheet.create({
 export default function CalendarTabScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(58,76,156,0.24)', accent: '#3A4C9C', accentDim: 'rgba(58,76,156,0.18)', muted: 'rgba(58,76,156,0.55)' }), [colors]);
+  const VP = useMemo(() => ({ card: colors.bg.card, cardBorder: 'rgba(255,255,255,0.10)', accent: '#ECEEEE', accentDim: 'rgba(236,238,238,0.12)', muted: 'rgba(236,238,238,0.5)' }), [colors]);
   const styles = useMemo(() => makeStyles(colors, VP), [colors, VP]);
   const { events, tasks, selectedDate, setEvents, setTasks, updateTask, setSelectedDate, setLoading } =
     useCalendarStore();

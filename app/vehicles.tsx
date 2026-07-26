@@ -29,7 +29,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
 
-const ACCENT = '#55B4FF';
+const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const KIND_META: Record<VehicleKind, { label: string; Icon: any }> = {
   car:        { label: 'Samochód',  Icon: Car },
   bike:       { label: 'Rower',     Icon: Bike },

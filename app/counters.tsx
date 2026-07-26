@@ -22,7 +22,8 @@ const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
-const ACCENT = '#46B0DE';
+const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
+const ON_ACCENT = '#12100F';   // ciemny tekst/ikona na białym akcencie
 // Marker emojis for countdowns — the chosen one hops along the progress bar.
 const EVENT_EMOJIS = ['🎂', '✈️', '🎁', '❤️', '🏖️', '🎄', '🎉', '🎓', '🏠', '🚗', '⚽', '🎸', '💍', '🍼', '🌸', '🎯', '🔥', '💸'];
 
@@ -108,7 +109,7 @@ export default function Counters() {
             <Hourglass size={32} color={c.text.muted} />
             <Text style={s.emptyText}>Dodaj odliczanie do eventu albo licznik „ile dni temu…".</Text>
             <TouchableOpacity style={[s.addBtn, { backgroundColor: ACCENT }]} onPress={openAdd} activeOpacity={0.85}>
-              <Plus size={16} color="#fff" /><Text style={s.addBtnText}>Dodaj pierwszy</Text>
+              <Plus size={16} color={ON_ACCENT} /><Text style={s.addBtnText}>Dodaj pierwszy</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -290,11 +291,11 @@ export default function Counters() {
             <TouchableOpacity style={s.dashToggle} onPress={() => { haptic.tap(); setOnDash(v => !v); }} activeOpacity={0.8}>
               <LayoutDashboard size={15} color={onDash ? ACCENT : c.text.muted} />
               <Text style={[s.dashToggleText, onDash && { color: ACCENT }]}>Pokaż na dashboardzie</Text>
-              <View style={[s.checkbox, onDash && { backgroundColor: ACCENT, borderColor: ACCENT }]}>{onDash && <Check size={12} color="#fff" />}</View>
+              <View style={[s.checkbox, onDash && { backgroundColor: ACCENT, borderColor: ACCENT }]}>{onDash && <Check size={12} color={ON_ACCENT} />}</View>
             </TouchableOpacity>
 
             <TouchableOpacity style={[s.saveBtn, { backgroundColor: ACCENT }, !canSave && { opacity: 0.4 }]} onPress={save} disabled={!canSave} activeOpacity={0.85}>
-              <Check size={17} color="#fff" /><Text style={s.saveText}>{editing ? 'Zapisz' : 'Dodaj'}</Text>
+              <Check size={17} color={ON_ACCENT} /><Text style={s.saveText}>{editing ? 'Zapisz' : 'Dodaj'}</Text>
             </TouchableOpacity>
             </ScrollView>
           </View>
@@ -314,7 +315,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   empty: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   emptyText: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260, lineHeight: 19 },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[4], paddingVertical: 10, borderRadius: radius.full },
-  addBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  addBtnText: { color: ON_ACCENT, fontWeight: '800', fontSize: 14 },
 
   section: { fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[3], marginBottom: spacing[2] },
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], marginBottom: spacing[3] },
@@ -362,5 +363,5 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   calItemDate: { fontSize: 12, fontWeight: '800', color: '#46B0DE', width: 44 },
   calItemName: { flex: 1, fontSize: 13, color: c.text.secondary },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: radius.lg, marginTop: spacing[3] },
-  saveText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  saveText: { color: ON_ACCENT, fontWeight: '800', fontSize: 15 },
 }));
