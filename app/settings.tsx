@@ -123,8 +123,6 @@ export default function SettingsScreen() {
   const { tasks, events, gcalEvents } = useCalendarStore();
   const { settings: workSettings, setSettings: setWorkSettings } = useWorkStore();
   const themeMode = useThemeStore(s => s.mode);
-  const tabSlide = useUiPrefs(s => s.tabSlide);
-  const setTabSlide = useUiPrefs(s => s.setTabSlide);
   const liteMode = useUiPrefs(s => s.liteMode);
   const setLiteMode = useUiPrefs(s => s.setLiteMode);
 
@@ -614,21 +612,6 @@ export default function SettingsScreen() {
                 onValueChange={(v) => { setHapticsOn(v); appSettings.setHapticsEnabled(v); }}
                 trackColor={{ false: colors.fill.strong, true: colors.accent.purple + '80' }}
                 thumbColor={hapticsOn ? colors.accent.purple : colors.text.muted}
-              />
-            </View>
-            <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
-              <View style={styles.iconWrap}>
-                <LucideIcons.ArrowLeftRight size={16} color={colors.text.secondary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowLabel}>Płynne przejście</Text>
-                <Text style={[styles.rowLabel, { fontSize: 11, color: colors.text.muted, fontWeight: '400', marginTop: 1 }]}>Delikatne rozmycie między zakładkami (slide klatkował na ciężkich ekranach)</Text>
-              </View>
-              <Switch
-                value={tabSlide}
-                onValueChange={setTabSlide}
-                trackColor={{ false: colors.fill.strong, true: '#46B0DE99' }}
-                thumbColor={tabSlide ? '#46B0DE' : colors.text.muted}
               />
             </View>
             <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}>
