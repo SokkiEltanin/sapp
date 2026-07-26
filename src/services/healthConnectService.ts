@@ -140,6 +140,20 @@ function srcOf(r: any): string | null {
   return typeof pkg === 'string' && pkg ? pkg : null;
 }
 
+// Steps de-duplicated by SOURCE: Health Connect receives steps from MULTIPLE writers —
+// the Galaxy Watch (via Samsung Health) AND the phone's own step counter / Google Fit.
+// Summing every record double-counts (the classic "zegarek 15k, apka 25k"). The real
+// day total is the LARGEST single source, not the sum. Groups records by data origin,
+// sums within each source, returns the max.
+function stepsBySourceMax(recs: any[]): number {
+  const bySrc = new Map<string, number>();
+  for (const r of recs) {
+    const src = srcOf(r) ?? 'unknown';
+    bySrc.set(src, (bySrc.get(src) ?? 0) + (r.count ?? 0));
+  }
+  return bySrc.size ? Math.max(...bySrc.values()) : 0;
+}
+
 export async function probeHydration(days = 7): Promise<WaterProbe> {
   const permission = await isPermissionGranted('Hydration');
   const nutriPermission = await isPermissionGranted('Nutrition');
@@ -275,7 +289,7 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
   };
 
   let steps = 0;
-  try { steps = (await read(hc, 'Steps', filter)).reduce((s, r) => s + (r.count ?? 0), 0); } catch {}
+  try { steps = stepsBySourceMax(await read(hc, 'Steps', filter)); } catch {}   // dedup po źródle (nie sumuj zegarka + telefonu)
 
   let sleepMinutes = 0, sleepDeepMin = 0, sleepRemMin = 0, sleepLightMin = 0;
   try {
@@ -391,9 +405,20 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
   const filter = { operator: 'between', startTime: start.toISOString(), endTime: endIso.toISOString() } as const;
 
   try {
+    // steps bucketed by day AND source, then per-day MAX source (dedup — never sum
+    // the watch and the phone together; see stepsBySourceMax).
+    const bySrcByDay = new Map<string, Map<string, number>>();
     for (const r of await read(hc, 'Steps', filter)) {
-      const p = byDay.get(localKey(new Date(r.startTime)));
-      if (p) p.steps += r.count ?? 0;
+      const day = localKey(new Date(r.startTime));
+      if (!byDay.has(day)) continue;
+      const m = bySrcByDay.get(day) ?? new Map<string, number>();
+      const src = srcOf(r) ?? 'unknown';
+      m.set(src, (m.get(src) ?? 0) + (r.count ?? 0));
+      bySrcByDay.set(day, m);
+    }
+    for (const [day, m] of bySrcByDay) {
+      const p = byDay.get(day);
+      if (p) p.steps = m.size ? Math.max(...m.values()) : 0;
     }
   } catch {}
 
