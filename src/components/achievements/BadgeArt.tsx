@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { View, Image, StyleSheet, Animated, Easing } from 'react-native';
 import {
   Flame, Crown, Salad, PiggyBank, Landmark, Banknote, Briefcase, Heart, Award, Lock, Skull,
-  Gem, ShieldCheck, Star, Sparkles, Zap, Dumbbell, Medal,
+  Gem, ShieldCheck, Star, Sparkles, Zap, Dumbbell, Medal, Utensils, Apple, ChefHat,
 } from 'lucide-react-native';
 
 import { badgePng } from '@/utils/badgeIcons';
@@ -12,6 +12,9 @@ import { useColors } from '@/theme/useColors';
 // lucide placeholder for ids that don't (yet) have a custom PNG.
 const FALLBACK: Record<string, any> = {
   'loyal': Heart, 'habit-streak-7': Flame, 'habit-streak-30': Crown, 'no-junk-7': Salad,
+  // liczenie kalorii (do podmiany na własne PNG)
+  'first-bite': Utensils, 'kcal-week': Flame, 'kcal-month': Salad, 'meals-100': Medal,
+  'home-chef': ChefHat, 'meal-prepper': Apple,
   'saver-1000': PiggyBank, 'saver-5000': PiggyBank, 'saver-10000': Landmark,
   'work-100h': Briefcase, 'work-1000h': Medal, 'payday-first': Banknote,
   // legendary

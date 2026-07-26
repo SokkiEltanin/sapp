@@ -45,6 +45,12 @@ export interface AchCtx {
   junkPurchasesMonth: number;// sweets purchases this month
   fastFoodCount: number;     // all-time fast-food purchases
   maxDaySpend: number;       // biggest single-day spend (zł)
+
+  // ── Liczenie kalorii (Jedzenie) ──
+  mealsLogged: number;       // all-time meals logged in the calorie counter
+  foodDaysLogged: number;    // distinct days with ≥1 meal logged
+  foodLogStreak: number;     // consecutive days (→ today) with a meal logged
+  dishesCreated: number;     // own dishes/recipes saved to the library
 }
 
 export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Życie' | 'Legendy' | 'Grzeszki';
@@ -134,6 +140,20 @@ export const ACHIEVEMENTS: Achievement[] = [
     lore: 'Z małego pnia wystrzelił pęd. 30 dni i nawyk zakorzenił się na dobre — teraz to część Ciebie.', value: c => c.habitBestStreak },
   { id: 'no-junk-7',  title: 'Tydzień fit', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
     lore: 'Siedem dni i ani jednego cukrowego poślizgu. Twój organizm przybija Ci piątkę.', value: c => c.noJunkStreak },
+
+  // ── Liczenie kalorii (nowe — ikony do podmiany na własne PNG) ──
+  { id: 'first-bite', title: 'Pierwszy kęs', desc: 'Zalogowany pierwszy posiłek', group: 'Jedzenie', tier: 1, target: 1,
+    lore: 'Widelec wbity w pierwszy zapisany posiłek. Liczenie kalorii właśnie się zaczęło — reszta to już tylko powtórki.', value: c => c.mealsLogged >= 1 ? 1 : 0 },
+  { id: 'kcal-week', title: 'Tydzień pod kontrolą', desc: '7 dni z rzędu z zapisanym jedzeniem', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
+    lore: 'Siedem dni bez luki w dzienniku jedzenia. Wiesz dokładnie, co wjechało na talerz — i to widać.', value: c => c.foodLogStreak },
+  { id: 'kcal-month', title: 'Miesiąc świadomości', desc: '30 dni z zapisanym jedzeniem', group: 'Jedzenie', tier: 3, target: 30, unit: 'dni',
+    lore: 'Trzydzieści dni liczenia — jedzenie nie ma już przed Tobą tajemnic. Każdy gram policzony, każda kaloria znana.', value: c => c.foodDaysLogged },
+  { id: 'meals-100', title: 'Setka posiłków', desc: '100 zapisanych posiłków', group: 'Jedzenie', tier: 2, target: 100, unit: '×',
+    lore: 'Sto posiłków w dzienniku. Talerz za talerzem złożyły się w solidny nawyk — apka zna już Twój apetyt na pamięć.', value: c => c.mealsLogged },
+  { id: 'home-chef', title: 'Domowy kucharz', desc: 'Zapisany pierwszy własny przepis / danie', group: 'Jedzenie', tier: 1, target: 1,
+    lore: 'Fartuch założony, danie zważone, kalorie policzone. Gotujesz po swojemu — i wiesz dokładnie, ile to ma.', value: c => c.dishesCreated >= 1 ? 1 : 0 },
+  { id: 'meal-prepper', title: 'Meal prep', desc: '5 własnych dań w bibliotece', group: 'Jedzenie', tier: 2, target: 5, unit: 'dań',
+    lore: 'Pięć autorskich dań na półce. Naleśniki, puree, ciasto — masz własną książkę kucharską z kaloriami w komplecie.', value: c => c.dishesCreated },
   { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h',
     lore: 'Pracujesz jak dobrze naoliwiony mechanizm — bez zacięć, bez postoju. 100 godzin na liczniku maszyny.', value: c => c.workHoursTotal },
   { id: 'work-1000h', title: 'Weteran',     desc: 'Łącznie 1 000 h pracy',      group: 'Praca', tier: 3, target: 1000, unit: 'h',
@@ -227,8 +247,13 @@ export function buildAchCtx(args: {
   budgetTotal: number;
   billTracked: boolean;
   cardBalancePeak?: number;
+  foodMeals?: { date?: string }[];   // calorie-counter meals
+  dishesCreated?: number;            // own dishes/recipes in the library
 }): AchCtx {
   const { expenses, moodEntries, workEvents, workSettings, healthDays } = args;
+  const foodMeals = args.foodMeals ?? [];
+  const foodDays = new Set<string>();
+  for (const m of foodMeals) { const d = (m.date ?? '').slice(0, 10); if (d) foodDays.add(d); }
   const wcol = workSettings.workColor;
   const wp = workSettings.workPrefix?.trim().toLowerCase();
   const workHoursTotal = workEvents
@@ -340,6 +365,10 @@ export function buildAchCtx(args: {
     bestStepsDay, billTracked: args.billTracked,
     logStreak: streakBack(k => loggedDays.has(k)),
     activeDays: loggedDays.size,
+    mealsLogged: foodMeals.length,
+    foodDaysLogged: foodDays.size,
+    foodLogStreak: streakBack(k => foodDays.has(k)),
+    dishesCreated: args.dishesCreated ?? 0,
     goodMoodStreak: streakBack(k => (moodByDay[k] ?? 0) >= 4),
     moodLevelsSeen: moodLevels.size,
     balancedMonth, hasBudget: args.budgetTotal > 0, tasksDone: args.tasksDone,

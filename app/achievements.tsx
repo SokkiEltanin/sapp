@@ -7,6 +7,7 @@ import { ChevronLeft, Trophy, X } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import BadgeArt from '@/components/achievements/BadgeArt';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useFoodStore, isRecipeProduct } from '@/store/foodStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
@@ -37,6 +38,9 @@ export default function Achievements() {
   const { settings: workSettings } = useWorkStore();
   const { habits, getStreak } = useHabits();
   const { subscriptions } = useSubscriptions();
+  const foodMeals = useFoodStore(st => st.meals);
+  const foodProducts = useFoodStore(st => st.products);
+  const dishesCreated = useMemo(() => foodProducts.filter(isRecipeProduct).length, [foodProducts]);
   const [healthDays, setHealthDays] = useState<Record<string, { steps?: number; sleepMinutes?: number }>>({});
   const [budgetTotal, setBudgetTotal] = useState(0);
   const [cardPeak, setCardPeak] = useState(0);
@@ -53,7 +57,8 @@ export default function Achievements() {
     habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
     healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
     budgetTotal, billTracked: subscriptions.some(sub => sub.active), cardBalancePeak: cardPeak,
-  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions, cardPeak]);
+    foodMeals, dishesCreated,
+  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions, cardPeak, foodMeals, dishesCreated]);
 
   const celebrate = useCelebration(st => st.celebrate);
   const states = useMemo(() => evaluateAchievements(ctx), [ctx]);

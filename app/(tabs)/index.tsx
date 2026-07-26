@@ -49,7 +49,7 @@ import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { getCategoryMeta } from '@/utils/categories';
 import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META, addNonFood, loadNonFood } from '@/utils/food';
-import { useFoodStore, targetIntake } from '@/store/foodStore';
+import { useFoodStore, targetIntake, isRecipeProduct } from '@/store/foodStore';
 import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
@@ -832,8 +832,10 @@ export default function DashboardScreen() {
   useEffect(() => { loadNonFood().then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
   const markNotFood = useCallback((name: string) => { haptic.tap(); addNonFood(name).then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
   const foodMeals    = useFoodStore(st => st.meals);           // calorie log (for the balance widget)
+  const foodProducts = useFoodStore(st => st.products);        // for the "dishes created" achievement
   const foodGoalMode = useFoodStore(st => st.goalMode);
   const foodManualGoal = useFoodStore(st => st.manualGoal);
+  const dishesCreated = useMemo(() => foodProducts.filter(isRecipeProduct).length, [foodProducts]);
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
   const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
@@ -1425,7 +1427,8 @@ export default function DashboardScreen() {
     healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
     budgetTotal: Object.values(budgets).reduce((s2, v) => s2 + (v ?? 0), 0),
     billTracked: subscriptions.some(sb => sb.active), cardBalancePeak: cardPeak,
-  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions, cardPeak]);
+    foodMeals, dishesCreated,
+  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions, cardPeak, foodMeals, dishesCreated]);
   const earnedBadges = useMemo(() => achStates.filter(st => st.unlocked && st.a.kind !== 'bad').length, [achStates]);
   const celebrate = useCelebration(st => st.celebrate);
   useEffect(() => {
