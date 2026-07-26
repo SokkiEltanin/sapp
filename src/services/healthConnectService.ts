@@ -467,3 +467,69 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
 
   return out;
 }
+
+// ── Self-test (Ustawienia → „Test połączeń zdrowia") ─────────────────────────
+// One tap → reads what Health Connect actually holds for TODAY and reports per
+// metric, incl. steps PER SOURCE (so double-counting shows up plainly). Never throws.
+export type SelfTestStatus = 'ok' | 'warn' | 'fail';
+export interface SelfTestRow { key: string; label: string; status: SelfTestStatus; detail: string; }
+export interface SelfTestReport { available: string; rows: SelfTestRow[]; raw: string; }
+
+function shortSrc(pkg: string): string {
+  if (/shealth|samsung/i.test(pkg)) return 'Samsung Health';
+  if (/google.*fit|com\.google\.android\.apps\.fitness/i.test(pkg)) return 'Google Fit';
+  if (/healthsync|appyhapps/i.test(pkg)) return 'Health Sync';
+  if (/fitbit/i.test(pkg)) return 'Fitbit';
+  const m = pkg.split('.'); return m[m.length - 1] || pkg;
+}
+
+export async function runHealthSelfTest(): Promise<SelfTestReport> {
+  const rows: SelfTestRow[] = [];
+  const push = (key: string, label: string, status: SelfTestStatus, detail: string) => rows.push({ key, label, status, detail });
+
+  const avail = await probeHealthConnect();
+  push('hc', 'Health Connect', avail === 'dostępne' ? 'ok' : 'fail', avail);
+
+  const hc = mod();
+  const buildRaw = () => {
+    const icon = (s: SelfTestStatus) => (s === 'ok' ? 'OK ' : s === 'warn' ? '! ' : 'X ');
+    return 'RAPORT ZDROWIA (dziś)\n' + rows.map(r => `${icon(r.status)}${r.label}: ${r.detail}`).join('\n');
+  };
+  if (!hc || avail !== 'dostępne') return { available: avail, rows, raw: buildRaw() };
+  try { if (!(await ensureInit(hc))) { push('init', 'Inicjalizacja', 'fail', 'nie udało się zainicjować'); return { available: avail, rows, raw: buildRaw() }; } } catch {}
+
+  // permissions
+  const need = ['Steps', 'SleepSession', 'Weight', 'ActiveCaloriesBurned', 'TotalCaloriesBurned', 'BasalMetabolicRate', 'Hydration', 'HeartRate'];
+  let granted = new Set<string>();
+  try { const g = await hc.getGrantedPermissions(); granted = new Set((g ?? []).map((p: any) => p.recordType)); } catch {}
+  const missing = need.filter(p => !granted.has(p));
+  push('perm', 'Uprawnienia', missing.length === 0 ? 'ok' : (missing.length < need.length ? 'warn' : 'fail'),
+    missing.length === 0 ? `wszystkie (${need.length})` : `brakuje: ${missing.join(', ')}`);
+
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const filter = { operator: 'between', startTime: start.toISOString(), endTime: new Date().toISOString() } as const;
+
+  // steps PER SOURCE — reveals double counting (watch + phone)
+  try {
+    const recs = await read(hc, 'Steps', filter);
+    const bySrc = new Map<string, number>();
+    for (const r of recs) { const src = srcOf(r) ?? '?'; bySrc.set(src, (bySrc.get(src) ?? 0) + (r.count ?? 0)); }
+    const total = bySrc.size ? Math.max(...bySrc.values()) : 0;
+    const sum = [...bySrc.values()].reduce((a, b) => a + b, 0);
+    const srcTxt = bySrc.size ? [...bySrc.entries()].map(([s, v]) => `${shortSrc(s)} ${v}`).join(' · ') : 'brak rekordów';
+    const multi = bySrc.size > 1;
+    push('steps', 'Kroki dziś', total > 0 ? 'ok' : (granted.has('Steps') ? 'warn' : 'fail'),
+      `${total} kroków (biorę MAX ze źródeł). Źródła: ${srcTxt}${multi ? ` — suma byłaby ${sum}, dedup chroni przed podwójnym liczeniem` : ''}`);
+  } catch { push('steps', 'Kroki dziś', 'fail', 'błąd odczytu'); }
+
+  const day = await readHealthDay(new Date());
+  const sm = day?.sleepMinutes ?? 0;
+  push('sleep', 'Sen (ost. noc)', sm > 0 ? 'ok' : 'warn', sm > 0 ? `${Math.floor(sm / 60)}h ${sm % 60}m` : 'brak danych');
+  push('weight', 'Waga', day?.weightKg != null ? 'ok' : 'warn', day?.weightKg != null ? `${day.weightKg} kg` : 'brak — waż się / włącz „Masa ciała" w HC');
+  push('total', 'Spalone (total)', (day?.totalCalories ?? 0) > 0 ? 'ok' : 'warn', `${Math.round(day?.totalCalories ?? 0)} kcal`);
+  push('active', 'Kalorie aktywne', (day?.activeCalories ?? 0) > 0 ? 'ok' : 'warn', `${Math.round(day?.activeCalories ?? 0)} kcal (Samsung często NIE eksportuje aktywnych — total wystarcza)`);
+  push('water', 'Woda', (day?.hydrationMl ?? 0) > 0 ? 'ok' : 'warn', (day?.hydrationMl ?? 0) > 0 ? `${Math.round(day!.hydrationMl!)} ml z zegarka` : 'brak — Samsung nie eksportuje wody bez Health Sync');
+  push('hr', 'Tętno śr.', day?.heartRateAvg != null ? 'ok' : 'warn', day?.heartRateAvg != null ? `${day.heartRateAvg} bpm` : 'brak');
+
+  return { available: avail, rows, raw: buildRaw() };
+}

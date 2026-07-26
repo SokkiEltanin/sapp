@@ -1480,8 +1480,21 @@ export default function SettingsScreen() {
         <CollapsibleSection icon={LucideIcons.Wrench} title="Diagnostyka" color="#8A93A8" defaultOpen={false}>
           <View style={styles.card}>
             <PressableScale
-              onPress={() => { router.push('/expenses/audit' as any); }}
+              onPress={() => { haptic.tap(); router.push('/health-test' as any); }}
               style={styles.row}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#46B0DE18' }]}>
+                <LucideIcons.Activity size={16} color="#46B0DE" />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Test połączeń zdrowia</Text>
+                <Text style={styles.rowSub}>Sprawdza kroki (wg źródła), sen, wagę, kalorie, wodę — raport do wysłania</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+            <PressableScale
+              onPress={() => { router.push('/expenses/audit' as any); }}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
             >
               <View style={[styles.iconWrap, { backgroundColor: '#E4343418' }]}>
                 <LucideIcons.Receipt size={16} color="#E43434" />
