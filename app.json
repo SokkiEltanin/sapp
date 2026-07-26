@@ -9,6 +9,8 @@
     "newArchEnabled": true,
     "scheme": "sapp",
     "splash": {
+      "image": "./assets/splash-blank.png",
+      "resizeMode": "contain",
       "backgroundColor": "#083A64"
     },
     "ios": {
