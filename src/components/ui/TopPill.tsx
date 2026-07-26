@@ -147,7 +147,7 @@ export default function TopPill() {
       const pre = workPrefix ? `${workPrefix} ` : '';
       return {
         badge: 'JUTRO',
-        color:  colors.accent.blue,    // #5166F5
+        color:  colors.text.primary,   // mono
         text:  `${pre}MASZ ZMIANĘ NA ${tomShift.startTime}`,
         route: '/(tabs)/stats',
         key:   `shift-tom`,

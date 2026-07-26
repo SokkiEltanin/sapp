@@ -120,7 +120,7 @@ export default function DatePickerField({ value, onChange, placeholder, style }:
                     onPress={() => selectDay(day)} activeOpacity={0.75}
                   >
                     <View style={[dp.dayCircle, isSelected && dp.cellSel, isToday && !isSelected && dp.cellToday]}>
-                      <Text style={[dp.cellText, isSelected && dp.cellTextSel, isToday && !isSelected && { color: c.accent.blue }]}>
+                      <Text style={[dp.cellText, isSelected && dp.cellTextSel, isToday && !isSelected && { color: c.text.primary }]}>
                         {day}
                       </Text>
                     </View>
@@ -176,7 +176,7 @@ const makeDp = themedStyles((c: typeof colors) => StyleSheet.create({
   // centered highlight regardless of cell-width rounding.
   dayCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   cellSel: { backgroundColor: c.text.primary },
-  cellToday: { borderWidth: 1, borderColor: c.accent.blue },
+  cellToday: { borderWidth: 1, borderColor: c.text.primary },
   cellText: { fontSize: 13, fontWeight: '500', color: c.text.primary },
   cellTextSel: { color: c.bg.primary, fontWeight: '800' },
 
