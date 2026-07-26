@@ -27,20 +27,21 @@ import { useUiActions } from '@/store/uiActions';
 // ─── Colors ───────────────────────────────────────────────────────────────────
 // Green/red accents stay both themes; the dark surfaces flip via gFor(c).
 
+// mono (redesign) — chrome zadań = biel; overdue ZOSTAJE czerwony (semantyka statusu).
 const G = {
-  card:         '#28443A',
-  cardBorder:   'rgba(42,198,143,0.20)',
-  accent:       '#2AC68F',
-  accentDim:    'rgba(42,198,143,0.18)',
+  card:         '#1A1C1C',
+  cardBorder:   'rgba(255,255,255,0.10)',
+  accent:       '#ECEEEE',
+  accentDim:    'rgba(236,238,238,0.12)',
   overdueCard:  '#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
 };
 function gFor(c: any) {
   return {
     card: c.bg.card,
-    cardBorder: 'rgba(42,198,143,0.22)',
-    accent: '#2AC68F',
-    accentDim: 'rgba(42,198,143,0.18)',
+    cardBorder: 'rgba(255,255,255,0.10)',
+    accent: '#ECEEEE',
+    accentDim: 'rgba(236,238,238,0.12)',
     overdueCard: c.bg.card,
     overdueBorder: 'rgba(255,107,107,0.30)',
   };
