@@ -94,7 +94,6 @@ export default function TabBar({ currentIndex }: Props) {
       { icon: ScanLine,     color: colors.accent.blue,   onPress: () => router.push('/expenses/scan' as any) },
     ] : currentIndex === 5 ? [
       { icon: Apple,           color: '#34D399', onPress: () => router.push('/food/products' as any) },
-      { icon: ChefHat,         color: '#C084FC', onPress: () => router.push('/food/library' as any) },
       { icon: UtensilsCrossed, color: '#F59E0B', onPress: () => router.push('/food/add' as any) },
     ] : [];
 

@@ -650,7 +650,7 @@ export default function SettingsScreen() {
         </CollapsibleSection>
 
         {/* Work prefix */}
-        <CollapsibleSection icon={LucideIcons.Briefcase} title="Praca" color="#60A5FA">
+        <CollapsibleSection icon={LucideIcons.Briefcase} title="Praca" color="#60A5FA" defaultOpen={false}>
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#60A5FA18' }]}>
@@ -810,7 +810,7 @@ export default function SettingsScreen() {
         </CollapsibleSection>
 
         {/* Account balance reconciliation */}
-        <CollapsibleSection icon={LucideIcons.Wallet} title="Saldo konta" color="#5B7BE3">
+        <CollapsibleSection icon={LucideIcons.Wallet} title="Saldo konta" color="#5B7BE3" defaultOpen={false}>
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#5B7BE318' }]}>
@@ -843,7 +843,7 @@ export default function SettingsScreen() {
         </CollapsibleSection>
 
         {/* Payday prompt */}
-        <CollapsibleSection icon={LucideIcons.Banknote} title="Wypłata" color="#2AC68F">
+        <CollapsibleSection icon={LucideIcons.Banknote} title="Wypłata" color="#2AC68F" defaultOpen={false}>
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.iconWrap, { backgroundColor: '#2AC68F18' }]}>
@@ -1279,7 +1279,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Account */}
-        <CollapsibleSection icon={LucideIcons.User} title="Konto" color="#2AC68F">
+        <CollapsibleSection icon={LucideIcons.User} title="Konto" color="#2AC68F" defaultOpen={false}>
           <View style={styles.card}>
             {googleUser ? (
               <View style={styles.row}>
