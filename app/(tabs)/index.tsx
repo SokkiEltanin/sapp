@@ -134,9 +134,10 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   bike:        Bike,
 };
 const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
-// Proposed SINGLE app accent (redesign „dark clean · jeden akcent"). Pilot = panel Pracy;
-// docelowo rozlać na resztę zamiast per-zakładka. Zmień w JEDNYM miejscu.
-const WORK_ACCENT = '#2AC68F';
+// SINGLE app accent = MONOCHROME (user: „akcent czarno-biały, kolory tylko dodatki").
+// Emfaza przez biel+waga+kontrast, nie kolor. Kolory zostają tylko punktowo (i w kalendarzu).
+// Jedno miejsce do zmiany, docelowo rozlać na resztę.
+const WORK_ACCENT = colors.text.primary;
 const WEEKS_BACK  = 8;
 
 // Per-metric icon for custom stat tiles, so each widget's preview is glanceable at a
@@ -4089,14 +4090,14 @@ export default function DashboardScreen() {
                 <TouchableOpacity style={[s.card, { backgroundColor: cardBgDark }]} activeOpacity={0.9}
                   onPress={() => { haptic.tap(); setWorkPanel(true); }}>
                   <View style={s.cardHeader}>
-                    <Briefcase size={13} color={accentColor} />
+                    <Briefcase size={13} color={WORK_ACCENT} />
                     <Text style={s.cardTitle}>Praca</Text>
                     <TouchableOpacity
                       onPress={() => { haptic.tap(); setWorkHoursChart(v => !v); }}
                       style={s.workToggle}
                       activeOpacity={0.8}
                     >
-                      <Text style={[s.workToggleText, { color: accentColor }]}>
+                      <Text style={[s.workToggleText, { color: WORK_ACCENT }]}>
                         {workHoursChart ? 'Ten miesiąc' : 'Ostatnie 6 msc'}
                       </Text>
                     </TouchableOpacity>
@@ -4119,11 +4120,11 @@ export default function DashboardScreen() {
                       {wm.plannedH > 0 && (
                         <View style={{ marginTop: spacing[3] }}>
                           <View style={s.workSplitBar}>
-                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: accentColor }} />
-                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: accentColor + '40' }} />
+                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_ACCENT }} />
+                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT + '40' }} />
                           </View>
                           <Text style={s.workSplitText}>
-                            <Text style={{ color: accentColor, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
+                            <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
                             {`  ·  zaplanowane +${wm.plannedH.toFixed(0)} h`}
                           </Text>
                         </View>
@@ -4139,17 +4140,17 @@ export default function DashboardScreen() {
                     <>
                       <View style={s.waveValues}>
                         {wm.months.map((m, i) => (
-                          <Text key={i} style={[s.waveValue, m.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+                          <Text key={i} style={[s.waveValue, m.isCurrent && { color: WORK_ACCENT, fontWeight: '800' }]}>
                             {hasRate
                               ? (m.earnings > 0 ? (m.earnings >= 1000 ? `${(m.earnings / 1000).toFixed(1)}k` : String(m.earnings)) : '')
                               : (m.hours > 0 ? `${Math.round(m.hours)}h` : '')}
                           </Text>
                         ))}
                       </View>
-                      <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={accentColor} />
+                      <WaveChart data={wm.months.map(m => hasRate ? m.earnings : m.hours)} color={WORK_ACCENT} />
                       <View style={s.waveLabels}>
                         {wm.months.map((m, i) => (
-                          <Text key={i} style={[s.waveLabel, m.isCurrent && { color: accentColor, fontWeight: '700' }]}>
+                          <Text key={i} style={[s.waveLabel, m.isCurrent && { color: WORK_ACCENT, fontWeight: '700' }]}>
                             {m.label}
                           </Text>
                         ))}
@@ -5656,9 +5657,9 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpLeftDivider: { width: 1, height: 40, backgroundColor: c.border.default },
   wpAvgLine: { fontSize: 12.5, color: c.text.secondary, marginTop: spacing[4], lineHeight: 18 },
   wpAvgB: { fontWeight: '800', color: c.text.primary },
-  wpRateCard: { marginTop: spacing[5], backgroundColor: WORK_ACCENT + '14', borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: WORK_ACCENT + '33' },
-  wpRateVal: { fontSize: 30, fontWeight: '900', color: WORK_ACCENT, letterSpacing: -0.6 },
-  wpRateUnit: { fontSize: 16, fontWeight: '700', color: WORK_ACCENT + 'AA' },
+  wpRateCard: { marginTop: spacing[5], backgroundColor: c.fill.subtle, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
+  wpRateVal: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.6 },
+  wpRateUnit: { fontSize: 16, fontWeight: '700', color: c.text.muted },
   wpRateHint: { fontSize: 11.5, color: c.text.muted, marginTop: 4 },
   wpTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
   wpTotalLabel: { fontSize: 12, fontWeight: '600', color: c.text.muted },
@@ -5666,7 +5667,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   wmRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 8 },
   wmMonth: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.secondary },
   wmH: { width: 118, textAlign: 'right', fontSize: 12.5, fontWeight: '700', color: c.text.primary },
-  wmZl: { width: 72, textAlign: 'right', fontSize: 13, fontWeight: '800', color: WORK_ACCENT },
+  wmZl: { width: 72, textAlign: 'right', fontSize: 13, fontWeight: '800', color: c.text.primary },
   npCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
   npHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   npTitle: { fontSize: 15, fontWeight: '800', color: c.text.primary },
