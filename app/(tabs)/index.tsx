@@ -28,6 +28,7 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
+import { computeSavings } from '@/utils/savings';
 import { useTasks } from '@/hooks/useTasks';
 import { useHabits } from '@/hooks/useHabits';
 import { useMoodCheckIn } from '@/hooks/useMoodCheckIn';
@@ -959,6 +960,7 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
+  const savings = useMemo(() => computeSavings(expenses), [expenses]);
   const fvFixedItems = useMemo(() => {
     const cur = fvMonths[fvMonths.length - 1];
     return cur ? fixedBreakdown(expenses, cur.month) : [];
@@ -3888,6 +3890,37 @@ export default function DashboardScreen() {
                 </View>
               )}
             </View>
+            );
+
+            nodes['savings'] = savings.total > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Wallet size={13} color="#2AC68F" />
+                  <Text style={s.cardTitle}>Zaoszczędzone</Text>
+                  <View style={{ flex: 1 }} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text.muted }}>{savings.count}× kupon / promo</Text>
+                </View>
+                <View style={s.finRow}>
+                  <View style={s.finStat}>
+                    <Text style={[s.finVal, { color: '#2AC68F' }]}>{savings.total.toFixed(0)}</Text>
+                    <Text style={s.finKey}>zł łącznie</Text>
+                  </View>
+                  <View style={s.finDivider} />
+                  <View style={s.finStat}>
+                    <Text style={s.finVal}>{savings.thisMonth.toFixed(0)}</Text>
+                    <Text style={s.finKey}>zł w tym mies.</Text>
+                  </View>
+                  {savings.lidlTotal > 0 && (
+                    <>
+                      <View style={s.finDivider} />
+                      <View style={s.finStat}>
+                        <Text style={s.finVal}>{savings.lidlTotal.toFixed(0)}</Text>
+                        <Text style={s.finKey}>zł Lidl</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
             );
 
             nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
