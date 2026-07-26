@@ -11,6 +11,7 @@ import {
   PRESET_CATS, presetCatLabel, isRecipeProduct, presetIngredientNames,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
+import DatePickerField from '@/components/ui/DatePickerField';
 import { normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -25,6 +26,17 @@ function defaultMealType(): MealType {
   if (h < 16) return 'obiad';
   if (h < 21) return 'kolacja';
   return 'przekaska';
+}
+
+function isoNDaysAgo(n: number): string {
+  const d = new Date(); d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function dayLabelFor(iso: string): string {
+  if (iso === isoNDaysAgo(0)) return 'Dziś';
+  if (iso === isoNDaysAgo(1)) return 'Wczoraj';
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
 }
 
 // A pickable food — from the user's counted DB (curated) or the offline base.
@@ -72,12 +84,13 @@ export default function FoodAdd() {
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
   const params = useLocalSearchParams<{ date?: string; edit?: string; preset?: string; dupPreset?: string }>();
-  const mealDate = typeof params.date === 'string' && params.date ? params.date
+  const initialDate = typeof params.date === 'string' && params.date ? params.date
     : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
   const editId = typeof params.edit === 'string' ? params.edit : undefined;
   const editPresetParam = typeof params.preset === 'string' ? params.preset : undefined;
   const dupPresetParam = typeof params.dupPreset === 'string' ? params.dupPreset : undefined;
 
+  const [mealDate, setMealDate] = useState(initialDate);   // dzień, do którego dodajesz (można cofnąć)
   const [mealType, setMealType] = useState<MealType>(defaultMealType());
   const [items, setItems]       = useState<MealItem[]>([]);
   const [note, setNote]         = useState('');
@@ -87,7 +100,7 @@ export default function FoodAdd() {
   useEffect(() => {
     if (!editId) return;
     const m = storeMeals.find(x => x.id === editId);
-    if (m) { setMealType(m.type); setItems(m.items.map(it => ({ ...it }))); setNote(m.note ?? ''); }
+    if (m) { setMealType(m.type); setItems(m.items.map(it => ({ ...it }))); setNote(m.note ?? ''); setMealDate(m.date); }
   }, [editId]);
 
   // Opened from the library to edit a preset → load its ingredients into the builder.
@@ -393,7 +406,7 @@ export default function FoodAdd() {
   const save = () => {
     if (items.length === 0) return;
     haptic.success();
-    if (editId) updateMeal(editId, mealType, items, note.trim() || undefined);
+    if (editId) updateMeal(editId, mealType, items, note.trim() || undefined, mealDate);
     else addMeal(mealType, items, note.trim() || undefined, mealDate);
     router.back();
   };
@@ -423,6 +436,16 @@ export default function FoodAdd() {
             <TouchableOpacity onPress={() => { haptic.tap(); setDupNotice(false); setItems([]); setPName(''); setPYields(''); setPCat(''); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
           </View>
         )}
+        {/* dzień — można dodać WSTECZ (do wcześniejszego dnia) */}
+        <View style={s.dateRow}>
+          <Text style={s.dateLabel}>Dzień: {dayLabelFor(mealDate)}</Text>
+          <View style={{ flex: 1 }} />
+          {mealDate !== isoNDaysAgo(0) && (
+            <TouchableOpacity onPress={() => { haptic.tap(); setMealDate(isoNDaysAgo(0)); }} style={s.dateJump} hitSlop={6}><Text style={s.dateJumpTxt}>Dziś</Text></TouchableOpacity>
+          )}
+          <DatePickerField value={mealDate} onChange={setMealDate} style={s.datePicker} />
+        </View>
+
         {/* meal type */}
         <View style={s.typeRow}>
           {MEAL_TYPES.map(mt => {
@@ -803,6 +826,12 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   scroll:    { padding: spacing[4], gap: spacing[3], paddingBottom: 120 },
 
   card: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
+
+  dateRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dateLabel:  { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  dateJump:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle },
+  dateJumpTxt:{ fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  datePicker: { paddingVertical: 8, paddingHorizontal: spacing[3] },
 
   typeRow:  { flexDirection: 'row', gap: spacing[2] },
   typeChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },

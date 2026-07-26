@@ -106,12 +106,14 @@ export const usePetStore = create<PetState>()(
       addXp: (n) => set((s) => ({ xp: Math.max(0, s.xp + n) })),
       addCoins: (n) => set((s) => ({ coins: Math.max(0, s.coins + n) })),
       spendCoins: (n) => {
+        if (!get()._hydrated) return false;            // nie wydawaj zanim portfel się wczyta
         if (get().coins < n) return false;
         set((s) => ({ coins: s.coins - n }));
         return true;
       },
       buyItem: (id, cost) => {
         const s = get();
+        if (!s._hydrated) return false;                // patrz spendCoins — anty-clobber
         if (s.ownedItems.includes(id)) return true;
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, id] });
@@ -120,6 +122,7 @@ export const usePetStore = create<PetState>()(
       // Buy a coat colour (free if already owned) and wear it immediately.
       buyColor: (id, cost) => {
         const s = get();
+        if (!s._hydrated) return false;
         if (s.ownedItems.includes(id) || cost === 0) { set({ catColor: id }); return true; }
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, id], catColor: id });
@@ -128,6 +131,7 @@ export const usePetStore = create<PetState>()(
       setColor: (id) => set({ catColor: id }),
       buyStripes: (cost) => {
         const s = get();
+        if (!s._hydrated) return false;
         if (s.ownedItems.includes('stripes')) { set({ catStripes: !s.catStripes }); return true; }
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'stripes'], catStripes: true });
@@ -251,7 +255,7 @@ export const usePetStore = create<PetState>()(
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
       }),
       onRehydrateStorage: () => (state) => {
-        if (!state) return;
+        if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)
         state._hydrated = true;
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
@@ -263,6 +267,11 @@ export const usePetStore = create<PetState>()(
     },
   ),
 );
+
+// Fail-safe: if hydration somehow never fires (storage error / very slow disk), open
+// the wallet gate after a moment so the shop is never blocked forever. Normal
+// hydration wins in <100 ms and makes this a no-op.
+setTimeout(() => { if (!usePetStore.getState()._hydrated) usePetStore.setState({ _hydrated: true }); }, 4000);
 
 // ─── Level / growth from xp ─────────────────────────────────────────────────────
 // Gentle curve: each level costs a bit more. Growth stage drives the blob's size

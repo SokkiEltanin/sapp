@@ -267,7 +267,7 @@ interface FoodState {
 
   // meals
   addMeal: (type: MealType, items: MealItem[], note?: string, date?: string) => void;
-  updateMeal: (id: string, type: MealType, items: MealItem[], note?: string) => void;
+  updateMeal: (id: string, type: MealType, items: MealItem[], note?: string, date?: string) => void;
   removeMeal: (id: string) => void;
   mealsForDate: (date: string) => MealEntry[];
   kcalForDate: (date: string) => number;
@@ -370,8 +370,8 @@ export const useFoodStore = create<FoodState>()(
           products: s.products.map(p => (ids.has(p.id) ? { ...p, uses: p.uses + 1, lastUsed: Date.now() } : p)),
         }));
       },
-      updateMeal: (id, type, items, note) => set(s => ({
-        meals: s.meals.map(m => (m.id === id ? { ...m, type, items, kcal: items.reduce((a, it) => a + (it.kcal || 0), 0), note } : m)),
+      updateMeal: (id, type, items, note, date) => set(s => ({
+        meals: s.meals.map(m => (m.id === id ? { ...m, type, items, kcal: items.reduce((a, it) => a + (it.kcal || 0), 0), note, ...(date ? { date } : {}) } : m)),
       })),
       removeMeal: (id) => set(s => ({ meals: s.meals.filter(m => m.id !== id) })),
       mealsForDate: (date) => get().meals.filter(m => m.date === date),
