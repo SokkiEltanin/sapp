@@ -33,13 +33,15 @@ const TABS = [
   { Icon: Utensils        },
 ];
 
+// MONO: wszystkie zakładki dziedziczą mono timeAccent (null). Wyjątek = KALENDARZ
+// (user: „zostaw dla kalendarza kolory") — jedyny kolorowy akcent w pasku.
 const TAB_ACCENTS = [
   null,
-  colors.tabs.tasks,
+  null,
   colors.tabs.calendar,
-  colors.tabs.finances,
-  '#8B5CF6',
-  '#F59E0B',
+  null,
+  null,
+  null,
 ] as const;
 
 const PILL_H = 52;
@@ -125,11 +127,11 @@ export default function TabBar({ currentIndex }: Props) {
             return (
               <TouchableOpacity
                 key={i}
-                style={[s.actionFab, { borderColor: a.color + '66', backgroundColor: c.bg.elevated }]}
+                style={[s.actionFab, { borderColor: c.border.default, backgroundColor: c.bg.elevated }]}
                 onPress={() => { haptic.tap(); a.onPress(); }}
                 activeOpacity={0.85}
               >
-                <Icon size={21} color={a.color} strokeWidth={2.2} />
+                <Icon size={21} color={c.text.primary} strokeWidth={2.2} />
               </TouchableOpacity>
             );
           })}
