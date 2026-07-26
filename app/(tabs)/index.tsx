@@ -2979,16 +2979,16 @@ export default function DashboardScreen() {
                 )}
                 <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto' }}>
                   <TouchableOpacity onPress={() => { haptic.tap(); openCheckIn(); }} style={s.hdrIcon} activeOpacity={0.8}>
-                    <Smile size={18} color={todayEntry ? colors.accent.green : colors.accent.purple} />
+                    <Smile size={18} color={todayEntry ? colors.text.primary : colors.text.muted} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/counters' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
-                    <Hourglass size={17} color={colors.text.secondary} />
+                    <Hourglass size={17} color={colors.text.muted} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/month-cards' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
-                    <Layers size={17} color="#A78BFA" />
+                    <Layers size={17} color={colors.text.muted} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/achievements' as any); }} style={s.hdrIcon} activeOpacity={0.8}>
-                    <Trophy size={17} color="#FFC83D" />
+                    <Trophy size={17} color={colors.text.muted} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -5215,12 +5215,12 @@ const buildStyles = (c: any) => StyleSheet.create({
   root: { flex: 1, backgroundColor: c.bg.primary },
   safe: { flex: 1 },
 
-  scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[5] },
+  scroll: { paddingHorizontal: spacing[4], gap: spacing[4], paddingTop: spacing[5] },
 
   // ── Minimal header (date + weather) ───────────────────────────────────────
-  headerMin: { paddingTop: spacing[1], marginBottom: spacing[3] },
+  headerMin: { paddingTop: spacing[1], marginBottom: spacing[4] },
   headerMinRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerMinDate: { fontSize: 13, fontWeight: '800', letterSpacing: 1, color: c.text.primary, flexShrink: 1 },
+  headerMinDate: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: c.text.muted, textTransform: 'uppercase', flexShrink: 1 },
   headerMinWeather: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: spacing[2] },
   hdrIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border.subtle },
   headerMinTemp: { fontSize: 13, fontWeight: '800', color: c.text.primary },
@@ -5526,7 +5526,8 @@ const buildStyles = (c: any) => StyleSheet.create({
     gap: spacing[3],
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
-  cardTitle: { fontSize: 12, fontWeight: '800', color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 1 },
+  // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
+  cardTitle: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 1 },
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
   forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },
