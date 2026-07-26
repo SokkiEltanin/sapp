@@ -4437,7 +4437,7 @@ export default function DashboardScreen() {
                             { text: 'Anuluj', style: 'cancel' },
                             { text: 'Usuń', style: 'destructive', onPress: () => removeCustomTile(rid) },
                           ])}
-                          onEdit={ct?.type === 'stat' ? () => router.navigate(`/widget-builder?edit=${id}` as any) : undefined}
+                          onEdit={undefined}
                         />
                       );
                     })}
