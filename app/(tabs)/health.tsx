@@ -29,12 +29,13 @@ import { colors, spacing, radius, typography } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
 
+// mono (redesign czarno-biały) — akcent zdrowia = biel, nie purpura
 const T = {
-  card:       '#0E0A18',
-  cardBorder: 'rgba(139,92,246,0.18)',
-  accent:     '#8B5CF6',
-  accentDim:  'rgba(139,92,246,0.12)',
-  muted:      'rgba(139,92,246,0.45)',
+  card:       '#0E0F12',
+  cardBorder: 'rgba(255,255,255,0.10)',
+  accent:     '#ECEEEE',
+  accentDim:  'rgba(236,238,238,0.10)',
+  muted:      'rgba(236,238,238,0.45)',
 };
 
 const WEEK_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
@@ -92,10 +93,10 @@ export default function HealthScreen() {
   const colors = useColors();
   const T = useMemo(() => ({
     card: colors.bg.card,
-    cardBorder: 'rgba(139,92,246,0.22)',
-    accent: '#8B5CF6',
-    accentDim: 'rgba(139,92,246,0.14)',
-    muted: 'rgba(139,92,246,0.55)',
+    cardBorder: 'rgba(255,255,255,0.10)',
+    accent: '#ECEEEE',
+    accentDim: 'rgba(236,238,238,0.12)',
+    muted: 'rgba(236,238,238,0.5)',
   }), [colors]);
   const styles = useMemo(() => makeStyles(colors, T), [colors, T]);
   const wm = useMemo(() => makeWm(colors, T), [colors, T]);

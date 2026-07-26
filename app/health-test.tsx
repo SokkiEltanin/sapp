@@ -10,7 +10,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
-const ACCENT = '#46B0DE';
+const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 
 export default function HealthTest() {
   const c = useColors();

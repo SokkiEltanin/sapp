@@ -13,7 +13,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
-const ACCENT = '#F59E0B';
+const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 const numOr0 = (s: string) => { const v = parseFloat(s.replace(',', '.')); return isNaN(v) ? 0 : v; };
 
 export default function FoodProductForm() {

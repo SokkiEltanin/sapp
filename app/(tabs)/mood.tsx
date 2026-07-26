@@ -10,16 +10,17 @@ import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 
+// mono (redesign czarno-biały) — chrome nastroju = biel; SAME kolory nastrojów
+// (MOOD_COLORS) zostają jako dane, tak jak eventy kalendarza.
 const P = {
-  card:       '#170810',
-  cardBorder: 'rgba(244,114,182,0.18)',
-  accent:     '#F472B6',
-  accentDim:  'rgba(244,114,182,0.12)',
-  muted:      'rgba(244,114,182,0.45)',
+  card:       '#0F1012',
+  cardBorder: 'rgba(255,255,255,0.10)',
+  accent:     '#ECEEEE',
+  accentDim:  'rgba(236,238,238,0.10)',
+  muted:      'rgba(236,238,238,0.45)',
 };
-// Reactive palette: pink accent stays both themes, dark card flips.
 function pFor(c: any) {
-  return { card: c.bg.card, cardBorder: 'rgba(244,114,182,0.20)', accent: '#F472B6', accentDim: 'rgba(244,114,182,0.12)', muted: 'rgba(244,114,182,0.50)' };
+  return { card: c.bg.card, cardBorder: 'rgba(255,255,255,0.10)', accent: '#ECEEEE', accentDim: 'rgba(236,238,238,0.12)', muted: 'rgba(236,238,238,0.5)' };
 }
 import { useMoodStore } from '@/store/moodStore';
 import { useCalendarStore } from '@/store/calendarStore';

@@ -15,7 +15,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
-const ACCENT = '#F59E0B';
+const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 
 const PREP_TYPES: { id: PrepType; label: string; hint: string }[] = [
   { id: 'raw',    label: 'Mieszanka', hint: 'sałatka / ciasto na surowo / shake — waga = suma składników' },

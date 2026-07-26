@@ -14,7 +14,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
-const ACCENT = '#F59E0B';
+const ACCENT = '#ECEEEE';   // mono (redesign czarno-biały)
 
 type Tab = 'produkty' | 'kompozycje';
 
