@@ -9,8 +9,6 @@
     "newArchEnabled": true,
     "scheme": "sapp",
     "splash": {
-      "image": "./assets/LOGONOWEpupildoapki.png",
-      "resizeMode": "contain",
       "backgroundColor": "#083A64"
     },
     "ios": {

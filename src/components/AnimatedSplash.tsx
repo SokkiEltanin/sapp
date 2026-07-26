@@ -1,38 +1,41 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
-import CatArt from '@/components/pet/CatArt';
-import { DEFAULT_PALETTE } from '@/utils/catPalettes';
+import { Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-// Animated loading screen = our actual vector pet (CatArt) in `lively` mode: it glances
-// around and flutters its ears almost immediately (the normal idle intervals are
-// multi-second, so on a ~1.5 s splash the cat looked static — the user's "SVG się nie
-// rusza"). A row of pulsing "ładowanie" dots sits lower on the screen and the cat keeps
-// glancing DOWN toward them, so it reads as the pet watching the app load, not twitching
-// in a void. Same art/size/navy as the native splash → seamless handoff, no fade-in;
-// only the fade-OUT animates, revealing the dashboard (which mounts behind).
+// Loading screen — deliberately minimal: no cat, no SVG, no splash-art (the user asked
+// for "just a nice loading bar / dots"). A wordmark over an indeterminate progress bar
+// (a highlight sweeping across a track) plus three pulsing dots, on the brand navy.
+// Starts fully shown (seamless with the native splash's navy) — only the fade-OUT
+// animates, revealing the dashboard mounting behind.
 
 const NAVY = '#083A64';
+const ACCENT = '#7FB2F0';
 
 export default function AnimatedSplash({ visible, onHidden }: { visible: boolean; onHidden: () => void }) {
   const { width, height } = useWindowDimensions();
-  const size = Math.min(width, height);
+  const barW = Math.min(width * 0.56, 240);
+  const hiliteW = barW * 0.42;
+
   const fade = useRef(new Animated.Value(1)).current;   // START shown — seamless with native splash
+  const slide = useRef(new Animated.Value(0)).current;
   const d0 = useRef(new Animated.Value(0)).current;
   const d1 = useRef(new Animated.Value(0)).current;
   const d2 = useRef(new Animated.Value(0)).current;
 
-  // three loading dots pulsing in sequence
+  // indeterminate bar highlight sweep + three pulsing dots
   useEffect(() => {
+    const sweep = Animated.loop(Animated.timing(slide, {
+      toValue: 1, duration: 1150, easing: Easing.inOut(Easing.cubic), useNativeDriver: true,
+    }));
     const mk = (v: Animated.Value, delay: number) => Animated.loop(Animated.sequence([
       Animated.delay(delay),
-      Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(v, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.delay(540 - delay),
+      Animated.timing(v, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.delay(520 - delay),
     ]));
-    const a = Animated.parallel([mk(d0, 0), mk(d1, 170), mk(d2, 340)]);
-    a.start();
-    return () => a.stop();
-  }, [d0, d1, d2]);
+    const dots = Animated.parallel([mk(d0, 0), mk(d1, 160), mk(d2, 320)]);
+    sweep.start(); dots.start();
+    return () => { sweep.stop(); dots.stop(); };
+  }, [slide, d0, d1, d2]);
 
   // fade out once ready, then unmount
   useEffect(() => {
@@ -41,15 +44,19 @@ export default function AnimatedSplash({ visible, onHidden }: { visible: boolean
       .start(({ finished }) => { if (finished) onHidden(); });
   }, [visible, fade, onHidden]);
 
+  const tx = slide.interpolate({ inputRange: [0, 1], outputRange: [-hiliteW, barW] });
   const dotStyle = (v: Animated.Value) => ({
     opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }],
+    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.2] }) }],
   });
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} pointerEvents={visible ? 'auto' : 'none'}>
-      <CatArt size={size} palette={DEFAULT_PALETTE} stripes animate lively expression="happy" />
-      <View style={[styles.dots, { bottom: height * 0.20 }]}>
+      <Text style={styles.wordmark}>Sapp</Text>
+      <View style={[styles.track, { width: barW }]}>
+        <Animated.View style={[styles.hilite, { width: hiliteW, transform: [{ translateX: tx }] }]} />
+      </View>
+      <View style={styles.dots}>
         <Animated.View style={[styles.dot, dotStyle(d0)]} />
         <Animated.View style={[styles.dot, dotStyle(d1)]} />
         <Animated.View style={[styles.dot, dotStyle(d2)]} />
@@ -60,6 +67,9 @@ export default function AnimatedSplash({ visible, onHidden }: { visible: boolean
 
 const styles = StyleSheet.create({
   root: { backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  dots: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#7FB2F0' },
+  wordmark: { fontSize: 40, fontWeight: '900', letterSpacing: 1, color: '#EAF2FB', marginBottom: 34 },
+  track: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' },
+  hilite: { height: 5, borderRadius: 3, backgroundColor: ACCENT },
+  dots: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT },
 });
