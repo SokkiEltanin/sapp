@@ -41,6 +41,16 @@ function daysUntil(iso: string, today: string) {
   return Math.round(ms / 86_400_000);
 }
 
+// Kontrastowy tekst na badge: ciemny na JASNYM tle (mono/biały akcent), biały na
+// ciemnym/kolorowym — inaczej mono-akcent = biały tekst na białym badge (nic nie widać).
+function textOn(bg: string): string {
+  const h = (bg || '').replace('#', '');
+  if (h.length < 6) return '#FFFFFF';
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return lum > 0.6 ? '#0A0B0C' : '#FFFFFF';
+}
+
 // Safe uppercase — Google Calendar events can have an empty/undefined title,
 // and `undefined.toUpperCase()` would throw and crash the whole pill.
 function up(s: string | undefined | null): string {
@@ -363,7 +373,7 @@ export default function TopPill() {
         activeOpacity={0.8}
       >
         <View style={[s.badge, { backgroundColor: item.color }]}>
-          <Text style={s.badgeText} numberOfLines={1}>{item.badge}</Text>
+          <Text style={[s.badgeText, { color: textOn(item.color) }]} numberOfLines={1}>{item.badge}</Text>
         </View>
         <Text style={s.text} numberOfLines={1}>{item.text}</Text>
       </TouchableOpacity>
