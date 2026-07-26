@@ -193,14 +193,25 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   (Kompozycje i dania = presety + dania-z-przepisu, grupowane wg `PRESET_CATS`, ULUBIONE na górze,
   wyszukiwarka, przytrzymaj=usuń). Przełącznik = `router.replace` między nimi. FAB zakładki (index 5):
   Apple→products, ChefHat→library, UtensilsCrossed→add.
-- **PRZEPIS = PRODUKT (ważysz ugotowane).** `app/food/recipe.tsx`: dodajesz surowe składniki w
-  dowolnych jednostkach (reużywa picker z add), wpisujesz **wagę GOTOWEGO dania** (g), a store liczy
-  gęstość: `recipeDensity(ings, cookedWeight)` → `kcalPer100g = Σkcal/waga·100` (+ makra/100g).
-  `saveRecipeProduct(name, ings, cookedWeight, cat?, id?)` tworzy/aktualizuje `FoodProduct` z polem
-  `recipe:{ingredients, cookedWeight}` (`isRecipeProduct(p)` = ma recipe). Dzięki temu danie logujesz
-  jak każdy produkt — WAŻĄC porcję — a odparowana woda liczy się sama (kcal nie parują, waga tak).
-  Danie ma znacznik ChefHat w wyszukiwarce add; edycja = `/food/recipe?edit=<id>`; presety edytujesz
-  przez `/food/add?preset=<id>`. `FoodProduct.pinned` + `togglePinProduct` = ulubione też dla dań.
+- **PRZEPIS = PRODUKT (ważysz ugotowane).** `app/food/recipe.tsx`: składniki w dowolnych jednostkach
+  (reużywa picker z add), **typ przygotowania** `RecipeMeta.prep`: **raw** (mieszanka — waga = suma
+  składników, auto/edytowalna) · **cooked** (wpisz wagę gotowego) · **fried** (waga + `fryFat`: na czym
+  smażone, w łyżkach → +kcal, bardziej tłuste). `recipeDensity(ings, weight, extraKcal, extraFatG)` →
+  `kcalPer100g = (Σkcal+tłuszcz)/waga·100`. `saveRecipeProduct({name, ingredients, weight, cat?, id?,
+  prep?, fryFat?, addons?})` → `FoodProduct.recipe`. **Dodatki** (`recipe.addons`, nutella/banan) =
+  jedzone RAZEM, liczone OSOBNO (nie w gęstości); w kreatorze rola Składnik/Dodatek w pickerze; przy
+  logowaniu w „Co zjadłem" doklejają się jako osobne pozycje (usuwasz niezjedzone). Danie ma ChefHat w
+  wyszukiwarce; edycja `/food/recipe?edit=<id>`, dup `?dup=`; presety przez `/food/add?preset=<id>`.
+  `FoodProduct.pinned` + `togglePinProduct`.
+- **Data jedzenia + wstecz:** `app/food/add.tsx` ma wybór dnia (DatePickerField, skrót „Dziś");
+  `updateMeal(id,type,items,note?,date?)` — edycja może przenieść posiłek. Kroki double-count fix:
+  `stepsBySourceMax` w healthConnectService (MAX ze źródeł, nie suma).
+- **Widget „Zaoszczędzone":** `computeSavings(expenses)` (utils/savings.ts) sumuje `ReceiptItem.discount`
+  (parser łapie RABAT/LIDL PLUS/KUPON/BON); sekcja dashboardu `savings` (grupa Finanse) — łącznie/mies./Lidl.
+- **Perf:** `uiPrefs.liteMode` („Ogranicz animacje", Ustawienia→Interfejs) → `AnimatedCardBg` zwraca null
+  (animowane rozmyte SVG chmury/cząsteczki = najdroższy efekt na Androidzie). Self-test zdrowia:
+  `runHealthSelfTest()` + `app/health-test.tsx` (Ustawienia→Diagnostyka), kroki WG ŹRÓDŁA.
+- **Splash:** `AnimatedSplash` bez kota/SVG (wordmark + pasek + kropki); app.json splash = samo navy.
 - **Biblioteka presetów:** `MealPreset.cat` (PRESET_CATS: kanapki/naleśniki/dania/wypieki/sałatki/
   napoje/przekąski/inne) + `pinned` + `togglePinPreset`; okno presetu: Przypnij/Edytuj/Kopia/Usuń
   + pomijanie składników.
