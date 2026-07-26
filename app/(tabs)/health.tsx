@@ -23,6 +23,7 @@ import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration } from '@/services/healthConnectService';
+import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography } from '@/theme';
 
@@ -190,11 +191,37 @@ export default function HealthScreen() {
       // focus so this screen mirrors it (freezeOnBlur means Zdrowie can't write while
       // blurred, so keeping state fresh on entry prevents a stale write clobbering it).
       try { const raw = await AsyncStorage.getItem(todayKey()); const w = raw ? JSON.parse(raw).weight : 0; if (active && w > 0) setWeight(w); } catch {}
+
+      // Chart BASELINE from the cache (per-day blobs: auto-sync + Samsung import) — reads
+      // AsyncStorage, so it works even when Health Connect is unavailable/sparse. This is
+      // why the week/month steps chart was blank: it only ever used the live watch read.
+      let range: HealthDayPoint[] = [];
+      try {
+        const hist = await getHealthHistory(30);
+        const today = new Date();
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(today); d.setDate(today.getDate() - i);
+          const key = ymd(d); const h = hist[key];
+          range.push({ date: key, steps: h?.steps ?? 0, sleepMinutes: h?.sleepMinutes ?? 0, weightKg: h && h.weight > 0 ? h.weight : null, activeCalories: 0, totalCalories: h?.burn ?? 0, bmr: 0 });
+        }
+      } catch {}
+      if (active && range.some(p => p.steps > 0 || p.sleepMinutes > 0 || p.weightKg != null)) applyHealthRange(range);
+
       if (Platform.OS !== 'android' || !isHealthConnectAvailable()) return;
       try {
-        const [day, range] = await Promise.all([readHealthDay(new Date()), readHealthRange(30)]);
+        const [day, live] = await Promise.all([readHealthDay(new Date()), readHealthRange(30)]);
         if (!active) return;
-        if (range && range.some(p => p.steps > 0 || p.sleepMinutes > 0)) applyHealthRange(range);
+        if (live && live.length) {
+          const byDate = new Map(live.map(p => [p.date, p]));
+          range = range.map(p => {
+            const L = byDate.get(p.date); if (!L) return p;
+            return { ...p,
+              steps: Math.max(p.steps, L.steps), sleepMinutes: Math.max(p.sleepMinutes, L.sleepMinutes),
+              weightKg: L.weightKg ?? p.weightKg, activeCalories: L.activeCalories || p.activeCalories,
+              totalCalories: Math.max(p.totalCalories, L.totalCalories), bmr: L.bmr || p.bmr };
+          });
+          if (range.some(p => p.steps > 0 || p.sleepMinutes > 0)) applyHealthRange(range);
+        }
         if (day) {
           if (day.steps > 0) setSteps(day.steps);
           if (day.sleepMinutes > 0) { setSleepH(Math.floor(day.sleepMinutes / 60)); setSleepM(day.sleepMinutes % 60); setSleepQuality(qualityFromMinutes(day.sleepMinutes)); }

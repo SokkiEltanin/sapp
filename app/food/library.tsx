@@ -108,15 +108,18 @@ export default function FoodLibrary() {
       { text: 'Usuń', style: 'destructive', onPress: () => { haptic.tap(); e.kind === 'recipe' ? removeProduct(e.id) : removePreset(e.id); } },
     ]);
   };
-  // long-press → menu: duplikuj (zrób wariant — zmień bułkę/składnik) / usuń
+  // long-press → menu: dodatki (dla dań) / duplikuj / przypnij / usuń
   const rowMenu = (e: Entry) => {
     haptic.tap();
-    Alert.alert(e.name, e.kind === 'recipe' ? 'Danie z przepisu' : 'Kompozycja', [
+    const opts: any[] = [];
+    if (e.kind === 'recipe') opts.push({ text: 'Dodaj dodatki (złóż danie)', onPress: () => { haptic.tap(); router.push(`/food/add?dish=${e.id}` as any); } });
+    opts.push(
       { text: 'Duplikuj (zrób wariant)', onPress: () => dup(e) },
       { text: e.pinned ? 'Odepnij' : 'Przypnij', onPress: () => togglePin(e) },
       { text: 'Usuń', style: 'destructive', onPress: () => del(e) },
       { text: 'Anuluj', style: 'cancel' },
-    ]);
+    );
+    Alert.alert(e.name, e.kind === 'recipe' ? 'Danie z przepisu' : 'Kompozycja', opts);
   };
 
   return (

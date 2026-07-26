@@ -209,8 +209,7 @@ export default function RecipeBuilder() {
       name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal,
       protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined,
     };
-    if (pickRole === 'addon') setAddons(prev => [...prev, item]);
-    else setIngs(prev => [...prev, item]);
+    setIngs(prev => [...prev, item]);
     setSel(null); setQuery('');
   };
 
@@ -218,7 +217,7 @@ export default function RecipeBuilder() {
   const save = () => {
     if (!canSave) return;
     haptic.success();
-    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry, addons });
+    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry });
     router.back();
   };
   const del = () => {
@@ -321,23 +320,7 @@ export default function RecipeBuilder() {
           ))}
         </View>
 
-        {/* dodatki (jedzone razem — nutella, banan…) */}
-        <View style={s.sectionHead}><Text style={s.sectionTitle}>Dodatki (jedzone razem)</Text><Text style={s.sectionSum}>osobno, nie w wadze</Text></View>
-        {addons.length > 0 && (
-          <View style={s.card}>
-            {addons.map((it, i) => (
-              <View key={i} style={[s.ingRow, i > 0 && s.itemBorder]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.ingName} numberOfLines={1}>{it.name}</Text>
-                  <Text style={s.ingMeta} numberOfLines={1}>{it.unit === 'g' ? `${it.grams} g` : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}</Text>
-                </View>
-                <Text style={s.ingKcal}>{it.kcal} kcal</Text>
-                <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setAddons(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-        <Text style={s.prepHint}>Dodatki dokłada się przy jedzeniu (np. naleśnik + nutella) — jak ser do bułki. Wybierz produkt wyżej i w okienku zaznacz „Dodatek".</Text>
+        <Text style={s.prepHint}>Dodatki (nutella, banan) dołożysz przy jedzeniu: w „Co zjadłem" przytrzymaj to danie → „Dodaj dodatki" i zapisz jako naleśnik z dodatkami. Tu tylko składniki samego ciasta/dania.</Text>
 
         {/* waga — tylko gdy gotowane / smażone */}
         {prep === 'raw' ? (
@@ -420,18 +403,6 @@ export default function RecipeBuilder() {
               {sel && (
                 <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
                   <Text style={s.sheetTitle}>{sel.name}</Text>
-                  {/* rola: składnik ciasta (dzielony przez wagę) vs dodatek (jedzony razem) */}
-                  <View style={s.roleRow}>
-                    {(['ing', 'addon'] as const).map(r => {
-                      const on = pickRole === r;
-                      return (
-                        <TouchableOpacity key={r} onPress={() => { haptic.tap(); setPickRole(r); }}
-                          style={[s.roleChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
-                          <Text style={[s.roleTxt, on && { color: ACCENT }]}>{r === 'ing' ? 'Składnik' : 'Dodatek'}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
                   <View style={s.unitWrap}>
                     {pickerUnits.map(u => {
                       const on = unit === u;
@@ -478,7 +449,7 @@ export default function RecipeBuilder() {
                   <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {dens() || '—'}/100g</Text></View>
                   <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
                     disabled={!(pickerGrams() > 0)} onPress={confirmPicker}>
-                    <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>{pickRole === 'addon' ? 'Dodaj dodatek' : 'Dodaj składnik'}</Text>
+                    <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj składnik</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}

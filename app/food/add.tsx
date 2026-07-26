@@ -83,7 +83,7 @@ export default function FoodAdd() {
   const updateProduct       = useFoodStore(st => st.updateProduct);
   const learnPortion        = useFoodStore(st => st.learnPortion);
 
-  const params = useLocalSearchParams<{ date?: string; edit?: string; preset?: string; dupPreset?: string }>();
+  const params = useLocalSearchParams<{ date?: string; edit?: string; preset?: string; dupPreset?: string; dish?: string }>();
   const initialDate = typeof params.date === 'string' && params.date ? params.date
     : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
   const editId = typeof params.edit === 'string' ? params.edit : undefined;
@@ -155,6 +155,7 @@ export default function FoodAdd() {
   const [pCat, setPCat]         = useState('');         // library category
   const [editPresetId, setEditPresetId] = useState<string | null>(null);   // editing an existing preset
   const [dupNotice, setDupNotice] = useState(false);    // building a COPY of a preset
+  const [composeDishName, setComposeDishName] = useState(''); // building "danie + dodatki" from a dish
 
   const total = items.reduce((sum, it) => sum + it.kcal, 0);
 
@@ -265,7 +266,7 @@ export default function FoodAdd() {
     const y = yields > 1 ? Math.round(yields) : undefined;
     if (editPresetId) updatePreset(editPresetId, nm, items.map(it => ({ ...it })), mealType, y, pCat);
     else addPreset(nm, items.map(it => ({ ...it })), mealType, y, pCat);
-    setSaveP(false); setPName(''); setPYields(''); setPCat(''); setEditPresetId(null); setDupNotice(false);
+    setSaveP(false); setPName(''); setPYields(''); setPCat(''); setEditPresetId(null); setDupNotice(false); setComposeDishName('');
   };
   // Load a preset's ingredients as a NEW preset (a copy) — change the bun / add stuff, then save.
   const loadPresetAsCopy = (p: MealPreset) => {
@@ -340,6 +341,20 @@ export default function FoodAdd() {
     else if (e.kind === 'dish' && e.product) openPicker(productToCandidate(e.product));
   };
   const pinEntry = (e: LibEntry) => { haptic.tap(); e.kind === 'dish' ? togglePinProduct(e.id) : togglePinPreset(e.id); };
+  // Compose "danie + dodatki": open the dish's portion picker, then you add toppings and
+  // save the whole thing as a preset ("Naleśniki z nutellą").
+  const composeFromDish = (p: FoodProduct) => {
+    setComposeDishName(p.name); setEditPresetId(null); setDupNotice(false);
+    setPName(p.name + ' z dodatkami'); setPCat(p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania'); setPYields('');
+    openPicker(productToCandidate(p));
+  };
+  // opened from the library "Dodaj dodatki" on a dish
+  useEffect(() => {
+    const id = typeof params.dish === 'string' ? params.dish : undefined;
+    if (!id) return;
+    const p = products.find(x => x.id === id);
+    if (p && isRecipeProduct(p)) composeFromDish(p);
+  }, [params.dish]);
 
   const density = () => {
     const k = parseFloat(kcal100.replace(',', '.'));
@@ -379,11 +394,7 @@ export default function FoodAdd() {
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
     const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100 } as any, grams);
-    const dishItem: MealItem = { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined };
-    // A dish with typical add-ons (naleśnik + nutella) → drop them in too (delete any you skipped).
-    const dishProduct = products.find(p => p.id === productId);
-    const dishAddons = dishProduct?.recipe?.addons ?? [];
-    setItems(prev => [...prev, dishItem, ...dishAddons.map(a => ({ ...a }))]);
+    setItems(prev => [...prev, { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined }]);
     setSel(null);
   };
 
@@ -438,6 +449,13 @@ export default function FoodAdd() {
             <Copy size={14} color={ACCENT} />
             <Text style={s.editBannerTxt}>Kopia — zmień co chcesz (np. bułkę) i „Zapisz jako preset"</Text>
             <TouchableOpacity onPress={() => { haptic.tap(); setDupNotice(false); setItems([]); setPName(''); setPYields(''); setPCat(''); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
+          </View>
+        )}
+        {composeDishName !== '' && !editPresetId && (
+          <View style={s.editBanner}>
+            <ChefHat size={14} color={ACCENT} />
+            <Text style={s.editBannerTxt}>„{composeDishName}" + dodatki — dorzuć produkty (nutella, banan) i „Zapisz jako preset"</Text>
+            <TouchableOpacity onPress={() => { haptic.tap(); setComposeDishName(''); setItems([]); setPName(''); setPYields(''); setPCat(''); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
           </View>
         )}
         {/* dzień — można dodać WSTECZ (do wcześniejszego dnia) */}
