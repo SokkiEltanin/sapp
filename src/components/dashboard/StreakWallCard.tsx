@@ -93,6 +93,13 @@ export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakIte
                 <Text style={s.unit}>{r.days === 1 ? 'dzień' : 'dni'}</Text>
               </View>
               <Text style={s.label} numberOfLines={1}>{r.name}</Text>
+              {/* pasek postępu do następnego progu (awans koloru) — legenda = pełny */}
+              <View style={s.track}>
+                <View style={[s.fill, { width: `${Math.round(frac * 100)}%` }]} />
+              </View>
+              <Text style={s.next} numberOfLines={1}>
+                {t.next ? `${t.next - r.days} dni do awansu` : 'MAKS · legenda'}
+              </Text>
             </View>
           );
         })}
@@ -107,9 +114,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   title: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  // 2 na rząd, lekko prostokątne — dużo miejsca na grubą liczbę + podpis.
+  // 2 na rząd, lekko prostokątne — dużo miejsca na grubą liczbę + podpis + pasek.
   tile: {
-    flexBasis: '47%', flexGrow: 1, minWidth: 130, aspectRatio: 1.5,
+    flexBasis: '47%', flexGrow: 1, minWidth: 130, aspectRatio: 1.42,
     borderRadius: radius.lg, borderWidth: 1,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
@@ -117,7 +124,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // lekko widoczna „rzecz" w tle — duża, w prawym górnym rogu, ledwo widoczna
   bgIcon: { position: 'absolute', top: -10, right: -8, opacity: 0.16 },
   numRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  num: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
+  num: { fontSize: 34, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
   unit: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
   label: { fontSize: 11.5, fontWeight: '600', color: 'rgba(255,255,255,0.92)', marginTop: 3 },
+  track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden', marginTop: 7 },
+  fill: { height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.9)' },
+  next: { fontSize: 9.5, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginTop: 4, letterSpacing: 0.2 },
 }));

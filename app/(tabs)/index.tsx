@@ -85,7 +85,7 @@ import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
-import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
+import StreakFlame, { streakColor, streakTier } from '@/components/counters/StreakFlame';
 import StreakCard from '@/components/counters/StreakCard';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
 // persisted screen instead of expo-router's blank production fallback.
@@ -3410,13 +3410,16 @@ export default function DashboardScreen() {
                 })()}
                 {dashSince.length > 1 && (
                   <View style={[s.sinceGrid, { marginTop: spacing[3] }]}>
-                    {dashSince.slice(1, 7).map(({ cn, days }) => (
-                      <View key={cn.id} style={s.sinceTile}>
+                    {dashSince.slice(1, 7).map(({ cn, days }) => {
+                      const tc = streakTier(days).color;
+                      return (
+                      <View key={cn.id} style={[s.sinceTile, { backgroundColor: tc + '1A', borderWidth: 1, borderColor: tc + '3A' }]}>
                         <StreakFlame days={days} size={46} />
                         <Text style={s.sinceTileUnit}>{days === 1 ? 'dzień' : 'dni'}</Text>
                         <Text style={s.sinceTileName} numberOfLines={1}>{cn.mode === 'auto' ? `bez ${cn.name}` : cn.name}</Text>
                       </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -3889,7 +3892,13 @@ export default function DashboardScreen() {
               </View>
             );
 
-            nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (
+            nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (() => {
+              const SWEET = '#F472B6';   // różowy cukierek — semantyczny „dodatek" dla słodyczy
+              const wk = weekOverview.filter(w => w.food > 0 || w.sweets > 0);
+              const avgFood = wk.reduce((s2, w) => s2 + w.food, 0) / (wk.length || 1);
+              const avgSweet = wk.reduce((s2, w) => s2 + w.sweets, 0) / (wk.length || 1);
+              const share = avgFood + avgSweet > 0 ? Math.round((avgSweet / (avgFood + avgSweet)) * 100) : 0;
+              return (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Wallet size={13} color={accentColor} />
@@ -3900,11 +3909,17 @@ export default function DashboardScreen() {
                       <Text style={s.dualLegendLabel}>jedzenie</Text>
                     </View>
                     <View style={s.dualLegendItem}>
-                      <View style={[s.dualLegendLine, { backgroundColor: accentColor, opacity: 0.4 }]} />
+                      <View style={[s.dualLegendLine, { backgroundColor: SWEET }]} />
                       <Text style={s.dualLegendLabel}>słodkie</Text>
                     </View>
                   </View>
                 </View>
+                {/* Podsumowanie: średnia tygodniowa + udział słodyczy w koszyku jedzenia */}
+                <Text style={s.statSub}>
+                  Średnio/tydzień: <Text style={{ color: accentColor, fontWeight: '800' }}>{Math.round(avgFood)} zł</Text> jedzenie ·{' '}
+                  <Text style={{ color: SWEET, fontWeight: '800' }}>{Math.round(avgSweet)} zł</Text> słodkie
+                  {share > 0 ? `  ·  ${share}% koszyka` : ''}
+                </Text>
                 {/* Values above each point — food spend per week (rounded zł) */}
                 <View style={s.waveValues}>
                   {weekOverview.map((w, i) => (
@@ -3917,7 +3932,7 @@ export default function DashboardScreen() {
                   data1={weekOverview.map(w => w.food)}
                   data2={weekOverview.map(w => w.sweets)}
                   color1={accentColor}
-                  color2={accentColor + '60'}
+                  color2={SWEET}
                 />
                 <View style={s.waveLabels}>
                   {weekOverview.map((w, i) => (
@@ -3927,7 +3942,8 @@ export default function DashboardScreen() {
                   ))}
                 </View>
               </View>
-            );
+              );
+            })();
 
             nodes['who-ate'] = personConsumption.totalSweets > 0 && payers.length >= 2 && (
               <WhoAteCard data={personConsumption} monthLabel={MONTH_SHORT[new Date().getMonth()]} />
