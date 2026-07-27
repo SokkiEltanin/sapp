@@ -11,14 +11,12 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { looksLikeFood } from '@/utils/calories';
 import { foodAmountOf } from '@/utils/food';
 import { isSelfTransfer } from '@/utils/statWidgets';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { RefreshCcw, Tag, Car, Package, HandCoins, SlidersHorizontal, X, TrendingUp, TrendingDown, Wallet } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
-import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 // Route-level crash boundary (persisted + recoverable, not a blank screen).
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
@@ -28,6 +26,7 @@ import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
+import { getCategoryMeta } from '@/utils/categories';
 import { Expense } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -60,51 +59,6 @@ function monthDates(): string[] {
   return Array.from({ length: n }, (_, i) => `${y}-${pad(m + 1)}-${pad(i + 1)}`);
 }
 
-// ─── Wave chart ────────────────────────────────────────────────────────────────
-const WAVE_W = 320, WAVE_H = 70;
-
-// Points at column centres ((i+0.5)/n) so they line up with the value/label rows.
-function buildFinPath(data: number[], max: number) {
-  const n = data.length;
-  const pts = data.map((v, i) => ({
-    x: ((i + 0.5) / n) * WAVE_W,
-    y: WAVE_H - 8 - (v / max) * (WAVE_H - 20),
-  }));
-  let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  for (let i = 1; i < pts.length; i++) {
-    const px = pts[i - 1].x, py = pts[i - 1].y, cx = pts[i].x, cy = pts[i].y;
-    const mx = (px + cx) / 2;
-    line += ` C ${mx.toFixed(1)} ${py.toFixed(1)}, ${mx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
-  }
-  const fill = `${line} L ${pts[pts.length - 1].x.toFixed(1)} ${WAVE_H} L ${pts[0].x.toFixed(1)} ${WAVE_H} Z`;
-  return { line, fill, pts };
-}
-
-// Dual wave: expenses (red, solid) + income (green, dashed), shared scale.
-function DualFinWave({ exp, inc }: { exp: number[]; inc: number[] }) {
-  if (exp.length < 2) return null;
-  const max = Math.max(...exp, ...inc, 1);
-  const E = buildFinPath(exp, max);
-  const I = buildFinPath(inc, max);
-  return (
-    <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
-      <Defs>
-        <SvgLinearGradient id="finExp" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#FF5A5A" stopOpacity="0.16" />
-          <Stop offset="1" stopColor="#FF5A5A" stopOpacity="0" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id="finInc" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#2AC68F" stopOpacity="0.10" />
-          <Stop offset="1" stopColor="#2AC68F" stopOpacity="0" />
-        </SvgLinearGradient>
-      </Defs>
-      <Path d={E.fill} fill="url(#finExp)" />
-      <Path d={I.fill} fill="url(#finInc)" />
-      <Path d={E.line} stroke="#E43434" strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-      <Path d={I.line} stroke="#2AC68F" strokeWidth="1.8" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 3" />
-    </Svg>
-  );
-}
 
 export default function FinancesScreen() {
   const insets = useSafeAreaInsets();
@@ -255,6 +209,9 @@ export default function FinancesScreen() {
     }
     let topCat = '', topCatAmt = 0;
     for (const [k, v] of Object.entries(catSpend)) if (v > topCatAmt) { topCat = k; topCatAmt = v; }
+    // Pełne rozbicie „dokąd idą pieniądze" — kategorie tego miesiąca malejąco.
+    const cats = Object.entries(catSpend).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const catTotal = cats.reduce((s, [, v]) => s + v, 0);
 
     const dailyRate = day > 0 ? spendThis / day : 0;
     const forecast = dailyRate * daysInMonth;
@@ -264,6 +221,7 @@ export default function FinancesScreen() {
     return {
       day, daysInMonth, daysLeft, spendThis, spendPrevToDate, spendPrevFull,
       topCat, topCatAmt, dailyRate, forecast, paceVsPrevPct, perDayLeft,
+      cats, catTotal,
     };
   }, [expenses, monthTotals.inc]);
 
@@ -476,6 +434,38 @@ export default function FinancesScreen() {
                   </View>
                 );
               })()}
+
+              {/* ── DOKĄD IDĄ PIENIĄDZE — rozbicie tego miesiąca na kategorie (paski) ─── */}
+              {monthPulse.cats.length > 0 && (
+                <View style={st.breakdownCard}>
+                  <View style={st.monthHead}>
+                    <Text style={st.monthTitle}>Dokąd idą pieniądze</Text>
+                    <Text style={st.monthDayTag}>{monthPulse.catTotal.toFixed(0)} zł · {monthPulse.cats.length} kat.</Text>
+                  </View>
+                  {monthPulse.cats.slice(0, 6).map(([cat, amt]) => {
+                    const meta = getCategoryMeta(cat as any);
+                    const pct = monthPulse.catTotal > 0 ? amt / monthPulse.catTotal : 0;
+                    return (
+                      <View key={cat} style={st.bkRow}>
+                        <View style={[st.bkDot, { backgroundColor: meta.color }]} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={st.bkTop}>
+                            <Text style={st.bkLabel} numberOfLines={1}>{meta.label || cat}</Text>
+                            <Text style={st.bkAmt}>{amt.toFixed(0)} zł</Text>
+                          </View>
+                          <View style={st.bkTrack}>
+                            <View style={[st.bkFill, { width: `${Math.max(3, Math.round(pct * 100))}%`, backgroundColor: meta.color }]} />
+                          </View>
+                        </View>
+                        <Text style={st.bkPct}>{Math.round(pct * 100)}%</Text>
+                      </View>
+                    );
+                  })}
+                  {monthPulse.cats.length > 6 && (
+                    <Text style={st.bkMore}>+ {monthPulse.cats.length - 6} mniejszych kategorii</Text>
+                  )}
+                </View>
+              )}
 
               {/* ── Filters button → popup ─── */}
               <View style={st.filterBar}>
@@ -720,14 +710,6 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   scopeBtnText: { fontSize: 11, fontWeight: '700', color: c.text.muted },
   scopeBtnTextOn: { color: c.accent.blue },
 
-  // ── Chart card ──────────────────────────────────────────────────────────────
-  chartCard: {
-    marginHorizontal: spacing[4], marginBottom: spacing[3],
-    backgroundColor: f.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: f.cardBorder,
-    padding: spacing[4], gap: spacing[2],
-  },
-
   // "TEN MIESIĄC" glance card — two proportional bars + net balance.
   monthCard: {
     marginHorizontal: spacing[4], marginBottom: spacing[3],
@@ -738,6 +720,23 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   monthTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
   monthHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthDayTag: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 0.3 },
+
+  // "Dokąd idą pieniądze" — rozbicie kategorii tego miesiąca (paski)
+  breakdownCard: {
+    marginHorizontal: spacing[4], marginBottom: spacing[3],
+    backgroundColor: f.card, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: f.cardBorder,
+    padding: spacing[4], gap: spacing[3],
+  },
+  bkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  bkDot: { width: 10, height: 10, borderRadius: 5 },
+  bkTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 },
+  bkLabel: { fontSize: 13, fontWeight: '700', color: c.text.primary, flex: 1, marginRight: spacing[2] },
+  bkAmt: { fontSize: 13, fontWeight: '800', color: c.text.primary, fontVariant: ['tabular-nums'] },
+  bkTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, overflow: 'hidden' },
+  bkFill: { height: '100%', borderRadius: 3 },
+  bkPct: { width: 34, textAlign: 'right', fontSize: 11, fontWeight: '700', color: c.text.muted, fontVariant: ['tabular-nums'] },
+  bkMore: { fontSize: 11, color: c.text.muted, fontStyle: 'italic', marginTop: -spacing[1] },
   // clean insight lines under the flow bars
   pulseLines: { gap: spacing[2], marginTop: spacing[1], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
   pulseLineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
