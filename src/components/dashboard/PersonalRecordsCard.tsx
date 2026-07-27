@@ -50,7 +50,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
   },
-  bgIcon: { position: 'absolute', top: -8, right: -6, opacity: 0.08 },
+  bgIcon: { position: 'absolute', top: -8, right: -6, opacity: 0.15 },
   value: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
   label: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: 3, lineHeight: 15 },
 }));

@@ -2875,20 +2875,6 @@ export default function DashboardScreen() {
     return { days, today: todayCell, loggedCount: logged.length, cumDeficit, kg: cumDeficit / 7700, target, hasData: logged.length > 0 };
   }, [foodMeals, healthDays, foodGoalMode, foodManualGoal]);
 
-  // "Bąbelki wydatków" — this month's spend per category as sized bubbles.
-  const spendBubbles = useMemo(() => {
-    const now = new Date();
-    const mk = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-    const sums: Record<string, number> = {};
-    for (const e of expenses) {
-      if (e.type === 'income' || isSelfTransfer(e) || !inScope(e, scope)) continue;
-      if ((e.date ?? '').slice(0, 7) !== mk) continue;
-      sums[e.category] = (sums[e.category] ?? 0) + e.amount;
-    }
-    const rows = Object.entries(sums).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-    return { rows, max: rows.length ? rows[0][1] : 1, total: rows.reduce((s, [, v]) => s + v, 0) };
-  }, [expenses, scope]);
-
   // "Kolekcja sklepów" — where you shop as a collection: distinct stores, favourite
   // (most visits), and the most recently discovered new one.
   const shopsCollection = useMemo(() => {
@@ -3612,30 +3598,6 @@ export default function DashboardScreen() {
                 </View>
               );
             })();
-
-            nodes['spend-bubbles'] = spendBubbles.rows.length > 0 && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Wallet size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Wydatki — bąbelki</Text>
-                  <Text style={s.bubbleTotal}>{Math.round(spendBubbles.total)} zł</Text>
-                </View>
-                <View style={s.bubbleWrap}>
-                  {spendBubbles.rows.map(([cat, amt]) => {
-                    const meta = getCategoryMeta(cat as any);
-                    const d = 46 + Math.round(Math.sqrt(amt / spendBubbles.max) * 66); // 46..112 px
-                    return (
-                      <View key={cat} style={s.bubbleCol}>
-                        <View style={[s.bubble, { width: d, height: d, borderRadius: d / 2, backgroundColor: meta.color + '24', borderColor: meta.color + '70' }]}>
-                          <Text style={[s.bubbleAmt, { color: meta.color, fontSize: d < 62 ? 11 : 14 }]} numberOfLines={1}>{Math.round(amt)}</Text>
-                        </View>
-                        <Text style={s.bubbleLabel} numberOfLines={1}>{meta.label}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            );
 
             nodes['shops-collection'] = shopsCollection.total > 0 && (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
@@ -5313,7 +5275,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   budgetWarnCard: {
     backgroundColor: c.bg.card,
     borderRadius: radius.xl,
-    borderWidth: 1, borderColor: 'rgba(81,102,245,0.25)',
+    borderWidth: 1, borderColor: c.border.card,
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
     gap: spacing[3],
   },
@@ -5354,7 +5316,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   },
   budgetWarnFill: {
     height: '100%', borderRadius: 5,
-    backgroundColor: '#5166F5',
+    backgroundColor: c.text.primary,
   },
 
   // ── Humor line (below main card) ──────────────────────────────────────────
@@ -5716,13 +5678,6 @@ const buildStyles = (c: any) => StyleSheet.create({
   yearAgoStat: { flex: 1, alignItems: 'center', gap: 2, backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingVertical: spacing[3] },
   yearAgoVal: { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
   yearAgoKey: { fontSize: 10, color: c.text.muted, fontWeight: '600' },
-  // "Bąbelki wydatków"
-  bubbleTotal: { marginLeft: 'auto', fontSize: 12, fontWeight: '800', color: c.text.secondary },
-  bubbleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], justifyContent: 'center', alignItems: 'flex-end', marginTop: spacing[3] },
-  bubbleCol: { alignItems: 'center', gap: 4 },
-  bubble: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5 },
-  bubbleAmt: { fontWeight: '900', letterSpacing: -0.5 },
-  bubbleLabel: { fontSize: 10, color: c.text.muted, fontWeight: '600', maxWidth: 76, textAlign: 'center' },
   // two-metric compare verdict
   cmpVerdict: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2], borderWidth: 1, borderRadius: radius.md, paddingHorizontal: spacing[3], paddingVertical: 7 },
   cmpVerdictTxt: { flex: 1, fontSize: 11.5, fontWeight: '700' },

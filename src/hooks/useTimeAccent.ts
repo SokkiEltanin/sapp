@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
 import { getSunTimes } from '@/utils/sunTimes';
-import { useSkinStore } from '@/store/skinStore';
-import { skinById } from '@/theme/skins';
 
 export type TimeOfDay = 'night' | 'dawn' | 'morning' | 'afternoon' | 'evening';
 
@@ -17,7 +15,8 @@ interface TimeAccent {
 // AKCENT = MONO (czarno-biały) — user: „akcent apki czarno-biały, kolory tylko dodatki".
 // `color` (emfaza: ikony/paski/wykresy/liczby) = near-white na ciemnym. Hero wash
 // (gradientTop/cardBg) = neutralny dark (bez niebieskiego) dla clean look. Greeting time-based.
-// Skiny NADAL nadpisują kolorem (opcjonalne „dodatki"). Kalendarz ma swoje kolory osobno.
+// Skiny WYŁĄCZONE — user chce jeden dopieszczony mono default (bez kolorowych stylów).
+// Kalendarz ma swoje kolory osobno.
 const MONO = '#ECEEEE';
 const HERO_TOP = '#0B0D0F', HERO_CARD = '#20242A', HERO_CARD_DARK = '#171B20';
 const ACCENTS: Record<TimeOfDay, Omit<TimeAccent, 'timeOfDay'>> = {
@@ -50,16 +49,12 @@ export function useTimeAccent(): TimeAccent {
   const now = new Date();
   const nowH = now.getHours() + now.getMinutes() / 60;
   const sun = getSunTimes();
-  const activeSkin = useSkinStore((s) => s.active);
-  // Key changes every 30 min and whenever sun times / skin update → theme re-evaluates.
-  const key = `${Math.floor(nowH * 2)}-${sun?.sunrise ?? ''}-${sun?.sunset ?? ''}-${activeSkin}`;
+  // Key changes every 30 min and whenever sun times update → theme re-evaluates.
+  const key = `${Math.floor(nowH * 2)}-${sun?.sunrise ?? ''}-${sun?.sunset ?? ''}`;
   return useMemo(() => {
     const tod = sun
       ? timeOfDayBySun(nowH, sun.sunrise, sun.sunset)
       : timeOfDayByHour(now.getHours());
-    const base = { ...ACCENTS[tod], timeOfDay: tod };
-    // An equipped skin overrides the colours but keeps the time-based greeting.
-    const skin = activeSkin !== 'auto' ? skinById(activeSkin) : undefined;
-    return skin?.colors ? { ...base, ...skin.colors } : base;
+    return { ...ACCENTS[tod], timeOfDay: tod };
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 }

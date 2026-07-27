@@ -352,20 +352,33 @@ export default function Pet() {
           {quests.claimableCount > 0 && <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>{quests.claimableCount} do odbioru</Text></View>}
         </View>
         <View style={s.qCard}>
-          {quests.daily.map((q, i) => (
-            <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[s.qLabel, q.claimed && { color: c.text.muted }]} numberOfLines={1}>{q.label}</Text>
-                {q.note && <Text style={s.qNote}>{q.note}</Text>}
-              </View>
-              <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
-              {q.claimed
-                ? <View style={s.qDone}><CheckIcon size={14} color="#2AC68F" /></View>
-                : q.done
-                  ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
-                  : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
-            </View>
-          ))}
+          {(() => {
+            // Odebrane znikają z aktywnej listy i zwijają się w jedną stopkę.
+            const active = quests.daily.filter(q => !q.claimed);
+            const claimedN = quests.daily.length - active.length;
+            return (
+              <>
+                {active.map((q, i) => (
+                  <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
+                      {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                    </View>
+                    <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                    {q.done
+                      ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                      : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
+                  </View>
+                ))}
+                {claimedN > 0 && (
+                  <View style={[s.qClaimedFoot, active.length > 0 && s.qRowBorder]}>
+                    <CheckIcon size={12} color="#2AC68F" />
+                    <Text style={s.qClaimedTxt}>{claimedN} {claimedN === 1 ? 'odebrane' : 'odebrane'} dziś</Text>
+                  </View>
+                )}
+              </>
+            );
+          })()}
         </View>
 
         {/* ── Bonus dailies (adaptive, higher reward) ── */}
@@ -373,20 +386,32 @@ export default function Pet() {
           <>
             <Text style={s.section}>Bonusowe dziś</Text>
             <View style={s.qCard}>
-              {quests.bonusDaily.map((q, i) => (
-                <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[s.qLabel, q.claimed && { color: c.text.muted }]} numberOfLines={1}>{q.label}</Text>
-                    {q.note && <Text style={s.qNote}>{q.note}</Text>}
-                  </View>
-                  <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
-                  {q.claimed
-                    ? <View style={s.qDone}><CheckIcon size={14} color="#2AC68F" /></View>
-                    : q.done
-                      ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
-                      : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
-                </View>
-              ))}
+              {(() => {
+                const active = quests.bonusDaily.filter(q => !q.claimed);
+                const claimedN = quests.bonusDaily.length - active.length;
+                return (
+                  <>
+                    {active.map((q, i) => (
+                      <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
+                          {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                        </View>
+                        <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                        {q.done
+                          ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                          : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
+                      </View>
+                    ))}
+                    {claimedN > 0 && (
+                      <View style={[s.qClaimedFoot, active.length > 0 && s.qRowBorder]}>
+                        <CheckIcon size={12} color="#2AC68F" />
+                        <Text style={s.qClaimedTxt}>{claimedN} odebrane dziś</Text>
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
             </View>
           </>
         )}
@@ -593,6 +618,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qClaim: { backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 10, shadowColor: '#2AC68F', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   qClaimTxt: { fontSize: 14, fontWeight: '900', color: '#07160F', letterSpacing: 0.2 },
   qDone: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2AC68F1A' },
+  qClaimedFoot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing[2] },
+  qClaimedTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, letterSpacing: 0.2 },
   qLocked: { width: 30, alignItems: 'center' },
   qLockedTxt: { fontSize: 14, color: c.text.muted, fontWeight: '800' },
 

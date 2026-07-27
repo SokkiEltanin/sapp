@@ -76,13 +76,13 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
       <View style={s.head}>
-        <Sparkles size={13} color={m.color} />
+        <Sparkles size={13} color={c.text.secondary} />
         <Text style={s.title}>Ciekawostka dnia</Text>
-      </View>
-
-      <View style={[s.catRow, { backgroundColor: m.color + '18', borderColor: m.color + '3A' }]}>
-        <Ic size={13} color={m.color} />
-        <Text style={[s.catTxt, { color: m.color }]}>{m.label}</Text>
+        {/* kategoria równo w prawym górnym rogu kafelka */}
+        <View style={[s.catChip, { backgroundColor: m.color + '18', borderColor: m.color + '3A' }]}>
+          <Ic size={11} color={m.color} />
+          <Text style={[s.catTxt, { color: m.color }]}>{m.label}</Text>
+        </View>
       </View>
 
       <Text style={s.text}>{t.text}</Text>
@@ -95,8 +95,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.card, gap: spacing[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { flex: 1, fontSize: 12, fontWeight: '800', color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.8 },
-  catRow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
-  catTxt: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4 },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
+  catTxt: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   text: { fontSize: 14, lineHeight: 20, color: c.text.primary, fontWeight: '500' },
   src: { fontSize: 12, color: c.text.muted, fontStyle: 'italic' },
 }));

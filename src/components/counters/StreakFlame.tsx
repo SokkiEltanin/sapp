@@ -2,14 +2,30 @@ import { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Easing } from 'react-native';
 import { Flame } from 'lucide-react-native';
 
+// Progi serii — wspólny język kolorów dla całej apki (płomienie + kafelki „Twoje serie").
+// Im dłuższa seria, tym rzadszy „rarity" kolor kafelka: bordo → czerwień → pomarańcz →
+// róż → błękit → fiolet (legenda). Przekroczenie progu = celebracja (StreakWallCard).
+export interface StreakTier { i: number; color: string; name: string; min: number; next: number | null }
+const STREAK_TIERS: { min: number; color: string; name: string }[] = [
+  { min: 1,   color: '#9A3444', name: 'Bordo' },
+  { min: 7,   color: '#DC2626', name: 'Czerwień' },
+  { min: 14,  color: '#F97316', name: 'Pomarańcz' },
+  { min: 30,  color: '#EC4899', name: 'Róż' },
+  { min: 60,  color: '#3B82F6', name: 'Błękit' },
+  { min: 100, color: '#8B5CF6', name: 'Legenda' },
+];
+export function streakTier(days: number): StreakTier {
+  let i = 0;
+  for (let k = 0; k < STREAK_TIERS.length; k++) if (days >= STREAK_TIERS[k].min) i = k;
+  const t = STREAK_TIERS[i];
+  return { i, color: t.color, name: t.name, min: t.min, next: i + 1 < STREAK_TIERS.length ? STREAK_TIERS[i + 1].min : null };
+}
+
 // Duolingo-style streak flame: the day count sits inside a flickering flame whose
-// colour "heats up" with the streak length.
+// colour "heats up" with the streak length (via the shared tier scheme above).
 export function streakColor(days: number): string {
-  if (days >= 100) return '#A855F7'; // legendary purple
-  if (days >= 30) return '#FFC83D';  // gold
-  if (days >= 7) return '#FF6A00';   // hot orange
-  if (days >= 1) return '#FF9F43';   // orange
-  return '#8A93A8';                  // cold grey (0 days)
+  if (days < 1) return '#8A93A8'; // cold grey (0 days)
+  return streakTier(days).color;
 }
 
 export default function StreakFlame({ days, size = 48 }: { days: number; size?: number }) {

@@ -1377,20 +1377,6 @@ export default function SettingsScreen() {
             </PressableScale>
 
             <PressableScale
-              onPress={() => { haptic.tap(); router.push('/skins' as any); }}
-              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
-            >
-              <View style={[styles.iconWrap, { backgroundColor: '#A78BFA18' }]}>
-                <LucideIcons.Palette size={16} color="#A78BFA" />
-              </View>
-              <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>Skórki</Text>
-                <Text style={styles.rowSub}>Motywy dashboardu odblokowywane za karty miesiąca</Text>
-              </View>
-              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
-            </PressableScale>
-
-            <PressableScale
               onPress={() => { haptic.tap(); router.push('/pet' as any); }}
               style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
             >

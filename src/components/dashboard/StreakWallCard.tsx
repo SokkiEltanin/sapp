@@ -1,10 +1,17 @@
+import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, Droplets, Candy, Dumbbell, BookOpen, Moon, Cigarette, Wine, Footprints } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
+import { streakTier } from '@/components/counters/StreakFlame';
+import { toast } from '@/store/toastStore';
+import { haptic } from '@/utils/haptics';
 
 export interface StreakItem { key: string; name: string; days: number }
+
+const SEEN_KEY = 'streak_tiers_v1';
 
 // Faint background icon per streak — reads the name and picks something recognisable
 // (a glass for water, a candy for sweets, a cigarette for a quit-smoking counter…).
@@ -21,13 +28,49 @@ function iconFor(name: string) {
   return Flame;
 }
 
-// „Twoje serie" — Duolingo-style: każda seria to KWADRAT z grubą liczbą dni, podpisem
-// pod spodem i lekko widoczną ikoną w tle. Mono (liczba biała, podpis stonowany) — kolor
-// tylko przez subtelną ikonę-tło. Turbo minimalistyczne.
+// 2-char hex alpha from 0..1
+const a2 = (o: number) => Math.round(Math.max(0, Math.min(1, o)) * 255).toString(16).padStart(2, '0');
+
+// „Twoje serie" — Duolingo-style: każda seria to KWADRAT zabarwiony na kolor swojego progu
+// (bordo → czerwień → pomarańcz → róż → błękit → fiolet legenda). Im dłuższa seria, tym
+// intensywniejsze tło. Gruba biała liczba + podpis + lekko widoczna ikona w tle. Po
+// przekroczeniu progu — pop „gratulacje" (toast + haptik).
 export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: string }) {
   const c = useColors();
   const s = makeS(c);
   const rows = streaks.filter(x => x.days > 0).sort((a, b) => b.days - a.days).slice(0, 6);
+
+  // Celebracja progu — porównaj bieżące progi z ostatnio widzianymi. Pierwsze uruchomienie
+  // tylko zapisuje baseline (bez spamu toastów). Odpala się raz na montaż.
+  const fired = useRef(false);
+  useEffect(() => {
+    if (fired.current || rows.length === 0) return;
+    fired.current = true;
+    (async () => {
+      let raw: string | null = null;
+      try { raw = await AsyncStorage.getItem(SEEN_KEY); } catch {}
+      const seen: Record<string, number> = raw ? JSON.parse(raw) : {};
+      const isFirst = !raw;
+      const nextSeen: Record<string, number> = { ...seen };
+      let best: { name: string; days: number; tierName: string; ti: number } | null = null;
+      for (const r of rows) {
+        const t = streakTier(r.days);
+        const prev = seen[r.key] ?? -1;
+        // celebruj tylko realne kamienie milowe (≥7 dni = tier ≥ 1), gdy próg wzrósł
+        if (!isFirst && t.i > prev && t.i >= 1 && (!best || t.i > best.ti)) {
+          best = { name: r.name, days: r.days, tierName: t.name, ti: t.i };
+        }
+        nextSeen[r.key] = t.i;
+      }
+      try { await AsyncStorage.setItem(SEEN_KEY, JSON.stringify(nextSeen)); } catch {}
+      if (best) {
+        haptic.success();
+        const bang = best.ti >= 5 ? 'LEGENDA' : 'Nowy próg';
+        toast.success(`🔥 ${best.name}: ${best.days} dni — ${bang}: ${best.tierName}!`);
+      }
+    })();
+  }, [rows.length]);
+
   if (rows.length === 0) return null;
   return (
     <View style={[s.card, { backgroundColor: cardBg }]}>
@@ -38,9 +81,13 @@ export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakIte
       <View style={s.grid}>
         {rows.map(r => {
           const Icon = iconFor(r.name);
+          const t = streakTier(r.days);
+          // intensywność rośnie w obrębie progu — od jego początku do następnego progu
+          const frac = t.next ? Math.min(1, Math.max(0, (r.days - t.min) / (t.next - t.min))) : 1;
+          const bgA = a2(0.14 + 0.20 * frac);   // 0.14 → 0.34
           return (
-            <View key={r.key} style={s.tile}>
-              <Icon size={78} color={c.text.primary} strokeWidth={1.4} style={s.bgIcon} />
+            <View key={r.key} style={[s.tile, { backgroundColor: t.color + bgA, borderColor: t.color + '66' }]}>
+              <Icon size={78} color={t.color} strokeWidth={1.4} style={s.bgIcon} />
               <View style={s.numRow}>
                 <Text style={s.num}>{r.days}</Text>
                 <Text style={s.unit}>{r.days === 1 ? 'dzień' : 'dni'}</Text>
@@ -63,14 +110,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // 2 na rząd, lekko prostokątne — dużo miejsca na grubą liczbę + podpis.
   tile: {
     flexBasis: '47%', flexGrow: 1, minWidth: 130, aspectRatio: 1.5,
-    backgroundColor: c.fill.subtle, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle,
+    borderRadius: radius.lg, borderWidth: 1,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
   },
   // lekko widoczna „rzecz" w tle — duża, w prawym górnym rogu, ledwo widoczna
-  bgIcon: { position: 'absolute', top: -10, right: -8, opacity: 0.07 },
+  bgIcon: { position: 'absolute', top: -10, right: -8, opacity: 0.16 },
   numRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  num: { fontSize: 36, fontWeight: '900', color: c.text.primary, letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
-  unit: { fontSize: 12, fontWeight: '700', color: c.text.muted },
-  label: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: 3 },
+  num: { fontSize: 36, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
+  unit: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
+  label: { fontSize: 11.5, fontWeight: '600', color: 'rgba(255,255,255,0.92)', marginTop: 3 },
 }));
