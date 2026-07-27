@@ -15,7 +15,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import CalendarGrid from '@/components/calendar/CalendarGrid';
 import WeekStrip from '@/components/calendar/WeekStrip';
 import TaskItem from '@/components/calendar/TaskItem';
-import DayTimeline from '@/components/calendar/DayTimeline';
+import DayTimelineH from '@/components/calendar/DayTimelineH';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -578,7 +578,7 @@ export default function CalendarTabScreen() {
             </Text>
 
             <View style={styles.timelineWrap}>
-              <DayTimeline
+              <DayTimelineH
                 events={selectedEvents}
                 date={selectedDate}
                 onPress={(id) => openCalEntry(id)}
