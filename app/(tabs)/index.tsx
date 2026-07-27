@@ -819,7 +819,8 @@ export default function DashboardScreen() {
   const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [weatherPanel, setWeatherPanel] = useState(false);
-  const [workPanel, setWorkPanel]   = useState(false);
+  const workPanel    = useUiActions(s => s.workPanelOpen);   // boolean w store → brak podwójnego otwarcia
+  const setWorkPanel = useUiActions(s => s.setWorkPanelOpen);
   const [statDetail, setStatDetail] = useState<CustomTile | null>(null);
   const [detailPeriod, setDetailPeriod] = useState<'week' | 'month'>('month'); // tydzień/miesiąc toggle in the detail view
   // Time capsule ("List do przyszłego siebie")
@@ -842,12 +843,6 @@ export default function DashboardScreen() {
   const dishesCreated = useMemo(() => foodProducts.filter(isRecipeProduct).length, [foodProducts]);
   const [weightInput, setWeightInput] = useState('');
   const [subConfirms, setSubConfirms] = useState<PendingSubConfirm[]>([]);
-  const workPanelTrigger = useUiActions(s => s.workPanelTrigger);
-  // Consume the trigger so it can't re-open the panel on a later remount/startup
-  // (the counter otherwise stays > 0 after the first open and the mount effect fires again).
-  useEffect(() => {
-    if (workPanelTrigger > 0) { setWorkPanel(true); useUiActions.setState({ workPanelTrigger: 0 }); }
-  }, [workPanelTrigger]);
   const bankPendingCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 0 : 1), 0)); // manual review only
   const bankAutoCount = useBankQueue(st => st.pending.reduce((n, p) => n + (p.auto ? 1 : 0), 0));
   const [tagRules, setTagRules]     = useState<TagBudgetRule[]>([]);
