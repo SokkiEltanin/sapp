@@ -375,6 +375,7 @@ export interface HealthDayPoint {
   activeCalories: number;  // kcal spalone w ruchu tego dnia
   totalCalories: number;   // kcal spalone łącznie (jeśli zegarek podaje)
   bmr: number;             // kcal/dzień (spoczynek) — 0 gdy brak
+  hydrationMl?: number;    // woda z zegarka (ml) tego dnia — do retroaktywnego leczenia serii
 }
 
 function localKey(d: Date): string {
@@ -463,7 +464,16 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
       if (p && v > 0) p.bmr = Math.round(v);
     }
   } catch {}
-  for (const p of out) { p.activeCalories = Math.round(p.activeCalories); p.totalCalories = Math.round(p.totalCalories); }
+  // Woda per dzień — sumowana po dniu startu; pozwala retroaktywnie zaliczyć wodę za
+  // dni, gdy apka była zamknięta, więc seria „Woda" nie pada.
+  try {
+    for (const r of await read(hc, 'Hydration', filter)) {
+      const p = byDay.get(localKey(new Date(r.startTime)));
+      const ml = r.volume?.inMilliliters ?? (r.volume?.inLiters != null ? r.volume.inLiters * 1000 : 0);
+      if (p && ml > 0) p.hydrationMl = (p.hydrationMl ?? 0) + ml;
+    }
+  } catch {}
+  for (const p of out) { p.activeCalories = Math.round(p.activeCalories); p.totalCalories = Math.round(p.totalCalories); p.hydrationMl = Math.round(p.hydrationMl ?? 0); }
 
   return out;
 }

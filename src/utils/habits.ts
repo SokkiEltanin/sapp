@@ -73,6 +73,34 @@ export async function feedWaterHabit(glasses: number, date: string): Promise<boo
   return true;
 }
 
+// A "steps" habit (matched by name, since there's no kind:'steps') that we auto-mark
+// from Health Connect steps, so a "did I hit my step goal" streak doesn't die on days
+// the app wasn't opened before midnight.
+export async function getStepsHabit(): Promise<Habit | null> {
+  const list = await getHabits();
+  const match = (t: string) => {
+    const s = t.trim().toLowerCase();
+    return s === 'kroki' || s === 'kroków' || s === 'chodzenie' || s === 'spacer' || s === 'steps';
+  };
+  return list.find((h) => match(h.title)) ?? null;
+}
+
+// Mark the steps habit done for `date` when the watch shows the day HIT the goal.
+// MAX so it never un-marks a day you already completed by hand. No-op without a steps
+// habit or when the goal wasn't met. Returns true if it changed anything.
+export async function feedStepsHabit(steps: number, goal: number, date: string): Promise<boolean> {
+  if (!(steps > 0 && goal > 0 && steps >= goal)) return false;
+  const h = await getStepsHabit();
+  if (!h) return false;
+  const counts = await getCounts(date);
+  const target = Math.max(1, h.dailyGoal ?? 1);
+  const next = Math.max(counts[h.id] ?? 0, target);
+  if ((counts[h.id] ?? 0) >= next) return false;
+  counts[h.id] = next;
+  await setCounts(date, counts);
+  return true;
+}
+
 // A day's water intake in glasses = the water habit's count (0 if no water habit).
 // Single source of truth shared by the Health screen, the Habits screen and the pet.
 export async function getWaterGlasses(date: string): Promise<number> {

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isHealthConnectAvailable, readHealthRange, readHealthDay } from './healthConnectService';
-import { feedWaterHabit } from '@/utils/habits';
+import { isHealthConnectAvailable, readHealthRange } from './healthConnectService';
+import { feedWaterHabit, feedStepsHabit } from '@/utils/habits';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { useHabitsSync } from '@/store/habitsSync';
 
@@ -80,19 +80,27 @@ export async function autoSyncHealth(days = 30, force = false): Promise<number> 
     if (writes.length) await AsyncStorage.multiSet(writes);
     if (latestWeight != null) await AsyncStorage.setItem('health_last_weight', String(latestWeight)).catch(() => {});
 
-    // Water: pull today's Health Connect hydration into the "Woda" habit so it updates
-    // in the background too — not only when Zdrowie is opened + pulled-to-refresh. The
-    // watch can only supply this if water is logged in Samsung Health (no wearable
-    // measures intake); feedWaterHabit uses max, so it never clobbers manual taps.
+    // Woda z Health Connect → nawyk „Woda", PER DZIEŃ z całego okna (nie tylko dziś).
+    // Dzięki temu, gdy apka była zamknięta o północy, woda za pominięte dni zalicza się
+    // retroaktywnie przy najbliższym otwarciu → seria „Woda" NIE pada. feedWaterHabit
+    // używa MAX, więc nigdy nie nadpisze ręcznych stuknięć. (Watch dostarcza wodę tylko
+    // jeśli logujesz ją w Samsung Health — bez tego nie ma czego leczyć.)
     try {
-      const today = await readHealthDay(new Date());
-      if (today?.hydrationMl && today.hydrationMl > 0) {
-        const { glassMl } = await getHealthGoals();
-        const d = new Date();
-        const todayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const changed = await feedWaterHabit(Math.round(today.hydrationMl / (glassMl || 250)), todayKey);
-        if (changed) useHabitsSync.getState().bump();
+      const goals = await getHealthGoals();
+      const glassMl = goals.glassMl || 250;
+      const stepGoal = goals.stepGoal || 0;
+      let anyChanged = false;
+      for (const p of range) {
+        // woda per dzień (leczy serię „Woda")
+        if ((p.hydrationMl ?? 0) > 0) {
+          if (await feedWaterHabit(Math.round((p.hydrationMl ?? 0) / glassMl), p.date)) anyChanged = true;
+        }
+        // kroki per dzień — zalicz habit „Kroki" gdy dzień trafił w cel (leczy serię kroków)
+        if (stepGoal > 0 && p.steps >= stepGoal) {
+          if (await feedStepsHabit(p.steps, stepGoal, p.date)) anyChanged = true;
+        }
       }
+      if (anyChanged) useHabitsSync.getState().bump();
     } catch {}
 
     _lastRun = now;
