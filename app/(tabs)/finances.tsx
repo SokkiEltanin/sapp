@@ -67,10 +67,11 @@ export default function FinancesScreen() {
   const colors = useColors();
   const F = useMemo(() => ({
     card: colors.bg.card,
-    cardBorder: 'rgba(228,52,52,0.24)',
+    // obrys kart MONO (był czerwony rgba(228,52,52) → dwie karty wyglądały jak alarm)
+    cardBorder: colors.border.card,
     accent: '#E43434',
     accentDim: 'rgba(228,52,52,0.14)',
-    muted: 'rgba(228,52,52,0.55)',
+    muted: colors.text.muted,
   }), [colors]);
   const st = useMemo(() => makeStyles(colors, F), [colors, F]);
 
@@ -717,7 +718,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     borderWidth: 1, borderColor: f.cardBorder,
     padding: spacing[4], gap: spacing[3],
   },
-  monthTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },
+  monthTitle: { fontSize: 11, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
   monthHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthDayTag: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 0.3 },
 
@@ -726,7 +727,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     marginHorizontal: spacing[4], marginBottom: spacing[3],
     backgroundColor: f.card, borderRadius: radius.xl,
     borderWidth: 1, borderColor: f.cardBorder,
-    padding: spacing[4], gap: spacing[3],
+    padding: spacing[4], gap: spacing[2] + 2,
   },
   bkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   bkDot: { width: 10, height: 10, borderRadius: 5 },
