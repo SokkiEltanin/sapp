@@ -9,7 +9,7 @@ import { ChevronLeft, Flame, Snowflake } from 'lucide-react-native';
 import { Habit } from '@/types';
 import { getHabits } from '@/utils/habits';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { spacing, radius } from '@/theme';
+import { spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 
@@ -174,7 +174,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3] },
 
   hero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], borderRadius: radius.xl, borderWidth: 1, padding: spacing[4] },
-  heroNum: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
+  heroNum: { fontFamily: fonts.display, fontSize: 32, color: c.text.primary, letterSpacing: -0.5 },
   heroUnit: { fontSize: 13, fontWeight: '700', color: c.text.muted },
   heroSub: { fontSize: 12, color: c.text.secondary, marginTop: 2 },
 
@@ -187,7 +187,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   statsRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, paddingVertical: spacing[3] },
   stat: { flex: 1, alignItems: 'center', gap: 2 },
-  statVal: { fontSize: 20, fontWeight: '900', color: c.text.primary, fontVariant: ['tabular-nums'] },
+  statVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary },
   statKey: { fontSize: 10.5, fontWeight: '600', color: c.text.muted },
   statDiv: { width: 1, height: 30, backgroundColor: c.border.subtle },
 }));

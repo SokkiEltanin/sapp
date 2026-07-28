@@ -5,7 +5,7 @@ import { Trophy, Footprints, Moon, Flame, Smile, Scale, Medal } from 'lucide-rea
 import { RecordItem } from '@/utils/personalRecords';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { spacing, radius } from '@/theme';
+import { spacing, radius, fonts } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
 const ICONS: Record<string, any> = { footprints: Footprints, moon: Moon, flame: Flame, smile: Smile, scale: Scale };
@@ -68,7 +68,7 @@ function PersonalRecordsCard({ records, cardBg }: { records: RecordItem[]; cardB
 const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.card, gap: spacing[3] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
   headCount: { fontSize: 12, fontWeight: '800', color: c.text.muted, fontVariant: ['tabular-nums'] },
 
   // HERO — flagowy rekord
@@ -84,8 +84,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center',
   },
-  heroEyebrow: { fontSize: 9.5, fontWeight: '800', color: GOLD, letterSpacing: 1, textTransform: 'uppercase' },
-  heroValue: { fontSize: 32, fontWeight: '900', color: c.text.primary, letterSpacing: -1, fontVariant: ['tabular-nums'], marginTop: 1 },
+  heroEyebrow: { fontFamily: fonts.label, fontSize: 9, color: GOLD, letterSpacing: 1, textTransform: 'uppercase' },
+  heroValue: { fontFamily: fonts.display, fontSize: 30, color: c.text.primary, letterSpacing: -0.5, marginTop: 2 },
   heroLabel: { fontSize: 12, fontWeight: '600', color: c.text.secondary, marginTop: 1, lineHeight: 16 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
@@ -96,7 +96,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     justifyContent: 'flex-end', overflow: 'hidden',
   },
   bgIcon: { position: 'absolute', top: -8, right: -6, opacity: 0.18 },
-  value: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  value: { fontFamily: fonts.display, fontSize: 27, color: c.text.primary, letterSpacing: -0.5 },
   label: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: 3, lineHeight: 15 },
 }));
 

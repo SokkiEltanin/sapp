@@ -188,6 +188,8 @@ export default function RootLayout() {
     Airstrike:     require('../assets/fonts/airstrike.ttf'),
     AirstrikeBold: require('../assets/fonts/airstrikebold.ttf'),
     AirstrikeCond: require('../assets/fonts/airstrikecond.ttf'),
+    LexendTera:    require('../assets/fonts/LexendTera.ttf'),   // CAPS-owe nagłówki (mockup serii)
+    ArchivoBlack:  require('../assets/fonts/ArchivoBlack.ttf'), // wielkie liczby (heavy 900)
   });
 
   useEffect(() => { appSettings.loadAll(); }, []);

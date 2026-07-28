@@ -6,7 +6,7 @@ import { Flame, Droplets, Candy, Dumbbell, BookOpen, Moon, Cigarette, Wine, Foot
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { spacing, radius } from '@/theme';
+import { spacing, radius, fonts } from '@/theme';
 import { streakTier } from '@/components/counters/StreakFlame';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -147,7 +147,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
 const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.card, gap: spacing[3] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
   headCount: { fontSize: 12, fontWeight: '800', color: c.text.muted, fontVariant: ['tabular-nums'] },
   freezePill: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 8, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: '#7DD3FC1E', borderWidth: 1, borderColor: '#7DD3FC44' },
   freezeTxt: { fontSize: 11, fontWeight: '800', color: '#7DD3FC', fontVariant: ['tabular-nums'] },
@@ -159,9 +159,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     justifyContent: 'flex-end', overflow: 'hidden', minHeight: 128,
   },
   heroBgIcon: { position: 'absolute', top: -18, right: -10, opacity: 0.2 },
-  heroNum: { fontSize: 56, fontWeight: '900', color: '#FFFFFF', letterSpacing: -2.5, fontVariant: ['tabular-nums'] },
+  heroNum: { fontFamily: fonts.display, fontSize: 54, color: '#FFFFFF', letterSpacing: -1 },
   heroUnit: { fontSize: 15, fontWeight: '800', color: 'rgba(255,255,255,0.8)' },
-  heroLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.95)', marginTop: 2 },
+  heroLabel: { fontFamily: fonts.label, fontSize: 12.5, color: 'rgba(255,255,255,0.95)', marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.8 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   // 2 na rząd, lekko prostokątne — dużo miejsca na grubą liczbę + podpis + pasek.
@@ -183,9 +183,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   leagueTxt: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
   numRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  num: { fontSize: 34, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
+  num: { fontFamily: fonts.display, fontSize: 33, color: '#FFFFFF', letterSpacing: -0.5 },
   unit: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
-  label: { fontSize: 11.5, fontWeight: '600', color: 'rgba(255,255,255,0.92)', marginTop: 3 },
+  label: { fontFamily: fonts.label, fontSize: 10.5, color: 'rgba(255,255,255,0.92)', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.6 },
   track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden', marginTop: 7 },
   fill: { height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.9)' },
   next: { fontSize: 9.5, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginTop: 4, letterSpacing: 0.2 },
