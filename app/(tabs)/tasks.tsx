@@ -175,8 +175,15 @@ function buildGroupedList(sorted: Task[], done: Task[], today: string): ListItem
 const KIND_ICON: Record<TaskKind, any> = { quick: Zap, deep: Target, waiting: Hourglass };
 
 function buildKindGroupedList(sorted: Task[]): ListItem[] {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const buckets: Record<TaskKind, Task[]> = { quick: [], deep: [], waiting: [] };
-  for (const t of sorted) buckets[resolveKind(t)].push(t);
+  for (const t of sorted) {
+    let k = resolveKind(t);
+    // „Poczekalnia" z ustawioną datą „obudź gdy", która już minęła → wraca jako aktywne.
+    if (k === 'waiting' && t.wakeAt && t.wakeAt <= today) k = 'quick';
+    buckets[k].push(t);
+  }
   const result: ListItem[] = [];
   for (const k of KIND_ORDER) {
     const arr = buckets[k];

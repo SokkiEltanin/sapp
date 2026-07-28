@@ -9,9 +9,11 @@ import { router } from 'expo-router';
 import {
   X, Check, CalendarDays, Flag, AlignLeft, Timer,
   Bell, BellOff, ChevronUp, ChevronDown, ListChecks, Plus, Coins,
+  Zap, Target, Hourglass,
 } from 'lucide-react-native';
 
-import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring, Subtask } from '@/types';
+import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring, Subtask, TaskKind } from '@/types';
+import { KIND_META, KIND_ORDER, inferKind } from '@/utils/taskKind';
 import { tasksService } from '@/services/calendarService';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -143,6 +145,17 @@ export default function AddTaskScreen() {
   const [priority, setPriority]       = useState<EventPriority>('normal');
   const [saving, setSaving]           = useState(false);
 
+  // Typ zadania — auto-zgadnięty z tytułu, dopóki nie zmienisz ręcznie.
+  const [kind, setKind]               = useState<TaskKind>('quick');
+  const [kindTouched, setKindTouched] = useState(false);
+  const [waitingFor, setWaitingFor]   = useState('');   // poczekalnia: na co czekasz
+  const [wakeAt, setWakeAt]           = useState('');    // poczekalnia: obudź gdy (YYYY-MM-DD)
+  const KIND_ICON: Record<TaskKind, any> = { quick: Zap, deep: Target, waiting: Hourglass };
+  const onTitleChange = (t: string) => {
+    setTitle(t);
+    if (!kindTouched) setKind(inferKind(t));
+  };
+
   // Reminder
   const [reminderOn, setReminderOn]       = useState(false);
   const [reminderHour, setReminderHour]   = useState(9);
@@ -205,6 +218,9 @@ export default function AddTaskScreen() {
         scheduledDate: deadline || selectedDate || undefined,
         status: 'pending' as TaskStatus,
         priority,
+        kind,
+        waitingFor: kind === 'waiting' && waitingFor.trim() ? waitingFor.trim() : undefined,
+        wakeAt: kind === 'waiting' && wakeAt ? wakeAt : undefined,
         difficulty,
         estimatedPomodoros: pomodoros > 0 ? pomodoros : undefined,
         completedPomodoros: 0,
@@ -278,7 +294,7 @@ export default function AddTaskScreen() {
             <TextInput
               ref={titleRef}
               value={title}
-              onChangeText={setTitle}
+              onChangeText={onTitleChange}
               placeholder="Co trzeba zrobić?"
               placeholderTextColor={G.muted}
               style={s.titleInput}
@@ -286,6 +302,54 @@ export default function AddTaskScreen() {
               autoFocus
             />
           </View>
+
+          {/* ── Typ zadania (auto-zgadnięty, klikalny) ── */}
+          <SectionCard label="Typ" icon={<Zap size={12} color={G.muted} />}>
+            <View style={s.priorityRow}>
+              {KIND_ORDER.map(k => {
+                const m = KIND_META[k];
+                const Icon = KIND_ICON[k];
+                const active = kind === k;
+                return (
+                  <TouchableOpacity
+                    key={k}
+                    style={[s.kindChip, active && { borderColor: m.color, backgroundColor: m.color + '18' }]}
+                    onPress={() => { haptic.tap(); setKind(k); setKindTouched(true); }}
+                    activeOpacity={0.8}
+                  >
+                    <Icon size={16} color={active ? m.color : colors.text.muted} strokeWidth={2.2} />
+                    <Text style={[s.kindChipText, active && { color: m.color, fontWeight: '800' }]}>{m.short}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={s.kindHint}>{KIND_META[kind].hint}</Text>
+
+            {kind === 'waiting' && (
+              <View style={{ gap: spacing[3], marginTop: spacing[1] }}>
+                <TextInput
+                  value={waitingFor}
+                  onChangeText={setWaitingFor}
+                  placeholder="Na co czekasz? (np. rozliczenie projektu)"
+                  placeholderTextColor={G.muted}
+                  style={s.waitInput}
+                />
+                <Text style={s.advLabel}>OBUDŹ GDY</Text>
+                <View style={s.chipRow}>
+                  {([['Bez', ''], ['Za tydzień', offsetDate(7)], ['Za miesiąc', offsetDate(30)]] as [string, string][]).map(([lbl, val]) => {
+                    const active = wakeAt === val;
+                    return (
+                      <TouchableOpacity key={lbl} style={[s.deadlineChip, active && s.deadlineChipActive]}
+                        onPress={() => { haptic.tap(); setWakeAt(val); }} activeOpacity={0.75}>
+                        <Text style={[s.deadlineChipText, active && s.deadlineChipTextActive]}>{lbl}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {wakeAt ? <Text style={s.deadlineDate}>wróci jako aktywne: {wakeAt}</Text> : null}
+              </View>
+            )}
+          </SectionCard>
 
           {/* ── Deadline ── */}
           <SectionCard
@@ -659,6 +723,18 @@ const makeS = (c: any) => StyleSheet.create({
     backgroundColor: c.border.subtle,
   },
   priorityChipText: { fontSize: 13, fontWeight: '600', color: c.text.muted },
+
+  kindChip: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    paddingVertical: spacing[3], borderRadius: radius.md, borderWidth: 1,
+    borderColor: c.border.default, backgroundColor: c.border.subtle,
+  },
+  kindChipText: { fontSize: 12.5, fontWeight: '600', color: c.text.muted },
+  kindHint: { fontSize: 11, color: G.muted, marginTop: -spacing[1] },
+  waitInput: {
+    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: radius.md, borderWidth: 1, borderColor: G.cardBorder,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[3], fontSize: 13, color: c.text.primary,
+  },
 
   reminderToggle: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
