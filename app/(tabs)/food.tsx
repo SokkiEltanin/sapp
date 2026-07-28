@@ -148,7 +148,10 @@ export default function Food() {
       active = bmr > 0 ? Math.max(0, watchTotal - bmr) : 0;   // ruch = całość − spoczynek
       source = 'total';
     } else if (bmr > 0) {
-      active = activeToday; total = bmr + active; source = 'bmr';
+      // PODŁOGA aktywności ~25% BMR (lekko aktywny, TDEE ok. x1.25): gdy Samsung nie
+      // eksportuje ruchu do Health Connect, cel NIE spada do samego spoczynku (BMR).
+      active = Math.max(activeToday, Math.round(bmr * 0.25));
+      total = bmr + active; source = 'bmr';
     } else {
       total = burnByDay[today] ?? 0; active = activeToday; source = 'fallback';
     }

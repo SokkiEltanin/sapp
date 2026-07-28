@@ -22,9 +22,10 @@ export function dailyBurnFromHc(hc: any, fallbackBmr = 0): number {
   const bmr = Number(hc.bmr) || fallbackBmr || 0;
   const active = Number(hc.activeCalories) || 0;
   // Watch often gives ONLY the activity calories (e.g. 77) with no BMR record. Before,
-  // that returned 0 ("nie czyta z zegarka"). Now: BMR (watch or profile) + active, or at
-  // least the active/movement calories so the watch value always shows.
-  if (bmr > 0) return Math.round(bmr + active);
+  // that returned 0 ("nie czyta z zegarka"). Now: BMR (watch or profile) + active.
+  // PODŁOGA aktywności ~25% BMR (lekko aktywny): gdy Samsung nie eksportuje ruchu do
+  // Health Connect, dzień nie ma wydatku = samego spoczynku (to zaniżało cel/deficyt).
+  if (bmr > 0) return Math.round(bmr + Math.max(active, Math.round(bmr * 0.25)));
   return Math.round(active);
 }
 
