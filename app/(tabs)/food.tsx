@@ -145,20 +145,24 @@ export default function Food() {
     const profileBmr = bmrMifflin(weightKg, profile.heightCm, profile.ageYears, profile.sex);
     const bmr = profileBmr || watchBmr || 0;
     let total: number, active: number, source: 'total' | 'bmr' | 'fallback';
+    let moveSrc: 'watch' | 'steps' | 'floor' | 'none' = 'none';
     if (watchTotal >= 1200) {
       total = watchTotal;
       active = bmr > 0 ? Math.max(0, watchTotal - bmr) : 0;   // ruch = całość − spoczynek
-      source = 'total';
+      source = 'total'; moveSrc = 'watch';
     } else if (bmr > 0) {
       // Ruch: zmierzony z zegarka LUB oszacowany z KROKÓW (Samsung eksportuje kroki pewnie,
       // aktywne kcal rzadko) + mała podłoga 12% BMR. Cel nie spada do samego spoczynku.
       const stepsActive = activeFromSteps(stepsToday, weightKg);
-      active = Math.max(activeToday, stepsActive, Math.round(bmr * 0.12));
+      const floorA = Math.round(bmr * 0.12);
+      active = Math.max(activeToday, stepsActive, floorA);
+      moveSrc = activeToday > 0 && activeToday >= stepsActive && activeToday >= floorA ? 'watch'
+        : stepsActive > 0 && stepsActive >= floorA ? 'steps' : 'floor';
       total = bmr + active; source = 'bmr';
     } else {
       total = burnByDay[today] ?? 0; active = activeToday; source = 'fallback';
     }
-    return { bmr, active, total, source, fromProfile: profileBmr > 0, hasWatchTotal: watchTotal >= 1200 };
+    return { bmr, active, total, source, moveSrc, fromProfile: profileBmr > 0, hasWatchTotal: watchTotal >= 1200 };
   }, [weightKg, profile, activeToday, stepsToday, watchBmr, watchTotal, burnByDay, today]);
   const burn = burnModel.total;
   const profileComplete = burnModel.fromProfile;
@@ -348,6 +352,7 @@ export default function Food() {
             ) : profileComplete ? (
               <Text style={s.needsTxt}>
                 Spoczynek <Text style={s.needsB}>{burnModel.bmr}</Text> + ruch <Text style={s.needsB}>{burnModel.active}</Text> = <Text style={s.needsB}>{burnModel.total}</Text> spalone
+                <Text style={{ color: colors.text.muted }}>{burnModel.moveSrc === 'steps' ? '  · ruch z kroków (zegarek nie podaje kcal)' : burnModel.moveSrc === 'watch' ? '  · z zegarka' : ''}</Text>
               </Text>
             ) : (
               <Text style={[s.needsTxt, { color: ACCENT }]}>Ustaw profil (wzrost, wiek, płeć) → policzę Twoje zapotrzebowanie</Text>
