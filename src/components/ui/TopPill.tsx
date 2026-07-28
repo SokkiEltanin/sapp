@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState } from 'react-native';
 import { router } from 'expo-router';
+import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles } from 'lucide-react-native';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
@@ -56,6 +57,22 @@ function textOn(bg: string): string {
 function up(s: string | undefined | null): string {
   return (s ?? '').toUpperCase();
 }
+
+// Kontekstowa ikona statusu (po prefiksie klucza) — daje pillowi tożsamość „live island".
+function pillIcon(key: string): any {
+  if (key.startsWith('pom-')) return Timer;
+  if (key.startsWith('earn-') || key.startsWith('shift-')) return Briefcase;
+  if (key.startsWith('overdue-')) return AlertTriangle;
+  if (key.startsWith('today-') || key.startsWith('pending-')) return ListTodo;
+  if (key.startsWith('budget-')) return Wallet;
+  if (key.startsWith('gcal-') || key.startsWith('deadline-')) return CalendarClock;
+  if (key.startsWith('habit-')) return Flame;
+  if (key === 'mood-missing') return Smile;
+  if (key === 'all-clear') return Check;
+  return Sparkles;
+}
+// Stany „na żywo" (tykają co sekundę) → pulsująca kropka.
+const isLive = (key: string) => key.startsWith('pom-') || key.startsWith('earn-');
 
 // ─── Pill data type ───────────────────────────────────────────────────────────
 
@@ -331,6 +348,20 @@ export default function TopPill() {
   const opacity  = useRef(new Animated.Value(item ? 1 : 0)).current;
   const scale    = useRef(new Animated.Value(item ? 1 : 0.9)).current;
   const prevKey  = useRef<string | null>(item?.key ?? null);
+  const pulse    = useRef(new Animated.Value(0)).current;
+
+  // Pulsująca kropka dla stanów „na żywo" (pomodoro / praca).
+  useEffect(() => {
+    if (item && isLive(item.key)) {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => loop.stop();
+    }
+    pulse.setValue(0);
+  }, [item?.key]);
 
   useEffect(() => {
     if (!item) {
@@ -363,6 +394,10 @@ export default function TopPill() {
 
   if (!item) return null;
 
+  const Icon = pillIcon(item.key);
+  const live = isLive(item.key);
+  const on   = textOn(item.color);
+
   return (
     <Animated.View style={[s.islandWrap, { opacity, transform: [{ scale }] }]}>
       {/* A single self-contained pill (its own solid background) that hugs its
@@ -373,9 +408,17 @@ export default function TopPill() {
         activeOpacity={0.8}
       >
         <View style={[s.badge, { backgroundColor: item.color }]}>
-          <Text style={[s.badgeText, { color: textOn(item.color) }]} numberOfLines={1}>{item.badge}</Text>
+          <Icon size={12} color={on} strokeWidth={2.6} />
+          <Text style={[s.badgeText, { color: on }]} numberOfLines={1}>{item.badge}</Text>
         </View>
         <Text style={s.text} numberOfLines={1}>{item.text}</Text>
+        {live && (
+          <Animated.View style={[s.liveDot, {
+            backgroundColor: item.color,
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.25] }) }],
+          }]} />
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -413,12 +456,17 @@ const makeS = (t: any) => StyleSheet.create({
     shadowRadius: 7,
   },
   badge: {
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    minWidth: 56,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    minWidth: 48,
+  },
+  liveDot: {
+    width: 7, height: 7, borderRadius: 3.5, marginLeft: 2,
   },
   badgeText: {
     fontFamily: fonts.display,   // Archivo Black — punchy liczba/krótki badge
