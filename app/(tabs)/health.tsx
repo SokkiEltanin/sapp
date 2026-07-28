@@ -193,6 +193,14 @@ export default function HealthScreen() {
       // blurred, so keeping state fresh on entry prevents a stale write clobbering it).
       try { const raw = await AsyncStorage.getItem(todayKey()); const w = raw ? JSON.parse(raw).weight : 0; if (active && w > 0) setWeight(w); } catch {}
 
+      // Historyczne kroki/sen/waga z eksportu Samsung — jednorazowo, PRZED odczytem cache,
+      // żeby wykres tygodnia/miesiąca miał dane nawet jeśli user nigdy nie kliknął importu
+      // w ustawieniach (to był powód „widget kroków nie działa w tygodniu").
+      try {
+        const bf = await import('@/utils/samsungBackfill');
+        if (!(await bf.isBackfillDone())) await bf.runSamsungBackfill();
+      } catch {}
+
       // Chart BASELINE from the cache (per-day blobs: auto-sync + Samsung import) — reads
       // AsyncStorage, so it works even when Health Connect is unavailable/sparse. This is
       // why the week/month steps chart was blank: it only ever used the live watch read.
@@ -206,7 +214,10 @@ export default function HealthScreen() {
           range.push({ date: key, steps: h?.steps ?? 0, sleepMinutes: h?.sleepMinutes ?? 0, weightKg: h && h.weight > 0 ? h.weight : null, activeCalories: 0, totalCalories: h?.burn ?? 0, bmr: 0 });
         }
       } catch {}
-      if (active && range.some(p => p.steps > 0 || p.sleepMinutes > 0 || p.weightKg != null)) applyHealthRange(range);
+      // ZAWSZE ustaw monthData (30-dniowy szkielet), żeby karta wykresu kroków się nie
+      // chowała gdy cache jest chwilowo rzadki — puste dni pokażą się jako 0, ale widget
+      // istnieje i wypełnia się gdy dane dojdą (auto-sync / backfill / live HC).
+      if (active && range.length) applyHealthRange(range);
 
       if (Platform.OS !== 'android' || !isHealthConnectAvailable()) return;
       try {
@@ -878,7 +889,10 @@ export default function HealthScreen() {
               </View>
             </View>
             {(() => {
-              const data = stepsRange === 7 ? monthData.slice(-7) : monthData;
+              // dzisiejszy słupek zawsze z żywej wartości `steps` (blob w monthData może być za nią)
+              const todayYmd = ymd(new Date());
+              const data = (stepsRange === 7 ? monthData.slice(-7) : monthData)
+                .map(p => (p.date === todayYmd && steps > p.steps ? { ...p, steps } : p));
               const maxC = Math.max(...data.map(p => p.steps), 1);
               const avgWin = stepsRange === 7 ? healthStats.avgSteps7 : healthStats.avgSteps30;
               const DOW = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];

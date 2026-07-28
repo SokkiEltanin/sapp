@@ -10,7 +10,10 @@ import backfill from '@/data/samsungBackfill.json';
 // Row shape: [date, steps, sleepMin, weightKg, totalCal, activeCal, bmr]
 type Row = [string, number, number, number, number, number, number];
 
-export const BACKFILL_KEY = 'samsung_backfill_done_v1';
+// v2: wymusza jednorazowe ponowne wypełnienie u userów, u których v1 nie zapisał
+// historycznych kroków (wykres tygodnia był pusty). Idempotentne — wypełnia tylko
+// puste pola, więc ponowny bieg nic nie psuje.
+export const BACKFILL_KEY = 'samsung_backfill_done_v2';
 
 function qualityFromMinutes(min: number): string | undefined {
   if (min <= 0) return undefined;

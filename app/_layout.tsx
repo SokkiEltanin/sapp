@@ -293,6 +293,28 @@ export default function RootLayout() {
     return () => { clearTimeout(t); sub.remove(); };
   }, []);
 
+  // Flush przed północą — gdy apka jest otwarta, tuż przed zmianą dnia (23:58) zrzuca
+  // dzisiejsze kroki + wodę z zegarka do cache per-dzień, żeby dzień nigdy nie kończył
+  // się nieaktualnymi danymi „zanim się zresetuje". Self-reschedule na kolejną noc.
+  // (Pełne działanie w tle o północy wymagałoby natywnego zadania — to best-effort gdy
+  //  apka żyje; poranny foreground i tak dorównuje zaległości przez range-backfill.)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleMidnightFlush = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(23, 58, 0, 0);
+      if (next <= now) next.setDate(next.getDate() + 1);
+      const ms = Math.min(next.getTime() - now.getTime(), 2 ** 31 - 1);
+      timer = setTimeout(() => {
+        autoSyncHealth(2, true).catch(() => {});   // kroki + hydration → nawyk „Woda"
+        scheduleMidnightFlush();                    // ustaw na kolejną noc
+      }, ms);
+    };
+    scheduleMidnightFlush();
+    return () => clearTimeout(timer);
+  }, []);
+
   // Drain bank notifications captured by the native listener while the app was
   // closed/backgrounded, on cold start + every foreground. Enqueued items are then
   // auto-accepted (trusted merchants) or shown for review by the dashboard.
