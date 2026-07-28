@@ -34,6 +34,10 @@ function isDone(habit: Habit, count: number): boolean {
   return count >= goalFor(habit);
 }
 
+// Stan pojedynczego dnia w widoku serii: zaliczony / uratowany zamrożeniem / pominięty.
+// Zamrożony pokazujemy INACZEJ (niebieski) — user chce widzieć „wtedy był freeze".
+export type DayState = 'done' | 'frozen' | 'miss';
+
 // Which habits count as done on `date` — the single rule behind todayDone (weekly-target
 // habits count when the rolling 7-day target is met). Exported so other screens can
 // reconstruct a PAST day with identical semantics, e.g. the pet's missed-reward catch-up.
@@ -72,6 +76,11 @@ export function useHabits() {
       isDone(habit, completions[date]?.[habit.id] ?? 0) || !!frozen[`${habit.id}|${date}`],
     [completions, frozen],
   );
+  const dayState = useCallback((habit: Habit, date: string): DayState => {
+    if (isDone(habit, completions[date]?.[habit.id] ?? 0)) return 'done';
+    if (frozen[`${habit.id}|${date}`]) return 'frozen';
+    return 'miss';
+  }, [completions, frozen]);
 
   const load = useCallback(async () => {
     try {
@@ -194,17 +203,17 @@ export function useHabits() {
     return streak;
   }, [isDoneOrFrozen, today, habits]);
 
-  const getLast7 = useCallback((habitId: string): boolean[] => {
+  const getLast7 = useCallback((habitId: string): DayState[] => {
     const habit = habits.find((h) => h.id === habitId);
-    if (!habit) return Array(7).fill(false);
-    return Array.from({ length: 7 }, (_, i) => isDoneOrFrozen(habit, offsetDate(today, -(6 - i))));
-  }, [isDoneOrFrozen, today, habits]);
+    if (!habit) return Array(7).fill('miss');
+    return Array.from({ length: 7 }, (_, i) => dayState(habit, offsetDate(today, -(6 - i))));
+  }, [dayState, today, habits]);
 
-  const getLast30 = useCallback((habitId: string): boolean[] => {
+  const getLast30 = useCallback((habitId: string): DayState[] => {
     const habit = habits.find((h) => h.id === habitId);
-    if (!habit) return Array(30).fill(false);
-    return Array.from({ length: 30 }, (_, i) => isDoneOrFrozen(habit, offsetDate(today, -(29 - i))));
-  }, [isDoneOrFrozen, today, habits]);
+    if (!habit) return Array(30).fill('miss');
+    return Array.from({ length: 30 }, (_, i) => dayState(habit, offsetDate(today, -(29 - i))));
+  }, [dayState, today, habits]);
 
   // AUTO-ZAMROŻENIE: gdy „wczoraj" wypadło z serii, a dziś jeszcze nie zaliczone i była
   // realna seria (≥2 dni przed luką) — zużyj jedno zamrożenie na wczoraj, żeby seria nie

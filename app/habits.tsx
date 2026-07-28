@@ -12,7 +12,9 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
-import { useHabits } from '@/hooks/useHabits';
+import { useHabits, DayState } from '@/hooks/useHabits';
+
+const ICE = '#7DD3FC';   // dzień uratowany zamrożeniem serii = niebieski
 import { stepFor } from '@/utils/habits';
 import { HABIT_COLORS, HABIT_ICONS, Habit, HabitType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -43,20 +45,21 @@ function HabitIcon({ name, size, color }: { name: string; size: number; color: s
 
 const DAY_LABELS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 
-function HistoryDots({ days, color }: { days: boolean[]; color: string }) {
+function HistoryDots({ days, color }: { days: DayState[]; color: string }) {
   const colors = useColors();
   const hd = useMemo(() => makeHd(colors), [colors]);
   const today = new Date();
   return (
     <View style={hd.row}>
-      {days.map((done, i) => {
+      {days.map((st, i) => {
         const d = new Date(today);
         d.setDate(today.getDate() - (6 - i));
         const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
         const isToday = i === 6;
+        const dotColor = st === 'done' ? color : st === 'frozen' ? ICE : undefined;
         return (
           <View key={i} style={hd.col}>
-            <View style={[hd.dot, done && { backgroundColor: color }, isToday && hd.dotToday]} />
+            <View style={[hd.dot, dotColor && { backgroundColor: dotColor }, isToday && hd.dotToday]} />
             <Text style={[hd.label, isToday && hd.labelToday]}>{DAY_LABELS[dow]}</Text>
           </View>
         );
@@ -81,7 +84,7 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
   done: boolean;
   count: number;
   streak: number;
-  last7: boolean[];
+  last7: DayState[];
   onToggle: () => void;
   onIncrement: () => void;
   onDecrement: () => void;
@@ -249,7 +252,7 @@ const CELL = 18;
 const GAP  = 2;
 const ROW_H = CELL + GAP;
 
-function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: string) => boolean[] }) {
+function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: string) => DayState[] }) {
   const colors = useColors();
   const mg = useMemo(() => makeMg(colors), [colors]);
   const scrollRef = useRef<ScrollView>(null);
@@ -271,7 +274,14 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
 
   return (
     <View style={mg.wrap}>
-      <Text style={mg.title}>OSTATNIE 30 DNI</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={mg.title}>OSTATNIE 30 DNI</Text>
+        <View style={{ flex: 1 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: ICE }} />
+          <Text style={mg.legend}>zamrożone</Text>
+        </View>
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         <View style={{ paddingRight: GAP + 2 }}>
           <View style={{ height: ROW_H }} />
@@ -287,13 +297,13 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
               <View style={{ width: CELL, height: CELL, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={[mg.dayNum, day.isWeekend && mg.dayNumWeekend, day.isToday && mg.dayNumToday]}>{day.num}</Text>
               </View>
-              {habits.map((h, hi) => (
-                <View key={h.id} style={[
-                  mg.cell,
-                  { backgroundColor: data[hi][di] ? h.color + 'CC' : colors.border.subtle },
-                  day.isToday && mg.cellToday,
-                ]} />
-              ))}
+              {habits.map((h, hi) => {
+                const st = data[hi][di];
+                const bg = st === 'done' ? h.color + 'CC' : st === 'frozen' ? ICE : colors.border.subtle;
+                return (
+                  <View key={h.id} style={[mg.cell, { backgroundColor: bg }, day.isToday && mg.cellToday]} />
+                );
+              })}
             </View>
           ))}
         </ScrollView>
@@ -305,6 +315,7 @@ function MonthGrid({ habits, getLast30 }: { habits: Habit[]; getLast30: (id: str
 const makeMg = (c: any) => StyleSheet.create({
   wrap: { backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], overflow: 'hidden' },
   title: { fontSize: 10, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing[2] },
+  legend: { fontSize: 9.5, fontWeight: '700', color: '#7DD3FC', marginBottom: spacing[2] },
   iconCell: { width: 20, alignItems: 'center', justifyContent: 'center' },
   dayNum: { fontSize: 8, color: c.text.muted, fontWeight: '500', textAlign: 'center' },
   dayNumWeekend: { color: c.text.muted },
