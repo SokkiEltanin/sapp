@@ -77,52 +77,85 @@ export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakIte
       <View style={s.head}>
         <Flame size={13} color={c.text.secondary} />
         <Text style={s.title}>Twoje serie</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={s.headCount}>{rows.length}</Text>
       </View>
-      <View style={s.grid}>
-        {rows.map(r => {
-          const Icon = iconFor(r.name);
-          const t = streakTier(r.days);
-          // intensywność rośnie w obrębie progu — od jego początku do następnego progu
-          const frac = t.next ? Math.min(1, Math.max(0, (r.days - t.min) / (t.next - t.min))) : 1;
-          const bgA = a2(0.14 + 0.20 * frac);   // 0.14 → 0.34
-          return (
-            <View key={r.key} style={[s.tile, { backgroundColor: t.color + bgA, borderColor: t.color + '66' }]}>
-              <Icon size={78} color={t.color} strokeWidth={1.4} style={s.bgIcon} />
-              <View style={s.numRow}>
-                <Text style={s.num}>{r.days}</Text>
-                <Text style={s.unit}>{r.days === 1 ? 'dzień' : 'dni'}</Text>
-              </View>
-              <Text style={s.label} numberOfLines={1}>{r.name}</Text>
-              {/* pasek postępu do następnego progu (awans koloru) — legenda = pełny */}
-              <View style={s.track}>
-                <View style={[s.fill, { width: `${Math.round(frac * 100)}%` }]} />
-              </View>
-              <Text style={s.next} numberOfLines={1}>
-                {t.next ? `${t.next - r.days} dni do awansu` : 'MAKS · legenda'}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+
+      {/* HERO — najdłuższa seria dostaje pełną szerokość + wielką liczbę + ligę */}
+      {renderTile(rows[0], true)}
+
+      {/* SIATKA — reszta serii, 2 na rząd */}
+      {rows.length > 1 && (
+        <View style={s.grid}>
+          {rows.slice(1).map(r => renderTile(r, false))}
+        </View>
+      )}
     </View>
   );
+
+  function renderTile(r: StreakItem, hero: boolean) {
+    const Icon = iconFor(r.name);
+    const t = streakTier(r.days);
+    const frac = t.next ? Math.min(1, Math.max(0, (r.days - t.min) / (t.next - t.min))) : 1;
+    const bgA = a2((hero ? 0.18 : 0.14) + 0.20 * frac);
+    const nextName = t.next ? streakTier(t.next).name : null;
+    return (
+      <View key={r.key} style={[hero ? s.heroTile : s.tile, { backgroundColor: t.color + bgA, borderColor: t.color + '66' }]}>
+        <Icon size={hero ? 128 : 78} color={t.color} strokeWidth={1.3} style={hero ? s.heroBgIcon : s.bgIcon} />
+        {/* badge „ligi" — nazwa progu (BORDO → … → LEGENDA) = collectible identity */}
+        <View style={[s.league, { borderColor: t.color + '77' }]}>
+          <Text style={[s.leagueTxt, { color: '#FFFFFF' }]} numberOfLines={1}>{t.name}</Text>
+        </View>
+        <View style={s.numRow}>
+          <Text style={hero ? s.heroNum : s.num}>{r.days}</Text>
+          <Text style={hero ? s.heroUnit : s.unit}>{r.days === 1 ? 'dzień' : 'dni'}</Text>
+        </View>
+        <Text style={hero ? s.heroLabel : s.label} numberOfLines={1}>{r.name}</Text>
+        <View style={s.track}>
+          <View style={[s.fill, { width: `${Math.round(frac * 100)}%` }]} />
+        </View>
+        <Text style={s.next} numberOfLines={1}>
+          {t.next ? `jeszcze ${t.next - r.days} dni → ${nextName}` : 'MAKS · legenda 🏆'}
+        </Text>
+      </View>
+    );
+  }
 }
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.card, gap: spacing[3] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  headCount: { fontSize: 12, fontWeight: '800', color: c.text.muted, fontVariant: ['tabular-nums'] },
+
+  // HERO — najdłuższa seria, pełna szerokość, wielka liczba
+  heroTile: {
+    borderRadius: radius.lg, borderWidth: 1,
+    paddingHorizontal: spacing[4], paddingVertical: spacing[4],
+    justifyContent: 'flex-end', overflow: 'hidden', minHeight: 128,
+  },
+  heroBgIcon: { position: 'absolute', top: -18, right: -10, opacity: 0.14 },
+  heroNum: { fontSize: 56, fontWeight: '900', color: '#FFFFFF', letterSpacing: -2.5, fontVariant: ['tabular-nums'] },
+  heroUnit: { fontSize: 15, fontWeight: '800', color: 'rgba(255,255,255,0.8)' },
+  heroLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.95)', marginTop: 2 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   // 2 na rząd, lekko prostokątne — dużo miejsca na grubą liczbę + podpis + pasek.
   tile: {
-    flexBasis: '47%', flexGrow: 1, minWidth: 130, aspectRatio: 1.42,
+    flexBasis: '47%', flexGrow: 1, minWidth: 130, aspectRatio: 1.36,
     borderRadius: radius.lg, borderWidth: 1,
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
   },
   // lekko widoczna „rzecz" w tle — duża, w prawym górnym rogu, ledwo widoczna
   bgIcon: { position: 'absolute', top: -10, right: -8, opacity: 0.16 },
+  // badge „ligi" (nazwa progu) — prawy górny róg, collectible identity
+  league: {
+    position: 'absolute', top: 8, right: 8,
+    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999,
+    borderWidth: 1, backgroundColor: 'rgba(0,0,0,0.28)',
+  },
+  leagueTxt: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
   numRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
   num: { fontSize: 34, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
   unit: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
