@@ -100,7 +100,7 @@ import YearPixels from '@/components/dashboard/YearPixels';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { colors, spacing, radius } from '@/theme';
+import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { useWorkStore } from '@/store/workStore';
 import { useWorkEarnings, isPaycheck } from '@/hooks/useWorkEarnings';
@@ -5193,7 +5193,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   // ── Minimal header (date + weather) ───────────────────────────────────────
   headerMin: { paddingTop: spacing[1], marginBottom: spacing[4] },
   headerMinRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerMinDate: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, color: c.text.muted, textTransform: 'uppercase', flexShrink: 1 },
+  headerMinDate: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.9, color: c.text.muted, textTransform: 'uppercase', flexShrink: 1 },
   headerMinWeather: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: spacing[2] },
   hdrIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border.subtle },
   headerMinTemp: { fontSize: 13, fontWeight: '800', color: c.text.primary },
@@ -5500,7 +5500,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
-  cardTitle: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 1 },
+  cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
   forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },
@@ -5664,7 +5664,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   // ── Finance stats row ──────────────────────────────────────────────────────
   finRow: { flexDirection: 'row', alignItems: 'flex-start' },
   finStat: { flex: 1, alignItems: 'center', gap: 2 },
-  finVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  finVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary, letterSpacing: -0.4 },
   finKey: { fontSize: 10, color: c.text.muted },
   finPct: { fontSize: 10, color: c.accent.blue, fontWeight: '600' },
   finDivider: { width: 1, height: 40, backgroundColor: c.border.subtle, alignSelf: 'center' },
@@ -5716,7 +5716,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   foodItemAmt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
   notFoodBtn: { paddingVertical: 8, paddingLeft: spacing[2] },
   // "Kolekcja sklepów"
-  shopTotal: { marginLeft: 'auto', fontSize: 16, fontWeight: '900', color: c.text.primary },
+  shopTotal: { marginLeft: 'auto', fontFamily: fonts.display, fontSize: 16, color: c.text.primary },
   shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
   shopChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.bg.elevated, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, paddingLeft: spacing[3], paddingRight: 4, paddingVertical: 3, maxWidth: '100%' },
   shopChipName: { fontSize: 12, fontWeight: '600', color: c.text.secondary, maxWidth: 120 },

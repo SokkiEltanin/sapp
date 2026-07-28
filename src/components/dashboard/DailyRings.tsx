@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useColors } from '@/theme/useColors';
+import { fonts } from '@/theme';
 
 export interface RingSpec {
   key: string;
@@ -53,6 +54,6 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 6, marginTop: 6 },
   ringWrap: { flex: 1, alignItems: 'center', gap: 3 },
   center: { alignItems: 'center', justifyContent: 'center' },
-  val: { fontSize: 12.5, fontWeight: '800', letterSpacing: -0.2 },
+  val: { fontFamily: fonts.display, fontSize: 12.5, letterSpacing: -0.2 },
   label: { fontSize: 9.5, fontWeight: '600' },
 });

@@ -5,7 +5,7 @@ import { FlaskConical, BookOpen, Lightbulb, Globe, Sparkles } from 'lucide-react
 import { TRIVIA, Trivia, TriviaCat } from '@/data/trivia';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { spacing, radius } from '@/theme';
+import { spacing, radius, fonts } from '@/theme';
 
 const META: Record<TriviaCat, { icon: any; label: string; color: string }> = {
   nauka:   { icon: FlaskConical, label: 'Nauka',     color: '#46B0DE' },
@@ -94,7 +94,7 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
 const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.card, gap: spacing[2] },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  title: { flex: 1, fontSize: 12, fontWeight: '800', color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  title: { flex: 1, fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.9 },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
   catTxt: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   text: { fontSize: 14, lineHeight: 20, color: c.text.primary, fontWeight: '500' },

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Easing } from 'react-native';
 import { Flame } from 'lucide-react-native';
+import { fonts } from '@/theme';
 
 // Progi serii — wspólny język kolorów dla całej apki (płomienie + kafelki „Twoje serie").
 // Im dłuższa seria, tym rzadszy „rarity" kolor kafelka: bordo → czerwień → pomarańcz →
@@ -61,7 +62,7 @@ export default function StreakFlame({ days, size = 48 }: { days: number; size?: 
 const st = StyleSheet.create({
   count: {
     position: 'absolute', left: 0, right: 0, textAlign: 'center',
-    fontWeight: '900', letterSpacing: -0.5,
+    fontFamily: fonts.display, letterSpacing: -0.5,
     textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
   },
 });

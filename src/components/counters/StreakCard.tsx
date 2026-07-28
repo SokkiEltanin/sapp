@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Flame, Check } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
+import { fonts } from '@/theme';
 import { streakColor } from './StreakFlame';
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
@@ -163,11 +164,11 @@ const st = StyleSheet.create({
   wrap: { gap: 14 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   flameChip: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8 },
+  label: { fontFamily: fonts.label, fontSize: 10, letterSpacing: 0.8 },
   countRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
-  count: { fontSize: 30, fontWeight: '900', letterSpacing: -1 },
+  count: { fontFamily: fonts.display, fontSize: 30, letterSpacing: -1 },
   countUnit: { fontSize: 13, fontWeight: '700' },
-  caption: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, marginBottom: 8 },
+  caption: { fontFamily: fonts.label, fontSize: 9, letterSpacing: 0.8, marginBottom: 8 },
   strip: { flexDirection: 'row', justifyContent: 'space-between' },
   col: { alignItems: 'center', gap: 6, flex: 1 },
   dot: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
