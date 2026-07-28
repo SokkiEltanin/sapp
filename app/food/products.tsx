@@ -66,7 +66,7 @@ export default function FoodBase() {
       return {
         key: 'r-' + p.id, id: p.id, kind: 'recipe' as const, name: p.name, cat: p.cat && PRESET_CATS.some(pc => pc.tag === p.cat) ? p.cat : 'dania',
         pinned: !!p.pinned, uses: p.uses,
-        sub: `${p.kcalPer100g ?? 0} kcal/100g · z ${ingredients.length} skł. · ${p.recipe!.cookedWeight} g`,
+        sub: `${p.semi ? 'półprodukt · ' : ''}${p.kcalPer100g ?? 0} kcal/100g · z ${ingredients.length} skł. · ${p.recipe!.cookedWeight} g`,
         ingredients, ingHay: normalizeProductName(ingredients.join(' ')),
       };
     });

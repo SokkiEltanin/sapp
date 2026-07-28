@@ -54,6 +54,7 @@ export interface FoodProduct {
   fromBase?: boolean;                            // seeded from the offline base
   pinned?: boolean;                              // favourite — floats to the top of the library
   recipe?: RecipeMeta;                           // set → a cooked dish; kcal/100g is DERIVED from it
+  semi?: boolean;                                // „półprodukt" — baza (np. naleśniki) do budowania innych dań; podbity w wyborze składników
 }
 
 // One line inside a logged meal — grams & kcal are RESOLVED at log time and stored,
@@ -276,6 +277,7 @@ interface FoodState {
   saveRecipeProduct: (input: {
     name: string; ingredients: MealItem[]; weight: number; cat?: string; id?: string;
     prep?: PrepType; fryFat?: { name: string; grams: number; kcal: number }; addons?: MealItem[];
+    semi?: boolean;
   }) => FoodProduct;
   markFresh: (name: string) => void;            // one product bought
   markFreshMany: (names: string[]) => void;     // a receipt's worth (already-counted only)
@@ -337,7 +339,7 @@ export const useFoodStore = create<FoodState>()(
         }));
       },
       togglePinProduct: (id) => set(s => ({ products: s.products.map(p => (p.id === id ? { ...p, pinned: !p.pinned } : p)) })),
-      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, addons }) => {
+      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, addons, semi }) => {
         const t = recipeTotals(ingredients);
         // raw = a mixture → weight is the summed ingredient weight (unless the user set one)
         const w = prep === 'raw' ? (weight > 0 ? weight : t.grams) : weight;
@@ -346,7 +348,7 @@ export const useFoodStore = create<FoodState>()(
           name: name.trim(),
           kcalPer100g: d.kcalPer100g, kcalPerPortion: undefined,
           protein100: d.protein100, carbs100: d.carbs100, fat100: d.fat100,
-          cat: cat || 'inne', defaultUnit: 'g',
+          cat: cat || 'inne', defaultUnit: 'g', semi: !!semi,
           recipe: {
             ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(d.weight),
             prep, fryFat: fryFat && fryFat.grams > 0 ? fryFat : undefined,

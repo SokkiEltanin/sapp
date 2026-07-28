@@ -42,6 +42,7 @@ interface Candidate {
   defaultUnit?: FoodUnit;
   productId?: string;
   source: 'curated' | 'base';
+  semi?: boolean;   // półprodukt (baza) — podbity i oznaczony w liście składników
 }
 
 export default function RecipeBuilder() {
@@ -67,6 +68,7 @@ export default function RecipeBuilder() {
   const [fatSpoons, setFatSpoons] = useState('1');     // łyżki tłuszczu
   const [ings, setIngs]     = useState<MealItem[]>([]);
   const [addons, setAddons] = useState<MealItem[]>([]);    // dodatki jedzone RAZEM (nutella…)
+  const [semi, setSemi]     = useState(false);             // półprodukt = baza do innych dań
   const [query, setQuery]   = useState('');
 
   // ingredient portion picker
@@ -93,6 +95,7 @@ export default function RecipeBuilder() {
     setCooked(pr === 'raw' ? '' : String(p.recipe.cookedWeight || ''));
     setIngs(p.recipe.ingredients.map((it: MealItem) => ({ ...it })));
     setAddons((p.recipe.addons ?? []).map((it: MealItem) => ({ ...it })));
+    setSemi(!!p.semi);
     if (p.recipe.fryFat) {
       const f = FRY_FATS.find(x => x.name === p.recipe.fryFat.name);
       if (f) { setFryFatId(f.id); setFatSpoons(String(Math.max(1, Math.round(p.recipe.fryFat.grams / f.gPerSpoon)))); }
@@ -128,8 +131,9 @@ export default function RecipeBuilder() {
     const curated: Candidate[] = products.map(p => ({
       name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
       protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100,
-      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated' as const,
-      _rank: (p.lastUsed ?? 0) + p.uses * 1000,
+      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, source: 'curated' as const, semi: p.semi,
+      // półprodukty (bazy jak naleśniki) skaczą na górę, by łatwo je dodać do nowego dania
+      _rank: (p.lastUsed ?? 0) + p.uses * 1000 + (p.semi ? 5_000_000 : 0),
     } as any));
     const q = query.trim();
     if (!q) {
@@ -217,7 +221,7 @@ export default function RecipeBuilder() {
   const save = () => {
     if (!canSave) return;
     haptic.success();
-    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry });
+    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry, semi });
     router.back();
   };
   const del = () => {
@@ -264,6 +268,18 @@ export default function RecipeBuilder() {
             );
           })}
         </View>
+
+        {/* półprodukt — baza do budowania innych dań */}
+        <TouchableOpacity activeOpacity={0.8} onPress={() => { haptic.tap(); setSemi(v => !v); }}
+          style={[s.semiToggle, semi && { backgroundColor: ACCENT + '18', borderColor: ACCENT + '88' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.semiTitle, semi && { color: ACCENT }]}>Półprodukt — baza do innych dań</Text>
+            <Text style={s.semiHint}>np. naleśniki: skoczą na górę listy składników, więc dodasz do nich nutellę / banana jak do produktu</Text>
+          </View>
+          <View style={[s.semiBox, semi && { backgroundColor: ACCENT, borderColor: ACCENT }]}>
+            {semi && <Check size={15} color="#1A1206" strokeWidth={3} />}
+          </View>
+        </TouchableOpacity>
 
         {/* typ przygotowania */}
         <Text style={s.label}>Jak przygotowane?</Text>
@@ -312,7 +328,10 @@ export default function RecipeBuilder() {
           {candidates.map((cand, i) => (
             <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
               <View style={{ flex: 1 }}>
-                <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                <View style={s.candNameRow}>
+                  <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+                  {cand.semi && <View style={s.semiBadge}><Text style={s.semiBadgeTxt}>PÓŁPRODUKT</Text></View>}
+                </View>
                 <Text style={s.candMeta}>{cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}{cand.source === 'curated' ? '  ·  moje' : ''}</Text>
               </View>
               <Plus size={18} color={ACCENT} />
@@ -507,8 +526,16 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   addNewTxt:   { fontSize: 13, fontWeight: '700', color: ACCENT, flex: 1 },
 
   candRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 9 },
-  candName: { fontSize: 14, fontWeight: '600', color: c.text.primary },
+  candNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  candName: { fontSize: 14, fontWeight: '600', color: c.text.primary, flexShrink: 1 },
   candMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
+  semiBadge:   { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: ACCENT + '22', borderWidth: 1, borderColor: ACCENT + '55' },
+  semiBadgeTxt:{ fontSize: 8, fontWeight: '900', color: ACCENT, letterSpacing: 0.5 },
+
+  semiToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  semiTitle:  { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
+  semiHint:   { fontSize: 11, color: c.text.muted, lineHeight: 15, marginTop: 2 },
+  semiBox:    { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
 
   weightCard: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.subtle, padding: spacing[3] },
   weightInput: { width: 110, height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 24, fontWeight: '800', color: c.text.primary },
