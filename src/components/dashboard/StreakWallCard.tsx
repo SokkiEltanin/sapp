@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { memo, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, Droplets, Candy, Dumbbell, BookOpen, Moon, Cigarette, Wine, Footprints } from 'lucide-react-native';
 import { useColors } from '@/theme/useColors';
@@ -35,7 +36,7 @@ const a2 = (o: number) => Math.round(Math.max(0, Math.min(1, o)) * 255).toString
 // (bordo → czerwień → pomarańcz → róż → błękit → fiolet legenda). Im dłuższa seria, tym
 // intensywniejsze tło. Gruba biała liczba + podpis + lekko widoczna ikona w tle. Po
 // przekroczeniu progu — pop „gratulacje" (toast + haptik).
-export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: string }) {
+function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: string }) {
   const c = useColors();
   const s = makeS(c);
   const rows = streaks.filter(x => x.days > 0).sort((a, b) => b.days - a.days).slice(0, 6);
@@ -73,7 +74,8 @@ export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakIte
 
   if (rows.length === 0) return null;
   return (
-    <View style={[s.card, { backgroundColor: cardBg }]}>
+    <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/habits' as any); }}
+      style={[s.card, { backgroundColor: cardBg }]}>
       <View style={s.head}>
         <Flame size={13} color={c.text.secondary} />
         <Text style={s.title}>Twoje serie</Text>
@@ -90,7 +92,7 @@ export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakIte
           {rows.slice(1).map(r => renderTile(r, false))}
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   function renderTile(r: StreakItem, hero: boolean) {
@@ -101,7 +103,13 @@ export default function StreakWallCard({ streaks, cardBg }: { streaks: StreakIte
     const nextName = t.next ? streakTier(t.next).name : null;
     return (
       <View key={r.key} style={[hero ? s.heroTile : s.tile, { backgroundColor: t.color + bgA, borderColor: t.color + '66' }]}>
-        <Icon size={hero ? 128 : 78} color={t.color} strokeWidth={1.3} style={hero ? s.heroBgIcon : s.bgIcon} />
+        {/* tło = obrazek CZEGO dotyczy seria (woda/cukierek/ogień…) — BIAŁE, żeby było
+            widać na kolorowym kaflu (kolor progu na kolorze progu był niewidoczny) */}
+        <Icon size={hero ? 132 : 82} color="#FFFFFF" strokeWidth={1.3} style={hero ? s.heroBgIcon : s.bgIcon} />
+        {/* płomień serii — top-left, uniwersalny znacznik „to jest seria" */}
+        <View style={s.flameChip}>
+          <Flame size={hero ? 17 : 13} color="#FFFFFF" fill="#FFFFFF" strokeWidth={1.5} />
+        </View>
         {/* badge „ligi" — nazwa progu (BORDO → … → LEGENDA) = collectible identity */}
         <View style={[s.league, { borderColor: t.color + '77' }]}>
           <Text style={[s.leagueTxt, { color: '#FFFFFF' }]} numberOfLines={1}>{t.name}</Text>
@@ -134,7 +142,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
     justifyContent: 'flex-end', overflow: 'hidden', minHeight: 128,
   },
-  heroBgIcon: { position: 'absolute', top: -18, right: -10, opacity: 0.14 },
+  heroBgIcon: { position: 'absolute', top: -18, right: -10, opacity: 0.2 },
   heroNum: { fontSize: 56, fontWeight: '900', color: '#FFFFFF', letterSpacing: -2.5, fontVariant: ['tabular-nums'] },
   heroUnit: { fontSize: 15, fontWeight: '800', color: 'rgba(255,255,255,0.8)' },
   heroLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.95)', marginTop: 2 },
@@ -147,8 +155,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
   },
-  // lekko widoczna „rzecz" w tle — duża, w prawym górnym rogu, ledwo widoczna
-  bgIcon: { position: 'absolute', top: -10, right: -8, opacity: 0.16 },
+  // lekko widoczna „rzecz" w tle — duża, w prawym górnym rogu (biała → widać na kolorze)
+  bgIcon: { position: 'absolute', top: -10, right: -8, opacity: 0.22 },
+  // płomień serii — lewy górny róg
+  flameChip: { position: 'absolute', top: 8, left: 8, opacity: 0.92 },
   // badge „ligi" (nazwa progu) — prawy górny róg, collectible identity
   league: {
     position: 'absolute', top: 8, right: 8,
@@ -164,3 +174,5 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   fill: { height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.9)' },
   next: { fontSize: 9.5, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginTop: 4, letterSpacing: 0.2 },
 }));
+
+export default memo(StreakWallCard);

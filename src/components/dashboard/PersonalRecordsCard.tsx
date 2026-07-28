@@ -1,9 +1,12 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { memo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
 import { Trophy, Footprints, Moon, Flame, Smile, Scale, Medal } from 'lucide-react-native';
 import { RecordItem } from '@/utils/personalRecords';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
+import { haptic } from '@/utils/haptics';
 
 const ICONS: Record<string, any> = { footprints: Footprints, moon: Moon, flame: Flame, smile: Smile, scale: Scale };
 const GOLD = '#FBBF24';
@@ -12,12 +15,13 @@ const GOLD = '#FBBF24';
 // dostaje HERO na pełną szerokość ze złotym medalem i wielką wartością; reszta to siatka
 // kwadratów z tłem-ikoną. Mono (wartości białe), złoto = jedyny „dodatek" (to półka
 // trofeów). Liczby z buildRecords (personalRecords.ts).
-export default function PersonalRecordsCard({ records, cardBg }: { records: RecordItem[]; cardBg: string }) {
+function PersonalRecordsCard({ records, cardBg }: { records: RecordItem[]; cardBg: string }) {
   const c = useColors();
   const s = makeS(c);
   if (records.length === 0) return null;
   return (
-    <View style={[s.card, { backgroundColor: cardBg }]}>
+    <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.push('/achievements' as any); }}
+      style={[s.card, { backgroundColor: cardBg }]}>
       <View style={s.head}>
         <Trophy size={13} color={GOLD} />
         <Text style={s.title}>Rekordy życiowe</Text>
@@ -33,7 +37,7 @@ export default function PersonalRecordsCard({ records, cardBg }: { records: Reco
           {records.slice(1).map(r => renderRec(r, false))}
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   function renderRec(r: RecordItem, hero: boolean) {
@@ -75,7 +79,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingHorizontal: spacing[4], paddingVertical: spacing[4],
     overflow: 'hidden',
   },
-  heroBgIcon: { position: 'absolute', top: -14, right: -12, opacity: 0.14 },
+  heroBgIcon: { position: 'absolute', top: -14, right: -12, opacity: 0.18 },
   medal: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center',
@@ -91,7 +95,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     paddingHorizontal: spacing[3], paddingVertical: spacing[3],
     justifyContent: 'flex-end', overflow: 'hidden',
   },
-  bgIcon: { position: 'absolute', top: -8, right: -6, opacity: 0.15 },
+  bgIcon: { position: 'absolute', top: -8, right: -6, opacity: 0.18 },
   value: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
   label: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: 3, lineHeight: 15 },
 }));
+
+export default memo(PersonalRecordsCard);
