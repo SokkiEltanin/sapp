@@ -15,18 +15,28 @@ export interface HealthDayHistory {
 // -day figure — so we only trust totalCalories when it's plausibly a full day
 // (>=1200); otherwise BMR + active. Mirrors the Zdrowie energy card so the food
 // tab and burn widgets agree with it. 0 = no usable burn data.
-export function dailyBurnFromHc(hc: any, fallbackBmr = 0): number {
-  if (!hc) return fallbackBmr > 0 ? Math.round(fallbackBmr) : 0;
+// Ruch (aktywne kcal) oszacowany z KROKÓW — waga-skalowany. Samsung eksportuje kroki
+// do Health Connect PEWNIE (naprawione: stepsBySourceMax), a aktywne kalorie RZADKO —
+// więc kroki to najlepszy fallback. ~0.0005 kcal/krok/kg (≈ 0.036 kcal/krok @72kg;
+// 10k kroków @72kg ≈ 360 kcal). Nigdy nie zaniża — bierzemy MAX z pomiarem zegarka.
+export function activeFromSteps(steps: number, weightKg: number): number {
+  if (!(steps > 0)) return 0;
+  const kg = weightKg > 0 ? weightKg : 70;
+  return Math.round(steps * kg * 0.0005);
+}
+
+export function dailyBurnFromHc(hc: any, fallbackBmr = 0, steps = 0, weightKg = 0): number {
+  const stepsActive = activeFromSteps(steps, weightKg);
+  if (!hc) return fallbackBmr > 0 ? Math.round(fallbackBmr + stepsActive) : Math.round(stepsActive);
   const total = Number(hc.totalCalories) || 0;
-  if (total >= 1200) return Math.round(total);
+  if (total >= 1200) return Math.round(total);                 // pełny dzień z zegarka = najlepsze
   const bmr = Number(hc.bmr) || fallbackBmr || 0;
   const active = Number(hc.activeCalories) || 0;
-  // Watch often gives ONLY the activity calories (e.g. 77) with no BMR record. Before,
-  // that returned 0 ("nie czyta z zegarka"). Now: BMR (watch or profile) + active.
-  // PODŁOGA aktywności ~25% BMR (lekko aktywny): gdy Samsung nie eksportuje ruchu do
-  // Health Connect, dzień nie ma wydatku = samego spoczynku (to zaniżało cel/deficyt).
-  if (bmr > 0) return Math.round(bmr + Math.max(active, Math.round(bmr * 0.25)));
-  return Math.round(active);
+  // Ruch = MAX(zmierzony z zegarka, oszacowany z kroków, mała podłoga 12% BMR na wypadek
+  // gdyby i kroki nie doszły). Samsung często NIE eksportuje aktywnych kcal → kroki ratują.
+  const move = Math.max(active, stepsActive, bmr > 0 ? Math.round(bmr * 0.12) : 0);
+  if (bmr > 0) return Math.round(bmr + move);
+  return Math.round(Math.max(active, stepsActive));
 }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }
@@ -45,7 +55,7 @@ export async function saveTodayWeight(kg: number): Promise<void> {
   await AsyncStorage.setItem('health_last_weight', String(kg)).catch(() => {});
 }
 
-export async function getHealthHistory(days = 60, fallbackBmr = 0): Promise<Record<string, HealthDayHistory>> {
+export async function getHealthHistory(days = 60, fallbackBmr = 0, defaultWeightKg = 0): Promise<Record<string, HealthDayHistory>> {
   const keys: string[] = [];
   const dates: string[] = [];
   const today = new Date();
@@ -66,7 +76,9 @@ export async function getHealthHistory(days = 60, fallbackBmr = 0): Promise<Reco
         // the sleep average.
         const isFakeSleep = Number(d.sleepH) === 7 && Number(d.sleepM) === 30 && !d.sleepQuality;
         const sleepMinutes = isFakeSleep ? 0 : (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
-        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: Number(d.steps) || 0, burn: dailyBurnFromHc(d.hc, fallbackBmr) };
+        const stepsN = Number(d.steps) || 0;
+        const wKg = Number(d.weight) || defaultWeightKg;
+        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: stepsN, burn: dailyBurnFromHc(d.hc, fallbackBmr, stepsN, wKg) };
       } catch {}
     });
   } catch {}

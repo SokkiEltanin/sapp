@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale, Settings, Check, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Pencil } from 'lucide-react-native';
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
-import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
+import { getHealthHistory, saveTodayWeight, activeFromSteps } from '@/utils/healthHistory';
 import { getHealthGoals, saveHealthGoals, bmrMifflin } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import DatePickerField from '@/components/ui/DatePickerField';
@@ -48,6 +48,7 @@ export default function Food() {
 
   const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned (watch)
   const [activeToday, setActiveToday] = useState(0);   // ruch (spalone w ruchu, z zegarka)
+  const [stepsToday, setStepsToday] = useState(0);     // kroki dziś (fallback ruchu, gdy brak aktywnych kcal)
   const [watchBmr, setWatchBmr] = useState(0);         // BMR z zegarka (fallback)
   const [watchTotal, setWatchTotal] = useState(0);     // CAŁKOWITE spalanie z zegarka (najlepsze — pełny dzień)
   const [profile, setProfile] = useState<{ heightCm: number; ageYears: number; sex: 'm' | 'f' | '' }>({ heightCm: 0, ageYears: 0, sex: '' });
@@ -113,10 +114,11 @@ export default function Food() {
     const lwRaw = await AsyncStorage.getItem('health_last_weight');
     const lw = lwRaw ? parseFloat(lwRaw) : 0;
     const pbmr = bmrMifflin(lw, goals.heightCm, goals.ageYears, goals.sex);
-    const hist = await getHealthHistory(30, pbmr);
+    const hist = await getHealthHistory(30, pbmr, lw);
     const series: { d: string; w: number }[] = [];
     const bbd: Record<string, number> = {};
     for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); bbd[d] = hist[d].burn; }
+    setStepsToday(hist[today]?.steps ?? 0);   // kroki dziś → szacowanie ruchu, gdy zegarek nie eksportuje aktywnych kcal
     let last = series.length ? series[series.length - 1].w : 0;
     if (!(last > 0) && lw > 0) last = lw;
     weightRef.current = last; setWeightKg(last); setWeightSeries(series); setBurnByDay(bbd);
@@ -148,15 +150,16 @@ export default function Food() {
       active = bmr > 0 ? Math.max(0, watchTotal - bmr) : 0;   // ruch = całość − spoczynek
       source = 'total';
     } else if (bmr > 0) {
-      // PODŁOGA aktywności ~25% BMR (lekko aktywny, TDEE ok. x1.25): gdy Samsung nie
-      // eksportuje ruchu do Health Connect, cel NIE spada do samego spoczynku (BMR).
-      active = Math.max(activeToday, Math.round(bmr * 0.25));
+      // Ruch: zmierzony z zegarka LUB oszacowany z KROKÓW (Samsung eksportuje kroki pewnie,
+      // aktywne kcal rzadko) + mała podłoga 12% BMR. Cel nie spada do samego spoczynku.
+      const stepsActive = activeFromSteps(stepsToday, weightKg);
+      active = Math.max(activeToday, stepsActive, Math.round(bmr * 0.12));
       total = bmr + active; source = 'bmr';
     } else {
       total = burnByDay[today] ?? 0; active = activeToday; source = 'fallback';
     }
     return { bmr, active, total, source, fromProfile: profileBmr > 0, hasWatchTotal: watchTotal >= 1200 };
-  }, [weightKg, profile, activeToday, watchBmr, watchTotal, burnByDay, today]);
+  }, [weightKg, profile, activeToday, stepsToday, watchBmr, watchTotal, burnByDay, today]);
   const burn = burnModel.total;
   const profileComplete = burnModel.fromProfile;
 
