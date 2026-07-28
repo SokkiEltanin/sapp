@@ -10,7 +10,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
-import { colors } from '@/theme';
+import { colors, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 import { plPlural } from '@/utils/plural';
@@ -421,16 +421,17 @@ const makeS = (t: any) => StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: {
+    fontFamily: fonts.display,   // Archivo Black — punchy liczba/krótki badge
     fontSize: 11,
-    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.4,
+    letterSpacing: 0.2,
   },
   text: {
     flexShrink: 1,
-    fontSize: 12.5,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontFamily: fonts.label,     // Lexend Tera — CAPS status (jak mockup)
+    fontSize: 11.5,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
     color: '#F2F3F3',
   },
 });
