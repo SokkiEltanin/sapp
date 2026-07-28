@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
-import { CalendarEvent } from '@/types';
+import { CalendarEvent, isMultiDay } from '@/types';
 import { colors, spacing, radius } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -34,8 +34,10 @@ export default function DayTimelineH({ events, date, onPress, onAddAtTime }: Pro
   const isToday = date === today;
   const [w, setW] = useState(300);
 
-  const timed = events.filter(e => e.startTime).sort((a, b) => toMins(a.startTime) - toMins(b.startTime));
-  const allDay = events.filter(e => !e.startTime);
+  // Wielodniowe traktujemy jak całodniowe pigułki (nie jako blok o danej godzinie),
+  // bo trwają przez cały dzień — pokazują się na KAŻDYM dniu zakresu.
+  const timed = events.filter(e => e.startTime && !isMultiDay(e)).sort((a, b) => toMins(a.startTime) - toMins(b.startTime));
+  const allDay = events.filter(e => !e.startTime || isMultiDay(e));
 
   // Okno osi: od najwcześniejszego eventu (lub 7:00) do najpóźniejszego końca (lub 21:00),
   // zaokrąglone do pełnych godzin; „teraz" też mieści się w oknie.
@@ -84,10 +86,18 @@ export default function DayTimelineH({ events, date, onPress, onAddAtTime }: Pro
         <View style={st.allDayRow}>
           {allDay.map(ev => {
             const col = ev.color ?? colors.accent.purple;
+            // wielodniowy → dopisz „dzień N/M" żeby było widać że trwa
+            let span = '';
+            if (isMultiDay(ev)) {
+              const s = ev.date.slice(0, 10), e2 = ev.endDate!.slice(0, 10);
+              const di = Math.round((Date.parse(date) - Date.parse(s)) / 86400000) + 1;
+              const tot = Math.round((Date.parse(e2) - Date.parse(s)) / 86400000) + 1;
+              span = `  ·  ${di}/${tot}`;
+            }
             return (
               <Pressable key={ev.id} onPress={() => { haptic.tap(); onPress?.(ev.id); }}
                 style={[st.allDayPill, { backgroundColor: col + '28', borderColor: col + '55' }]}>
-                <Text style={[st.allDayText, { color: col }]} numberOfLines={1}>{ev.title}</Text>
+                <Text style={[st.allDayText, { color: col }]} numberOfLines={1}>{ev.title}{span}</Text>
               </Pressable>
             );
           })}

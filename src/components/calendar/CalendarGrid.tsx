@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { CalendarEvent, MoodEntry, MOOD_COLORS, Task } from '@/types';
+import { CalendarEvent, MoodEntry, MOOD_COLORS, Task, eventCoversDay } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -35,12 +35,13 @@ export default function CalendarGrid({ year, month, selectedDate, events, tasks,
   while (cells.length % 7 !== 0) cells.push(null);
 
   const ds = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`;
-  const eventsFor = (day: number) => events.filter(e => e.date.startsWith(ds(day)));
+  // wielodniowe eventy liczą się na KAŻDYM dniu zakresu (nie tylko pierwszym)
+  const eventsFor = (day: number) => events.filter(e => eventCoversDay(e, ds(day)));
   const evColor = (day: number) => {
-    const ev = events.find(e => e.date.startsWith(ds(day)));
+    const ev = events.find(e => eventCoversDay(e, ds(day)));
     return ev ? (ev.color ?? colors.tabs.calendar) : null;
   };
-  const hasEv = (day: number) => events.some(e => e.date.startsWith(ds(day)));
+  const hasEv = (day: number) => events.some(e => eventCoversDay(e, ds(day)));
   const hasTk = (day: number) => tasks.some(t => t.deadline?.startsWith(ds(day)) && t.status !== 'done');
   const hasHighTk = (day: number) => tasks.some(
     t => t.deadline?.startsWith(ds(day)) && t.status !== 'done' && t.priority === 'high',

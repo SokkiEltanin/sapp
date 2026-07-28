@@ -67,7 +67,6 @@ export default function RecipeBuilder() {
   const [fryFatId, setFryFatId] = useState('');        // '' = bez tłuszczu
   const [fatSpoons, setFatSpoons] = useState('1');     // łyżki tłuszczu
   const [ings, setIngs]     = useState<MealItem[]>([]);
-  const [addons, setAddons] = useState<MealItem[]>([]);    // dodatki jedzone RAZEM (nutella…)
   const [semi, setSemi]     = useState(false);             // półprodukt = baza do innych dań
   const [query, setQuery]   = useState('');
 
@@ -94,7 +93,6 @@ export default function RecipeBuilder() {
     setPrep(pr);
     setCooked(pr === 'raw' ? '' : String(p.recipe.cookedWeight || ''));
     setIngs(p.recipe.ingredients.map((it: MealItem) => ({ ...it })));
-    setAddons((p.recipe.addons ?? []).map((it: MealItem) => ({ ...it })));
     setSemi(!!p.semi);
     if (p.recipe.fryFat) {
       const f = FRY_FATS.find(x => x.name === p.recipe.fryFat.name);
@@ -402,7 +400,7 @@ export default function RecipeBuilder() {
             <Text style={s.resultMacros}>na 100 g:  B {density.protein100 ?? 0}  ·  W {density.carbs100 ?? 0}  ·  T {density.fat100 ?? 0}</Text>
           ) : null}
           {density.kcalPer100g > 0 && (
-            <Text style={s.resultExample}>przykład: porcja 150 g ≈ {Math.round(density.kcalPer100g * 1.5)} kcal{addons.length ? ` + dodatki` : ''}</Text>
+            <Text style={s.resultExample}>przykład: porcja 150 g ≈ {Math.round(density.kcalPer100g * 1.5)} kcal</Text>
           )}
         </View>
       </ScrollView>

@@ -184,13 +184,27 @@ export interface CalendarEvent {
   id: string;
   title: string;
   description?: string;
-  date: string;        // ISO date
+  date: string;        // ISO date — dzień startu (wielodniowy: pierwszy dzień)
+  endDate?: string;    // YYYY-MM-DD — ostatni dzień (wielodniowy 16.08→24.08); brak = jednodniowy
   startTime?: string;  // HH:mm
   endTime?: string;
   allDay: boolean;
   priority: EventPriority;
   color?: string;
   createdAt: string;
+}
+
+// Czy event OBEJMUJE dany dzień (YYYY-MM-DD) — jednodniowy: tylko swój dzień;
+// wielodniowy: od date do endDate włącznie.
+export function eventCoversDay(e: CalendarEvent, dayYMD: string): boolean {
+  const start = (e.date || '').slice(0, 10);
+  if (!start) return false;
+  const end = (e.endDate || start).slice(0, 10);
+  return dayYMD >= start && dayYMD <= end;
+}
+// Wielodniowy? (endDate po dacie startu)
+export function isMultiDay(e: CalendarEvent): boolean {
+  return !!e.endDate && e.endDate.slice(0, 10) > e.date.slice(0, 10);
 }
 
 export interface Subtask {

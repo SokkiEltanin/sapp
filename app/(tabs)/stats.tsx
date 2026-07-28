@@ -25,7 +25,7 @@ import { maintenanceService } from '@/services/maintenanceService';
 import { maintenanceDueEvents } from '@/utils/maintenanceCalendar';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { googleCalendarService } from '@/services/googleCalendarService';
-import { CalendarEvent, Task } from '@/types';
+import { CalendarEvent, Task, eventCoversDay } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
 import { getCategoryMeta } from '@/utils/categories';
 import { colors, spacing, radius, typography } from '@/theme';
@@ -399,7 +399,7 @@ export default function CalendarTabScreen() {
   );
 
   const selectedEvents = useMemo(
-    () => allEvents.filter(e => e.date.startsWith(selectedDate)),
+    () => allEvents.filter(e => eventCoversDay(e, selectedDate)),   // wielodniowe: na każdym dniu zakresu
     [allEvents, selectedDate],
   );
 

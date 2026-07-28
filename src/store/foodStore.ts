@@ -83,15 +83,13 @@ export interface MealItem {
 export type PrepType = 'raw' | 'cooked' | 'fried';
 
 // A dish stored ON a product: the ingredients + how it was prepared. kcal/100g is
-// DERIVED — total kcal ÷ weight — so you log it by WEIGHING your portion. `addons`
-// are things eaten WITH it (nutella on a pancake) — counted separately at log time,
-// never divided into the density.
+// DERIVED — total kcal ÷ weight — so you log it by WEIGHING your portion. (Dodatki à la
+// nutella robi się teraz przez PÓŁPRODUKTY — patrz FoodProduct.semi — nie osobnym polem.)
 export interface RecipeMeta {
   ingredients: MealItem[];
   cookedWeight: number;   // g of the finished dish (for raw = the summed/edited weight)
   prep?: PrepType;        // undefined = 'cooked' (back-compat with dishes saved earlier)
   fryFat?: { name: string; grams: number; kcal: number };  // fried: the fat that got added
-  addons?: MealItem[];    // "eaten with" toppings — appended (not divided) when logging
 }
 
 // Resolved macro grams for a portion of a product (density × grams). 0s when unknown.
@@ -276,7 +274,7 @@ interface FoodState {
   // create/update a dish product: kcal/100g derived from ingredients (+fry fat) ÷ weight
   saveRecipeProduct: (input: {
     name: string; ingredients: MealItem[]; weight: number; cat?: string; id?: string;
-    prep?: PrepType; fryFat?: { name: string; grams: number; kcal: number }; addons?: MealItem[];
+    prep?: PrepType; fryFat?: { name: string; grams: number; kcal: number };
     semi?: boolean;
   }) => FoodProduct;
   markFresh: (name: string) => void;            // one product bought
@@ -339,7 +337,7 @@ export const useFoodStore = create<FoodState>()(
         }));
       },
       togglePinProduct: (id) => set(s => ({ products: s.products.map(p => (p.id === id ? { ...p, pinned: !p.pinned } : p)) })),
-      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, addons, semi }) => {
+      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, semi }) => {
         const t = recipeTotals(ingredients);
         // raw = a mixture → weight is the summed ingredient weight (unless the user set one)
         const w = prep === 'raw' ? (weight > 0 ? weight : t.grams) : weight;
@@ -352,7 +350,6 @@ export const useFoodStore = create<FoodState>()(
           recipe: {
             ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(d.weight),
             prep, fryFat: fryFat && fryFat.grams > 0 ? fryFat : undefined,
-            addons: addons && addons.length ? addons.map(it => ({ ...it })) : undefined,
           },
         };
         const existing = id ? get().products.find(p => p.id === id) : undefined;

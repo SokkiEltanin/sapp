@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { CalendarEvent, MoodEntry, MOOD_COLORS, Task } from '@/types';
+import { CalendarEvent, MoodEntry, MOOD_COLORS, Task, eventCoversDay } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
 
@@ -42,7 +42,7 @@ export default function WeekStrip({ selectedDate, events, tasks, moodEntries = [
     return { date: toDateStr(d), day: d.getDate(), dow: d.getDay() };
   });
 
-  const hasEv = (date: string) => events.some(e => e.date.startsWith(date));
+  const hasEv = (date: string) => events.some(e => eventCoversDay(e, date));
   const hasTk = (date: string) => tasks.some(t => t.deadline?.startsWith(date) && t.status !== 'done');
   const hasUrgent = (date: string) => tasks.some(
     t => t.deadline?.startsWith(date) && t.status !== 'done' && t.priority === 'high'

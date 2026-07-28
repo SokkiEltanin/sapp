@@ -38,6 +38,7 @@ export default function AddCalendarModal() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(params.date ?? '');
+  const [eventEndDate, setEventEndDate] = useState('');   // wielodniowe: ostatni dzień
   const [startTime, setStartTime] = useState(params.startTime ?? '');
   const [endTime, setEndTime] = useState('');
   const [priority, setPriority] = useState<EventPriority>('normal');
@@ -72,6 +73,8 @@ export default function AddCalendarModal() {
         });
       } else {
         const dateStr = deadline.trim() || selectedDate;
+        const endD = eventEndDate.trim();
+        const endDate = endD && endD > dateStr ? endD : undefined;   // tylko gdy po dacie startu
         const st = startTime.trim() || undefined;
         const et = endTime.trim() || undefined;
         const isAllDay = !st;
@@ -80,6 +83,7 @@ export default function AddCalendarModal() {
           title: title.trim(),
           description: description.trim() || undefined,
           date: dateStr + 'T12:00:00.000Z',
+          endDate,
           startTime: st,
           endTime: et,
           allDay: isAllDay,
@@ -189,6 +193,20 @@ export default function AddCalendarModal() {
               keyboardType="numbers-and-punctuation"
             />
           </View>
+
+          {/* End date — events only (wielodniowe, np. 16.08 → 24.08) */}
+          {type === 'event' && (
+            <View>
+              <InputField
+                label="Data końca (opcjonalnie — wielodniowe)"
+                value={eventEndDate}
+                onChangeText={setEventEndDate}
+                placeholder={deadline || selectedDate}
+                leftSlot={<CalendarDays size={16} color={colors.text.muted} />}
+                keyboardType="numbers-and-punctuation"
+              />
+            </View>
+          )}
 
           {/* Time — events only */}
           {type === 'event' && (
