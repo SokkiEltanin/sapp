@@ -109,8 +109,14 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     const frac = t.next ? Math.min(1, Math.max(0, (r.days - t.min) / (t.next - t.min))) : 1;
     const bgA = a2((hero ? 0.18 : 0.14) + 0.20 * frac);
     const nextName = t.next ? streakTier(t.next).name : null;
+    const onTile = () => {
+      haptic.tap();
+      if (r.key.startsWith('h:')) router.push(`/habit-year?id=${r.key.slice(2)}` as any);
+      else router.push('/counters' as any);
+    };
     return (
-      <View key={r.key} style={[hero ? s.heroTile : s.tile, { backgroundColor: t.color + bgA, borderColor: t.color + '66' }]}>
+      <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
+        style={[hero ? s.heroTile : s.tile, { backgroundColor: t.color + bgA, borderColor: t.color + '66' }]}>
         {/* tło = obrazek CZEGO dotyczy seria (woda/cukierek/ogień…) — BIAŁE, żeby było
             widać na kolorowym kaflu (kolor progu na kolorze progu był niewidoczny) */}
         <Icon size={hero ? 132 : 82} color="#FFFFFF" strokeWidth={1.3} style={hero ? s.heroBgIcon : s.bgIcon} />
@@ -133,7 +139,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
         <Text style={s.next} numberOfLines={1}>
           {t.next ? `jeszcze ${t.next - r.days} dni → ${nextName}` : 'MAKS · legenda 🏆'}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   }
 }
