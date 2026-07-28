@@ -2,7 +2,8 @@ import { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Flame, Droplets, Candy, Dumbbell, BookOpen, Moon, Cigarette, Wine, Footprints } from 'lucide-react-native';
+import { Flame, Droplets, Candy, Dumbbell, BookOpen, Moon, Cigarette, Wine, Footprints, Snowflake } from 'lucide-react-native';
+import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius } from '@/theme';
@@ -39,6 +40,7 @@ const a2 = (o: number) => Math.round(Math.max(0, Math.min(1, o)) * 255).toString
 function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: string }) {
   const c = useColors();
   const s = makeS(c);
+  const freezes = useStreakFreezeStore(st => st.freezes);
   const rows = streaks.filter(x => x.days > 0).sort((a, b) => b.days - a.days).slice(0, 6);
 
   // Celebracja progu — porównaj bieżące progi z ostatnio widzianymi. Pierwsze uruchomienie
@@ -80,6 +82,12 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
         <Flame size={13} color={c.text.secondary} />
         <Text style={s.title}>Twoje serie</Text>
         <View style={{ flex: 1 }} />
+        {freezes > 0 && (
+          <View style={s.freezePill}>
+            <Snowflake size={11} color="#7DD3FC" />
+            <Text style={s.freezeTxt}>{freezes}</Text>
+          </View>
+        )}
         <Text style={s.headCount}>{rows.length}</Text>
       </View>
 
@@ -135,6 +143,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   title: { fontSize: 11.5, fontWeight: '700', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
   headCount: { fontSize: 12, fontWeight: '800', color: c.text.muted, fontVariant: ['tabular-nums'] },
+  freezePill: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 8, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, backgroundColor: '#7DD3FC1E', borderWidth: 1, borderColor: '#7DD3FC44' },
+  freezeTxt: { fontSize: 11, fontWeight: '800', color: '#7DD3FC', fontVariant: ['tabular-nums'] },
 
   // HERO — najdłuższa seria, pełna szerokość, wielka liczba
   heroTile: {

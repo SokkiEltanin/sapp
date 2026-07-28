@@ -2,11 +2,14 @@ import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import { usePetStore } from '@/store/petStore';
+import { useStreakFreezeStore } from '@/store/streakFreezeStore';
+
+const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 import { SHOP_COLORS, STRIPES, TIER_META } from '@/utils/petShop';
 import { paletteById } from '@/utils/catPalettes';
 import { spacing, radius } from '@/theme';
@@ -20,7 +23,15 @@ import { toast } from '@/store/toastStore';
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, spendCoins } = usePetStore();
+  const freezes    = useStreakFreezeStore(st => st.freezes);
+  const addFreezes = useStreakFreezeStore(st => st.addFreezes);
+
+  const onBuyFreeze = () => {
+    haptic.tap();
+    if (spendCoins(FREEZE_COST)) { addFreezes(1); haptic.success(); toast.success('Kupione: Zamrożenie serii ❄'); }
+    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${FREEZE_COST}`); }
+  };
 
   const onColor = (id: string, cost: number, name: string) => {
     haptic.tap();
@@ -93,6 +104,18 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
+        <Text style={s.section}>Zamrożenia serii</Text>
+        <PressableScale onPress={onBuyFreeze}>
+          <View style={s.stripeRow}>
+            <View style={s.freezeIcon}><Snowflake size={20} color="#7DD3FC" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.cellName}>Zamrożenie serii</Text>
+              <Text style={s.cellState}>ratuje serię za 1 pominięty dzień · masz: {freezes}</Text>
+            </View>
+            <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{FREEZE_COST}</Text></View>
+          </View>
+        </PressableScale>
+
         <Text style={s.hint}>Monety zbierasz questami — za dbanie o SIEBIE.</Text>
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -117,5 +140,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   cost: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   costTxt: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
   stripeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  freezeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#7DD3FC1E', borderWidth: 1, borderColor: '#7DD3FC44', alignItems: 'center', justifyContent: 'center' },
   hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
 }));

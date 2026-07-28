@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Habit } from '@/types';
 import { getHabits, saveHabits, getCounts, setCounts, stepFor } from '@/utils/habits';
 import { useHabitsSync } from '@/store/habitsSync';
+import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { notificationsService } from '@/services/notificationsService';
 
 function applyReminder(habit: Habit) {
@@ -61,6 +62,16 @@ export function useHabits() {
   const today = todayStr();
   const syncVersion = useHabitsSync((s) => s.version);
   const bump = useHabitsSync((s) => s.bump);
+
+  // Zamrożenia serii — dzień zamrożony liczy się jako zaliczony.
+  const frozen      = useStreakFreezeStore((s) => s.frozen);
+  const freezes     = useStreakFreezeStore((s) => s.freezes);
+  const applyFreeze = useStreakFreezeStore((s) => s.applyFreeze);
+  const isDoneOrFrozen = useCallback(
+    (habit: Habit, date: string) =>
+      isDone(habit, completions[date]?.[habit.id] ?? 0) || !!frozen[`${habit.id}|${date}`],
+    [completions, frozen],
+  );
 
   const load = useCallback(async () => {
     try {
@@ -162,14 +173,12 @@ export function useHabits() {
     const target = habit.weeklyTarget && habit.weeklyTarget < 7 ? habit.weeklyTarget : null;
 
     if (!target) {
-      // Daily streak: consecutive days done
-      const todayCount = completions[today]?.[habitId] ?? 0;
+      // Daily streak: consecutive done-OR-FROZEN days (zamrożenie ratuje pominięty dzień)
       let streak = 0;
-      const start = isDone(habit, todayCount) ? 0 : -1;
+      const start = isDoneOrFrozen(habit, today) ? 0 : -1;
       for (let i = start; i >= -29; i--) {
         const d = offsetDate(today, i);
-        const c = completions[d]?.[habitId] ?? 0;
-        if (isDone(habit, c)) streak++; else break;
+        if (isDoneOrFrozen(habit, d)) streak++; else break;
       }
       return streak;
     }
@@ -177,33 +186,43 @@ export function useHabits() {
     // Weekly streak: consecutive 7-day windows meeting the target
     let streak = 0;
     for (let w = 0; w <= 3; w++) {
-      const windowDone = Array.from({ length: 7 }, (_, i) => {
-        const d = offsetDate(today, -(w * 7) - i);
-        return isDone(habit, completions[d]?.[habitId] ?? 0);
-      }).filter(Boolean).length;
+      const windowDone = Array.from({ length: 7 }, (_, i) =>
+        isDoneOrFrozen(habit, offsetDate(today, -(w * 7) - i))).filter(Boolean).length;
       if (windowDone >= target) streak++;
       else break;
     }
     return streak;
-  }, [completions, today, habits]);
+  }, [isDoneOrFrozen, today, habits]);
 
   const getLast7 = useCallback((habitId: string): boolean[] => {
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return Array(7).fill(false);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = offsetDate(today, -(6 - i));
-      return isDone(habit, completions[d]?.[habitId] ?? 0);
-    });
-  }, [completions, today, habits]);
+    return Array.from({ length: 7 }, (_, i) => isDoneOrFrozen(habit, offsetDate(today, -(6 - i))));
+  }, [isDoneOrFrozen, today, habits]);
 
   const getLast30 = useCallback((habitId: string): boolean[] => {
     const habit = habits.find((h) => h.id === habitId);
     if (!habit) return Array(30).fill(false);
-    return Array.from({ length: 30 }, (_, i) => {
-      const d = offsetDate(today, -(29 - i));
-      return isDone(habit, completions[d]?.[habitId] ?? 0);
-    });
-  }, [completions, today, habits]);
+    return Array.from({ length: 30 }, (_, i) => isDoneOrFrozen(habit, offsetDate(today, -(29 - i))));
+  }, [isDoneOrFrozen, today, habits]);
+
+  // AUTO-ZAMROŻENIE: gdy „wczoraj" wypadło z serii, a dziś jeszcze nie zaliczone i była
+  // realna seria (≥2 dni przed luką) — zużyj jedno zamrożenie na wczoraj, żeby seria nie
+  // padła. Chroni TYLKO wczoraj (nie wskrzesza starych serii), 1 zamrożenie na nawyk.
+  useEffect(() => {
+    if (isLoading || freezes <= 0) return;
+    for (const h of habits) {
+      if (h.weeklyTarget && h.weeklyTarget < 7) continue;   // tylko serie dzienne
+      if (isDoneOrFrozen(h, today)) continue;               // dziś ok → seria bezpieczna
+      const yest = offsetDate(today, -1);
+      if (isDoneOrFrozen(h, yest)) continue;                // wczoraj kotwiczy → jeszcze żyje
+      const anchor = offsetDate(today, -2);
+      if (!isDoneOrFrozen(h, anchor)) continue;             // brak serii do uratowania
+      let len = 0;
+      for (let i = -2; i >= -30; i--) { if (isDoneOrFrozen(h, offsetDate(today, i))) len++; else break; }
+      if (len >= 2) applyFreeze(h.id, yest);                // zużyj 1 zamrożenie na wczoraj
+    }
+  }, [isLoading, freezes, frozen, completions, habits, today, isDoneOrFrozen, applyFreeze]);
 
   const getTodayCount = useCallback((habitId: string): number => {
     return completions[today]?.[habitId] ?? 0;
