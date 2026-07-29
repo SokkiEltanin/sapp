@@ -536,7 +536,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   semiBox:    { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
 
   weightCard: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.subtle, padding: spacing[3] },
-  weightInput: { width: 110, height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 24, fontWeight: '800', color: c.text.primary },
+  weightInput: { width: 110, height: 56, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 24, fontWeight: '800', color: c.text.primary },
   weightUnit:  { fontSize: 16, fontWeight: '800', color: c.text.secondary },
   weightHint:  { flex: 1, fontSize: 11.5, color: c.text.muted, lineHeight: 15 },
 
@@ -563,7 +563,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   qtyRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
   qtyBtn:    { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   qtyCenter: { alignItems: 'center', minWidth: 96 },
-  qtyValInput: { minWidth: 74, height: 44, textAlign: 'center', fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
+  qtyValInput: { minWidth: 74, height: 52, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
   qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 2 },
   qtyHint:   { fontSize: 11, color: c.text.muted, textAlign: 'center' },
 
@@ -571,7 +571,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },
   fieldUnit:  { fontSize: 14, fontWeight: '700', color: c.text.muted },
   fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
-  bigInput:   { flex: 1, height: 48, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 22, fontWeight: '800', color: c.text.primary },
+  bigInput:   { flex: 1, height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 22, fontWeight: '800', color: c.text.primary },
   smInput:    { width: 76, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary },
 
   sheetKcal:    { alignItems: 'center', gap: 1 },

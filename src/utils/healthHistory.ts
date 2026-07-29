@@ -29,14 +29,14 @@ export function dailyBurnFromHc(hc: any, fallbackBmr = 0, steps = 0, weightKg = 
   const stepsActive = activeFromSteps(steps, weightKg);
   if (!hc) return fallbackBmr > 0 ? Math.round(fallbackBmr + stepsActive) : Math.round(stepsActive);
   const total = Number(hc.totalCalories) || 0;
-  if (total >= 1200) return Math.round(total);                 // pełny dzień z zegarka = najlepsze
   const bmr = Number(hc.bmr) || fallbackBmr || 0;
   const active = Number(hc.activeCalories) || 0;
-  // Ruch = MAX(zmierzony z zegarka, oszacowany z kroków, mała podłoga 12% BMR na wypadek
-  // gdyby i kroki nie doszły). Samsung często NIE eksportuje aktywnych kcal → kroki ratują.
+  // Ruch = MAX(zmierzony z zegarka, oszacowany z kroków, mała podłoga 12% BMR).
   const move = Math.max(active, stepsActive, bmr > 0 ? Math.round(bmr * 0.12) : 0);
-  if (bmr > 0) return Math.round(bmr + move);
-  return Math.round(Math.max(active, stepsActive));
+  const est = bmr > 0 ? bmr + move : Math.max(active, stepsActive);
+  // Samsung czasem daje OKROJONY „total" mniejszy niż BMR (np. 1252 < 1670) — bez sensu.
+  // Ufamy totalowi TYLKO gdy pełny dzień I WYŻSZY niż BMR+ruch; inaczej BMR+ruch.
+  return Math.round(total >= 1200 && total > est ? total : est);
 }
 
 function pad(n: number) { return String(n).padStart(2, '0'); }

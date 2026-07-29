@@ -86,6 +86,7 @@ export default function FinancesScreen() {
   const [amtMax, setAmtMax] = useState('');
   const [filterModal, setFilterModal] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false); // false = only the recent window in the list
+  const [showDetails, setShowDetails] = useState(false); // szczegóły miesiąca schowane pod saldem (tap)
   const [balanceOffset, setBalanceOffset] = useState(0);
   const scope = useStatsScope(s => s.scope);
   const toggleScope = useStatsScope(s => s.toggle);
@@ -319,29 +320,32 @@ export default function FinancesScreen() {
                   </View>
                 }
               />
-              {/* ── Balance: one number (NA KARCIE). Tap to adjust the starting offset. ─── */}
+              {/* ── Saldo = JEDNA liczba (NA KARCIE). Stuknij → szczegóły miesiąca. ─── */}
               <View style={st.heroMin}>
-                <Text style={st.heroDate}>NA KARCIE</Text>
-                <PressableScale onPress={() => { haptic.tap(); router.navigate('/settings' as any); }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={st.heroDate}>NA KARCIE</Text>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/settings' as any); }} hitSlop={8}>
+                    <Text style={st.heroEditLink}>zmień saldo</Text>
+                  </TouchableOpacity>
+                </View>
+                <PressableScale onPress={() => { haptic.tap(); setShowDetails(v => !v); }}>
                   <View style={st.heroAmountRow}>
                     <Text style={[st.heroAmount, { color: balance >= 0 ? colors.text.primary : colors.accent.red }]}>
                       {balance < 0 ? '−' : ''}{Math.abs(balance).toFixed(2)}
                     </Text>
                     <Text style={st.heroCurrency}> PLN</Text>
                   </View>
+                  <Text style={st.heroSub}>
+                    Ten miesiąc: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> ·{' '}
+                    przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
+                    {hasHouseholdSplit ? <Text style={st.heroScopeTag}>{'  '}({scope === 'all' ? 'wszyscy' : 'ja'})</Text> : null}
+                  </Text>
+                  <Text style={st.heroDetailsHint}>{showDetails ? 'ukryj szczegóły ▴' : 'stuknij → szczegóły miesiąca ▾'}</Text>
                 </PressableScale>
-                <Text style={st.heroSub}>
-                  W tym miesiącu: wydatki <Text style={st.heroSubStrong}>{monthTotals.exp.toFixed(0)}</Text> zł
-                  {'   ·   '}
-                  przychody <Text style={st.heroSubStrong}>{monthTotals.inc.toFixed(0)}</Text> zł
-                </Text>
-                <Text style={st.heroSub2}>
-                  Jedzenie <Text style={st.heroSubStrong}>{monthTotals.food.toFixed(0)}</Text> zł
-                  {'   ·   '}
-                  słodycze <Text style={st.heroSubStrong}>{monthTotals.sweets.toFixed(0)}</Text> zł
-                  {hasHouseholdSplit ? <Text style={st.heroScopeTag}>{'  '}({scope === 'all' ? 'wszyscy' : 'ja'})</Text> : null}
-                </Text>
               </View>
+
+              {showDetails && (<>{/* ── szczegóły miesiąca (rozwijane pod saldem) ── */}
 
               {/* ── Stats scope toggle: everyone vs only me (only when there's a split) ─── */}
               {hasHouseholdSplit && (
@@ -467,6 +471,7 @@ export default function FinancesScreen() {
                   )}
                 </View>
               )}
+              </>)}{/* koniec szczegółów miesiąca */}
 
               {/* ── Filters button → popup ─── */}
               <View style={st.filterBar}>
@@ -691,8 +696,10 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   heroAmount:    { fontFamily: fonts.display, fontSize: 40, color: c.text.primary, letterSpacing: -1, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: c.text.muted, paddingBottom: 4 },
   heroSplit:     { fontSize: 12, color: c.text.secondary, fontWeight: '500', marginTop: 3, marginBottom: 2 },
-  heroSub:       { fontSize: 12, color: c.text.secondary, fontWeight: '500' },
+  heroSub:       { fontSize: 12, color: c.text.secondary, fontWeight: '500', marginTop: 4 },
   heroSub2:      { fontSize: 12, color: c.text.muted, fontWeight: '500', marginTop: 2 },
+  heroEditLink:  { fontSize: 11, fontWeight: '700', color: c.text.muted, letterSpacing: 0.3 },
+  heroDetailsHint: { fontSize: 11, fontWeight: '700', color: f.accent, marginTop: 6, letterSpacing: 0.3 },
   heroSubStrong: { color: c.text.primary, fontWeight: '800' },
   heroScopeTag:  { color: c.text.muted, fontWeight: '600', fontStyle: 'italic' },
 

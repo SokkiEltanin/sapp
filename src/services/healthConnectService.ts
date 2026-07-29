@@ -293,9 +293,16 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
 
   let sleepMinutes = 0, sleepDeepMin = 0, sleepRemMin = 0, sleepLightMin = 0;
   try {
-    for (const r of await read(hc, 'SleepSession', filter)) {
+    // Sen: szersze okno (30h wstecz) i SUMUJEMY WSZYSTKIE sesje kończące się w `date`
+    // (dzień POBUDKI) — bug: dayFilter gubił drzemkę/drugą sesję albo sen nocny zaczęty
+    // wczoraj. „Spałem 2 razy dziś" → obie się liczą.
+    const dayKey = localKey(date);
+    const sleepWin = { operator: 'between', startTime: new Date(date.getTime() - 30 * 3600e3).toISOString(), endTime: filter.endTime } as const;
+    for (const r of await read(hc, 'SleepSession', sleepWin)) {
       const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
-      if (en > st) sleepMinutes += Math.round((en - st) / 60000);
+      if (en <= st) continue;
+      if (localKey(new Date(en)) !== dayKey) continue;   // liczymy na dniu POBUDKI
+      sleepMinutes += Math.round((en - st) / 60000);
       // Stage minutes (HC enum: 4=light, 5=deep, 6=REM). Samsung populates these.
       for (const stg of (r.stages ?? [])) {
         const ss = new Date(stg.startTime).getTime(), se = new Date(stg.endTime).getTime();

@@ -146,19 +146,19 @@ export default function Food() {
     const bmr = profileBmr || watchBmr || 0;
     let total: number, active: number, source: 'total' | 'bmr' | 'fallback';
     let moveSrc: 'watch' | 'steps' | 'floor' | 'none' = 'none';
-    if (watchTotal >= 1200) {
-      total = watchTotal;
-      active = bmr > 0 ? Math.max(0, watchTotal - bmr) : 0;   // ruch = całość − spoczynek
-      source = 'total'; moveSrc = 'watch';
-    } else if (bmr > 0) {
-      // Ruch: zmierzony z zegarka LUB oszacowany z KROKÓW (Samsung eksportuje kroki pewnie,
-      // aktywne kcal rzadko) + mała podłoga 12% BMR. Cel nie spada do samego spoczynku.
+    if (bmr > 0) {
+      // Ruch: zmierzony z zegarka (aktywne kcal) LUB oszacowany z KROKÓW + podłoga 12% BMR.
       const stepsActive = activeFromSteps(stepsToday, weightKg);
       const floorA = Math.round(bmr * 0.12);
       active = Math.max(activeToday, stepsActive, floorA);
       moveSrc = activeToday > 0 && activeToday >= stepsActive && activeToday >= floorA ? 'watch'
         : stepsActive > 0 && stepsActive >= floorA ? 'steps' : 'floor';
-      total = bmr + active; source = 'bmr';
+      const est = bmr + active;   // BMR + ruch = najbardziej wiarygodne
+      // Samsung czasem daje OKROJONY total < BMR (np. 1252 < 1670) — ufamy mu TYLKO gdy WYŻSZY.
+      if (watchTotal >= 1200 && watchTotal > est) { total = watchTotal; source = 'total'; moveSrc = 'watch'; }
+      else { total = est; source = 'bmr'; }
+    } else if (watchTotal >= 1200) {
+      total = watchTotal; active = 0; source = 'total'; moveSrc = 'watch';
     } else {
       total = burnByDay[today] ?? 0; active = activeToday; source = 'fallback';
     }
@@ -265,7 +265,10 @@ export default function Food() {
   }, [weightGoal, weightSeries, weightKg]);
 
   const dayBurn   = isToday ? burn : (burnByDay[viewDate] ?? 0);   // watch burn for the browsed day
-  const target    = targetIntake(dayBurn, goalMode, manualGoal);
+  // Cel liczony ze ŚREDNIEGO spalania (30 dni), nie z dzisiejszego skoku — user: „średnia
+  // z dni spalania". Stabilny dzień do dnia; dopóki brak historii, spada na dzisiejszy burn.
+  const targetBurn = avgStats.avgBurn > 0 ? avgStats.avgBurn : dayBurn;
+  const target    = targetIntake(targetBurn, goalMode, manualGoal);
   const remaining = target - eaten;
   const pct       = target > 0 ? Math.min(1, eaten / target) : 0;
   const ratio     = target > 0 ? eaten / target : 0;

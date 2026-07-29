@@ -932,7 +932,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   qtyBtn:    { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
   qtyCenter: { alignItems: 'center', minWidth: 96 },
   qtyVal:    { fontSize: 30, fontWeight: '800', color: c.text.primary },
-  qtyValInput: { minWidth: 74, height: 44, textAlign: 'center', fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
+  qtyValInput: { minWidth: 74, height: 52, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
   qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 2 },
   qtyHint:   { fontSize: 11, color: c.text.muted, textAlign: 'center' },
 
@@ -940,8 +940,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },
   fieldUnit:  { fontSize: 14, fontWeight: '700', color: c.text.muted },
   fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
-  bigInput:   { flex: 1, height: 48, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 22, fontWeight: '800', color: c.text.primary },
-  smInput:    { width: 76, height: 40, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary },
+  bigInput:   { flex: 1, height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 22, fontWeight: '800', color: c.text.primary },
+  smInput:    { width: 76, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 16, fontWeight: '700', color: c.text.primary },
 
   addNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '55', borderStyle: 'dashed' },
   addNewTxt: { fontSize: 13, fontWeight: '700', color: ACCENT, flex: 1 },
