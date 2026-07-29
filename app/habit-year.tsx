@@ -38,6 +38,8 @@ export default function HabitYear() {
   const [habit, setHabit] = useState<Habit | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});   // date → count
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'month' | 'year'>('month');   // domyślnie MIESIĄC, tap → rok
+  const windowDays = view === 'month' ? 35 : 371;
 
   useEffect(() => {
     let alive = true;
@@ -67,7 +69,7 @@ export default function HabitYear() {
   // ── build the grid + stats ─────────────────────────────────────────────
   const { cells, cols, monthCols, stats } = useMemo(() => {
     const today = new Date();
-    const start = new Date(today); start.setDate(today.getDate() - (WINDOW - 1));
+    const start = new Date(today); start.setDate(today.getDate() - (windowDays - 1));
     const firstDow = (start.getDay() + 6) % 7;   // Monday = 0
     const goal = habit ? goalFor(habit) : 1;
     const stateFor = (ds: string): DayState => {
@@ -101,9 +103,9 @@ export default function HabitYear() {
     }
     for (let i = seq.length - 1; i >= 0; i--) { if (seq[i] === 'done' || seq[i] === 'frozen') current++; else break; }
     return { cells, cols, monthCols, stats: { doneDays, frozenDays, longest, current } };
-  }, [counts, frozen, habit, habitId]);
+  }, [counts, frozen, habit, habitId, windowDays]);
 
-  const CELL = 6, GAP = 1.6, TOP = 12;
+  const CELL = view === 'month' ? 13 : 6, GAP = view === 'month' ? 3 : 1.6, TOP = 12;
   const W = cols * (CELL + GAP);
   const H = TOP + 7 * (CELL + GAP);
   const habitColor = habit?.color ?? c.text.primary;
@@ -113,8 +115,15 @@ export default function HabitYear() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
-        <Text style={s.title} numberOfLines={1}>{habit?.title ?? 'Nawyk'} — rok</Text>
-        <View style={{ width: 24 }} />
+        <Text style={s.title} numberOfLines={1}>{habit?.title ?? 'Nawyk'}</Text>
+        {/* toggle MIESIĄC / ROK */}
+        <View style={s.viewToggle}>
+          {(['month', 'year'] as const).map(v => (
+            <TouchableOpacity key={v} onPress={() => setView(v)} style={[s.viewBtn, view === v && s.viewBtnOn]}>
+              <Text style={[s.viewBtnTxt, view === v && s.viewBtnTxtOn]}>{v === 'month' ? 'Miesiąc' : 'Rok'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -123,7 +132,7 @@ export default function HabitYear() {
           <Flame size={26} color={habitColor} fill={stats.current > 0 ? habitColor : 'transparent'} />
           <View style={{ flex: 1 }}>
             <Text style={s.heroNum}>{stats.current} <Text style={s.heroUnit}>{stats.current === 1 ? 'dzień' : 'dni'} z rzędu</Text></Text>
-            <Text style={s.heroSub}>najdłuższa w roku: {stats.longest} dni</Text>
+            <Text style={s.heroSub}>najdłuższa: {stats.longest} dni · {view === 'month' ? 'ostatnie 5 tyg.' : 'rok'}</Text>
           </View>
         </View>
 
@@ -159,7 +168,7 @@ export default function HabitYear() {
             <Text style={s.statKey}>zamrożenia użyte</Text>
           </View>
           <View style={s.statDiv} />
-          <View style={s.stat}><Text style={s.statVal}>{Math.round((stats.doneDays / WINDOW) * 100)}%</Text><Text style={s.statKey}>frekwencja</Text></View>
+          <View style={s.stat}><Text style={s.statVal}>{Math.round((stats.doneDays / windowDays) * 100)}%</Text><Text style={s.statKey}>frekwencja</Text></View>
         </View>
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -171,6 +180,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
   title: { fontSize: 17, fontWeight: '800', color: c.text.primary, flex: 1 },
+  viewToggle: { flexDirection: 'row', backgroundColor: c.fill.subtle, borderRadius: radius.full, padding: 2, borderWidth: 1, borderColor: c.border.subtle },
+  viewBtn: { paddingHorizontal: 11, paddingVertical: 5, borderRadius: radius.full },
+  viewBtnOn: { backgroundColor: c.text.primary },
+  viewBtnTxt: { fontSize: 11, fontWeight: '800', color: c.text.muted },
+  viewBtnTxtOn: { color: c.bg.primary },
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3] },
 
   hero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], borderRadius: radius.xl, borderWidth: 1, padding: spacing[4] },

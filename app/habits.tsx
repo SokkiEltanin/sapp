@@ -8,7 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft, Plus, Minus, Droplets, Dumbbell, BookOpen,
   Moon, Zap, Heart, Sun, Bike, Check, Trash2, Flame,
-  CalendarDays, Bell, ChevronUp, ChevronDown,
+  CalendarDays, Bell, ChevronUp, ChevronDown, LayoutGrid,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -151,7 +151,13 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
           </View>
         )}
 
-        <HistoryDots days={last7} color={habit.color} />
+        {/* dotknij pasek 7 dni → pixel MIESIĄC (toggle na ROK) tego nawyku */}
+        <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); router.push(`/habit-year?id=${habit.id}` as any); }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <HistoryDots days={last7} color={habit.color} />
+          <View style={{ flex: 1 }} />
+          <LayoutGrid size={13} color={colors.text.muted} />
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity onPress={() => { haptic.tap(); onDelete(); }} style={hr.deleteBtn} hitSlop={8}>
