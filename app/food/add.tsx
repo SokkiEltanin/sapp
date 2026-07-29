@@ -465,13 +465,20 @@ export default function FoodAdd() {
             <TouchableOpacity onPress={() => { haptic.tap(); setComposeDishName(''); setItems([]); setPName(''); setPYields(''); setPCat(''); }} hitSlop={8}><X size={15} color={c.text.muted} /></TouchableOpacity>
           </View>
         )}
-        {/* dzień — można dodać WSTECZ (do wcześniejszego dnia) */}
+        {/* dzień — szybkie chipy do dodawania WSTECZ + kalendarz */}
         <View style={s.dateRow}>
-          <Text style={s.dateLabel}>Dzień: {dayLabelFor(mealDate)}</Text>
+          <Text style={s.dateLabel}>Dodajesz do:</Text>
+          {[0, 1, 2].map(n => {
+            const iso = isoNDaysAgo(n);
+            const on = mealDate === iso;
+            return (
+              <TouchableOpacity key={n} onPress={() => { haptic.tap(); setMealDate(iso); }}
+                style={[s.dateChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                <Text style={[s.dateChipTxt, on && { color: ACCENT }]}>{n === 0 ? 'Dziś' : n === 1 ? 'Wczoraj' : '2 dni'}</Text>
+              </TouchableOpacity>
+            );
+          })}
           <View style={{ flex: 1 }} />
-          {mealDate !== isoNDaysAgo(0) && (
-            <TouchableOpacity onPress={() => { haptic.tap(); setMealDate(isoNDaysAgo(0)); }} style={s.dateJump} hitSlop={6}><Text style={s.dateJumpTxt}>Dziś</Text></TouchableOpacity>
-          )}
           <DatePickerField value={mealDate} onChange={setMealDate} style={s.datePicker} />
         </View>
 
@@ -876,6 +883,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   dateRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   dateLabel:  { fontSize: 13, fontWeight: '700', color: c.text.secondary },
   dateJump:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle },
+  dateChip:    { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle },
+  dateChipTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
   dateJumpTxt:{ fontSize: 12, fontWeight: '700', color: c.text.secondary },
   datePicker: { paddingVertical: 8, paddingHorizontal: spacing[3] },
 
