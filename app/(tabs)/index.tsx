@@ -5057,10 +5057,12 @@ export default function DashboardScreen() {
                     })}
                     {items.length === 0 && <Text style={s.statSub}>Brak pozycji w tej kategorii (wykluczone lub bez pozycji).</Text>}
                   </ScrollView>
-                  <TouchableOpacity style={[s.capsuleSeal, { backgroundColor: colors.accent.blue, marginTop: spacing[3], flexDirection: 'row', gap: 8 }]} activeOpacity={0.9}
+                  <TouchableOpacity
+                    style={{ marginTop: spacing[3], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: radius.lg, backgroundColor: accentColor }}
+                    activeOpacity={0.9}
                     onPress={() => { haptic.tap(); setFoodCat(null); router.navigate('/products' as any); }}>
-                    <ShoppingCart size={15} color="#fff" />
-                    <Text style={[s.capsuleSealTxt, { color: '#fff' }]}>Zarządzaj produktami (scal / popraw)</Text>
+                    <ShoppingCart size={16} color={colors.bg.primary} strokeWidth={2.4} />
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: colors.bg.primary }}>Zarządzaj produktami</Text>
                   </TouchableOpacity>
                 </>
               );

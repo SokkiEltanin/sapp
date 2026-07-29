@@ -293,26 +293,32 @@ export async function readHealthDay(date: Date = new Date()): Promise<HealthConn
 
   let sleepMinutes = 0, sleepDeepMin = 0, sleepRemMin = 0, sleepLightMin = 0;
   try {
-    // Sen: szersze okno (30h wstecz) i SUMUJEMY WSZYSTKIE sesje kończące się w `date`
-    // (dzień POBUDKI) — bug: dayFilter gubił drzemkę/drugą sesję albo sen nocny zaczęty
-    // wczoraj. „Spałem 2 razy dziś" → obie się liczą.
+    // Sen: okno 30h wstecz, liczymy sesje kończące się w `date` (dzień POBUDKI — łapie
+    // sen nocny zaczęty wczoraj + drzemki dziś). GRUPUJEMY PO ŹRÓDLE i bierzemy źródło
+    // z NAJWIĘKSZĄ sumą — bo Health Sync + Samsung natywnie piszą TĘ SAMĄ sesję (duplikat),
+    // a ślepe sumowanie dawało 17h. W obrębie źródła sesje się sumują (2 sny dziś = obie).
     const dayKey = localKey(date);
     const sleepWin = { operator: 'between', startTime: new Date(date.getTime() - 30 * 3600e3).toISOString(), endTime: filter.endTime } as const;
+    const bySrc = new Map<string, { min: number; deep: number; rem: number; light: number }>();
     for (const r of await read(hc, 'SleepSession', sleepWin)) {
       const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
       if (en <= st) continue;
-      if (localKey(new Date(en)) !== dayKey) continue;   // liczymy na dniu POBUDKI
-      sleepMinutes += Math.round((en - st) / 60000);
-      // Stage minutes (HC enum: 4=light, 5=deep, 6=REM). Samsung populates these.
+      if (localKey(new Date(en)) !== dayKey) continue;   // dzień POBUDKI = dziś
+      const src = srcOf(r) ?? 'unknown';
+      const e = bySrc.get(src) ?? { min: 0, deep: 0, rem: 0, light: 0 };
+      e.min += Math.round((en - st) / 60000);
       for (const stg of (r.stages ?? [])) {
         const ss = new Date(stg.startTime).getTime(), se = new Date(stg.endTime).getTime();
         if (se <= ss) continue;
         const mins = Math.round((se - ss) / 60000);
-        if (stg.stage === 5) sleepDeepMin += mins;
-        else if (stg.stage === 6) sleepRemMin += mins;
-        else if (stg.stage === 4) sleepLightMin += mins;
+        if (stg.stage === 5) e.deep += mins;
+        else if (stg.stage === 6) e.rem += mins;
+        else if (stg.stage === 4) e.light += mins;
       }
+      bySrc.set(src, e);
     }
+    const best = [...bySrc.values()].reduce((a, b) => (b.min > a.min ? b : a), { min: 0, deep: 0, rem: 0, light: 0 });
+    sleepMinutes = best.min; sleepDeepMin = best.deep; sleepRemMin = best.rem; sleepLightMin = best.light;
   } catch {}
 
   let exerciseMinutes = 0;
@@ -431,11 +437,22 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
   } catch {}
 
   try {
+    // Sen po dniu POBUDKI, ale DEDUP PO ŹRÓDLE (Health Sync + Samsung = duplikat) —
+    // grupujemy minuty per (dzień, źródło) i bierzemy MAX źródło, nie sumę.
+    const sleepByDaySrc = new Map<string, Map<string, number>>();
     for (const r of await read(hc, 'SleepSession', filter)) {
       const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
       if (en <= st) continue;
-      const p = byDay.get(localKey(new Date(r.endTime)));   // wake day
-      if (p) p.sleepMinutes += Math.round((en - st) / 60000);
+      const day = localKey(new Date(r.endTime));   // wake day
+      if (!byDay.has(day)) continue;
+      const m = sleepByDaySrc.get(day) ?? new Map<string, number>();
+      const src = srcOf(r) ?? 'unknown';
+      m.set(src, (m.get(src) ?? 0) + Math.round((en - st) / 60000));
+      sleepByDaySrc.set(day, m);
+    }
+    for (const [day, m] of sleepByDaySrc) {
+      const p = byDay.get(day);
+      if (p) p.sleepMinutes = m.size ? Math.max(...m.values()) : 0;
     }
   } catch {}
 
