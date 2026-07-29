@@ -11,7 +11,7 @@ import { getHealthHistory, saveTodayWeight, activeFromSteps } from '@/utils/heal
 import { getHealthGoals, saveHealthGoals, bmrMifflin } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import DatePickerField from '@/components/ui/DatePickerField';
-import { spacing, radius, colors } from '@/theme';
+import { spacing, radius, colors, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -609,13 +609,13 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   heroCard:   { alignItems: 'center', gap: spacing[3] },
   ringWrap:   { alignItems: 'center', justifyContent: 'center' },
   ringCenter: { position: 'absolute', alignItems: 'center' },
-  ringEaten:  { fontSize: 34, fontWeight: '800', color: c.text.primary, letterSpacing: -1 },
+  ringEaten:  { fontFamily: fonts.display, fontSize: 34, color: c.text.primary, letterSpacing: -0.5 },
   ringOf:     { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 1 },
 
   heroStats:   { flexDirection: 'row', alignItems: 'center', gap: spacing[4] },
   heroStat:    { alignItems: 'center', gap: 2, minWidth: 72 },
   heroBurnRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  heroStatVal: { fontSize: 20, fontWeight: '800', color: c.text.primary },
+  heroStatVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary },
   heroStatLabel: { fontSize: 11, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   heroDivider: { width: 1, height: 30, backgroundColor: c.border.subtle },
 
@@ -669,7 +669,7 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   avgRow:     { flexDirection: 'row', alignItems: 'center' },
   avgItem:    { flex: 1, alignItems: 'center', gap: 2 },
-  avgVal:     { fontSize: 18, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
+  avgVal:     { fontFamily: fonts.display, fontSize: 18, color: c.text.primary, letterSpacing: -0.4 },
   avgLbl:     { fontSize: 10, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
   avgDivider: { width: 1, height: 28, backgroundColor: c.border.default },
   avgRec:     { fontSize: 12, color: c.text.secondary, lineHeight: 17, marginTop: 2 },

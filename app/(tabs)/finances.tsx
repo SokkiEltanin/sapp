@@ -28,7 +28,7 @@ import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
 import { getCategoryMeta } from '@/utils/categories';
 import { Expense } from '@/types';
-import { colors, spacing, radius } from '@/theme';
+import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { haptic } from '@/utils/haptics';
 
@@ -686,9 +686,9 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   },
   heroPillLabel: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
   heroPillVal: { fontSize: 12.5, color: c.text.primary, fontWeight: '800' },
-  heroDate:      { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 1.5 },
+  heroDate:      { fontFamily: fonts.label, fontSize: 10, color: c.text.muted, letterSpacing: 1.5 },
   heroAmountRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  heroAmount:    { fontSize: 42, fontWeight: '800', color: c.text.primary, letterSpacing: -2, lineHeight: 46 },
+  heroAmount:    { fontFamily: fonts.display, fontSize: 40, color: c.text.primary, letterSpacing: -1, lineHeight: 46 },
   heroCurrency:  { fontSize: 20, fontWeight: '600', color: c.text.muted, paddingBottom: 4 },
   heroSplit:     { fontSize: 12, color: c.text.secondary, fontWeight: '500', marginTop: 3, marginBottom: 2 },
   heroSub:       { fontSize: 12, color: c.text.secondary, fontWeight: '500' },
@@ -718,7 +718,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     borderWidth: 1, borderColor: f.cardBorder,
     padding: spacing[4], gap: spacing[3],
   },
-  monthTitle: { fontSize: 11, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
+  monthTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 1 },
   monthHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthDayTag: { fontSize: 10, fontWeight: '700', color: c.text.muted, letterSpacing: 0.3 },
 
@@ -733,7 +733,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   bkDot: { width: 10, height: 10, borderRadius: 5 },
   bkTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 },
   bkLabel: { fontSize: 13, fontWeight: '700', color: c.text.primary, flex: 1, marginRight: spacing[2] },
-  bkAmt: { fontSize: 13, fontWeight: '800', color: c.text.primary, fontVariant: ['tabular-nums'] },
+  bkAmt: { fontFamily: fonts.display, fontSize: 13, color: c.text.primary },
   bkTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, overflow: 'hidden' },
   bkFill: { height: '100%', borderRadius: 3 },
   bkPct: { width: 34, textAlign: 'right', fontSize: 11, fontWeight: '700', color: c.text.muted, fontVariant: ['tabular-nums'] },
@@ -774,7 +774,7 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
     borderTopWidth: 1, borderTopColor: c.border.subtle,
   },
   flowNetLabel: { fontSize: 12, color: c.text.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  flowNet: { fontSize: 18, fontWeight: '800' },
+  flowNet: { fontFamily: fonts.display, fontSize: 18 },
   flowFixedNote: { fontSize: 10.5, color: c.text.muted, marginTop: 2 },
   chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chartTitle: { fontSize: 11, fontWeight: '800', color: f.accent, letterSpacing: 1 },

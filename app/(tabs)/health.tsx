@@ -25,7 +25,7 @@ import { useColors } from '@/theme/useColors';
 import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration } from '@/services/healthConnectService';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
-import { colors, spacing, radius, typography } from '@/theme';
+import { colors, spacing, radius, typography, fonts } from '@/theme';
 
 // ─── Teal palette ─────────────────────────────────────────────────────────────
 
@@ -1511,9 +1511,9 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   tealCard: { gap: spacing[3], backgroundColor: t.card, borderColor: t.cardBorder },
   tealPomRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: t.card, borderColor: t.cardBorder },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  cardLabel: { fontSize: 10, fontWeight: '600', color: t.muted, letterSpacing: 1.2 },
+  cardLabel: { fontFamily: fonts.label, fontSize: 10, color: t.muted, letterSpacing: 1.2 },
 
-  heroNum: { fontSize: 44, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
+  heroNum: { fontFamily: fonts.display, fontSize: 44, letterSpacing: -1, lineHeight: 50 },
   heroSub: { ...typography.caption, color: c.text.muted },
 
   progressTrack: { height: 8, backgroundColor: c.fill.medium, borderRadius: radius.full, overflow: 'hidden' },
@@ -1578,7 +1578,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   stageText: { fontSize: 11, fontWeight: '600', color: c.text.secondary },
   summaryRow: { flexDirection: 'row', gap: spacing[2] },
   summaryTile: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: spacing[3], backgroundColor: t.card, borderRadius: radius.lg, borderWidth: 1, borderColor: t.cardBorder },
-  summaryVal: { fontSize: 17, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
+  summaryVal: { fontFamily: fonts.display, fontSize: 17, color: c.text.primary, letterSpacing: -0.4 },
   summaryLabel: { fontSize: 9.5, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
 
   qualityBadge: {
@@ -1649,7 +1649,7 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   },
   analysisGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing[3] },
   analysisTile: { width: '50%', paddingVertical: spacing[2], gap: 1 },
-  analysisVal: { fontSize: 20, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
+  analysisVal: { fontFamily: fonts.display, fontSize: 20, color: c.text.primary, letterSpacing: -0.4 },
   analysisLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted },
   analysisNote: {
     fontSize: 11, color: c.text.secondary, fontStyle: 'italic',
