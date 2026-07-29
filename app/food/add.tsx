@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers, ChefHat, Copy } from 'lucide-react-native';
+import { ChevronLeft, Search, Plus, Minus, X, Pencil, Check, Trash2, Star, RotateCcw, Layers, ChefHat, Copy, Apple } from 'lucide-react-native';
 
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemKcal,
@@ -428,6 +428,13 @@ export default function FoodAdd() {
 
   const unitLabel = (u: FoodUnit) => UNIT_META[u].label;
 
+  // Rozróżnienie pozycji w komponowanym posiłku: złożenie (preset), danie (przepis), produkt.
+  const kindOf = (it: MealItem): 'danie' | 'kompozycja' | 'produkt' => {
+    if (it.parts && it.parts.length) return 'kompozycja';
+    const p = it.productId ? products.find(x => x.id === it.productId) : undefined;
+    return p && isRecipeProduct(p) ? 'danie' : 'produkt';
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -481,25 +488,36 @@ export default function FoodAdd() {
           })}
         </View>
 
-        {/* added items */}
+        {/* added items — TWÓJ POSIŁEK: rozróżnienie DANIE / ZŁOŻENIE / PRODUKT */}
         {items.length > 0 && (
           <View style={s.card}>
-            {items.map((it, i) => (
-              <View key={i} style={[s.itemRow, i > 0 && s.itemBorder]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.itemName} numberOfLines={1}>
-                    {it.parts ? <Layers size={12} color={ACCENT} /> : null}{it.parts ? ' ' : ''}{it.name}{it.parts && it.qty > 1 ? ` ×${it.qty}` : ''}
-                  </Text>
+            <View style={s.mealHead}>
+              <Text style={s.mealHeadTxt}>Twój posiłek</Text>
+              <Text style={s.mealHeadCount}>{items.length} {items.length === 1 ? 'pozycja' : 'pozycje'}</Text>
+            </View>
+            {items.map((it, i) => {
+              const k = kindOf(it);
+              const KindIcon = k === 'danie' ? ChefHat : k === 'kompozycja' ? Layers : Apple;
+              const kindCol = k === 'danie' ? '#F59E0B' : k === 'kompozycja' ? ACCENT : c.text.muted;
+              return (
+              <View key={i} style={[s.itemRow, s.itemBorder]}>
+                <View style={[s.kindTag, { borderColor: kindCol + '55', backgroundColor: kindCol + '18' }]}>
+                  <KindIcon size={11} color={kindCol} />
+                  <Text style={[s.kindTagTxt, { color: kindCol }]}>{k === 'danie' ? 'DANIE' : k === 'kompozycja' ? 'ZŁOŻENIE' : 'PRODUKT'}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={s.itemName} numberOfLines={1}>{it.name}{it.parts && it.qty > 1 ? ` ×${it.qty}` : ''}</Text>
                   <Text style={s.itemMeta} numberOfLines={1}>
                     {it.parts ? it.parts.map(p => p.name).join(', ')
                       : it.unit === 'g' ? `${it.grams} g`
                       : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}
                   </Text>
                 </View>
-                <Text style={s.itemKcal}>{it.kcal} kcal</Text>
+                <Text style={s.itemKcal}>{it.kcal}</Text>
                 <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setItems(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
               </View>
-            ))}
+              );
+            })}
             <View style={s.totalRow}>
               <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setSaveP(true); }}>
                 <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
@@ -544,7 +562,10 @@ export default function FoodAdd() {
                       <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
                       <View style={{ flex: 1 }}>
                         <View style={s.candNameRow}>
-                          {e.kind === 'dish' ? <ChefHat size={13} color={ACCENT} /> : <Layers size={13} color={c.text.muted} />}
+                          <View style={[s.kindTag, e.kind === 'dish' ? { borderColor: '#F59E0B55', backgroundColor: '#F59E0B18' } : { borderColor: ACCENT + '44', backgroundColor: ACCENT + '14' }]}>
+                            {e.kind === 'dish' ? <ChefHat size={10} color="#F59E0B" /> : <Layers size={10} color={ACCENT} />}
+                            <Text style={[s.kindTagTxt, { color: e.kind === 'dish' ? '#F59E0B' : ACCENT }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
+                          </View>
                           <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
                         </View>
                         <Text style={s.candMeta}>{e.meta}{e.note ? `  ·  ${e.note}` : ''}</Text>
@@ -595,7 +616,10 @@ export default function FoodAdd() {
                       <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
                       <View style={{ flex: 1 }}>
                         <View style={s.candNameRow}>
-                          {e.kind === 'dish' ? <ChefHat size={13} color={ACCENT} /> : <Layers size={13} color={c.text.muted} />}
+                          <View style={[s.kindTag, e.kind === 'dish' ? { borderColor: '#F59E0B55', backgroundColor: '#F59E0B18' } : { borderColor: ACCENT + '44', backgroundColor: ACCENT + '14' }]}>
+                            {e.kind === 'dish' ? <ChefHat size={10} color="#F59E0B" /> : <Layers size={10} color={ACCENT} />}
+                            <Text style={[s.kindTagTxt, { color: e.kind === 'dish' ? '#F59E0B' : ACCENT }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
+                          </View>
                           <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
                         </View>
                         <Text style={s.candMeta}>{e.meta}</Text>
@@ -888,8 +912,13 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   multChip: { minWidth: 56, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   multTxt:  { fontSize: 15, fontWeight: '800', color: c.text.secondary },
 
-  itemRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 8 },
+  mealHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  mealHeadTxt:   { fontSize: 11, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  mealHeadCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
+  itemRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 8 },
   itemBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
+  kindTag:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, minWidth: 58, justifyContent: 'center' },
+  kindTagTxt: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
   itemName:   { fontSize: 14, fontWeight: '700', color: c.text.primary },
   itemMeta:   { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
   itemKcal:   { fontSize: 13, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
