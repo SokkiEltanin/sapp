@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, Car, PersonStanding } from 'lucide-react-native';
+import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, LayoutGrid, Car, PersonStanding } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
@@ -152,6 +152,7 @@ export default function Counters() {
                 {auto ? <Ban size={15} color={ACCENT} /> : <RotateCcw size={15} color={ACCENT} />}
                 <Text style={s.cardName} numberOfLines={1}>{auto ? `bez ${cn.name}` : cn.name}</Text>
                 {cn.onDashboard !== false && <LayoutDashboard size={13} color={c.text.muted} />}
+                <TouchableOpacity onPress={() => { haptic.tap(); router.push(`/habit-year?counter=${cn.id}` as any); }} hitSlop={8} style={s.iconBtn}><LayoutGrid size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => openEdit(cn)} hitSlop={8} style={s.iconBtn}><Pencil size={15} color={c.text.muted} /></TouchableOpacity>
                 <TouchableOpacity onPress={() => del(cn)} hitSlop={8} style={s.iconBtn}><Trash2 size={15} color={c.accent.red} /></TouchableOpacity>
               </View>

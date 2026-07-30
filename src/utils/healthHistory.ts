@@ -25,14 +25,16 @@ export function activeFromSteps(steps: number, weightKg: number): number {
   return Math.round(steps * kg * 0.0005);
 }
 
-export function dailyBurnFromHc(hc: any, fallbackBmr = 0, steps = 0, weightKg = 0): number {
+export function dailyBurnFromHc(hc: any, fallbackBmr = 0, steps = 0, weightKg = 0, floorFrac = 0.45): number {
   const stepsActive = activeFromSteps(steps, weightKg);
-  if (!hc) return fallbackBmr > 0 ? Math.round(fallbackBmr + stepsActive) : Math.round(stepsActive);
+  const floorFor = (bmr: number) => bmr > 0 ? Math.round(bmr * floorFrac) : 0;
+  if (!hc) return fallbackBmr > 0 ? Math.round(fallbackBmr + Math.max(stepsActive, floorFor(fallbackBmr))) : Math.round(stepsActive);
   const total = Number(hc.totalCalories) || 0;
   const bmr = Number(hc.bmr) || fallbackBmr || 0;
   const active = Number(hc.activeCalories) || 0;
-  // Ruch = MAX(zmierzony z zegarka, oszacowany z kroków, mała podłoga 12% BMR).
-  const move = Math.max(active, stepsActive, bmr > 0 ? Math.round(bmr * 0.12) : 0);
+  // Ruch = MAX(zmierzony z zegarka, oszacowany z kroków, podłoga wg poziomu aktywności).
+  // Podłoga łapie rower/aktywność, której kroki nie widzą — bez niej cel bywał za niski.
+  const move = Math.max(active, stepsActive, floorFor(bmr));
   const est = bmr > 0 ? bmr + move : Math.max(active, stepsActive);
   // Samsung czasem daje OKROJONY „total" mniejszy niż BMR (np. 1252 < 1670) — bez sensu.
   // Ufamy totalowi TYLKO gdy pełny dzień I WYŻSZY niż BMR+ruch; inaczej BMR+ruch.
@@ -55,7 +57,7 @@ export async function saveTodayWeight(kg: number): Promise<void> {
   await AsyncStorage.setItem('health_last_weight', String(kg)).catch(() => {});
 }
 
-export async function getHealthHistory(days = 60, fallbackBmr = 0, defaultWeightKg = 0): Promise<Record<string, HealthDayHistory>> {
+export async function getHealthHistory(days = 60, fallbackBmr = 0, defaultWeightKg = 0, floorFrac = 0.45): Promise<Record<string, HealthDayHistory>> {
   const keys: string[] = [];
   const dates: string[] = [];
   const today = new Date();
@@ -78,7 +80,7 @@ export async function getHealthHistory(days = 60, fallbackBmr = 0, defaultWeight
         const sleepMinutes = isFakeSleep ? 0 : (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
         const stepsN = Number(d.steps) || 0;
         const wKg = Number(d.weight) || defaultWeightKg;
-        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: stepsN, burn: dailyBurnFromHc(d.hc, fallbackBmr, stepsN, wKg) };
+        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: stepsN, burn: dailyBurnFromHc(d.hc, fallbackBmr, stepsN, wKg, floorFrac) };
       } catch {}
     });
   } catch {}

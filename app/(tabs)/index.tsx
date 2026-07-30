@@ -54,7 +54,7 @@ import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
-import { getHealthGoals } from '@/utils/healthGoals';
+import { getHealthGoals, bmrMifflin, ACTIVITY_FACTOR } from '@/utils/healthGoals';
 import DailyRings, { RingSpec } from '@/components/dashboard/DailyRings';
 import MonthWrappedCard from '@/components/dashboard/MonthWrappedCard';
 import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
@@ -1215,13 +1215,23 @@ export default function DashboardScreen() {
   useEffect(() => { loadPomSessions(); }, []);
   useEffect(() => { loadNameAliases().then(setNameAliases).catch(() => {}); }, []);
   const reloadHealth = useCallback((force = false) => {
-    const read = () => {
-      getHealthHistory(150).then(h => {
+    const read = async () => {
+      // BMR + poziom aktywności → burn per dzień = spoczynek + ruch (jak w zakładce Jedzenie),
+      // żeby cel na dashboardzie zgadzał się z zakładką (podłoga ruchu wg aktywności).
+      let pbmr = 0, floorFrac = ACTIVITY_FACTOR.mod, lw = 0;
+      try {
+        const g = await getHealthGoals();
+        setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 });
+        floorFrac = ACTIVITY_FACTOR[g.activityLevel] ?? ACTIVITY_FACTOR.mod;
+        const lwRaw = await AsyncStorage.getItem('health_last_weight');
+        lw = lwRaw ? parseFloat(lwRaw) : 0;
+        pbmr = bmrMifflin(lw, g.heightCm, g.ageYears, g.sex);
+      } catch {}
+      getHealthHistory(150, pbmr, lw, floorFrac).then(h => {
         const m: StatCtx['healthDays'] = {};
         for (const [d, v] of Object.entries(h)) m[d] = { steps: v.steps, sleepMinutes: v.sleepMinutes, weightKg: v.weight > 0 ? v.weight : null, burn: v.burn };
         setHealthDays(m);
       }).catch(() => {});
-      getHealthGoals().then(g => setHealthGoals({ stepGoal: g.stepGoal || 10000, waterGoal: g.waterGoal || 8, weightGoal: g.weightGoal || 0 })).catch(() => {});
     };
     read();
     // Pull fresh steps/sleep from the watch. force=true (app ENTRY: cold start + resume)

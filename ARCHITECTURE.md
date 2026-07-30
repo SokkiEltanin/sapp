@@ -185,7 +185,12 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   TYLKO tu** — w `app/products.tsx` zostało samo matchowanie/scalanie + tagi/waga/kategoria.
   MealItem niesie rozwiązane makra; presety/dania je sumują; zakładka pokazuje dzienne B/W/T.
 - **Zapotrzebowanie:** `bmrMifflin(kg,cm,age,sex)` (profil w `health_goals`: heightCm/ageYears/
-  sex, modal Profil na zakładce) → spalanie = BMR (spoczynek) + active (ruch z zegarka).
+  sex + `activityLevel`, modal Profil na zakładce) → spalanie = BMR (spoczynek) + active (ruch).
+  **Ruch = MAX(aktywne z zegarka, oszac. z kroków, podłoga `activityFloor(bmr,level)` =
+  BMR×factor).** Podłoga (sed 0.15 / light 0.30 / mod 0.45 / high 0.62) łapie rower i aktywność
+  której kroki nie widzą — bez niej cel bywał za niski. `dailyBurnFromHc(...,floorFrac)` i
+  `getHealthHistory(...,floorFrac)` niosą factor; dashboard i zakładka czytają `activityLevel`
+  z `health_goals` (spójny cel). Domyślnie `mod`.
   `foodBase.ts` = warzywa+owoce + **podstawy do wypieków** (jajko 55 g/szt, mąka 130 g/szkl,
   olej 13 g/łyżkę…) — kluczowe są poprawne gramy na jednostkę, by PRZEPISY liczyły się od razu.
 - **Biblioteka: PRODUKTY vs KOMPOZYCJE I DANIA.** Dwa ekrany-siostry z przełącznikiem u góry:
@@ -247,6 +252,11 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
 - **Wrapped/kolekcje**: `monthCards.ts`/`yearCards.ts` + `MonthWrappedCard`/`YearWrappedCard`
   (BEZ emotek — „wyglądało tanio"). `YearPixels` = rok w pikselach (viz `pixels`).
 - **Nawyki/liczniki**: `utils/habits.ts` + `useHabits`, `countersStore` (dni bez / odliczania).
+  `app/habit-year.tsx` = jeden ekran pixeli dla NAWYKU (`?id=`) **i** LICZNIKA (`?counter=`):
+  MIESIĄC = kalendarz (Pn..Nd + numery dni), ROK = rolka GitHub. Nawyk: done=kolor nawyku,
+  frozen=ICE; licznik „bez X": dzień czysto=zielony, wpadka (kupiłeś)=czerwony (z paragonów przez
+  `matchesAvoid`). Seria licznika liczona OD DZIŚ; nawyku jak `getStreak` (od wczoraj gdy dziś
+  jeszcze nie zrobione). Wejścia: kafle „Twoje serie" (dashboard) + ikona siatki w `/counters`.
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 

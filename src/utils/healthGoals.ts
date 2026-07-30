@@ -1,5 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Poziom aktywności (JEDNORAZOWE ustawienie, nie codzienne) — ustala „podłogę" spalania
+// jako ułamek BMR na dni bez danych aktywnych z zegarka. Ktoś kto jeździ rowerem i robi
+// 8k kroków spala sporo, czego kroki same nie łapią → bez tego cel byłby za niski.
+export type ActivityLevel = 'sed' | 'light' | 'mod' | 'high';
+export const ACTIVITY_FACTOR: Record<ActivityLevel, number> = { sed: 0.15, light: 0.30, mod: 0.45, high: 0.62 };
+export const ACTIVITY_LABEL: Record<ActivityLevel, string> = {
+  sed: 'Siedzący', light: 'Lekko aktywny', mod: 'Aktywny', high: 'Bardzo aktywny',
+};
+export const ACTIVITY_DESC: Record<ActivityLevel, string> = {
+  sed: 'praca przy biurku, mało ruchu',
+  light: 'trochę chodzenia, sporadyczny ruch',
+  mod: '~8k kroków, rower, częsty ruch',
+  high: 'ciężka praca fizyczna / codzienny trening',
+};
+
 export interface HealthGoals {
   stepGoal: number;
   waterGoal: number;  // daily water goal in glasses
@@ -10,10 +25,17 @@ export interface HealthGoals {
   heightCm: number;
   ageYears: number;
   sex: 'm' | 'f' | '';
+  activityLevel: ActivityLevel;   // one-time; sets the active-burn floor
 }
 
 const KEY = 'health_goals';
-const DEFAULTS: HealthGoals = { stepGoal: 10_000, waterGoal: 8, glassMl: 250, weightGoal: 0, heightCm: 0, ageYears: 0, sex: '' };
+const DEFAULTS: HealthGoals = { stepGoal: 10_000, waterGoal: 8, glassMl: 250, weightGoal: 0, heightCm: 0, ageYears: 0, sex: '', activityLevel: 'mod' };
+
+// „Podłoga" ruchu (aktywne kcal) dla dni bez pomiaru z zegarka: BMR × factor poziomu.
+export function activityFloor(bmr: number, level: ActivityLevel = 'mod'): number {
+  if (!(bmr > 0)) return 0;
+  return Math.round(bmr * (ACTIVITY_FACTOR[level] ?? ACTIVITY_FACTOR.mod));
+}
 
 export async function getHealthGoals(): Promise<HealthGoals> {
   try {
@@ -28,6 +50,7 @@ export async function getHealthGoals(): Promise<HealthGoals> {
       heightCm:  parsed.heightCm  > 0 ? parsed.heightCm  : 0,
       ageYears:  parsed.ageYears  > 0 ? parsed.ageYears  : 0,
       sex:       parsed.sex === 'm' || parsed.sex === 'f' ? parsed.sex : '',
+      activityLevel: (['sed', 'light', 'mod', 'high'] as const).includes(parsed.activityLevel) ? parsed.activityLevel : DEFAULTS.activityLevel,
     };
   } catch {
     return DEFAULTS;

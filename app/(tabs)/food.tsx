@@ -8,7 +8,7 @@ import { Flame, UtensilsCrossed, Trash2, Target, Plus, Minus, Droplets, Scale, S
 
 import { useFoodStore, MEAL_TYPES, mealTypeLabel, targetIntake, GoalMode, MealEntry, MealType } from '@/store/foodStore';
 import { getHealthHistory, saveTodayWeight, activeFromSteps } from '@/utils/healthHistory';
-import { getHealthGoals, saveHealthGoals, bmrMifflin } from '@/utils/healthGoals';
+import { getHealthGoals, saveHealthGoals, bmrMifflin, ACTIVITY_FACTOR, ACTIVITY_LABEL, ACTIVITY_DESC, type ActivityLevel } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { spacing, radius, colors, fonts } from '@/theme';
@@ -51,9 +51,10 @@ export default function Food() {
   const [stepsToday, setStepsToday] = useState(0);     // kroki dziś (fallback ruchu, gdy brak aktywnych kcal)
   const [watchBmr, setWatchBmr] = useState(0);         // BMR z zegarka (fallback)
   const [watchTotal, setWatchTotal] = useState(0);     // CAŁKOWITE spalanie z zegarka (najlepsze — pełny dzień)
-  const [profile, setProfile] = useState<{ heightCm: number; ageYears: number; sex: 'm' | 'f' | '' }>({ heightCm: 0, ageYears: 0, sex: '' });
+  const [profile, setProfile] = useState<{ heightCm: number; ageYears: number; sex: 'm' | 'f' | ''; activityLevel: ActivityLevel }>({ heightCm: 0, ageYears: 0, sex: '', activityLevel: 'mod' });
   const [profileModal, setProfileModal] = useState(false);
   const [pfH, setPfH] = useState(''); const [pfA, setPfA] = useState(''); const [pfSex, setPfSex] = useState<'m' | 'f' | ''>('');
+  const [pfAct, setPfAct] = useState<ActivityLevel>('mod');
   const today = todayStr();
   const [viewDate, setViewDate] = useState(today);   // browsed day (default today)
   const [dateModal, setDateModal] = useState(false);
@@ -108,13 +109,14 @@ export default function Food() {
   const loadBody = useCallback(async () => {
     const goals = await getHealthGoals();
     setWeightGoal(goals.weightGoal);
-    setProfile({ heightCm: goals.heightCm, ageYears: goals.ageYears, sex: goals.sex });
+    setProfile({ heightCm: goals.heightCm, ageYears: goals.ageYears, sex: goals.sex, activityLevel: goals.activityLevel });
     // BMR from the profile (last known weight) → passed to the history so EVERY day's burn
     // = resting (BMR) + active, even when the watch reports only activity calories.
     const lwRaw = await AsyncStorage.getItem('health_last_weight');
     const lw = lwRaw ? parseFloat(lwRaw) : 0;
     const pbmr = bmrMifflin(lw, goals.heightCm, goals.ageYears, goals.sex);
-    const hist = await getHealthHistory(30, pbmr, lw);
+    const floorFrac = ACTIVITY_FACTOR[goals.activityLevel] ?? ACTIVITY_FACTOR.mod;
+    const hist = await getHealthHistory(30, pbmr, lw, floorFrac);
     const series: { d: string; w: number }[] = [];
     const bbd: Record<string, number> = {};
     for (const d of Object.keys(hist).sort()) { const w = hist[d].weight; if (w > 0) series.push({ d, w }); bbd[d] = hist[d].burn; }
@@ -147,9 +149,10 @@ export default function Food() {
     let total: number, active: number, source: 'total' | 'bmr' | 'fallback';
     let moveSrc: 'watch' | 'steps' | 'floor' | 'none' = 'none';
     if (bmr > 0) {
-      // Ruch: zmierzony z zegarka (aktywne kcal) LUB oszacowany z KROKÓW + podłoga 12% BMR.
+      // Ruch: zmierzony z zegarka (aktywne kcal) LUB oszacowany z KROKÓW + podłoga wg poziomu
+      // aktywności (łapie rower/aktywność, której kroki nie widzą — bez tego cel był za niski).
       const stepsActive = activeFromSteps(stepsToday, weightKg);
-      const floorA = Math.round(bmr * 0.12);
+      const floorA = Math.round(bmr * (ACTIVITY_FACTOR[profile.activityLevel] ?? ACTIVITY_FACTOR.mod));
       active = Math.max(activeToday, stepsActive, floorA);
       moveSrc = activeToday > 0 && activeToday >= stepsActive && activeToday >= floorA ? 'watch'
         : stepsActive > 0 && stepsActive >= floorA ? 'steps' : 'floor';
@@ -167,12 +170,13 @@ export default function Food() {
   const burn = burnModel.total;
   const profileComplete = burnModel.fromProfile;
 
-  const openProfile = () => { haptic.tap(); setPfH(profile.heightCm ? String(profile.heightCm) : ''); setPfA(profile.ageYears ? String(profile.ageYears) : ''); setPfSex(profile.sex); setProfileModal(true); };
+  const openProfile = () => { haptic.tap(); setPfH(profile.heightCm ? String(profile.heightCm) : ''); setPfA(profile.ageYears ? String(profile.ageYears) : ''); setPfSex(profile.sex); setPfAct(profile.activityLevel); setProfileModal(true); };
   const saveProfile = () => {
     const h = parseInt(pfH, 10) || 0, a = parseInt(pfA, 10) || 0;
-    setProfile({ heightCm: h, ageYears: a, sex: pfSex });
-    saveHealthGoals({ heightCm: h, ageYears: a, sex: pfSex }).catch(() => {});
+    setProfile({ heightCm: h, ageYears: a, sex: pfSex, activityLevel: pfAct });
+    saveHealthGoals({ heightCm: h, ageYears: a, sex: pfSex, activityLevel: pfAct }).catch(() => {});
     setProfileModal(false);
+    loadBody();   // przelicz historię/cel z nową podłogą aktywności
   };
   const checkWatch = async () => {
     haptic.tap();
@@ -355,7 +359,7 @@ export default function Food() {
             ) : profileComplete ? (
               <Text style={s.needsTxt}>
                 Spoczynek <Text style={s.needsB}>{burnModel.bmr}</Text> + ruch <Text style={s.needsB}>{burnModel.active}</Text> = <Text style={s.needsB}>{burnModel.total}</Text> spalone
-                <Text style={{ color: colors.text.muted }}>{burnModel.moveSrc === 'steps' ? '  · ruch z kroków (zegarek nie podaje kcal)' : burnModel.moveSrc === 'watch' ? '  · z zegarka' : ''}</Text>
+                <Text style={{ color: colors.text.muted }}>{burnModel.moveSrc === 'steps' ? '  · ruch z kroków (zegarek nie podaje kcal)' : burnModel.moveSrc === 'watch' ? '  · z zegarka' : burnModel.moveSrc === 'floor' ? '  · szacunek z poziomu aktywności (zmień w profilu)' : ''}</Text>
               </Text>
             ) : (
               <Text style={[s.needsTxt, { color: ACCENT }]}>Ustaw profil (wzrost, wiek, płeć) → policzę Twoje zapotrzebowanie</Text>
@@ -543,12 +547,24 @@ export default function Food() {
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={s.pfActHint}>Poziom aktywności — podnosi cel, gdy zegarek nie podaje spalania (łapie rower itp.)</Text>
+              <View style={s.pfActGrid}>
+                {(['sed', 'light', 'mod', 'high'] as const).map(lv => (
+                  <TouchableOpacity key={lv} onPress={() => { haptic.tap(); setPfAct(lv); }}
+                    style={[s.actChip, pfAct === lv && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                    <Text style={[s.actChipTitle, pfAct === lv && { color: ACCENT }]}>{ACTIVITY_LABEL[lv]}</Text>
+                    <Text style={s.actChipDesc}>{ACTIVITY_DESC[lv]}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               {(() => {
                 const h = parseInt(pfH, 10) || 0, a = parseInt(pfA, 10) || 0;
                 const bmr = bmrMifflin(weightKg, h, a, pfSex);
-                return bmr > 0
-                  ? <Text style={s.pfBmr}>BMR ≈ {bmr} kcal/dzień (spoczynek, przy {weightKg.toFixed(1)} kg)</Text>
-                  : <Text style={s.pfSub}>{weightKg > 0 ? 'Uzupełnij wzrost, wiek i płeć.' : 'Najpierw ustaw wagę (karta Waga / zegarek).'}</Text>;
+                if (bmr > 0) {
+                  const tdee = bmr + Math.round(bmr * (ACTIVITY_FACTOR[pfAct] ?? ACTIVITY_FACTOR.mod));
+                  return <Text style={s.pfBmr}>BMR ≈ {bmr} · z aktywnością ≈ {tdee} kcal/dzień (przy {weightKg.toFixed(1)} kg)</Text>;
+                }
+                return <Text style={s.pfSub}>{weightKg > 0 ? 'Uzupełnij wzrost, wiek i płeć.' : 'Najpierw ustaw wagę (karta Waga / zegarek).'}</Text>;
               })()}
               <TouchableOpacity style={[s.sheetSave, { backgroundColor: (parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex) ? ACCENT : c.fill.subtle }]}
                 disabled={!(parseInt(pfH, 10) > 0 && parseInt(pfA, 10) > 0 && pfSex)} onPress={saveProfile}>
@@ -637,6 +653,11 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   pfUnit:     { fontSize: 13, fontWeight: '600', color: c.text.muted },
   sexChip:    { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default },
   sexTxt:     { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  pfActHint:  { fontSize: 11.5, color: c.text.muted, lineHeight: 15, marginTop: 2 },
+  pfActGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  actChip:    { flexBasis: '47.5%', flexGrow: 1, paddingVertical: 9, paddingHorizontal: 11, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, gap: 2 },
+  actChipTitle: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
+  actChipDesc: { fontSize: 10, color: c.text.muted, lineHeight: 13 },
   pfBmr:      { fontSize: 13, fontWeight: '800', color: '#F59E0B' },
   pfProbe:    { alignItems: 'center', paddingVertical: 6 },
   pfProbeTxt: { fontSize: 12, fontWeight: '600', color: c.text.muted, textDecorationLine: 'underline' },

@@ -107,6 +107,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     const onTile = () => {
       haptic.tap();
       if (r.key.startsWith('h:')) router.push(`/habit-year?id=${r.key.slice(2)}` as any);
+      else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
       else router.push('/counters' as any);
     };
     return (
