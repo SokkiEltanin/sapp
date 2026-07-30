@@ -13,6 +13,7 @@ import { useCounters, Counter, daysSince, daysUntil, untilProgress, autoDaysWith
 import { WIDGET_TAGS } from '@/utils/statWidgets';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useFoodStore } from '@/store/foodStore';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -36,6 +37,7 @@ export default function Counters() {
   const { counters, add, update, remove, resetSince } = useCounters();
   const { events, gcalEvents } = useCalendarStore();
   const { expenses } = useExpensesStore();
+  const meals = useFoodStore(st => st.meals);
 
   type UiKind = 'until' | 'since' | 'avoid';
   const [editing, setEditing] = useState<Counter | null>(null);
@@ -46,10 +48,11 @@ export default function Counters() {
   const [endDate, setEndDate] = useState('');   // until: optional event-window end (trip)
   const [emoji, setEmoji] = useState('');       // until: hopping marker (blank = walker)
   const [keyword, setKeyword] = useState('');
+  const [trackMode, setTrackMode] = useState<'buy' | 'eat'>('eat');   // avoid: reset od zjedzenia / kupna
   const [onDash, setOnDash] = useState(true);
   const [pickCal, setPickCal] = useState(false);
 
-  const daysFor = (cn: Counter) => cn.mode === 'auto' ? autoDaysWithout(cn, expenses) : daysSince(cn);
+  const daysFor = (cn: Counter) => cn.mode === 'auto' ? autoDaysWithout(cn, expenses, meals) : daysSince(cn);
   const untils = counters.filter(x => x.kind === 'until').sort((a, b) => a.date.localeCompare(b.date));
   const sinces = counters.filter(x => x.kind === 'since').sort((a, b) => daysFor(b) - daysFor(a));
 
@@ -61,11 +64,11 @@ export default function Counters() {
       .slice(0, 10);
   }, [events, gcalEvents]);
 
-  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setEmoji(''); setKeyword(''); setOnDash(true); setPickCal(false); setOpen(true); };
+  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setEmoji(''); setKeyword(''); setTrackMode('eat'); setOnDash(true); setPickCal(false); setOpen(true); };
   const openEdit = (cn: Counter) => {
     setEditing(cn);
     setUiKind(cn.mode === 'auto' ? 'avoid' : cn.kind === 'until' ? 'until' : 'since');
-    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setEmoji(cn.emoji ?? ''); setKeyword(cn.keyword ?? ''); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
+    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setEmoji(cn.emoji ?? ''); setKeyword(cn.keyword ?? ''); setTrackMode(cn.track ?? 'eat'); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
   };
 
   const canSave = !!name.trim() && (uiKind === 'avoid' ? !!keyword.trim() : !!date);
@@ -73,14 +76,14 @@ export default function Counters() {
     if (!canSave) return;
     haptic.success();
     if (uiKind === 'avoid') {
-      const patch = { kind: 'since' as const, mode: 'auto' as const, name: name.trim(), keyword: keyword.trim(), onDashboard: onDash };
+      const patch = { kind: 'since' as const, mode: 'auto' as const, name: name.trim(), keyword: keyword.trim(), track: trackMode, onDashboard: onDash };
       if (editing) update(editing.id, patch);
       else add({ ...patch, date: todayStr(), startDate: todayStr() });
     } else {
       const kind = uiKind as 'until' | 'since';
       const evEnd = (kind === 'until' && endDate && endDate >= date) ? endDate : undefined;
       const evEmoji = kind === 'until' ? (emoji || undefined) : undefined;
-      const patch = { kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, mode: undefined, keyword: undefined, onDashboard: onDash };
+      const patch = { kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, mode: undefined, keyword: undefined, track: undefined, onDashboard: onDash };
       if (editing) update(editing.id, patch);
       else add({ kind, name: name.trim(), date, endDate: evEnd, emoji: evEmoji, startDate: todayStr(), onDashboard: onDash });
     }
@@ -238,6 +241,20 @@ export default function Counters() {
                 </View>
                 <Text style={s.fieldLabel}>…lub własne słowa (oddziel znakiem |)</Text>
                 <TextInput value={keyword} onChangeText={setKeyword} placeholder="np. cola|fanta|sprite" placeholderTextColor={c.text.muted} style={s.input} autoCapitalize="none" />
+                <Text style={s.fieldLabel}>Zerować serię gdy…</Text>
+                <View style={s.trackRow}>
+                  {([['eat', 'ZJEM to', 'liczy z „Co zjadłem"'], ['buy', 'KUPIĘ to', 'liczy z paragonów']] as const).map(([k, lbl, sub]) => {
+                    const active = trackMode === k;
+                    return (
+                      <TouchableOpacity key={k} style={[s.trackBtn, active && { backgroundColor: ACCENT + '22', borderColor: ACCENT }]}
+                        onPress={() => { haptic.tap(); setTrackMode(k); }} activeOpacity={0.8}>
+                        <Text style={[s.trackTitle, active && { color: ACCENT }]}>{lbl}</Text>
+                        <Text style={s.trackSub}>{sub}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={s.hintTextSm}>Kupno na zapas / prezent nie psuje serii — liczy się dopiero zjedzenie.</Text>
               </>
             ) : (
               <>
@@ -350,6 +367,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[1] },
   presetChip: { paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
   presetText: { fontSize: 12.5, fontWeight: '600', color: c.text.secondary },
+  trackRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
+  trackBtn: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.primary },
+  trackTitle: { fontSize: 13, fontWeight: '800', color: c.text.secondary },
+  trackSub: { fontSize: 10.5, color: c.text.muted },
   dashToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[3], paddingVertical: spacing[2] },
   dashToggleText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: c.text.secondary },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },

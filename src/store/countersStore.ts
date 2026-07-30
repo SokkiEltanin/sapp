@@ -13,8 +13,9 @@ export interface Counter {
   endDate?: string;   // until only → end of an event window (e.g. trip's last day)
   emoji?: string;     // until only → marker that hops along the bar instead of the walker
   icon?: string;      // optional lucide key (see counterIcons)
-  mode?: 'auto';      // since only: 'days without X' auto-tracked from purchases
-  keyword?: string;   // auto: '|'-separated keywords matched against expenses
+  mode?: 'auto';      // since only: 'days without X' auto-tracked
+  keyword?: string;   // auto: '|'-separated keywords matched against expenses / meals
+  track?: 'buy' | 'eat'; // auto: reset on BUYING (paragony) or EATING (Co zjadłem). Default 'eat'.
   onDashboard?: boolean; // show as a dashboard tile
   createdAt: string;
 }
@@ -125,10 +126,31 @@ export function autoLastDate(keyword: string, expenses: MatchExpense[]): string 
   return last;
 }
 
-// Days "without" for an auto counter: since the last matching purchase (or since
-// the counter was created if there was never one).
-export function autoDaysWithout(c: Counter, expenses: MatchExpense[], now = Date.now()): number {
-  const last = c.keyword ? autoLastDate(c.keyword, expenses) : null;
+// ── Match against the FOOD LOG (Co zjadłem) — reset on EATING, not buying ────
+// User can buy sweets once and eat them over a month, or buy them as a gift — so a
+// „bez słodyczy" streak should break when a matching food is LOGGED, not purchased.
+type MatchMeal = { date?: string; items?: { name?: string; parts?: { name?: string }[] }[] };
+
+export function autoLastEatDate(keyword: string, meals: MatchMeal[]): string | null {
+  let last: string | null = null;
+  for (const m of meals) {
+    const day = (m.date ?? '').slice(0, 10);
+    if (!day) continue;
+    const names = (m.items ?? [])
+      .flatMap(it => [it?.name, ...((it?.parts ?? []).map(p => p?.name))])
+      .filter(Boolean).join(' ');
+    if (matchesAvoid(names, keyword) && (!last || day > last)) last = day;
+  }
+  return last;
+}
+
+// Days "without" for an auto counter: since the last matching EAT (default) or BUY,
+// or since the counter was created if there was never one.
+export function autoDaysWithout(c: Counter, expenses: MatchExpense[], meals: MatchMeal[] = [], now = Date.now()): number {
+  const track = c.track ?? 'eat';
+  const last = c.keyword
+    ? (track === 'buy' ? autoLastDate(c.keyword, expenses) : autoLastEatDate(c.keyword, meals))
+    : null;
   const from = last ?? (c.startDate || c.createdAt.slice(0, 10));
   return Math.max(0, Math.floor((now - atMidnight(from)) / MS_DAY));
 }

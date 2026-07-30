@@ -10,6 +10,7 @@ import { Habit } from '@/types';
 import { getHabits } from '@/utils/habits';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useCounters, matchesAvoid, type Counter } from '@/store/countersStore';
+import { useFoodStore } from '@/store/foodStore';
 import { expensesService } from '@/services/expensesService';
 import { spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -42,6 +43,7 @@ export default function HabitYear() {
   const isCounter = !!counterId;
   const frozen = useStreakFreezeStore(st => st.frozen);
   const allCounters = useCounters(st => st.counters);
+  const meals = useFoodStore(st => st.meals);
 
   const [habit, setHabit] = useState<Habit | null>(null);
   const [counter, setCounter] = useState<Counter | null>(null);
@@ -83,22 +85,34 @@ export default function HabitYear() {
     return () => { alive = false; };
   }, [habitId, counterId, isCounter, allCounters]);
 
-  // dni z pasującym zakupem (auto-licznik „bez X")
+  // dni „wpadki" auto-licznika „bez X": zjedzenie (Co zjadłem) domyślnie, albo kupno (paragony)
   const matchDays = useMemo(() => {
     const set = new Set<string>();
     if (!isCounter || !counter?.keyword) return set;
-    for (const e of expenses) {
-      if (e?.type === 'income') continue;
-      const day = (e?.date ?? '').slice(0, 10);
-      if (!day) continue;
-      const parts = [
-        e.note, (e.tags ?? []).join(' '), e.storeName,
-        ...((e.receiptItems ?? []).flatMap((it: any) => [it?.name, ...((it?.tags) ?? [])])),
-      ].filter(Boolean).join(' ');
-      if (matchesAvoid(parts, counter.keyword)) set.add(day);
+    const kw = counter.keyword;
+    if ((counter.track ?? 'eat') === 'buy') {
+      for (const e of expenses) {
+        if (e?.type === 'income') continue;
+        const day = (e?.date ?? '').slice(0, 10);
+        if (!day) continue;
+        const parts = [
+          e.note, (e.tags ?? []).join(' '), e.storeName,
+          ...((e.receiptItems ?? []).flatMap((it: any) => [it?.name, ...((it?.tags) ?? [])])),
+        ].filter(Boolean).join(' ');
+        if (matchesAvoid(parts, kw)) set.add(day);
+      }
+    } else {
+      for (const m of meals) {
+        const day = (m?.date ?? '').slice(0, 10);
+        if (!day) continue;
+        const names = (m.items ?? [])
+          .flatMap((it: any) => [it?.name, ...((it?.parts ?? []).map((p: any) => p?.name))])
+          .filter(Boolean).join(' ');
+        if (matchesAvoid(names, kw)) set.add(day);
+      }
     }
     return set;
-  }, [isCounter, counter, expenses]);
+  }, [isCounter, counter, expenses, meals]);
 
   // ── build the grid + stats ─────────────────────────────────────────────
   const { cells, weeks, monthCols, stats } = useMemo(() => {

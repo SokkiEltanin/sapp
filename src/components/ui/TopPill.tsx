@@ -476,9 +476,11 @@ const makeS = (t: any) => StyleSheet.create({
   },
   text: {
     flexShrink: 1,
-    fontFamily: fonts.label,     // Lexend Tera — CAPS status (jak mockup)
-    fontSize: 11.5,
-    letterSpacing: 0.6,
+    // Standard font (NIE LexendTera) — LexendTera jest bardzo szeroki i ucinał dłuższe
+    // komunikaty („ZBLIŻASZ SIĘ DO LIMITU…"). System font mieści dużo więcej i czyta się lepiej.
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
     color: '#F2F3F3',
   },
