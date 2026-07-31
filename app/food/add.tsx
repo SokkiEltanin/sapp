@@ -95,6 +95,7 @@ export default function FoodAdd() {
   const [items, setItems]       = useState<MealItem[]>([]);
   const [note, setNote]         = useState('');
   const [query, setQuery]       = useState('');
+  const [browseTab, setBrowseTab] = useState<'dishes' | 'products' | 'recent'>('dishes');   // przeglądanie: jedno naraz
 
   // Editing an existing meal → prefill from the store (once).
   useEffect(() => {
@@ -435,6 +436,37 @@ export default function FoodAdd() {
     return p && isRecipeProduct(p) ? 'danie' : 'produkt';
   };
 
+  // Wiersz biblioteki (danie/kompozycja) — reużywany w szukaniu i przeglądaniu.
+  const renderLibRow = (e: LibEntry & { note?: string }, i: number) => (
+    <TouchableOpacity key={e.key} onPress={() => tapEntry(e)} onLongPress={() => pinEntry(e)} delayLongPress={400} style={[s.candRow, i > 0 && s.itemBorder]}>
+      <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
+      <View style={{ flex: 1 }}>
+        <View style={s.candNameRow}>
+          <View style={[s.kindTag, e.kind === 'dish' ? { borderColor: '#F59E0B55', backgroundColor: '#F59E0B18' } : { borderColor: ACCENT + '44', backgroundColor: ACCENT + '14' }]}>
+            {e.kind === 'dish' ? <ChefHat size={10} color="#F59E0B" /> : <Layers size={10} color={ACCENT} />}
+            <Text style={[s.kindTagTxt, { color: e.kind === 'dish' ? '#F59E0B' : ACCENT }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
+          </View>
+          <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
+        </View>
+        <Text style={s.candMeta}>{e.meta}{e.note ? `  ·  ${e.note}` : ''}</Text>
+      </View>
+      <Plus size={18} color={ACCENT} />
+    </TouchableOpacity>
+  );
+  // Wiersz pojedynczego produktu.
+  const renderSingle = (cand: Candidate, i: number) => (
+    <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
+        <Text style={s.candMeta}>
+          {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
+          {cand.source === 'curated' ? '  ·  moje' : ''}
+        </Text>
+      </View>
+      <Plus size={18} color={ACCENT} />
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -534,7 +566,7 @@ export default function FoodAdd() {
           </View>
         )}
 
-        {/* search — pojedyncze produkty pod szukajką; domyślnie kompozycje i dania */}
+        {/* szukajka = szybkie znajdowanie; bez wpisu = uporządkowane przeglądanie w segmentach */}
         <View style={s.searchBox}>
           <Search size={17} color={c.text.muted} />
           <TextInput style={s.searchInput} value={query} onChangeText={setQuery}
@@ -542,17 +574,8 @@ export default function FoodAdd() {
           {query.length > 0 && <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}><X size={16} color={c.text.muted} /></TouchableOpacity>}
         </View>
 
-        <View style={s.linkRow}>
-          <TouchableOpacity style={s.manualBtn} onPress={() => { haptic.tap(); setMName(query); setMKcal(''); setManual(true); }}>
-            <Pencil size={15} color={ACCENT} /><Text style={s.manualTxt}>Wpisz ręcznie</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.manualBtn} onPress={() => { haptic.tap(); router.push('/food/recipe' as any); }}>
-            <ChefHat size={15} color={ACCENT} /><Text style={s.manualTxt}>Nowy przepis / danie</Text>
-          </TouchableOpacity>
-        </View>
-
         {query.trim() ? (
-          /* ── SZUKANIE: pasujące kompozycje/dania + pojedyncze produkty ── */
+          /* ── SZUKANIE: pasujące dania/kompozycje + pojedyncze produkty ── */
           <>
             {!exactExists && (
               <TouchableOpacity style={s.addNewRow} onPress={addNew}>
@@ -562,101 +585,95 @@ export default function FoodAdd() {
             )}
             {libMatches.length > 0 && (
               <View style={{ gap: 4 }}>
-                <Text style={s.sectionHint}>Kompozycje i dania</Text>
-                <View style={s.card}>
-                  {libMatches.map((e, i) => (
-                    <TouchableOpacity key={e.key} onPress={() => tapEntry(e)} onLongPress={() => pinEntry(e)} delayLongPress={400} style={[s.candRow, i > 0 && s.itemBorder]}>
-                      <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
-                      <View style={{ flex: 1 }}>
-                        <View style={s.candNameRow}>
-                          <View style={[s.kindTag, e.kind === 'dish' ? { borderColor: '#F59E0B55', backgroundColor: '#F59E0B18' } : { borderColor: ACCENT + '44', backgroundColor: ACCENT + '14' }]}>
-                            {e.kind === 'dish' ? <ChefHat size={10} color="#F59E0B" /> : <Layers size={10} color={ACCENT} />}
-                            <Text style={[s.kindTagTxt, { color: e.kind === 'dish' ? '#F59E0B' : ACCENT }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
-                          </View>
-                          <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
-                        </View>
-                        <Text style={s.candMeta}>{e.meta}{e.note ? `  ·  ${e.note}` : ''}</Text>
-                      </View>
-                      <Plus size={18} color={ACCENT} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={s.sectionHint}>Dania i kompozycje</Text>
+                <View style={s.card}>{libMatches.map((e, i) => renderLibRow(e, i))}</View>
               </View>
             )}
             {(() => {
-              const singles = candidates.filter(cand => !cand.isRecipe);   // dania są wyżej w „Kompozycje i dania"
+              const singles = candidates.filter(cand => !cand.isRecipe);
               return (
                 <View style={{ gap: 4 }}>
                   <Text style={s.sectionHint}>Pojedyncze produkty</Text>
                   <View style={s.card}>
-                    {singles.map((cand, i) => (
-                      <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
-                          <Text style={s.candMeta}>
-                            {cand.kcalPer100g != null ? `${cand.kcalPer100g} kcal/100g` : cand.kcalPerPortion != null ? `${cand.kcalPerPortion} kcal/porcja` : '—'}
-                            {cand.source === 'curated' ? '  ·  moje' : ''}
-                          </Text>
-                        </View>
-                        <Plus size={18} color={ACCENT} />
-                      </TouchableOpacity>
-                    ))}
-                    {singles.length === 0 && <Text style={s.candMeta}>Brak pojedynczych produktów — użyj „Wpisz ręcznie" albo „Dodaj nowy".</Text>}
+                    {singles.map((cand, i) => renderSingle(cand, i))}
+                    {singles.length === 0 && <Text style={s.candMeta}>Brak — użyj „Dodaj nowy" wyżej.</Text>}
                   </View>
+                  <TouchableOpacity style={s.manualRow} onPress={() => { haptic.tap(); setMName(query); setMKcal(''); setManual(true); }}>
+                    <Pencil size={14} color={ACCENT} /><Text style={s.manualTxt}>Wpisz „{query.trim()}" ręcznie (na oko)</Text>
+                  </TouchableOpacity>
                 </View>
               );
             })()}
           </>
         ) : (
-          /* ── DOMYŚLNIE: kompozycje i dania — ulubione, potem kategoriami ── */
+          /* ── PRZEGLĄDANIE: segmenty (jedno naraz) ── */
           <>
-            {librarySections.map(sec => (
-              <View key={sec.tag} style={{ gap: 4 }}>
-                <View style={s.catHead}>
-                  {sec.tag === '_fav' && <Star size={13} color={ACCENT} fill={ACCENT} />}
-                  <Text style={s.catHeadTxt}>{sec.label}</Text>
-                  <Text style={s.catHeadCount}>{sec.items.length}</Text>
-                </View>
+            <View style={s.segRow}>
+              {([['dishes', 'Dania', ChefHat], ['products', 'Produkty', Apple], ['recent', 'Ostatnie', RotateCcw]] as const).map(([id, label, Ic]) => {
+                const on = browseTab === id;
+                return (
+                  <TouchableOpacity key={id} onPress={() => { haptic.tap(); setBrowseTab(id); }} style={[s.segBtn, on && s.segBtnOn]} activeOpacity={0.8}>
+                    <Ic size={14} color={on ? c.bg.primary : c.text.muted} />
+                    <Text style={[s.segTxt, on && s.segTxtOn]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {browseTab === 'dishes' && (
+              <>
+                <TouchableOpacity style={s.createRow} onPress={() => { haptic.tap(); router.push('/food/recipe' as any); }}>
+                  <ChefHat size={16} color={ACCENT} /><Text style={s.createTxt}>Nowy przepis / danie</Text><Plus size={16} color={ACCENT} />
+                </TouchableOpacity>
+                {librarySections.map(sec => (
+                  <View key={sec.tag} style={{ gap: 4 }}>
+                    <View style={s.catHead}>
+                      {sec.tag === '_fav' && <Star size={13} color={ACCENT} fill={ACCENT} />}
+                      <Text style={s.catHeadTxt}>{sec.label}</Text>
+                      <Text style={s.catHeadCount}>{sec.items.length}</Text>
+                    </View>
+                    <View style={s.card}>{sec.items.map((e, i) => renderLibRow(e, i))}</View>
+                  </View>
+                ))}
+                {librarySections.length === 0 && (
+                  <View style={s.card}>
+                    <Text style={s.candMeta}>Brak dań i kompozycji. Zbuduj posiłek z produktów i „Zapisz jako preset", albo dodaj „Nowy przepis / danie".</Text>
+                  </View>
+                )}
+                <Text style={s.presetHint}>Stuknij = dodaj do posiłku. Gwiazdka = przypnij na górę.</Text>
+              </>
+            )}
+
+            {browseTab === 'products' && (
+              <>
+                <TouchableOpacity style={s.createRow} onPress={() => { haptic.tap(); setMName(''); setMKcal(''); setManual(true); }}>
+                  <Pencil size={16} color={ACCENT} /><Text style={s.createTxt}>Wpisz ręcznie (na oko)</Text><Plus size={16} color={ACCENT} />
+                </TouchableOpacity>
                 <View style={s.card}>
-                  {sec.items.map((e, i) => (
-                    <TouchableOpacity key={e.key} onPress={() => tapEntry(e)} onLongPress={() => pinEntry(e)} delayLongPress={400} style={[s.candRow, i > 0 && s.itemBorder]}>
-                      <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
+                  {candidates.filter(cand => !cand.isRecipe).map((cand, i) => renderSingle(cand, i))}
+                </View>
+                <Text style={s.presetHint}>Szukasz konkretnego? Wpisz nazwę w wyszukiwarkę wyżej.</Text>
+              </>
+            )}
+
+            {browseTab === 'recent' && (
+              recentMeals.length > 0 ? (
+                <View style={s.card}>
+                  {recentMeals.map((m, i) => (
+                    <TouchableOpacity key={m.id} onPress={() => repeatMeal(m)} style={[s.candRow, i > 0 && s.itemBorder]}>
+                      <RotateCcw size={15} color={c.text.muted} />
                       <View style={{ flex: 1 }}>
-                        <View style={s.candNameRow}>
-                          <View style={[s.kindTag, e.kind === 'dish' ? { borderColor: '#F59E0B55', backgroundColor: '#F59E0B18' } : { borderColor: ACCENT + '44', backgroundColor: ACCENT + '14' }]}>
-                            {e.kind === 'dish' ? <ChefHat size={10} color="#F59E0B" /> : <Layers size={10} color={ACCENT} />}
-                            <Text style={[s.kindTagTxt, { color: e.kind === 'dish' ? '#F59E0B' : ACCENT }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
-                          </View>
-                          <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
-                        </View>
-                        <Text style={s.candMeta}>{e.meta}</Text>
+                        <Text style={s.candName} numberOfLines={1}>{m.items.map(it => it.name).join(', ')}</Text>
+                        <Text style={s.candMeta}>{dayLabelFor(m.date)} · {m.kcal} kcal · {m.items.length} poz.</Text>
                       </View>
                       <Plus size={18} color={ACCENT} />
                     </TouchableOpacity>
                   ))}
                 </View>
-              </View>
-            ))}
-            {librarySections.length === 0 && (
-              <View style={s.card}>
-                <Text style={s.candMeta}>Brak kompozycji i dań. Zapisz posiłek jako preset (poniżej, gdy dodasz pozycje) albo „Nowy przepis / danie". Pojedyncze produkty znajdziesz przez wyszukiwarkę wyżej.</Text>
-              </View>
+              ) : (
+                <View style={s.card}><Text style={s.candMeta}>Brak ostatnich posiłków — pojawią się tu, gdy coś dodasz.</Text></View>
+              )
             )}
-            {recentMeals.length > 0 && (
-              <View style={{ gap: 4 }}>
-                <Text style={s.sectionHint}>Ostatnie posiłki</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.quickRow}>
-                  {recentMeals.map(m => (
-                    <TouchableOpacity key={m.id} style={[s.quickChip, { borderStyle: 'dashed' }]} onPress={() => repeatMeal(m)}>
-                      <RotateCcw size={13} color={c.text.muted} />
-                      <Text style={s.quickTxt} numberOfLines={1}>{m.items.map(i => i.name).slice(0, 2).join(', ')}</Text>
-                      <Text style={s.quickKcal}>{m.kcal}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-            <Text style={s.presetHint}>Pojedynczy produkt (banan, jogurt) — wpisz w wyszukiwarkę. Gwiazdka przypina na górę.</Text>
           </>
         )}
       </ScrollView>
@@ -941,6 +958,17 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   linkRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[4], flexWrap: 'wrap' },
   manualBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4 },
   manualTxt: { fontSize: 13, fontWeight: '700', color: ACCENT },
+  manualRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 2 },
+
+  // segmenty przeglądania (Dania / Produkty / Ostatnie)
+  segRow: { flexDirection: 'row', gap: spacing[2] },
+  segBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  segBtnOn: { backgroundColor: ACCENT, borderColor: ACCENT },
+  segTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.muted },
+  segTxtOn: { color: c.bg.primary },
+  // wiersz „utwórz" (nowy przepis / wpisz ręcznie) na górze segmentu
+  createRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '55', borderStyle: 'dashed' },
+  createTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: ACCENT },
 
   sectionHint: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 2 },
   catHead:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2], marginLeft: 2 },

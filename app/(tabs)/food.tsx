@@ -58,6 +58,9 @@ export default function Food() {
   const today = todayStr();
   const [viewDate, setViewDate] = useState(today);   // browsed day (default today)
   const [dateModal, setDateModal] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());   // rozwinięte posiłki (rozpis pozycji)
+  const toggleExpand = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const hhmm = (ts: number) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const isToday = viewDate === today;
   const shiftDay = (delta: number) => {
     const [y, m, d] = viewDate.split('-').map(Number);
@@ -492,22 +495,42 @@ export default function Food() {
                   <Text style={s.mealTitle}>{mt.label}</Text>
                   <Text style={s.mealSub}>{sub.toLocaleString('pl-PL')} kcal</Text>
                 </View>
-                {entries.map(m => (
-                  <View key={m.id} style={s.mealRow}>
-                    <TouchableOpacity style={s.mealTap} activeOpacity={0.7}
-                      onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}&edit=${m.id}` as any); }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.mealName} numberOfLines={1}>{mealSummary(m)}</Text>
-                        {m.note ? <Text style={s.mealNote} numberOfLines={1}>{m.note}</Text> : null}
+                {entries.map(m => {
+                  const isOpen = expanded.has(m.id);
+                  return (
+                  <View key={m.id}>
+                    <View style={s.mealRow}>
+                      <TouchableOpacity style={s.mealTap} activeOpacity={0.7} onPress={() => { haptic.tap(); toggleExpand(m.id); }}>
+                        <ChevronRight size={15} color={c.text.muted} style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.mealName} numberOfLines={1}>{mealSummary(m)}</Text>
+                          <Text style={s.mealNote} numberOfLines={1}>{hhmm(m.ts)} · {m.items.length} {m.items.length === 1 ? 'pozycja' : 'poz.'}{m.note ? ` · ${m.note}` : ''}</Text>
+                        </View>
+                        <Text style={s.mealKcal}>{m.kcal.toLocaleString('pl-PL')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}&edit=${m.id}` as any); }}>
+                        <Pencil size={14} color={c.text.muted} />
+                      </TouchableOpacity>
+                      <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); removeMeal(m.id); }}>
+                        <Trash2 size={15} color={c.text.muted} />
+                      </TouchableOpacity>
+                    </View>
+                    {isOpen && (
+                      <View style={s.breakdown}>
+                        {m.items.map((it, ii) => (
+                          <View key={ii} style={s.bdRow}>
+                            <Text style={s.bdName} numberOfLines={1}>
+                              {it.name}{it.parts && it.qty > 1 ? ` ×${it.qty}` : ''}
+                              <Text style={s.bdMeta}>{it.grams > 0 ? `  ${it.grams} g` : it.unit !== 'g' && it.unit !== 'porcja' ? `  ${it.qty} ${it.unit}` : ''}</Text>
+                            </Text>
+                            <Text style={s.bdKcal}>{it.kcal}</Text>
+                          </View>
+                        ))}
                       </View>
-                      <Text style={s.mealKcal}>{m.kcal.toLocaleString('pl-PL')}</Text>
-                      <Pencil size={13} color={c.text.muted} />
-                    </TouchableOpacity>
-                    <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); removeMeal(m.id); }}>
-                      <Trash2 size={15} color={c.text.muted} />
-                    </TouchableOpacity>
+                    )}
                   </View>
-                ))}
+                  );
+                })}
               </View>
             );
           })
@@ -713,6 +736,11 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   mealName:   { fontSize: 13.5, fontWeight: '600', color: c.text.primary },
   mealNote:   { fontSize: 11, color: c.text.muted, marginTop: 1 },
   mealKcal:   { fontSize: 13, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
+  breakdown:  { marginLeft: 30, marginTop: 2, marginBottom: 4, gap: 2, borderLeftWidth: 1, borderLeftColor: c.border.subtle, paddingLeft: spacing[3] },
+  bdRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2], paddingVertical: 2 },
+  bdName:     { flex: 1, fontSize: 12.5, color: c.text.secondary },
+  bdMeta:     { fontSize: 11, color: c.text.muted },
+  bdKcal:     { fontSize: 12, fontWeight: '700', color: c.text.muted, fontVariant: ['tabular-nums'] },
 
   addMore:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: radius.xl, borderWidth: 1.5, borderStyle: 'dashed' },
   addMoreTxt: { fontSize: 13, fontWeight: '800' },
