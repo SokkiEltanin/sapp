@@ -151,9 +151,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // JEDNOLITE KWADRATY, 2 na rząd. BEZ flexGrow → samotny kafel zostaje pół-szerokości
   // (nie rozciąga się na cały ekran). aspectRatio ~1 = kwadrat jak w Duolingo.
   tile: {
-    flexBasis: '47.5%', minWidth: 128, aspectRatio: 1.05,
+    flexBasis: '47.5%', minWidth: 128, aspectRatio: 1.62,
     borderRadius: radius.lg, borderWidth: 1,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3], paddingVertical: 11,
     justifyContent: 'flex-end', overflow: 'hidden',
   },
   // lekko widoczna „rzecz" w tle — duża, w prawym górnym rogu (biała → widać na kolorze)
@@ -168,12 +168,12 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   leagueTxt: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.6, textTransform: 'uppercase' },
   numRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  num: { fontFamily: fonts.display, fontSize: 33, color: '#FFFFFF', letterSpacing: -0.5 },
-  unit: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
-  label: { fontFamily: fonts.label, fontSize: 10.5, color: 'rgba(255,255,255,0.92)', marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.6 },
-  track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden', marginTop: 7 },
+  num: { fontFamily: fonts.display, fontSize: 26, color: '#FFFFFF', letterSpacing: -0.5 },
+  unit: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
+  label: { fontFamily: fonts.label, fontSize: 10, color: 'rgba(255,255,255,0.92)', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
+  track: { height: 3.5, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden', marginTop: 5 },
   fill: { height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.9)' },
-  next: { fontSize: 9.5, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginTop: 4, letterSpacing: 0.2 },
+  next: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,0.7)', marginTop: 3, letterSpacing: 0.2 },
 }));
 
 export default memo(StreakWallCard);

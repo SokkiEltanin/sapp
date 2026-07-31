@@ -98,6 +98,24 @@ export default function TabBar({ currentIndex }: Props) {
     : todayDueCount > 0 ? todayDueCount
     : pendingCount;
 
+  // Pulsująca poświata pod ikoną Zadań gdy jest ping (coś do zrobienia) — szybciej gdy
+  // zaległe/dziś (pilne), wolniej gdy zwykłe. Native driver = tanio.
+  const hasPing = pendingCount > 0;
+  const urgentPing = overdueCount > 0 || todayDueCount > 0;
+  const taskPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (hasPing) {
+      const dur = urgentPing ? 620 : 980;
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(taskPulse, { toValue: 1, duration: dur, useNativeDriver: true }),
+        Animated.timing(taskPulse, { toValue: 0, duration: dur, useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => loop.stop();
+    }
+    taskPulse.setValue(0);
+  }, [hasPing, urgentPing]);
+
   return (
     <>
       {/* ── Bar ────────────────────────────────────────────────────── */}
@@ -168,10 +186,20 @@ export default function TabBar({ currentIndex }: Props) {
                   activeOpacity={0.7}
                 >
                   <View style={s.iconWrap}>
+                    {showBadge && (
+                      <Animated.View
+                        pointerEvents="none"
+                        style={[s.pingGlow, {
+                          backgroundColor: badgeColor,
+                          opacity: taskPulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, urgentPing ? 0.5 : 0.36] }),
+                          transform: [{ scale: taskPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, urgentPing ? 1.7 : 1.45] }) }],
+                        }]}
+                      />
+                    )}
                     <Icon
                       size={focused ? 23 : 20}
-                      color={focused ? accent : c.text.muted}
-                      strokeWidth={focused ? 2.4 : 1.6}
+                      color={showBadge && !focused ? badgeColor : focused ? accent : c.text.muted}
+                      strokeWidth={focused ? 2.4 : showBadge ? 2.2 : 1.6}
                     />
                     {showBadge && (
                       <View style={[s.badge, { backgroundColor: badgeColor }]}>
@@ -250,7 +278,13 @@ const makeStyles = themedStyles((c: typeof colors) => StyleSheet.create({
     borderRadius: 999,   // full capsule → matches the rounded pill (was a boxy 18)
     borderWidth: 1,
   },
-  iconWrap: { position: 'relative', zIndex: 1 },
+  iconWrap: { position: 'relative', zIndex: 1, alignItems: 'center', justifyContent: 'center' },
+  // pulsująca poświata pod ikoną Zadań (przyciąga wzrok gdy jest ping)
+  pingGlow: {
+    position: 'absolute',
+    width: 34, height: 34, borderRadius: 17,
+    alignSelf: 'center',
+  },
 
   badge: {
     position: 'absolute', top: -5, right: -8,

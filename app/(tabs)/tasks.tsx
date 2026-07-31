@@ -35,6 +35,9 @@ const G = {
   accentDim:    'rgba(236,238,238,0.12)',
   overdueCard:  '#1A0A0A',
   overdueBorder:'rgba(255,107,107,0.25)',
+  green:        '#2AC68F',
+  activeBorder: 'rgba(42,198,143,0.22)',
+  greenStrong:  'rgba(42,198,143,0.50)',
 };
 function gFor(c: any) {
   return {
@@ -44,6 +47,9 @@ function gFor(c: any) {
     accentDim: 'rgba(236,238,238,0.12)',
     overdueCard: c.bg.card,
     overdueBorder: 'rgba(255,107,107,0.30)',
+    green: '#2AC68F',
+    activeBorder: 'rgba(42,198,143,0.22)',
+    greenStrong: 'rgba(42,198,143,0.50)',
   };
 }
 
@@ -213,13 +219,21 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
   const dueDays  = (!overdue && task.status !== 'snoozed' && !isDone && task.deadline) ? daysUntil(task.deadline) : null;
   const isToday  = dueDays === 0;
 
+  // Aktywne (do zrobienia) = zielony akcent: tint tła + pasek z lewej + zielony border.
+  // Overdue zostaje czerwony, done/snoozed neutralne. Dziś / wysoki priorytet = mocniej.
+  const isActive  = !isDone && !overdue && task.status !== 'snoozed';
+  const emphasize = isActive && (isToday || task.priority === 'high');
   const cardBg     = overdue ? G.overdueCard : G.card;
-  const cardBorder = overdue ? G.overdueBorder : isToday ? G.accentDim : G.cardBorder;
-  const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.accent
+  const cardBorder = overdue ? G.overdueBorder
+    : isDone || task.status === 'snoozed' ? G.cardBorder
+    : emphasize ? G.greenStrong
+    : isActive ? G.activeBorder
+    : G.cardBorder;
+  const subColor   = subtitle === 'AKTUALNIE W TOKU' ? G.green
     : overdue            ? G.accent
     : task.status === 'snoozed' ? colors.text.muted
-    : isToday            ? G.accent
-    : dueDays === 1      ? G.accent + 'CC'
+    : isToday            ? G.green
+    : dueDays === 1      ? G.green + 'CC'
     : colors.text.muted;
 
   return (
@@ -228,6 +242,8 @@ function TaskCard({ task, pomodoroTaskId, onComplete, onEdit, onEditDirect }: {
       onPress={() => onEdit(task)}
       activeOpacity={0.75}
     >
+      {isActive && <View pointerEvents="none" style={[s.greenWash, emphasize && s.greenWashStrong]} />}
+      {isActive && <View pointerEvents="none" style={[s.accentBar, emphasize && s.accentBarStrong]} />}
       {/* Left controls: done swoosh + edit */}
       <View style={s.leftControls}>
         <TouchableOpacity
@@ -734,8 +750,14 @@ const makeS = (c: any, g: any) => StyleSheet.create({
     borderRadius: 18, borderWidth: 1,
     paddingVertical: spacing[3], paddingRight: spacing[3],
     gap: spacing[3],
+    position: 'relative', overflow: 'hidden',
   },
   cardDone: { opacity: 0.45 },
+  // zielone „uwypuklenie" aktywnego zadania
+  greenWash: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(42,198,143,0.06)' },
+  greenWashStrong: { backgroundColor: 'rgba(42,198,143,0.11)' },
+  accentBar: { position: 'absolute', left: 0, top: 8, bottom: 8, width: 3.5, borderTopRightRadius: 3, borderBottomRightRadius: 3, backgroundColor: 'rgba(42,198,143,0.55)' },
+  accentBarStrong: { top: 6, bottom: 6, width: 4, backgroundColor: '#2AC68F' },
 
   leftControls: {
     marginLeft: spacing[3],
