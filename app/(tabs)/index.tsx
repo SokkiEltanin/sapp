@@ -2262,6 +2262,19 @@ export default function DashboardScreen() {
       return { label: MONTH_SHORT[d.getMonth()], year: d.getFullYear(), hours: h, earnings: Math.round(h * rate) };
     });
     const bestMonth = best12.reduce((m, x) => (x.earnings > m.earnings ? x : m), best12[0]);
+    // NADCHODZĄCE miesiące (grafik naprzód z kalendarza) — suma godzin, byś zweryfikował od
+    // razu po dodaniu. Bierzemy 4 miesiące do przodu, pokazujemy tylko te z godzinami.
+    const upcoming = Array.from({ length: 4 }, (_, k) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + 1 + k, 1);
+      const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      let h = 0; const dset = new Set<string>();
+      for (const e of allEvents) {
+        if (!isWork(e) || (e.date ?? '').slice(0, 7) !== ym) continue;
+        const dd = dur(e); h += dd; if (dd > 0) dset.add((e.date ?? '').slice(0, 10));
+      }
+      return { ym, label: MONTH_SHORT[d.getMonth()], year: d.getFullYear(), hours: h, shifts: dset.size, earnings: Math.round(h * rate) };
+    }).filter(m => m.hours > 0);
+    const upcomingH = upcoming.reduce((a, m) => a + m.hours, 0);
     return {
       months, currentHours, rate,
       currentEarnings: Math.round(currentHours * rate),
@@ -2274,7 +2287,7 @@ export default function DashboardScreen() {
       avgHours, avgEarnings,
       yearHours, yearEarnings: Math.round(yearHours * rate),
       shiftCount, perShift: shiftCount > 0 ? Math.round((workedH * rate) / shiftCount) : 0,
-      bestMonth,
+      bestMonth, upcoming, upcomingH,
     };
   }, [allEvents, workSettings, workEarnings, today]);
 
@@ -4120,6 +4133,17 @@ export default function DashboardScreen() {
                           {wm.daysWorked} {wm.daysWorked === 1 ? 'dzień' : 'dni'} · śr. {wm.avgPerDay.toFixed(1)} h/dzień{hasRate ? ` · ${Math.round(wm.avgPerDay * wm.rate).toLocaleString('pl-PL')} zł/dzień` : ''}
                         </Text>
                       )}
+
+                      {/* grafik naprzód — od razu widać sumę godzin przyszłych miesięcy */}
+                      {wm.upcoming.length > 0 && (
+                        <View style={s.workAheadRow}>
+                          <CalendarClock size={12} color={WORK_ACCENT} />
+                          <Text style={s.workAheadText} numberOfLines={1}>
+                            Naprzód <Text style={{ color: WORK_ACCENT, fontWeight: '800' }}>{wm.upcomingH.toFixed(0)} h</Text>
+                            {'  ·  ' + wm.upcoming.map(m => `${m.label} ${m.hours.toFixed(0)}h`).join(' · ')}
+                          </Text>
+                        </View>
+                      )}
                     </>
                   ) : (
                     <>
@@ -4566,6 +4590,25 @@ export default function DashboardScreen() {
                           </View>
                         </>
                       )}
+                    </View>
+                  )}
+
+                  {/* ── ZAPLANOWANE NAPRZÓD: grafik przyszłych miesięcy (weryfikacja) ── */}
+                  {wm.upcoming.length > 0 && (
+                    <View style={s.wpAheadCard}>
+                      <View style={s.wpAheadHead}>
+                        <CalendarClock size={13} color={WORK_ACCENT} />
+                        <Text style={s.wpAheadTitle}>Zaplanowane naprzód</Text>
+                        <Text style={s.wpAheadTotal}>{wm.upcomingH.toFixed(0)} h</Text>
+                      </View>
+                      {wm.upcoming.map(m => (
+                        <View key={m.ym} style={s.wpAheadRow}>
+                          <Text style={s.wpAheadMonth}>{m.label} {m.year}</Text>
+                          <Text style={s.wpAheadDays}>{m.shifts} {m.shifts === 1 ? 'dzień' : 'dni'}</Text>
+                          <Text style={s.wpAheadH}>{m.hours.toFixed(0)} h{hasRate ? ` · ${m.earnings.toLocaleString('pl-PL')} zł` : ''}</Text>
+                        </View>
+                      ))}
+                      <Text style={s.wpAheadHint}>Suma godzin z kalendarza na przyszłe miesiące — sprawdź czy grafik się zgadza.</Text>
                     </View>
                   )}
 
@@ -5501,6 +5544,8 @@ const buildStyles = (c: any) => StyleSheet.create({
   workSplitBar: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: c.fill.subtle },
   workSplitText: { fontSize: 11, color: c.text.secondary, marginTop: 6 },
   workMeta: { fontSize: 11.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[3] },
+  workAheadRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  workAheadText: { flex: 1, fontSize: 11.5, color: c.text.secondary, fontWeight: '600' },
 
   card: {
     backgroundColor: c.bg.card,
@@ -5641,6 +5686,16 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpLeftDivider: { width: 1, height: 40, backgroundColor: c.border.default },
   wpAvgLine: { fontSize: 12.5, color: c.text.secondary, marginTop: spacing[4], lineHeight: 18 },
   wpAvgB: { fontWeight: '800', color: c.text.primary },
+  // „Zaplanowane naprzód" — grafik przyszłych miesięcy
+  wpAheadCard: { marginTop: spacing[4], backgroundColor: WORK_ACCENT + '12', borderRadius: radius.xl, padding: spacing[3], borderWidth: 1, borderColor: WORK_ACCENT + '3A' },
+  wpAheadHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  wpAheadTitle: { fontSize: 11.5, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  wpAheadTotal: { marginLeft: 'auto', fontSize: 15, fontWeight: '900', color: WORK_ACCENT, letterSpacing: -0.3 },
+  wpAheadRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.border.subtle },
+  wpAheadMonth: { flex: 1, fontSize: 13.5, fontWeight: '700', color: c.text.primary },
+  wpAheadDays: { fontSize: 11.5, fontWeight: '600', color: c.text.muted, marginRight: spacing[3] },
+  wpAheadH: { fontSize: 13, fontWeight: '800', color: c.text.primary, fontVariant: ['tabular-nums'] },
+  wpAheadHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6, lineHeight: 14 },
   wpRateCard: { marginTop: spacing[5], backgroundColor: c.fill.subtle, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
   wpRateVal: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.6 },
   wpRateUnit: { fontSize: 16, fontWeight: '700', color: c.text.muted },
