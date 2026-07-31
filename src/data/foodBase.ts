@@ -1,10 +1,13 @@
 import { FoodUnit } from '@/store/foodStore';
 import { normalizeProductName } from '@/utils/productMemory';
 
-// Built-in OFFLINE base — deliberately ONLY fruit & vegetables (kcal per 100 g +
-// household portion grams). Everything else the user adds himself over time via the
-// "Dodaj produkt" form (kcal + macros + optional link to a purchased item), and it
-// gets remembered in foodStore — his own products always win over this starter set.
+// Built-in OFFLINE base — a broad starter set of common Polish groceries (kcal per
+// 100 g + household portion grams), weighted toward what actually shows up on Lidl /
+// Kaufland receipts: pieczywo, nabiał, wędliny, ryby, sosy, makarony/kasze, słodycze,
+// przekąski, napoje, plus owoce & warzywa. The user still adds/edits his own products
+// via "Dodaj produkt" (kcal + macros + link to a purchase); his curated products always
+// WIN over this base — a base item is hidden once a curated one shares its name.
+// kcal values are typical per-100 g figures (packaged goods vary ±10-15%).
 
 export interface BaseFood {
   name: string;
@@ -87,6 +90,124 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Cukier',               kcal: 400, protein: 0,   unit: 'lyzka',    unitGrams: { szklanka: 220, lyzka: 12, lyzeczka: 5 } },
   { name: 'Masło',                kcal: 735, protein: 0.9, unit: 'lyzka',    unitGrams: { lyzka: 15, lyzeczka: 5, szt: 200 } },
   { name: 'Woda',                 kcal: 0,   protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+
+  // ── Pieczywo ───────────────────────────────────────────────────────────────
+  { name: 'Bułka pszenna (kajzerka)', kcal: 290, protein: 9,   unit: 'szt',    unitGrams: { szt: 50 } },
+  { name: 'Bułka grahamka',       kcal: 250, protein: 9,   unit: 'szt',    unitGrams: { szt: 55 } },
+  { name: 'Bułka pełnoziarnista', kcal: 249, protein: 10,  unit: 'szt',    unitGrams: { szt: 65 } },
+  { name: 'Bułka z ziarnami',     kcal: 265, protein: 9,   unit: 'szt',    unitGrams: { szt: 70 } },
+  { name: 'Bułka z dynią',        kcal: 293, protein: 11.8, unit: 'szt',   unitGrams: { szt: 86 } },
+  { name: 'Bułka fitness',        kcal: 250, protein: 10,  unit: 'szt',    unitGrams: { szt: 50 } },
+  { name: 'Bułka górska',         kcal: 270, protein: 9,   unit: 'szt',    unitGrams: { szt: 55 } },
+  { name: 'Chleb pszenny tostowy', kcal: 265, protein: 8,  unit: 'kromka', unitGrams: { kromka: 25 } },
+  { name: 'Chleb żytni razowy',   kcal: 220, protein: 6.5, unit: 'kromka', unitGrams: { kromka: 35 } },
+  { name: 'Chleb mieszany',       kcal: 250, protein: 7,   unit: 'kromka', unitGrams: { kromka: 35 } },
+  { name: 'Chleb orkiszowy',      kcal: 240, protein: 8,   unit: 'kromka', unitGrams: { kromka: 35 } },
+  { name: 'Bagietka',             kcal: 270, protein: 9,   unit: 'porcja', unitGrams: { porcja: 60 } },
+  { name: 'Chałka',               kcal: 320, protein: 8,   unit: 'kromka', unitGrams: { kromka: 40 } },
+  { name: 'Tortilla pszenna',     kcal: 300, protein: 8,   unit: 'szt',    unitGrams: { szt: 60 } },
+  { name: 'Sucharki',             kcal: 380, protein: 9,   unit: 'szt',    unitGrams: { szt: 8 } },
+  { name: 'Bułka tarta',          kcal: 350, protein: 11,  unit: 'lyzka',  unitGrams: { lyzka: 10 } },
+
+  // ── Nabiał ─────────────────────────────────────────────────────────────────
+  { name: 'Mleko 3,2%',           kcal: 63,  protein: 3.2, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Mleko UHT 1,5%',       kcal: 46,  protein: 3.4, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Serek wiejski',        kcal: 95,  protein: 12,  unit: 'szt',      unitGrams: { szt: 200, lyzka: 30 } },
+  { name: 'Serek szczypiorek',    kcal: 230, protein: 8,   unit: 'lyzka',    unitGrams: { lyzka: 20, szt: 100 } },
+  { name: 'Jogurt naturalny 2%',  kcal: 60,  protein: 4.3, unit: 'szt',      unitGrams: { szt: 150, lyzka: 25 } },
+  { name: 'Jogurt grecki 10%',    kcal: 115, protein: 5,   unit: 'szt',      unitGrams: { szt: 150, lyzka: 25 } },
+  { name: 'Kefir',                kcal: 50,  protein: 3.3, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Śmietana 18%',         kcal: 185, protein: 2.5, unit: 'lyzka',    unitGrams: { lyzka: 20 } },
+  { name: 'Ser żółty (gouda/edam)', kcal: 330, protein: 25, unit: 'plaster', unitGrams: { plaster: 20 } },
+  { name: 'Ser mozzarella',       kcal: 250, protein: 18,  unit: 'plaster',  unitGrams: { plaster: 25 } },
+  { name: 'Ser feta',             kcal: 265, protein: 14,  unit: 'porcja',   unitGrams: { porcja: 30 } },
+  { name: 'Twaróg półtłusty',     kcal: 130, protein: 18,  unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Serek topiony',        kcal: 280, protein: 10,  unit: 'plaster',  unitGrams: { plaster: 25 } },
+  { name: 'Mascarpone',           kcal: 430, protein: 4,   unit: 'lyzka',    unitGrams: { lyzka: 20 } },
+  { name: 'Ricotta',              kcal: 150, protein: 8,   unit: 'lyzka',    unitGrams: { lyzka: 25 } },
+
+  // ── Wędliny i mięso ────────────────────────────────────────────────────────
+  { name: 'Polędwica z kurczaka (wędlina)', kcal: 100, protein: 20, unit: 'plaster', unitGrams: { plaster: 15 } },
+  { name: 'Polędwica sopocka',    kcal: 113, protein: 18,  unit: 'plaster',  unitGrams: { plaster: 12 } },
+  { name: 'Szynka z indyka',      kcal: 105, protein: 18,  unit: 'plaster',  unitGrams: { plaster: 15 } },
+  { name: 'Szynka gotowana',      kcal: 120, protein: 18,  unit: 'plaster',  unitGrams: { plaster: 20 } },
+  { name: 'Schab wędzony',        kcal: 150, protein: 22,  unit: 'plaster',  unitGrams: { plaster: 20 } },
+  { name: 'Kiełbasa krakowska',   kcal: 260, protein: 20,  unit: 'plaster',  unitGrams: { plaster: 15 } },
+  { name: 'Kabanosy',             kcal: 300, protein: 22,  unit: 'szt',      unitGrams: { szt: 30 } },
+  { name: 'Parówki',              kcal: 260, protein: 11,  unit: 'szt',      unitGrams: { szt: 30 } },
+  { name: 'Boczek wędzony',       kcal: 300, protein: 15,  unit: 'plaster',  unitGrams: { plaster: 15 } },
+  { name: 'Pasztet',              kcal: 280, protein: 10,  unit: 'lyzka',    unitGrams: { lyzka: 20, plaster: 20 } },
+  { name: 'Salami',               kcal: 380, protein: 22,  unit: 'plaster',  unitGrams: { plaster: 8 } },
+  { name: 'Pierś z kurczaka (grillowana)', kcal: 165, protein: 31, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Mięso mielone (smażone)', kcal: 250, protein: 20, unit: 'porcja', unitGrams: { porcja: 120 } },
+
+  // ── Ryby ───────────────────────────────────────────────────────────────────
+  { name: 'Makrela wędzona',      kcal: 220, protein: 20,  unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Łosoś wędzony',        kcal: 180, protein: 22,  unit: 'plaster',  unitGrams: { plaster: 20 } },
+  { name: 'Tuńczyk w sosie własnym', kcal: 110, protein: 25, unit: 'porcja', unitGrams: { porcja: 80 } },
+  { name: 'Śledź w oleju',        kcal: 210, protein: 16,  unit: 'porcja',   unitGrams: { porcja: 80 } },
+
+  // ── Sosy i tłuszcze ────────────────────────────────────────────────────────
+  { name: 'Ketchup',              kcal: 100, protein: 1.4, unit: 'lyzka',    unitGrams: { lyzka: 15 } },
+  { name: 'Majonez',              kcal: 680, protein: 1,   unit: 'lyzka',    unitGrams: { lyzka: 15 } },
+  { name: 'Musztarda',            kcal: 100, protein: 5,   unit: 'lyzeczka', unitGrams: { lyzeczka: 5, lyzka: 15 } },
+  { name: 'Oliwa z oliwek',       kcal: 884, protein: 0,   unit: 'lyzka',    unitGrams: { lyzka: 13, lyzeczka: 5 } },
+  { name: 'Masło orzechowe',      kcal: 600, protein: 25,  unit: 'lyzka',    unitGrams: { lyzka: 16 } },
+
+  // ── Makarony, kasze, ryż ───────────────────────────────────────────────────
+  { name: 'Makaron (suchy)',      kcal: 360, protein: 12,  unit: 'porcja',   unitGrams: { porcja: 80 } },
+  { name: 'Makaron (ugotowany)',  kcal: 140, protein: 5,   unit: 'porcja',   unitGrams: { porcja: 180 } },
+  { name: 'Ryż biały (suchy)',    kcal: 350, protein: 7,   unit: 'porcja',   unitGrams: { porcja: 70 } },
+  { name: 'Ryż (ugotowany)',      kcal: 130, protein: 2.7, unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Kasza gryczana (sucha)', kcal: 340, protein: 12, unit: 'porcja',  unitGrams: { porcja: 70 } },
+  { name: 'Kasza jaglana (sucha)', kcal: 350, protein: 11, unit: 'porcja',   unitGrams: { porcja: 70 } },
+  { name: 'Płatki owsiane',       kcal: 370, protein: 13,  unit: 'porcja',   unitGrams: { porcja: 50, lyzka: 10 } },
+
+  // ── Słodycze ───────────────────────────────────────────────────────────────
+  { name: 'Czekolada mleczna',    kcal: 535, protein: 7.5, unit: 'porcja',   unitGrams: { porcja: 25 } },
+  { name: 'Czekolada gorzka',     kcal: 550, protein: 8,   unit: 'porcja',   unitGrams: { porcja: 25 } },
+  { name: 'Nutella',              kcal: 539, protein: 6,   unit: 'lyzka',    unitGrams: { lyzka: 20 } },
+  { name: 'Baton czekoladowy',    kcal: 490, protein: 6,   unit: 'szt',      unitGrams: { szt: 45 } },
+  { name: 'Toffifee',             kcal: 530, protein: 5,   unit: 'szt',      unitGrams: { szt: 10 } },
+  { name: 'Oreo (ciastka)',       kcal: 480, protein: 5,   unit: 'szt',      unitGrams: { szt: 11 } },
+  { name: 'Jeżyki (ciastka)',     kcal: 490, protein: 5,   unit: 'szt',      unitGrams: { szt: 12 } },
+  { name: 'Chałwa',               kcal: 500, protein: 12,  unit: 'porcja',   unitGrams: { porcja: 30 } },
+  { name: 'Lody familijne',       kcal: 200, protein: 3.5, unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Ciastka kruche',       kcal: 470, protein: 6,   unit: 'szt',      unitGrams: { szt: 12 } },
+  { name: 'Piernik',              kcal: 380, protein: 5,   unit: 'szt',      unitGrams: { szt: 30 } },
+  { name: 'Żelki',                kcal: 340, protein: 6,   unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Wafelek',              kcal: 500, protein: 6,   unit: 'szt',      unitGrams: { szt: 40 } },
+  { name: 'Miód',                 kcal: 320, protein: 0.3, unit: 'lyzka',    unitGrams: { lyzka: 20, lyzeczka: 7 } },
+  { name: 'Dżem',                 kcal: 250, protein: 0.4, unit: 'lyzka',    unitGrams: { lyzka: 20 } },
+
+  // ── Przekąski ──────────────────────────────────────────────────────────────
+  { name: 'Chipsy',               kcal: 535, protein: 6,   unit: 'garsc',    unitGrams: { garsc: 25 } },
+  { name: 'Chrupki kukurydziane', kcal: 520, protein: 6,   unit: 'garsc',    unitGrams: { garsc: 20 } },
+  { name: 'Paluszki',             kcal: 390, protein: 11,  unit: 'garsc',    unitGrams: { garsc: 20 } },
+  { name: 'Orzeszki ziemne solone', kcal: 600, protein: 25, unit: 'garsc',   unitGrams: { garsc: 30 } },
+  { name: 'Orzechy nerkowca',     kcal: 580, protein: 18,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Orzechy włoskie',      kcal: 650, protein: 15,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Migdały',              kcal: 580, protein: 21,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Mieszanka studencka',  kcal: 480, protein: 12,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Krakersy',             kcal: 450, protein: 9,   unit: 'garsc',    unitGrams: { garsc: 25 } },
+
+  // ── Napoje ─────────────────────────────────────────────────────────────────
+  { name: 'Cola',                 kcal: 42,  protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Napój izotoniczny (Oshee)', kcal: 25, protein: 0, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Sok pomarańczowy',     kcal: 45,  protein: 0.7, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Sok jabłkowy',         kcal: 46,  protein: 0.1, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Napój energetyczny',   kcal: 45,  protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Kawa (czarna)',        kcal: 2,   protein: 0.1, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Piwo',                 kcal: 43,  protein: 0.5, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+
+  // ── Dania gotowe / obiady ──────────────────────────────────────────────────
+  { name: 'Zupa pomidorowa',      kcal: 60,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Rosół',                kcal: 35,  protein: 2,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Pierogi ruskie',       kcal: 200, protein: 6,   unit: 'szt',      unitGrams: { szt: 30 } },
+  { name: 'Naleśnik',             kcal: 150, protein: 5,   unit: 'szt',      unitGrams: { szt: 60 } },
+  { name: 'Pizza (kawałek)',      kcal: 260, protein: 11,  unit: 'porcja',   unitGrams: { porcja: 120 } },
+  { name: 'Kluski śląskie',       kcal: 160, protein: 3,   unit: 'szt',      unitGrams: { szt: 30 } },
+  { name: 'Kanapka z serem/wędliną', kcal: 250, protein: 11, unit: 'szt',    unitGrams: { szt: 100 } },
 ];
 
 // Fuzzy-ish search over the base: normalized substring + token match, ranked so a
