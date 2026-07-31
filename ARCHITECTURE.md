@@ -167,11 +167,13 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
 - `src/data/foodBase.ts` — wbudowana OFFLINE baza kcal/100g (~150 polskich produktów) +
   porcje domowe; `searchFoodBase(q)`. Startowa — to co user doda/zweryfikuje w foodStore wygrywa.
 - `app/(tabs)/food.tsx` — kafelek pierścienia (zjedzone vs cel + spalone + zostało), wybór
-  celu (redukcja/utrzymanie/masa), lista dzisiejszych posiłków wg typu. FAB „Co zjadłem" =
-  `ACTIONS[5]` w TabBar → `app/food/add.tsx`. **Domyślny widok = KOMPOZYCJE I DANIA** (ulubione
-  na górze, potem wg PRESET_CATS; presety→okno apply, dania→picker gramów; gwiazdka/long-press
-  przypina). **Pojedyncze produkty TYLKO pod wyszukiwarką** (`libMatches` = presety+dania,
-  reszta z `candidates` odfiltrowana z isRecipe). Picker jednostki+ilości: ilość EDYTOWALNA
+  celu (redukcja/utrzymanie/masa), lista posiłków dnia wg typu — **posiłki ROZWIJANE**
+  (`expanded` Set, tap=rozwiń → rozpis pozycji: nazwa/gramy/kcal + godzina `hhmm(ts)`; edycja/kosz
+  osobno). FAB „Co zjadłem" = `ACTIONS[5]` w TabBar → `app/food/add.tsx`. **Przeglądanie w
+  SEGMENTACH (jedno naraz):** `browseTab` Dania / Produkty / Ostatnie (chipy) — akcje „utwórz"
+  wewnątrz segmentu (Nowy przepis w Daniach, Wpisz ręcznie w Produktach). Wyszukiwarka (z wpisem)
+  = szybkie znajdowanie: dania+kompozycje (`libMatches`) + pojedyncze produkty (`candidates` bez
+  isRecipe) + „Dodaj nowy". Helpery `renderLibRow`/`renderSingle` reużyte. Picker jednostki+ilości: ilość EDYTOWALNA
   (ułamki 0,5/1,5 — `qtyText`+`bumpQty`), podgląd kcal, override gram UCZY porcję; „Wpisz
   ręcznie" = produkt kcalPerPortion. Reużywa `productMemory` + `normalizeProductName`.
 - **Bilans kalorii:** `getHealthHistory` niesie `burn` per dzień → karta „Bilans tygodnia"
@@ -237,6 +239,11 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   storu) + `CatTail.tsx` (ogon; prążki przez obrócony `<Pattern>`). `catPalettes.ts` —
   `DEFAULT_PALETTE` = niebieski (to samo co logo/splash). `petStore` (xp/coins/kolor/prążki),
   `petState.ts` (nastrój z danych), `quests.ts`, `petShop.ts`.
+- **Sklep (`app/pet-shop.tsx`):** zamrożenie serii PRZYPIĘTE na górze; reszta w kategoriach
+  (chipy Skrzynki/Kolory/Dodatki), kolory grupowane wg rzadkości. **Skrzynki (gacha)** =
+  `petBoxes.ts` (`LOOT_BOXES` + `rollBox`): losują kolor (ważony rzadkością, tylko nieposiadane) /
+  zamrożenie / monety; droższa = lepsze szanse. Odsłona `components/pet/BoxRevealModal.tsx`
+  (❄ zamrożenia lecą z boków). Reużywa `spendCoins`/`buyItem(id,0)`/`addCoins`/`addFreezes` — bez zmian w petStore.
 - **Ograniczenie RN:** animować tylko transformy wrappera `Animated.View` (native driver);
   animacja propów SVG stutteruje. RN nie ma transform-origin → piwot = translate→rotate→translate.
 - **AnimatedSplash** używa CatArt (nie PNG) — te same ID/rozmiar co natywny splash, start
