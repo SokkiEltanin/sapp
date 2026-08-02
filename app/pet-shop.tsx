@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -10,7 +10,8 @@ import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import { usePetStore } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
-import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
+import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
+import { STARTUPS, startupById, SPLASH_BG, ANIM_LABEL, Startup } from '@/utils/petStartups';
 import { paletteById } from '@/utils/catPalettes';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -20,18 +21,24 @@ import { toast } from '@/store/toastStore';
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 
-type Cat = 'boxes' | 'colors' | 'extras';
+const todayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+type Cat = 'boxes' | 'colors' | 'startups' | 'extras';
 const CATS: { id: Cat; label: string; Icon: any }[] = [
-  { id: 'boxes',  label: 'Skrzynki', Icon: Gift },
-  { id: 'colors', label: 'Kolory',   Icon: Palette },
-  { id: 'extras', label: 'Dodatki',  Icon: Sparkles },
+  { id: 'boxes',    label: 'Skrzynki', Icon: Gift },
+  { id: 'colors',   label: 'Kolory',   Icon: Palette },
+  { id: 'startups', label: 'Startupy', Icon: Rocket },
+  { id: 'extras',   label: 'Dodatki',  Icon: Sparkles },
 ];
 const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins, buyStartup, equippedStartup, claimDailyBox, dayClaims } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -69,7 +76,48 @@ export default function PetShop() {
     setReveal({ box, reward });
   };
 
+  // Darmowa skrzynka dnia — raz dziennie: losuj i przyznaj (jak w sklepowej gaczy).
+  const dailyReady = !dayClaims[`dailybox:${todayKey()}`];
+  const onDailyBox = () => {
+    haptic.tap();
+    if (!dailyReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
+    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems);
+    if (reward.type === 'color') buyItem(reward.colorId, 0);
+    else if (reward.type === 'coins') addCoins(reward.coins);
+    else if (reward.type === 'freeze') addFreezes(reward.count);
+    haptic.success();
+    setReveal({ box: DAILY_BOX, reward });
+  };
+
+  // Startup (kosmetyk splasha): kup+ustaw, albo tylko ustaw jeśli już masz.
+  const onStartup = (su: Startup) => {
+    haptic.tap();
+    const had = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
+    if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(had ? `${su.name} — ustawione` : `Kupione: ${su.name}`); }
+    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${su.cost}`); }
+  };
+
   const worn = paletteById(catColor);
+
+  const renderStartupCell = (su: Startup) => {
+    const owned = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
+    const on = equippedStartup === su.id;
+    const tier = TIER_META[su.tier];
+    return (
+      <PressableScale key={su.id} onPress={() => onStartup(su)}>
+        <View style={[s.cell, on && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
+          <View style={[s.startupSwatch, { borderColor: su.ink + '55' }]}>
+            <Text style={[s.startupSwatchMark, { color: su.ink }]}>Sapp</Text>
+          </View>
+          <Text style={s.cellName} numberOfLines={1}>{su.name}</Text>
+          <Text style={s.animTag}>{ANIM_LABEL[su.anim]}{su.glow ? ' · glow' : ''}</Text>
+          {owned
+            ? <Text style={[s.cellState, { color: on ? tier.color : c.text.muted }]}>{on ? 'ustawione' : 'kupione'}</Text>
+            : <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{su.cost}</Text></View>}
+        </View>
+      </PressableScale>
+    );
+  };
 
   const renderColorCell = (sc: typeof SHOP_COLORS[number]) => {
     const owned = ownedItems.includes(sc.id) || sc.cost === 0;
@@ -102,6 +150,22 @@ export default function PetShop() {
         <View style={s.preview}>
           <CatArt size={140} expression="happy" palette={worn} stripes={catStripes} animate={false} />
         </View>
+
+        {/* PRZYPIĘTE: darmowa skrzynka dnia — główne nowe źródło monet */}
+        <PressableScale onPress={onDailyBox}>
+          <View style={[s.dailyHero, !dailyReady && s.dailyHeroDone]}>
+            <View style={[s.dailyIcon, !dailyReady && { backgroundColor: '#FBBF2420' }]}>
+              <Gift size={22} color={dailyReady ? '#0B0E1A' : '#FBBF24'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.dailyTitle}>Skrzynka dnia — za darmo</Text>
+              <Text style={s.dailySub}>{dailyReady ? 'Odbierz codziennie: monety, czasem kolor lub ❄' : 'Odebrane — wróć jutro'}</Text>
+            </View>
+            {dailyReady
+              ? <View style={s.dailyCta}><Text style={s.dailyCtaTxt}>ODBIERZ</Text></View>
+              : <Check size={18} color="#FBBF24" />}
+          </View>
+        </PressableScale>
 
         {/* PRZYPIĘTE NA GÓRZE — zamrożenie serii (najważniejsze, funkcjonalne) */}
         <PressableScale onPress={onBuyFreeze}>
@@ -169,6 +233,30 @@ export default function PetShop() {
           );
         })}
 
+        {/* ── STARTUPY (ekran ładowania) ───────────────────────────── */}
+        {cat === 'startups' && (
+          <View style={{ gap: spacing[2] }}>
+            <Text style={s.blurbTop}>Zmieniają ekran ładowania apki. Zobaczysz przy następnym starcie.</Text>
+            <View style={[s.startupPreview, { backgroundColor: SPLASH_BG }]}>
+              <Text style={[s.startupPreviewMark, { color: startupById(equippedStartup).ink }]}>Sapp</Text>
+              <Text style={s.startupPreviewCap}>teraz: {startupById(equippedStartup).name} · {ANIM_LABEL[startupById(equippedStartup).anim]}</Text>
+            </View>
+            {TIER_ORDER.map(tier => {
+              const items = STARTUPS.filter(x => x.tier === tier);
+              if (!items.length) return null;
+              return (
+                <View key={tier} style={{ gap: spacing[2] }}>
+                  <View style={s.subHead}>
+                    <View style={[s.tierDot, { backgroundColor: TIER_META[tier].color }]} />
+                    <Text style={[s.subSection, { color: TIER_META[tier].color }]}>{TIER_META[tier].label}</Text>
+                  </View>
+                  <View style={s.grid}>{items.map(renderStartupCell)}</View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* ── DODATKI ──────────────────────────────────────────────── */}
         {cat === 'extras' && (
           <PressableScale onPress={onStripes}>
@@ -188,7 +276,7 @@ export default function PetShop() {
           </PressableScale>
         )}
 
-        <Text style={s.hint}>Monety zbierasz questami — za dbanie o SIEBIE.</Text>
+        <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota.</Text>
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -246,6 +334,23 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
+
+  // skrzynka dnia (darmowa, przypięta)
+  dailyHero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#FBBF2455', backgroundColor: '#FBBF2414' },
+  dailyHeroDone: { borderColor: c.border.default, backgroundColor: c.bg.card },
+  dailyIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center' },
+  dailyTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
+  dailySub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
+  dailyCta: { backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 6 },
+  dailyCtaTxt: { fontSize: 11, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.5 },
+
+  // startupy (kosmetyki splasha)
+  startupPreview: { alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: spacing[4], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default },
+  startupPreviewMark: { fontSize: 30, fontWeight: '900', letterSpacing: 1 },
+  startupPreviewCap: { fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '600' },
+  startupSwatch: { width: 74, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#1A1C1C', alignItems: 'center', justifyContent: 'center' },
+  startupSwatchMark: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+  animTag: { fontSize: 9, color: c.text.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
 
   hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
 }));

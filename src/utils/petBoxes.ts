@@ -47,6 +47,17 @@ export function boxById(id: BoxId): LootBox {
   return LOOT_BOXES.find(b => b.id === id) ?? LOOT_BOXES[0];
 }
 
+// Darmowa SKRZYNKA DNIA — raz dziennie, za 0 monet (nowe główne źródło monet). Głównie
+// monety, mała szansa na nieposiadany kolor lub zamrożenie. NIE w LOOT_BOXES — nie jest
+// na sprzedaż; odbierasz ją z hero na górze sklepu. Losowana tym samym rollBox.
+export const DAILY_BOX: LootBox = {
+  id: 'sardine', name: 'Skrzynka dnia', cost: 0, color: '#FBBF24', emoji: '🎁',
+  blurb: 'Za darmo, raz dziennie',
+  colorChance: 0.10, freezeChance: 0.10,
+  tierWeight: { basic: 9, rare: 2, epic: 0.3 },
+  coins: { min: 6, max: 20, jackpot: 60, jackpotChance: 0.06 },
+};
+
 export type BoxReward =
   | { type: 'color'; colorId: string; name: string; swatch: string; rarity: CrateTier }
   | { type: 'coins'; coins: number; rarity: CrateTier }

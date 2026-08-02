@@ -28,6 +28,7 @@ interface PetState {
   roomAddons: Record<string, string[]>;
   catColor: string;             // palette id from catPalettes
   catStripes: boolean;          // tail stripes on/off
+  equippedStartup: string;      // id kosmetyku ekranu ładowania (splash); 'default' = darmowy
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
   // dailyClaims can only remember ONE date per quest, so claiming yesterday's catch-up
@@ -58,6 +59,8 @@ interface PetState {
   buyColor: (id: string, cost: number) => boolean;  // false if not enough coins
   setColor: (id: string) => void;
   buyStripes: (cost: number) => boolean;            // buys, or toggles once owned
+  buyStartup: (id: string, cost: number) => boolean; // splash cosmetic: buy+equip, or just equip if owned
+  claimDailyBox: () => boolean;                     // free daily chest: marks today claimed (false if already)
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
   claimDailyFor: (id: string, date: string, coins: number, xp: number) => boolean; // catch-up claim for a past day
@@ -84,6 +87,7 @@ export const usePetStore = create<PetState>()(
       ownedItems: [],
       catColor: 'blue',
       catStripes: false,
+      equippedStartup: 'default',
       roomAddons: {},
       equipped: {},
       claimedQuests: [],
@@ -135,6 +139,27 @@ export const usePetStore = create<PetState>()(
         if (s.ownedItems.includes('stripes')) { set({ catStripes: !s.catStripes }); return true; }
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'stripes'], catStripes: true });
+        return true;
+      },
+      // Splash cosmetic: free (owned or cost 0) → just equip; otherwise buy (deduct +
+      // remember under `startup:<id>` in ownedItems) and equip. Mirrors buyColor.
+      buyStartup: (id, cost) => {
+        const s = get();
+        if (!s._hydrated) return false;
+        const key = `startup:${id}`;
+        if (s.ownedItems.includes(key) || cost === 0) { set({ equippedStartup: id }); return true; }
+        if (s.coins < cost) return false;
+        set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, key], equippedStartup: id });
+        return true;
+      },
+      // Free daily chest: one claim per day. Records the day in dayClaims (same anti-clobber
+      // store the daily quests use); the caller rolls + grants the reward on a `true`.
+      claimDailyBox: () => {
+        const t = todayISO();
+        const s = get();
+        const key = `dailybox:${t}`;
+        if (s.dayClaims[key]) return false;
+        set({ dayClaims: { ...s.dayClaims, [key]: true } });
         return true;
       },
       claimQuest: (id, coins, xp) => set((s) => s.claimedQuests.includes(id) ? s : ({
@@ -240,7 +265,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, equippedStartup: 'default', equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -248,6 +273,7 @@ export const usePetStore = create<PetState>()(
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes,
+        equippedStartup: s.equippedStartup,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
         weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
@@ -257,6 +283,7 @@ export const usePetStore = create<PetState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)
         state._hydrated = true;
+        state.equippedStartup = state.equippedStartup ?? 'default';   // stary stan bez pola → domyślny splash
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};

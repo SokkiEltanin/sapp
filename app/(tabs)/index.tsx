@@ -2364,6 +2364,8 @@ export default function DashboardScreen() {
   const petClaimedQuests = usePetStore(st => st.claimedQuests);
   const petDailyClaims = usePetStore(st => st.dailyClaims);
   const petMonthlyClaims = usePetStore(st => st.monthlyClaims);
+  const petDayClaims = usePetStore(st => st.dayClaims);
+  const dailyBoxReady = !petDayClaims[`dailybox:${todayISO()}`];   // free daily chest waiting?
   const petState = useMemo(() => {
     const tISO = todayISO();
     const todayMoods = moodEntries.filter(e => e.date === tISO);
@@ -3134,7 +3136,7 @@ export default function DashboardScreen() {
 
               nodes['pet'] = (
                 <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }}>
-                  <PetTile name={petName} pet={petState} level={petLevel} claimable={petClaimable} />
+                  <PetTile name={petName} pet={petState} level={petLevel} claimable={petClaimable + (dailyBoxReady ? 1 : 0)} />
                 </TouchableOpacity>
               );
 
