@@ -14,6 +14,7 @@ import { searchFoodBase } from '@/data/foodBase';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
+import { fonts } from '@/theme/fonts';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
@@ -465,9 +466,9 @@ export default function FoodAdd() {
       <Star size={15} color={ACCENT} fill={e.pinned ? ACCENT : 'transparent'} />
       <View style={{ flex: 1 }}>
         <View style={s.candNameRow}>
-          <View style={[s.kindTag, e.kind === 'dish' ? { borderColor: '#F59E0B55', backgroundColor: '#F59E0B18' } : { borderColor: ACCENT + '44', backgroundColor: ACCENT + '14' }]}>
-            {e.kind === 'dish' ? <ChefHat size={10} color="#F59E0B" /> : <Layers size={10} color={ACCENT} />}
-            <Text style={[s.kindTagTxt, { color: e.kind === 'dish' ? '#F59E0B' : ACCENT }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
+          <View style={s.kindTag}>
+            {e.kind === 'dish' ? <ChefHat size={10} color={c.text.secondary} /> : <Layers size={10} color={c.text.secondary} />}
+            <Text style={[s.kindTagTxt, { color: c.text.secondary }]}>{e.kind === 'dish' ? 'DANIE' : 'ZŁOŻENIE'}</Text>
           </View>
           <Text style={s.candName} numberOfLines={1}>{e.name}</Text>
         </View>
@@ -560,13 +561,13 @@ export default function FoodAdd() {
             {items.map((it, i) => {
               const k = kindOf(it);
               const KindIcon = k === 'danie' ? ChefHat : k === 'kompozycja' ? Layers : Apple;
-              const kindCol = k === 'danie' ? '#F59E0B' : k === 'kompozycja' ? ACCENT : c.text.muted;
+              const kindCol = k === 'produkt' ? c.text.muted : c.text.secondary;   // MONO — bez koloru
               const editable = !(it.parts && it.parts.length);   // produkt = stuknij, by zmienić ilość
               return (
-              <View key={i} style={[s.itemRow, s.itemBorder]}>
+              <View key={i} style={[s.itemRow, i > 0 && s.itemBorder]}>
                 <TouchableOpacity style={s.itemMain} activeOpacity={editable ? 0.6 : 1} disabled={!editable}
                   onPress={() => editTrayItem(i)}>
-                  <View style={[s.kindTag, { borderColor: kindCol + '55', backgroundColor: kindCol + '18' }]}>
+                  <View style={s.kindTag}>
                     <KindIcon size={11} color={kindCol} />
                     <Text style={[s.kindTagTxt, { color: kindCol }]}>{k === 'danie' ? 'DANIE' : k === 'kompozycja' ? 'ZŁOŻENIE' : 'PRODUKT'}</Text>
                   </View>
@@ -584,12 +585,12 @@ export default function FoodAdd() {
               </View>
               );
             })}
-            <Text style={s.itemEditHint}>Stuknij pozycję, aby zmienić ilość · kosz usuwa</Text>
+            <Text style={s.itemEditHint}>Stuknij pozycję, aby zmienić ilość</Text>
             <View style={s.totalRow}>
               <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setSaveP(true); }}>
                 <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
               </TouchableOpacity>
-              <Text style={s.totalVal}>{total} kcal</Text>
+              <Text style={s.totalVal}>{total}<Text style={s.totalUnit}> kcal</Text></Text>
             </View>
           </View>
         )}
@@ -668,7 +669,7 @@ export default function FoodAdd() {
                     <Text style={s.candMeta}>Brak dań i kompozycji. Zbuduj posiłek z produktów i „Zapisz jako preset", albo dodaj „Nowy przepis / danie".</Text>
                   </View>
                 )}
-                <Text style={s.presetHint}>Stuknij = dodaj do posiłku. Gwiazdka = przypnij na górę.</Text>
+                <Text style={s.presetHint}>Przytrzymaj pozycję, aby przypiąć ją na górę.</Text>
               </>
             )}
 
@@ -680,7 +681,6 @@ export default function FoodAdd() {
                 <View style={s.card}>
                   {candidates.filter(cand => !cand.isRecipe).map((cand, i) => renderSingle(cand, i))}
                 </View>
-                <Text style={s.presetHint}>Szukasz konkretnego? Wpisz nazwę w wyszukiwarkę wyżej.</Text>
               </>
             )}
 
@@ -919,23 +919,23 @@ export default function FoodAdd() {
 
 const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
-  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: c.text.primary },
-  scroll:    { padding: spacing[4], gap: spacing[3], paddingBottom: 120 },
+  header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[3] },
+  headerTitle: { fontSize: 19, fontWeight: '900', color: c.text.primary, letterSpacing: -0.3 },
+  scroll:    { padding: spacing[4], gap: spacing[4], paddingBottom: 132 },
 
-  card: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[3], borderWidth: 1, borderColor: c.border.subtle },
+  card: { backgroundColor: c.bg.card, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.subtle },
 
-  dateRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dateLabel:  { fontSize: 13, fontWeight: '700', color: c.text.secondary },
-  dateJump:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle },
-  dateChip:    { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle },
-  dateChipTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
-  dateJumpTxt:{ fontSize: 12, fontWeight: '700', color: c.text.secondary },
+  dateRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
+  dateLabel:  { fontFamily: fonts.label, fontSize: 10, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 2 },
+  dateJump:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  dateChip:    { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  dateChipTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
+  dateJumpTxt:{ fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
   datePicker: { paddingVertical: 8, paddingHorizontal: spacing[3] },
 
   typeRow:  { flexDirection: 'row', gap: spacing[2] },
-  typeChip: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
-  typeTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+  typeChip: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  typeTxt:  { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
 
   quickRow:  { gap: spacing[2], paddingVertical: 2 },
   quickChip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 190, paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
@@ -952,10 +952,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   presetActions: { flexDirection: 'row', gap: 6, marginTop: 4 },
   presetActBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 2, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
   presetActTxt:  { fontSize: 11, fontWeight: '700', color: c.text.secondary },
-  editBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 10, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '66', backgroundColor: ACCENT + '18' },
-  editBannerTxt: { flex: 1, fontSize: 12.5, fontWeight: '700', color: ACCENT },
-  savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  savePresetTxt: { fontSize: 12.5, fontWeight: '700', color: ACCENT },
+  editBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle },
+  editBannerTxt: { flex: 1, fontSize: 12.5, fontWeight: '700', color: c.text.primary },
+  savePresetBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
+  savePresetTxt: { fontSize: 12.5, fontWeight: '800', color: ACCENT },
 
   partsBox:  { gap: 2, backgroundColor: c.fill.subtle, borderRadius: radius.lg, padding: spacing[2] },
   partRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6, paddingHorizontal: spacing[2] },
@@ -963,27 +963,28 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   partKcal:  { fontSize: 12, fontWeight: '700', color: c.text.secondary },
   partsHint: { fontSize: 11, color: c.text.muted, paddingHorizontal: spacing[2], paddingTop: 2 },
   multRow:  { flexDirection: 'row', gap: spacing[2], justifyContent: 'center' },
-  multChip: { minWidth: 56, alignItems: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
-  multTxt:  { fontSize: 15, fontWeight: '800', color: c.text.secondary },
+  multChip: { minWidth: 60, alignItems: 'center', paddingVertical: 10, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  multTxt:  { fontFamily: fonts.display, fontSize: 16, color: c.text.secondary },
 
-  mealHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  mealHeadTxt:   { fontSize: 11, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  mealHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
+  mealHeadTxt:   { fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 1 },
   mealHeadCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
-  itemRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 8 },
+  itemRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 11 },
   itemMain:   { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  itemEditHint: { fontSize: 10.5, color: c.text.muted, marginTop: 4 },
+  itemEditHint: { fontSize: 10.5, color: c.text.muted, marginTop: spacing[2], textAlign: 'center' },
   itemBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
-  kindTag:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, minWidth: 58, justifyContent: 'center' },
+  kindTag:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, minWidth: 58, justifyContent: 'center' },
   kindTagTxt: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },
-  itemName:   { fontSize: 14, fontWeight: '700', color: c.text.primary },
+  itemName:   { fontSize: 14.5, fontWeight: '700', color: c.text.primary },
   itemMeta:   { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
-  itemKcal:   { fontSize: 13, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
-  totalRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.default },
+  itemKcal:   { fontFamily: fonts.display, fontSize: 15, color: c.text.primary, fontVariant: ['tabular-nums'] },
+  totalRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: c.border.default },
   totalLabel: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
-  totalVal:   { fontSize: 16, fontWeight: '800', color: ACCENT },
+  totalVal:   { fontFamily: fonts.display, fontSize: 32, color: ACCENT, letterSpacing: -0.5 },
+  totalUnit:  { fontFamily: fonts.display, fontSize: 14, color: c.text.muted },
 
-  searchBox:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 46 },
-  searchInput: { flex: 1, fontSize: 15, color: c.text.primary },
+  searchBox:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 50 },
+  searchInput: { flex: 1, fontSize: 15.5, color: c.text.primary },
 
   linkRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[4], flexWrap: 'wrap' },
   manualBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 4 },
@@ -992,43 +993,43 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
 
   // segmenty przeglądania (Dania / Produkty / Ostatnie)
   segRow: { flexDirection: 'row', gap: spacing[2] },
-  segBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  segBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
   segBtnOn: { backgroundColor: ACCENT, borderColor: ACCENT },
   segTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.muted },
   segTxtOn: { color: c.bg.primary },
   // wiersz „utwórz" (nowy przepis / wpisz ręcznie) na górze segmentu
-  createRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '55', borderStyle: 'dashed' },
-  createTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: ACCENT },
+  createRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, borderStyle: 'dashed', backgroundColor: c.fill.subtle },
+  createTxt: { flex: 1, fontSize: 13, fontWeight: '800', color: c.text.primary },
 
-  sectionHint: { fontSize: 11, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 2 },
-  catHead:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2], marginLeft: 2 },
+  sectionHint: { fontFamily: fonts.label, fontSize: 10, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 1, marginLeft: 2 },
+  catHead:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2], marginBottom: 2, marginLeft: 2 },
   catHeadDot:   { width: 9, height: 9, borderRadius: 5 },
-  catHeadTxt:   { fontSize: 13, fontWeight: '800', color: c.text.primary },
+  catHeadTxt:   { fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.6 },
   catHeadCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 
-  candRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 9 },
-  candNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  candRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: 11 },
+  candNameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   candName: { fontSize: 14, fontWeight: '600', color: c.text.primary, flexShrink: 1 },
   candMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
 
-  saveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing[4], paddingBottom: spacing[5], backgroundColor: c.bg.primary + 'F2' },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: radius.full },
-  saveTxt: { fontSize: 15, fontWeight: '800' },
+  saveBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing[4], paddingTop: spacing[3], paddingBottom: spacing[5], backgroundColor: c.bg.primary, borderTopWidth: 1, borderTopColor: c.border.subtle },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: radius.full },
+  saveTxt: { fontSize: 15.5, fontWeight: '900' },
 
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing[4] },
   sheet:      { borderRadius: radius.xl, padding: spacing[4], gap: spacing[3], borderWidth: 1, borderColor: c.border.default },
-  sheetTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  sheetTitle: { fontSize: 17, fontWeight: '900', color: c.text.primary, letterSpacing: -0.3 },
   sheetSub:   { fontSize: 12, color: c.text.muted, lineHeight: 16, marginTop: -6 },
 
   unitWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  unitChip: { paddingHorizontal: spacing[3], paddingVertical: 7, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
-  unitTxt:  { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
+  unitChip: { paddingHorizontal: spacing[3], paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
+  unitTxt:  { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
 
   qtyRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
-  qtyBtn:    { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
+  qtyBtn:    { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, alignItems: 'center', justifyContent: 'center' },
   qtyCenter: { alignItems: 'center', minWidth: 96 },
-  qtyVal:    { fontSize: 30, fontWeight: '800', color: c.text.primary },
-  qtyValInput: { minWidth: 74, height: 52, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 28, fontWeight: '800', color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
+  qtyVal:    { fontFamily: fonts.display, fontSize: 32, color: c.text.primary },
+  qtyValInput: { minWidth: 74, height: 52, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontFamily: fonts.display, fontSize: 30, color: c.text.primary, borderBottomWidth: 1, borderBottomColor: c.border.default },
   qtyUnit:   { fontSize: 12, fontWeight: '600', color: c.text.muted, marginTop: 2 },
   qtyHint:   { fontSize: 11, color: c.text.muted, textAlign: 'center' },
 
@@ -1036,17 +1037,17 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   fieldLabel: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary, width: 88 },
   fieldUnit:  { fontSize: 14, fontWeight: '700', color: c.text.muted },
   fieldHint:  { fontSize: 11, color: c.text.muted, flex: 1 },
-  bigInput:   { flex: 1, height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 22, fontWeight: '800', color: c.text.primary },
-  smInput:    { width: 76, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 16, fontWeight: '700', color: c.text.primary },
+  bigInput:   { flex: 1, height: 54, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontFamily: fonts.display, fontSize: 24, color: c.text.primary },
+  smInput:    { width: 76, height: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false, paddingVertical: 0, fontSize: 16, fontWeight: '800', color: c.text.primary },
 
-  addNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 11, borderRadius: radius.lg, borderWidth: 1, borderColor: ACCENT + '55', borderStyle: 'dashed' },
-  addNewTxt: { fontSize: 13, fontWeight: '700', color: ACCENT, flex: 1 },
+  addNewRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: spacing[3], paddingVertical: 12, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, borderStyle: 'dashed', backgroundColor: c.fill.subtle },
+  addNewTxt: { fontSize: 13, fontWeight: '800', color: c.text.primary, flex: 1 },
 
   sheetKcal:    { alignItems: 'center', gap: 1 },
-  sheetKcalVal: { fontSize: 22, fontWeight: '800', color: ACCENT },
+  sheetKcalVal: { fontFamily: fonts.display, fontSize: 28, color: ACCENT, letterSpacing: -0.5 },
   sheetKcalSub: { fontSize: 11.5, color: c.text.muted },
-  sheetAdd:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: radius.full },
-  sheetAddTxt:  { fontSize: 14, fontWeight: '800', color: '#1A1206' },
+  sheetAdd:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 50, borderRadius: radius.full },
+  sheetAddTxt:  { fontSize: 14.5, fontWeight: '900', color: '#1A1206' },
 
-  mInput: { height: 46, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3], fontSize: 15, color: c.text.primary },
+  mInput: { height: 48, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.fill.subtle, paddingHorizontal: spacing[3], fontSize: 15, color: c.text.primary },
 }));
