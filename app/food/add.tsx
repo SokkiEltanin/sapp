@@ -48,6 +48,7 @@ interface Candidate {
   protein100?: number;
   carbs100?: number;
   fat100?: number;
+  sugar100?: number;
   cat?: string;
   unitGrams?: Partial<Record<FoodUnit, number>>;
   defaultUnit?: FoodUnit;
@@ -292,7 +293,7 @@ export default function FoodAdd() {
   const candidates: Candidate[] = useMemo(() => {
     const curated: Candidate[] = products.map(p => ({
       name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
-      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
+      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, sugar100: p.sugar100, cat: p.cat,
       unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: isRecipeProduct(p), source: 'curated',
       _rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
     } as any));
@@ -303,7 +304,7 @@ export default function FoodAdd() {
       const seen = new Set(curated.map(x => normalizeProductName(x.name)));
       const base: Candidate[] = searchFoodBase('', 14)
         .filter(f => !seen.has(normalizeProductName(f.name)))
-        .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
+        .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, sugar100: f.sugar, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
       return [...curated.slice(0, 10), ...base];
     }
     const nq = normalizeProductName(q);
@@ -311,7 +312,7 @@ export default function FoodAdd() {
     const seen = new Set(curatedMatch.map(x => normalizeProductName(x.name)));
     const base: Candidate[] = searchFoodBase(q, 24)
       .filter(f => !seen.has(normalizeProductName(f.name)))
-      .map(f => ({ name: f.name, kcalPer100g: f.kcal, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
+      .map(f => ({ name: f.name, kcalPer100g: f.kcal, sugar100: f.sugar, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
     return [...curatedMatch, ...base];
   }, [products, query]);
 
@@ -355,7 +356,7 @@ export default function FoodAdd() {
   // A cooked dish (recipe product) → the normal grams picker (weigh your portion).
   const productToCandidate = (p: FoodProduct): Candidate => ({
     name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
-    protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, cat: p.cat,
+    protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, sugar100: p.sugar100, cat: p.cat,
     unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: true, source: 'curated',
   });
   const tapEntry = (e: LibEntry) => {
@@ -407,7 +408,7 @@ export default function FoodAdd() {
     if (!productId) {
       const p = upsertProductByName(sel.name, {
         kcalPer100g: k100 > 0 ? k100 : sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
-        protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100,
+        protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100, sugar100: sel.sugar100,
         unitGrams: sel.unitGrams, defaultUnit: unit, fromBase: sel.source === 'base',
       });
       productId = p.id;
@@ -416,8 +417,8 @@ export default function FoodAdd() {
     }
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
-    const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100 } as any, grams);
-    const newItem = { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined };
+    const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100, sugar100: sel.sugar100 } as any, grams);
+    const newItem = { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined, sugar: mac.sugar || undefined };
     if (editItemIndex != null) { const idx = editItemIndex; setItems(prev => prev.map((x, j) => j === idx ? newItem : x)); }
     else setItems(prev => [...prev, newItem]);
     setSel(null); setEditItemIndex(null);

@@ -43,6 +43,7 @@ export interface FoodProduct {
   protein100?: number;                           // białko  g/100g
   carbs100?: number;                             // węglowodany g/100g
   fat100?: number;                               // tłuszcze g/100g
+  sugar100?: number;                             // w tym cukry g/100g (podzbiór węgli)
   cat?: string;                                  // food category tag (FOOD_SUBCATS)
   linkedName?: string;                           // purchased-product name this represents (manual link)
   unitGrams?: Partial<Record<FoodUnit, number>>; // learned per-product portion grams
@@ -71,6 +72,7 @@ export interface MealItem {
   protein?: number;     // resolved grams of macro for this line (if product carries them)
   carbs?: number;
   fat?: number;
+  sugar?: number;       // w tym cukry (g) dla tej pozycji
   parts?: MealItem[];   // set for composite/preset lines
   presetId?: string;
 }
@@ -93,12 +95,13 @@ export interface RecipeMeta {
 }
 
 // Resolved macro grams for a portion of a product (density × grams). 0s when unknown.
-export function computeItemMacros(p: FoodProduct | undefined, grams: number): { protein: number; carbs: number; fat: number } {
+export function computeItemMacros(p: FoodProduct | undefined, grams: number): { protein: number; carbs: number; fat: number; sugar: number } {
   const g = grams / 100;
   return {
     protein: p?.protein100 != null ? Math.round(p.protein100 * g * 10) / 10 : 0,
     carbs:   p?.carbs100   != null ? Math.round(p.carbs100 * g * 10) / 10 : 0,
     fat:     p?.fat100     != null ? Math.round(p.fat100 * g * 10) / 10 : 0,
+    sugar:   p?.sugar100   != null ? Math.round(p.sugar100 * g * 10) / 10 : 0,
   };
 }
 
@@ -202,32 +205,32 @@ export function presetIngredientNames(p: MealPreset): string[] {
 export function presetGrams(p: MealPreset): number {
   return p.items.reduce((s, it) => s + (it.grams || 0), 0);
 }
-export function presetMacros(p: MealPreset): { protein: number; carbs: number; fat: number } {
+export function presetMacros(p: MealPreset): { protein: number; carbs: number; fat: number; sugar: number } {
   return p.items.reduce((a, it) => ({
-    protein: a.protein + (it.protein || 0), carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0),
-  }), { protein: 0, carbs: 0, fat: 0 });
+    protein: a.protein + (it.protein || 0), carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0), sugar: a.sugar + (it.sugar || 0),
+  }), { protein: 0, carbs: 0, fat: 0, sugar: 0 });
 }
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 // ── cooked-recipe maths ───────────────────────────────────────────────────────
-export function recipeTotals(ings: MealItem[]): { kcal: number; protein: number; carbs: number; fat: number; grams: number } {
+export function recipeTotals(ings: MealItem[]): { kcal: number; protein: number; carbs: number; fat: number; sugar: number; grams: number } {
   return ings.reduce((a, it) => ({
     kcal: a.kcal + (it.kcal || 0), protein: a.protein + (it.protein || 0),
-    carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0), grams: a.grams + (it.grams || 0),
-  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, grams: 0 });
+    carbs: a.carbs + (it.carbs || 0), fat: a.fat + (it.fat || 0), sugar: a.sugar + (it.sugar || 0), grams: a.grams + (it.grams || 0),
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, sugar: 0, grams: 0 });
 }
 // Per-100 g density of a dish. `weight` is the finished weight (cooked/fried) or the
 // summed ingredient weight (raw). `extraKcal`/`extraFatG` add a frying fat. Falls back
 // to the raw ingredient weight when no weight is set yet (live preview while building).
 export function recipeDensity(ings: MealItem[], weight: number, extraKcal = 0, extraFatG = 0): {
-  kcalPer100g: number; protein100?: number; carbs100?: number; fat100?: number; totalKcal: number; weight: number;
+  kcalPer100g: number; protein100?: number; carbs100?: number; fat100?: number; sugar100?: number; totalKcal: number; weight: number;
 } {
   const t = recipeTotals(ings);
   const w = weight > 0 ? weight : (t.grams > 0 ? t.grams : 0);
   const totalKcal = t.kcal + extraKcal;
   if (!(w > 0)) return { kcalPer100g: 0, totalKcal, weight: 0 };
   const per = (v: number) => { const x = Math.round((v / w) * 1000) / 10; return x > 0 ? x : undefined; };
-  return { kcalPer100g: Math.round((totalKcal / w) * 100), protein100: per(t.protein), carbs100: per(t.carbs), fat100: per(t.fat + extraFatG), totalKcal, weight: w };
+  return { kcalPer100g: Math.round((totalKcal / w) * 100), protein100: per(t.protein), carbs100: per(t.carbs), fat100: per(t.fat + extraFatG), sugar100: per(t.sugar), totalKcal, weight: w };
 }
 export function isRecipeProduct(p: FoodProduct): boolean {
   return !!p.recipe && p.recipe.ingredients.length > 0;
@@ -246,6 +249,7 @@ export function presetToItem(p: MealPreset, mult: number): MealItem {
     protein: r1(m.protein * mult) || undefined,
     carbs: r1(m.carbs * mult) || undefined,
     fat: r1(m.fat * mult) || undefined,
+    sugar: r1(m.sugar * mult) || undefined,
     parts: p.items.map(it => ({ ...it })),
     presetId: p.id,
   };
@@ -345,7 +349,7 @@ export const useFoodStore = create<FoodState>()(
         const patch: Partial<FoodProduct> = {
           name: name.trim(),
           kcalPer100g: d.kcalPer100g, kcalPerPortion: undefined,
-          protein100: d.protein100, carbs100: d.carbs100, fat100: d.fat100,
+          protein100: d.protein100, carbs100: d.carbs100, fat100: d.fat100, sugar100: d.sugar100,
           cat: cat || 'inne', defaultUnit: 'g', semi: !!semi,
           recipe: {
             ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(d.weight),

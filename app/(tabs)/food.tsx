@@ -76,9 +76,9 @@ export default function Food() {
   );
   const eaten = useMemo(() => dayMeals.reduce((sum, m) => sum + m.kcal, 0), [dayMeals]);
   const macrosToday = useMemo(() => {
-    let protein = 0, carbs = 0, fat = 0;
-    for (const m of dayMeals) for (const it of m.items) { protein += it.protein || 0; carbs += it.carbs || 0; fat += it.fat || 0; }
-    return { protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat), any: protein + carbs + fat > 0 };
+    let protein = 0, carbs = 0, fat = 0, sugar = 0;
+    for (const m of dayMeals) for (const it of m.items) { protein += it.protein || 0; carbs += it.carbs || 0; fat += it.fat || 0; sugar += it.sugar || 0; }
+    return { protein: Math.round(protein), carbs: Math.round(carbs), fat: Math.round(fat), sugar: Math.round(sugar), any: protein + carbs + fat > 0 };
   }, [dayMeals]);
 
   // ── Woda — single source = the "Woda" habit (shared with Zdrowie/Nawyki/pet) ──
@@ -390,6 +390,9 @@ export default function Food() {
               <Text style={s.macroChip}>B <Text style={s.macroChipV}>{macrosToday.protein} g</Text></Text>
               <Text style={s.macroChip}>W <Text style={s.macroChipV}>{macrosToday.carbs} g</Text></Text>
               <Text style={s.macroChip}>T <Text style={s.macroChipV}>{macrosToday.fat} g</Text></Text>
+              {macrosToday.sugar > 0 && (
+                <Text style={s.macroChip}>Cukier <Text style={s.macroChipV}>{macrosToday.sugar} g</Text> <Text style={s.macroChipSub}>≈ {Math.round(macrosToday.sugar / 4)} łyż.</Text></Text>
+              )}
             </View>
           )}
         </View>
@@ -697,9 +700,10 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   goalChip:    { paddingHorizontal: spacing[3], paddingVertical: 6, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   goalChipTxt: { fontSize: 12, fontWeight: '700', color: c.text.secondary },
 
-  macroLine:  { flexDirection: 'row', justifyContent: 'center', gap: spacing[3], marginTop: 2 },
+  macroLine:  { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: spacing[3], marginTop: 2 },
   macroChip:  { fontSize: 12, fontWeight: '700', color: c.text.muted },
   macroChipV: { color: c.text.primary, fontWeight: '800' },
+  macroChipSub: { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
 
   trackRow:   { flexDirection: 'row', gap: spacing[3] },
   trackCard:  { flex: 1, gap: spacing[2] },

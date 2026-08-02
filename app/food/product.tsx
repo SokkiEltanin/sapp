@@ -35,6 +35,7 @@ export default function FoodProductForm() {
   const [prot, setProt]     = useState('');
   const [carb, setCarb]     = useState('');
   const [fat, setFat]       = useState('');
+  const [sugar, setSugar]   = useState('');
   const [linkedName, setLinkedName] = useState('');
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkQuery, setLinkQuery] = useState('');
@@ -50,6 +51,7 @@ export default function FoodProductForm() {
       setProt(editing.protein100 != null ? String(editing.protein100) : '');
       setCarb(editing.carbs100 != null ? String(editing.carbs100) : '');
       setFat(editing.fat100 != null ? String(editing.fat100) : '');
+      setSugar(editing.sugar100 != null ? String(editing.sugar100) : '');
       setLinkedName(editing.linkedName ?? '');
     } else if (params.name) {
       setName(params.name);
@@ -88,6 +90,7 @@ export default function FoodProductForm() {
       protein100: numOr0(prot) > 0 ? numOr0(prot) : undefined,
       carbs100:   numOr0(carb) > 0 ? numOr0(carb) : undefined,
       fat100:     numOr0(fat) > 0 ? numOr0(fat) : undefined,
+      sugar100:   numOr0(sugar) > 0 ? numOr0(sugar) : undefined,
       unitGrams:  wg > 0 ? { szt: wg } as Partial<Record<FoodUnit, number>> : undefined,
       defaultUnit: (wg > 0 ? 'szt' : 'g') as FoodUnit,
       linkedName: linkedName.trim() || undefined,
@@ -140,9 +143,10 @@ export default function FoodProductForm() {
 
           <Text style={s.label}>Makra na 100 g (opcjonalnie)</Text>
           <View style={s.macroRow}>
-            <View style={s.macroCol}><Text style={s.macroLbl}>B (białko)</Text><TextInput style={s.macroInput} value={prot} onChangeText={setProt} keyboardType="numeric" placeholder="12" placeholderTextColor={c.text.muted} /></View>
-            <View style={s.macroCol}><Text style={s.macroLbl}>W (węgle)</Text><TextInput style={s.macroInput} value={carb} onChangeText={setCarb} keyboardType="numeric" placeholder="46" placeholderTextColor={c.text.muted} /></View>
-            <View style={s.macroCol}><Text style={s.macroLbl}>T (tłuszcz)</Text><TextInput style={s.macroInput} value={fat} onChangeText={setFat} keyboardType="numeric" placeholder="9.4" placeholderTextColor={c.text.muted} /></View>
+            <View style={s.macroCol}><Text style={s.macroLbl}>Białko</Text><TextInput style={s.macroInput} value={prot} onChangeText={setProt} keyboardType="numeric" placeholder="12" placeholderTextColor={c.text.muted} /></View>
+            <View style={s.macroCol}><Text style={s.macroLbl}>Węgle</Text><TextInput style={s.macroInput} value={carb} onChangeText={setCarb} keyboardType="numeric" placeholder="46" placeholderTextColor={c.text.muted} /></View>
+            <View style={s.macroCol}><Text style={s.macroLbl}>Tłuszcz</Text><TextInput style={s.macroInput} value={fat} onChangeText={setFat} keyboardType="numeric" placeholder="9.4" placeholderTextColor={c.text.muted} /></View>
+            <View style={s.macroCol}><Text style={s.macroLbl}>w tym cukry</Text><TextInput style={s.macroInput} value={sugar} onChangeText={setSugar} keyboardType="numeric" placeholder="8" placeholderTextColor={c.text.muted} /></View>
           </View>
 
           {/* powiązanie z kupionym */}
@@ -200,8 +204,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   twoCol: { flexDirection: 'row', gap: spacing[3] },
   col:    { flex: 1 },
 
-  macroRow:   { flexDirection: 'row', gap: spacing[2] },
-  macroCol:   { flex: 1, gap: 4 },
+  macroRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  macroCol:   { flexBasis: '47%', flexGrow: 1, gap: 4 },
   macroLbl:   { fontSize: 11, fontWeight: '700', color: c.text.muted, textAlign: 'center' },
   macroInput: { height: 46, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, textAlign: 'center', fontSize: 16, fontWeight: '700', color: c.text.primary, backgroundColor: c.bg.card },
 
