@@ -38,7 +38,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins, buyStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -70,6 +70,7 @@ export default function PetShop() {
     if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
     const reward = rollBox(box, SHOP_COLORS, ownedItems);
     if (reward.type === 'color') buyItem(reward.colorId, 0);
+    else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
     haptic.success();
@@ -83,6 +84,7 @@ export default function PetShop() {
     if (!dailyReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
     const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems);
     if (reward.type === 'color') buyItem(reward.colorId, 0);
+    else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
     haptic.success();
@@ -218,7 +220,7 @@ export default function PetShop() {
                     <View style={{ flex: 1 }}>
                       <Text style={s.cellName}>{box.name}</Text>
                       <Text style={s.cellState}>{box.blurb}</Text>
-                      <Text style={s.oddsTxt}>kolor {Math.round(box.colorChance * 100)}% · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
+                      <Text style={s.oddsTxt}>kolor {Math.round(box.colorChance * 100)}%{box.startupChance ? ` · startup ${Math.round(box.startupChance * 100)}%` : ''} · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
                     </View>
                     <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                   </View>

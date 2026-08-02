@@ -85,7 +85,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
   const glowOp = burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0.28] });
   const cardScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
-  const rewardTitle = reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : 'MONETY';
+  const rewardTitle = reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'startup' ? 'NOWY STARTUP!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : 'MONETY';
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -113,6 +113,11 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
                   {reward?.type === 'color' ? (
                     <>
                       <View style={[st.swatch, { backgroundColor: reward.swatch }]} />
+                      <Text style={st.rewardName}>{reward.name}</Text>
+                    </>
+                  ) : reward?.type === 'startup' ? (
+                    <>
+                      <View style={st.startupSwatch}><Text style={[st.startupMark, { color: reward.ink }]}>Sapp</Text></View>
                       <Text style={st.rewardName}>{reward.name}</Text>
                     </>
                   ) : reward?.type === 'freeze' ? (
@@ -150,6 +155,8 @@ const st = StyleSheet.create({
   card: { minWidth: 190, paddingHorizontal: 26, paddingVertical: 20, borderRadius: 20, backgroundColor: '#161A1A', borderWidth: 2, alignItems: 'center', gap: 8 },
   tier: { fontSize: 13, fontWeight: '900', letterSpacing: 2 },
   swatch: { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  startupSwatch: { width: 96, height: 46, borderRadius: 10, backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  startupMark: { fontSize: 20, fontWeight: '900', letterSpacing: 1 },
   coins: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
   rewardName: { fontSize: 16, fontWeight: '800', color: '#fff' },
   rewardKind: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5 },

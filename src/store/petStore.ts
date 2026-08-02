@@ -75,6 +75,7 @@ interface PetState {
   setColor: (id: string) => void;
   buyStripes: (cost: number) => boolean;            // buys, or toggles once owned
   buyStartup: (id: string, cost: number) => boolean; // splash cosmetic: buy+equip, or just equip if owned
+  grantStartup: (id: string) => void;               // gacha: own a splash cosmetic for free + wear it
   claimDailyBox: () => boolean;                     // free daily chest: marks today claimed (false if already)
   registerLogin: () => { streak: number; coins: number } | null; // once/day login-streak coin bonus
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
@@ -170,6 +171,12 @@ export const usePetStore = create<PetState>()(
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, key], equippedStartup: id });
         return true;
+      },
+      grantStartup: (id) => {
+        const s = get();
+        const key = `startup:${id}`;
+        if (s.ownedItems.includes(key)) { set({ equippedStartup: id }); return; }
+        set({ ownedItems: [...s.ownedItems, key], equippedStartup: id });
       },
       // Login-streak coin bonus: once per day. Consecutive days (yesterday → +1) grow the
       // streak (cap 7); a gap resets to 1. Grants coins immediately, returns the amount so

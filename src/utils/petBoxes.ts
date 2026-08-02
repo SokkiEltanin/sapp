@@ -3,6 +3,7 @@
 // zamrożenie serii. Droższa skrzynka = lepsze szanse na rzadkie kolory.
 import { CrateTier } from '@/utils/crates';
 import { CosmeticTier, ShopColor } from '@/utils/petShop';
+import { STARTUPS } from '@/utils/petStartups';
 
 export type BoxId = 'sardine' | 'silver' | 'gold';
 
@@ -14,6 +15,7 @@ export interface LootBox {
   emoji: string;
   blurb: string;
   colorChance: number;   // szansa że nagrodą jest KOLOR
+  startupChance?: number; // szansa na STARTUP (kosmetyk splasha); tylko lepsze skrzynki
   freezeChance: number;  // szansa na zamrożenie (reszta = monety)
   tierWeight: Record<CosmeticTier, number>;   // wagi losowania koloru wg rzadkości
   coins: { min: number; max: number; jackpot: number; jackpotChance: number };
@@ -29,15 +31,15 @@ export const LOOT_BOXES: LootBox[] = [
   },
   {
     id: 'silver', name: 'Srebrna skrzynka', cost: 90, color: '#4DA8FF', emoji: '🥈',
-    blurb: 'Lepsze szanse na rzadki kolor + zamrożenie',
-    colorChance: 0.42, freezeChance: 0.15,
+    blurb: 'Lepsze szanse na rzadki kolor, startup + zamrożenie',
+    colorChance: 0.38, startupChance: 0.10, freezeChance: 0.14,
     tierWeight: { basic: 4, rare: 4, epic: 1.5 },
     coins: { min: 10, max: 30, jackpot: 90, jackpotChance: 0.04 },
   },
   {
     id: 'gold', name: 'Złota skrzynka', cost: 200, color: '#FBBF24', emoji: '🥇',
-    blurb: 'Najlepsze szanse — nawet epicki kolor',
-    colorChance: 0.58, freezeChance: 0.20,
+    blurb: 'Najlepsze szanse — epicki kolor lub startup',
+    colorChance: 0.48, startupChance: 0.16, freezeChance: 0.18,
     tierWeight: { basic: 2, rare: 4, epic: 4.5 },
     coins: { min: 25, max: 70, jackpot: 200, jackpotChance: 0.05 },
   },
@@ -60,6 +62,7 @@ export const DAILY_BOX: LootBox = {
 
 export type BoxReward =
   | { type: 'color'; colorId: string; name: string; swatch: string; rarity: CrateTier }
+  | { type: 'startup'; startupId: string; name: string; ink: string; rarity: CrateTier }
   | { type: 'coins'; coins: number; rarity: CrateTier }
   | { type: 'freeze'; count: number; rarity: CrateTier };
 
@@ -78,17 +81,26 @@ function pickWeighted<T>(items: { item: T; w: number }[]): T | null {
 export function rollBox(box: LootBox, colors: ShopColor[], ownedIds: string[]): BoxReward {
   const owned = new Set(ownedIds);
   const unowned = colors.filter(c => c.cost > 0 && !owned.has(c.id));
+  const unownedStartups = STARTUPS.filter(su => su.cost > 0 && !owned.has(`startup:${su.id}`));
   const r = Math.random();
+  const colorCut = box.colorChance;
+  const startupCut = colorCut + (box.startupChance ?? 0);
+  const freezeCut = startupCut + box.freezeChance;
   // 1) KOLOR (jeśli jest jeszcze jakiś nieposiadany) — ważony rzadkością
-  if (r < box.colorChance && unowned.length > 0) {
+  if (r < colorCut && unowned.length > 0) {
     const pick = pickWeighted(unowned.map(c => ({ item: c, w: box.tierWeight[c.tier] ?? 0 })));
     if (pick) return { type: 'color', colorId: pick.id, name: pick.name, swatch: pick.palette.coat, rarity: COLOR_RARITY[pick.tier] };
   }
-  // 2) ZAMROŻENIE
-  if (r < box.colorChance + box.freezeChance) {
+  // 2) STARTUP (kosmetyk splasha; rzadszy = trudniej — ta sama waga tierów co kolory)
+  if (r < startupCut && unownedStartups.length > 0) {
+    const pick = pickWeighted(unownedStartups.map(su => ({ item: su, w: box.tierWeight[su.tier] ?? 0 })));
+    if (pick) return { type: 'startup', startupId: pick.id, name: pick.name, ink: pick.ink, rarity: COLOR_RARITY[pick.tier] };
+  }
+  // 3) ZAMROŻENIE
+  if (r < freezeCut) {
     return { type: 'freeze', count: 1, rarity: box.id === 'gold' ? 'epic' : 'rare' };
   }
-  // 3) MONETY (rzadki jackpot = mityczny)
+  // 4) MONETY (rzadki jackpot = mityczny)
   const jackpot = Math.random() < box.coins.jackpotChance;
   const coins = jackpot ? box.coins.jackpot : box.coins.min + Math.floor(Math.random() * (box.coins.max - box.coins.min + 1));
   return { type: 'coins', coins, rarity: jackpot ? 'mythic' : 'basic' };
