@@ -348,7 +348,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   startupPreview: { alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: spacing[4], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default },
   startupPreviewMark: { fontSize: 30, fontWeight: '900', letterSpacing: 1 },
   startupPreviewCap: { fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '600' },
-  startupSwatch: { width: 74, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#1A1C1C', alignItems: 'center', justifyContent: 'center' },
+  startupSwatch: { width: 74, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
   startupSwatchMark: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
   animTag: { fontSize: 9, color: c.text.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
 
