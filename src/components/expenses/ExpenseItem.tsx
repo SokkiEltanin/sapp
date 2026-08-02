@@ -2,13 +2,18 @@ import { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
-import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { TrendingUp, TrendingDown, ShoppingCart, ChevronDown, ChevronUp, Wallet } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { Expense } from '@/types';
 import { getCategoryMeta } from '@/utils/categories';
 import { estimateItemKcal } from '@/utils/calories';
+import { isMine } from '@/store/statsScope';
 import { colors, spacing, radius, typography } from '@/theme';
 import { haptic } from '@/utils/haptics';
+
+// Warm amber marks a transaction someone ELSE paid (payer ≠ "Ja"): it shows in the
+// list but does NOT count toward your spend/balance, so it needs an at-a-glance tell.
+const PAYER_ACCENT = '#E0A33A';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -30,6 +35,8 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   const isReceipt = !isIncome && (expense.receiptItems?.length ?? 0) > 0;
   const meta      = getCategoryMeta(expense.category);
   const accentColor = isIncome ? colors.accent.green : isReceipt ? colors.accent.blue : colors.border.default;
+  // Paid by someone else (partner) → excluded from YOUR totals. Flag it visually.
+  const mine = isMine(expense);
 
   const title = expense.storeName || expense.note || meta.label;
   // No time in the list — every entry defaults to noon, so "12:00" was just noise.
@@ -50,7 +57,7 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
   };
 
   return (
-    <View style={[styles.wrap, isReceipt && styles.wrapReceipt]}>
+    <View style={[styles.wrap, isReceipt && styles.wrapReceipt, !mine && styles.wrapNotMine]}>
       {/* Main row */}
       <PressableScale
         onPress={() => { haptic.tap(); onPress?.(expense); }}
@@ -71,11 +78,24 @@ export default function ExpenseItem({ expense, onPress, onLongPress }: Props) {
         <View style={styles.info}>
           <Text style={styles.note} numberOfLines={1}>{title}</Text>
           {!!subtitle && <Text style={styles.meta} numberOfLines={1}>{subtitle}</Text>}
+          {!mine && !!expense.payer && (
+            <View style={styles.payerBadge}>
+              <Wallet size={10} color={PAYER_ACCENT} />
+              <Text style={styles.payerBadgeText} numberOfLines={1}>Płaci: {expense.payer}</Text>
+            </View>
+          )}
         </View>
 
-        <Text style={[styles.amount, { color: isIncome ? colors.accent.green : colors.text.primary }]}>
-          {isIncome ? '+' : '-'}{expense.amount.toFixed(2)} zł
-        </Text>
+        <View style={styles.amountCol}>
+          <Text style={[
+            styles.amount,
+            { color: isIncome ? colors.accent.green : colors.text.primary },
+            !mine && styles.amountNotMine,
+          ]}>
+            {isIncome ? '+' : '-'}{expense.amount.toFixed(2)} zł
+          </Text>
+          {!mine && <Text style={styles.notMineTag}>nie wlicza się</Text>}
+        </View>
 
         {/* Expand toggle for receipts. Non-receipts render an equal-width spacer so
             every amount lines up at the same right edge (no indented prices). */}
@@ -150,6 +170,11 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   wrapReceipt: {
     borderColor: c.accent.blue + '25',
   },
+  // Paid by someone else — warm border so the whole row reads "not counted toward me".
+  wrapNotMine: {
+    borderColor: PAYER_ACCENT + '55',
+    backgroundColor: PAYER_ACCENT + '0C',
+  },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
     paddingRight: spacing[2], paddingVertical: spacing[3],
@@ -164,6 +189,20 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   note: { ...typography.bodySmall, color: c.text.primary, fontWeight: '500' },
   meta: { ...typography.caption, color: c.text.muted },
   amount: { ...typography.label, fontWeight: '700', fontSize: 14 },
+  amountCol: { alignItems: 'flex-end', justifyContent: 'center' },
+  // Struck-through + muted = "this amount is NOT in your total" at a glance.
+  amountNotMine: { color: c.text.muted, textDecorationLine: 'line-through' },
+  notMineTag: {
+    fontSize: 8, fontWeight: '800', color: PAYER_ACCENT,
+    letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1,
+  },
+  payerBadge: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 3,
+    marginTop: 3, paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: radius.full, borderWidth: 1,
+    borderColor: PAYER_ACCENT + '55', backgroundColor: PAYER_ACCENT + '18',
+  },
+  payerBadgeText: { fontSize: 9, fontWeight: '700', color: PAYER_ACCENT, maxWidth: 150 },
   chevronBtn: {
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
