@@ -605,7 +605,7 @@ export default function ScanReceiptModal() {
             fullWidth
             disabled={!pastedText.trim()}
           />
-          <PressableScale onPress={() => router.push('/expenses/manual' as any)} style={styles.manualBtn}>
+          <PressableScale onPress={() => router.push((attachToId ? `/expenses/manual?attachTo=${attachToId}` : '/expenses/manual') as any)} style={styles.manualBtn}>
             <PenLine size={14} color={colors.text.secondary} />
             <Text style={styles.manualBtnText}>Wpisz ręcznie produkty</Text>
           </PressableScale>

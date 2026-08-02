@@ -698,17 +698,30 @@ export default function ExpenseDetailScreen() {
 
           {/* ── Attach a receipt to a bare (e.g. bank-logged) payment ────────── */}
           {!isInc && editedItems.length === 0 && (
-            <PressableScale
-              onPress={() => { haptic.tap(); router.push(`/expenses/scan?attachTo=${id}` as any); }}
-              style={s.scanBtn}
-            >
-              <ShoppingCart size={16} color={colors.accent.blue} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.scanBtnText}>Doskanuj paragon</Text>
-                <Text style={s.scanBtnHint}>Dodaj produkty z paragonu do tej płatności</Text>
-              </View>
-              <LucideIcons.ChevronRight size={16} color={colors.accent.blue} />
-            </PressableScale>
+            <>
+              <PressableScale
+                onPress={() => { haptic.tap(); router.push(`/expenses/scan?attachTo=${id}` as any); }}
+                style={s.scanBtn}
+              >
+                <ShoppingCart size={16} color={colors.accent.blue} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.scanBtnText}>Doskanuj paragon</Text>
+                  <Text style={s.scanBtnHint}>Dodaj produkty z paragonu do tej płatności</Text>
+                </View>
+                <LucideIcons.ChevronRight size={16} color={colors.accent.blue} />
+              </PressableScale>
+              <PressableScale
+                onPress={() => { haptic.tap(); router.push(`/expenses/manual?attachTo=${id}` as any); }}
+                style={s.scanBtn}
+              >
+                <Pencil size={16} color={colors.accent.blue} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.scanBtnText}>Wpisz ręcznie</Text>
+                  <Text style={s.scanBtnHint}>Dodaj produkty ręcznie do tej płatności</Text>
+                </View>
+                <LucideIcons.ChevronRight size={16} color={colors.accent.blue} />
+              </PressableScale>
+            </>
           )}
 
           {/* ── Type toggle (editing only) ───────────────────────────────────── */}

@@ -1,12 +1,13 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, KeyboardAvoidingView, Platform,
+  TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { goBackOrHome } from '@/utils/nav';
-import { X, Plus, Trash2, Check, ShoppingCart } from 'lucide-react-native';
+import { beginScanSave, markScanStep, clearScanSave } from '@/utils/scanBreadcrumb';
+import { X, Plus, Trash2, Check, ShoppingCart, Link2 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -339,7 +340,24 @@ export default function ManualReceiptScreen() {
   });
   const addPending = useExpensesStore(s => s.addPending);
   const confirmSync = useExpensesStore(s => s.confirmSync);
+  const updateExpense = useExpensesStore(s => s.updateExpense);
+  const setExpenses = useExpensesStore(s => s.setExpenses);
+  // Attach mode: opened from a bare (e.g. bank-logged) payment — the manually-typed
+  // receipt ENRICHES that expense in place instead of creating a duplicate. `attachTo`
+  // = its id (passed from the payment screen or the scanner's "wpisz ręcznie" link).
+  const params = useLocalSearchParams<{ attachTo?: string }>();
+  const attachToId = typeof params.attachTo === 'string' ? params.attachTo : undefined;
+  const attachTarget = useExpensesStore(s => attachToId ? s.expenses.find(e => e.id === attachToId) : undefined);
   useEffect(() => { getPayers().then(list => { setPayers(list); setPayer(p => p || list[0] || ''); }).catch(() => {}); }, []);
+  // Line the receipt up with the payment it attaches to (date + payer default to it).
+  useEffect(() => {
+    if (!attachTarget) return;
+    const d = new Date(attachTarget.date ?? Date.now());
+    const p = (n: number) => String(n).padStart(2, '0');
+    setDateInput(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`);
+    if (attachTarget.payer) setPayer(attachTarget.payer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachTarget?.id]);
 
   function makeItem(): Item {
     return {
@@ -421,11 +439,17 @@ export default function ManualReceiptScreen() {
   }, [groups, items]);
 
   const save = async () => {
+    // Dismiss the keyboard BEFORE navigating: on Android, leaving a screen with a
+    // focused TextInput + open keyboard inside a KeyboardAvoidingView hard-crashes to a
+    // black screen — the exact bug the scanner had. A manual receipt is nothing BUT text
+    // inputs, so this path hit it hardest and never got the fix.
+    Keyboard.dismiss();
     if (validCount === 0) {
       toast.error('Dodaj co najmniej jeden produkt z ceną');
       return;
     }
     setSaving(true);
+    beginScanSave(attachToId ? 'attach-manual' : 'manual');   // freeze breadcrumb → launch popup
     try {
       let dateParsed = new Date().toISOString();
       if (dateInput) {
@@ -489,10 +513,44 @@ export default function ManualReceiptScreen() {
       // doesn't resolve until the server acks, so `await`-ing it froze the screen on
       // weak/no signal (the same "black screen" the scanner had).
       const nowIso = new Date().toISOString();
+      const roundedTotal = Math.round(totalAmount * 100) / 100;
+      markScanStep('built');
+
+      if (attachToId) {
+        // Enrich the EXISTING payment in place — never a duplicate (mirrors the
+        // scanner's directed-attach). Persist via the service even if the row isn't in
+        // the in-memory store yet, then reload.
+        const updates: Partial<Expense> = {
+          amount: roundedTotal,
+          category: dominantCat,
+          tags,
+          paymentMethod,
+          date: dateParsed,
+          receiptItems,
+          ...(store ? { storeName: store, note: store } : {}),
+          ...(payer ? { payer } : {}),
+          updatedAt: nowIso,
+        };
+        const inStore = useExpensesStore.getState().expenses.some(e => e.id === attachToId);
+        if (inStore) updateExpense(attachToId, updates);
+        expensesService.update(attachToId, updates)
+          .then(() => { if (!inStore) expensesService.getAll().then(setExpenses).catch(() => {}); })
+          .catch(() => {});
+        haptic.success();
+        toast.success('Dodano paragon do płatności');
+        markScanStep('nav');
+        clearScanSave();
+        // Land on the now-enriched payment. Yield a frame first: mutating the store
+        // re-renders the still-mounted dashboard, and navigating mid-commit was the
+        // OTHER half of the black screen (scanner fixed it the same way).
+        requestAnimationFrame(() => router.replace(`/expenses/${attachToId}` as any));
+        return;
+      }
+
       const expense: Expense = {
         id: expensesService.newId(),
         type: 'expense',
-        amount: Math.round(totalAmount * 100) / 100,
+        amount: roundedTotal,
         currency: 'PLN',
         category: dominantCat,
         tags,
@@ -511,7 +569,9 @@ export default function ManualReceiptScreen() {
         .catch(() => {}); // stays pending; retried on next foreground
       haptic.success();
       toast.success(`Zapisano ${receiptItems.length} pozycji · ${totalAmount.toFixed(2)} zł`);
-      goBackOrHome();
+      markScanStep('nav');
+      clearScanSave();
+      requestAnimationFrame(() => goBackOrHome());   // yield a frame → no black screen mid-commit
 
       // Budget alerts - non-blocking, fire after navigation
       getBudgets().then(budgets => {
@@ -532,6 +592,7 @@ export default function ManualReceiptScreen() {
         }
       }).catch(() => {});
     } catch (e: any) {
+      clearScanSave();
       setSaving(false);
       toast.error(e?.message ?? 'Błąd zapisu paragonu');
     }
@@ -551,6 +612,16 @@ export default function ManualReceiptScreen() {
         </View>
         <View style={{ width: 36 }} />
       </View>
+
+      {attachTarget && (
+        <View style={styles.attachBanner}>
+          <Link2 size={14} color={colors.accent.blue} />
+          <Text style={styles.attachBannerText} numberOfLines={2}>
+            Dopisujesz paragon do płatności {attachTarget.amount.toFixed(2)} zł
+            {attachTarget.storeName ? ` · ${attachTarget.storeName}` : (attachTarget.note ? ` · ${attachTarget.note}` : '')}
+          </Text>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -697,6 +768,15 @@ const makeStyles = themedStyles((c: any) => StyleSheet.create({
   headerCenter: { alignItems: 'center' },
   title: { ...typography.h4, color: c.text.primary },
   subtitle: { ...typography.caption, color: c.text.muted, marginTop: 2 },
+
+  attachBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    marginHorizontal: spacing[4], marginTop: spacing[3],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.md, borderWidth: 1,
+    borderColor: c.accent.blue + '40', backgroundColor: c.accent.blue + '12',
+  },
+  attachBannerText: { flex: 1, fontSize: 12, fontWeight: '600', color: c.accent.blue },
 
   scroll: { padding: spacing[4], gap: spacing[3], paddingBottom: spacing[6] },
 
