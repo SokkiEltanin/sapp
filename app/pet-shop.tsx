@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
-import { usePetStore } from '@/store/petStore';
+import { usePetStore, loginBonusCoins } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
@@ -38,7 +38,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins, buyStartup, equippedStartup, claimDailyBox, dayClaims } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins, buyStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -166,6 +166,16 @@ export default function PetShop() {
               : <Check size={18} color="#FBBF24" />}
           </View>
         </PressableScale>
+
+        {/* Seria logowań — nowe źródło monet (bonus przyznawany przy wejściu na pulpit) */}
+        {loginStreak > 0 && (
+          <View style={s.loginStrip}>
+            <Flame size={14} color="#FB923C" />
+            <Text style={s.loginTxt}>Seria logowań: {loginStreak} {loginStreak === 1 ? 'dzień' : 'dni'}</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={s.loginNext}>jutro +{loginBonusCoins(loginStreak + 1)}</Text>
+          </View>
+        )}
 
         {/* PRZYPIĘTE NA GÓRZE — zamrożenie serii (najważniejsze, funkcjonalne) */}
         <PressableScale onPress={onBuyFreeze}>
@@ -334,6 +344,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
+
+  // seria logowań
+  loginStrip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md, borderWidth: 1, borderColor: '#FB923C3A', backgroundColor: '#FB923C12' },
+  loginTxt: { fontSize: 12, fontWeight: '800', color: c.text.primary },
+  loginNext: { fontSize: 11, fontWeight: '800', color: '#FB923C' },
 
   // skrzynka dnia (darmowa, przypięta)
   dailyHero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#FBBF2455', backgroundColor: '#FBBF2414' },

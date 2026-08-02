@@ -2368,6 +2368,16 @@ export default function DashboardScreen() {
   const dailyBoxReady = !petDayClaims[`dailybox:${todayISO()}`];   // free daily chest waiting?
   const petAffection = usePetStore(st => st.affection);
   const petAffectionDay = usePetStore(st => st.affectionDay);
+  const petHydrated = usePetStore(st => st._hydrated);
+  const registerLogin = usePetStore(st => st.registerLogin);
+  const loginRan = useRef(false);
+  // Login-streak coin bonus: once per day, after the wallet hydrates → toast the reward.
+  useEffect(() => {
+    if (!petHydrated || loginRan.current) return;
+    loginRan.current = true;
+    const g = registerLogin();
+    if (g) { haptic.success(); toast.success(`Seria logowań: ${g.streak} ${g.streak === 1 ? 'dzień' : 'dni'} 🔥  +${g.coins} monet`); }
+  }, [petHydrated, registerLogin]);
   const petState = useMemo(() => {
     const tISO = todayISO();
     const todayMoods = moodEntries.filter(e => e.date === tISO);

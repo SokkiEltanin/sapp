@@ -13,6 +13,17 @@ function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+function yesterdayISO(): string {
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Rosnący bonus monet za kolejne dni z rzędu (cap na 7. dniu). Nowe źródło monet obok
+// skrzynki dnia / questów / głaskania.
+export function loginBonusCoins(streak: number): number {
+  const table = [0, 3, 4, 6, 8, 10, 12, 15];
+  return table[Math.min(Math.max(1, streak), 7)];
+}
 
 interface PetState {
   name: string;
@@ -29,6 +40,10 @@ interface PetState {
   catColor: string;             // palette id from catPalettes
   catStripes: boolean;          // tail stripes on/off
   equippedStartup: string;      // id kosmetyku ekranu ładowania (splash); 'default' = darmowy
+  // ── login streak (bonus monet za kolejne dni z rzędu) ──
+  loginStreak: number;          // dni z rzędu z otwarciem apki
+  lastLoginDay: string | null;  // YYYY-MM-DD ostatniego dnia z bonusem
+  loginBonusDay: string | null; // YYYY-MM-DD dnia w którym bonus już przyznano
   claimedQuests: string[];      // milestone tier ids already rewarded (one-time)
   dailyClaims: Record<string, string>; // dailyQuestId → YYYY-MM-DD last claimed
   // dailyClaims can only remember ONE date per quest, so claiming yesterday's catch-up
@@ -61,6 +76,7 @@ interface PetState {
   buyStripes: (cost: number) => boolean;            // buys, or toggles once owned
   buyStartup: (id: string, cost: number) => boolean; // splash cosmetic: buy+equip, or just equip if owned
   claimDailyBox: () => boolean;                     // free daily chest: marks today claimed (false if already)
+  registerLogin: () => { streak: number; coins: number } | null; // once/day login-streak coin bonus
   claimQuest: (id: string, coins: number, xp: number) => void;       // milestone (one-time)
   claimDaily: (id: string, coins: number, xp: number) => boolean;    // daily (once/day)
   claimDailyFor: (id: string, date: string, coins: number, xp: number) => boolean; // catch-up claim for a past day
@@ -88,6 +104,9 @@ export const usePetStore = create<PetState>()(
       catColor: 'blue',
       catStripes: false,
       equippedStartup: 'default',
+      loginStreak: 0,
+      lastLoginDay: null,
+      loginBonusDay: null,
       roomAddons: {},
       equipped: {},
       claimedQuests: [],
@@ -151,6 +170,19 @@ export const usePetStore = create<PetState>()(
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, key], equippedStartup: id });
         return true;
+      },
+      // Login-streak coin bonus: once per day. Consecutive days (yesterday → +1) grow the
+      // streak (cap 7); a gap resets to 1. Grants coins immediately, returns the amount so
+      // the dashboard can toast it. Null if already granted today or wallet not hydrated.
+      registerLogin: () => {
+        if (!get()._hydrated) return null;
+        const t = todayISO();
+        const s = get();
+        if (s.loginBonusDay === t) return null;
+        const streak = s.lastLoginDay === yesterdayISO() ? (s.loginStreak || 0) + 1 : 1;
+        const coins = loginBonusCoins(streak);
+        set({ loginStreak: streak, lastLoginDay: t, loginBonusDay: t, coins: s.coins + coins });
+        return { streak, coins };
       },
       // Free daily chest: one claim per day. Records the day in dayClaims (same anti-clobber
       // store the daily quests use); the caller rolls + grants the reward on a `true`.
@@ -265,7 +297,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, equippedStartup: 'default', equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -274,6 +306,7 @@ export const usePetStore = create<PetState>()(
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes,
         equippedStartup: s.equippedStartup,
+        loginStreak: s.loginStreak, lastLoginDay: s.lastLoginDay, loginBonusDay: s.loginBonusDay,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
         weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
@@ -284,6 +317,9 @@ export const usePetStore = create<PetState>()(
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)
         state._hydrated = true;
         state.equippedStartup = state.equippedStartup ?? 'default';   // stary stan bez pola → domyślny splash
+        state.loginStreak = state.loginStreak ?? 0;
+        state.lastLoginDay = state.lastLoginDay ?? null;
+        state.loginBonusDay = state.loginBonusDay ?? null;
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};
