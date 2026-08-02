@@ -1,87 +1,73 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
-// Loading screen — deliberately LIGHTWEIGHT. The old version animated the full vector cat
-// (CatArt) on the JS thread while stores hydrate → jank. Now: wordmark + an indeterminate
-// progress bar + three pulsing dots, all on the native driver (translateX/opacity/scale) →
-// zero JS-thread work, so it stays smooth even while the app is booting behind it.
-// Same navy as app.json native splash → seamless handoff; only the fade-OUT animates.
+// Loading screen — MINIMAL and lag-proof by design. ONE element (the "Sapp" wordmark),
+// ONE idea of motion (a soft wave of light rippling across the letters). Each letter is
+// its own node so the ripple lands on the GLYPHS, not on a rectangle over them — which
+// is why it looks intentional without a masked-view. Everything runs on the native
+// driver (opacity + translateY), so it never touches the JS thread while the stores
+// hydrate behind it. Pure MONO black-and-white — matches the app.
 //
-// Future: a user-supplied animation (Lottie / pre-rendered image or GIF) would ALSO be
-// jank-free because it plays on the UI thread, not recomputed in JS like the SVG cat —
-// this is where "customowe startupy za monety" can swap the mark per owned cosmetic.
+// The old version stacked a wordmark + progress bar + three dots ("za dużo tego") in
+// navy/amber. Gone. Background = the app's own near-black + app.json's native splash bg
+// → seamless handoff; only the fade-OUT animates.
+//
+// Future: swap the mark for an owned cosmetic ("customowe startupy za monety"); a
+// pre-rendered image / Lottie plays on the UI thread and stays jank-free the same way.
 
-const NAVY = '#083A64';   // matches native splash backgroundColor → seamless
-const AMBER = '#FFC24B';
+const BG = '#1A1C1C';    // = app background + app.json splash bg → seamless handoff
+const INK = '#F2F3F3';   // MONO near-white
+const LETTERS = ['S', 'a', 'p', 'p'];
+const STEP = 150;        // stagger between letters (ms) → the wave's speed
 
 export default function AnimatedSplash({ visible, onHidden }: { visible: boolean; onHidden: () => void }) {
-  const { width, height } = useWindowDimensions();
-  const barW = Math.min(width * 0.55, 260);
-  const fade = useRef(new Animated.Value(1)).current;   // START shown — seamless with native splash
-  const slide = useRef(new Animated.Value(0)).current;  // indeterminate bar sweep
-  const d0 = useRef(new Animated.Value(0)).current;
-  const d1 = useRef(new Animated.Value(0)).current;
-  const d2 = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(1)).current;                 // START shown — seamless with native splash
+  const vals = useRef(LETTERS.map(() => new Animated.Value(0))).current;
 
-  // Indeterminate progress: a highlight sweeps left→right forever.
+  // The ripple: each letter brightens+rises in turn, then the wave repeats. Every
+  // letter's cycle is the SAME length (STEP*N + hold), just phase-shifted, so the loop
+  // stays perfectly in sync forever.
   useEffect(() => {
-    const loop = Animated.loop(Animated.timing(slide, {
-      toValue: 1, duration: 1100, easing: Easing.inOut(Easing.cubic), useNativeDriver: true,
-    }));
-    loop.start();
-    return () => loop.stop();
-  }, [slide]);
-
-  // Three loading dots pulsing in sequence.
-  useEffect(() => {
-    const mk = (v: Animated.Value, delay: number) => Animated.loop(Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(v, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      Animated.delay(540 - delay),
-    ]));
-    const a = Animated.parallel([mk(d0, 0), mk(d1, 170), mk(d2, 340)]);
-    a.start();
-    return () => a.stop();
-  }, [d0, d1, d2]);
+    const N = LETTERS.length;
+    const anims = vals.map((v, i) => Animated.loop(Animated.sequence([
+      Animated.delay(i * STEP),
+      Animated.timing(v, { toValue: 1, duration: 460, easing: Easing.out(Easing.sin), useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0, duration: 460, easing: Easing.in(Easing.sin), useNativeDriver: true }),
+      Animated.delay((N - i) * STEP + 360),
+    ])));
+    const group = Animated.parallel(anims);
+    group.start();
+    return () => group.stop();
+  }, [vals]);
 
   // Fade out once ready, then unmount.
   useEffect(() => {
     if (visible) return;
-    Animated.timing(fade, { toValue: 0, duration: 440, easing: Easing.in(Easing.quad), useNativeDriver: true })
+    Animated.timing(fade, { toValue: 0, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true })
       .start(({ finished }) => { if (finished) onHidden(); });
   }, [visible, fade, onHidden]);
 
-  const dotStyle = (v: Animated.Value) => ({
-    opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.25] }) }],
-  });
-  const highlightW = barW * 0.4;
-  const sweepX = slide.interpolate({ inputRange: [0, 1], outputRange: [-highlightW, barW] });
-
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} pointerEvents={visible ? 'auto' : 'none'}>
-      <View style={styles.center}>
-        <Text style={styles.mark}>Sapp</Text>
-        <View style={[styles.track, { width: barW }]}>
-          <Animated.View style={[styles.highlight, { width: highlightW, transform: [{ translateX: sweepX }] }]} />
-        </View>
-        <View style={styles.dots}>
-          <Animated.View style={[styles.dot, dotStyle(d0)]} />
-          <Animated.View style={[styles.dot, dotStyle(d1)]} />
-          <Animated.View style={[styles.dot, dotStyle(d2)]} />
-        </View>
+      <View style={styles.row}>
+        {LETTERS.map((ch, i) => (
+          <Animated.Text
+            key={i}
+            style={[styles.mark, {
+              opacity: vals[i].interpolate({ inputRange: [0, 1], outputRange: [0.34, 1] }),
+              transform: [{ translateY: vals[i].interpolate({ inputRange: [0, 1], outputRange: [2.5, -2.5] }) }],
+            }]}
+          >
+            {ch}
+          </Animated.Text>
+        ))}
       </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: NAVY, alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  center: { alignItems: 'center', gap: 26 },
-  mark: { fontSize: 46, fontWeight: '900', letterSpacing: 1, color: '#FFFFFF' },
-  track: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.14)', overflow: 'hidden' },
-  highlight: { height: 4, borderRadius: 2, backgroundColor: AMBER },
-  dots: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: AMBER },
+  root: { backgroundColor: BG, alignItems: 'center', justifyContent: 'center', zIndex: 100 },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  mark: { fontSize: 58, fontWeight: '900', letterSpacing: 1, color: INK, marginHorizontal: 1 },
 });
