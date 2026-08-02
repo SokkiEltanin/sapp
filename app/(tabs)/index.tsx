@@ -2292,6 +2292,8 @@ export default function DashboardScreen() {
       yearHours, yearEarnings: Math.round(yearHours * rate),
       shiftCount, perShift: shiftCount > 0 ? Math.round((workedH * rate) / shiftCount) : 0,
       bestMonth, upcoming, upcomingH,
+      // brak JAKICHKOLWIEK dopasowanych godzin pracy → pokaż stan pusty (jak oznaczać grafik)
+      anyHours: workedH > 0 || plannedH > 0 || upcomingH > 0 || months.some(m => m.hours > 0),
     };
   }, [allEvents, workSettings, workEarnings, today]);
 
@@ -4569,6 +4571,31 @@ export default function DashboardScreen() {
               const wm = workMonthly; const hasRate = wm.rate > 0;
               return (
                 <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+                  {/* ── NA ŻYWO: jesteś w pracy → zarobek na sekundę (tyka co sekundę) ── */}
+                  {workEarnings.isWorking && (
+                    <View style={s.wpLive}>
+                      <View style={s.wpLiveTop}>
+                        <View style={s.wpLiveDot} />
+                        <Text style={s.wpLiveTag}>NA ŻYWO W PRACY{workEarnings.activeEventTitle ? ` · ${workEarnings.activeEventTitle}` : ''}</Text>
+                      </View>
+                      <Text style={s.wpLiveBig}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></Text>
+                      <Text style={s.wpLiveSub}>
+                        +{(workEarnings.perSecond * 100).toFixed(2)} gr/s
+                        {workEarnings.perSecond > 0 ? `  ·  ${Math.round(workEarnings.perSecond * 3600).toLocaleString('pl-PL')} zł/h` : ''}
+                      </Text>
+                    </View>
+                  )}
+                  {/* ── Stan pusty: prefiks/kolor ustawiony, ale ZERO dopasowanych zmian ── */}
+                  {!wm.anyHours && (
+                    <View style={s.wpEmpty}>
+                      <Text style={s.wpEmptyTitle}>Brak godzin pracy w kalendarzu</Text>
+                      <Text style={s.wpEmptyBody}>
+                        Godziny liczą się z wydarzeń, których tytuł zaczyna się od „{workSettings.workPrefix || '[JD]'}"
+                        i mają godzinę (np. „{workSettings.workPrefix || '[JD]'} 8-16"){workSettings.workColor ? ' lub mają kolor pracy' : ''}.
+                        Dodaj grafik na przyszłe miesiące — pojawi się tu od razu (i w „Zaplanowane naprzód").
+                      </Text>
+                    </View>
+                  )}
                   {/* ── Ten miesiąc: fakt = godziny z kalendarza [JD] ── */}
                   <View style={{ marginTop: spacing[2] }}>
                     <Text style={s.wpBig}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
@@ -5705,6 +5732,16 @@ const buildStyles = (c: any) => StyleSheet.create({
   wpAheadDays: { fontSize: 11.5, fontWeight: '600', color: c.text.muted, marginRight: spacing[3] },
   wpAheadH: { fontSize: 13, fontWeight: '800', color: c.text.primary, fontVariant: ['tabular-nums'] },
   wpAheadHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6, lineHeight: 14 },
+  wpLive: { marginTop: spacing[2], padding: spacing[3], borderRadius: radius.xl, backgroundColor: '#2AC68F14', borderWidth: 1, borderColor: '#2AC68F44' },
+  wpLiveTop: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  wpLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2AC68F' },
+  wpLiveTag: { flex: 1, fontSize: 10.5, fontWeight: '800', color: '#2AC68F', letterSpacing: 0.5, textTransform: 'uppercase' },
+  wpLiveBig: { fontFamily: fonts.display, fontSize: 34, color: c.text.primary, letterSpacing: -0.5 },
+  wpLiveUnit: { fontSize: 15, fontWeight: '700', color: c.text.muted },
+  wpLiveSub: { fontSize: 12, fontWeight: '700', color: c.text.secondary, marginTop: 2, fontVariant: ['tabular-nums'] },
+  wpEmpty: { marginTop: spacing[2], padding: spacing[3], borderRadius: radius.lg, backgroundColor: c.fill.subtle, borderWidth: 1, borderColor: c.border.subtle },
+  wpEmptyTitle: { fontSize: 13, fontWeight: '800', color: c.text.primary, marginBottom: 4 },
+  wpEmptyBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
   wpRateCard: { marginTop: spacing[5], backgroundColor: c.fill.subtle, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
   wpRateVal: { fontSize: 30, fontWeight: '900', color: c.text.primary, letterSpacing: -0.6 },
   wpRateUnit: { fontSize: 16, fontWeight: '700', color: c.text.muted },

@@ -5,6 +5,7 @@ import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
+import { useUiActions } from '@/store/uiActions';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useHabits } from '@/hooks/useHabits';
@@ -82,6 +83,7 @@ interface PillItem {
   text: string;
   route: string;
   key: string; // for animation change detection
+  action?: () => void; // if set, run instead of router.push(route) on tap
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ export default function TopPill() {
 
   const events     = useCalendarStore(s => s.events);
   const expenses   = useExpensesStore(s => s.expenses);
+  const openWorkPanel = useUiActions(s => s.openWorkPanel);
 
   // Live earnings — ticks each second while a work shift is in progress.
   const allEvents    = useMemo(() => [...events, ...gcalEvents], [events, gcalEvents]);
@@ -150,7 +153,10 @@ export default function TopPill() {
         badge: `${workEarnings.totalEarned.toFixed(2)} zł`,
         color: '#2AC68F',
         text:  (workEarnings.activeEventTitle ? workEarnings.activeEventTitle.toUpperCase() : 'JESTEŚ W PRACY'),
-        route: '/settings',
+        // Stuknięcie w „live earnings" otwiera panel Praca (nie Ustawienia) — tam widać
+        // zarobek na sekundę i godziny. Panel to Modal na zamontowanym dashboardzie.
+        route: '/(tabs)',
+        action: () => { router.push('/(tabs)' as any); openWorkPanel(); },
         key:   `earn-${Math.floor(workEarnings.totalEarned)}`,
       };
     }
@@ -341,7 +347,7 @@ export default function TopPill() {
     expenses, budgets,
     habits, todayDone,
     todayMoodEntry,
-    today, tomorrow, weekEnd, hour, timeAccent,
+    today, tomorrow, weekEnd, hour, timeAccent, openWorkPanel,
   ]);
 
   // ── Animation on content change — Dynamic-Island style pop ────────────────
@@ -404,7 +410,7 @@ export default function TopPill() {
           content — no surrounding band/border/halo around it. */}
       <TouchableOpacity
         style={s.island}
-        onPress={() => { haptic.tap(); router.push(item.route as any); }}
+        onPress={() => { haptic.tap(); if (item.action) item.action(); else router.push(item.route as any); }}
         activeOpacity={0.8}
       >
         <View style={[s.badge, { backgroundColor: item.color }]}>
