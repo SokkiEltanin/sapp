@@ -11,6 +11,8 @@ export interface RecordItem {
   icon: string;   // lucide name, mapped in the card
   label: string;
   value: string;
+  num: number;              // surowa wartość do porównań „pobity rekord"
+  lowerIsBetter?: boolean;  // waga — mniej = lepiej
 }
 
 type HealthDays = Record<string, { steps: number; sleepMinutes: number; weightKg: number | null }>;
@@ -72,19 +74,19 @@ export function buildRecords(healthDays: HealthDays, expenses: Expense[], moodEn
   const out: RecordItem[] = [];
 
   const steps = Object.values(healthDays).map(d => d.steps).filter(s => s > 0);
-  if (steps.length) out.push({ key: 'steps', icon: 'footprints', label: 'Najwięcej kroków w dniu', value: Math.max(...steps).toLocaleString('pl-PL') });
+  if (steps.length) { const v = Math.max(...steps); out.push({ key: 'steps', icon: 'footprints', label: 'Najwięcej kroków w dniu', value: v.toLocaleString('pl-PL'), num: v }); }
 
   const sleeps = Object.values(healthDays).map(d => d.sleepMinutes).filter(s => s > 0);
-  if (sleeps.length) { const m = Math.max(...sleeps); out.push({ key: 'sleep', icon: 'moon', label: 'Najdłuższy sen', value: `${Math.floor(m / 60)}h ${m % 60}m` }); }
+  if (sleeps.length) { const m = Math.max(...sleeps); out.push({ key: 'sleep', icon: 'moon', label: 'Najdłuższy sen', value: `${Math.floor(m / 60)}h ${m % 60}m`, num: m }); }
 
   const sweetless = longestSweetless(expenses);
-  if (sweetless > 0) out.push({ key: 'sweetless', icon: 'flame', label: 'Najdłużej bez słodyczy', value: `${sweetless} ${sweetless === 1 ? 'dzień' : 'dni'}` });
+  if (sweetless > 0) out.push({ key: 'sweetless', icon: 'flame', label: 'Najdłużej bez słodyczy', value: `${sweetless} ${sweetless === 1 ? 'dzień' : 'dni'}`, num: sweetless });
 
   const mood = bestMoodWeek(moodEntries);
-  if (mood > 0) out.push({ key: 'mood', icon: 'smile', label: 'Najlepszy tydzień nastroju', value: `${mood.toFixed(1)}/5` });
+  if (mood > 0) out.push({ key: 'mood', icon: 'smile', label: 'Najlepszy tydzień nastroju', value: `${mood.toFixed(1)}/5`, num: Math.round(mood * 100) / 100 });
 
   const weights = Object.values(healthDays).map(d => d.weightKg).filter((w): w is number => !!w && w > 0);
-  if (weights.length >= 2) out.push({ key: 'weight', icon: 'scale', label: 'Najniższa waga', value: `${Math.min(...weights).toFixed(1)} kg` });
+  if (weights.length >= 2) { const v = Math.min(...weights); out.push({ key: 'weight', icon: 'scale', label: 'Najniższa waga', value: `${v.toFixed(1)} kg`, num: Math.round(v * 10) / 10, lowerIsBetter: true }); }
 
   return out;
 }

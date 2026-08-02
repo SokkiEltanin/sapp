@@ -62,6 +62,7 @@ import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
 import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
+import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
@@ -1007,6 +1008,36 @@ export default function DashboardScreen() {
 
   // "Rekordy życiowe" widget — all-time bests from the data already loaded.
   const records = useMemo(() => buildRecords(healthDays, expenses, moodEntries), [healthDays, expenses, moodEntries]);
+  // „Rekord pobity!" — porównaj bieżące rekordy z zapisanym najlepszym wynikiem; pierwszy
+  // raz = baseline (bez fajerwerków). Idempotentne (baseline w AsyncStorage tylko rośnie/
+  // maleje na korzyść) + dedup w sesji, więc nie spamuje.
+  const [recordFx, setRecordFx] = useState(false);
+  const celebratedRecordsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (records.length === 0) return;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('records_best_v1');
+        const prev: Record<string, number> = raw ? JSON.parse(raw) : {};
+        const isFirst = raw == null;
+        const next: Record<string, number> = { ...prev };
+        const beaten: typeof records = [];
+        for (const r of records) {
+          const better = !isFirst && prev[r.key] != null &&
+            (r.lowerIsBetter ? r.num < prev[r.key] - 1e-9 : r.num > prev[r.key] + 1e-9);
+          if (better && !celebratedRecordsRef.current.has(r.key)) { beaten.push(r); celebratedRecordsRef.current.add(r.key); }
+          next[r.key] = prev[r.key] == null ? r.num : (r.lowerIsBetter ? Math.min(prev[r.key], r.num) : Math.max(prev[r.key], r.num));
+        }
+        await AsyncStorage.setItem('records_best_v1', JSON.stringify(next));
+        if (beaten.length) {
+          haptic.success();
+          toast.success(`Nowy rekord! ${beaten[0].label}: ${beaten[0].value}`);
+          setRecordFx(true);
+          setTimeout(() => setRecordFx(false), 2600);
+        }
+      } catch {}
+    })();
+  }, [records]);
 
   // "Ściana serii" widget — every active streak: habit streaks + "dni bez"/since counters.
   const streakWall = useMemo<StreakItem[]>(() => {
@@ -2989,6 +3020,7 @@ export default function DashboardScreen() {
       />
 
       {unlockCard && <MonthCardUnlock card={unlockCard} onDismiss={() => setUnlockCard(null)} />}
+      {recordFx && <View pointerEvents="none" style={StyleSheet.absoluteFill}><Confetti colors={['#FDE047', '#FFFFFF', accentColor, '#22D3EE']} /></View>}
 
       <SafeAreaView style={s.safe} edges={[]}>
         <View style={{ flex: 1 }}>
