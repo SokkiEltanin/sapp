@@ -18,6 +18,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { useExpensesStore } from '@/store/expensesStore';
+import { saveMerchant } from '@/utils/merchantMemory';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod, Vehicle } from '@/types';
@@ -480,6 +481,13 @@ export default function ExpenseDetailScreen() {
         updatedAt: new Date().toISOString(),
       };
       updateExpense(id!, updates);
+      // Ucz auto-łapacza: gdy zmieniasz kategorię wydatku ze sklepem, zapamiętaj ją dla
+      // tego sprzedawcy → kolejne auto-złapane płatności z tego sklepu dostają poprawną
+      // kategorię (ten sam storeKey = pierwsze słowo nazwy, co parser powiadomień).
+      if (!editIsIncome && expense.storeName && expCat !== expense.category) {
+        const storeKey = expense.storeName.trim().split(/\s+/)[0]?.toLowerCase();
+        if (storeKey) saveMerchant(storeKey, { category: expCat, name: expense.storeName }).catch(() => {});
+      }
       await expensesService.update(id!, updates);
       haptic.success();
       setEditing(false);

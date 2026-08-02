@@ -49,6 +49,7 @@ import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { getCategoryMeta } from '@/utils/categories';
 import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META, addNonFood, loadNonFood } from '@/utils/food';
+import { isUserNonShop, addNonShop, loadNonShop } from '@/utils/shopExclude';
 import { useFoodStore, targetIntake, isRecipeProduct } from '@/store/foodStore';
 import { useTimeCapsule } from '@/store/timeCapsuleStore';
 import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
@@ -836,6 +837,9 @@ export default function DashboardScreen() {
   const [nonFoodVer, setNonFoodVer] = useState(0);             // bumps when the "nie jedzenie" list changes
   useEffect(() => { loadNonFood().then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
   const markNotFood = useCallback((name: string) => { haptic.tap(); addNonFood(name).then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
+  const [nonShopVer, setNonShopVer] = useState(0);             // bumps when the "to nie sklep" list changes
+  useEffect(() => { loadNonShop().then(() => setNonShopVer(v => v + 1)).catch(() => {}); }, []);
+  const markNotShop = useCallback((name: string) => { haptic.tap(); addNonShop(name).then(() => setNonShopVer(v => v + 1)).catch(() => {}); }, []);
   const foodMeals    = useFoodStore(st => st.meals);           // calorie log (for the balance widget)
   const foodProducts = useFoodStore(st => st.products);        // for the "dishes created" achievement
   const foodGoalMode = useFoodStore(st => st.goalMode);
@@ -2901,7 +2905,7 @@ export default function DashboardScreen() {
     for (const e of expenses) {
       if (e.type === 'income' || isSelfTransfer(e)) continue;
       const s = e.storeName?.trim();
-      if (!s) continue;
+      if (!s || isUserNonShop(s)) continue;   // pomiń wykluczone „to nie sklep"
       counts[s] = (counts[s] ?? 0) + 1;
       const d = (e.date ?? '').slice(0, 10);
       if (d && (!firstSeen[s] || d < firstSeen[s])) firstSeen[s] = d;
@@ -2909,7 +2913,7 @@ export default function DashboardScreen() {
     const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const newest = Object.entries(firstSeen).sort((a, b) => b[1].localeCompare(a[1]))[0];
     return { rows, total: rows.length, fav: rows[0] ?? null, newest: newest ? { name: newest[0], date: newest[1] } : null };
-  }, [expenses]);
+  }, [expenses, nonShopVer]);
 
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
@@ -3635,12 +3639,17 @@ export default function DashboardScreen() {
                 )}
                 <View style={s.shopWrap}>
                   {shopsCollection.rows.slice(0, 12).map(([name, cnt]) => (
-                    <View key={name} style={s.shopChip}>
+                    <TouchableOpacity key={name} style={s.shopChip} activeOpacity={0.7}
+                      onLongPress={() => Alert.alert('To nie sklep?', `Usunąć „${name}" z kolekcji sklepów? (np. przelew, osoba)`, [
+                        { text: 'Anuluj', style: 'cancel' },
+                        { text: 'To nie sklep', style: 'destructive', onPress: () => markNotShop(name) },
+                      ])}>
                       <Text style={s.shopChipName} numberOfLines={1}>{name}</Text>
                       <View style={[s.shopChipCount, { backgroundColor: accentColor + '26' }]}><Text style={[s.shopChipCountTxt, { color: accentColor }]}>{cnt}</Text></View>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
+                <Text style={s.shopHint}>Przytrzymaj sklep, aby usunąć (to nie sklep)</Text>
               </View>
             );
 
@@ -5785,6 +5794,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   // "Kolekcja sklepów"
   shopTotal: { marginLeft: 'auto', fontFamily: fonts.display, fontSize: 16, color: c.text.primary },
   shopWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
+  shopHint: { fontSize: 10.5, color: c.text.muted, marginTop: spacing[2] },
   shopChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.bg.elevated, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, paddingLeft: spacing[3], paddingRight: 4, paddingVertical: 3, maxWidth: '100%' },
   shopChipName: { fontSize: 12, fontWeight: '600', color: c.text.secondary, maxWidth: 120 },
   shopChipCount: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
