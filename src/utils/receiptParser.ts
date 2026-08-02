@@ -346,12 +346,20 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'porzeczk','granat','papaja','awokado','limonka','grejpfrut',
   ]],
   ['słodycze',   [
-    'czekolad','cukierek','batonik','lody','wafelek','ciastk','biszkopty',
+    'czekolad','czekoladk','cukierek','cukierk','batonik','baton','lody','wafelek','ciastk','ciasteczk','biszkopty',
     'kinder','kitkat','pralinki','toffi','galaretk','żelki','karmel',
     'ptasie mleczk','michałk','krówk','chałw','miodownik','piernik',
     'snickers','twix','mars','bounty','milky way','raffaello','ferrero',
-    'lion','oreo','lotus','delicje','prince polo','wawel','wedel',
+    'lion','oreo','lotus','delicje','prince polo','prince','wawel','wedel',
     'milka','ritter','lindt','haribo','mentos','lizak','donut','muffin',
+    // rozszerzenie 2026-08: więcej polskich słodyczy/marek + deserów
+    'grześk','grzesk','jeżyk','nutella','krem czekolad','krem orzech','mus czekolad',
+    'draż','landrynk','guma do żu','orbit','pianki','marshmallow',
+    'sernik','brownie','ptysie','eklerk','faworki','napoleonk','wuzetk',
+    'andrut','marcepan','nugat','trufl','deser','pudding','budyń','kisiel','gofr',
+    'herbatnik','digestive','petit beurre','bahlsen','leibniz','princessa',
+    'merci','celebrations','tic tac','skittles','m&m','smarties','nimm2','chupa',
+    'sorbet','markiza','kokosank',
   ]],
   ['pieczywo',   [
     'chleb','bułk','bagietk','tost','graham','pumpernik','orkiszow','rustykalna',
@@ -370,6 +378,8 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'grzank','grzanki','lays',"lay's",'ovenbaked','oven baked','pringles','doritos','cheetos',
     'crunchips','tortilla chip','star chips','snack','przekąsk','w skor','w skorup','solone',
     'krakelin','wafle ryż','wafle kukurydz','sezamk','flips','bake rolls','bakerolls',
+    'talarki','tuc','lajkonik','beskidzkie','monster munch','curly','sun snack',
+    'peperami','twist','chrupki kukurydz','pop corn',
   ]],
   ['chemia',     [
     'szampon','mydło','proszek','płyn do','chusteczk','papier toalet',
