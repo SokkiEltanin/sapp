@@ -3976,6 +3976,27 @@ export default function DashboardScreen() {
                   <Text style={{ color: SWEET, fontWeight: '800' }}>{Math.round(avgSweet)} zł</Text> słodkie
                   {share > 0 ? `  ·  ${share}% koszyka` : ''}
                 </Text>
+                {/* TREND słodyczy — bo sama linia mało mówi: strzałka + % (ostatnie tygodnie vs wcześniejsze) */}
+                {(() => {
+                  const ser = weekOverview.map(w => w.sweets);
+                  const half = Math.max(1, Math.floor(ser.length / 2));
+                  const earlier = ser.slice(0, ser.length - half);
+                  const recent = ser.slice(ser.length - half);
+                  const a = earlier.length ? earlier.reduce((x, y) => x + y, 0) / earlier.length : 0;
+                  const b = recent.reduce((x, y) => x + y, 0) / (recent.length || 1);
+                  if (a <= 0 && b <= 0) return null;
+                  const pct = a > 0 ? Math.round((b - a) / a * 100) : (b > 0 ? 100 : 0);
+                  const up = b > a + 0.5, down = b < a - 0.5;
+                  const col = up ? SWEET : down ? '#4CA96B' : colors.text.muted;
+                  const word = up ? 'rośnie' : down ? 'spada' : 'stabilnie';
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      {down ? <TrendingDown size={14} color={col} /> : <TrendingUp size={14} color={col} />}
+                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: col }}>Słodkie {word}{pct !== 0 ? `  ${pct > 0 ? '+' : ''}${pct}%` : ''}</Text>
+                      <Text style={{ fontSize: 11, color: colors.text.muted }}>ostatnio vs wcześniej</Text>
+                    </View>
+                  );
+                })()}
                 {/* Values above each point — food spend per week (rounded zł) */}
                 <View style={s.waveValues}>
                   {weekOverview.map((w, i) => (
