@@ -129,6 +129,7 @@ export default function FoodAdd() {
 
   // portion picker (for a selected candidate)
   const [sel, setSel]           = useState<Candidate | null>(null);
+  const [editItemIndex, setEditItemIndex] = useState<number | null>(null);  // edycja ilości pozycji już w posiłku
   const [unit, setUnit]         = useState<FoodUnit>('g');
   const [qtyText, setQtyText]   = useState('1');            // wpisywana ilość (0,5 / 1,5 jednostki)
   const [gramsOverride, setGramsOverride] = useState('');   // for unit 'g' this IS the grams (from the scale)
@@ -321,13 +322,33 @@ export default function FoodAdd() {
     return Array.from(new Set(list));
   }, [sel]);
 
-  const openPicker = (cand: Candidate) => {
+  const openPicker = (cand: Candidate, editIndex: number | null = null) => {
     haptic.tap();
     // With a kitchen scale the grams path is the accurate one, so default to 'g' when
     // the food is density-based (kcal/100g); otherwise its household unit.
     const u: FoodUnit = cand.kcalPer100g != null ? 'g' : (cand.defaultUnit ?? (Object.keys(cand.unitGrams ?? {})[0] as FoodUnit) ?? 'g');
     setSel(cand); setUnit(u); setQtyText('1'); setGramsOverride('');
     setKcal100(cand.kcalPer100g != null ? String(cand.kcalPer100g) : '');
+    setEditItemIndex(editIndex);   // null = dopisz nową; liczba = zamień istniejącą pozycję
+  };
+
+  // Stuknięcie pozycji w „Twój posiłek" → picker z jej ILOŚCIĄ/jednostką → zapis ZASTĘPUJE
+  // tę pozycję (a nie dopisuje). Tylko produkty; złożenia/dania edytuje się przez usuń+dodaj.
+  const editTrayItem = (i: number) => {
+    const it = items[i];
+    if (it.parts && it.parts.length) return;
+    const p = it.productId ? products.find(x => x.id === it.productId) : undefined;
+    const cand: Candidate = p ? productToCandidate(p) : ({
+      name: it.name,
+      kcalPer100g: it.grams > 0 ? Math.round((it.kcal / it.grams) * 100) : undefined,
+      protein100: undefined, carbs100: undefined, fat100: undefined,
+      source: 'curated',
+    } as any);
+    openPicker(cand, i);
+    // prefill z istniejącej pozycji (nadpisuje domyślne z openPicker w tym samym renderze)
+    setUnit(it.unit);
+    setQtyText(String(it.qty || 1));
+    setGramsOverride(it.unit !== 'g' && it.grams > 0 ? String(it.grams) : '');
   };
 
   // A cooked dish (recipe product) → the normal grams picker (weigh your portion).
@@ -395,8 +416,10 @@ export default function FoodAdd() {
     const ov = parseFloat(gramsOverride.replace(',', '.'));
     if (ov > 0 && unit !== 'g' && qty > 0) learnPortion(productId, unit, ov / qty);
     const mac = computeItemMacros({ protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100 } as any, grams);
-    setItems(prev => [...prev, { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined }]);
-    setSel(null);
+    const newItem = { name: sel.name, productId, qty: unit === 'g' ? 1 : qty, unit, grams: Math.round(grams), kcal, protein: mac.protein || undefined, carbs: mac.carbs || undefined, fat: mac.fat || undefined };
+    if (editItemIndex != null) { const idx = editItemIndex; setItems(prev => prev.map((x, j) => j === idx ? newItem : x)); }
+    else setItems(prev => [...prev, newItem]);
+    setSel(null); setEditItemIndex(null);
   };
 
   // add a brand-new product straight from the search box → the grams+kcal/100g picker
@@ -538,25 +561,30 @@ export default function FoodAdd() {
               const k = kindOf(it);
               const KindIcon = k === 'danie' ? ChefHat : k === 'kompozycja' ? Layers : Apple;
               const kindCol = k === 'danie' ? '#F59E0B' : k === 'kompozycja' ? ACCENT : c.text.muted;
+              const editable = !(it.parts && it.parts.length);   // produkt = stuknij, by zmienić ilość
               return (
               <View key={i} style={[s.itemRow, s.itemBorder]}>
-                <View style={[s.kindTag, { borderColor: kindCol + '55', backgroundColor: kindCol + '18' }]}>
-                  <KindIcon size={11} color={kindCol} />
-                  <Text style={[s.kindTagTxt, { color: kindCol }]}>{k === 'danie' ? 'DANIE' : k === 'kompozycja' ? 'ZŁOŻENIE' : 'PRODUKT'}</Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.itemName} numberOfLines={1}>{it.name}{it.parts && it.qty > 1 ? ` ×${it.qty}` : ''}</Text>
-                  <Text style={s.itemMeta} numberOfLines={1}>
-                    {it.parts ? it.parts.map(p => p.name).join(', ')
-                      : it.unit === 'g' ? `${it.grams} g`
-                      : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}
-                  </Text>
-                </View>
+                <TouchableOpacity style={s.itemMain} activeOpacity={editable ? 0.6 : 1} disabled={!editable}
+                  onPress={() => editTrayItem(i)}>
+                  <View style={[s.kindTag, { borderColor: kindCol + '55', backgroundColor: kindCol + '18' }]}>
+                    <KindIcon size={11} color={kindCol} />
+                    <Text style={[s.kindTagTxt, { color: kindCol }]}>{k === 'danie' ? 'DANIE' : k === 'kompozycja' ? 'ZŁOŻENIE' : 'PRODUKT'}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.itemName} numberOfLines={1}>{it.name}{it.parts && it.qty > 1 ? ` ×${it.qty}` : ''}</Text>
+                    <Text style={s.itemMeta} numberOfLines={1}>
+                      {it.parts ? it.parts.map(p => p.name).join(', ')
+                        : it.unit === 'g' ? `${it.grams} g`
+                        : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
                 <Text style={s.itemKcal}>{it.kcal}</Text>
                 <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setItems(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
               </View>
               );
             })}
+            <Text style={s.itemEditHint}>Stuknij pozycję, aby zmienić ilość · kosz usuwa</Text>
             <View style={s.totalRow}>
               <TouchableOpacity style={s.savePresetBtn} onPress={() => { haptic.tap(); setSaveP(true); }}>
                 <Star size={13} color={ACCENT} /><Text style={s.savePresetTxt}>{editPresetId ? 'Zaktualizuj preset' : 'Zapisz jako preset'}</Text>
@@ -682,7 +710,7 @@ export default function FoodAdd() {
       <View style={s.saveBar}>
         <TouchableOpacity style={[s.saveBtn, { backgroundColor: items.length ? ACCENT : c.fill.subtle }]} disabled={!items.length} onPress={save}>
           <Check size={18} color={items.length ? '#1A1206' : c.text.muted} />
-          <Text style={[s.saveTxt, { color: items.length ? '#1A1206' : c.text.muted }]}>Zapisz{total > 0 ? ` · ${total} kcal` : ''}</Text>
+          <Text style={[s.saveTxt, { color: items.length ? '#1A1206' : c.text.muted }]}>{editId ? 'Zapisz zmiany' : 'Zapisz'}{total > 0 ? ` · ${total} kcal` : ''}</Text>
         </TouchableOpacity>
       </View>
 
@@ -693,7 +721,7 @@ export default function FoodAdd() {
             <TouchableOpacity activeOpacity={1} style={[s.sheet, { backgroundColor: c.bg.card }]} onPress={() => {}}>
               {sel && (
                 <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
-                  <Text style={s.sheetTitle}>{sel.name}</Text>
+                  <Text style={s.sheetTitle}>{editItemIndex != null ? `Zmień ilość: ${sel.name}` : sel.name}</Text>
                   {/* unit chips — 'g' first for the scale workflow */}
                   <View style={s.unitWrap}>
                     {pickerUnits.map(u => {
@@ -746,7 +774,7 @@ export default function FoodAdd() {
                   <View style={s.sheetKcal}><Text style={s.sheetKcalVal}>{pickerKcal()} kcal</Text><Text style={s.sheetKcalSub}>{Math.round(pickerGrams())} g × {density() || '—'}/100g</Text></View>
                   <TouchableOpacity style={[s.sheetAdd, { backgroundColor: pickerKcal() > 0 || pickerGrams() > 0 ? ACCENT : c.fill.subtle }]}
                     disabled={!(pickerGrams() > 0 && (density() > 0 || sel.kcalPerPortion != null))} onPress={confirmPicker}>
-                    <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>Dodaj do posiłku</Text>
+                    <Plus size={18} color="#1A1206" /><Text style={s.sheetAddTxt}>{editItemIndex != null ? 'Zapisz zmianę' : 'Dodaj do posiłku'}</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -942,6 +970,8 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   mealHeadTxt:   { fontSize: 11, fontWeight: '800', color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.8 },
   mealHeadCount: { fontSize: 11, fontWeight: '700', color: c.text.muted },
   itemRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 8 },
+  itemMain:   { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  itemEditHint: { fontSize: 10.5, color: c.text.muted, marginTop: 4 },
   itemBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
   kindTag:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, borderWidth: 1, minWidth: 58, justifyContent: 'center' },
   kindTagTxt: { fontSize: 8, fontWeight: '900', letterSpacing: 0.4 },

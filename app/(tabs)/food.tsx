@@ -511,7 +511,13 @@ export default function Food() {
                       <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}&edit=${m.id}` as any); }}>
                         <Pencil size={14} color={c.text.muted} />
                       </TouchableOpacity>
-                      <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); removeMeal(m.id); }}>
+                      <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => {
+                        haptic.tap();
+                        Alert.alert('Usunąć posiłek?', `${m.items.length} ${m.items.length === 1 ? 'pozycja' : 'pozycje'} · ${m.kcal.toLocaleString('pl-PL')} kcal`, [
+                          { text: 'Anuluj', style: 'cancel' },
+                          { text: 'Usuń', style: 'destructive', onPress: () => removeMeal(m.id) },
+                        ]);
+                      }}>
                         <Trash2 size={15} color={c.text.muted} />
                       </TouchableOpacity>
                     </View>
