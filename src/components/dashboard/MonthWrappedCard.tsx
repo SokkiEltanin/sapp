@@ -52,6 +52,14 @@ export default function MonthWrappedCard({
   };
   const shineX = shine.interpolate({ inputRange: [0, 1], outputRange: [-320, 470] });
 
+  // Distance "ciekawostka" tylko dla NAPRAWDĘ aktywnego miesiąca (≥120k kroków ≈ trasa
+  // między miastami). Poniżej pomijamy — mała suma dawała absurdy typu „11 km ≈ bieg na
+  // 10 km" na miesiącu z 2 dniami danych (bieżący). Landmarki z listy poniżej ~90 km
+  // (spacer / bieg / (pół)maraton) źle brzmią jako podsumowanie CAŁEGO miesiąca.
+  const distanceFact = card.steps >= 120000 ? stepsToDistanceFact(card.steps) : '';
+  // „progres" tieru = ile rekordów kolekcji trzyma ten miesiąc (0…4 = kolor karty).
+  const recordsN = card.tierRank;
+
   const chips: { icon: any; text: string; tone?: 'up' | 'down' | 'star' }[] = [];
   if (card.spendRank === 1 && card.monthsTracked >= 2)
     chips.push({ icon: Trophy, text: 'Rekord wydatków', tone: 'star' });
@@ -79,6 +87,12 @@ export default function MonthWrappedCard({
         {/* No emoji stickers/watermark — they cheapened the card ("wygląda tanio").
             The gradient + rarity pill + tier accent carry the collectible identity. */}
 
+        {/* subtelny połysk górnej krawędzi — „szkło" karty kolekcjonerskiej (wszystkie tiery),
+            daje głębię zamiast płaskiego gradientu. Za treścią (pointerEvents none). */}
+        <View pointerEvents="none" style={st.gloss}>
+          <LinearGradient colors={['rgba(255,255,255,0.16)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1 }} />
+        </View>
+
         {/* header */}
         <View style={st.head}>
           <View style={{ flex: 1 }}>
@@ -91,9 +105,13 @@ export default function MonthWrappedCard({
               </View>
               <Text style={[st.kickerTxt, { color: card.accent }]}>#{card.index}</Text>
             </View>
-            {/* rarity tier — always shown so the colour is legible */}
+            {/* rarity tier — always shown so the colour is legible. Dopisany „progres"
+                (ile rekordów trzyma miesiąc) tłumaczy, CO oznacza kolor karty. */}
             <View style={[st.rarityPill, { borderColor: card.accent + '99', backgroundColor: card.accent + '1F' }]}>
               <Text style={[st.rarityTxt, { color: card.accent }]}>{card.tierLabel}</Text>
+              {recordsN >= 1 && (
+                <Text style={[st.rarityCount, { color: card.accent }]}>· {recordsN} {recordsN === 1 ? 'rekord' : 'rekordy'}</Text>
+              )}
             </View>
             <Text style={st.month}>{card.monthName}</Text>
             <Text style={st.year}>{card.year}</Text>
@@ -120,12 +138,12 @@ export default function MonthWrappedCard({
           )}
         </View>
 
-        {/* fun fact — the steps as a relatable distance ("tyle co z Lublina do Rzeszowa
-            piechotą"), because a raw step count means less than the walk it equals */}
-        {stepsToDistanceFact(card.steps) ? (
+        {/* fun fact — kroki jako trasa między miastami ("prawie tyle co z Lublina do
+            Rzeszowa"), tylko dla aktywnego miesiąca (distanceFact bramkowane wyżej) */}
+        {distanceFact ? (
           <View style={st.factRow}>
             <Sparkles size={12} color={card.accent} />
-            <Text style={st.factTxt} numberOfLines={2}>{stepsToDistanceFact(card.steps)}</Text>
+            <Text style={st.factTxt} numberOfLines={2}>{distanceFact}</Text>
           </View>
         ) : null}
 
@@ -222,6 +240,7 @@ const st = StyleSheet.create({
   },
   cardCompact: { padding: 16 },
   sheen: { position: 'absolute', top: -60, bottom: -60, width: 130 },
+  gloss: { position: 'absolute', top: 0, left: 0, right: 0, height: 72 },
 
   head: { flexDirection: 'row', alignItems: 'flex-start' },
   kicker: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
@@ -230,6 +249,7 @@ const st = StyleSheet.create({
   typePillTxt: { fontSize: 10, fontWeight: '900', color: '#12151b', letterSpacing: 0.7 },
   rarityPill: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, marginBottom: 7 },
   rarityTxt: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  rarityCount: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3, opacity: 0.9 },
   month: { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -1, ...shadow },
   year: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '700', marginTop: -2, ...shadow },
 

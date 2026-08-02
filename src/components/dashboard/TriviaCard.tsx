@@ -15,7 +15,8 @@ const META: Record<TriviaCat, { icon: any; label: string; color: string }> = {
 };
 
 const KEY = 'trivia_state_v1';
-const MAX_SHOWS = 4;   // each fact appears at most 4× before it's "archived"
+const MAX_SHOWS = 2;         // każda ciekawostka pokaże się MAX 2× w całości, potem „archiwum"
+const REPEAT_GAP_DAYS = 30;  // …i min. 30 dni przerwy między 1. a 2. pokazem (user: powtarzały się za szybko)
 
 // Stable key per fact from its text, so counts survive reordering / adding items.
 function keyOf(t: Trivia): string {
@@ -27,27 +28,58 @@ const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+// dni między dwiema datami YYYY-MM-DD (b − a); Infinity gdy brak/niepoprawna data = „przerwa spełniona"
+function daysBetween(a: string | undefined, b: string): number {
+  if (!a) return Infinity;
+  const t0 = Date.parse(a + 'T00:00:00');
+  const t1 = Date.parse(b + 'T00:00:00');
+  if (isNaN(t0) || isNaN(t1)) return Infinity;
+  return Math.round((t1 - t0) / 86400000);
+}
 
-interface Persist { counts: Record<string, number>; currentKey: string | null; day: string | null }
+interface Persist {
+  counts: Record<string, number>;
+  lastShown?: Record<string, string>;   // key → data ostatniego pokazu (YYYY-MM-DD)
+  currentKey: string | null;
+  day: string | null;
+}
 
-// Pick a fact that hasn't hit MAX_SHOWS yet (the "active pool"), excluding the current
-// one. When everything is archived, reset the counts and start the cycle over — so you
-// see variety and never the same few facts on a loop. Increments the picked fact.
-function advance(counts: Record<string, number>, excludeKey: string | null): { key: string; counts: Record<string, number> } {
-  let pool = TRIVIA.filter(t => (counts[keyOf(t)] ?? 0) < MAX_SHOWS && keyOf(t) !== excludeKey);
+// Wybierz ciekawostkę spełniającą OBA warunki: pokazana < MAX_SHOWS razy ORAZ ostatnio
+// pokazana ≥ REPEAT_GAP_DAYS temu (albo nigdy). Gdy nic nie spełnia przerwy — bierzemy
+// najdawniej widzianą z nie-wyczerpanych (relaksujemy przerwę, ale nie limit 2×). Gdy
+// WSZYSTKO wyczerpane (2×) — nowy wielki cykl (reset counts), wciąż respektując świeżość.
+function advance(
+  counts: Record<string, number>,
+  lastShown: Record<string, string>,
+  excludeKey: string | null,
+  today: string,
+): { key: string; counts: Record<string, number>; lastShown: Record<string, string> } {
+  const notMaxed = TRIVIA.filter(t => (counts[keyOf(t)] ?? 0) < MAX_SHOWS && keyOf(t) !== excludeKey);
+  let pool = notMaxed.filter(t => daysBetween(lastShown[keyOf(t)], today) >= REPEAT_GAP_DAYS);
   if (pool.length === 0) {
-    counts = {};                                            // all archived → new cycle
-    pool = TRIVIA.filter(t => keyOf(t) !== excludeKey);
-    if (pool.length === 0) pool = [...TRIVIA];
+    if (notMaxed.length > 0) {
+      // wszystkie nie-wyczerpane pokazane za świeżo → weź NAJDAWNIEJ widzianą (max możliwa przerwa)
+      pool = [...notMaxed].sort((a, b) =>
+        (lastShown[keyOf(a)] ?? '') < (lastShown[keyOf(b)] ?? '') ? -1 : 1).slice(0, 1);
+    } else {
+      counts = {};                                          // wszystko po 2× → nowy cykl
+      const fresh = TRIVIA.filter(t => keyOf(t) !== excludeKey);
+      pool = fresh.filter(t => daysBetween(lastShown[keyOf(t)], today) >= REPEAT_GAP_DAYS);
+      if (pool.length === 0) pool = fresh.length ? fresh : [...TRIVIA];
+    }
   }
   const pick = pool[Math.floor(Math.random() * pool.length)];
   const k = keyOf(pick);
-  return { key: k, counts: { ...counts, [k]: (counts[k] ?? 0) + 1 } };
+  return {
+    key: k,
+    counts: { ...counts, [k]: (counts[k] ?? 0) + 1 },
+    lastShown: { ...lastShown, [k]: today },
+  };
 }
 
 // "Ciekawostka" — one curated fact (science / book insight / self-dev / world). One per
-// day by default (counted once when first shown that day) + a shuffle button, each fact
-// capped at 4 appearances then archived. Content in trivia.ts.
+// day (counted once when first shown that day). Każdy fakt pokaże się MAX 2× w historii,
+// z min. 30-dniową przerwą między pokazami. Treść w trivia.ts.
 export default function TriviaCard({ cardBg }: { cardBg: string }) {
   const c = useColors();
   const s = makeS(c);
@@ -56,16 +88,16 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
   useEffect(() => {
     let alive = true;
     AsyncStorage.getItem(KEY).then(raw => {
-      let p: Persist = raw ? JSON.parse(raw) : { counts: {}, currentKey: null, day: null };
+      let p: Persist = raw ? JSON.parse(raw) : { counts: {}, lastShown: {}, currentKey: null, day: null };
       const today = todayStr();
       const valid = p.currentKey && TRIVIA.some(t => keyOf(t) === p.currentKey);
       if (p.day !== today || !valid) {
-        const r = advance(p.counts ?? {}, p.currentKey ?? null);   // new day → fresh fact
-        p = { counts: r.counts, currentKey: r.key, day: today };
+        const r = advance(p.counts ?? {}, p.lastShown ?? {}, p.currentKey ?? null, today);   // new day → fresh fact
+        p = { counts: r.counts, lastShown: r.lastShown, currentKey: r.key, day: today };
         AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
       }
       if (alive) setSt(p);
-    }).catch(() => { if (alive) setSt({ counts: {}, currentKey: keyOf(TRIVIA[0]), day: todayStr() }); });
+    }).catch(() => { if (alive) setSt({ counts: {}, lastShown: {}, currentKey: keyOf(TRIVIA[0]), day: todayStr() }); });
     return () => { alive = false; };
   }, []);
 

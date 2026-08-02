@@ -242,13 +242,18 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
       .filter((x): x is number => x != null);
     return per.length ? per.reduce((s, x) => s + x, 0) / per.length : 0;
   })();
-  const bestMoodMonth = ordered
+  // REKORDY liczymy tylko wśród ZAMKNIĘTYCH miesięcy — miesiąc w trakcie (mało dni danych)
+  // nie może zdobyć „najbardziej ruchliwy/najlepszy nastrój" (to fałszowało odznaki).
+  const sealed = ordered.filter(m => m !== nowKey);
+  const bestMoodMonth = sealed
     .map(m => ({ m, v: agg[m] && agg[m].moodN ? agg[m].moodSum / agg[m].moodN : -1 }))
     .sort((a, b) => b.v - a.v)[0]?.m ?? null;
-  const bestStepsMonth = ordered
-    .map(m => ({ m, v: agg[m] && agg[m].stepDays ? agg[m].steps / agg[m].stepDays : -1 }))
+  // „Najbardziej ruchliwy" = najwięcej kroków ŁĄCZNIE (spójne z liczbą na karcie), a nie
+  // najwyższa średnia/dzień (którą wygrywał miesiąc z 1–2 dniami danych, np. bieżący).
+  const bestStepsMonth = sealed
+    .map(m => ({ m, v: agg[m]?.steps ?? -1 }))
     .sort((a, b) => b.v - a.v)[0]?.m ?? null;
-  const bestSweetsMonth = ordered
+  const bestSweetsMonth = sealed
     .map(m => ({ m, v: agg[m]?.sweetsSpend ?? 0 }))
     .sort((a, b) => b.v - a.v)[0]?.m ?? null;
 
@@ -273,7 +278,7 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     const isTopMood = bestMoodMonth === month && a.moodN > 0 && ordered.length >= 2;
     const isTopSteps = bestStepsMonth === month && a.stepDays > 0 && ordered.length >= 2;
     const isTopSweets = bestSweetsMonth === month && a.sweetsSpend > 0 && ordered.length >= 2;
-    const isTopSpendMonth = isTopSpend(spendRankList, month);
+    const isTopSpendMonth = isTopSpend(spendRankList, month) && month !== nowKey;
 
     // rarity ladder: how many collection RECORDS this month holds → its metal
     // tier. Copper = a normal month; each record it dominates bumps it up; holding
