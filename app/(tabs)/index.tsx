@@ -2366,6 +2366,8 @@ export default function DashboardScreen() {
   const petMonthlyClaims = usePetStore(st => st.monthlyClaims);
   const petDayClaims = usePetStore(st => st.dayClaims);
   const dailyBoxReady = !petDayClaims[`dailybox:${todayISO()}`];   // free daily chest waiting?
+  const petAffection = usePetStore(st => st.affection);
+  const petAffectionDay = usePetStore(st => st.affectionDay);
   const petState = useMemo(() => {
     const tISO = todayISO();
     const todayMoods = moodEntries.filter(e => e.date === tISO);
@@ -2405,6 +2407,14 @@ export default function DashboardScreen() {
       stepsThisMonth: Object.entries(healthDays).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0),
     }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, monthlyClaims: petMonthlyClaims, today: tISO }).claimableCount;
   }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, monthCards, petClaimedQuests, petDailyClaims, petMonthlyClaims, getStreak]);
+  // Evening pupil nudge — content matches state (free chest → rewards → misses you).
+  // Rescheduled on every open so it never nags about something already handled.
+  useEffect(() => {
+    const affectionLow = petAffectionDay !== todayISO() || petAffection < 30;
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshPetReminder({ dailyBoxReady, claimable: petClaimable, affectionLow }))
+      .catch(() => {});
+  }, [dailyBoxReady, petClaimable, petAffection, petAffectionDay]);
   // Passive daily care XP (once/day), scaled by how well you're doing.
   const petTicked = useRef(false);
   useEffect(() => {

@@ -407,6 +407,8 @@ export default function RootLayout() {
         router.navigate('/(tabs)/stats' as any);
       } else if (screen === 'month-cards') {
         router.navigate('/month-cards' as any);
+      } else if (screen === 'pet') {
+        router.navigate('/pet' as any);           // pupil nudge (skrzynka dnia / nagrody / tęskni)
       } else {
         // Never leave a tap dead — fall back to the dashboard.
         router.navigate('/(tabs)/' as any);

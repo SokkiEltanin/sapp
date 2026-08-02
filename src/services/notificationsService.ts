@@ -294,6 +294,29 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Pupil nudge: ONE evening notification whose content matches the current state —
+  // free daily chest waiting → rewards to claim → the pet misses you. Rides the master
+  // notif toggle and is rescheduled on every app open, so the message stays true; if
+  // there's nothing worth nudging, it just cancels. Deep-links to the pet page.
+  async refreshPetReminder(opts: { dailyBoxReady: boolean; claimable: number; affectionLow: boolean }): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('pet-daily').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+      let content: { title: string; body: string } | null = null;
+      if (opts.dailyBoxReady)      content = { title: 'Skrzynka dnia czeka 🎁', body: 'Odbierz darmowe monety u pupila — zajmie chwilę.' };
+      else if (opts.claimable > 0) content = { title: 'Masz nagrody u pupila', body: `${opts.claimable} do odebrania — wpadnij po monety i XP.` };
+      else if (opts.affectionLow)  content = { title: 'Twój pupil tęskni 🐱', body: 'Zajrzyj i pogłaszcz go chwilę — poprawi Wam obu humor.' };
+      if (!content) return;
+      const hour = parseInt((await AsyncStorage.getItem('notif_pet_hour')) ?? '19') || 19;
+      const min  = parseInt((await AsyncStorage.getItem('notif_pet_min')) ?? '0') || 0;
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'pet-daily',
+        content: { ...content, data: { screen: 'pet' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(hour, min, false) },
+      });
+    } catch {}
+  },
+
   async scheduleDailyTaskBriefing(
     hour = 8, minute = 0,
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },
