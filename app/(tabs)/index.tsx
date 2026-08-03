@@ -784,6 +784,116 @@ function DashEditRow({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+// ── Sekcje wydzielone do React.memo (perf audit 2026-08) ──────────────────────
+// Cały dashboard re-renderuje się przy każdej zmianie dowolnego store'a i przebudowuje
+// JSX ~43 sekcji. Opakowanie ciężkich sekcji (wykresy) w React.memo + przekazanie
+// ZMEMOIZOWANYCH danych/tokenów jako propsów sprawia, że shallow-equal pomija ich render,
+// gdy zmiana ich nie dotyczy (np. odhaczenie nawyku nie przelicza wykresu słodyczy).
+type WeekOv = { food: number; sweets: number; dates: string[]; isCurrent: boolean };
+
+const SweetsVsFoodSection = React.memo(function SweetsVsFoodSection(
+  { s, cardBg, accentColor, colors, weekOverview }:
+  { s: any; cardBg: string; accentColor: string; colors: any; weekOverview: WeekOv[] },
+) {
+  const SWEET = '#F472B6';
+  const wk = weekOverview.filter(w => w.food > 0 || w.sweets > 0);
+  const avgFood = wk.reduce((s2, w) => s2 + w.food, 0) / (wk.length || 1);
+  const avgSweet = wk.reduce((s2, w) => s2 + w.sweets, 0) / (wk.length || 1);
+  const share = avgFood + avgSweet > 0 ? Math.round((avgSweet / (avgFood + avgSweet)) * 100) : 0;
+  return (
+    <View style={[s.card, { backgroundColor: cardBg }]}>
+      <View style={s.cardHeader}>
+        <Wallet size={13} color={accentColor} />
+        <Text style={[s.cardTitle]} numberOfLines={1}>Słodkie vs jedzenie</Text>
+        <View style={s.dualLegend}>
+          <View style={s.dualLegendItem}>
+            <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
+            <Text style={s.dualLegendLabel}>jedzenie</Text>
+          </View>
+          <View style={s.dualLegendItem}>
+            <View style={[s.dualLegendLine, { backgroundColor: SWEET }]} />
+            <Text style={s.dualLegendLabel}>słodkie</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={s.statSub}>
+        Średnio/tydzień: <Text style={{ color: accentColor, fontWeight: '800' }}>{Math.round(avgFood)} zł</Text> jedzenie ·{' '}
+        <Text style={{ color: SWEET, fontWeight: '800' }}>{Math.round(avgSweet)} zł</Text> słodkie
+        {share > 0 ? `  ·  ${share}% koszyka` : ''}
+      </Text>
+      {(() => {
+        const ser = weekOverview.map(w => w.sweets);
+        const half = Math.max(1, Math.floor(ser.length / 2));
+        const earlier = ser.slice(0, ser.length - half);
+        const recent = ser.slice(ser.length - half);
+        const a = earlier.length ? earlier.reduce((x, y) => x + y, 0) / earlier.length : 0;
+        const b = recent.reduce((x, y) => x + y, 0) / (recent.length || 1);
+        if (a <= 0 && b <= 0) return null;
+        const pct = a > 0 ? Math.round((b - a) / a * 100) : (b > 0 ? 100 : 0);
+        const up = b > a + 0.5, down = b < a - 0.5;
+        const col = up ? SWEET : down ? '#4CA96B' : colors.text.muted;
+        const word = up ? 'rośnie' : down ? 'spada' : 'stabilnie';
+        return (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            {down ? <TrendingDown size={14} color={col} /> : <TrendingUp size={14} color={col} />}
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: col }}>Słodkie {word}{pct !== 0 ? `  ${pct > 0 ? '+' : ''}${pct}%` : ''}</Text>
+            <Text style={{ fontSize: 11, color: colors.text.muted }}>ostatnio vs wcześniej</Text>
+          </View>
+        );
+      })()}
+      <View style={s.waveValues}>
+        {weekOverview.map((w, i) => (
+          <Text key={i} style={[s.waveValue, w.isCurrent && { color: accentColor, fontWeight: '800' }]}>
+            {w.food > 0 ? Math.round(w.food) : ''}
+          </Text>
+        ))}
+      </View>
+      <DualWaveChart data1={weekOverview.map(w => w.food)} data2={weekOverview.map(w => w.sweets)} color1={accentColor} color2={SWEET} />
+      <View style={s.waveLabels}>
+        {weekOverview.map((w, i) => (
+          <Text key={i} style={[s.waveLabel, w.isCurrent && { color: accentColor, fontWeight: '700' }]}>
+            {weekLabel(w.dates).split(' ')[0]}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+const SpendByDaySection = React.memo(function SpendByDaySection(
+  { s, cardBg, accentColor, colors, weekdayAvg }:
+  { s: any; cardBg: string; accentColor: string; colors: any; weekdayAvg: { avg: number; pct: number; label: string }[] },
+) {
+  return (
+    <View style={[s.card, { backgroundColor: cardBg }]}>
+      <View style={s.cardHeader}>
+        <BarChart2 size={13} color={accentColor} />
+        <Text style={[s.cardTitle]}>W jakie dni jesz najwięcej?</Text>
+        <Text style={[s.cardTitle, { marginLeft: 'auto' as any, color: colors.text.muted }]}>śr. zł/dzień</Text>
+      </View>
+      <View style={s.dowRow}>
+        {weekdayAvg.map((d, i) => {
+          const isWeekend = i >= 5;
+          const barColor = isWeekend ? accentColor + 'AA' : accentColor;
+          return (
+            <View key={i} style={s.dowCol}>
+              {d.avg > 0 && (
+                <Text style={[s.dowAvgLabel, { color: isWeekend ? accentColor + 'AA' : accentColor }]}>
+                  {d.avg >= 100 ? `${(d.avg / 1).toFixed(0)}` : d.avg.toFixed(0)}
+                </Text>
+              )}
+              <View style={s.dowBar}>
+                <View style={[s.dowFill, { height: Math.max(d.pct * 44, d.avg > 0 ? 4 : 0), backgroundColor: barColor, opacity: d.avg > 0 ? 1 : 0.1 }]} />
+              </View>
+              <Text style={[s.dowLabel, isWeekend && { color: accentColor + 'AA' }]}>{d.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+});
+
 export default function DashboardScreen() {
   const colors = useColors();
   const s = useMemo(() => makeStyles(colors), [colors]);
@@ -3982,79 +4092,8 @@ export default function DashboardScreen() {
               </View>
             );
 
-            nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 && (() => {
-              const SWEET = '#F472B6';   // różowy cukierek — semantyczny „dodatek" dla słodyczy
-              const wk = weekOverview.filter(w => w.food > 0 || w.sweets > 0);
-              const avgFood = wk.reduce((s2, w) => s2 + w.food, 0) / (wk.length || 1);
-              const avgSweet = wk.reduce((s2, w) => s2 + w.sweets, 0) / (wk.length || 1);
-              const share = avgFood + avgSweet > 0 ? Math.round((avgSweet / (avgFood + avgSweet)) * 100) : 0;
-              return (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Wallet size={13} color={accentColor} />
-                  <Text style={[s.cardTitle]} numberOfLines={1}>Słodkie vs jedzenie</Text>
-                  <View style={s.dualLegend}>
-                    <View style={s.dualLegendItem}>
-                      <View style={[s.dualLegendLine, { backgroundColor: accentColor }]} />
-                      <Text style={s.dualLegendLabel}>jedzenie</Text>
-                    </View>
-                    <View style={s.dualLegendItem}>
-                      <View style={[s.dualLegendLine, { backgroundColor: SWEET }]} />
-                      <Text style={s.dualLegendLabel}>słodkie</Text>
-                    </View>
-                  </View>
-                </View>
-                {/* Podsumowanie: średnia tygodniowa + udział słodyczy w koszyku jedzenia */}
-                <Text style={s.statSub}>
-                  Średnio/tydzień: <Text style={{ color: accentColor, fontWeight: '800' }}>{Math.round(avgFood)} zł</Text> jedzenie ·{' '}
-                  <Text style={{ color: SWEET, fontWeight: '800' }}>{Math.round(avgSweet)} zł</Text> słodkie
-                  {share > 0 ? `  ·  ${share}% koszyka` : ''}
-                </Text>
-                {/* TREND słodyczy — bo sama linia mało mówi: strzałka + % (ostatnie tygodnie vs wcześniejsze) */}
-                {(() => {
-                  const ser = weekOverview.map(w => w.sweets);
-                  const half = Math.max(1, Math.floor(ser.length / 2));
-                  const earlier = ser.slice(0, ser.length - half);
-                  const recent = ser.slice(ser.length - half);
-                  const a = earlier.length ? earlier.reduce((x, y) => x + y, 0) / earlier.length : 0;
-                  const b = recent.reduce((x, y) => x + y, 0) / (recent.length || 1);
-                  if (a <= 0 && b <= 0) return null;
-                  const pct = a > 0 ? Math.round((b - a) / a * 100) : (b > 0 ? 100 : 0);
-                  const up = b > a + 0.5, down = b < a - 0.5;
-                  const col = up ? SWEET : down ? '#4CA96B' : colors.text.muted;
-                  const word = up ? 'rośnie' : down ? 'spada' : 'stabilnie';
-                  return (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                      {down ? <TrendingDown size={14} color={col} /> : <TrendingUp size={14} color={col} />}
-                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: col }}>Słodkie {word}{pct !== 0 ? `  ${pct > 0 ? '+' : ''}${pct}%` : ''}</Text>
-                      <Text style={{ fontSize: 11, color: colors.text.muted }}>ostatnio vs wcześniej</Text>
-                    </View>
-                  );
-                })()}
-                {/* Values above each point — food spend per week (rounded zł) */}
-                <View style={s.waveValues}>
-                  {weekOverview.map((w, i) => (
-                    <Text key={i} style={[s.waveValue, w.isCurrent && { color: accentColor, fontWeight: '800' }]}>
-                      {w.food > 0 ? Math.round(w.food) : ''}
-                    </Text>
-                  ))}
-                </View>
-                <DualWaveChart
-                  data1={weekOverview.map(w => w.food)}
-                  data2={weekOverview.map(w => w.sweets)}
-                  color1={accentColor}
-                  color2={SWEET}
-                />
-                <View style={s.waveLabels}>
-                  {weekOverview.map((w, i) => (
-                    <Text key={i} style={[s.waveLabel, w.isCurrent && { color: accentColor, fontWeight: '700' }]}>
-                      {weekLabel(w.dates).split(' ')[0]}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-              );
-            })();
+            nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 &&
+              <SweetsVsFoodSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekOverview={weekOverview} />;
 
             nodes['who-ate'] = personConsumption.totalSweets > 0 && payers.length >= 2 && (
               <WhoAteCard data={personConsumption} monthLabel={MONTH_SHORT[new Date().getMonth()]} />
@@ -4136,38 +4175,8 @@ export default function DashboardScreen() {
               );
             })();
 
-            nodes['spend-by-day'] = weekdayAvg.some(d => d.avg > 0) && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <BarChart2 size={13} color={accentColor} />
-                  <Text style={[s.cardTitle]}>W jakie dni jesz najwięcej?</Text>
-                  <Text style={[s.cardTitle, { marginLeft: 'auto' as any, color: colors.text.muted }]}>śr. zł/dzień</Text>
-                </View>
-                <View style={s.dowRow}>
-                  {weekdayAvg.map((d, i) => {
-                    const isWeekend = i >= 5;
-                    const barColor = isWeekend ? accentColor + 'AA' : accentColor;
-                    return (
-                      <View key={i} style={s.dowCol}>
-                        {d.avg > 0 && (
-                          <Text style={[s.dowAvgLabel, { color: isWeekend ? accentColor + 'AA' : accentColor }]}>
-                            {d.avg >= 100 ? `${(d.avg / 1).toFixed(0)}` : d.avg.toFixed(0)}
-                          </Text>
-                        )}
-                        <View style={s.dowBar}>
-                          <View style={[s.dowFill, {
-                            height: Math.max(d.pct * 44, d.avg > 0 ? 4 : 0),
-                            backgroundColor: barColor,
-                            opacity: d.avg > 0 ? 1 : 0.1,
-                          }]} />
-                        </View>
-                        <Text style={[s.dowLabel, isWeekend && { color: accentColor + 'AA' }]}>{d.label}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            );
+            nodes['spend-by-day'] = weekdayAvg.some(d => d.avg > 0) &&
+              <SpendByDaySection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekdayAvg={weekdayAvg} />;
 
             nodes['work-hours'] = workMonthly && (workMonthly.currentHours > 0 || workMonthly.months.some(m => m.hours > 0)) && (() => {
               const wm = workMonthly;
