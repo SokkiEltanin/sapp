@@ -2936,7 +2936,8 @@ export default function DashboardScreen() {
     return rings;
   }, [healthDays, healthGoals, habits, habitsDoneIds, budgets, scopedExpenses, getTodayCount]);
 
-  const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
+  // krótki dzień tygodnia („pon.") — pełny + szeroki font LexendTera wyjeżdżał poza ekran
+  const dateLabel = new Date().toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'long' })
     .replace(/^\w/, c => c.toUpperCase());
 
   const humor = useMemo(() => humorLine(todayEntry?.mood), [todayEntry?.mood]);
@@ -5428,7 +5429,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   // ── Minimal header (date + weather) ───────────────────────────────────────
   headerMin: { paddingTop: spacing[1], marginBottom: spacing[4] },
   headerMinRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerMinDate: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.9, color: c.text.muted, textTransform: 'uppercase', flexShrink: 1 },
+  headerMinDate: { fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.4, color: c.text.muted, textTransform: 'uppercase', flexShrink: 1, marginRight: spacing[2] },
   headerMinWeather: { flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: spacing[2] },
   hdrIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border.subtle },
   headerMinTemp: { fontSize: 13, fontWeight: '800', color: c.text.primary },
