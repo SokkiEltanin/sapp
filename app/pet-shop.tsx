@@ -7,6 +7,7 @@ import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
+import StartupPreview from '@/components/pet/StartupPreview';
 import { usePetStore, loginBonusCoins } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
@@ -44,6 +45,7 @@ export default function PetShop() {
 
   const [cat, setCat] = useState<Cat>('colors');
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);   // żywy podgląd startupu (przed kupnem)
 
   // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
   // założenie posiadanego / darmowa skrzynka dnia nie pytają).
@@ -109,6 +111,7 @@ export default function PetShop() {
   // Startup (kosmetyk splasha): kup+ustaw, albo tylko ustaw jeśli już masz.
   const onStartup = (su: Startup) => {
     haptic.tap();
+    setPreviewStartupId(su.id);   // najpierw pokaż animację w górnym boksie (podgląd przed kupnem)
     const had = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
     if (had) { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`${su.name} — ustawione`); } return; }  // posiadane → tylko ustawiasz
     if (coins < su.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${su.cost}`); return; }
@@ -265,10 +268,17 @@ export default function PetShop() {
         {cat === 'startups' && (
           <View style={{ gap: spacing[2] }}>
             <Text style={s.blurbTop}>Zmieniają ekran ładowania apki. Zobaczysz przy następnym starcie.</Text>
-            <View style={[s.startupPreview, { backgroundColor: SPLASH_BG }]}>
-              <Text style={[s.startupPreviewMark, { color: startupById(equippedStartup).ink }]}>Sapp</Text>
-              <Text style={s.startupPreviewCap}>teraz: {startupById(equippedStartup).name} · {ANIM_LABEL[startupById(equippedStartup).anim]}</Text>
-            </View>
+            {(() => {
+              const shown = startupById(previewStartupId ?? equippedStartup);
+              const isPreview = !!previewStartupId && previewStartupId !== equippedStartup;
+              return (
+                <View style={{ gap: 5 }}>
+                  <StartupPreview startup={shown} height={92} fontSize={30} />
+                  <Text style={s.startupPreviewCap}>{isPreview ? 'podgląd' : 'teraz'}: {shown.name} · {ANIM_LABEL[shown.anim]}</Text>
+                  <Text style={s.startupPreviewHint}>Stuknij startup poniżej, aby zobaczyć jego animację tutaj</Text>
+                </View>
+              );
+            })()}
             {TIER_ORDER.map(tier => {
               const items = STARTUPS.filter(x => x.tier === tier);
               if (!items.length) return null;
@@ -380,7 +390,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // startupy (kosmetyki splasha)
   startupPreview: { alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: spacing[4], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default },
   startupPreviewMark: { fontSize: 30, fontWeight: '900', letterSpacing: 1 },
-  startupPreviewCap: { fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '600' },
+  startupPreviewCap: { fontSize: 11, color: c.text.secondary, fontWeight: '700', textAlign: 'center' },
+  startupPreviewHint: { fontSize: 10, color: c.text.muted, textAlign: 'center' },
   startupSwatch: { width: 74, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
   startupSwatchMark: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
   animTag: { fontSize: 9, color: c.text.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
