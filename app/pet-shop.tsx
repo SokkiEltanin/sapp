@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame } from 'lucide-react-native';
@@ -45,36 +45,51 @@ export default function PetShop() {
   const [cat, setCat] = useState<Cat>('colors');
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
 
+  // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
+  // założenie posiadanego / darmowa skrzynka dnia nie pytają).
+  const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup') => {
+    Alert.alert('Potwierdź zakup', `${name} — ${cost} monet`, [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: verb, onPress: onYes },
+    ]);
+  };
+
   const onBuyFreeze = () => {
     haptic.tap();
-    if (spendCoins(FREEZE_COST)) { addFreezes(1); haptic.success(); toast.success('Kupione: Zamrożenie serii ❄'); }
-    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${FREEZE_COST}`); }
+    if (coins < FREEZE_COST) { haptic.error(); toast.error(`Za mało monet — potrzeba ${FREEZE_COST}`); return; }
+    confirmBuy('Zamrożenie serii', FREEZE_COST, () => {
+      if (spendCoins(FREEZE_COST)) { addFreezes(1); haptic.success(); toast.success('Kupione: Zamrożenie serii ❄'); }
+    });
   };
 
   const onColor = (id: string, cost: number, name: string) => {
     haptic.tap();
     const had = ownedItems.includes(id) || cost === 0;
-    if (buyColor(id, cost)) { haptic.success(); toast.success(had ? `${name} — założone` : `Kupione: ${name}`); }
-    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); }
+    if (had) { if (buyColor(id, cost)) { haptic.success(); toast.success(`${name} — założone`); } return; }  // posiadane → tylko zakładasz
+    if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
+    confirmBuy(name, cost, () => { if (buyColor(id, cost)) { haptic.success(); toast.success(`Kupione: ${name}`); } });
   };
   const onStripes = () => {
     haptic.tap();
-    if (buyStripes(STRIPES.cost)) haptic.success();
-    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${STRIPES.cost}`); }
+    if (ownedItems.includes('stripes')) { buyStripes(STRIPES.cost); haptic.success(); return; }   // posiadane → tylko przełącz
+    if (coins < STRIPES.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${STRIPES.cost}`); return; }
+    confirmBuy(STRIPES.name, STRIPES.cost, () => { if (buyStripes(STRIPES.cost)) haptic.success(); });
   };
 
-  // Kup skrzynkę → wylosuj → przyznaj nagrodę → pokaż odsłonę.
+  // Kup skrzynkę → POTWIERDŹ → wylosuj → przyznaj nagrodę → pokaż odsłonę.
   const onBuyBox = (box: LootBox) => {
     haptic.tap();
     if (coins < box.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${box.cost}`); return; }
-    if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
-    const reward = rollBox(box, SHOP_COLORS, ownedItems);
-    if (reward.type === 'color') buyItem(reward.colorId, 0);
-    else if (reward.type === 'startup') grantStartup(reward.startupId);
-    else if (reward.type === 'coins') addCoins(reward.coins);
-    else if (reward.type === 'freeze') addFreezes(reward.count);
-    haptic.success();
-    setReveal({ box, reward });
+    confirmBuy(box.name, box.cost, () => {
+      if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
+      const reward = rollBox(box, SHOP_COLORS, ownedItems);
+      if (reward.type === 'color') buyItem(reward.colorId, 0);
+      else if (reward.type === 'startup') grantStartup(reward.startupId);
+      else if (reward.type === 'coins') addCoins(reward.coins);
+      else if (reward.type === 'freeze') addFreezes(reward.count);
+      haptic.success();
+      setReveal({ box, reward });
+    }, 'Otwórz');
   };
 
   // Darmowa skrzynka dnia — raz dziennie: losuj i przyznaj (jak w sklepowej gaczy).
@@ -95,8 +110,9 @@ export default function PetShop() {
   const onStartup = (su: Startup) => {
     haptic.tap();
     const had = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
-    if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(had ? `${su.name} — ustawione` : `Kupione: ${su.name}`); }
-    else { haptic.error(); toast.error(`Za mało monet — potrzeba ${su.cost}`); }
+    if (had) { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`${su.name} — ustawione`); } return; }  // posiadane → tylko ustawiasz
+    if (coins < su.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${su.cost}`); return; }
+    confirmBuy(su.name, su.cost, () => { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`Kupione: ${su.name}`); } });
   };
 
   const worn = paletteById(catColor);
