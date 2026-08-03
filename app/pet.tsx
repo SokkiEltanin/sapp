@@ -37,7 +37,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catTabby, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses } = usePetStore();
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   const [trophiesOpen, setTrophiesOpen] = useState(false);
@@ -280,7 +280,7 @@ export default function Pet() {
 
         {/* stage — no room backdrop any more; the cat IS the stage */}
         <View style={s.stage}>
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
+          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes} tabby={catTabby}
             onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
         </View>
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, View, StyleSheet, Text, Vibration } from 'react-native';
-import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask } from 'react-native-svg';
+import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask, Pattern } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
 import { CatPalette, DEFAULT_PALETTE, PUPIL } from '@/utils/catPalettes';
@@ -48,11 +48,11 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
-  palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
+  palette = DEFAULT_PALETTE, stripes = false, tabby = false, onAngry, lively = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
-  celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean;
+  celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean; tabby?: boolean;
   onAngry?: () => void;
   lively?: boolean;   // eager idle for the loading splash: glance + ear-flutter soon & often
 }) {
@@ -339,6 +339,12 @@ export default function CatArt({
 
             <Svg width={size} height={size} viewBox="0 0 2000 2000">
               <Defs>
+                {/* tabby — pręgi na sierści przez Pattern (jak działające paski ogona):
+                    additive fill NAD kolorem, więc animacji (transformy wrappera) nie rusza.
+                    Subtelne pasemka w markColor, lekko pod kątem = tekstura, nie „naklejka". */}
+                <Pattern id="coatTabby" patternUnits="userSpaceOnUse" width={130} height={130} patternTransform="rotate(10)">
+                  <Rect x={0} y={0} width={130} height={30} fill={p.mark} opacity={0.3} />
+                </Pattern>
                 {/* mask, don't paint — see the note at the top of this file */}
                 <Mask id="eyesFull">
                   <Rect x="0" y="0" width="2000" height="2000" fill="#fff" />
@@ -370,6 +376,8 @@ export default function CatArt({
               <G>
                 <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
                 <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
+                {tabby && <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill="url(#coatTabby)" /></G>}
+                {tabby && <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill="url(#coatTabby)" /></G>}
                 <G transform="matrix(1,0,0,1.860595,35.894072,-1501.867858)"><Path d="M1227.275,1647.023L606.308,1647.023C605.249,1636.462 604.719,1625.853 604.719,1615.237C604.719,1523.584 644.172,1436.465 712.809,1376.557L1120.774,1376.557C1189.411,1436.465 1228.864,1523.584 1228.864,1615.237C1228.864,1625.853 1228.334,1636.462 1227.275,1647.023Z" fill={p.shade} /></G>
                 {/* forelegs WITHOUT the original arch: the arch had to be covered by a
                     rect to raise a paw, and that rect bit a square notch out of it.
@@ -385,6 +393,7 @@ export default function CatArt({
                   flutter — animating them here inside the SVG would stutter */}
               <G>
                 <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>
+                {tabby && <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill="url(#coatTabby)" /></G>}
                 <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
 
                 {shut ? (

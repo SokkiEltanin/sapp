@@ -21,6 +21,7 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
+const TABBY_COST = 70;    // pręgi tabby na ciele
 
 const todayKey = () => {
   const d = new Date();
@@ -39,7 +40,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, buyColor, buyStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, catTabby, buyColor, buyStripes, buyTabby, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -76,6 +77,12 @@ export default function PetShop() {
     if (ownedItems.includes('stripes')) { buyStripes(STRIPES.cost); haptic.success(); return; }   // posiadane → tylko przełącz
     if (coins < STRIPES.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${STRIPES.cost}`); return; }
     confirmBuy(STRIPES.name, STRIPES.cost, () => { if (buyStripes(STRIPES.cost)) haptic.success(); });
+  };
+  const onTabby = () => {
+    haptic.tap();
+    if (ownedItems.includes('tabby')) { buyTabby(TABBY_COST); haptic.success(); return; }   // posiadane → tylko przełącz
+    if (coins < TABBY_COST) { haptic.error(); toast.error(`Za mało monet — potrzeba ${TABBY_COST}`); return; }
+    confirmBuy('Pręgi (tabby)', TABBY_COST, () => { if (buyTabby(TABBY_COST)) haptic.success(); });
   };
 
   // Kup skrzynkę → POTWIERDŹ → wylosuj → przyznaj nagrodę → pokaż odsłonę.
@@ -169,7 +176,7 @@ export default function PetShop() {
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.preview}>
-          <CatArt size={140} expression="happy" palette={worn} stripes={catStripes} animate={false} />
+          <CatArt size={140} expression="happy" palette={worn} stripes={catStripes} tabby={catTabby} animate={false} />
         </View>
 
         {/* PRZYPIĘTE: darmowa skrzynka dnia — główne nowe źródło monet */}
@@ -297,21 +304,39 @@ export default function PetShop() {
 
         {/* ── DODATKI ──────────────────────────────────────────────── */}
         {cat === 'extras' && (
-          <PressableScale onPress={onStripes}>
-            <View style={[s.boxRow, catStripes && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.cellName}>{STRIPES.name}</Text>
-                <Text style={s.cellState}>
-                  {ownedItems.includes('stripes')
-                    ? (catStripes ? '● włączone — stuknij, aby wyłączyć' : '○ wyłączone — stuknij, aby włączyć')
-                    : 'jedyny wzór, który przeszedł'}
-                </Text>
+          <View style={{ gap: spacing[2] }}>
+            <PressableScale onPress={onStripes}>
+              <View style={[s.boxRow, catStripes && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cellName}>{STRIPES.name}</Text>
+                  <Text style={s.cellState}>
+                    {ownedItems.includes('stripes')
+                      ? (catStripes ? '● włączone — stuknij, aby wyłączyć' : '○ wyłączone — stuknij, aby włączyć')
+                      : 'paski na ogonie'}
+                  </Text>
+                </View>
+                {ownedItems.includes('stripes')
+                  ? <Check size={18} color="#4DA8FF" />
+                  : <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{STRIPES.cost}</Text></View>}
               </View>
-              {ownedItems.includes('stripes')
-                ? <Check size={18} color="#4DA8FF" />
-                : <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{STRIPES.cost}</Text></View>}
-            </View>
-          </PressableScale>
+            </PressableScale>
+
+            <PressableScale onPress={onTabby}>
+              <View style={[s.boxRow, catTabby && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cellName}>Pręgi (tabby)</Text>
+                  <Text style={s.cellState}>
+                    {ownedItems.includes('tabby')
+                      ? (catTabby ? '● włączone — stuknij, aby wyłączyć' : '○ wyłączone — stuknij, aby włączyć')
+                      : 'pręgi na ciele i głowie — jak u prawdziwych kotów'}
+                  </Text>
+                </View>
+                {ownedItems.includes('tabby')
+                  ? <Check size={18} color="#4DA8FF" />
+                  : <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{TABBY_COST}</Text></View>}
+              </View>
+            </PressableScale>
+          </View>
         )}
 
         <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota.</Text>

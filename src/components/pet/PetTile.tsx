@@ -13,9 +13,10 @@ export default function PetTile({ name, pet, level, claimable = 0 }: { name: str
   // wear the coat you actually bought — the tile used to always show the default blue
   const catColor = usePetStore(s => s.catColor);
   const catStripes = usePetStore(s => s.catStripes);
+  const catTabby = usePetStore(s => s.catTabby);
   return (
     <View style={[st.card, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
-      <CatArt expression={pet.expression} size={70} animate={false} palette={paletteById(catColor)} stripes={catStripes} />
+      <CatArt expression={pet.expression} size={70} animate={false} palette={paletteById(catColor)} stripes={catStripes} tabby={catTabby} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>
           <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>
