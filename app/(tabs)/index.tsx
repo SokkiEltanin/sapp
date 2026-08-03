@@ -790,7 +790,7 @@ function DashEditRow({
 // JSX ~43 sekcji. Opakowanie ciężkich sekcji (wykresy) w React.memo + przekazanie
 // ZMEMOIZOWANYCH danych/tokenów jako propsów sprawia, że shallow-equal pomija ich render,
 // gdy zmiana ich nie dotyczy (np. odhaczenie nawyku nie przelicza wykresu słodyczy).
-type WeekOv = { food: number; sweets: number; dates: string[]; isCurrent: boolean };
+type WeekOv = { food: number; sweets: number; avgMood?: number | null; dates: string[]; isCurrent: boolean };
 
 const SweetsVsFoodSection = React.memo(function SweetsVsFoodSection(
   { s, cardBg, accentColor, colors, weekOverview }:
@@ -1066,6 +1066,34 @@ const SavingsSection = React.memo(function SavingsSection(
             </View>
           </>
         )}
+      </View>
+    </View>
+  );
+});
+
+const MoodWaveSection = React.memo(function MoodWaveSection(
+  { s, cardBg, accentColor, colors, weekOverview }:
+  { s: any; cardBg: string; accentColor: string; colors: any; weekOverview: WeekOv[] },
+) {
+  const cur = weekOverview.find(w => w.isCurrent);
+  return (
+    <View style={[s.card, { backgroundColor: cardBg }]}>
+      <View style={s.cardHeader}>
+        <Smile size={13} color={colors.text.muted} />
+        <Text style={s.cardTitle}>Nastrój — 8 tygodni</Text>
+        {cur?.avgMood != null && (
+          <View style={[s.avgPill, { backgroundColor: moodColor(cur.avgMood) + '25' }]}>
+            <Text style={[s.avgPillText, { color: moodColor(cur.avgMood) }]}>{cur.avgMood.toFixed(1)}</Text>
+          </View>
+        )}
+      </View>
+      <WaveChart data={weekOverview.map(w => w.avgMood ?? 0)} color={accentColor} dotColors={weekOverview.map(w => w.avgMood ? moodColor(w.avgMood) : null)} />
+      <View style={s.waveLabels}>
+        {weekOverview.map((w, i) => (
+          <Text key={i} style={[s.waveLabel, w.isCurrent && { color: accentColor, fontWeight: '700' }]}>
+            {weekLabel(w.dates).split(' ')[0]}
+          </Text>
+        ))}
       </View>
     </View>
   );
@@ -4439,33 +4467,8 @@ export default function DashboardScreen() {
               );
             })();
 
-            nodes['mood-wave'] = weekOverview.filter(w => w.avgMood !== null).length >= 3 && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Smile size={13} color={colors.text.muted} />
-                  <Text style={s.cardTitle}>Nastrój — 8 tygodni</Text>
-                  {weekOverview.find(w => w.isCurrent)?.avgMood != null && (
-                    <View style={[s.avgPill, { backgroundColor: moodColor(weekOverview.find(w => w.isCurrent)!.avgMood!) + '25' }]}>
-                      <Text style={[s.avgPillText, { color: moodColor(weekOverview.find(w => w.isCurrent)!.avgMood!) }]}>
-                        {weekOverview.find(w => w.isCurrent)!.avgMood!.toFixed(1)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <WaveChart
-                  data={weekOverview.map(w => w.avgMood ?? 0)}
-                  color={accentColor}
-                  dotColors={weekOverview.map(w => w.avgMood ? moodColor(w.avgMood) : null)}
-                />
-                <View style={s.waveLabels}>
-                  {weekOverview.map((w, i) => (
-                    <Text key={i} style={[s.waveLabel, w.isCurrent && { color: accentColor, fontWeight: '700' }]}>
-                      {weekLabel(w.dates).split(' ')[0]}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-            );
+            nodes['mood-wave'] = weekOverview.filter(w => w.avgMood !== null).length >= 3 &&
+              <MoodWaveSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekOverview={weekOverview} />;
 
             nodes['month-tasks'] = (() => {
               const now = new Date();
