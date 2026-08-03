@@ -409,6 +409,8 @@ export default function RootLayout() {
         router.navigate('/month-cards' as any);
       } else if (screen === 'pet') {
         router.navigate('/pet' as any);           // pupil nudge (skrzynka dnia / nagrody / tęskni)
+      } else if (screen === 'bosses') {
+        router.navigate('/bosses' as any);        // „Boss czeka" nudge
       } else {
         // Never leave a tap dead — fall back to the dashboard.
         router.navigate('/(tabs)/' as any);

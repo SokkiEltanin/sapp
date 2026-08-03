@@ -317,6 +317,23 @@ export const notificationsService = {
     } catch {}
   },
 
+  // Boss nudge: wieczorem, TYLKO gdy jest bijalny boss (odblokowany poziomem, nie pokonany,
+  // ma HP) i masz zbankowaną energię — inaczej cisza (nie spamuje). Aktywuje Etap 4.
+  async refreshBossReminder(opts: { fightable: boolean; energy: number }): Promise<void> {
+    try {
+      await Notifications.cancelScheduledNotificationAsync('boss-ready').catch(() => {});
+      if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+      if (!opts.fightable || opts.energy < 80) return;
+      const hour = parseInt((await AsyncStorage.getItem('notif_boss_hour')) ?? '18') || 18;
+      const min = parseInt((await AsyncStorage.getItem('notif_boss_min')) ?? '30') || 30;
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'boss-ready',
+        content: { title: 'Boss czeka na łomot', body: `Masz ${opts.energy} energii z dbania o siebie — uderz, zanim boss zregeneruje HP.`, data: { screen: 'bosses' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: nextFireDate(hour, min, false) },
+      });
+    } catch {}
+  },
+
   async scheduleDailyTaskBriefing(
     hour = 8, minute = 0,
     context?: { taskCount?: number; eventCount?: number; habitCount?: number },

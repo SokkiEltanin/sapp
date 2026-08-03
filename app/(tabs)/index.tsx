@@ -68,6 +68,7 @@ import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import { stepsToDistanceFact } from '@/utils/funComparisons';
 import { buildRecords } from '@/utils/personalRecords';
+import { BOSSES } from '@/utils/bosses';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
@@ -2686,6 +2687,9 @@ export default function DashboardScreen() {
   const dailyBoxReady = !petDayClaims[`dailybox:${todayISO()}`];   // free daily chest waiting?
   const petAffection = usePetStore(st => st.affection);
   const petAffectionDay = usePetStore(st => st.affectionDay);
+  const petEnergy = usePetStore(st => st.energy);
+  const petDefeated = usePetStore(st => st.defeatedBosses);
+  const petBossHp = usePetStore(st => st.bossHp);
   const petHydrated = usePetStore(st => st._hydrated);
   const registerLogin = usePetStore(st => st.registerLogin);
   const loginRan = useRef(false);
@@ -2743,6 +2747,13 @@ export default function DashboardScreen() {
       .then(({ notificationsService }) => notificationsService.refreshPetReminder({ dailyBoxReady, claimable: petClaimable, affectionLow }))
       .catch(() => {});
   }, [dailyBoxReady, petClaimable, petAffection, petAffectionDay]);
+  // „Boss czeka" — gdy jest bijalny boss (odblokowany poziomem, nie pokonany, ma HP) + energia.
+  useEffect(() => {
+    const fightable = BOSSES.some(b => petLevel >= b.unlockLevel && !(petDefeated ?? []).includes(b.id) && (petBossHp?.[b.id] ?? b.hp) > 0);
+    import('@/services/notificationsService')
+      .then(({ notificationsService }) => notificationsService.refreshBossReminder({ fightable, energy: petEnergy }))
+      .catch(() => {});
+  }, [petLevel, petDefeated, petBossHp, petEnergy]);
   // Passive daily care XP (once/day), scaled by how well you're doing.
   const petTicked = useRef(false);
   useEffect(() => {
