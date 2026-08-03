@@ -176,7 +176,10 @@ export default function PetShop() {
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.preview}>
-          <CatArt size={140} expression="happy" palette={worn} stripes={catStripes} tabby={catTabby} animate={false} />
+          {/* żywy podgląd — animowany + klikalny, żeby na miejscu potwierdzić, że pręgi
+              nie psują ruchu (oddech / mruganie / uszy / machnięcie łapą) */}
+          <CatArt size={150} expression="happy" palette={worn} stripes={catStripes} tabby={catTabby} affection={60} />
+          <Text style={s.previewCap}>{catTabby ? 'pręgi WŁ · dotknij kota' : 'dotknij kota — podgląd na żywo'}</Text>
         </View>
 
         {/* PRZYPIĘTE: darmowa skrzynka dnia — główne nowe źródło monet */}
@@ -361,7 +364,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   coinPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#FBBF2440' },
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[1] },
-  preview: { alignItems: 'center', paddingVertical: spacing[2] },
+  preview: { alignItems: 'center', paddingVertical: spacing[2], gap: 4 },
+  previewCap: { fontSize: 10.5, color: c.text.muted, fontWeight: '700' },
 
   // przypięty freeze
   freezeHero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#7DD3FC44', backgroundColor: '#7DD3FC12' },

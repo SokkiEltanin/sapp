@@ -21,6 +21,14 @@ import CatTail from '@/components/pet/CatTail';
 
 const LX = 794, RX = 1107, EYY = 762;
 
+// tabby (pręgi „makrelowe") — powtarzalne CIENKIE paski pod lekkim kątem, jak u prawdziwych
+// kotów. Wszystkie liczby w JEDNYM miejscu, bo renderu SVG nie mam — stroimy tu po oku.
+// TERAZ mocniej/gęściej (do testu, żeby było wyraźnie widać); potem zejdziemy z opacity+gęstością.
+//   tile  = rozmiar kafla wzoru (mniejszy = gęstsze paski)
+//   angle = kąt nachylenia pasków (deg)
+//   sNH   = grubość paska N, sNy = jego pozycja w kaflu, sNo = krycie (0–1)
+const TABBY = { tile: 78, angle: 12, s1y: 0, s1H: 16, s1o: 0.42, s2y: 40, s2H: 11, s2o: 0.34 };
+
 // cheek shapes — used ONLY as mask geometry, never painted
 const CHEEK_L = 'M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z';
 
@@ -342,8 +350,9 @@ export default function CatArt({
                 {/* tabby — pręgi na sierści przez Pattern (jak działające paski ogona):
                     additive fill NAD kolorem, więc animacji (transformy wrappera) nie rusza.
                     Subtelne pasemka w markColor, lekko pod kątem = tekstura, nie „naklejka". */}
-                <Pattern id="coatTabby" patternUnits="userSpaceOnUse" width={130} height={130} patternTransform="rotate(10)">
-                  <Rect x={0} y={0} width={130} height={30} fill={p.mark} opacity={0.3} />
+                <Pattern id="coatTabby" patternUnits="userSpaceOnUse" width={TABBY.tile} height={TABBY.tile} patternTransform={`rotate(${TABBY.angle})`}>
+                  <Rect x={0} y={TABBY.s1y} width={TABBY.tile} height={TABBY.s1H} fill={p.mark} opacity={TABBY.s1o} />
+                  <Rect x={0} y={TABBY.s2y} width={TABBY.tile} height={TABBY.s2H} fill={p.mark} opacity={TABBY.s2o} />
                 </Pattern>
                 {/* mask, don't paint — see the note at the top of this file */}
                 <Mask id="eyesFull">

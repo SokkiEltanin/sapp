@@ -18,6 +18,7 @@ import { getPayers } from '@/utils/payers';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
 import { ExpenseTemplate, ExpenseCategory, IncomeCategory, TransactionType } from '@/types';
 import { toast } from '@/store/toastStore';
+import { localISO } from '@/utils/date';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -57,7 +58,7 @@ export default function TemplatesScreen() {
         category: tmpl.category,
         tags: tmpl.tags ?? [],
         note: tmpl.note ?? '',
-        date: new Date().toISOString(),
+        date: localISO(),   // LOKALNY dzień — nie UTC (po północy wpadało na wczoraj)
         payer: defaultPayer || undefined,
       });
       addExpense(exp);

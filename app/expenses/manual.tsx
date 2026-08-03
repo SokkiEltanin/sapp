@@ -20,6 +20,7 @@ import { getBudgets } from '@/utils/budgets';
 import { getFoodTags, categorize } from '@/utils/receiptParser';
 import { getPayers, addPayer } from '@/utils/payers';
 import { toast } from '@/store/toastStore';
+import { localISO } from '@/utils/date';
 import { Expense, ExpenseCategory, ReceiptItem, PaymentMethod } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -451,7 +452,7 @@ export default function ManualReceiptScreen() {
     setSaving(true);
     beginScanSave(attachToId ? 'attach-manual' : 'manual');   // freeze breadcrumb → launch popup
     try {
-      let dateParsed = new Date().toISOString();
+      let dateParsed = localISO();   // LOKALNY dzień+czas — nie UTC (po północy wpadało na wczoraj)
       if (dateInput) {
         const parts = dateInput.split('-').map(Number);
         if (parts.length === 3) {

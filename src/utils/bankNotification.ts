@@ -6,6 +6,8 @@
 //   "Zapłacono kwotę 10,18 PLN karta *8743 dnia 03-07-2026 godz. 06:37:30
 //    w LIDL HETMANSKA LIDL HETMANSKA Rzeszow POL. Bank Pekao S.A."
 
+import { localISO } from '@/utils/date';
+
 export interface ParsedBankTx {
   amount: number;        // 10.18
   currency: string;      // 'PLN' | 'EUR' | 'USD' … (foreign-card payments abroad)
@@ -50,8 +52,9 @@ export function parseBankNotification(title: string, text: string): ParsedBankTx
   if (!inTrig && !outTrig) return null;
   const direction: 'in' | 'out' = (inTrig && !paidOut) ? 'in' : 'out';
 
-  // Date + time: "dnia 03-07-2026 godz. 06:37:30" (fallback: now)
-  let dateISO = new Date().toISOString().slice(0, 19);
+  // Date + time: "dnia 03-07-2026 godz. 06:37:30" (fallback: now, LOCAL not UTC —
+  // a BLIK push with no date at 00:30 must not land on yesterday)
+  let dateISO = localISO();
   const dtM = body.match(/(\d{2})-(\d{2})-(\d{4}).*?(\d{2}):(\d{2})(?::(\d{2}))?/);
   if (dtM) {
     const [, dd, mm, yyyy, hh, mi, ss] = dtM;

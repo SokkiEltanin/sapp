@@ -18,7 +18,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { ExpenseCategory, IncomeCategory, TransactionType, PaymentMethod, Vehicle } from '@/types';
 import { vehiclesService } from '@/services/vehiclesService';
 import { CATEGORY_META, INCOME_CATEGORY_META } from '@/utils/categories';
-import { monthISO } from '@/utils/date';
+import { monthISO, localISO } from '@/utils/date';
 import { expensesService } from '@/services/expensesService';
 import { templatesService } from '@/services/templatesService';
 import { workService } from '@/services/workService';
@@ -216,7 +216,7 @@ export default function AddExpenseModal() {
     }
     setSaving(true);
     try {
-      let dateParsed = new Date().toISOString();
+      let dateParsed = localISO();   // LOKALNY dzień+czas — nie UTC (inaczej po północy wpada na wczoraj)
       if (dateInput) {
         const parts = dateInput.split('-').map(Number);
         if (parts.length === 3) {

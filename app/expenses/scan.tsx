@@ -12,6 +12,7 @@ import DatePickerField from '@/components/ui/DatePickerField';
 import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/utils/receiptParser';
 import { sameLocalDay } from '@/utils/bankNotification';
 import { toast } from '@/store/toastStore';
+import { localISO } from '@/utils/date';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useFoodStore } from '@/store/foodStore';
@@ -334,7 +335,7 @@ export default function ScanReceiptModal() {
     // force-close leaves this marker and the next launch reports the frozen step.
     beginScanSave(attachToId ? 'attach' : 'new');
     try {
-      let dateParsed = new Date().toISOString();
+      let dateParsed = localISO();   // LOKALNY dzień+czas — nie UTC (po północy wpadało na wczoraj)
       if (dateInput) {
         const parts = dateInput.split('-').map(Number);
         if (parts.length === 3) {
