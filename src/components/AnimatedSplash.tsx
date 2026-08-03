@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Ellipse } from 'react-native-svg';
 import { usePetStore } from '@/store/petStore';
 import { startupById, SPLASH_BG, SplashAnim } from '@/utils/petStartups';
+import { paletteById } from '@/utils/catPalettes';
+import CatArt from '@/components/pet/CatArt';
 
 // Loading screen — lag-proof by design: everything runs on the native driver (opacity +
 // transforms), so it never touches the JS thread while the stores hydrate behind it. Pure
@@ -130,37 +133,87 @@ function SweepMark({ ink, glow }: { ink: string; glow?: boolean }) {
   );
 }
 
-// ── CAT EYES: two feline eyes ignite in the dark, then glow-pulse. ──
+// ── RING: a clean rotating loader ring (NOT text — a proper spinner). ──
+function RingMark({ ink, glow }: { ink: string; glow?: boolean }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(v, { toValue: 1, duration: 1100, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  const rot = v.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return (
+    <View style={styles.ringCol}>
+      <Animated.View
+        style={[styles.ring, { borderColor: ink + '22', borderTopColor: ink, transform: [{ rotate: rot }] },
+          glow ? { shadowColor: ink, shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 7 } : null]}
+        pointerEvents="none"
+      />
+      <Text style={[styles.markSmall, { color: ink }, glowFor(glow, ink)]}>Sapp</Text>
+    </View>
+  );
+}
+
+// One feline eye: an almond outline with a glowing iris and a vertical slit pupil. SVG so
+// it actually reads as a cat's eye (the old version was a rounded rectangle). Static shape —
+// the ignite/pulse animates the wrapper (native driver), never the SVG props.
+function CatEyeSvg({ ink }: { ink: string }) {
+  return (
+    <Svg width={58} height={40} viewBox="0 0 58 40">
+      <Path d="M2 20 Q29 1 56 20 Q29 39 2 20 Z" fill={ink + '22'} stroke={ink} strokeWidth={2.4} strokeLinejoin="round" />
+      <Ellipse cx={29} cy={20} rx={12} ry={15} fill={ink} opacity={0.85} />
+      <Ellipse cx={29} cy={20} rx={3.2} ry={13} fill="#000" />
+      <Ellipse cx={24} cy={13} rx={3} ry={4} fill="#fff" opacity={0.5} />
+    </Svg>
+  );
+}
+
+// ── CAT EYES: two real feline eyes ignite in the dark (scaleY = slowly opening), then
+// glow-pulse. Wrapper-only transforms → native driver. ──
 function CatEyesMark({ ink, glow }: { ink: string; glow?: boolean }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(v, { toValue: 1, duration: 850, easing: Easing.out(Easing.cubic), useNativeDriver: true }),   // ignite
+      Animated.timing(v, { toValue: 1, duration: 850, easing: Easing.out(Easing.cubic), useNativeDriver: true }),   // ignite (eyes open)
       Animated.timing(v, { toValue: 0.62, duration: 950, easing: Easing.inOut(Easing.sin), useNativeDriver: true }), // glow-pulse
     ]));
     loop.start();
     return () => loop.stop();
   }, [v]);
-  const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] });
-  const scale = v.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
+  const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [0.18, 1] });
+  const scaleY = v.interpolate({ inputRange: [0, 1], outputRange: [0.12, 1] });   // lids open as they light up
   const eyeStyle = (rot: string) => [
-    styles.eye,
-    { borderColor: ink, backgroundColor: ink + '26', opacity, transform: [{ scale }, { rotate: rot }] },
-    glow ? { shadowColor: ink, shadowOpacity: 0.9, shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 8 } : null,
+    { opacity, transform: [{ rotate: rot }, { scaleY }] },
+    glow ? { shadowColor: ink, shadowOpacity: 0.9, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 8 } : null,
   ];
   return (
     <View style={styles.eyesCol}>
       <View style={styles.eyesRow}>
-        <Animated.View style={eyeStyle('-10deg')}><View style={[styles.slit, { backgroundColor: '#000' }]} /></Animated.View>
-        <Animated.View style={eyeStyle('10deg')}><View style={[styles.slit, { backgroundColor: '#000' }]} /></Animated.View>
+        <Animated.View style={eyeStyle('-8deg')}><CatEyeSvg ink={ink} /></Animated.View>
+        <Animated.View style={eyeStyle('8deg')}><CatEyeSvg ink={ink} /></Animated.View>
       </View>
       <Animated.Text style={[styles.eyesBrand, { color: ink, opacity }]}>Sapp</Animated.Text>
     </View>
   );
 }
 
+// ── CAT: the actual companion greets you — wearing the coat/stripes/tabby you bought.
+// Uses CatArt's purpose-built `lively` idle. Only mounts once the wallet is hydrated (you
+// must already own+equip it), so its JS timers never compete with cold-start hydration. ──
+function CatMark({ glow }: { ink: string; glow?: boolean }) {
+  const catColor = usePetStore(s => s.catColor);
+  const catStripes = usePetStore(s => s.catStripes);
+  const catTabby = usePetStore(s => s.catTabby);
+  return (
+    <View style={styles.catCol}>
+      <CatArt size={156} expression="happy" animate lively palette={paletteById(catColor)} stripes={catStripes} tabby={catTabby} />
+      <Text style={[styles.markSmall, { color: '#F2F3F3' }, glowFor(glow, '#F2F3F3')]}>Sapp</Text>
+    </View>
+  );
+}
+
 const MARKS: Record<SplashAnim, typeof WaveMark> = {
-  bar: BarMark, wave: WaveMark, pulse: PulseMark, sweep: SweepMark, cateyes: CatEyesMark,
+  bar: BarMark, wave: WaveMark, pulse: PulseMark, sweep: SweepMark, ring: RingMark, cateyes: CatEyesMark, cat: CatMark,
 };
 
 export default function AnimatedSplash({ visible, onHidden }: { visible: boolean; onHidden: () => void }) {
@@ -202,10 +255,15 @@ const styles = StyleSheet.create({
   underlineBase: { position: 'absolute', left: 0, right: 0, top: 0, height: 2, borderRadius: 1 },
   underlineHi: { position: 'absolute', top: 0, left: 0 },
 
+  // ring (orbita)
+  ringCol: { alignItems: 'center', gap: 20 },
+  ring: { width: 64, height: 64, borderRadius: 32, borderWidth: 5 },
+
   // cat eyes
   eyesCol: { alignItems: 'center', gap: 20 },
   eyesRow: { flexDirection: 'row', gap: 28 },
-  eye: { width: 50, height: 30, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  slit: { width: 4, height: 22, borderRadius: 2 },
   eyesBrand: { fontSize: 22, fontWeight: '900', letterSpacing: 2 },
+
+  // twój kot
+  catCol: { alignItems: 'center', gap: 8 },
 });

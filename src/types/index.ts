@@ -151,11 +151,14 @@ export interface Subscription {
   updatedAt: string;
 }
 
-// Money someone owes me (a loan/IOU). On `askDate` the dashboard asks whether it
-// was returned; confirming logs an income (cash/card) and settles it.
+// An IOU in EITHER direction. On `askDate` the dashboard asks whether it was returned.
+// Settling by CASH logs the money move (income if they owe me, expense if I owe them);
+// settling by CARD/transfer logs NOTHING — the bank push will catch that transaction on
+// its own, so creating an entry here would double-count it.
 export interface Debt {
   id: string;
-  person: string;          // who owes me
+  person: string;          // the other person
+  kind?: 'theyOwe' | 'iOwe'; // theyOwe = they owe ME (default, back-compat) · iOwe = I owe THEM
   amount: number;
   currency: string;        // PLN
   askDate: string;         // YYYY-MM-DD — when to start asking "did they return it?"

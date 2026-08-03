@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Ellipse } from 'react-native-svg';
 import { Startup, SPLASH_BG } from '@/utils/petStartups';
+import { usePetStore } from '@/store/petStore';
+import { paletteById } from '@/utils/catPalettes';
+import CatArt from '@/components/pet/CatArt';
 
 // Kompaktowy, ŻYWY podgląd animacji startupu (do sklepu pupila). Te same 5 rodzajów co
 // AnimatedSplash (bar/wave/pulse/sweep/cateyes), ale w małym boksie i skalowane fontSize.
@@ -101,6 +105,35 @@ function SweepMark({ ink, glow, fs, w }: { ink: string; glow?: boolean; fs: numb
   );
 }
 
+function RingMark({ ink, glow, fs }: { ink: string; glow?: boolean; fs: number }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(v, { toValue: 1, duration: 1050, easing: Easing.linear, useNativeDriver: true }));
+    loop.start(); return () => loop.stop();
+  }, [v]);
+  const rot = v.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const d = Math.round(fs * 1.7), bw = Math.max(3, Math.round(fs * 0.14));
+  return (
+    <View style={{ alignItems: 'center', gap: 8 }}>
+      <Animated.View style={[{ width: d, height: d, borderRadius: d / 2, borderWidth: bw, borderColor: ink + '22', borderTopColor: ink, transform: [{ rotate: rot }] },
+        glow ? { shadowColor: ink, shadowOpacity: 0.8, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 5 } : null]} />
+      <Text style={[{ fontSize: Math.round(fs * 0.62), fontWeight: '900', letterSpacing: 1, color: ink }, glowFor(glow, ink)]}>Sapp</Text>
+    </View>
+  );
+}
+
+function CatEyeSvg({ ink, fs }: { ink: string; fs: number }) {
+  const w = Math.round(fs * 1.9), h = Math.round(fs * 1.3);
+  return (
+    <Svg width={w} height={h} viewBox="0 0 58 40">
+      <Path d="M2 20 Q29 1 56 20 Q29 39 2 20 Z" fill={ink + '22'} stroke={ink} strokeWidth={2.4} strokeLinejoin="round" />
+      <Ellipse cx={29} cy={20} rx={12} ry={15} fill={ink} opacity={0.85} />
+      <Ellipse cx={29} cy={20} rx={3.2} ry={13} fill="#000" />
+      <Ellipse cx={24} cy={13} rx={3} ry={4} fill="#fff" opacity={0.5} />
+    </Svg>
+  );
+}
+
 function CatEyesMark({ ink, glow, fs }: { ink: string; glow?: boolean; fs: number }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -110,23 +143,28 @@ function CatEyesMark({ ink, glow, fs }: { ink: string; glow?: boolean; fs: numbe
     ]));
     loop.start(); return () => loop.stop();
   }, [v]);
-  const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] });
-  const scale = v.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
-  const ew = Math.round(fs * 1.5), eh = Math.round(fs * 0.9);
+  const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [0.18, 1] });
+  const scaleY = v.interpolate({ inputRange: [0, 1], outputRange: [0.12, 1] });
   const eye = (rot: string) => [
-    { width: ew, height: eh, borderRadius: eh * 0.55, borderWidth: 1.6, borderColor: ink, backgroundColor: ink + '26',
-      alignItems: 'center' as const, justifyContent: 'center' as const, opacity, transform: [{ scale }, { rotate: rot }] },
+    { opacity, transform: [{ rotate: rot }, { scaleY }] },
     glow ? { shadowColor: ink, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 } : null,
   ];
   return (
     <View style={{ alignItems: 'center', gap: 6 }}>
-      <View style={{ flexDirection: 'row', gap: Math.round(fs * 0.8) }}>
-        <Animated.View style={eye('-10deg')}><View style={{ width: 2.5, height: eh * 0.7, borderRadius: 2, backgroundColor: '#000' }} /></Animated.View>
-        <Animated.View style={eye('10deg')}><View style={{ width: 2.5, height: eh * 0.7, borderRadius: 2, backgroundColor: '#000' }} /></Animated.View>
+      <View style={{ flexDirection: 'row', gap: Math.round(fs * 0.7) }}>
+        <Animated.View style={eye('-8deg')}><CatEyeSvg ink={ink} fs={fs} /></Animated.View>
+        <Animated.View style={eye('8deg')}><CatEyeSvg ink={ink} fs={fs} /></Animated.View>
       </View>
-      <Animated.Text style={{ fontSize: Math.round(fs * 0.7), fontWeight: '900', letterSpacing: 1, color: ink, opacity }}>Sapp</Animated.Text>
+      <Animated.Text style={{ fontSize: Math.round(fs * 0.62), fontWeight: '900', letterSpacing: 1, color: ink, opacity }}>Sapp</Animated.Text>
     </View>
   );
+}
+
+function CatMark({ height }: { height: number }) {
+  const catColor = usePetStore(s => s.catColor);
+  const catStripes = usePetStore(s => s.catStripes);
+  const catTabby = usePetStore(s => s.catTabby);
+  return <CatArt size={Math.round(height * 0.92)} expression="happy" animate lively palette={paletteById(catColor)} stripes={catStripes} tabby={catTabby} />;
 }
 
 export default function StartupPreview({ startup, height = 88, fontSize = 30 }: { startup: Startup; height?: number; fontSize?: number }) {
@@ -138,6 +176,8 @@ export default function StartupPreview({ startup, height = 88, fontSize = 30 }: 
         : anim === 'wave' ? <WaveMark ink={ink} glow={glow} fs={fontSize} />
         : anim === 'pulse' ? <PulseMark ink={ink} glow={glow} fs={fontSize} />
         : anim === 'sweep' ? <SweepMark ink={ink} glow={glow} fs={fontSize} w={w} />
+        : anim === 'ring' ? <RingMark ink={ink} glow={glow} fs={fontSize} />
+        : anim === 'cat' ? <CatMark height={height} />
         : <CatEyesMark ink={ink} glow={glow} fs={fontSize} />}
     </View>
   );

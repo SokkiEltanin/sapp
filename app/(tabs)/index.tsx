@@ -40,7 +40,7 @@ import {
 } from '@/types';
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
-import { todayISO, ymd } from '@/utils/date';
+import { todayISO, ymd, localISO } from '@/utils/date';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -1588,18 +1588,24 @@ export default function DashboardScreen() {
     return debts.find(d => !d.settled && d.askDate <= t && !debtDismissed.has(d.id)) ?? null;
   }, [debts, debtDismissed]);
 
+  // TYLKO gotówka tworzy wpis (przychód gdy ktoś oddaje mnie, wydatek gdy ja oddaję).
+  // Karta/przelew NIE tworzy nic — złapie powiadomienie z banku (bez podwójnego liczenia).
   const settleDebt = useCallback(async (d: Debt, method: PaymentMethod) => {
     haptic.success();
     try {
-      const todayS = todayISO();
-      await expensesService.add({
-        type: 'income', amount: d.amount, currency: 'PLN', category: 'transfer' as any,
-        tags: [], note: `Zwrot: ${d.person}`, date: todayS, paymentMethod: method,
-      });
-      await debtsService.update(d.id, { settled: true, settledMethod: method, settledDate: todayS });
+      const iOwe = (d.kind ?? 'theyOwe') === 'iOwe';
+      if (method === 'cash') {
+        await expensesService.add({
+          type: iOwe ? 'expense' : 'income', amount: d.amount, currency: 'PLN', category: 'transfer' as any,
+          tags: [], note: iOwe ? `Oddałem: ${d.person}` : `Zwrot: ${d.person}`, date: localISO(), paymentMethod: 'cash',
+        });
+        expensesService.getAll().then(setExpenses).catch(() => {});
+      }
+      await debtsService.update(d.id, { settled: true, settledMethod: method, settledDate: todayISO() });
       setDebts(prev => prev.map(x => x.id === d.id ? { ...x, settled: true } : x));
-      expensesService.getAll().then(setExpenses).catch(() => {});
-      toast.success(`Zwrot dodany (${method === 'cash' ? 'gotówka' : 'karta'})`);
+      toast.success(method === 'cash'
+        ? (iOwe ? 'Rozliczono — dodano do wydatków' : 'Rozliczono — dodano do przychodów')
+        : 'Rozliczono — kartę/przelew złapie bank');
     } catch { haptic.error(); toast.error('Nie udało się zapisać — sprawdź połączenie'); }
   }, [setExpenses]);
 
@@ -3569,7 +3575,11 @@ export default function DashboardScreen() {
                     <Wallet size={13} color={colors.accent.amber} />
                     <Text style={s.cardTitle}>Dług</Text>
                   </View>
-                  <Text style={[s.factText, { marginTop: spacing[1] }]}>Czy {dueDebt.person} oddał Ci {dueDebt.amount.toFixed(2)} zł?</Text>
+                  <Text style={[s.factText, { marginTop: spacing[1] }]}>
+                    {(dueDebt.kind ?? 'theyOwe') === 'iOwe'
+                      ? `Czy oddałeś ${dueDebt.person} ${dueDebt.amount.toFixed(2)} zł?`
+                      : `Czy ${dueDebt.person} oddał Ci ${dueDebt.amount.toFixed(2)} zł?`}
+                  </Text>
                   <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[3] }}>
                     <TouchableOpacity style={[s.paydayBtn, { backgroundColor: colors.accent.green }]} activeOpacity={0.85}
                       onPress={() => settleDebt(dueDebt, 'cash')}>
