@@ -97,7 +97,9 @@ export default function FoodAdd() {
   const [items, setItems]       = useState<MealItem[]>([]);
   const [note, setNote]         = useState('');
   const [query, setQuery]       = useState('');
-  const [browseTab, setBrowseTab] = useState<'dishes' | 'products' | 'recent'>('dishes');   // przeglądanie: jedno naraz
+  // drill-down: null = ekran startowy (Na oko + Ulubione + kafle kategorii); string = wybrana
+  // kategoria (tag z PRESET_CATS / '_fav' / '_products' / '_recent'). Mniej na raz.
+  const [browseCat, setBrowseCat] = useState<string | null>(null);
 
   // Editing an existing meal → prefill from the store (once).
   useEffect(() => {
@@ -238,6 +240,17 @@ export default function FoodAdd() {
     }
     return out.sort(byRank);
   }, [libEntries, query]);
+
+  // ── drill-down helpers: kafle kategorii = niepuste kategorie biblioteki (bez Ulubionych,
+  // te są osobnym przyciskiem u góry). '_products'/'_recent' to kafle specjalne.
+  const categoryTiles = useMemo(
+    () => librarySections.filter(sec => sec.tag !== '_fav').map(sec => ({ tag: sec.tag, label: sec.label, count: sec.items.length })),
+    [librarySections],
+  );
+  const catLabelFor = (tag: string) =>
+    tag === '_products' ? 'Produkty' : tag === '_recent' ? 'Ostatnie' : tag === '_fav' ? 'Ulubione'
+      : (librarySections.find(sec => sec.tag === tag)?.label ?? tag);
+  const catEntries = (tag: string): LibEntry[] => librarySections.find(sec => sec.tag === tag)?.items ?? [];
 
   const applyPreset = () => {
     if (!applying) return;
@@ -539,18 +552,7 @@ export default function FoodAdd() {
           <DatePickerField value={mealDate} onChange={setMealDate} style={s.datePicker} />
         </View>
 
-        {/* meal type */}
-        <View style={s.typeRow}>
-          {MEAL_TYPES.map(mt => {
-            const on = mealType === mt.id;
-            return (
-              <TouchableOpacity key={mt.id} onPress={() => { haptic.tap(); setMealType(mt.id); }}
-                style={[s.typeChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
-                <Text style={[s.typeTxt, on && { color: ACCENT }]}>{mt.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {/* Typ posiłku (śniadanie/obiad…) usunięty z flow — zapisuje się „ogólnie" (auto wg pory). */}
 
         {/* added items — TWÓJ POSIŁEK: rozróżnienie DANIE / ZŁOŻENIE / PRODUKT */}
         {items.length > 0 && (
@@ -635,46 +637,15 @@ export default function FoodAdd() {
               );
             })()}
           </>
-        ) : (
-          /* ── PRZEGLĄDANIE: segmenty (jedno naraz) ── */
+        ) : browseCat ? (
+          /* ── KATEGORIA wybrana → lista pozycji (stuknięcie → modal ilości/składników) ── */
           <>
-            <View style={s.segRow}>
-              {([['dishes', 'Dania', ChefHat], ['products', 'Produkty', Apple], ['recent', 'Ostatnie', RotateCcw]] as const).map(([id, label, Ic]) => {
-                const on = browseTab === id;
-                return (
-                  <TouchableOpacity key={id} onPress={() => { haptic.tap(); setBrowseTab(id); }} style={[s.segBtn, on && s.segBtnOn]} activeOpacity={0.8}>
-                    <Ic size={14} color={on ? c.bg.primary : c.text.muted} />
-                    <Text style={[s.segTxt, on && s.segTxtOn]}>{label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <TouchableOpacity style={s.backRow} onPress={() => { haptic.tap(); setBrowseCat(null); }} activeOpacity={0.7}>
+              <ChevronLeft size={18} color={c.text.primary} />
+              <Text style={s.backTxt}>{catLabelFor(browseCat)}</Text>
+            </TouchableOpacity>
 
-            {browseTab === 'dishes' && (
-              <>
-                <TouchableOpacity style={s.createRow} onPress={() => { haptic.tap(); router.push('/food/recipe' as any); }}>
-                  <ChefHat size={16} color={ACCENT} /><Text style={s.createTxt}>Nowy przepis / danie</Text><Plus size={16} color={ACCENT} />
-                </TouchableOpacity>
-                {librarySections.map(sec => (
-                  <View key={sec.tag} style={{ gap: 4 }}>
-                    <View style={s.catHead}>
-                      {sec.tag === '_fav' && <Star size={13} color={ACCENT} fill={ACCENT} />}
-                      <Text style={s.catHeadTxt}>{sec.label}</Text>
-                      <Text style={s.catHeadCount}>{sec.items.length}</Text>
-                    </View>
-                    <View style={s.card}>{sec.items.map((e, i) => renderLibRow(e, i))}</View>
-                  </View>
-                ))}
-                {librarySections.length === 0 && (
-                  <View style={s.card}>
-                    <Text style={s.candMeta}>Brak dań i kompozycji. Zbuduj posiłek z produktów i „Zapisz jako preset", albo dodaj „Nowy przepis / danie".</Text>
-                  </View>
-                )}
-                <Text style={s.presetHint}>Przytrzymaj pozycję, aby przypiąć ją na górę.</Text>
-              </>
-            )}
-
-            {browseTab === 'products' && (
+            {browseCat === '_products' ? (
               <>
                 <TouchableOpacity style={s.createRow} onPress={() => { haptic.tap(); setMName(''); setMKcal(''); setManual(true); }}>
                   <Pencil size={16} color={ACCENT} /><Text style={s.createTxt}>Wpisz ręcznie (na oko)</Text><Plus size={16} color={ACCENT} />
@@ -682,10 +653,9 @@ export default function FoodAdd() {
                 <View style={s.card}>
                   {candidates.filter(cand => !cand.isRecipe).map((cand, i) => renderSingle(cand, i))}
                 </View>
+                <Text style={s.presetHint}>Szukasz konkretnego? Wpisz nazwę / składnik w wyszukiwarkę wyżej.</Text>
               </>
-            )}
-
-            {browseTab === 'recent' && (
+            ) : browseCat === '_recent' ? (
               recentMeals.length > 0 ? (
                 <View style={s.card}>
                   {recentMeals.map((m, i) => (
@@ -702,7 +672,55 @@ export default function FoodAdd() {
               ) : (
                 <View style={s.card}><Text style={s.candMeta}>Brak ostatnich posiłków — pojawią się tu, gdy coś dodasz.</Text></View>
               )
+            ) : (
+              (() => {
+                const entries = catEntries(browseCat);
+                return entries.length > 0 ? (
+                  <>
+                    <View style={s.card}>{entries.map((e, i) => renderLibRow(e, i))}</View>
+                    <Text style={s.presetHint}>Stuknij = dodaj do posiłku · przytrzymaj = przypnij na górę.</Text>
+                  </>
+                ) : (
+                  <View style={s.card}><Text style={s.candMeta}>Pusto w tej kategorii.</Text></View>
+                );
+              })()
             )}
+          </>
+        ) : (
+          /* ── START: Na oko + Ulubione + kafle kategorii ── */
+          <>
+            <View style={s.startRow}>
+              <TouchableOpacity style={s.startBtn} onPress={() => { haptic.tap(); setMName(''); setMKcal(''); setManual(true); }} activeOpacity={0.85}>
+                <Pencil size={16} color={c.text.primary} /><Text style={s.startBtnTxt}>Na oko</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.startBtn} onPress={() => { haptic.tap(); setBrowseCat('_fav'); }} activeOpacity={0.85}>
+                <Star size={16} color={c.text.primary} fill={c.text.primary} /><Text style={s.startBtnTxt}>Ulubione</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={s.sectionHint}>Wybierz kategorię</Text>
+            <View style={s.catGrid}>
+              {categoryTiles.map(ct => (
+                <TouchableOpacity key={ct.tag} style={s.catTile} onPress={() => { haptic.tap(); setBrowseCat(ct.tag); }} activeOpacity={0.85}>
+                  <Text style={s.catTileLabel} numberOfLines={1}>{ct.label}</Text>
+                  <Text style={s.catTileCount}>{ct.count} {ct.count === 1 ? 'pozycja' : 'pozycje'}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={s.catTile} onPress={() => { haptic.tap(); setBrowseCat('_products'); }} activeOpacity={0.85}>
+                <Text style={s.catTileLabel}>Produkty</Text>
+                <Text style={s.catTileCount}>pojedyncze + baza</Text>
+              </TouchableOpacity>
+              {recentMeals.length > 0 && (
+                <TouchableOpacity style={s.catTile} onPress={() => { haptic.tap(); setBrowseCat('_recent'); }} activeOpacity={0.85}>
+                  <Text style={s.catTileLabel}>Ostatnie</Text>
+                  <Text style={s.catTileCount}>powtórz posiłek</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity style={s.createRow} onPress={() => { haptic.tap(); router.push('/food/recipe' as any); }}>
+              <ChefHat size={16} color={ACCENT} /><Text style={s.createTxt}>Nowy przepis / danie</Text><Plus size={16} color={ACCENT} />
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -993,6 +1011,17 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   manualRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 2 },
 
   // segmenty przeglądania (Dania / Produkty / Ostatnie)
+  // drill-down: start (Na oko / Ulubione) + kafle kategorii + powrót
+  startRow: { flexDirection: 'row', gap: spacing[2] },
+  startBtn:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  startBtnTxt: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
+  catGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  catTile:   { flexBasis: '47%', flexGrow: 1, paddingVertical: 16, paddingHorizontal: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.bg.card, gap: 3 },
+  catTileLabel: { fontSize: 14.5, fontWeight: '800', color: c.text.primary },
+  catTileCount: { fontSize: 11, color: c.text.muted, fontWeight: '600' },
+  backRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
+  backTxt:   { fontFamily: fonts.label, fontSize: 12, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.6 },
+
   segRow: { flexDirection: 'row', gap: spacing[2] },
   segBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.subtle, backgroundColor: c.fill.subtle },
   segBtnOn: { backgroundColor: ACCENT, borderColor: ACCENT },
