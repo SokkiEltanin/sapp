@@ -78,6 +78,43 @@ export const BOSSES: Boss[] = [
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +5% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.05, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…',
   },
+  // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
+  {
+    id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 9000,
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
+    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…',
+  },
+  {
+    id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 12000,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+7% uniku, +3% atak', bonus: { dodge: 0.07, atk: 0.03 } },
+    coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…',
+  },
+  {
+    id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 16000,
+    weakness: 'habits', weaknessLabel: 'nawyki (woda)',
+    loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
+    coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?',
+  },
+  {
+    id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 22000,
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_gear', name: 'Mechanizm Czasu', emoji: '⚙️', desc: '+9% energii, +3% atak', bonus: { energyMult: 0.09, atk: 0.03 } },
+    coins: 380, xp: 3800, taunt: 'Zrobisz to jutro… na pewno…',
+  },
+  {
+    id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 30000,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +6% uniku', bonus: { atk: 0.08, dodge: 0.06 } },
+    coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…',
+  },
+  {
+    id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 42000,
+    weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
+    loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +8% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.08, energyMult: 0.08, crit: 0.05 } },
+    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…',
+  },
 ];
 
 export function bossById(id: string): Boss | undefined { return BOSSES.find(b => b.id === id); }
