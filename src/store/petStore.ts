@@ -39,11 +39,9 @@ interface PetState {
   roomAddons: Record<string, string[]>;
   catColor: string;             // palette id from catPalettes
   catStripes: boolean;          // tail stripes on/off
-  catTabby: boolean;            // pręgi tabby na ciele/głowie on/off
   catEyeColor: string;          // hex koloru oczu; '' = domyślny (PUPIL)
   catWhiskers: boolean;         // wąsy on/off
   catLegStripes: boolean;       // pręgi na łapkach on/off
-  catForeheadM: boolean;        // znak „M" tabby na czole on/off
   equippedStartup: string;      // id kosmetyku ekranu ładowania (splash); 'default' = darmowy
   // ── login streak (bonus monet za kolejne dni z rzędu) ──
   loginStreak: number;          // dni z rzędu z otwarciem apki
@@ -79,11 +77,9 @@ interface PetState {
   buyColor: (id: string, cost: number) => boolean;  // false if not enough coins
   setColor: (id: string) => void;
   buyStripes: (cost: number) => boolean;            // buys, or toggles once owned
-  buyTabby: (cost: number) => boolean;              // pręgi tabby: buys, or toggles once owned
   buyEyeColor: (id: string, hex: string, cost: number) => boolean; // kolor oczu: kup+ustaw / ustaw jeśli masz
   buyWhiskers: (cost: number) => boolean;           // wąsy: buys, or toggles once owned
   buyLegStripes: (cost: number) => boolean;         // pręgi na łapkach: buys, or toggles once owned
-  buyForeheadM: (cost: number) => boolean;          // znak „M" na czole: buys, or toggles once owned
   buyStartup: (id: string, cost: number) => boolean; // splash cosmetic: buy+equip, or just equip if owned
   grantStartup: (id: string) => void;               // gacha: own a splash cosmetic for free + wear it
   claimDailyBox: () => boolean;                     // free daily chest: marks today claimed (false if already)
@@ -114,11 +110,9 @@ export const usePetStore = create<PetState>()(
       ownedItems: [],
       catColor: 'blue',
       catStripes: false,
-      catTabby: false,
       catEyeColor: '',
       catWhiskers: false,
       catLegStripes: false,
-      catForeheadM: false,
       equippedStartup: 'default',
       loginStreak: 0,
       lastLoginDay: null,
@@ -176,14 +170,6 @@ export const usePetStore = create<PetState>()(
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'stripes'], catStripes: true });
         return true;
       },
-      buyTabby: (cost) => {
-        const s = get();
-        if (!s._hydrated) return false;
-        if (s.ownedItems.includes('tabby')) { set({ catTabby: !s.catTabby }); return true; }
-        if (s.coins < cost) return false;
-        set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'tabby'], catTabby: true });
-        return true;
-      },
       // Kolor oczu: posiadany (klucz `eye:<id>`) lub darmowy → tylko ustaw hex; inaczej kup+ustaw.
       buyEyeColor: (id, hex, cost) => {
         const s = get();
@@ -208,14 +194,6 @@ export const usePetStore = create<PetState>()(
         if (s.ownedItems.includes('legstripes')) { set({ catLegStripes: !s.catLegStripes }); return true; }
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'legstripes'], catLegStripes: true });
-        return true;
-      },
-      buyForeheadM: (cost) => {
-        const s = get();
-        if (!s._hydrated) return false;
-        if (s.ownedItems.includes('foreheadm')) { set({ catForeheadM: !s.catForeheadM }); return true; }
-        if (s.coins < cost) return false;
-        set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, 'foreheadm'], catForeheadM: true });
         return true;
       },
       // Splash cosmetic: free (owned or cost 0) → just equip; otherwise buy (deduct +
@@ -361,15 +339,15 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catTabby: false, catEyeColor: '', catWhiskers: false, catLegStripes: false, catForeheadM: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
-        lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes, catTabby: s.catTabby,
-        catEyeColor: s.catEyeColor, catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes, catForeheadM: s.catForeheadM,
+        lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes,
+        catEyeColor: s.catEyeColor, catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes,
         equippedStartup: s.equippedStartup,
         loginStreak: s.loginStreak, lastLoginDay: s.lastLoginDay, loginBonusDay: s.loginBonusDay,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,

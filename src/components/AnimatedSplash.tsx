@@ -203,15 +203,13 @@ function CatEyesMark({ ink, glow }: { ink: string; glow?: boolean }) {
 function CatMark({ glow }: { ink: string; glow?: boolean }) {
   const catColor = usePetStore(s => s.catColor);
   const catStripes = usePetStore(s => s.catStripes);
-  const catTabby = usePetStore(s => s.catTabby);
   const catEyeColor = usePetStore(s => s.catEyeColor);
   const catWhiskers = usePetStore(s => s.catWhiskers);
   const catLegStripes = usePetStore(s => s.catLegStripes);
-  const catForeheadM = usePetStore(s => s.catForeheadM);
   return (
     <View style={styles.catCol}>
-      <CatArt size={156} expression="happy" animate lively palette={paletteById(catColor)} stripes={catStripes} tabby={catTabby}
-        eyeColor={catEyeColor} whiskers={catWhiskers} legStripes={catLegStripes} foreheadM={catForeheadM} />
+      <CatArt size={156} expression="happy" animate lively palette={paletteById(catColor)} stripes={catStripes}
+        eyeColor={catEyeColor} whiskers={catWhiskers} legStripes={catLegStripes} />
       <Text style={[styles.markSmall, { color: '#F2F3F3' }, glowFor(glow, '#F2F3F3')]}>Sapp</Text>
     </View>
   );

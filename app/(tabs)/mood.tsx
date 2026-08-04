@@ -52,7 +52,16 @@ const PL_STOPWORDS = new Set([
   'sobie','swój','swoją','jego','jej','nam','nas','was','was','tego','tych',
   'było','który','która','które','tego','przy','nad','pod','przed','między',
   'żeby','kiedy','gdzie','skąd','wtedy','potem','zaraz','już','znowu','chyba',
+  // dorzucone po feedbacku „korelacje błędne" — częste PL wypełniacze, które łapały się jako „słowa"
+  'mimo','oraz','lub','albo','czyli','gdy','aby','ażeby','więcej','mniej','znów',
+  'całkiem','raczej','nawet','wcale','około','ponieważ','dlatego','bardziej','jakoś',
+  'jakiś','jakaś','jakieś','taki','taka','takie','przecież','ogóle','wogóle','ogólnie',
+  'generalnie','typu','jakby','dobra','okej','wogole','naprawdę','normalnie','totalnie',
+  'kurde','kurwa','blin','spoko','trochę','bardzo','strasznie','mega','super',
 ]);
+// Śmieci/śmiech — „xddd", „hahaha", „lol" itp. nie są słowem-kluczem.
+const NOISE_WORD = /^(x+d+|d+x+|ha(ha)+|he(he)+|hi(hi)+|lo+l|rofl|kek|heh|hah|xd+)$/i;
+const HAS_VOWEL = /[aąeęioóuy]/;
 
 interface KeywordStat {
   word: string;
@@ -71,11 +80,12 @@ function extractKeywords(entries: MoodEntry[]): { positive: KeywordStat[]; negat
     const isBad  = entry.mood <= 2;
     if (!isGood && !isBad) continue; // skip neutral entries (mood 3)
 
-    const words = entry.note
+    const words = [...new Set(entry.note   // dedupe per wpis → totalCount = liczba DNI ze słowem
       .toLowerCase()
       .replace(/[^a-ząćęłńóśźżA-ZĄĆĘŁŃÓŚŹŻ\s-]/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length >= 4 && !PL_STOPWORDS.has(w) && !/^\d+$/.test(w));
+      .filter(w => w.length >= 4 && !PL_STOPWORDS.has(w) && !/^\d+$/.test(w) && !NOISE_WORD.test(w) && HAS_VOWEL.test(w))
+    )];
 
     for (const word of words) {
       if (!stats[word]) stats[word] = { good: 0, bad: 0 };
@@ -736,12 +746,17 @@ function buildPatterns(
 ): string[] {
   const out: string[] = [];
   const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+  // Progi podniesione po feedbacku „korelacje w większości błędne": za mało próbek / za mała
+  // różnica = szum podawany jako fakt. Lepiej mniej wniosków, ale prawdziwych.
+  const MIN_N = 5;       // min próbek po KAŻDEJ stronie (było 3)
+  const D_MOOD = 0.45;   // min różnica nastroju/energii (było 0.35)
+  const D_SPEND = 60;    // min różnica wydatków w zł (było 10)
 
   // Work days vs days off
   const workMood: number[] = [], offMood: number[] = [];
   for (const e of entries) ((workByDate[e.date] ?? 0) > 0 ? workMood : offMood).push(e.mood);
   const wM = mean(workMood), oM = mean(offMood);
-  if (wM != null && oM != null && workMood.length >= 3 && offMood.length >= 3 && Math.abs(oM - wM) >= 0.35) {
+  if (wM != null && oM != null && workMood.length >= MIN_N && offMood.length >= MIN_N && Math.abs(oM - wM) >= D_MOOD) {
     out.push(oM > wM
       ? `W dni wolne masz lepszy humor (${oM.toFixed(1)}) niż w dni pracy (${wM.toFixed(1)}).`
       : `W dni pracy masz lepszy humor (${wM.toFixed(1)}) niż w wolne (${oM.toFixed(1)}).`);
@@ -751,7 +766,7 @@ function buildPatterns(
   const afterWork: number[] = [], afterRest: number[] = [];
   for (const e of entries) ((workByDate[dayBeforeStr(e.date)] ?? 0) > 0 ? afterWork : afterRest).push(e.energy);
   const aw = mean(afterWork), ar = mean(afterRest);
-  if (aw != null && ar != null && afterWork.length >= 3 && afterRest.length >= 3 && Math.abs(ar - aw) >= 0.35) {
+  if (aw != null && ar != null && afterWork.length >= MIN_N && afterRest.length >= MIN_N && Math.abs(ar - aw) >= D_MOOD) {
     out.push(ar > aw
       ? `Dzień po pracy masz zwykle mniej energii (${aw.toFixed(1)} vs ${ar.toFixed(1)}).`
       : `Dzień po pracy masz zwykle więcej energii (${aw.toFixed(1)} vs ${ar.toFixed(1)}).`);
@@ -764,7 +779,7 @@ function buildPatterns(
     if (h > 0) (h >= 9 ? afterLong : afterShort).push(e.mood);
   }
   const al = mean(afterLong), as = mean(afterShort);
-  if (al != null && as != null && afterLong.length >= 3 && afterShort.length >= 3 && Math.abs(as - al) >= 0.4) {
+  if (al != null && as != null && afterLong.length >= MIN_N && afterShort.length >= MIN_N && Math.abs(as - al) >= D_MOOD) {
     out.push(`Po dłuższych zmianach (9h+) masz nazajutrz ${al < as ? 'gorszy' : 'lepszy'} humor (${al.toFixed(1)} vs ${as.toFixed(1)}).`);
   }
 
@@ -772,7 +787,7 @@ function buildPatterns(
   const wknd: number[] = [], wkdy: number[] = [];
   for (const e of entries) { const dow = new Date(e.date).getDay(); ((dow === 0 || dow === 6) ? wknd : wkdy).push(e.mood); }
   const we = mean(wknd), wd = mean(wkdy);
-  if (we != null && wd != null && wknd.length >= 3 && wkdy.length >= 3 && Math.abs(we - wd) >= 0.35) {
+  if (we != null && wd != null && wknd.length >= MIN_N && wkdy.length >= MIN_N && Math.abs(we - wd) >= D_MOOD) {
     out.push(we > wd
       ? `W weekendy masz lepszy humor (${we.toFixed(1)}) niż w tygodniu (${wd.toFixed(1)}).`
       : `W tygodniu masz lepszy humor (${wd.toFixed(1)}) niż w weekendy (${we.toFixed(1)}).`);
@@ -787,7 +802,7 @@ function buildPatterns(
     else if (e.mood >= 4) goodSpend.push(sp);
   }
   const ls = mean(lowSpend), gs = mean(goodSpend);
-  if (ls != null && gs != null && lowSpend.length >= 3 && goodSpend.length >= 3 && Math.abs(ls - gs) >= 10) {
+  if (ls != null && gs != null && lowSpend.length >= MIN_N && goodSpend.length >= MIN_N && Math.abs(ls - gs) >= D_SPEND) {
     out.push(ls > gs
       ? `W gorsze dni wydajesz więcej — śr. ${Math.round(ls)} zł vs ${Math.round(gs)} zł w dobre.`
       : `W lepsze dni wydajesz więcej — śr. ${Math.round(gs)} zł vs ${Math.round(ls)} zł w gorsze.`);
@@ -797,7 +812,7 @@ function buildPatterns(
   const doneMood: number[] = [], idleMood: number[] = [];
   for (const e of entries) ((doneTasksByDate[e.date] ?? 0) > 0 ? doneMood : idleMood).push(e.mood);
   const dm = mean(doneMood), im = mean(idleMood);
-  if (dm != null && im != null && doneMood.length >= 3 && idleMood.length >= 3 && Math.abs(dm - im) >= 0.35) {
+  if (dm != null && im != null && doneMood.length >= MIN_N && idleMood.length >= MIN_N && Math.abs(dm - im) >= D_MOOD) {
     out.push(dm > im
       ? `W dni, gdy domykasz zadania, masz lepszy humor (${dm.toFixed(1)} vs ${im.toFixed(1)}).`
       : `W dni z domkniętymi zadaniami humor jest niższy (${dm.toFixed(1)} vs ${im.toFixed(1)}) — może przeciążenie?`);
@@ -813,13 +828,13 @@ function buildPatterns(
     else if (min < 360) { shortEnergy.push(e.energy); shortMood.push(e.mood); }
   }
   const wellEn = mean(wellEnergy), shortEn = mean(shortEnergy);
-  if (wellEn != null && shortEn != null && wellEnergy.length >= 3 && shortEnergy.length >= 3 && Math.abs(wellEn - shortEn) >= 0.35) {
+  if (wellEn != null && shortEn != null && wellEnergy.length >= MIN_N && shortEnergy.length >= MIN_N && Math.abs(wellEn - shortEn) >= D_MOOD) {
     out.push(wellEn > shortEn
       ? `Po dobrym śnie (7h+) masz więcej energii (${wellEn.toFixed(1)} vs ${shortEn.toFixed(1)} po krótkim).`
       : `Po krótkim śnie masz więcej energii (${shortEn.toFixed(1)} vs ${wellEn.toFixed(1)}) — ciekawe.`);
   }
   const wellMd = mean(wellMood), shortMd = mean(shortMood);
-  if (wellMd != null && shortMd != null && wellMood.length >= 3 && shortMood.length >= 3 && Math.abs(wellMd - shortMd) >= 0.35 && out.length < 6) {
+  if (wellMd != null && shortMd != null && wellMood.length >= MIN_N && shortMood.length >= MIN_N && Math.abs(wellMd - shortMd) >= D_MOOD && out.length < 6) {
     out.push(wellMd > shortMd
       ? `Lepiej wyspany masz lepszy humor (${wellMd.toFixed(1)} vs ${shortMd.toFixed(1)} po krótkim śnie).`
       : `Po krótkim śnie humor bywa lepszy (${shortMd.toFixed(1)} vs ${wellMd.toFixed(1)}).`);
@@ -835,13 +850,13 @@ function buildPatterns(
     else if (st < 4000) { lazyMood.push(e.mood); lazyEn.push(e.energy); }
   }
   const aMd = mean(activeMood), lMd = mean(lazyMood);
-  if (aMd != null && lMd != null && activeMood.length >= 3 && lazyMood.length >= 3 && Math.abs(aMd - lMd) >= 0.35 && out.length < 6) {
+  if (aMd != null && lMd != null && activeMood.length >= MIN_N && lazyMood.length >= MIN_N && Math.abs(aMd - lMd) >= D_MOOD && out.length < 6) {
     out.push(aMd > lMd
       ? `W dni z ruchem (8k+ kroków) masz lepszy humor (${aMd.toFixed(1)} vs ${lMd.toFixed(1)} w mało aktywne).`
       : `W mało aktywne dni humor bywa lepszy (${lMd.toFixed(1)} vs ${aMd.toFixed(1)}).`);
   }
   const aEn = mean(activeEn), lEn = mean(lazyEn);
-  if (aEn != null && lEn != null && activeEn.length >= 3 && lazyEn.length >= 3 && Math.abs(aEn - lEn) >= 0.35 && out.length < 6) {
+  if (aEn != null && lEn != null && activeEn.length >= MIN_N && lazyEn.length >= MIN_N && Math.abs(aEn - lEn) >= D_MOOD && out.length < 6) {
     out.push(aEn > lEn
       ? `Więcej kroków = więcej energii (${aEn.toFixed(1)} vs ${lEn.toFixed(1)} w mało aktywne dni).`
       : `Mniej kroków, a więcej energii (${lEn.toFixed(1)} vs ${aEn.toFixed(1)}) — ciekawe.`);
@@ -856,7 +871,7 @@ function buildPatterns(
     else if (r <= 0.3) sparseMood.push(e.mood);
   }
   const hfm = mean(habitfulMood), spm = mean(sparseMood);
-  if (hfm != null && spm != null && habitfulMood.length >= 3 && sparseMood.length >= 3 && Math.abs(hfm - spm) >= 0.35 && out.length < 6) {
+  if (hfm != null && spm != null && habitfulMood.length >= MIN_N && sparseMood.length >= MIN_N && Math.abs(hfm - spm) >= D_MOOD && out.length < 6) {
     out.push(hfm > spm
       ? `W dni z odhaczonymi nawykami masz lepszy humor (${hfm.toFixed(1)} vs ${spm.toFixed(1)}).`
       : `Więcej nawyków, a humor niższy (${hfm.toFixed(1)} vs ${spm.toFixed(1)}) — może presja?`);

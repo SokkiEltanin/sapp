@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, View, StyleSheet, Text, Vibration } from 'react-native';
-import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask, Pattern } from 'react-native-svg';
+import Svg, { G, Path, Circle, Ellipse, Rect, Defs, Mask } from 'react-native-svg';
 import { PetExpression } from '@/utils/petState';
 import { haptic } from '@/utils/haptics';
 import { CatPalette, DEFAULT_PALETTE, PUPIL } from '@/utils/catPalettes';
@@ -20,14 +20,6 @@ import CatTail from '@/components/pet/CatTail';
 //    never reached the muzzle because the head covered it).
 
 const LX = 794, RX = 1107, EYY = 762;
-
-// tabby (pręgi „makrelowe") — powtarzalne CIENKIE paski pod lekkim kątem, jak u prawdziwych
-// kotów. Wszystkie liczby w JEDNYM miejscu, bo renderu SVG nie mam — stroimy tu po oku.
-// TERAZ mocniej/gęściej (do testu, żeby było wyraźnie widać); potem zejdziemy z opacity+gęstością.
-//   tile  = rozmiar kafla wzoru (mniejszy = gęstsze paski)
-//   angle = kąt nachylenia pasków (deg)
-//   sNH   = grubość paska N, sNy = jego pozycja w kaflu, sNo = krycie (0–1)
-const TABBY = { tile: 78, angle: 12, s1y: 0, s1H: 16, s1o: 0.42, s2y: 40, s2H: 11, s2o: 0.34 };
 
 // cheek shapes — used ONLY as mask geometry, never painted
 const CHEEK_L = 'M405.732,671.041L574.51,671.041C579.309,681.043 581.781,691.796 581.781,702.66C581.781,747.37 540.71,783.668 490.121,783.668C439.533,783.668 398.461,747.37 398.461,702.66C398.461,691.796 400.934,681.043 405.732,671.041Z';
@@ -56,18 +48,17 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
-  palette = DEFAULT_PALETTE, stripes = false, tabby = false, onAngry, lively = false,
-  eyeColor = '', whiskers = false, legStripes = false, foreheadM = false,
+  palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
+  eyeColor = '', whiskers = false, legStripes = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
-  celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean; tabby?: boolean;
+  celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean;
   onAngry?: () => void;
   lively?: boolean;   // eager idle for the loading splash: glance + ear-flutter soon & often
   eyeColor?: string;   // '' = domyślny PUPIL; inaczej hex koloru oczu
   whiskers?: boolean;  // wąsy
   legStripes?: boolean; // pręgi na łapkach
-  foreheadM?: boolean;  // znak „M" tabby na czole
 }) {
   const p = palette;
   const breathe = useRef(new Animated.Value(0)).current;
@@ -315,7 +306,11 @@ export default function CatArt({
     ]).start();
   }, [celebrate]);
 
-  const eye = eyeColor || PUPIL;          // kolor oczu (dodatek) albo domyślny
+  // kolor oczu (dodatek). Zapis "hexL|hexR" = heterochromia (inny kolor każdego oka).
+  const [eyeL, eyeR] = eyeColor.includes('|')
+    ? (() => { const [a, b] = eyeColor.split('|'); return [a || PUPIL, b || PUPIL]; })()
+    : [eyeColor || PUPIL, eyeColor || PUPIL];
+  const hasEyeColor = !!eyeColor;         // wybrano kolorowe oczy → dodaj głębię (tęczówka+źrenica)
   const unit = size / 2000;               // px per viewBox unit — everything derives from this
   // shoulder (829,1250 in viewBox) expressed relative to the overlay's CENTRE, because RN
   // rotates about the centre and has no transform-origin
@@ -353,13 +348,6 @@ export default function CatArt({
 
             <Svg width={size} height={size} viewBox="0 0 2000 2000">
               <Defs>
-                {/* tabby — pręgi na sierści przez Pattern (jak działające paski ogona):
-                    additive fill NAD kolorem, więc animacji (transformy wrappera) nie rusza.
-                    Subtelne pasemka w markColor, lekko pod kątem = tekstura, nie „naklejka". */}
-                <Pattern id="coatTabby" patternUnits="userSpaceOnUse" width={TABBY.tile} height={TABBY.tile} patternTransform={`rotate(${TABBY.angle})`}>
-                  <Rect x={0} y={TABBY.s1y} width={TABBY.tile} height={TABBY.s1H} fill={p.mark} opacity={TABBY.s1o} />
-                  <Rect x={0} y={TABBY.s2y} width={TABBY.tile} height={TABBY.s2H} fill={p.mark} opacity={TABBY.s2o} />
-                </Pattern>
                 {/* mask, don't paint — see the note at the top of this file */}
                 <Mask id="eyesFull">
                   <Rect x="0" y="0" width="2000" height="2000" fill="#fff" />
@@ -390,10 +378,7 @@ export default function CatArt({
               {/* body */}
               <G>
                 <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
-                <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>
-                {tabby && <G transform="matrix(0,-0.483436,0.363931,0,59.355842,1854.91733)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill="url(#coatTabby)" /></G>}
-                {tabby && <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill="url(#coatTabby)" /></G>}
-                <G transform="matrix(1,0,0,1.860595,35.894072,-1501.867858)"><Path d="M1227.275,1647.023L606.308,1647.023C605.249,1636.462 604.719,1625.853 604.719,1615.237C604.719,1523.584 644.172,1436.465 712.809,1376.557L1120.774,1376.557C1189.411,1436.465 1228.864,1523.584 1228.864,1615.237C1228.864,1625.853 1228.334,1636.462 1227.275,1647.023Z" fill={p.shade} /></G>
+                <G transform="matrix(-0,0.483436,-0.363931,-0,1843.367298,968.497305)"><Path d="M1217.952,1697.909L615.632,1697.909C608.388,1670.962 604.719,1643.161 604.719,1615.237C604.719,1441.176 744.554,1299.859 916.792,1299.859C1089.029,1299.859 1228.864,1441.176 1228.864,1615.237C1228.864,1643.161 1225.195,1670.962 1217.952,1697.909Z" fill={p.coat} /></G>                <G transform="matrix(1,0,0,1.860595,35.894072,-1501.867858)"><Path d="M1227.275,1647.023L606.308,1647.023C605.249,1636.462 604.719,1625.853 604.719,1615.237C604.719,1523.584 644.172,1436.465 712.809,1376.557L1120.774,1376.557C1189.411,1436.465 1228.864,1523.584 1228.864,1615.237C1228.864,1625.853 1228.334,1636.462 1227.275,1647.023Z" fill={p.shade} /></G>
                 {/* forelegs WITHOUT the original arch: the arch had to be covered by a
                     rect to raise a paw, and that rect bit a square notch out of it.
                     The LEFT leg + paw hide whenever the raised arm is out (lick OR swat) —
@@ -422,12 +407,7 @@ export default function CatArt({
               {/* ears are drawn as separate animated overlays (Ear, below) so they can
                   flutter — animating them here inside the SVG would stutter */}
               <G>
-                <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>
-                {tabby && <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill="url(#coatTabby)" /></G>}
-                <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
-
-                {/* znak „M" tabby na czole — kreska w kolorze pręg (nie płaska łatka) */}
-                {foreheadM && <Path d="M887 695 L905 610 L952 665 L999 610 L1017 695" fill="none" stroke={p.mark} strokeWidth={12} strokeLinecap="round" strokeLinejoin="round" opacity={0.72} />}
+                <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>                <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
 
                 {shut ? (
                   <G>
@@ -443,15 +423,25 @@ export default function CatArt({
                         // slit pupils: a round pupil simply fills the narrowed eye, so all
                         // you saw was a dark wedge — and slits are what an angry cat has
                         <G>
-                          <Ellipse cx={794} cy={792} rx={17} ry={55} fill={eye} />
-                          <Ellipse cx={1107} cy={794} rx={17} ry={55} fill={eye} />
+                          <Ellipse cx={794} cy={792} rx={17} ry={55} fill={eyeL} />
+                          <Ellipse cx={1107} cy={794} rx={17} ry={55} fill={eyeR} />
                           <Circle cx={820} cy={762} r={9} fill="#fff" opacity={0.9} />
                           <Circle cx={1133} cy={764} r={9} fill="#fff" opacity={0.9} />
                         </G>
                       ) : (
                         <G>
-                          <Ellipse cx={794} cy={792} rx={54} ry={61} fill={eye} />
-                          <Ellipse cx={1107} cy={794} rx={55} ry={61} fill={eye} />
+                          {/* tęczówka */}
+                          <Ellipse cx={794} cy={792} rx={54} ry={61} fill={eyeL} />
+                          <Ellipse cx={1107} cy={794} rx={55} ry={61} fill={eyeR} />
+                          {hasEyeColor && (
+                            <G>
+                              {/* głębia: ciemniejszy rąbek tęczówki + pionowa źrenica */}
+                              <Ellipse cx={794} cy={792} rx={54} ry={61} fill="none" stroke="#000" strokeWidth={7} opacity={0.22} />
+                              <Ellipse cx={1107} cy={794} rx={55} ry={61} fill="none" stroke="#000" strokeWidth={7} opacity={0.22} />
+                              <Ellipse cx={794} cy={792} rx={22} ry={50} fill="#12131A" />
+                              <Ellipse cx={1107} cy={794} rx={22} ry={50} fill="#12131A" />
+                            </G>
+                          )}
                           <Circle cx={815} cy={758} r={17} fill="#fff" />
                           <Circle cx={1128} cy={760} r={17} fill="#fff" />
                         </G>

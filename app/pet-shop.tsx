@@ -21,18 +21,20 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
-const TABBY_COST = 70;    // pręgi tabby na ciele
 const WHISKERS_COST = 55;   // wąsy
 const LEGSTRIPES_COST = 65; // pręgi na łapkach
-const FOREHEAD_COST = 60;   // znak „M" na czole
 const EYE_COST = 50;        // kolor oczu (każdy poza domyślnym)
+// głębsze/bogatsze odcienie (user: „dodaj głębi / lekko ciemniejsze"). Zapis "hexL|hexR"
+// = heterochromia (inny kolor każdego oka). W CatArt tęczówka dostaje ciemny rąbek + źrenicę.
 const EYE_COLORS: { id: string; name: string; hex: string }[] = [
-  { id: 'default', name: 'Domyślne',   hex: '' },
-  { id: 'green',   name: 'Zielone',    hex: '#3FA96A' },
-  { id: 'amber',   name: 'Bursztyn',   hex: '#C98A2B' },
-  { id: 'blue',    name: 'Niebieskie', hex: '#3E7BC9' },
-  { id: 'copper',  name: 'Miedziane',  hex: '#B4603A' },
-  { id: 'gold',    name: 'Złote',      hex: '#C9A227' },
+  { id: 'default', name: 'Domyślne',    hex: '' },
+  { id: 'green',   name: 'Zielone',     hex: '#2E8B57' },
+  { id: 'amber',   name: 'Bursztyn',    hex: '#B5791F' },
+  { id: 'blue',    name: 'Niebieskie',  hex: '#2F6BB0' },
+  { id: 'copper',  name: 'Miedziane',   hex: '#9E4E2C' },
+  { id: 'gold',    name: 'Złote',       hex: '#B8901F' },
+  { id: 'hetero1', name: 'Hetero z-n',  hex: '#2E8B57|#2F6BB0' },
+  { id: 'hetero2', name: 'Hetero b-z',  hex: '#B5791F|#2E8B57' },
 ];
 
 const todayKey = () => {
@@ -52,7 +54,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, catTabby, catEyeColor, catWhiskers, catLegStripes, catForeheadM, buyColor, buyStripes, buyTabby, buyEyeColor, buyWhiskers, buyLegStripes, buyForeheadM, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, catEyeColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -62,12 +64,10 @@ export default function PetShop() {
   // podgląd kosmetyków kota PRZED kupnem — żeby zobaczyć kolor/pręgi/tabby bez płacenia
   const [pvColor, setPvColor] = useState<string | null>(null);
   const [pvStripes, setPvStripes] = useState<boolean | null>(null);
-  const [pvTabby, setPvTabby] = useState<boolean | null>(null);
   const [pvEye, setPvEye] = useState<string | null>(null);   // hex podglądu oczu ('' = domyślne)
   const [pvWhiskers, setPvWhiskers] = useState<boolean | null>(null);
   const [pvLeg, setPvLeg] = useState<boolean | null>(null);
-  const [pvM, setPvM] = useState<boolean | null>(null);
-  const clearPreviews = () => { setPvColor(null); setPvStripes(null); setPvTabby(null); setPvEye(null); setPvWhiskers(null); setPvLeg(null); setPvM(null); };
+  const clearPreviews = () => { setPvColor(null); setPvStripes(null); setPvEye(null); setPvWhiskers(null); setPvLeg(null); };
 
   // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
   // założenie posiadanego / darmowa skrzynka dnia nie pytają).
@@ -101,14 +101,6 @@ export default function PetShop() {
     if (owned) { buyStripes(STRIPES.cost); setPvStripes(null); haptic.success(); return; }   // posiadane → tylko przełącz
     if (coins < STRIPES.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${STRIPES.cost}`); return; }
     confirmBuy(STRIPES.name, STRIPES.cost, () => { if (buyStripes(STRIPES.cost)) { setPvStripes(null); haptic.success(); } });
-  };
-  const onTabby = () => {
-    haptic.tap();
-    const owned = ownedItems.includes('tabby');
-    setPvTabby(owned ? !catTabby : true);   // podgląd efektu na kocie
-    if (owned) { buyTabby(TABBY_COST); setPvTabby(null); haptic.success(); return; }   // posiadane → tylko przełącz
-    if (coins < TABBY_COST) { haptic.error(); toast.error(`Za mało monet — potrzeba ${TABBY_COST}`); return; }
-    confirmBuy('Pręgi (tabby)', TABBY_COST, () => { if (buyTabby(TABBY_COST)) { setPvTabby(null); haptic.success(); } });
   };
   // Kolor oczu: podgląd od razu, kup+ustaw / ustaw jeśli masz. 'default' (hex '') za darmo.
   const onEye = (id: string, hex: string, cost: number, name: string) => {
@@ -191,11 +183,9 @@ export default function PetShop() {
   const shownColorId = pvColor ?? catColor;
   const worn = paletteById(shownColorId);
   const shownStripes = pvStripes ?? catStripes;
-  const shownTabby = pvTabby ?? catTabby;
   const shownEye = pvEye ?? catEyeColor;
   const shownWhiskers = pvWhiskers ?? catWhiskers;
   const shownLeg = pvLeg ?? catLegStripes;
-  const shownM = pvM ?? catForeheadM;
   const pvColorMeta = pvColor ? SHOP_COLORS.find(sc => sc.id === pvColor) : null;
   const pvUnowned = !!pvColor && !ownedItems.includes(pvColor) && pvColor !== catColor;
 
@@ -252,8 +242,8 @@ export default function PetShop() {
         <View style={s.preview}>
           {/* żywy podgląd — animowany + klikalny; pokazuje TAKŻE kolor/pręgi/tabby, które
               właśnie stukasz w sklepie (przed kupnem), więc widzisz efekt bez płacenia */}
-          <CatArt size={150} expression="happy" palette={worn} stripes={shownStripes} tabby={shownTabby}
-            eyeColor={shownEye} whiskers={shownWhiskers} legStripes={shownLeg} foreheadM={shownM} affection={60} />
+          <CatArt size={150} expression="happy" palette={worn} stripes={shownStripes}
+            eyeColor={shownEye} whiskers={shownWhiskers} legStripes={shownLeg} affection={60} />
           <Text style={s.previewCap}>
             {pvUnowned ? `podgląd: ${pvColorMeta?.name ?? ''} — kup, aby założyć na stałe`
               : 'stuknij kolor lub dodatek — zobaczysz na kocie'}
@@ -393,10 +383,15 @@ export default function PetShop() {
                 {EYE_COLORS.map(ec => {
                   const owned = ec.hex === '' || ownedItems.includes(`eye:${ec.id}`);
                   const on = catEyeColor === ec.hex;
+                  const hetero = ec.hex.includes('|');
+                  const [hl, hr] = hetero ? ec.hex.split('|') : [ec.hex || '#2A2B36', ec.hex || '#2A2B36'];
                   return (
                     <PressableScale key={ec.id} onPress={() => onEye(ec.id, ec.hex, ec.hex === '' ? 0 : EYE_COST, ec.name)}>
                       <View style={[s.eyeCell, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
-                        <View style={[s.eyeDot, { backgroundColor: ec.hex || '#2A2B36' }]}>{on && <Check size={12} color="#fff" />}</View>
+                        <View style={[s.eyeDot, { backgroundColor: hl, overflow: 'hidden' }]}>
+                          {hetero && <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '50%', backgroundColor: hr }} />}
+                          {on && <Check size={12} color="#fff" />}
+                        </View>
                         <Text style={s.eyeName} numberOfLines={1}>{ec.name}</Text>
                         {!owned
                           ? <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{EYE_COST}</Text></View>
@@ -424,28 +419,10 @@ export default function PetShop() {
               </View>
             </PressableScale>
 
-            <PressableScale onPress={onTabby}>
-              <View style={[s.boxRow, catTabby && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.cellName}>Pręgi (tabby)</Text>
-                  <Text style={s.cellState}>
-                    {ownedItems.includes('tabby')
-                      ? (catTabby ? '● włączone — stuknij, aby wyłączyć' : '○ wyłączone — stuknij, aby włączyć')
-                      : 'pręgi na ciele i głowie — jak u prawdziwych kotów'}
-                  </Text>
-                </View>
-                {ownedItems.includes('tabby')
-                  ? <Check size={18} color="#4DA8FF" />
-                  : <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{TABBY_COST}</Text></View>}
-              </View>
-            </PressableScale>
-
             {extraRow('whiskers', 'Wąsy', 'cienkie wąsy od pyszczka', catWhiskers, WHISKERS_COST,
               () => onToggleExtra('whiskers', WHISKERS_COST, 'Wąsy', catWhiskers, setPvWhiskers, buyWhiskers))}
-            {extraRow('legstripes', 'Pręgi na łapkach', 'poziome pręgi na łapkach — jak u tabby', catLegStripes, LEGSTRIPES_COST,
+            {extraRow('legstripes', 'Pręgi na łapkach', 'poziome pręgi na łapkach', catLegStripes, LEGSTRIPES_COST,
               () => onToggleExtra('legstripes', LEGSTRIPES_COST, 'Pręgi na łapkach', catLegStripes, setPvLeg, buyLegStripes))}
-            {extraRow('foreheadm', 'Znak „M" na czole', 'klasyczny znaczek pręgowanych kotów', catForeheadM, FOREHEAD_COST,
-              () => onToggleExtra('foreheadm', FOREHEAD_COST, 'Znak „M" na czole', catForeheadM, setPvM, buyForeheadM))}
           </View>
         )}
 
