@@ -6,6 +6,7 @@ module.exports = {
   testEnvironment: 'node',
   transform: { '^.+\\.[jt]sx?$': 'babel-jest' },
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
-  transformIgnorePatterns: ['node_modules/(?!(date-fns)/)'],
+  transformIgnorePatterns: ['node_modules/(?!(date-fns|@react-native-async-storage)/)'],
+  setupFiles: ['<rootDir>/jest.setup.js'],
   testMatch: ['**/__tests__/**/*.test.ts'],
 };

@@ -41,7 +41,7 @@ import {
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
-import { groceryTotal, allSpend, weekIncome } from '@/utils/dashboard/spend';
+import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/utils/dashboard/spend';
 import { moodColor, plTasks } from '@/utils/dashboard/format';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
@@ -127,7 +127,6 @@ import AnimatedCardBg from '@/components/ui/AnimatedCardBg';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SWEETS_TAGS = ['słodycze', 'przekąski']; // junk side: sweets + snacks (combined everywhere)
 
 const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   droplets:    Droplets,
@@ -304,18 +303,6 @@ function dayAvg(entries: MoodEntry[]) {
     mood:   entries.reduce((a, b) => a + b.mood, 0) / entries.length as MoodLevel,
     energy: entries.reduce((a, b) => a + b.energy, 0) / entries.length as MoodLevel,
   };
-}
-function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = 'all'): number {
-  const set = new Set(dates);
-  let total = 0;
-  for (const e of expenses) {
-    if (e.type && e.type !== 'expense') continue;
-    if (!set.has(e.date.slice(0, 10))) continue;
-    for (const it of (e.receiptItems ?? [])) {
-      if (consumesInScope(it, scope) && (it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) total += it.price;
-    }
-  }
-  return total;
 }
 // A spend delta chip: lower spend = green, higher = red (opposite of "growth good").
 function SpendDelta({ pct, label, muted }: { pct: number; label: string; muted: string }) {

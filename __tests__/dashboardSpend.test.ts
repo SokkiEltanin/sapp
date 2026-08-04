@@ -1,4 +1,4 @@
-import { groceryTotal, allSpend, weekIncome } from '@/utils/dashboard/spend';
+import { groceryTotal, allSpend, weekIncome, sweetsTotal } from '@/utils/dashboard/spend';
 import { Expense } from '@/types';
 
 const e = (o: Partial<Expense>): Expense => ({
@@ -43,5 +43,36 @@ describe('dashboard/spend — agregacje wydatków', () => {
     expect(allSpend([], D)).toBe(0);
     expect(groceryTotal([], D)).toBe(0);
     expect(weekIncome([], D)).toBe(0);
+  });
+});
+
+describe('dashboard/spend — sweetsTotal (per-pozycja + scope)', () => {
+  test('sumuje ceny pozycji słodycze/przekąski w oknie dni', () => {
+    const exp = [
+      e({ date: '2026-08-04T09:00:00', receiptItems: [
+        { name: 'Baton', price: 5, tags: ['słodycze'] },
+        { name: 'Chleb', price: 4, tags: ['pieczywo'] },
+        { name: 'Chipsy', price: 7, tags: ['przekąski'] },
+      ] as any }),
+      e({ date: '2026-08-09T09:00:00', receiptItems: [{ name: 'Baton', price: 9, tags: ['słodycze'] }] as any }), // poza oknem
+    ];
+    expect(sweetsTotal(exp, D)).toBeCloseTo(12);
+  });
+
+  test('pomija pozycje excluded', () => {
+    const exp = [e({ date: '2026-08-04T09:00:00', receiptItems: [
+      { name: 'Baton', price: 5, tags: ['słodycze'], excluded: true },
+      { name: 'Cukierki', price: 6, tags: ['słodycze'] },
+    ] as any })];
+    expect(sweetsTotal(exp, D)).toBeCloseTo(6);
+  });
+
+  test('scope "mine": pozycja zjedzona przez kogoś innego nie liczy się', () => {
+    const exp = [e({ date: '2026-08-04T09:00:00', receiptItems: [
+      { name: 'Baton', price: 5, tags: ['słodycze'], eaters: ['Partnerka'] },
+      { name: 'Lody', price: 8, tags: ['słodycze'] }, // brak eaters = moje
+    ] as any })];
+    expect(sweetsTotal(exp, D, 'mine')).toBeCloseTo(8);
+    expect(sweetsTotal(exp, D, 'all')).toBeCloseTo(13);
   });
 });
