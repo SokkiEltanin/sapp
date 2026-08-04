@@ -35,6 +35,7 @@ import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory } from '@/types';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
+import { runSelfTest } from '@/utils/selfTest';
 import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -127,6 +128,20 @@ export default function SettingsScreen() {
   const setLiteMode = useUiPrefs(s => s.setLiteMode);
 
   const [backfillBusy, setBackfillBusy] = useState(false);
+  const [selfTestBusy, setSelfTestBusy] = useState(false);
+  const doSelfTest = async () => {
+    if (selfTestBusy) return;
+    haptic.tap(); setSelfTestBusy(true);
+    try {
+      const res = await runSelfTest();
+      const pass = res.filter(r => r.ok).length;
+      const body = res.map(r => `${r.ok ? '✓' : '✗'}  ${r.name}\n     ${r.detail}`).join('\n\n');
+      if (pass === res.length) haptic.success(); else haptic.warn();
+      Alert.alert(`Self-test: ${pass}/${res.length} OK`, body, [{ text: 'OK' }]);
+    } catch (e: any) {
+      Alert.alert('Self-test', 'Nie udało się uruchomić: ' + String(e?.message ?? e));
+    } finally { setSelfTestBusy(false); }
+  };
   const [backfillDone, setBackfillDone] = useState(false);
   useEffect(() => { isBackfillDone().then(setBackfillDone).catch(() => {}); }, []);
   const doBackfill = () => {
@@ -1485,8 +1500,21 @@ export default function SettingsScreen() {
         <CollapsibleSection icon={LucideIcons.Wrench} title="Diagnostyka" color="#8A93A8" defaultOpen={false}>
           <View style={styles.card}>
             <PressableScale
-              onPress={() => { haptic.tap(); router.push('/health-test' as any); }}
+              onPress={doSelfTest} disabled={selfTestBusy}
               style={styles.row}
+            >
+              <View style={[styles.iconWrap, { backgroundColor: '#A78BFA18' }]}>
+                {selfTestBusy ? <ActivityIndicator size="small" color="#A78BFA" /> : <LucideIcons.Stethoscope size={16} color="#A78BFA" />}
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>Self-test aplikacji</Text>
+                <Text style={styles.rowSub}>Sprawdza daty (bug „północ"), pamięć, chmurę/backup i wczytanie danych — ✓/✗</Text>
+              </View>
+              <ChevronLeft size={16} color={colors.text.muted} style={{ transform: [{ rotate: '180deg' }] }} />
+            </PressableScale>
+            <PressableScale
+              onPress={() => { haptic.tap(); router.push('/health-test' as any); }}
+              style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border.subtle }]}
             >
               <View style={[styles.iconWrap, { backgroundColor: '#46B0DE18' }]}>
                 <LucideIcons.Activity size={16} color="#46B0DE" />
