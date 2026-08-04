@@ -41,6 +41,7 @@ import {
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
+import { groceryTotal, allSpend, weekIncome } from '@/utils/dashboard/spend';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -303,11 +304,6 @@ function dayAvg(entries: MoodEntry[]) {
     energy: entries.reduce((a, b) => a + b.energy, 0) / entries.length as MoodLevel,
   };
 }
-function groceryTotal(expenses: Expense[], dates: string[]): number {
-  const set = new Set(dates);
-  return expenses.filter(e => (!e.type || e.type === 'expense') && e.category === 'groceries' && set.has(e.date.slice(0, 10)))
-    .reduce((s, e) => s + e.amount, 0);
-}
 function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = 'all'): number {
   const set = new Set(dates);
   let total = 0;
@@ -319,11 +315,6 @@ function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = '
     }
   }
   return total;
-}
-function allSpend(expenses: Expense[], dates: string[]): number {
-  const set = new Set(dates);
-  return expenses.filter(e => (!e.type || e.type === 'expense') && set.has(e.date.slice(0, 10)))
-    .reduce((s, e) => s + e.amount, 0);
 }
 // A spend delta chip: lower spend = green, higher = red (opposite of "growth good").
 function SpendDelta({ pct, label, muted }: { pct: number; label: string; muted: string }) {
@@ -342,11 +333,6 @@ const sd = StyleSheet.create({
   val: { fontSize: 12, fontWeight: '800' },
   label: { fontSize: 11, fontWeight: '600' },
 });
-function weekIncome(expenses: Expense[], dates: string[]): number {
-  const set = new Set(dates);
-  return expenses.filter(e => e.type === 'income' && set.has(e.date.slice(0, 10)))
-    .reduce((s, e) => s + e.amount, 0);
-}
 function moodColor(avg: number): string {
   if (avg >= 4.5) return MOOD_COLORS[5];
   if (avg >= 3.5) return MOOD_COLORS[4];
