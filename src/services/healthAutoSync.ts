@@ -28,6 +28,7 @@ function qualityFromMinutes(min: number): Quality | undefined {
 
 let _lastRun = 0;
 let _running = false;
+let _inflight: Promise<number> | null = null;   // trwający run — żeby równoległy caller mógł DOŁĄCZYĆ (nie dostać 0)
 const THROTTLE_MS = 10 * 60 * 1000; // don't hammer the watch — 10 min between runs
 
 // Returns how many day-keys were written (0 = nothing to do / skipped).
@@ -37,9 +38,13 @@ export async function autoSyncHealth(days = 30, force = false): Promise<number> 
   // A run in flight is always skipped (dedupe rapid tab switches). `force` only bypasses
   // the 10-min TIME throttle — that throttle was why re-opening the app inside 10 minutes
   // kept showing stale watch data. Screens that want fresh-on-entry pass force:true.
-  if (_running) return 0;
+  // Run w toku → DOŁĄCZ do niego (zwróć jego promise), zamiast zwracać 0. Dzięki temu gdy
+  // _layout forsuje sync na starcie, a pupil odpala swój ~w tym samym czasie, pupil poczeka
+  // na realny wynik (n>0) i re-czyta dane → nagrody aktualne od razu.
+  if (_running && _inflight) return _inflight;
   if (!force && now - _lastRun < THROTTLE_MS) return 0;
   _running = true;
+  _inflight = (async (): Promise<number> => {
   try {
     const range = await readHealthRange(days);
     if (!range || !range.length) { _lastRun = now; return 0; }
@@ -109,5 +114,8 @@ export async function autoSyncHealth(days = 30, force = false): Promise<number> 
     return 0;
   } finally {
     _running = false;
+    _inflight = null;
   }
+  })();
+  return _inflight;
 }

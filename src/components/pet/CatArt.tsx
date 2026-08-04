@@ -49,7 +49,7 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
   palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
-  eyeColor = '', whiskers = false, legStripes = false,
+  eyeColor = '', noseColor = '', whiskers = false, legStripes = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
@@ -57,6 +57,7 @@ export default function CatArt({
   onAngry?: () => void;
   lively?: boolean;   // eager idle for the loading splash: glance + ear-flutter soon & often
   eyeColor?: string;   // '' = domyślny PUPIL; inaczej hex koloru oczu
+  noseColor?: string;  // '' = domyślny p.ink; inaczej hex koloru noska
   whiskers?: boolean;  // wąsy
   legStripes?: boolean; // pręgi na łapkach
 }) {
@@ -407,7 +408,7 @@ export default function CatArt({
               {/* ears are drawn as separate animated overlays (Ear, below) so they can
                   flutter — animating them here inside the SVG would stutter */}
               <G>
-                <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>                <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
+                <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>                <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={noseColor || p.ink} /></G>
 
                 {shut ? (
                   <G>

@@ -14,12 +14,13 @@ export default function PetTile({ name, pet, level, claimable = 0 }: { name: str
   const catColor = usePetStore(s => s.catColor);
   const catStripes = usePetStore(s => s.catStripes);
   const catEyeColor = usePetStore(s => s.catEyeColor);
+  const catNoseColor = usePetStore(s => s.catNoseColor);
   const catWhiskers = usePetStore(s => s.catWhiskers);
   const catLegStripes = usePetStore(s => s.catLegStripes);
   return (
     <View style={[st.card, { backgroundColor: c.bg.card, borderColor: c.border.default }]}>
       <CatArt expression={pet.expression} size={70} animate={false} palette={paletteById(catColor)} stripes={catStripes}
-        eyeColor={catEyeColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>
           <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>

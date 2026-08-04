@@ -40,6 +40,7 @@ interface PetState {
   catColor: string;             // palette id from catPalettes
   catStripes: boolean;          // tail stripes on/off
   catEyeColor: string;          // hex koloru oczu; '' = domyślny (PUPIL)
+  catNoseColor: string;         // hex koloru noska; '' = domyślny (p.ink)
   catWhiskers: boolean;         // wąsy on/off
   catLegStripes: boolean;       // pręgi na łapkach on/off
   equippedStartup: string;      // id kosmetyku ekranu ładowania (splash); 'default' = darmowy
@@ -78,6 +79,7 @@ interface PetState {
   setColor: (id: string) => void;
   buyStripes: (cost: number) => boolean;            // buys, or toggles once owned
   buyEyeColor: (id: string, hex: string, cost: number) => boolean; // kolor oczu: kup+ustaw / ustaw jeśli masz
+  buyNoseColor: (id: string, hex: string, cost: number) => boolean; // kolor noska: kup+ustaw / ustaw jeśli masz
   buyWhiskers: (cost: number) => boolean;           // wąsy: buys, or toggles once owned
   buyLegStripes: (cost: number) => boolean;         // pręgi na łapkach: buys, or toggles once owned
   buyStartup: (id: string, cost: number) => boolean; // splash cosmetic: buy+equip, or just equip if owned
@@ -111,6 +113,7 @@ export const usePetStore = create<PetState>()(
       catColor: 'blue',
       catStripes: false,
       catEyeColor: '',
+      catNoseColor: '',
       catWhiskers: false,
       catLegStripes: false,
       equippedStartup: 'default',
@@ -178,6 +181,15 @@ export const usePetStore = create<PetState>()(
         if (s.ownedItems.includes(key) || cost === 0) { set({ catEyeColor: hex }); return true; }
         if (s.coins < cost) return false;
         set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, key], catEyeColor: hex });
+        return true;
+      },
+      buyNoseColor: (id, hex, cost) => {
+        const s = get();
+        if (!s._hydrated) return false;
+        const key = `nose:${id}`;
+        if (s.ownedItems.includes(key) || cost === 0) { set({ catNoseColor: hex }); return true; }
+        if (s.coins < cost) return false;
+        set({ coins: s.coins - cost, ownedItems: [...s.ownedItems, key], catNoseColor: hex });
         return true;
       },
       buyWhiskers: (cost) => {
@@ -339,7 +351,7 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
     }),
     {
       name: 'pet-v1',
@@ -347,7 +359,7 @@ export const usePetStore = create<PetState>()(
       partialize: (s) => ({
         name: s.name, createdAt: s.createdAt, xp: s.xp, coins: s.coins,
         lastCareTick: s.lastCareTick, ownedItems: s.ownedItems, catColor: s.catColor, catStripes: s.catStripes,
-        catEyeColor: s.catEyeColor, catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes,
+        catEyeColor: s.catEyeColor, catNoseColor: s.catNoseColor, catWhiskers: s.catWhiskers, catLegStripes: s.catLegStripes,
         equippedStartup: s.equippedStartup,
         loginStreak: s.loginStreak, lastLoginDay: s.lastLoginDay, loginBonusDay: s.loginBonusDay,
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,

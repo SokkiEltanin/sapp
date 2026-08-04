@@ -8,6 +8,10 @@ import { ChevronLeft, Pencil, Check, Coins, ShoppingBag, Swords } from 'lucide-r
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
+import BoxRevealModal from '@/components/pet/BoxRevealModal';
+import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
+import { SHOP_COLORS } from '@/utils/petShop';
+import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
@@ -37,7 +41,22 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses, claimDailyBox, buyItem, grantStartup, addCoins } = usePetStore();
+  const addFreezes = useStreakFreezeStore(st => st.addFreezes);
+  const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
+  const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
+  const onDailyBox = () => {
+    haptic.tap();
+    if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
+    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems);
+    if (reward.type === 'color') buyItem(reward.colorId, 0);
+    else if (reward.type === 'startup') grantStartup(reward.startupId);
+    else if (reward.type === 'coins') addCoins(reward.coins);
+    else if (reward.type === 'freeze') addFreezes(reward.count);
+    haptic.success();
+    setBoxReveal({ box: DAILY_BOX, reward });
+  };
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
   const [trophiesOpen, setTrophiesOpen] = useState(false);
@@ -103,7 +122,7 @@ export default function Pet() {
     // the pet's needs reflect current data whenever you open it), re-read if anything changed.
     import('@/services/healthAutoSync')
       .then(({ autoSyncHealth }) => autoSyncHealth(7, true))
-      .then(n => { if (n > 0) readHealth(); })
+      .then(() => readHealth())   // ZAWSZE re-czytaj po syncu (też gdy dołączyliśmy do trwającego runu) → nagrody aktualne
       .catch(() => {});
   }, [readHealth]);
   useFocusEffect(reload);
@@ -281,7 +300,7 @@ export default function Pet() {
         {/* stage — no room backdrop any more; the cat IS the stage */}
         <View style={s.stage}>
           <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
-            eyeColor={catEyeColor} whiskers={catWhiskers} legStripes={catLegStripes}
+            eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
             onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
         </View>
 
@@ -293,6 +312,16 @@ export default function Pet() {
           </View>
           <Text style={s.affTxt}>{affToday >= 100 ? 'głaskany!' : 'głaskanie'}</Text>
         </View>
+
+        {/* Skrzynka dnia — darmowa, TU przy kocie (w sklepie user o niej zapominał) */}
+        <PressableScale onPress={onDailyBox} style={[s.dailyBox, !dailyBoxReady && s.dailyBoxDone]}>
+          <Gift size={18} color={dailyBoxReady ? '#0B0E1A' : c.text.muted} />
+          <Text style={[s.dailyBoxTxt, !dailyBoxReady && { color: c.text.muted }]}>
+            {dailyBoxReady ? 'Odbierz skrzynkę dnia — za darmo' : 'Skrzynka odebrana — wróć jutro'}
+          </Text>
+          {dailyBoxReady && <View style={s.dailyBoxDot} />}
+        </PressableScale>
+
         {pendingCrates > 0 && (
           <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
             <Text style={{ fontSize: 18 }}>🐟</Text>
@@ -529,6 +558,13 @@ export default function Pet() {
       </ScrollView>
 
       <CrateModal visible={crateOpen} onClose={() => setCrateOpen(false)} onOpened={() => setCelebrate(c => c + 1)} />
+      <BoxRevealModal
+        visible={!!boxReveal}
+        reward={boxReveal?.reward ?? null}
+        boxColor={boxReveal?.box.color ?? '#FBBF24'}
+        boxEmoji={boxReveal?.box.emoji ?? '🎁'}
+        onClose={() => setBoxReveal(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -562,6 +598,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   affTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted, width: 68, textAlign: 'right' },
   crateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 11, borderRadius: radius.lg, backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
   crateBtnTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
+  dailyBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 12, borderRadius: radius.lg, backgroundColor: '#FBBF24', borderWidth: 1, borderColor: '#FBBF24' },
+  dailyBoxDone: { backgroundColor: c.bg.card, borderColor: c.border.default },
+  dailyBoxTxt: { fontSize: 13, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.2 },
+  dailyBoxDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E4342E' },
 
   levelCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[4] },
   levelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },

@@ -164,10 +164,11 @@ function CatMark({ height }: { height: number }) {
   const catColor = usePetStore(s => s.catColor);
   const catStripes = usePetStore(s => s.catStripes);
   const catEyeColor = usePetStore(s => s.catEyeColor);
+  const catNoseColor = usePetStore(s => s.catNoseColor);
   const catWhiskers = usePetStore(s => s.catWhiskers);
   const catLegStripes = usePetStore(s => s.catLegStripes);
   return <CatArt size={Math.round(height * 0.92)} expression="happy" animate lively palette={paletteById(catColor)} stripes={catStripes}
-    eyeColor={catEyeColor} whiskers={catWhiskers} legStripes={catLegStripes} />;
+    eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />;
 }
 
 export default function StartupPreview({ startup, height = 88, fontSize = 30 }: { startup: Startup; height?: number; fontSize?: number }) {
