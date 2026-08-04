@@ -1,0 +1,25 @@
+name: CI
+
+# Bramka jakości: typecheck + testy na każdym pushu i PR. Krojenie index.tsx (i każda inna
+# zmiana) nie może już cicho niczego zepsuć — czerwony CI = wiadomo od razu.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Tests
+        run: npm test -- --ci
