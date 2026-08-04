@@ -1,4 +1,5 @@
 import { CosmeticTier } from '@/utils/petShop';
+import { CUSTOM_STARTUPS } from '@/utils/customStartups';
 
 // "Customowe startupy" — kosmetyki EKRANU ŁADOWANIA (splash), kupowane monetami pupila.
 // Wszystkie na CZARNYM tle (#000) → mocny, spójny look. Różnią się KOLOREM (ink),
@@ -6,7 +7,7 @@ import { CosmeticTier } from '@/utils/petShop';
 // Odczytywane przez AnimatedSplash (equippedStartup w petStore). Kupno przez
 // usePetStore.buyStartup (owned w ownedItems pod `startup:<id>` → trafia do backupu).
 
-export type SplashAnim = 'bar' | 'wave' | 'pulse' | 'sweep' | 'ring' | 'cateyes' | 'cat';
+export type SplashAnim = 'bar' | 'wave' | 'pulse' | 'sweep' | 'ring' | 'cateyes' | 'cat' | 'custom';
 
 export interface Startup {
   id: string;
@@ -17,12 +18,13 @@ export interface Startup {
   anim: SplashAnim;     // rodzaj animacji
   glow?: boolean;       // poświata (akcent epicki)
   blurb: string;
+  asset?: number;       // dla anim 'custom' — require() Twojej animacji z assets/startups
 }
 
 export const SPLASH_BG = '#000000';   // czarne tło (= app.json splash) → seamless handoff
 
 export const ANIM_LABEL: Record<SplashAnim, string> = {
-  bar: 'płynny pasek', wave: 'fala', pulse: 'oddech', sweep: 'błysk', ring: 'orbita', cateyes: 'kocie ślepia', cat: 'twój kot',
+  bar: 'płynny pasek', wave: 'fala', pulse: 'oddech', sweep: 'błysk', ring: 'orbita', cateyes: 'kocie ślepia', cat: 'twój kot', custom: 'własna',
 };
 
 // Kuracja po feedbacku: koniec z „ten sam ruch, inny kolor za 280". Każdy tier ma sens:
@@ -41,6 +43,11 @@ export const STARTUPS: Startup[] = [
   { id: 'neon',     name: 'Neon',         tier: 'epic',  cost: 190, ink: '#C084FC', anim: 'sweep',   glow: true, blurb: 'Fioletowy neon z poświatą' },
   { id: 'zloto',    name: 'Złota orbita', tier: 'epic',  cost: 230, ink: '#FFD57A', anim: 'ring',    glow: true, blurb: 'Złoty pierścień z poświatą' },
   { id: 'kot',      name: 'Twój kot',     tier: 'epic',  cost: 300, ink: '#F2F3F3', anim: 'cat',     glow: true, blurb: 'Twój kot wita Cię przy starcie — w Twoim kolorze i z pręgami' },
+  // + customowe z assets/startups/ (NAZWA_CENA.webp) — doklejane na końcu, tier 'epic'.
+  ...CUSTOM_STARTUPS.map((c): Startup => ({
+    id: c.id, name: c.name, tier: c.tier, cost: c.cost, ink: '#F2F3F3', anim: 'custom', glow: true, asset: c.asset,
+    blurb: 'Twoja własna animacja startowa (assets/startups)',
+  })),
 ];
 
 export function startupById(id: string): Startup {

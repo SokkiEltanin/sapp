@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame } from 'lucide-react-native';
@@ -47,6 +47,10 @@ export default function PetShop() {
   const [cat, setCat] = useState<Cat>('colors');
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);   // żywy podgląd startupu (przed kupnem)
+  // podgląd kosmetyków kota PRZED kupnem — żeby zobaczyć kolor/pręgi/tabby bez płacenia
+  const [pvColor, setPvColor] = useState<string | null>(null);
+  const [pvStripes, setPvStripes] = useState<boolean | null>(null);
+  const [pvTabby, setPvTabby] = useState<boolean | null>(null);
 
   // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
   // założenie posiadanego / darmowa skrzynka dnia nie pytają).
@@ -67,22 +71,27 @@ export default function PetShop() {
 
   const onColor = (id: string, cost: number, name: string) => {
     haptic.tap();
+    setPvColor(id);   // podgląd na kocie OD RAZU — też dla nieposiadanych (zobaczysz przed kupnem)
     const had = ownedItems.includes(id) || cost === 0;
-    if (had) { if (buyColor(id, cost)) { haptic.success(); toast.success(`${name} — założone`); } return; }  // posiadane → tylko zakładasz
+    if (had) { if (buyColor(id, cost)) { setPvColor(null); haptic.success(); toast.success(`${name} — założone`); } return; }  // posiadane → tylko zakładasz
     if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
-    confirmBuy(name, cost, () => { if (buyColor(id, cost)) { haptic.success(); toast.success(`Kupione: ${name}`); } });
+    confirmBuy(name, cost, () => { if (buyColor(id, cost)) { setPvColor(null); haptic.success(); toast.success(`Kupione: ${name}`); } });
   };
   const onStripes = () => {
     haptic.tap();
-    if (ownedItems.includes('stripes')) { buyStripes(STRIPES.cost); haptic.success(); return; }   // posiadane → tylko przełącz
+    const owned = ownedItems.includes('stripes');
+    setPvStripes(owned ? !catStripes : true);   // podgląd efektu na kocie
+    if (owned) { buyStripes(STRIPES.cost); setPvStripes(null); haptic.success(); return; }   // posiadane → tylko przełącz
     if (coins < STRIPES.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${STRIPES.cost}`); return; }
-    confirmBuy(STRIPES.name, STRIPES.cost, () => { if (buyStripes(STRIPES.cost)) haptic.success(); });
+    confirmBuy(STRIPES.name, STRIPES.cost, () => { if (buyStripes(STRIPES.cost)) { setPvStripes(null); haptic.success(); } });
   };
   const onTabby = () => {
     haptic.tap();
-    if (ownedItems.includes('tabby')) { buyTabby(TABBY_COST); haptic.success(); return; }   // posiadane → tylko przełącz
+    const owned = ownedItems.includes('tabby');
+    setPvTabby(owned ? !catTabby : true);   // podgląd efektu na kocie
+    if (owned) { buyTabby(TABBY_COST); setPvTabby(null); haptic.success(); return; }   // posiadane → tylko przełącz
     if (coins < TABBY_COST) { haptic.error(); toast.error(`Za mało monet — potrzeba ${TABBY_COST}`); return; }
-    confirmBuy('Pręgi (tabby)', TABBY_COST, () => { if (buyTabby(TABBY_COST)) haptic.success(); });
+    confirmBuy('Pręgi (tabby)', TABBY_COST, () => { if (buyTabby(TABBY_COST)) { setPvTabby(null); haptic.success(); } });
   };
 
   // Kup skrzynkę → POTWIERDŹ → wylosuj → przyznaj nagrodę → pokaż odsłonę.
@@ -125,7 +134,13 @@ export default function PetShop() {
     confirmBuy(su.name, su.cost, () => { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`Kupione: ${su.name}`); } });
   };
 
-  const worn = paletteById(catColor);
+  // co pokazać na wielkim podglądzie: nadpisania podglądu, inaczej faktycznie założone
+  const shownColorId = pvColor ?? catColor;
+  const worn = paletteById(shownColorId);
+  const shownStripes = pvStripes ?? catStripes;
+  const shownTabby = pvTabby ?? catTabby;
+  const pvColorMeta = pvColor ? SHOP_COLORS.find(sc => sc.id === pvColor) : null;
+  const pvUnowned = !!pvColor && !ownedItems.includes(pvColor) && pvColor !== catColor;
 
   const renderStartupCell = (su: Startup) => {
     const owned = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
@@ -135,7 +150,9 @@ export default function PetShop() {
       <PressableScale key={su.id} onPress={() => onStartup(su)}>
         <View style={[s.cell, on && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
           <View style={[s.startupSwatch, { borderColor: su.ink + '55' }]}>
-            <Text style={[s.startupSwatchMark, { color: su.ink }]}>Sapp</Text>
+            {su.anim === 'custom' && su.asset
+              ? <Image source={su.asset} style={{ width: 60, height: 34 }} resizeMode="contain" fadeDuration={0} />
+              : <Text style={[s.startupSwatchMark, { color: su.ink }]}>Sapp</Text>}
           </View>
           <Text style={s.cellName} numberOfLines={1}>{su.name}</Text>
           <Text style={s.animTag}>{ANIM_LABEL[su.anim]}{su.glow ? ' · glow' : ''}</Text>
@@ -176,10 +193,13 @@ export default function PetShop() {
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.preview}>
-          {/* żywy podgląd — animowany + klikalny, żeby na miejscu potwierdzić, że pręgi
-              nie psują ruchu (oddech / mruganie / uszy / machnięcie łapą) */}
-          <CatArt size={150} expression="happy" palette={worn} stripes={catStripes} tabby={catTabby} affection={60} />
-          <Text style={s.previewCap}>{catTabby ? 'pręgi WŁ · dotknij kota' : 'dotknij kota — podgląd na żywo'}</Text>
+          {/* żywy podgląd — animowany + klikalny; pokazuje TAKŻE kolor/pręgi/tabby, które
+              właśnie stukasz w sklepie (przed kupnem), więc widzisz efekt bez płacenia */}
+          <CatArt size={150} expression="happy" palette={worn} stripes={shownStripes} tabby={shownTabby} affection={60} />
+          <Text style={s.previewCap}>
+            {pvUnowned ? `podgląd: ${pvColorMeta?.name ?? ''} — kup, aby założyć na stałe`
+              : 'stuknij kolor lub dodatek — zobaczysz na kocie'}
+          </Text>
         </View>
 
         {/* PRZYPIĘTE: darmowa skrzynka dnia — główne nowe źródło monet */}
@@ -225,7 +245,7 @@ export default function PetShop() {
           {CATS.map(({ id, label, Icon }) => {
             const active = cat === id;
             return (
-              <TouchableOpacity key={id} onPress={() => { haptic.tap(); setCat(id); }}
+              <TouchableOpacity key={id} onPress={() => { haptic.tap(); setCat(id); setPvColor(null); setPvStripes(null); setPvTabby(null); }}
                 style={[s.chip, active && s.chipOn]} activeOpacity={0.8}>
                 <Icon size={14} color={active ? c.bg.primary : c.text.muted} />
                 <Text style={[s.chipTxt, active && s.chipTxtOn]}>{label}</Text>

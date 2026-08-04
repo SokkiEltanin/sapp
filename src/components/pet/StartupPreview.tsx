@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Ellipse } from 'react-native-svg';
 import { Startup, SPLASH_BG } from '@/utils/petStartups';
@@ -178,6 +178,9 @@ export default function StartupPreview({ startup, height = 88, fontSize = 30 }: 
         : anim === 'sweep' ? <SweepMark ink={ink} glow={glow} fs={fontSize} w={w} />
         : anim === 'ring' ? <RingMark ink={ink} glow={glow} fs={fontSize} />
         : anim === 'cat' ? <CatMark height={height} />
+        : anim === 'custom' ? (startup.asset
+            ? <Image source={startup.asset} style={{ width: Math.round(height * 0.92), height: Math.round(height * 0.92) }} resizeMode="contain" fadeDuration={0} />
+            : <Text style={{ color: ink, fontSize: Math.round(fontSize * 0.5) }}>brak pliku</Text>)
         : <CatEyesMark ink={ink} glow={glow} fs={fontSize} />}
     </View>
   );

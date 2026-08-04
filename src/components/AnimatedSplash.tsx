@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Ellipse } from 'react-native-svg';
 import { usePetStore } from '@/store/petStore';
@@ -159,7 +159,7 @@ function RingMark({ ink, glow }: { ink: string; glow?: boolean }) {
 // the ignite/pulse animates the wrapper (native driver), never the SVG props.
 function CatEyeSvg({ ink }: { ink: string }) {
   return (
-    <Svg width={58} height={40} viewBox="0 0 58 40">
+    <Svg width={42} height={29} viewBox="0 0 58 40">
       <Path d="M2 20 Q29 1 56 20 Q29 39 2 20 Z" fill={ink + '22'} stroke={ink} strokeWidth={2.4} strokeLinejoin="round" />
       <Ellipse cx={29} cy={20} rx={12} ry={15} fill={ink} opacity={0.85} />
       <Ellipse cx={29} cy={20} rx={3.2} ry={13} fill="#000" />
@@ -212,8 +212,20 @@ function CatMark({ glow }: { ink: string; glow?: boolean }) {
   );
 }
 
+// ── CUSTOM: your own dropped-in animation (assets/startups/NAZWA_CENA.webp). RN Image
+// loops an animated WebP/GIF natively on Android — no extra dependency, no JS-thread cost. ──
+function CustomMark({ glow, asset }: { ink: string; glow?: boolean; asset?: number }) {
+  if (!asset) return <BarMark ink="#F2F3F3" glow={glow} />;   // plik zniknął po rebuildzie → fallback
+  return (
+    <View style={styles.catCol}>
+      <Image source={asset} style={styles.customImg} resizeMode="contain" fadeDuration={0} />
+      <Text style={[styles.markSmall, { color: '#F2F3F3' }, glowFor(glow, '#F2F3F3')]}>Sapp</Text>
+    </View>
+  );
+}
+
 const MARKS: Record<SplashAnim, typeof WaveMark> = {
-  bar: BarMark, wave: WaveMark, pulse: PulseMark, sweep: SweepMark, ring: RingMark, cateyes: CatEyesMark, cat: CatMark,
+  bar: BarMark, wave: WaveMark, pulse: PulseMark, sweep: SweepMark, ring: RingMark, cateyes: CatEyesMark, cat: CatMark, custom: CustomMark,
 };
 
 export default function AnimatedSplash({ visible, onHidden }: { visible: boolean; onHidden: () => void }) {
@@ -233,7 +245,9 @@ export default function AnimatedSplash({ visible, onHidden }: { visible: boolean
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} pointerEvents={visible ? 'auto' : 'none'}>
-      <Mark ink={cfg.ink} glow={cfg.glow} />
+      {cfg.anim === 'custom'
+        ? <CustomMark ink={cfg.ink} glow={cfg.glow} asset={cfg.asset} />
+        : <Mark ink={cfg.ink} glow={cfg.glow} />}
     </Animated.View>
   );
 }
@@ -260,10 +274,13 @@ const styles = StyleSheet.create({
   ring: { width: 64, height: 64, borderRadius: 32, borderWidth: 5 },
 
   // cat eyes
-  eyesCol: { alignItems: 'center', gap: 20 },
-  eyesRow: { flexDirection: 'row', gap: 28 },
-  eyesBrand: { fontSize: 22, fontWeight: '900', letterSpacing: 2 },
+  eyesCol: { alignItems: 'center', gap: 16 },
+  eyesRow: { flexDirection: 'row', gap: 20 },
+  eyesBrand: { fontSize: 20, fontWeight: '900', letterSpacing: 2 },
 
   // twój kot
   catCol: { alignItems: 'center', gap: 8 },
+
+  // custom (własna animacja z assets)
+  customImg: { width: 200, height: 200 },
 });
