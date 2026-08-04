@@ -68,6 +68,10 @@ interface PetState {
   energyToday: number;          // energy already granted today (for daily top-up)
   defeatedBosses: string[];
   bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
+  // ── raid tygodniowy ──
+  raidWeek: string | null;      // klucz tygodnia, dla którego raidHp jest aktualne
+  raidHp: number;               // pozostałe HP raidu tego tygodnia
+  raidWon: string[];            // klucze tygodni pokonanych (kolekcjonerskie medale)
   _hydrated: boolean;
 
   setName: (name: string) => void;
@@ -98,6 +102,10 @@ interface PetState {
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number) => void;
+  healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
+  raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
+  raidAttack: (damage: number) => { remaining: number; defeated: boolean };
+  raidClaim: (weekKey: string, coins: number, xp: number) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
   reset: () => void;
 }
 
@@ -134,6 +142,9 @@ export const usePetStore = create<PetState>()(
       energy: 0,
       energyDate: null,
       energyToday: 0,
+      raidWeek: null,
+      raidHp: 0,
+      raidWon: [],
       defeatedBosses: [],
       bossHp: {},
       _hydrated: false,
@@ -351,7 +362,16 @@ export const usePetStore = create<PetState>()(
         coins: s.coins + coins,
         xp: s.xp + xp,
       })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {} }),
+      healBoss: (bossId, amount, maxHp) => set((s) => ({ bossHp: { ...s.bossHp, [bossId]: Math.min(maxHp, (s.bossHp[bossId] ?? maxHp) + Math.max(0, amount)) } })),
+      raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp })),
+      raidAttack: (damage) => {
+        const s = get();
+        const remaining = Math.max(0, s.raidHp - damage);
+        set({ energy: 0, raidHp: remaining });
+        return { remaining, defeated: remaining <= 0 };
+      },
+      raidClaim: (weekKey, coins, xp) => set((s) => (s.raidWon.includes(weekKey) ? s : { raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp })),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidWeek: null, raidHp: 0, raidWon: [] }),
     }),
     {
       name: 'pet-v1',
@@ -367,6 +387,7 @@ export const usePetStore = create<PetState>()(
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
+        raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)

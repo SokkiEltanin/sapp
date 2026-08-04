@@ -4,7 +4,7 @@
 // drops a trophy with a passive combat bonus that helps against tougher bosses —
 // so difficulty scales up (boss HP) while YOU scale up (pet level + loot).
 
-export type WeaknessKey = 'steps' | 'sweetless' | 'habits' | 'mood';
+export type WeaknessKey = 'steps' | 'sweetless' | 'habits' | 'mood' | 'sleep' | 'water';
 
 export interface BossLoot {
   id: string;
@@ -27,6 +27,9 @@ export interface Boss {
   coins: number;
   xp: number;
   taunt: string;
+  // ── mechaniki (opcjonalne) ──
+  guard?: 'sweets' | 'poorSleep';  // OSŁONA: jeśli DZIŚ zrobiłeś tę złą rzecz → Twój cios ×0.5
+  regenPct?: number;               // REGENERACJA: jeśli DZIŚ zaniedbałeś jego słabość → leczy ten % max HP przy ciosie
 }
 
 export const BOSSES: Boss[] = [
@@ -40,7 +43,7 @@ export const BOSSES: Boss[] = [
     id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 520,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
-    coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…',
+    coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: 'sweets',
   },
   {
     id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 820,
@@ -52,7 +55,7 @@ export const BOSSES: Boss[] = [
     id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 1400,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_dragon', name: 'Trofeum Smoka', emoji: '🐲', desc: '+5% uniku, +3% siły ataku', bonus: { dodge: 0.05, atk: 0.03 } },
-    coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…',
+    coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
   },
   {
     id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 2200,
@@ -70,32 +73,32 @@ export const BOSSES: Boss[] = [
     id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 4500,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_veg', name: 'Korona Warzyw', emoji: '🥦', desc: '+5% siły ataku, +2% kryt', bonus: { atk: 0.05, crit: 0.02 } },
-    coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…',
+    coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…', guard: 'sweets',
   },
   {
     id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 6500,
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +5% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.05, energyMult: 0.05 } },
-    coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…',
+    coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
   },
   // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
   {
     id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 9000,
-    weakness: 'habits', weaknessLabel: 'nawyki',
+    weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
-    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…',
+    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: 'poorSleep', regenPct: 0.03,
   },
   {
     id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 12000,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+7% uniku, +3% atak', bonus: { dodge: 0.07, atk: 0.03 } },
-    coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…',
+    coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
   },
   {
     id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 16000,
-    weakness: 'habits', weaknessLabel: 'nawyki (woda)',
+    weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
-    coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?',
+    coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?', regenPct: 0.03,
   },
   {
     id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 22000,
@@ -107,13 +110,13 @@ export const BOSSES: Boss[] = [
     id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 30000,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +6% uniku', bonus: { atk: 0.08, dodge: 0.06 } },
-    coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…',
+    coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
   },
   {
     id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 42000,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +8% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.08, energyMult: 0.08, crit: 0.05 } },
-    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…',
+    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: 'sweets', regenPct: 0.04,
   },
 ];
 
@@ -152,6 +155,9 @@ export interface WeaknessCtx {
   sweetlessDays: number;
   habitsRatio: number;      // 0..1 (done/total today)
   moodLoggedToday: boolean;
+  boughtSweetToday: boolean;
+  sleepMinutes: number;     // dziś (0 = brak danych)
+  waterRatio: number;       // 0..1 (szklanki dziś / cel)
 }
 
 // Bonus damage multiplier for hitting a boss's weakness with the right habit.
@@ -161,6 +167,27 @@ export function weaknessMult(boss: Boss, c: WeaknessCtx): number {
     case 'sweetless': return 1 + Math.min(30, c.sweetlessDays) * 0.02;
     case 'habits':    return 1 + c.habitsRatio * 0.3;
     case 'mood':      return 1 + (c.moodLoggedToday ? 0.25 : 0);
+    case 'sleep':     return 1 + Math.min(1, c.sleepMinutes / 420) * 0.25;   // 7h+ = pełny bonus
+    case 'water':     return 1 + Math.min(1, c.waterRatio) * 0.25;
+  }
+}
+
+// OSŁONA: dziś zrobiłeś złą rzecz, na którą boss „żeruje" → Twój cios jest słabszy.
+export function bossGuarded(boss: Boss, c: WeaknessCtx): boolean {
+  if (boss.guard === 'sweets') return c.boughtSweetToday;
+  if (boss.guard === 'poorSleep') return c.sleepMinutes > 0 && c.sleepMinutes < 360; // <6h
+  return false;
+}
+
+// Czy DZIŚ spełniłeś zdrowe zachowanie tego bossa (jeśli NIE → regeneruje się).
+export function weaknessMet(boss: Boss, c: WeaknessCtx): boolean {
+  switch (boss.weakness) {
+    case 'steps':     return c.stepsToday >= 6000;
+    case 'sweetless': return !c.boughtSweetToday;
+    case 'habits':    return c.habitsRatio >= 0.5;
+    case 'mood':      return c.moodLoggedToday;
+    case 'sleep':     return c.sleepMinutes >= 360;
+    case 'water':     return c.waterRatio >= 0.5;
   }
 }
 
