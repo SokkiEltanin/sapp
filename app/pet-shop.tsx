@@ -22,6 +22,18 @@ import { toast } from '@/store/toastStore';
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 const TABBY_COST = 70;    // pręgi tabby na ciele
+const WHISKERS_COST = 55;   // wąsy
+const LEGSTRIPES_COST = 65; // pręgi na łapkach
+const FOREHEAD_COST = 60;   // znak „M" na czole
+const EYE_COST = 50;        // kolor oczu (każdy poza domyślnym)
+const EYE_COLORS: { id: string; name: string; hex: string }[] = [
+  { id: 'default', name: 'Domyślne',   hex: '' },
+  { id: 'green',   name: 'Zielone',    hex: '#3FA96A' },
+  { id: 'amber',   name: 'Bursztyn',   hex: '#C98A2B' },
+  { id: 'blue',    name: 'Niebieskie', hex: '#3E7BC9' },
+  { id: 'copper',  name: 'Miedziane',  hex: '#B4603A' },
+  { id: 'gold',    name: 'Złote',      hex: '#C9A227' },
+];
 
 const todayKey = () => {
   const d = new Date();
@@ -40,7 +52,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, catTabby, buyColor, buyStripes, buyTabby, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, catTabby, catEyeColor, catWhiskers, catLegStripes, catForeheadM, buyColor, buyStripes, buyTabby, buyEyeColor, buyWhiskers, buyLegStripes, buyForeheadM, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -51,6 +63,11 @@ export default function PetShop() {
   const [pvColor, setPvColor] = useState<string | null>(null);
   const [pvStripes, setPvStripes] = useState<boolean | null>(null);
   const [pvTabby, setPvTabby] = useState<boolean | null>(null);
+  const [pvEye, setPvEye] = useState<string | null>(null);   // hex podglądu oczu ('' = domyślne)
+  const [pvWhiskers, setPvWhiskers] = useState<boolean | null>(null);
+  const [pvLeg, setPvLeg] = useState<boolean | null>(null);
+  const [pvM, setPvM] = useState<boolean | null>(null);
+  const clearPreviews = () => { setPvColor(null); setPvStripes(null); setPvTabby(null); setPvEye(null); setPvWhiskers(null); setPvLeg(null); setPvM(null); };
 
   // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
   // założenie posiadanego / darmowa skrzynka dnia nie pytają).
@@ -93,6 +110,42 @@ export default function PetShop() {
     if (coins < TABBY_COST) { haptic.error(); toast.error(`Za mało monet — potrzeba ${TABBY_COST}`); return; }
     confirmBuy('Pręgi (tabby)', TABBY_COST, () => { if (buyTabby(TABBY_COST)) { setPvTabby(null); haptic.success(); } });
   };
+  // Kolor oczu: podgląd od razu, kup+ustaw / ustaw jeśli masz. 'default' (hex '') za darmo.
+  const onEye = (id: string, hex: string, cost: number, name: string) => {
+    haptic.tap();
+    setPvEye(hex);
+    const had = ownedItems.includes(`eye:${id}`) || cost === 0;
+    if (had) { if (buyEyeColor(id, hex, cost)) { setPvEye(null); haptic.success(); toast.success(`Oczy: ${name}`); } return; }
+    if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
+    confirmBuy(`Oczy: ${name}`, cost, () => { if (buyEyeColor(id, hex, cost)) { setPvEye(null); haptic.success(); toast.success(`Kupione: oczy ${name}`); } });
+  };
+  // Generyczny toggle-dodatek (wąsy / pręgi łapek / „M") — podgląd + kup / przełącz jeśli masz.
+  const onToggleExtra = (key: string, cost: number, name: string, cur: boolean, setPv: (v: boolean | null) => void, buy: (c: number) => boolean) => {
+    haptic.tap();
+    const owned = ownedItems.includes(key);
+    setPv(owned ? !cur : true);
+    if (owned) { buy(cost); setPv(null); haptic.success(); return; }
+    if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
+    confirmBuy(name, cost, () => { if (buy(cost)) { setPv(null); haptic.success(); } });
+  };
+  // Wspólny wiersz toggle-dodatku (wąsy / pręgi łapek / „M"). `on` = stan ZAŁOŻONY.
+  const extraRow = (key: string, name: string, desc: string, on: boolean, cost: number, onPress: () => void) => (
+    <PressableScale onPress={onPress}>
+      <View style={[s.boxRow, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.cellName}>{name}</Text>
+          <Text style={s.cellState}>
+            {ownedItems.includes(key)
+              ? (on ? '● włączone — stuknij, aby wyłączyć' : '○ wyłączone — stuknij, aby włączyć')
+              : desc}
+          </Text>
+        </View>
+        {ownedItems.includes(key)
+          ? <Check size={18} color="#4DA8FF" />
+          : <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text></View>}
+      </View>
+    </PressableScale>
+  );
 
   // Kup skrzynkę → POTWIERDŹ → wylosuj → przyznaj nagrodę → pokaż odsłonę.
   const onBuyBox = (box: LootBox) => {
@@ -139,6 +192,10 @@ export default function PetShop() {
   const worn = paletteById(shownColorId);
   const shownStripes = pvStripes ?? catStripes;
   const shownTabby = pvTabby ?? catTabby;
+  const shownEye = pvEye ?? catEyeColor;
+  const shownWhiskers = pvWhiskers ?? catWhiskers;
+  const shownLeg = pvLeg ?? catLegStripes;
+  const shownM = pvM ?? catForeheadM;
   const pvColorMeta = pvColor ? SHOP_COLORS.find(sc => sc.id === pvColor) : null;
   const pvUnowned = !!pvColor && !ownedItems.includes(pvColor) && pvColor !== catColor;
 
@@ -195,7 +252,8 @@ export default function PetShop() {
         <View style={s.preview}>
           {/* żywy podgląd — animowany + klikalny; pokazuje TAKŻE kolor/pręgi/tabby, które
               właśnie stukasz w sklepie (przed kupnem), więc widzisz efekt bez płacenia */}
-          <CatArt size={150} expression="happy" palette={worn} stripes={shownStripes} tabby={shownTabby} affection={60} />
+          <CatArt size={150} expression="happy" palette={worn} stripes={shownStripes} tabby={shownTabby}
+            eyeColor={shownEye} whiskers={shownWhiskers} legStripes={shownLeg} foreheadM={shownM} affection={60} />
           <Text style={s.previewCap}>
             {pvUnowned ? `podgląd: ${pvColorMeta?.name ?? ''} — kup, aby założyć na stałe`
               : 'stuknij kolor lub dodatek — zobaczysz na kocie'}
@@ -245,7 +303,7 @@ export default function PetShop() {
           {CATS.map(({ id, label, Icon }) => {
             const active = cat === id;
             return (
-              <TouchableOpacity key={id} onPress={() => { haptic.tap(); setCat(id); setPvColor(null); setPvStripes(null); setPvTabby(null); }}
+              <TouchableOpacity key={id} onPress={() => { haptic.tap(); setCat(id); clearPreviews(); }}
                 style={[s.chip, active && s.chipOn]} activeOpacity={0.8}>
                 <Icon size={14} color={active ? c.bg.primary : c.text.muted} />
                 <Text style={[s.chipTxt, active && s.chipTxtOn]}>{label}</Text>
@@ -328,6 +386,28 @@ export default function PetShop() {
         {/* ── DODATKI ──────────────────────────────────────────────── */}
         {cat === 'extras' && (
           <View style={{ gap: spacing[2] }}>
+            {/* Kolor oczu — mini paleta; stuknięcie od razu podgląda na kocie */}
+            <View style={{ gap: 6 }}>
+              <Text style={s.cellName}>Kolor oczu</Text>
+              <View style={s.grid}>
+                {EYE_COLORS.map(ec => {
+                  const owned = ec.hex === '' || ownedItems.includes(`eye:${ec.id}`);
+                  const on = catEyeColor === ec.hex;
+                  return (
+                    <PressableScale key={ec.id} onPress={() => onEye(ec.id, ec.hex, ec.hex === '' ? 0 : EYE_COST, ec.name)}>
+                      <View style={[s.eyeCell, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+                        <View style={[s.eyeDot, { backgroundColor: ec.hex || '#2A2B36' }]}>{on && <Check size={12} color="#fff" />}</View>
+                        <Text style={s.eyeName} numberOfLines={1}>{ec.name}</Text>
+                        {!owned
+                          ? <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{EYE_COST}</Text></View>
+                          : <Text style={[s.cellState, { color: on ? '#4DA8FF' : c.text.muted }]}>{on ? 'na oczach' : 'masz'}</Text>}
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+
             <PressableScale onPress={onStripes}>
               <View style={[s.boxRow, catStripes && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
                 <View style={{ flex: 1 }}>
@@ -359,6 +439,13 @@ export default function PetShop() {
                   : <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{TABBY_COST}</Text></View>}
               </View>
             </PressableScale>
+
+            {extraRow('whiskers', 'Wąsy', 'cienkie wąsy od pyszczka', catWhiskers, WHISKERS_COST,
+              () => onToggleExtra('whiskers', WHISKERS_COST, 'Wąsy', catWhiskers, setPvWhiskers, buyWhiskers))}
+            {extraRow('legstripes', 'Pręgi na łapkach', 'poziome pręgi na łapkach — jak u tabby', catLegStripes, LEGSTRIPES_COST,
+              () => onToggleExtra('legstripes', LEGSTRIPES_COST, 'Pręgi na łapkach', catLegStripes, setPvLeg, buyLegStripes))}
+            {extraRow('foreheadm', 'Znak „M" na czole', 'klasyczny znaczek pręgowanych kotów', catForeheadM, FOREHEAD_COST,
+              () => onToggleExtra('foreheadm', FOREHEAD_COST, 'Znak „M" na czole', catForeheadM, setPvM, buyForeheadM))}
           </View>
         )}
 
@@ -413,6 +500,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   subSection: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   cell: { width: 96, alignItems: 'center', gap: 5, padding: spacing[2], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  eyeCell: { width: 92, alignItems: 'center', gap: 5, padding: spacing[2], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  eyeDot: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.22)' },
+  eyeName: { fontSize: 11, fontWeight: '700', color: c.text.primary },
   swatch: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   cellState: { fontSize: 10, color: c.text.muted },

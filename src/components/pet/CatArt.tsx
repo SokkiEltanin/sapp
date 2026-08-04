@@ -57,12 +57,17 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
   palette = DEFAULT_PALETTE, stripes = false, tabby = false, onAngry, lively = false,
+  eyeColor = '', whiskers = false, legStripes = false, foreheadM = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
   celebrate?: number; affection?: number; palette?: CatPalette; stripes?: boolean; tabby?: boolean;
   onAngry?: () => void;
   lively?: boolean;   // eager idle for the loading splash: glance + ear-flutter soon & often
+  eyeColor?: string;   // '' = domyślny PUPIL; inaczej hex koloru oczu
+  whiskers?: boolean;  // wąsy
+  legStripes?: boolean; // pręgi na łapkach
+  foreheadM?: boolean;  // znak „M" tabby na czole
 }) {
   const p = palette;
   const breathe = useRef(new Animated.Value(0)).current;
@@ -310,6 +315,7 @@ export default function CatArt({
     ]).start();
   }, [celebrate]);
 
+  const eye = eyeColor || PUPIL;          // kolor oczu (dodatek) albo domyślny
   const unit = size / 2000;               // px per viewBox unit — everything derives from this
   // shoulder (829,1250 in viewBox) expressed relative to the overlay's CENTRE, because RN
   // rotates about the centre and has no transform-origin
@@ -397,6 +403,21 @@ export default function CatArt({
               </G>
               {!armOut && <Paw cx={829} p={p} />}
               <Paw cx={1077} p={p} />
+              {/* pręgi na łapkach — poziome bandki na goleniach (tabby); lewa znika gdy łapa uniesiona */}
+              {legStripes && !armOut && (
+                <G fill={p.mark} opacity={0.32}>
+                  <Rect x={779} y={1300} width={100} height={13} rx={5} />
+                  <Rect x={779} y={1360} width={100} height={13} rx={5} />
+                  <Rect x={779} y={1420} width={100} height={13} rx={5} />
+                </G>
+              )}
+              {legStripes && (
+                <G fill={p.mark} opacity={0.32}>
+                  <Rect x={1027} y={1300} width={100} height={13} rx={5} />
+                  <Rect x={1027} y={1360} width={100} height={13} rx={5} />
+                  <Rect x={1027} y={1420} width={100} height={13} rx={5} />
+                </G>
+              )}
 
               {/* ears are drawn as separate animated overlays (Ear, below) so they can
                   flutter — animating them here inside the SVG would stutter */}
@@ -404,6 +425,9 @@ export default function CatArt({
                 <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill={p.coat} /></G>
                 {tabby && <G transform="matrix(1,0,0,0.890459,-226.720183,-280.574338)"><Circle cx={1179.406} cy={1195.161} r={370.904} fill="url(#coatTabby)" /></G>}
                 <G transform="matrix(0.213355,0,0,0.272984,737.537265,581.298175)"><Path d="M1144.719,1084.766L843.176,1084.766C840.209,1076.226 838.71,1067.464 838.71,1058.671C838.71,998.193 908.269,949.093 993.948,949.093C1079.626,949.093 1149.185,998.193 1149.185,1058.671C1149.185,1067.464 1147.686,1076.226 1144.719,1084.766Z" fill={p.ink} /></G>
+
+                {/* znak „M" tabby na czole — kreska w kolorze pręg (nie płaska łatka) */}
+                {foreheadM && <Path d="M887 695 L905 610 L952 665 L999 610 L1017 695" fill="none" stroke={p.mark} strokeWidth={12} strokeLinecap="round" strokeLinejoin="round" opacity={0.72} />}
 
                 {shut ? (
                   <G>
@@ -419,15 +443,15 @@ export default function CatArt({
                         // slit pupils: a round pupil simply fills the narrowed eye, so all
                         // you saw was a dark wedge — and slits are what an angry cat has
                         <G>
-                          <Ellipse cx={794} cy={792} rx={17} ry={55} fill={PUPIL} />
-                          <Ellipse cx={1107} cy={794} rx={17} ry={55} fill={PUPIL} />
+                          <Ellipse cx={794} cy={792} rx={17} ry={55} fill={eye} />
+                          <Ellipse cx={1107} cy={794} rx={17} ry={55} fill={eye} />
                           <Circle cx={820} cy={762} r={9} fill="#fff" opacity={0.9} />
                           <Circle cx={1133} cy={764} r={9} fill="#fff" opacity={0.9} />
                         </G>
                       ) : (
                         <G>
-                          <Ellipse cx={794} cy={792} rx={54} ry={61} fill={PUPIL} />
-                          <Ellipse cx={1107} cy={794} rx={55} ry={61} fill={PUPIL} />
+                          <Ellipse cx={794} cy={792} rx={54} ry={61} fill={eye} />
+                          <Ellipse cx={1107} cy={794} rx={55} ry={61} fill={eye} />
                           <Circle cx={815} cy={758} r={17} fill="#fff" />
                           <Circle cx={1128} cy={760} r={17} fill="#fff" />
                         </G>
@@ -448,6 +472,17 @@ export default function CatArt({
                   </G>
                 )}
                 {mouthFor(expression, angry, petting || licking, p.ink)}
+                {/* wąsy — cienkie kreski od pyszczka na boki (statyczne, animacji nie ruszają) */}
+                {whiskers && (
+                  <G stroke={p.ink} strokeWidth={5} strokeLinecap="round" fill="none" opacity={0.5}>
+                    <Path d="M846 874 Q722 852 604 838" />
+                    <Path d="M848 902 Q720 906 596 904" />
+                    <Path d="M846 930 Q724 948 606 968" />
+                    <Path d="M1124 874 Q1248 852 1366 838" />
+                    <Path d="M1122 902 Q1250 906 1374 904" />
+                    <Path d="M1124 930 Q1246 948 1364 968" />
+                  </G>
+                )}
                 {licking && (
                   <G>
                     <Ellipse cx={985} cy={906} rx={46} ry={32} fill="#5E3140" />
