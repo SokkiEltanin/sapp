@@ -42,6 +42,7 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome } from '@/utils/dashboard/spend';
+import { moodColor, plTasks } from '@/utils/dashboard/format';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -333,19 +334,6 @@ const sd = StyleSheet.create({
   val: { fontSize: 12, fontWeight: '800' },
   label: { fontSize: 11, fontWeight: '600' },
 });
-function moodColor(avg: number): string {
-  if (avg >= 4.5) return MOOD_COLORS[5];
-  if (avg >= 3.5) return MOOD_COLORS[4];
-  if (avg >= 2.5) return MOOD_COLORS[3];
-  if (avg >= 1.5) return MOOD_COLORS[2];
-  return MOOD_COLORS[1];
-}
-function plTasks(n: number): string {
-  const m10 = n % 10, m100 = n % 100;
-  if (n === 1) return 'zadanie'; // only exactly 1 — "21 zadań", not "21 zadanie"
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'zadania';
-  return 'zadań';
-}
 // Dynamic tag-limit message that escalates with how much of the limit is used.
 function tagLimitMsg(pct: number): string {
   if (pct >= 1)    return 'Przekroczono limit';
