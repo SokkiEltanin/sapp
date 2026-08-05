@@ -42,10 +42,10 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/utils/dashboard/spend';
-import { moodColor, plTasks, tagLimitMsg } from '@/utils/dashboard/format';
+import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
-import { carryForward, lastNonZero, zoomFloor } from '@/utils/dashboard/chart';
+import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -164,43 +164,6 @@ const STAT_GROUP_ICON: Record<string, React.ComponentType<any>> = {
 };
 function metricIcon(def: { id: string; group: string }): React.ComponentType<any> {
   return STAT_METRIC_ICON[def.id] ?? STAT_GROUP_ICON[def.group] ?? BarChart2;
-}
-
-// A tag metric's registry label is generic ("Wydatki na tag…") — for a widget it must
-// name the actual tag, or a "przekąski vs słodycze" tile shows "Wydatki na tag…".
-function metricTagLabel(def: { label: string; unit: string; needsTag?: boolean } | undefined, tag?: string): string {
-  if (def?.needsTag && tag) {
-    const kind = def.unit === 'zł' ? 'wydatki' : def.unit === 'kg' ? 'kg' : 'szt.';
-    return `${tag.charAt(0).toUpperCase()}${tag.slice(1)} (${kind})`;
-  }
-  return def?.label ?? '';
-}
-
-// Compact per-point label for the trend charts (value shown ABOVE each dot). Kept
-// short so 6 across a narrow card stay legible: decimals for kg/h/rating, exact
-// (grouped) number up to 5 digits, then k-notation. Empty for a zero/no-data point.
-function fmtChartPt(v: number, unit: string): string {
-  if (!(v > 0)) return '';
-  if (unit === 'kg' || unit === 'h' || unit === '/5') return v.toFixed(1).replace('.', ',');
-  if (v >= 100000) return `${Math.round(v / 1000)}k`;
-  return Math.round(v).toLocaleString('pl-PL');
-}
-
-// Do two metric series move together across the SAME periods? Pearson over matched
-// non-zero pairs → a plain-language verdict for the two-metric compare widget.
-function compareVerdict(a: number[], b: number[], mutedColor: string): { text: string; color: string } | null {
-  const pairs: [number, number][] = [];
-  for (let i = 0; i < a.length; i++) if (a[i] > 0 && (b[i] ?? 0) > 0) pairs.push([a[i], b[i]]);
-  if (pairs.length < 3) return null;
-  const n = pairs.length;
-  const mx = pairs.reduce((s, p) => s + p[0], 0) / n;
-  const my = pairs.reduce((s, p) => s + p[1], 0) / n;
-  let sxy = 0, sxx = 0, syy = 0;
-  for (const [x, y] of pairs) { const dx = x - mx, dy = y - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
-  const r = sxx > 0 && syy > 0 ? sxy / Math.sqrt(sxx * syy) : 0;
-  if (r >= 0.4)  return { text: 'Zwykle idą w parze — więcej jednego, więcej drugiego', color: '#2AC68F' };
-  if (r <= -0.4) return { text: 'Zwykle przeciwnie — gdy jedno rośnie, drugie spada', color: '#F87171' };
-  return { text: 'Bez wyraźnego związku w tych okresach', color: mutedColor };
 }
 
 const MOOD_EMOJIS: Record<MoodLevel, string> = {

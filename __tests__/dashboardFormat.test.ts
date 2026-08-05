@@ -1,4 +1,4 @@
-import { moodColor, plTasks, tagLimitMsg } from '@/utils/dashboard/format';
+import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
 import { MOOD_COLORS } from '@/types';
 
 describe('dashboard/format', () => {
@@ -34,5 +34,21 @@ describe('dashboard/format', () => {
     expect(tagLimitMsg(0.9)).toBe('Hamuj! Limit prawie wyczerpany');
     expect(tagLimitMsg(1)).toBe('Przekroczono limit');
     expect(tagLimitMsg(1.5)).toBe('Przekroczono limit');
+  });
+
+  test('fmtChartPt — puste/dziesiętne/k-notacja', () => {
+    expect(fmtChartPt(0, 'zł')).toBe('');
+    expect(fmtChartPt(-5, 'zł')).toBe('');
+    expect(fmtChartPt(72.5, 'kg')).toBe('72,5');
+    expect(fmtChartPt(3.2, '/5')).toBe('3,2');
+    expect(fmtChartPt(120000, 'zł')).toBe('120k');
+  });
+
+  test('metricTagLabel — nazwa konkretnego tagu wg jednostki', () => {
+    expect(metricTagLabel(undefined)).toBe('');
+    expect(metricTagLabel({ label: 'Wydatki', unit: 'zł' })).toBe('Wydatki');
+    expect(metricTagLabel({ label: 'X', unit: 'zł', needsTag: true }, 'słodycze')).toBe('Słodycze (wydatki)');
+    expect(metricTagLabel({ label: 'X', unit: 'kg', needsTag: true }, 'mięso')).toBe('Mięso (kg)');
+    expect(metricTagLabel({ label: 'X', unit: 'szt', needsTag: true }, 'jajka')).toBe('Jajka (szt.)');
   });
 });

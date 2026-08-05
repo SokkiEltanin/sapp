@@ -20,6 +20,24 @@ export function plTasks(n: number): string {
   return 'zadań';
 }
 
+// Etykieta metryki tagowej — rejestrowa etykieta jest generyczna („Wydatki na tag…"), a
+// widget musi nazwać KONKRETNY tag.
+export function metricTagLabel(def: { label: string; unit: string; needsTag?: boolean } | undefined, tag?: string): string {
+  if (def?.needsTag && tag) {
+    const kind = def.unit === 'zł' ? 'wydatki' : def.unit === 'kg' ? 'kg' : 'szt.';
+    return `${tag.charAt(0).toUpperCase()}${tag.slice(1)} (${kind})`;
+  }
+  return def?.label ?? '';
+}
+
+// Zwięzła etykieta punktu wykresu (wartość nad kropką). Puste dla zera/braku danych.
+export function fmtChartPt(v: number, unit: string): string {
+  if (!(v > 0)) return '';
+  if (unit === 'kg' || unit === 'h' || unit === '/5') return v.toFixed(1).replace('.', ',');
+  if (v >= 100000) return `${Math.round(v / 1000)}k`;
+  return Math.round(v).toLocaleString('pl-PL');
+}
+
 // Komunikat limitu tagu, eskalujący z wykorzystaniem (0..1+).
 export function tagLimitMsg(pct: number): string {
   if (pct >= 1)    return 'Przekroczono limit';

@@ -1,4 +1,4 @@
-import { carryForward, lastNonZero, zoomFloor } from '@/utils/dashboard/chart';
+import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
 
 describe('dashboard/chart — transformacje serii', () => {
   test('carryForward przeciąga ostatnią znaną wartość przez zera', () => {
@@ -25,5 +25,22 @@ describe('dashboard/chart — transformacje serii', () => {
     expect(zoomFloor([0, 50])).toBe(0);   // <2 niezerowe
     expect(zoomFloor([1, 100])).toBe(0);  // lo nie > hi*0.3
     expect(zoomFloor([5])).toBe(0);
+  });
+});
+
+describe('dashboard/chart — compareVerdict (Pearson)', () => {
+  const M = '#888';
+  test('dodatnia korelacja → idą w parze', () => {
+    const v = compareVerdict([1, 2, 3, 4], [2, 4, 6, 8], M);
+    expect(v?.text).toMatch(/w parze/);
+    expect(v?.color).toBe('#2AC68F');
+  });
+  test('ujemna korelacja → przeciwnie', () => {
+    const v = compareVerdict([1, 2, 3, 4], [8, 6, 4, 2], M);
+    expect(v?.text).toMatch(/przeciwnie/);
+    expect(v?.color).toBe('#F87171');
+  });
+  test('mniej niż 3 dopasowane pary → null', () => {
+    expect(compareVerdict([1, 0, 0], [1, 0, 0], M)).toBeNull();
   });
 });
