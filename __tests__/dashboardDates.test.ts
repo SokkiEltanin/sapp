@@ -1,4 +1,4 @@
-import { getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
+import { getWeekDates, weekLabel, dayAvg, moodStreakFrom } from '@/utils/dashboard/dates';
 import { MoodEntry } from '@/types';
 
 const m = (mood: number, energy: number): MoodEntry => ({ mood, energy } as any);
@@ -31,5 +31,22 @@ describe('dashboard/dates', () => {
   test('dayAvg: średnia nastroju/energii + null gdy brak', () => {
     expect(dayAvg([])).toBeNull();
     expect(dayAvg([m(4, 3), m(2, 5)])).toEqual({ mood: 3, energy: 4 });
+  });
+});
+
+describe('dashboard/dates — moodStreakFrom', () => {
+  const d = (date: string) => ({ date });
+  test('kolejne dni kończące się dziś → pełna seria', () => {
+    expect(moodStreakFrom([d('2026-08-05'), d('2026-08-04'), d('2026-08-03')], '2026-08-05')).toBe(3);
+  });
+  test('ostatni wpis wczoraj → seria wciąż liczona', () => {
+    expect(moodStreakFrom([d('2026-08-04'), d('2026-08-03')], '2026-08-05')).toBe(2);
+  });
+  test('luka przerywa serię', () => {
+    expect(moodStreakFrom([d('2026-08-05'), d('2026-08-03')], '2026-08-05')).toBe(1);
+  });
+  test('ostatni wpis starszy niż wczoraj → 0; pusto → 0', () => {
+    expect(moodStreakFrom([d('2026-08-01')], '2026-08-05')).toBe(0);
+    expect(moodStreakFrom([], '2026-08-05')).toBe(0);
   });
 });

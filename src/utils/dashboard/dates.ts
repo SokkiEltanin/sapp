@@ -26,6 +26,22 @@ export function weekLabel(dates: string[]): string {
     : `${from.getDate()} ${fM} – ${to.getDate()} ${tM}`;
 }
 
+// Seria kolejnych dni z wpisem nastroju, kończąca się dziś LUB wczoraj (inaczej 0). `today`
+// = lokalny YYYY-MM-DD. Kotwica w południe → odporne na strefę czasową.
+export function moodStreakFrom(moodEntries: { date: string }[], today: string): number {
+  const dates = [...new Set(moodEntries.map(e => e.date))].sort().reverse();
+  if (!dates.length) return 0;
+  const yest = ymd(new Date(new Date(today + 'T12:00:00').getTime() - 86400000));
+  if (dates[0] !== today && dates[0] !== yest) return 0;
+  let streak = 0;
+  const cursor = new Date(dates[0] + 'T12:00:00');
+  for (const d of dates) {
+    if (d === ymd(cursor)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+    else if (d < ymd(cursor)) break;
+  }
+  return streak;
+}
+
 // Średni nastrój/energia z wpisów jednego dnia (null gdy brak wpisów).
 export function dayAvg(entries: MoodEntry[]): { mood: MoodLevel; energy: MoodLevel } | null {
   if (!entries.length) return null;

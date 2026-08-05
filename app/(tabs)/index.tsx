@@ -44,7 +44,7 @@ import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS, weekdaySpendPattern } from '@/utils/dashboard/spend';
 import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
-import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
+import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg, moodStreakFrom } from '@/utils/dashboard/dates';
 import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
 import { humorLine } from '@/utils/dashboard/humor';
 import { pctChange, monthSpendCompare } from '@/utils/dashboard/compare';
@@ -2395,19 +2395,7 @@ export default function DashboardScreen() {
     return { label: `${parseInt(dd)}.${parseInt(m)}`, title: upcoming.title };
   }, [pendingTasks, today]);
 
-  const moodStreak = useMemo(() => {
-    const dates = [...new Set(moodEntries.map(e => e.date))].sort().reverse();
-    if (!dates.length) return 0;
-    const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return ymd(d); })();
-    if (dates[0] !== today && dates[0] !== yest) return 0;
-    let streak = 0;
-    let cursor = new Date(dates[0]);
-    for (const d of dates) {
-      if (d === ymd(cursor)) { streak++; cursor.setDate(cursor.getDate() - 1); }
-      else if (d < ymd(cursor)) break;
-    }
-    return streak;
-  }, [moodEntries, today]);
+  const moodStreak = useMemo(() => moodStreakFrom(moodEntries, today), [moodEntries, today]);
 
   const moodByDay = useMemo(() => {
     const map: Record<string, MoodEntry[]> = {};
