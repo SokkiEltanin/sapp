@@ -19,3 +19,14 @@ export function plTasks(n: number): string {
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'zadania';
   return 'zadań';
 }
+
+// Komunikat limitu tagu, eskalujący z wykorzystaniem (0..1+).
+export function tagLimitMsg(pct: number): string {
+  if (pct >= 1)    return 'Przekroczono limit';
+  if (pct >= 0.85) return 'Hamuj! Limit prawie wyczerpany';
+  if (pct >= 0.6)  return 'Robi się gorąco';
+  if (pct >= 0.35) return 'Powoli, powoli';
+  if (pct >= 0.15) return 'Kurde, raz Cię pokusiło';
+  if (pct > 0)     return 'Na razie idzie dobrze';
+  return 'Czysto, zero wydatków';
+}

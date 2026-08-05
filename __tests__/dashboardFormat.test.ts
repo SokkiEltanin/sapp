@@ -1,4 +1,4 @@
-import { moodColor, plTasks } from '@/utils/dashboard/format';
+import { moodColor, plTasks, tagLimitMsg } from '@/utils/dashboard/format';
 import { MOOD_COLORS } from '@/types';
 
 describe('dashboard/format', () => {
@@ -23,5 +23,16 @@ describe('dashboard/format', () => {
     expect(plTasks(14)).toBe('zadań');
     expect(plTasks(22)).toBe('zadania');
     expect(plTasks(0)).toBe('zadań');
+  });
+
+  test('tagLimitMsg — eskalacja progami', () => {
+    expect(tagLimitMsg(0)).toBe('Czysto, zero wydatków');
+    expect(tagLimitMsg(0.1)).toBe('Na razie idzie dobrze');
+    expect(tagLimitMsg(0.2)).toBe('Kurde, raz Cię pokusiło');
+    expect(tagLimitMsg(0.5)).toBe('Powoli, powoli');
+    expect(tagLimitMsg(0.7)).toBe('Robi się gorąco');
+    expect(tagLimitMsg(0.9)).toBe('Hamuj! Limit prawie wyczerpany');
+    expect(tagLimitMsg(1)).toBe('Przekroczono limit');
+    expect(tagLimitMsg(1.5)).toBe('Przekroczono limit');
   });
 });

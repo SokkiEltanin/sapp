@@ -42,7 +42,8 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/utils/dashboard/spend';
-import { moodColor, plTasks } from '@/utils/dashboard/format';
+import { moodColor, plTasks, tagLimitMsg } from '@/utils/dashboard/format';
+import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
 import { carryForward, lastNonZero, zoomFloor } from '@/utils/dashboard/chart';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
@@ -296,39 +297,11 @@ const sd = StyleSheet.create({
   val: { fontSize: 12, fontWeight: '800' },
   label: { fontSize: 11, fontWeight: '600' },
 });
-// Dynamic tag-limit message that escalates with how much of the limit is used.
-function tagLimitMsg(pct: number): string {
-  if (pct >= 1)    return 'Przekroczono limit';
-  if (pct >= 0.85) return 'Hamuj! Limit prawie wyczerpany';
-  if (pct >= 0.6)  return 'Robi się gorąco';
-  if (pct >= 0.35) return 'Powoli, powoli';
-  if (pct >= 0.15) return 'Kurde, raz Cię pokusiło';
-  if (pct > 0)     return 'Na razie idzie dobrze';
-  return 'Czysto, zero wydatków';
-}
 function humorLine(mood?: number): string {
   if (mood === undefined) return 'Czysty start. Jak się czujesz?';
   const opts = HUMOR[mood] ?? HUMOR[3];
   return opts[(new Date().getDate()) % opts.length];
 }
-function isDurationExpired(sub: Subscription): boolean {
-  if (!sub.durationMonths || sub.durationMonths === 0 || !sub.startDate) return false;
-  const end = new Date(sub.startDate + 'T00:00:00');
-  end.setMonth(end.getMonth() + sub.durationMonths);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  return end <= today;
-}
-function advanceNextBillingDate(current: string, cycle: BillingCycle): string {
-  const d = new Date(current + 'T00:00:00');
-  switch (cycle) {
-    case 'weekly':    d.setDate(d.getDate() + 7); break;
-    case 'monthly':   d.setMonth(d.getMonth() + 1); break;
-    case 'quarterly': d.setMonth(d.getMonth() + 3); break;
-    case 'yearly':    d.setFullYear(d.getFullYear() + 1); break;
-  }
-  return ymd(d);
-}
-
 // ─── Wave charts ──────────────────────────────────────────────────────────────
 
 const WAVE_W = 320;
