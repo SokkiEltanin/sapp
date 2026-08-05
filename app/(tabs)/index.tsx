@@ -48,6 +48,8 @@ import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg, moodStreakFrom } from '@/
 import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
 import { humorLine } from '@/utils/dashboard/humor';
 import { pctChange, monthSpendCompare } from '@/utils/dashboard/compare';
+import { strongestLinks, DailyMetrics } from '@/utils/dashboard/correlations';
+import CorrelationsInsightCard from '@/components/dashboard/CorrelationsInsightCard';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -3088,6 +3090,50 @@ export default function DashboardScreen() {
     return { mood, spend, hasSpend, steps, label, has: mood != null || hasSpend || steps > 0 };
   }, [expenses, moodByDay, healthDays, scope]);
 
+  // „Co na Ciebie wpływa" — powiązania (Pearson) między sen/energia/humor/słodycze/praca/kroki
+  // z ostatnich 30 dni. Buduje metryki per-dzień z danych, które dashboard już ma.
+  const insightLinks = useMemo(() => {
+    const wcol = workSettings.workColor;
+    const wp = workSettings.workPrefix?.trim().toLowerCase();
+    const hasWork = !!(wcol || wp);
+    const workByDay: Record<string, number> = {};
+    if (hasWork) {
+      for (const e of allEvents) {
+        if (!isWorkEvent(e, { workColor: wcol, workPrefix: wp })) continue;
+        const d = (e.date ?? '').slice(0, 10); if (!d) continue;
+        workByDay[d] = (workByDay[d] ?? 0) + shiftHours(e);
+      }
+    }
+    const sweetsByDay: Record<string, number> = {};
+    for (const e of expenses) {
+      if (e.type === 'income' || !inScope(e, scope)) continue;
+      const d = (e.date ?? '').slice(0, 10); if (!d) continue;
+      for (const it of (e.receiptItems ?? [])) {
+        if (!consumesInScope(it, scope)) continue;
+        if ((it.tags ?? []).some(t => SWEETS_TAGS.includes(t))) sweetsByDay[d] = (sweetsByDay[d] ?? 0) + 1;
+      }
+    }
+    const days: DailyMetrics[] = [];
+    const now = new Date();
+    for (let i = 0; i < 30; i++) {
+      const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const key = ymd(dt);
+      const md = moodByDay[key] ?? [];
+      const mood = md.length ? md.reduce((a, b) => a + b.mood, 0) / md.length : undefined;
+      const enVals = md.map(e => e.energy).filter(v => v > 0);
+      const energy = enVals.length ? enVals.reduce((a, b) => a + b, 0) / enVals.length : undefined;
+      const hd = healthDays[key];
+      days.push({
+        sleep: hd?.sleepMinutes && hd.sleepMinutes > 0 ? hd.sleepMinutes : undefined,
+        steps: hd?.steps && hd.steps > 0 ? hd.steps : undefined,
+        mood, energy,
+        sweets: sweetsByDay[key] ?? 0,                 // brak zakupu = 0 słodyczy (istotny punkt)
+        work: hasWork ? (workByDay[key] ?? 0) : undefined,
+      });
+    }
+    return strongestLinks(days);
+  }, [expenses, moodByDay, healthDays, allEvents, workSettings, scope]);
+
   // "Jedzenie — rozkład": this month's FOOD spend (food lines only) split by week-of-month,
   // by day-of-week, and by food subcategory (mięso/nabiał/…).
   const foodBreakdown = useMemo(() => {
@@ -4236,6 +4282,9 @@ export default function DashboardScreen() {
 
             nodes['correlations'] = correlations.length > 0 &&
               <CorrelationsSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} correlations={correlations} />;
+
+            nodes['insights-web'] = insightLinks.length > 0 &&
+              <CorrelationsInsightCard links={insightLinks} cardBg={cardBgDark} />;
 
             nodes['mood-cal'] = Object.keys(moodByDay).some(d => d.startsWith(`${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`)) && (() => {
               const loggedToday = (moodByDay[todayStr()] ?? []).length > 0;
