@@ -266,6 +266,14 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   jeszcze nie zrobione). Wejścia: kafle „Twoje serie" (dashboard) + ikona siatki w `/counters`.
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
+- **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/
+  `SettingsItem` w `src/types/settings.ts`; generyczny render `SettingsRow`/`SettingsSectionView`
+  w `src/components/settings/`; wyszukiwarka (pasek + AND-match po słowach kluczowych,
+  diakrytyki-insensitive) w `src/utils/settingsSearch.ts` (`normalizeSearch`/`filterSections`,
+  testy w `__tests__/settingsSearch.test.ts`). Każdy wiersz ma `title`/`subtitle`/`keywords` w
+  JEDNYM miejscu (manifest w `settings.tsx`) — to jest zamierzony punkt pod przyszłe języki:
+  string do zmiany żyje w jednym polu, nie trzeba go szukać w JSX. `BackupSection` jest
+  wyjątkiem — zawsze widoczna, nie przechodzi przez filtr wyszukiwania (ma własny nagłówek).
 
 ## 11. Pułapki, które psują build (CZYTAJ ZANIM COŚ ZMIENISZ)
 
@@ -308,6 +316,16 @@ zapisem; dopisz kolekcję do backupu.
 **Zasada „bez dead-endów":** rozszerzając funkcję, podłącz ją WSZĘDZIE, gdzie pasuje
 (lista, statystyki, filtry, edycja, dashboard, powiadomienia, backup) — nie zostawiaj
 połowicznie podpiętej.
+
+**Nowa pozycja/sekcja w Ustawieniach** (`app/settings.tsx`) — NIE dopisuj gołego JSX:
+1. Prosty wiersz (switch/text/link/wartość) → dodaj obiekt `SettingsItem` do `items[]`
+   właściwej sekcji: `title`, opcjonalnie `subtitle`/`icon`/`accentColor`, `keywords`
+   (synonimy po polsku, żeby wyszukiwarka trafiała), `control` (`switch`/`text`/`link`/`value`).
+2. Coś bardziej złożonego (lista, kreator, box diagnostyczny) → `control: { kind: 'custom',
+   render: () => (...) }` z własnym JSX (korzysta z `styles`/`colors` z domknięcia) — nadal
+   wymaga `title`+`keywords`, żeby wyszukiwarka go znalazła, mimo że nie renderuje ich sama.
+3. Nowa sekcja → dopisz wpis do tablicy `sections` (id/title/icon/color/keywords/items) —
+   pojawi się automatycznie w liście i w wyszukiwarce, nic więcej nie trzeba podpinać.
 
 ---
 
