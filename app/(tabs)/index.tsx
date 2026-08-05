@@ -43,6 +43,7 @@ import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/utils/dashboard/spend';
 import { moodColor, plTasks } from '@/utils/dashboard/format';
+import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -138,7 +139,6 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   sun:         Sun,
   bike:        Bike,
 };
-const MONTH_SHORT = ['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
 // SINGLE app accent = MONOCHROME (user: „akcent czarno-biały, kolory tylko dodatki").
 // Emfaza przez biel+waga+kontrast, nie kolor. Kolory zostają tylko punktowo (i w kalendarzu).
 // Jedno miejsce do zmiany, docelowo rozlać na resztę.
@@ -277,32 +277,6 @@ function pad(n: number) { return String(n).padStart(2, '0'); }
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function toStr(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function getWeekDates(offset: number): string[] {
-  const today = new Date();
-  const dow   = today.getDay() === 0 ? 6 : today.getDay() - 1;
-  const mon   = new Date(today);
-  mon.setDate(today.getDate() - dow + offset * 7);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(mon); d.setDate(mon.getDate() + i); return toStr(d);
-  });
-}
-function weekLabel(dates: string[]) {
-  const from = new Date(dates[0]), to = new Date(dates[6]);
-  const fM = MONTH_SHORT[from.getMonth()], tM = MONTH_SHORT[to.getMonth()];
-  return from.getMonth() === to.getMonth()
-    ? `${from.getDate()}–${to.getDate()} ${fM}`
-    : `${from.getDate()} ${fM} – ${to.getDate()} ${tM}`;
-}
-function dayAvg(entries: MoodEntry[]) {
-  if (!entries.length) return null;
-  return {
-    mood:   entries.reduce((a, b) => a + b.mood, 0) / entries.length as MoodLevel,
-    energy: entries.reduce((a, b) => a + b.energy, 0) / entries.length as MoodLevel,
-  };
 }
 // A spend delta chip: lower spend = green, higher = red (opposite of "growth good").
 function SpendDelta({ pct, label, muted }: { pct: number; label: string; muted: string }) {
@@ -2545,13 +2519,13 @@ export default function DashboardScreen() {
   const moodStreak = useMemo(() => {
     const dates = [...new Set(moodEntries.map(e => e.date))].sort().reverse();
     if (!dates.length) return 0;
-    const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return toStr(d); })();
+    const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return ymd(d); })();
     if (dates[0] !== today && dates[0] !== yest) return 0;
     let streak = 0;
     let cursor = new Date(dates[0]);
     for (const d of dates) {
-      if (d === toStr(cursor)) { streak++; cursor.setDate(cursor.getDate() - 1); }
-      else if (d < toStr(cursor)) break;
+      if (d === ymd(cursor)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+      else if (d < ymd(cursor)) break;
     }
     return streak;
   }, [moodEntries, today]);
