@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FlaskConical, BookOpen, Lightbulb, Globe, Sparkles } from 'lucide-react-native';
+import { FlaskConical, BookOpen, Lightbulb, Globe, Sparkles, Check, GraduationCap } from 'lucide-react-native';
+import { haptic } from '@/utils/haptics';
 import { TRIVIA, Trivia, TriviaCat } from '@/data/trivia';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -40,6 +41,7 @@ function daysBetween(a: string | undefined, b: string): number {
 interface Persist {
   counts: Record<string, number>;
   lastShown?: Record<string, string>;   // key → data ostatniego pokazu (YYYY-MM-DD)
+  dismissed?: Record<string, true>;      // „To znam" → nigdy więcej nie pokazuj
   currentKey: string | null;
   day: string | null;
 }
@@ -51,10 +53,13 @@ interface Persist {
 function advance(
   counts: Record<string, number>,
   lastShown: Record<string, string>,
+  dismissed: Record<string, true>,
   excludeKey: string | null,
   today: string,
-): { key: string; counts: Record<string, number>; lastShown: Record<string, string> } {
-  const notMaxed = TRIVIA.filter(t => (counts[keyOf(t)] ?? 0) < MAX_SHOWS && keyOf(t) !== excludeKey);
+): { key: string | null; counts: Record<string, number>; lastShown: Record<string, string> } {
+  const undismissed = TRIVIA.filter(t => !dismissed[keyOf(t)]);   // „To znam" wypada z puli na zawsze
+  if (undismissed.length === 0) return { key: null, counts, lastShown };
+  const notMaxed = undismissed.filter(t => (counts[keyOf(t)] ?? 0) < MAX_SHOWS && keyOf(t) !== excludeKey);
   let pool = notMaxed.filter(t => daysBetween(lastShown[keyOf(t)], today) >= REPEAT_GAP_DAYS);
   if (pool.length === 0) {
     if (notMaxed.length > 0) {
@@ -63,9 +68,9 @@ function advance(
         (lastShown[keyOf(a)] ?? '') < (lastShown[keyOf(b)] ?? '') ? -1 : 1).slice(0, 1);
     } else {
       counts = {};                                          // wszystko po 2× → nowy cykl
-      const fresh = TRIVIA.filter(t => keyOf(t) !== excludeKey);
+      const fresh = undismissed.filter(t => keyOf(t) !== excludeKey);
       pool = fresh.filter(t => daysBetween(lastShown[keyOf(t)], today) >= REPEAT_GAP_DAYS);
-      if (pool.length === 0) pool = fresh.length ? fresh : [...TRIVIA];
+      if (pool.length === 0) pool = fresh.length ? fresh : [...undismissed];
     }
   }
   const pick = pool[Math.floor(Math.random() * pool.length)];
@@ -90,10 +95,10 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
     AsyncStorage.getItem(KEY).then(raw => {
       let p: Persist = raw ? JSON.parse(raw) : { counts: {}, lastShown: {}, currentKey: null, day: null };
       const today = todayStr();
-      const valid = p.currentKey && TRIVIA.some(t => keyOf(t) === p.currentKey);
+      const valid = p.currentKey && !(p.dismissed ?? {})[p.currentKey] && TRIVIA.some(t => keyOf(t) === p.currentKey);
       if (p.day !== today || !valid) {
-        const r = advance(p.counts ?? {}, p.lastShown ?? {}, p.currentKey ?? null, today);   // new day → fresh fact
-        p = { counts: r.counts, lastShown: r.lastShown, currentKey: r.key, day: today };
+        const r = advance(p.counts ?? {}, p.lastShown ?? {}, p.dismissed ?? {}, p.currentKey ?? null, today);   // new day → fresh fact
+        p = { counts: r.counts, lastShown: r.lastShown, dismissed: p.dismissed ?? {}, currentKey: r.key, day: today };
         AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
       }
       if (alive) setSt(p);
@@ -101,7 +106,37 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
     return () => { alive = false; };
   }, []);
 
-  const t = st ? (TRIVIA.find(x => keyOf(x) === st.currentKey) ?? TRIVIA[0]) : TRIVIA[0];
+  const onKnowIt = () => {
+    if (!st?.currentKey) return;
+    haptic.tap();
+    Alert.alert('To znam', 'Nie pokazywać już tej ciekawostki?', [
+      { text: 'Anuluj', style: 'cancel' },
+      { text: 'Nie pokazuj', style: 'destructive', onPress: () => {
+        const today = todayStr();
+        const dismissed = { ...(st.dismissed ?? {}), [st.currentKey!]: true as const };
+        const r = advance(st.counts, st.lastShown ?? {}, dismissed, st.currentKey, today);
+        const p: Persist = { counts: r.counts, lastShown: r.lastShown, dismissed, currentKey: r.key, day: today };
+        AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
+        setSt(p);
+        haptic.success();
+      } },
+    ]);
+  };
+
+  // wszystkie oznaczone „to znam" → miły stan końcowy
+  if (st && st.currentKey === null) {
+    return (
+      <View style={[s.card, { backgroundColor: cardBg }]}>
+        <View style={s.head}>
+          <GraduationCap size={13} color={c.text.secondary} />
+          <Text style={s.title}>Ciekawostka dnia</Text>
+        </View>
+        <Text style={s.text}>Przerobiłeś wszystkie ciekawostki 🎓 Szacun.</Text>
+      </View>
+    );
+  }
+
+  const t = st?.currentKey ? (TRIVIA.find(x => keyOf(x) === st.currentKey) ?? TRIVIA[0]) : TRIVIA[0];
   const m = META[t.cat];
   const Ic = m.icon;
 
@@ -119,6 +154,11 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
 
       <Text style={s.text}>{t.text}</Text>
       {t.src ? <Text style={s.src}>— {t.src}</Text> : null}
+
+      <TouchableOpacity onPress={onKnowIt} style={s.knowBtn} activeOpacity={0.8} hitSlop={6}>
+        <Check size={12} color={c.text.muted} />
+        <Text style={s.knowTxt}>To znam — nie pokazuj</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -131,4 +171,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   catTxt: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   text: { fontSize: 14, lineHeight: 20, color: c.text.primary, fontWeight: '500' },
   src: { fontSize: 12, color: c.text.muted, fontStyle: 'italic' },
+  knowBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: spacing[1], paddingVertical: 4, paddingHorizontal: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
+  knowTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 }));

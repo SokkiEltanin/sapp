@@ -4476,7 +4476,9 @@ export default function DashboardScreen() {
       </SafeAreaView>
 
       {/* Mood check-in modal */}
-      <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={todayEntry ?? null} />
+      {/* Dashboard = SZYBKI zapis → zawsze NOWY wpis (numerek „Humor N. raz dziś"), nie edycja
+          dzisiejszego. Poprawianie pomyłek robisz w zakładce Humor (edytuj konkretny wpis). */}
+      <MoodCheckInModal visible={modalVisible} onClose={closeCheckIn} existingEntry={null} />
 
       {/* Work panel */}
       <Modal visible={workPanel} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWorkPanel(false)}>
