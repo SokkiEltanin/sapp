@@ -41,7 +41,7 @@ import {
 import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { todayISO, ymd, localISO } from '@/utils/date';
-import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/utils/dashboard/spend';
+import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS, weekdaySpendPattern } from '@/utils/dashboard/spend';
 import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
@@ -2479,24 +2479,7 @@ export default function DashboardScreen() {
 
   // Average spending on FOOD per day-of-week (groceries only — other expenses
   // filtered out, per design). Data-driven from all historical grocery entries.
-  const weekdayAvg = useMemo(() => {
-    const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
-    const totals  = [0, 0, 0, 0, 0, 0, 0];
-    const dateSets: Set<string>[] = Array.from({ length: 7 }, () => new Set());
-    for (const e of scopedExpenses) {
-      if (e.type && e.type !== 'expense') continue;
-      if (e.category !== 'groceries') continue; // food only
-      if (!e.date) continue;
-      const d = new Date(e.date + 'T12:00:00');
-      if (isNaN(d.getTime())) continue;
-      const dow = (d.getDay() + 6) % 7;
-      totals[dow] += e.amount;
-      dateSets[dow].add(e.date.slice(0, 10));
-    }
-    const avgs = totals.map((t, i) => dateSets[i].size > 0 ? t / dateSets[i].size : 0);
-    const maxAvg = Math.max(...avgs, 1);
-    return days.map((label, i) => ({ label, avg: avgs[i], pct: avgs[i] / maxAvg }));
-  }, [scopedExpenses]);
+  const weekdayAvg = useMemo(() => weekdaySpendPattern(scopedExpenses), [scopedExpenses]);
 
   // Work hours per month over the last 6 months (from work events identified by
   // workColor / workPrefix). Data-driven — null if work tracking isn't set up.

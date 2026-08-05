@@ -31,6 +31,27 @@ export function weekIncome(expenses: Expense[], dates: string[]): number {
     .reduce((s, e) => s + e.amount, 0);
 }
 
+// Średni wydatek na JEDZENIE (groceries) wg DNIA TYGODNIA (Pon…Nd) + udział względem
+// najwyższego dnia (do słupków). Średnia liczona po DNIACH (distinct daty), nie transakcjach.
+export function weekdaySpendPattern(expenses: Expense[]): { label: string; avg: number; pct: number }[] {
+  const days = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+  const totals = [0, 0, 0, 0, 0, 0, 0];
+  const dateSets: Set<string>[] = Array.from({ length: 7 }, () => new Set());
+  for (const e of expenses) {
+    if (e.type && e.type !== 'expense') continue;
+    if (e.category !== 'groceries') continue; // tylko jedzenie
+    if (!e.date) continue;
+    const d = new Date(e.date.slice(0, 10) + 'T12:00:00');   // slice: e.date bywa pełnym timestampem (localISO) → bez tego Date był invalid i wydatki cicho wypadały
+    if (isNaN(d.getTime())) continue;
+    const dow = (d.getDay() + 6) % 7; // Pon=0 … Nd=6
+    totals[dow] += e.amount;
+    dateSets[dow].add(e.date.slice(0, 10));
+  }
+  const avgs = totals.map((t, i) => (dateSets[i].size > 0 ? t / dateSets[i].size : 0));
+  const maxAvg = Math.max(...avgs, 1);
+  return days.map((label, i) => ({ label, avg: avgs[i], pct: avgs[i] / maxAvg }));
+}
+
 // Suma wartości pozycji „słodycze/przekąski" (per-item price) w podanych dniach, w danym
 // zakresie konsumpcji (Ja/Wszyscy). Liczy pozycje paragonu, nie całe wydatki.
 export function sweetsTotal(expenses: Expense[], dates: string[], scope: StatsScope = 'all'): number {
