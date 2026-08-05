@@ -46,6 +46,7 @@ import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/u
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
 import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
+import { humorLine } from '@/utils/dashboard/humor';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -170,14 +171,6 @@ const MOOD_EMOJIS: Record<MoodLevel, string> = {
   1: '😩', 2: '😕', 3: '😐', 4: '😊', 5: '🤩',
 };
 
-const HUMOR: Record<number, string[]> = {
-  1: ['Przetrwanie to też sukces.', 'Gorzej nie będzie. Chyba.', 'Dzień jak z horroru. Żyjesz.'],
-  2: ['Niskie obroty, rozumiem.', 'Nie jest świetnie. Jest. To wystarczy.', 'Słabo. Ale jutro nowy dzień.'],
-  3: ['Standard. Middle ground.', 'Ani super, ani kiepsko.', 'Normalna energia.'],
-  4: ['Dobry nastrój? Wykorzystaj go.', 'Całkiem nieźle! Nie psuj tego.', 'Rzadki widok. Doceniam.'],
-  5: ['5/5 — dziś możesz wszystko.', 'Energia max. To wykorzystaj.', 'SZCZYT MOŻLIWOŚCI.'],
-};
-
 // ─── Weather ──────────────────────────────────────────────────────────────────
 
 const WMO_DESC: Record<number, string> = {
@@ -260,11 +253,6 @@ const sd = StyleSheet.create({
   val: { fontSize: 12, fontWeight: '800' },
   label: { fontSize: 11, fontWeight: '600' },
 });
-function humorLine(mood?: number): string {
-  if (mood === undefined) return 'Czysty start. Jak się czujesz?';
-  const opts = HUMOR[mood] ?? HUMOR[3];
-  return opts[(new Date().getDate()) % opts.length];
-}
 // ─── Wave charts ──────────────────────────────────────────────────────────────
 
 // Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
