@@ -44,6 +44,7 @@ import { todayISO, ymd, localISO } from '@/utils/date';
 import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/utils/dashboard/spend';
 import { moodColor, plTasks } from '@/utils/dashboard/format';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
+import { carryForward, lastNonZero, zoomFloor } from '@/utils/dashboard/chart';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -357,25 +358,6 @@ function buildWavePath(data: number[], max: number, min = 0) {
   return { line, fill, pts };
 }
 
-// Weight (and other never-zero trends) read 0 for buckets with no reading; carry the
-// last known value forward so a sparse series is a continuous line, not spikes to 0.
-function carryForward(values: number[]): number[] {
-  const first = values.find(v => v > 0) ?? 0;
-  let last = first;
-  return values.map(v => (v > 0 ? (last = v) : last));
-}
-function lastNonZero(values: number[]): number {
-  for (let i = values.length - 1; i >= 0; i--) if (values[i] > 0) return values[i];
-  return 0;
-}
-// A lower bound that zooms a narrow high band (e.g. weight 71–73 kg) so variance shows
-// instead of a flat line pinned to the top. 0 = don't zoom.
-function zoomFloor(values: number[]): number {
-  const nz = values.filter(v => v > 0);
-  if (nz.length < 2) return 0;
-  const lo = Math.min(...nz), hi = Math.max(...nz);
-  return (hi - lo > 0 && lo > hi * 0.3) ? Math.max(0, lo - (hi - lo) * 0.5) : 0;
-}
 
 // Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
 function DualWaveChart({ data1, data2, color1, color2, independent, min1 = 0, min2 = 0 }: {
