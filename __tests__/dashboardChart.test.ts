@@ -1,4 +1,4 @@
-import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
+import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
 
 describe('dashboard/chart — transformacje serii', () => {
   test('carryForward przeciąga ostatnią znaną wartość przez zera', () => {
@@ -42,5 +42,22 @@ describe('dashboard/chart — compareVerdict (Pearson)', () => {
   });
   test('mniej niż 3 dopasowane pary → null', () => {
     expect(compareVerdict([1, 0, 0], [1, 0, 0], M)).toBeNull();
+  });
+});
+
+describe('dashboard/chart — buildWavePath (ścieżka SVG)', () => {
+  test('punkty w środkach kolumn, y skalowane min..max', () => {
+    const r = buildWavePath([0, 10], 10, 0);
+    expect(r.pts).toHaveLength(2);
+    expect(r.pts[0].x).toBeCloseTo((0.5 / 2) * WAVE_W);  // 80
+    expect(r.pts[1].x).toBeCloseTo((1.5 / 2) * WAVE_W);  // 240
+    expect(r.pts[0].y).toBeCloseTo(WAVE_H - 6);          // v=min → dół (58)
+    expect(r.pts[1].y).toBeCloseTo(WAVE_H - 6 - (WAVE_H - 18)); // v=max → góra (12)
+  });
+  test('linia zaczyna się M, wypełnienie zamyka Z i schodzi do WAVE_H', () => {
+    const r = buildWavePath([1, 2, 3], 3, 0);
+    expect(r.line.startsWith('M ')).toBe(true);
+    expect(r.fill.endsWith('Z')).toBe(true);
+    expect(r.fill).toContain(`L ${r.pts[2].x.toFixed(1)} ${WAVE_H}`);
   });
 });

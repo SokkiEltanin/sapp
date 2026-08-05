@@ -1,6 +1,30 @@
 // Czyste transformacje serii danych pod wykresy dashboardu — wyniesione z app/(tabs)/index.tsx
 // (krok 1). Bez zależności od RN/store'ów → testowalne w node.
 
+// Wymiary viewBox wykresów falowych (jednostki SVG; SVG skaluje się do szerokości karty).
+export const WAVE_W = 320;
+export const WAVE_H = 64;
+
+// Buduje ścieżkę SVG (linia gładka + wypełnienie) dla wykresu falowego. Punkty w ŚRODKACH
+// kolumn ((i+0.5)/n) — żeby pasowały do flex:1 wierszy wartości/etykiet pod spodem. Krzywe
+// Béziera między punktami; wypełnienie schodzi PIONOWO na krawędziach (bez skośnego klina).
+export function buildWavePath(data: number[], max: number, min = 0): { line: string; fill: string; pts: { x: number; y: number }[] } {
+  const n = data.length;
+  const span = max - min || 1;
+  const yFor = (v: number) => WAVE_H - 6 - (Math.max(0, Math.min(1, (v - min) / span)) * (WAVE_H - 18));
+  const pts = data.map((v, i) => ({ x: ((i + 0.5) / n) * WAVE_W, y: yFor(v) }));
+  let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const px = pts[i - 1].x, py = pts[i - 1].y, cx = pts[i].x, cy = pts[i].y;
+    const cpx = (px + cx) / 2;
+    line += ` C ${cpx.toFixed(1)} ${py.toFixed(1)}, ${cpx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
+  }
+  const fx0 = pts[0].x.toFixed(1);
+  const fxN = pts[pts.length - 1].x.toFixed(1);
+  const fill = `${line} L ${fxN} ${WAVE_H} L ${fx0} ${WAVE_H} Z`;
+  return { line, fill, pts };
+}
+
 // Wagi (i inne serie „nigdy nie 0"): kubełki bez odczytu mają 0 → przeciągnij ostatnią znaną
 // wartość, żeby rzadka seria była CIĄGŁĄ linią, nie skokami do zera.
 export function carryForward(values: number[]): number[] {

@@ -45,7 +45,7 @@ import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS } from '@/
 import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
-import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
+import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -266,34 +266,6 @@ function humorLine(mood?: number): string {
   return opts[(new Date().getDate()) % opts.length];
 }
 // ─── Wave charts ──────────────────────────────────────────────────────────────
-
-const WAVE_W = 320;
-const WAVE_H = 64;
-
-function buildWavePath(data: number[], max: number, min = 0) {
-  // Plot points at COLUMN CENTRES ((i+0.5)/n) so they line up with the flex:1
-  // value/label rows underneath. (Edge-to-edge i/(n-1) drifts out of alignment.)
-  const n = data.length;
-  const span = max - min || 1;
-  const yFor = (v: number) => WAVE_H - 6 - (Math.max(0, Math.min(1, (v - min) / span)) * (WAVE_H - 18));
-  const pts = data.map((v, i) => ({
-    x: ((i + 0.5) / n) * WAVE_W,
-    y: yFor(v),
-  }));
-  let line = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  for (let i = 1; i < pts.length; i++) {
-    const px = pts[i-1].x, py = pts[i-1].y, cx = pts[i].x, cy = pts[i].y;
-    const cpx = (px + cx) / 2;
-    line += ` C ${cpx.toFixed(1)} ${py.toFixed(1)}, ${cpx.toFixed(1)} ${cy.toFixed(1)}, ${cx.toFixed(1)} ${cy.toFixed(1)}`;
-  }
-  // Fill drops straight DOWN at the first/last point (no diagonal wedge to the
-  // card corners — that slant looked off).
-  const fx0 = pts[0].x.toFixed(1);
-  const fxN = pts[pts.length - 1].x.toFixed(1);
-  const fill = `${line} L ${fxN} ${WAVE_H} L ${fx0} ${WAVE_H} Z`;
-  return { line, fill, pts };
-}
-
 
 // Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
 function DualWaveChart({ data1, data2, color1, color2, independent, min1 = 0, min2 = 0 }: {
