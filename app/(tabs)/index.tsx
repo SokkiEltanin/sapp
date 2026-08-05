@@ -47,6 +47,7 @@ import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/sub
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg } from '@/utils/dashboard/dates';
 import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
 import { humorLine } from '@/utils/dashboard/humor';
+import { pctChange, monthSpendCompare } from '@/utils/dashboard/compare';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -2452,29 +2453,14 @@ export default function DashboardScreen() {
   // Spend comparison for the Finanse card: this period vs the PREVIOUS one and vs
   // the AVERAGE of prior periods (mirrors the work panel's rate comparison).
   const finCompare = useMemo(() => {
-    const pct = (cur: number, base: number) => base > 0 ? Math.round((cur - base) / base * 100) : null;
     if (finPeriod === 'week') {
       const cur = weekOverview[weekOverview.length - 1]?.totalSpend ?? 0;
       const prev = weekOverview[weekOverview.length - 2]?.totalSpend ?? 0;
       const priors = weekOverview.slice(0, -1).map(w => w.totalSpend).filter(v => v > 0);
       const avg = priors.length ? priors.reduce((a, b) => a + b, 0) / priors.length : 0;
-      return { vsPrev: pct(cur, prev), vsAvg: pct(cur, avg) };
+      return { vsPrev: pctChange(cur, prev), vsAvg: pctChange(cur, avg) };
     }
-    // month: bucket scoped spend by calendar month
-    const byMonth: Record<string, number> = {};
-    for (const e of scopedExpenses) {
-      if ((e.type && e.type !== 'expense') || isSelfTransfer(e)) continue;
-      const m = (e.date ?? '').slice(0, 7); if (!m) continue;
-      byMonth[m] = (byMonth[m] ?? 0) + e.amount;
-    }
-    const months = Object.keys(byMonth).sort();
-    const curKey = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
-    const cur = byMonth[curKey] ?? 0;
-    const priorKeys = months.filter(m => m < curKey);
-    const prev = priorKeys.length ? byMonth[priorKeys[priorKeys.length - 1]] : 0;
-    const priorVals = priorKeys.slice(-6).map(m => byMonth[m]);
-    const avg = priorVals.length ? priorVals.reduce((a, b) => a + b, 0) / priorVals.length : 0;
-    return { vsPrev: pct(cur, prev), vsAvg: pct(cur, avg) };
+    return monthSpendCompare(scopedExpenses);
   }, [finPeriod, weekOverview, scopedExpenses]);
 
   // Average spending on FOOD per day-of-week (groceries only — other expenses
