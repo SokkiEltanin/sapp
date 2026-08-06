@@ -3,6 +3,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weekKeyOf } from '@/utils/quests';
 import { rollCrate, CrateTier } from '@/utils/crates';
+import { CombatItemId } from '@/utils/combatItems';
+
+// Ile itemów bojowych naraz w ekwipunku (v4 — patrz memory boss_design.md). TODO-balance,
+// user nie podał liczby — 3 to rozsądny start (mieści headshot+jedną obronę+jedną ofensywę).
+export const COMBAT_ITEM_SLOTS = 3;
 
 // Bazowe max HP kotka w walkach (v4 redesign, patrz memory boss_design.md) — przed
 // trwałymi ulepszeniami za monety (`catMaxHpBonus`). Osobna stała, nie magic number
@@ -80,6 +85,11 @@ interface PetState {
   // za monety; realny max = CAT_BASE_MAX_HP + catMaxHpBonus (patrz helper poniżej store'u).
   catHp: number;
   catMaxHpBonus: number;
+  // ── ekwipunek itemów bojowych (v4.1 — patrz memory boss_design.md „ITEMY BOJOWE") ──
+  // Klucz nieobecny = nieposiadany. Wartość = aktualny poziom (1..maxLevel z combatItems.ts).
+  // NIC jeszcze tego nie czyta w walce — czysto dodatkowy stan, jak catHp wcześniej.
+  ownedCombatItems: Partial<Record<CombatItemId, number>>;
+  equippedCombatItems: CombatItemId[];   // max COMBAT_ITEM_SLOTS
   // ── raid tygodniowy ──
   // WŁASNA pula energii — atak bossa i atak raidu NIE dzielą jednego zasobu (dawniej
   // dzieliły `energy`, więc trzeba było wybierać, w co uderzyć). Zasilana tym samym
@@ -144,6 +154,11 @@ interface PetState {
   damageCat: (amount: number) => number;                       // -HP (floor 0), zwraca nowe HP
   healCat: (amount: number) => number;                          // +HP (cap max), zwraca nowe HP
   resetCatHp: () => void;                                       // pełne HP (start/retry walki)
+  // ekwipunek itemów bojowych
+  grantCombatItem: (id: CombatItemId) => void;                                  // z dropu skrzynki — poziom 1 (no-op jeśli już posiadany)
+  upgradeCombatItem: (id: CombatItemId, cost: number, maxLevel: number) => boolean; // +1 poziom za monety, cap maxLevel
+  equipCombatItem: (id: CombatItemId) => boolean;                               // false = brak slotu lub nieposiadany
+  unequipCombatItem: (id: CombatItemId) => void;
   reset: () => void;
 }
 
@@ -195,6 +210,8 @@ export const usePetStore = create<PetState>()(
       bossHp: {},
       catHp: CAT_BASE_MAX_HP,
       catMaxHpBonus: 0,
+      ownedCombatItems: {},
+      equippedCombatItems: [],
       _hydrated: false,
 
       setName: (name) => set({ name: name.trim() || 'Blobek' }),
@@ -478,7 +495,26 @@ export const usePetStore = create<PetState>()(
         return next;
       },
       resetCatHp: () => set((s) => ({ catHp: CAT_BASE_MAX_HP + s.catMaxHpBonus })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventHp: {}, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0 }),
+      grantCombatItem: (id) => set((s) => s.ownedCombatItems[id] ? s : { ownedCombatItems: { ...s.ownedCombatItems, [id]: 1 } }),
+      upgradeCombatItem: (id, cost, maxLevel) => {
+        const s = get();
+        if (!s._hydrated) return false;
+        const cur = s.ownedCombatItems[id];
+        if (!cur || cur >= maxLevel) return false;
+        if (s.coins < cost) return false;
+        set({ coins: s.coins - cost, ownedCombatItems: { ...s.ownedCombatItems, [id]: cur + 1 } });
+        return true;
+      },
+      equipCombatItem: (id) => {
+        const s = get();
+        if (!s.ownedCombatItems[id]) return false;
+        if (s.equippedCombatItems.includes(id)) return true;
+        if (s.equippedCombatItems.length >= COMBAT_ITEM_SLOTS) return false;
+        set({ equippedCombatItems: [...s.equippedCombatItems, id] });
+        return true;
+      },
+      unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventHp: {}, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
     }),
     {
       name: 'pet-v1',
@@ -499,6 +535,7 @@ export const usePetStore = create<PetState>()(
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
         eventHp: s.eventHp, eventWon: s.eventWon,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus,
+        ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)
