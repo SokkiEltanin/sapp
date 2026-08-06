@@ -48,4 +48,17 @@ describe('dashboard/correlations — strongestLinks', () => {
     expect(link?.positive).toBe(false);
     expect(link?.strength).toBe('silna');
   });
+
+  test('pogoda→energia wykrywana jak każda inna para', () => {
+    const days: DailyMetrics[] = [
+      { weather: -2, energy: 1 },
+      { weather: 5, energy: 2 },
+      { weather: 12, energy: 3 },
+      { weather: 19, energy: 4 },
+      { weather: 26, energy: 5 },
+    ];
+    const link = strongestLinks(days).find(l => l.a === 'weather' && l.b === 'energy');
+    expect(link?.positive).toBe(true);
+    expect(link?.strength).toBe('silna');
+  });
 });

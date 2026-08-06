@@ -6,12 +6,13 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 
 const META: Record<MetricKey, { emoji: string; label: string }> = {
-  sleep:  { emoji: '😴', label: 'Sen' },
-  energy: { emoji: '⚡', label: 'Energia' },
-  mood:   { emoji: '🙂', label: 'Humor' },
-  sweets: { emoji: '🍬', label: 'Słodycze' },
-  work:   { emoji: '💼', label: 'Praca' },
-  steps:  { emoji: '👟', label: 'Kroki' },
+  sleep:   { emoji: '😴', label: 'Sen' },
+  energy:  { emoji: '⚡', label: 'Energia' },
+  mood:    { emoji: '🙂', label: 'Humor' },
+  sweets:  { emoji: '🍬', label: 'Słodycze' },
+  work:    { emoji: '💼', label: 'Praca' },
+  steps:   { emoji: '👟', label: 'Kroki' },
+  weather: { emoji: '🌤️', label: 'Pogoda' },
 };
 
 function verdict(l: Link): string {

@@ -13,12 +13,16 @@ import {
   bossGuarded, weaknessMet, WeaknessCtx,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
+import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventBossFromKey } from '@/utils/seasonalEvents';
+import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { sweetlessDaysFrom, weekKeyOf } from '@/utils/quests';
 import { useHabits } from '@/hooks/useHabits';
 import { getCounts, getWaterGlasses } from '@/utils/habits';
 import { getHealthGoals } from '@/utils/healthGoals';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useCalendarStore } from '@/store/calendarStore';
+import { useWorkStore } from '@/store/workStore';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -39,10 +43,15 @@ const WEAK_COLOR: Record<string, string> = {
 export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { xp, energy, raidEnergy, ownedItems, defeatedBosses, bossHp, syncEnergy, syncRaidEnergy, attackBoss, defeatBoss, healBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim } = usePetStore();
+  const {
+    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, bossHp, syncEnergy, syncRaidEnergy, syncEventEnergy,
+    attackBoss, defeatBoss, healBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim, eventHp, eventWon, eventAttack, eventClaim,
+  } = usePetStore();
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
+  const { events, gcalEvents } = useCalendarStore();
+  const { settings: workSettings } = useWorkStore();
 
   const [steps, setSteps] = useState(0);
   const [sleepMin, setSleepMin] = useState(0);
@@ -50,6 +59,7 @@ export default function Bosses() {
   const [waterGoal, setWaterGoal] = useState(8);
   const [victory, setVictory] = useState<Boss | null>(null);
   const [raidVictory, setRaidVictory] = useState(false);
+  const [eventVictory, setEventVictory] = useState(false);
   const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
@@ -91,11 +101,12 @@ export default function Bosses() {
       const banked = Math.max(todayE, Math.round(yestE * 0.7));
       syncEnergy(banked, bonuses.energyMult);
       syncRaidEnergy(banked, bonuses.energyMult);
+      syncEventEnergy(banked, bonuses.energyMult);
     }).catch(() => {});
     getWaterGlasses(todayISO()).then(setWaterToday).catch(() => {});
     getHealthGoals().then(g => setWaterGoal(g.waterGoal || 8)).catch(() => {});
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
-  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, syncRaidEnergy, habits, level, raidEnsure]);
+  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, habits, level, raidEnsure]);
   useFocusEffect(reload);
 
   // sequential campaign: current = first not-yet-defeated boss
@@ -113,6 +124,27 @@ export default function Bosses() {
   const raidWeakMult = weaknessMult({ weakness: raid.weakness } as Boss, wc);
   const raidPreviewDmg = Math.round(raidEnergy * atkMultiplier(level, bonuses) * raidWeakMult);
 
+  // ── wydarzenie (sezonowe święto LUB „nemesis miesiąca" — Twój najbardziej odstający
+  // wskaźnik tego miesiąca). Sezonowy zawsze wygrywa, gdy oba by pasowały. null = karta
+  // się nie pokazuje (nic sezonowego, nic wyjątkowo zaniedbanego w tym miesiącu). ──
+  const now = new Date();
+  const workByMonth = monthlyWorkHours([...events, ...gcalEvents], workSettings, now);
+  const sweetsByMonth = monthlySweetsSpend(expenses, now);
+  const workVsAvg = thisMonthVsAvg(workByMonth, now);
+  const sweetsVsAvg = thisMonthVsAvg(sweetsByMonth, now);
+  const menaceCtx = {
+    workHoursThisMonth: workVsAvg.thisMonth, workHoursAvg: workVsAvg.avg,
+    sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg,
+  };
+  const eventBoss = currentEventBoss(now, menaceCtx);
+  const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
+  const eventMaxHp = eventHpFor(level);
+  const eventRemaining = eventKey ? (eventHp[eventKey] ?? eventMaxHp) : 0;
+  const eventDone = eventKey ? eventWon.includes(eventKey) : false;
+  const eventUnlocked = level >= 2;
+  const eventWeakMult = eventBoss ? weaknessMult({ weakness: eventBoss.weakness } as Boss, wc) : 1;
+  const eventPreviewDmg = Math.round(eventEnergy * atkMultiplier(level, bonuses) * eventWeakMult);
+
   // attack animation
   const shake = useRef(new Animated.Value(0)).current;
   const dmgY = useRef(new Animated.Value(0)).current;
@@ -122,6 +154,9 @@ export default function Bosses() {
   const rShake = useRef(new Animated.Value(0)).current;
   const rDmgY = useRef(new Animated.Value(0)).current;
   const [raidHit, setRaidHit] = useState<{ dmg: number; crit: boolean } | null>(null);
+  const eShake = useRef(new Animated.Value(0)).current;
+  const eDmgY = useRef(new Animated.Value(0)).current;
+  const [eventHitFx, setEventHitFx] = useState<{ dmg: number; crit: boolean } | null>(null);
 
   const playHitFx = (crit: boolean) => {
     shake.setValue(0); dmgY.setValue(0); pop.setValue(0); flash.setValue(0);
@@ -187,6 +222,30 @@ export default function Bosses() {
     }
   };
 
+  const doEvent = () => {
+    if (!eventBoss || !eventKey) return;
+    if (eventDone) { haptic.tap(); toast.info('Wydarzenie już pokonane w tym okresie!'); return; }
+    if (!eventUnlocked) { haptic.error(); toast.info('Wydarzenia odblokujesz na poziomie 2'); return; }
+    if (eventEnergy <= 0) { haptic.error(); toast.info('Brak energii wydarzenia — zadbaj o siebie, by naładować cios'); return; }
+    const crit = Math.random() < bonuses.crit;
+    const damage = Math.round(eventEnergy * atkMultiplier(level, bonuses) * eventWeakMult * (crit ? 2 : 1));
+    haptic.medium();
+    setEventHitFx({ dmg: damage, crit });
+    eShake.setValue(0); eDmgY.setValue(0);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(eShake, { toValue: 1, duration: 55, useNativeDriver: true }),
+        Animated.timing(eShake, { toValue: -1, duration: 55, useNativeDriver: true }),
+        Animated.timing(eShake, { toValue: 0, duration: 55, useNativeDriver: true }),
+      ]),
+      Animated.timing(eDmgY, { toValue: 1, duration: 800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+    const res = eventAttack(eventKey, eventMaxHp, damage);
+    if (res.defeated) {
+      setTimeout(() => { eventClaim(eventKey, eventCoins(level), eventXp(level)); haptic.success(); setEventVictory(true); }, 300);
+    }
+  };
+
   const previewDmg = current ? Math.round(energy * atkMultiplier(level, bonuses) * weaknessMult(current, wc)) : 0;
   const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] });
   const popScale = pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
@@ -196,6 +255,9 @@ export default function Bosses() {
   const rShakeX = rShake.interpolate({ inputRange: [-1, 1], outputRange: [-7, 7] });
   const rFloatY = rDmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -44] });
   const rFloatOp = rDmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
+  const eShakeX = eShake.interpolate({ inputRange: [-1, 1], outputRange: [-7, 7] });
+  const eFloatY = eDmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -44] });
+  const eFloatOp = eDmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -241,6 +303,48 @@ export default function Bosses() {
           )}
           <Text style={s.raidReward}>Nagroda: {raid.trophyEmoji} medal tygodnia · +{raidCoins(level)} 🪙 · +{raidXp(level)} XP</Text>
         </View>
+
+        {/* ── WYDARZENIE: sezonowe święto lub „nemesis miesiąca" ── */}
+        {eventBoss && eventKey && (
+          <View style={[s.raidCard, { borderColor: '#F4B74055' }]}>
+            <View style={s.raidHead}>
+              <Text style={[s.raidKicker, { color: '#F4B740' }]}>
+                {eventBoss.kind === 'seasonal' ? 'WYDARZENIE SEZONOWE' : 'NEMESIS MIESIĄCA'}
+              </Text>
+              <View style={s.raidEnergyPill}><Zap size={11} color="#38BDF8" /><Text style={s.raidEnergyTxt}>{eventEnergy}</Text></View>
+              <View style={[s.raidMedals, { backgroundColor: '#F4B74018', borderColor: '#F4B74040' }]}>
+                <Text style={[s.raidMedalsTxt, { color: '#F4B740' }]}>🏆 {eventWon.length}</Text>
+              </View>
+            </View>
+            <View style={s.raidBody}>
+              <View style={s.raidAvatarWrap}>
+                <View style={[s.auraSmall, { backgroundColor: (WEAK_COLOR[eventBoss.weakness] ?? '#888') + '22', borderColor: (WEAK_COLOR[eventBoss.weakness] ?? '#888') + '55' }]} pointerEvents="none" />
+                <Animated.Text style={[s.raidEmoji, { transform: [{ translateX: eShakeX }] }]}>{eventBoss.emoji}</Animated.Text>
+                {eventHitFx && (
+                  <Animated.Text style={[s.rDmgFloat, { opacity: eFloatOp, transform: [{ translateY: eFloatY }], color: eventHitFx.crit ? '#FDE047' : '#F87171' }]}>-{eventHitFx.dmg}{eventHitFx.crit ? ' KRYT!' : ''}</Animated.Text>
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.raidName} numberOfLines={1}>{eventBoss.name}</Text>
+                <Text style={s.raidTaunt} numberOfLines={1}>„{eventBoss.taunt}"</Text>
+                <View style={s.hpTrackSm}><View style={[s.hpFill, { width: `${Math.round((eventDone ? 0 : eventRemaining) / eventMaxHp * 100)}%` }]} /></View>
+                <Text style={s.raidHpTxt}>{eventDone ? 'POKONANY ✓' : `${eventRemaining} / ${eventMaxHp} HP`} · słaby na {eventBoss.weaknessLabel}</Text>
+              </View>
+            </View>
+            {eventDone ? (
+              <Text style={s.raidDoneTxt}>Medal zdobyty!</Text>
+            ) : eventUnlocked ? (
+              <PressableScale onPress={doEvent}>
+                <View style={[s.raidBtn, { backgroundColor: '#F4B740' }, eventEnergy <= 0 && { opacity: 0.5 }]}>
+                  <Swords size={16} color="#0B0E1A" /><Text style={s.raidBtnTxt}>Uderz · ~{eventPreviewDmg}</Text>
+                </View>
+              </PressableScale>
+            ) : (
+              <Text style={s.raidLockTxt}>Wydarzenia odblokujesz na poziomie 2 (masz {level}).</Text>
+            )}
+            <Text style={s.raidReward}>Nagroda: {eventBoss.trophyEmoji} medal · +{eventCoins(level)} 🪙 · +{eventXp(level)} XP</Text>
+          </View>
+        )}
 
         {!current ? (
           <View style={s.done}>
@@ -350,6 +454,19 @@ export default function Bosses() {
             </View>
           </>
         )}
+        {eventWon.length > 0 && (
+          <>
+            <Text style={s.section}>Medale wydarzeń ({eventWon.length})</Text>
+            <View style={s.medalWall}>
+              {eventWon.slice().reverse().map(key => (
+                <View key={key} style={s.medal}>
+                  <Text style={s.medalEmoji}>{eventBossFromKey(key)?.trophyEmoji ?? '🏆'}</Text>
+                  <Text style={s.medalWk} numberOfLines={1}>{key}</Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* victory */}
@@ -383,6 +500,22 @@ export default function Bosses() {
             <Text style={s.vName}>{raid.name}</Text>
             <Text style={s.vReward}>Medal tygodnia · +{raidCoins(level)} 🪙 · +{raidXp(level)} XP</Text>
           </View>
+          <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
+        </Pressable>
+      </Modal>
+
+      {/* event victory */}
+      <Modal visible={eventVictory} transparent statusBarTranslucent animationType="fade" onRequestClose={() => setEventVictory(false)}>
+        <Pressable style={s.vBackdrop} onPress={() => setEventVictory(false)}>
+          <Confetti colors={['#F4B740', '#FDE047', '#38BDF8', '#F472B6']} />
+          {eventBoss && (
+            <View style={s.vCenter} pointerEvents="none">
+              <Text style={s.vKicker}>WYDARZENIE POKONANE!</Text>
+              <Text style={s.vBoss}>{eventBoss.trophyEmoji}</Text>
+              <Text style={s.vName}>{eventBoss.name}</Text>
+              <Text style={s.vReward}>Medal · +{eventCoins(level)} 🪙 · +{eventXp(level)} XP</Text>
+            </View>
+          )}
           <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
         </Pressable>
       </Modal>

@@ -78,6 +78,15 @@ interface PetState {
   raidWeek: string | null;      // klucz tygodnia, dla którego raidHp jest aktualne
   raidHp: number;               // pozostałe HP raidu tego tygodnia
   raidWon: string[];            // klucze tygodni pokonanych (kolekcjonerskie medale)
+  // ── wydarzenia (sezonowe święta / nemesis miesiąca) ──
+  // TRZECIA niezależna pula energii — patrz raidEnergy wyżej, ten sam powód. Klucz
+  // okresu (eventPeriodKey z seasonalEvents.ts) zmienia się z porą roku/miesiącem,
+  // więc HP trzymamy per-klucz (jak bossHp), nie jedną liczbą jak raidHp.
+  eventEnergy: number;
+  eventEnergyDate: string | null;
+  eventEnergyToday: number;
+  eventHp: Record<string, number>;  // eventKey → pozostałe hp (brak = pełne)
+  eventWon: string[];               // eventKeys pokonane (kolekcjonerskie medale)
   _hydrated: boolean;
 
   setName: (name: string) => void;
@@ -113,6 +122,10 @@ interface PetState {
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
   raidAttack: (damage: number) => { remaining: number; defeated: boolean };
   raidClaim: (weekKey: string, coins: number, xp: number) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
+  // wydarzenia
+  syncEventEnergy: (todayEnergy: number, mult: number) => void;
+  eventAttack: (eventKey: string, maxHp: number, damage: number) => { remaining: number; defeated: boolean };
+  eventClaim: (eventKey: string, coins: number, xp: number) => void;
   reset: () => void;
 }
 
@@ -155,6 +168,11 @@ export const usePetStore = create<PetState>()(
       raidWeek: null,
       raidHp: 0,
       raidWon: [],
+      eventEnergy: 0,
+      eventEnergyDate: null,
+      eventEnergyToday: 0,
+      eventHp: {},
+      eventWon: [],
       defeatedBosses: [],
       bossHp: {},
       _hydrated: false,
@@ -396,7 +414,29 @@ export const usePetStore = create<PetState>()(
         return { remaining, defeated: remaining <= 0 };
       },
       raidClaim: (weekKey, coins, xp) => set((s) => (s.raidWon.includes(weekKey) ? s : { raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [] }),
+      // Identical shape to syncEnergy/syncRaidEnergy, targeting the event's own bank.
+      syncEventEnergy: (todayEnergy, mult) => {
+        const t = todayISO();
+        const s = get();
+        const grantedToday = s.eventEnergyDate === t ? s.eventEnergyToday : 0;
+        const target = Math.round(todayEnergy * (1 + mult));
+        const delta = target - grantedToday;
+        if (delta <= 0 && s.eventEnergyDate === t) return;
+        set({
+          eventEnergy: s.eventEnergy + Math.max(0, delta),
+          eventEnergyDate: t,
+          eventEnergyToday: Math.max(grantedToday, target),
+        });
+      },
+      eventAttack: (eventKey, maxHp, damage) => {
+        const s = get();
+        const cur = s.eventHp[eventKey] ?? maxHp;
+        const remaining = Math.max(0, cur - damage);
+        set({ eventEnergy: 0, eventHp: { ...s.eventHp, [eventKey]: remaining } });
+        return { remaining, defeated: remaining <= 0 };
+      },
+      eventClaim: (eventKey, coins, xp) => set((s) => (s.eventWon.includes(eventKey) ? s : { eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp })),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventHp: {}, eventWon: [] }),
     }),
     {
       name: 'pet-v1',
@@ -414,6 +454,8 @@ export const usePetStore = create<PetState>()(
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
+        eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
+        eventHp: s.eventHp, eventWon: s.eventWon,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)

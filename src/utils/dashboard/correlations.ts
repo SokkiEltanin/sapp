@@ -1,7 +1,7 @@
 // Silnik korelacji „co na Ciebie wpływa" — Pearson po dopasowanych dniach między metrykami
 // self-care (sen, energia, humor, słodycze, praca, kroki). Czysty → testowalny w node.
 
-export type MetricKey = 'sleep' | 'mood' | 'energy' | 'sweets' | 'work' | 'steps';
+export type MetricKey = 'sleep' | 'mood' | 'energy' | 'sweets' | 'work' | 'steps' | 'weather';
 
 export interface DailyMetrics {
   sleep?: number;   // minuty snu
@@ -10,6 +10,7 @@ export interface DailyMetrics {
   sweets?: number;  // liczba/kcal słodyczy tego dnia
   work?: number;    // godziny pracy
   steps?: number;
+  weather?: number; // średnia temperatura dnia (°C)
 }
 
 export interface Link {
@@ -42,6 +43,7 @@ const PAIRS: [MetricKey, MetricKey][] = [
   ['sweets', 'mood'], ['sweets', 'energy'],
   ['work', 'mood'], ['work', 'energy'],
   ['steps', 'energy'], ['steps', 'mood'],
+  ['weather', 'mood'], ['weather', 'energy'], ['weather', 'steps'],
 ];
 
 // Najsilniejsze wiarygodne powiązania (posortowane wg |r|), max `max`.

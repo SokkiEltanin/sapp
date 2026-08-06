@@ -50,6 +50,7 @@ import { humorLine } from '@/utils/dashboard/humor';
 import { pctChange, monthSpendCompare } from '@/utils/dashboard/compare';
 import { strongestLinks, DailyMetrics } from '@/utils/dashboard/correlations';
 import CorrelationsInsightCard from '@/components/dashboard/CorrelationsInsightCard';
+import { weatherService } from '@/services/weatherService';
 import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice } from '@/utils/tagBudgets';
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
@@ -3090,8 +3091,21 @@ export default function DashboardScreen() {
     return { mood, spend, hasSpend, steps, label, has: mood != null || hasSpend || steps > 0 };
   }, [expenses, moodByDay, healthDays, scope]);
 
-  // „Co na Ciebie wpływa" — powiązania (Pearson) między sen/energia/humor/słodycze/praca/kroki
-  // z ostatnich 30 dni. Buduje metryki per-dzień z danych, które dashboard już ma.
+  // Historyczna pogoda (past_days=60 z weatherService, cache 6h) — jedyna metryka w
+  // insightLinks, której dashboard jeszcze nie trzyma w pamięci; pobierana raz, potem
+  // scalana per-dzień poniżej. Brak zgody na lokalizację / offline → po prostu pusta mapa,
+  // insightLinks działa dalej bez pogody (jak dotąd).
+  const [weatherByDay, setWeatherByDay] = useState<Record<string, number>>({});
+  useEffect(() => {
+    weatherService.getWeather().then(days => {
+      const map: Record<string, number> = {};
+      for (const d of days) map[d.date] = d.tempAvg;
+      setWeatherByDay(map);
+    }).catch(() => {});
+  }, []);
+
+  // „Co na Ciebie wpływa" — powiązania (Pearson) między sen/energia/humor/słodycze/praca/kroki/
+  // pogoda z ostatnich 30 dni. Buduje metryki per-dzień z danych, które dashboard już ma.
   const insightLinks = useMemo(() => {
     const wcol = workSettings.workColor;
     const wp = workSettings.workPrefix?.trim().toLowerCase();
@@ -3129,10 +3143,11 @@ export default function DashboardScreen() {
         mood, energy,
         sweets: sweetsByDay[key] ?? 0,                 // brak zakupu = 0 słodyczy (istotny punkt)
         work: hasWork ? (workByDay[key] ?? 0) : undefined,
+        weather: weatherByDay[key],
       });
     }
     return strongestLinks(days);
-  }, [expenses, moodByDay, healthDays, allEvents, workSettings, scope]);
+  }, [expenses, moodByDay, healthDays, allEvents, workSettings, scope, weatherByDay]);
 
   // "Jedzenie — rozkład": this month's FOOD spend (food lines only) split by week-of-month,
   // by day-of-week, and by food subcategory (mięso/nabiał/…).
