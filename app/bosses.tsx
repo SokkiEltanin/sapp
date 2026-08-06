@@ -39,7 +39,7 @@ const WEAK_COLOR: Record<string, string> = {
 export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { xp, energy, ownedItems, defeatedBosses, bossHp, syncEnergy, attackBoss, defeatBoss, healBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim } = usePetStore();
+  const { xp, energy, raidEnergy, ownedItems, defeatedBosses, bossHp, syncEnergy, syncRaidEnergy, attackBoss, defeatBoss, healBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim } = usePetStore();
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -86,12 +86,16 @@ export default function Bosses() {
         const yHabits = habits.filter(hb => (yc[hb.id] ?? 0) >= (hb.type === 'count' ? (hb.dailyGoal ?? 1) : 1)).length;
         yestE = energyFromData({ stepsToday: stepsYest, habitsDone: yHabits, moodLoggedToday: moodEntries.some(m => m.date === yISO), boughtSweetToday: false });
       } catch {}
-      syncEnergy(Math.max(todayE, Math.round(yestE * 0.7)), bonuses.energyMult);
+      // Same self-care number banks into BOTH pools independently — attacking the
+      // boss doesn't drain what you can spend on the raid, and vice versa.
+      const banked = Math.max(todayE, Math.round(yestE * 0.7));
+      syncEnergy(banked, bonuses.energyMult);
+      syncRaidEnergy(banked, bonuses.energyMult);
     }).catch(() => {});
     getWaterGlasses(todayISO()).then(setWaterToday).catch(() => {});
     getHealthGoals().then(g => setWaterGoal(g.waterGoal || 8)).catch(() => {});
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
-  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, habits, level, raidEnsure]);
+  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, syncRaidEnergy, habits, level, raidEnsure]);
   useFocusEffect(reload);
 
   // sequential campaign: current = first not-yet-defeated boss
@@ -107,7 +111,7 @@ export default function Bosses() {
   const raidDone = raidWon.includes(weekKey);
   const raidUnlocked = level >= 3;
   const raidWeakMult = weaknessMult({ weakness: raid.weakness } as Boss, wc);
-  const raidPreviewDmg = Math.round(energy * atkMultiplier(level, bonuses) * raidWeakMult);
+  const raidPreviewDmg = Math.round(raidEnergy * atkMultiplier(level, bonuses) * raidWeakMult);
 
   // attack animation
   const shake = useRef(new Animated.Value(0)).current;
@@ -163,9 +167,9 @@ export default function Bosses() {
   const doRaid = () => {
     if (raidDone) { haptic.tap(); toast.info('Raid tego tygodnia pokonany! Nowy w poniedziałek.'); return; }
     if (!raidUnlocked) { haptic.error(); toast.info('Raid odblokujesz na poziomie 3'); return; }
-    if (energy <= 0) { haptic.error(); toast.info('Brak energii — zadbaj o siebie, by naładować cios'); return; }
+    if (raidEnergy <= 0) { haptic.error(); toast.info('Brak energii raidu — zadbaj o siebie, by naładować cios'); return; }
     const crit = Math.random() < bonuses.crit;
-    const damage = Math.round(energy * atkMultiplier(level, bonuses) * raidWeakMult * (crit ? 2 : 1));
+    const damage = Math.round(raidEnergy * atkMultiplier(level, bonuses) * raidWeakMult * (crit ? 2 : 1));
     haptic.medium();
     setRaidHit({ dmg: damage, crit });
     rShake.setValue(0); rDmgY.setValue(0);
@@ -206,6 +210,7 @@ export default function Bosses() {
         <View style={s.raidCard}>
           <View style={s.raidHead}>
             <Text style={s.raidKicker}>RAID TYGODNIA</Text>
+            <View style={s.raidEnergyPill}><Zap size={11} color="#38BDF8" /><Text style={s.raidEnergyTxt}>{raidEnergy}</Text></View>
             <View style={s.raidMedals}><Text style={s.raidMedalsTxt}>🏆 {raidWon.length}</Text></View>
           </View>
           <View style={s.raidBody}>
@@ -227,7 +232,7 @@ export default function Bosses() {
             <Text style={s.raidDoneTxt}>Medal zdobyty! Nowy raid w poniedziałek.</Text>
           ) : raidUnlocked ? (
             <PressableScale onPress={doRaid}>
-              <View style={[s.raidBtn, energy <= 0 && { opacity: 0.5 }]}>
+              <View style={[s.raidBtn, raidEnergy <= 0 && { opacity: 0.5 }]}>
                 <Swords size={16} color="#0B0E1A" /><Text style={s.raidBtnTxt}>Uderz w raid · ~{raidPreviewDmg}</Text>
               </View>
             </PressableScale>
@@ -455,6 +460,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   raidKicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2, color: '#A78BFA' },
   raidMedals: { backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
   raidMedalsTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
+  raidEnergyPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#38BDF840' },
+  raidEnergyTxt: { fontSize: 11.5, fontWeight: '800', color: '#38BDF8' },
   raidBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   raidAvatarWrap: { width: 76, height: 76, alignItems: 'center', justifyContent: 'center' },
   auraSmall: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: 1 },

@@ -63,12 +63,18 @@ interface PetState {
   affectionRewardDay: string | null; // day the "full affection" bonus was paid
   pendingCrates: number;        // unopened sardine crates earned from full affection
   // ── boss battles ──
-  energy: number;               // banked attack energy
+  energy: number;               // banked attack energy (kampania bossów)
   energyDate: string | null;    // day the top-up counter belongs to
   energyToday: number;          // energy already granted today (for daily top-up)
   defeatedBosses: string[];
   bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
   // ── raid tygodniowy ──
+  // WŁASNA pula energii — atak bossa i atak raidu NIE dzielą jednego zasobu (dawniej
+  // dzieliły `energy`, więc trzeba było wybierać, w co uderzyć). Zasilana tym samym
+  // wzorem co energia bossa (ta sama codzienna samo-opieka napędza obie), ale osobno.
+  raidEnergy: number;
+  raidEnergyDate: string | null;
+  raidEnergyToday: number;
   raidWeek: string | null;      // klucz tygodnia, dla którego raidHp jest aktualne
   raidHp: number;               // pozostałe HP raidu tego tygodnia
   raidWon: string[];            // klucze tygodni pokonanych (kolekcjonerskie medale)
@@ -100,6 +106,7 @@ interface PetState {
   openCrate: () => { tier: CrateTier; coins: number } | null;    // open one pending crate
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
+  syncRaidEnergy: (todayEnergy: number, mult: number) => void; // jak syncEnergy, ale osobna pula raidu
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number) => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
@@ -142,6 +149,9 @@ export const usePetStore = create<PetState>()(
       energy: 0,
       energyDate: null,
       energyToday: 0,
+      raidEnergy: 0,
+      raidEnergyDate: null,
+      raidEnergyToday: 0,
       raidWeek: null,
       raidHp: 0,
       raidWon: [],
@@ -342,6 +352,21 @@ export const usePetStore = create<PetState>()(
           energyToday: Math.max(grantedToday, target),
         });
       },
+      // Identical shape to syncEnergy, targeting the raid's own bank — see the
+      // raidEnergy comment above for why this is separate from `energy`.
+      syncRaidEnergy: (todayEnergy, mult) => {
+        const t = todayISO();
+        const s = get();
+        const grantedToday = s.raidEnergyDate === t ? s.raidEnergyToday : 0;
+        const target = Math.round(todayEnergy * (1 + mult));
+        const delta = target - grantedToday;
+        if (delta <= 0 && s.raidEnergyDate === t) return;
+        set({
+          raidEnergy: s.raidEnergy + Math.max(0, delta),
+          raidEnergyDate: t,
+          raidEnergyToday: Math.max(grantedToday, target),
+        });
+      },
       attackBoss: (bossId, maxHp, damage, dodge) => {
         const s = get();
         const cur = s.bossHp[bossId] ?? maxHp;
@@ -367,11 +392,11 @@ export const usePetStore = create<PetState>()(
       raidAttack: (damage) => {
         const s = get();
         const remaining = Math.max(0, s.raidHp - damage);
-        set({ energy: 0, raidHp: remaining });
+        set({ raidEnergy: 0, raidHp: remaining });
         return { remaining, defeated: remaining <= 0 };
       },
       raidClaim: (weekKey, coins, xp) => set((s) => (s.raidWon.includes(weekKey) ? s : { raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidWeek: null, raidHp: 0, raidWon: [] }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [] }),
     }),
     {
       name: 'pet-v1',
@@ -387,6 +412,7 @@ export const usePetStore = create<PetState>()(
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
+        raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
       }),
       onRehydrateStorage: () => (state) => {
