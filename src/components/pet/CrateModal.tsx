@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { usePetStore } from '@/store/petStore';
 import { CRATE_META, CrateTier } from '@/utils/crates';
+import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { haptic } from '@/utils/haptics';
 
 // A coin/spark that flies outward and fades on the reveal burst.
@@ -24,7 +25,7 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
   const pending = usePetStore(s => s.pendingCrates);
 
   const [phase, setPhase] = useState<'closed' | 'opening' | 'revealed'>('closed');
-  const [result, setResult] = useState<{ tier: CrateTier; coins: number } | null>(null);
+  const [result, setResult] = useState<{ tier: CrateTier; coins: number; itemDropped: CombatItemId | null } | null>(null);
   const [shown, setShown] = useState(0);
   const [flies, setFlies] = useState<{ id: number; dx: number; dy: number; emoji: string }[]>([]);
 
@@ -110,6 +111,9 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
                   <Text style={[st.tier, { color: meta.color }]}>{meta.label.toUpperCase()}</Text>
                   <Text style={st.coins}>+{shown} 🪙</Text>
                   <Text style={st.fish2}>🐟</Text>
+                  {result?.itemDropped && (
+                    <Text style={st.itemDrop}>🎁 Nowy item bojowy: {COMBAT_ITEMS[result.itemDropped].name}!</Text>
+                  )}
                 </Animated.View>
               </View>
               <Pressable style={[st.btn, { backgroundColor: meta.color }]} onPress={onClose}>
@@ -141,6 +145,7 @@ const st = StyleSheet.create({
   tier: { fontSize: 13, fontWeight: '900', letterSpacing: 2 },
   coins: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
   fish2: { fontSize: 26 },
+  itemDrop: { color: '#FBBF24', fontSize: 12, fontWeight: '800', textAlign: 'center', marginTop: 4 },
   btn: { paddingHorizontal: 26, paddingVertical: 13, borderRadius: 14 },
   btnTxt: { color: '#07160F', fontSize: 15, fontWeight: '900' },
   again: { color: '#9AA6B2', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },

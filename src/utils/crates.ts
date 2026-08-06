@@ -8,6 +8,12 @@
 // `r < 0.02` bucket.
 export type CrateTier = 'basic' | 'rare' | 'epic' | 'legendary';
 
+// Niezależna szansa (osobna od tieru monet powyżej), że otwarcie skrzynki DODATKOWO
+// przyzna item bojowy (v4.1 — patrz memory boss_design.md). User 2026-08-06: "bardzo
+// rzadko". Osobna od kolorowego tieru = prościej — monety zostają jak były, item to
+// bonus na wierzchu, nie zależny od tego czy akurat wylosowało 'legendary'.
+export const COMBAT_ITEM_DROP_CHANCE = 0.01;
+
 export const CRATE_META: Record<CrateTier, { label: string; color: string }> = {
   basic:     { label: 'Zwykła',      color: '#9AA6B2' },
   rare:      { label: 'Rzadka',      color: '#4DA8FF' },

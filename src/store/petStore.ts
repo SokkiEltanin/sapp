@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weekKeyOf } from '@/utils/quests';
-import { rollCrate, CrateTier } from '@/utils/crates';
-import { CombatItemId } from '@/utils/combatItems';
+import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE } from '@/utils/crates';
+import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 
 // Ile itemów bojowych naraz w ekwipunku (v4 — patrz memory boss_design.md). TODO-balance,
 // user nie podał liczby — 3 to rozsądny start (mieści headshot+jedną obronę+jedną ofensywę).
@@ -134,7 +134,7 @@ interface PetState {
   claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
   petCat: (inc: number) => { value: number; justFull: boolean }; // tap-to-pet; full bar → a crate
-  openCrate: () => { tier: CrateTier; coins: number } | null;    // open one pending crate
+  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null } | null; // open one pending crate
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // jak syncEnergy, ale osobna pula raidu
@@ -389,8 +389,19 @@ export const usePetStore = create<PetState>()(
         const s = get();
         if ((s.pendingCrates ?? 0) <= 0) return null;
         const roll = rollCrate();
-        set({ pendingCrates: s.pendingCrates - 1, coins: s.coins + roll.coins });
-        return roll;
+        // Rzadka, niezależna szansa na item bojowy (v4.1) — tylko spośród jeszcze
+        // nieposiadanych, żeby nie "marnować" dropu na duplikat (merge nie istnieje jeszcze).
+        let itemDropped: CombatItemId | null = null;
+        if (Math.random() < COMBAT_ITEM_DROP_CHANCE) {
+          const candidates = (Object.keys(COMBAT_ITEMS) as CombatItemId[]).filter(id => !s.ownedCombatItems[id]);
+          if (candidates.length > 0) itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+        set({
+          pendingCrates: s.pendingCrates - 1,
+          coins: s.coins + roll.coins,
+          ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
+        });
+        return { ...roll, itemDropped };
       },
       // Top up the energy bank with today's self-care output (once per amount, tops
       // up as the day's data grows). energyMult from loot boosts the gain.
