@@ -67,7 +67,7 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
       setPhase('revealed');
       haptic.success();
       Animated.spring(burst, { toValue: 1, friction: 5, tension: 70, useNativeDriver: true }).start();
-      const n = roll.tier === 'mythic' ? 18 : roll.tier === 'epic' ? 13 : roll.tier === 'rare' ? 9 : 6;
+      const n = roll.tier === 'legendary' ? 18 : roll.tier === 'epic' ? 13 : roll.tier === 'rare' ? 9 : 6;
       setFlies(Array.from({ length: n }).map((_, i) => ({ id: i, dx: (Math.random() - 0.5) * 280, dy: -(50 + Math.random() * 230), emoji: i % 3 === 0 ? '✨' : '🪙' })));
       let c = 0; const step = Math.max(1, Math.round(roll.coins / 24));
       const iv = setInterval(() => { c = Math.min(roll.coins, c + step); setShown(c); if (c >= roll.coins) clearInterval(iv); }, 30);

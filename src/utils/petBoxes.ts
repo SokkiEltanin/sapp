@@ -67,7 +67,7 @@ export type BoxReward =
   | { type: 'freeze'; count: number; rarity: CrateTier };
 
 // Kolor mapuje na „mocniejszą" celebrację niż jego tier sklepowy (zdobycie koloru = święto).
-const COLOR_RARITY: Record<CosmeticTier, CrateTier> = { basic: 'rare', rare: 'epic', epic: 'mythic' };
+const COLOR_RARITY: Record<CosmeticTier, CrateTier> = { basic: 'rare', rare: 'epic', epic: 'legendary' };
 
 function pickWeighted<T>(items: { item: T; w: number }[]): T | null {
   const total = items.reduce((s, x) => s + Math.max(0, x.w), 0);
@@ -103,5 +103,5 @@ export function rollBox(box: LootBox, colors: ShopColor[], ownedIds: string[]): 
   // 4) MONETY (rzadki jackpot = mityczny)
   const jackpot = Math.random() < box.coins.jackpotChance;
   const coins = jackpot ? box.coins.jackpot : box.coins.min + Math.floor(Math.random() * (box.coins.max - box.coins.min + 1));
-  return { type: 'coins', coins, rarity: jackpot ? 'mythic' : 'basic' };
+  return { type: 'coins', coins, rarity: jackpot ? 'legendary' : 'basic' };
 }

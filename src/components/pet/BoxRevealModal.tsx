@@ -70,7 +70,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
             ex: (Math.random() - 0.5) * 40, ey: -20 + (Math.random() - 0.5) * 40, emoji: '❄️', size: 20 + Math.random() * 12 };
         }));
       } else {
-        const n = reward.rarity === 'mythic' ? 18 : reward.rarity === 'epic' ? 13 : 9;
+        const n = reward.rarity === 'legendary' ? 18 : reward.rarity === 'epic' ? 13 : 9;
         const em = reward.type === 'coins' ? '🪙' : '✨';
         setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
           sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
