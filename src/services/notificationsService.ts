@@ -564,6 +564,39 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync(`sub-${subId}`).catch(() => {});
   },
 
+  // Passive "renewing soon" heads-up — always on for active subscriptions (not tied to
+  // the opt-in reminderDaysBefore above, which is the separate "consider cancelling"
+  // reminder). Fixed at exactly two checkpoints, on purpose: replaces the old dashboard
+  // "did you pay?" modal that nagged daily and could stack with the mood check-in — this
+  // is informational only, fires once each, and adds nothing to your data.
+  async scheduleRenewalHeadsUp(sub: Subscription): Promise<void> {
+    if (!sub.active) return;
+    if (await AsyncStorage.getItem('notif_enabled') === 'false') return;
+    if (await AsyncStorage.getItem('notif_subs_enabled') === 'false') return;
+    const base = new Date(sub.nextBillingDate + 'T09:00:00');
+    for (const [days, tag] of [[7, 'renew7'], [1, 'renew1']] as [number, string][]) {
+      const fire = new Date(base);
+      fire.setDate(fire.getDate() - days);
+      if (fire <= new Date()) continue;
+      await Notifications.scheduleNotificationAsync({
+        identifier: `sub-${tag}-${sub.id}`,
+        content: {
+          title: `Subskrypcja: ${sub.name}`,
+          body: days === 1
+            ? `Jutro odnowi się za ${sub.amount.toFixed(2)} zł.`
+            : `Za tydzień odnowi się za ${sub.amount.toFixed(2)} zł.`,
+          data: { screen: 'subscriptions', subId: sub.id },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fire },
+      }).catch(() => {});
+    }
+  },
+
+  async cancelRenewalHeadsUp(subId: string): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync(`sub-renew7-${subId}`).catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync(`sub-renew1-${subId}`).catch(() => {});
+  },
+
   async scheduleEventReminder(eventId: string, title: string, dateIso: string, startTime?: string): Promise<void> {
     const [year, month, day] = dateIso.split('T')[0].split('-').map(Number);
     const [hour, minute] = startTime ? startTime.split(':').map(Number) : [9, 0];

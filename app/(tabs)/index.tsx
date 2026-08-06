@@ -1172,10 +1172,6 @@ export default function DashboardScreen() {
     reorderVisible(id, from + dir);
   }, [reorderVisible]);
 
-  // ── Subscription payment queue ────────────────────────────────────────────
-  const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
-  const [paymentConfirming, setPaymentConfirming] = useState(false);
-
   // Payday prompt — ask (on a configurable day) whether the paycheck arrived.
   const [paydayCfg, setPaydayCfg] = useState<PaydayConfig>({ enabled: false, day: 10 });
   const [paydayHandled, setPaydayHandled] = useState<string | null>(null);
@@ -1330,57 +1326,36 @@ export default function DashboardScreen() {
   }, []);
 
   // ── Subscription check ────────────────────────────────────────────────────
-  // A due bill you don't pay ("Nie") stays due, so this used to nag on EVERY app
-  // open. Limit it to once per half-day (morning / evening → at most twice a day),
-  // persisted so it survives app restarts.
+  // Used to queue an interactive "Czy opłaciłeś tę subskrypcję?" modal — nagged up to
+  // twice a day and could stack on top of the mood check-in modal. Replaced: a due
+  // subscription's nextBillingDate now just advances SILENTLY (no expense added, no
+  // question asked) so it doesn't get stuck; the user is informed ahead of time instead,
+  // via the renewal heads-up notifications scheduled in useSubscriptions (7 days + 1 day
+  // before). Bank-detected payments still work exactly as before (confirmSub below).
   useEffect(() => {
     if (checkedSubs.current || subscriptions.length === 0) return;
     checkedSubs.current = true;
-    (async () => {
-      const now = new Date();
-      const period = `${ymd(now)}-${now.getHours() < 15 ? 'am' : 'pm'}`;
-      try { if ((await AsyncStorage.getItem('subs_prompt_period')) === period) return; } catch {}
-      const todayS = ymd(now);
-      const due = subscriptions.filter(s => s.active && !isDurationExpired(s) && s.nextBillingDate <= todayS);
-      if (due.length > 0) {
-        setPaymentQueue(due);
-        AsyncStorage.setItem('subs_prompt_period', period).catch(() => {});
-      }
-    })();
-  }, [subscriptions]);
-
-  // If a queued subscription got auto-paid (e.g. bank notification advanced its
-  // billing date), drop it from the "zapłaciłeś?" prompt so it stops asking.
-  useEffect(() => {
     const todayS = ymd(new Date());
-    setPaymentQueue(q => q.filter(s => {
-      const cur = subscriptions.find(x => x.id === s.id);
-      return !!cur && cur.active && cur.nextBillingDate <= todayS;
-    }));
-  }, [subscriptions]);
-
-  const currentPayment = paymentQueue[0] ?? null;
-
-  const handlePaymentYes = useCallback(async () => {
-    if (!currentPayment) return;
-    haptic.success();
-    setPaymentConfirming(true);
-    try {
-      const todayS = todayISO();
-      await expensesService.add({
-        type: 'expense', amount: currentPayment.amount, currency: currentPayment.currency,
-        category: currentPayment.category, tags: currentPayment.tags ?? [], note: `Subskrypcja: ${currentPayment.name}`, date: todayS,
-      });
-      const next = advanceNextBillingDate(currentPayment.nextBillingDate, currentPayment.billingCycle);
-      await updateSub(currentPayment.id, { nextBillingDate: next });
-    } catch {
-      haptic.error();
-      toast.error('Nie udało się zapisać płatności — sprawdź połączenie');
+    const due = new Set<string>();
+    for (const s of subscriptions) {
+      if (!s.active || isDurationExpired(s) || s.nextBillingDate > todayS) continue;
+      due.add(s.id);
+      let next = s.nextBillingDate;
+      do { next = advanceNextBillingDate(next, s.billingCycle); } while (next <= todayS);
+      updateSub(s.id, { nextBillingDate: next }).catch(() => {});
     }
-    finally { setPaymentConfirming(false); setPaymentQueue(q => q.slice(1)); }
-  }, [currentPayment, updateSub]);
-
-  const handlePaymentNo = useCallback(() => { haptic.tap(); setPaymentQueue(q => q.slice(1)); }, []);
+    // Backfill: subscriptions that existed before the renewal heads-up feature won't have
+    // it scheduled until their next add/update — arm it once here too (idempotent, same
+    // notification identifiers get overwritten). Due ones are skipped — updateSub above
+    // already reschedules them against their newly-advanced date.
+    import('@/services/notificationsService').then(({ notificationsService }) => {
+      for (const s of subscriptions) {
+        if (s.active && !isDurationExpired(s) && !due.has(s.id)) {
+          notificationsService.scheduleRenewalHeadsUp(s).catch(() => {});
+        }
+      }
+    }).catch(() => {});
+  }, [subscriptions]);
 
   // Confirm (or reject) a bank payment as a subscription charge (EUR-by-rate case).
   const confirmSub = useCallback(async (c: PendingSubConfirm) => {
@@ -5214,38 +5189,6 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
-      {/* Subscription payment modal */}
-      {currentPayment && (
-        <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={handlePaymentNo}>
-          <View style={s.payOverlay}>
-            <View style={s.payCard}>
-              <View style={s.payIconWrap}>
-                <CreditCard size={24} color={colors.tabs.tasks} />
-              </View>
-              <Text style={s.payTitle}>Płatność należna</Text>
-              <Text style={s.payName}>{currentPayment.name}</Text>
-              <Text style={s.payAmount}>{currentPayment.amount.toFixed(2)} zł</Text>
-              <Text style={s.payHint}>Czy opłaciłeś tę subskrypcję?</Text>
-              {paymentQueue.length > 1 && (
-                <Text style={s.payQueue}>+{paymentQueue.length - 1} kolejnych</Text>
-              )}
-              <View style={s.payBtns}>
-                <PressableScale onPress={handlePaymentNo} style={s.payBtnNo}>
-                  <Text style={s.payBtnNoText}>Nie teraz</Text>
-                </PressableScale>
-                <PressableScale
-                  onPress={handlePaymentYes}
-                  style={[s.payBtnYes, paymentConfirming && { opacity: 0.6 }]}
-                  disabled={paymentConfirming}
-                >
-                  <Check size={16} color={colors.bg.primary} />
-                  <Text style={s.payBtnYesText}>{paymentConfirming ? 'Zapisuję...' : 'Tak, opłaciłem'}</Text>
-                </PressableScale>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 }
@@ -5938,34 +5881,4 @@ const buildStyles = (c: any) => StyleSheet.create({
   dualLegendLine:  { width: 10, height: 2, borderRadius: 1 },
   dualLegendLabel: { fontSize: 9, color: c.text.muted },
 
-  // ── Subscription payment modal ─────────────────────────────────────────────
-  payOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.80)', justifyContent: 'center', alignItems: 'center', padding: spacing[6] },
-  payCard: {
-    width: '100%', backgroundColor: c.bg.card, borderRadius: radius.xl,
-    padding: spacing[6], alignItems: 'center', gap: spacing[3],
-    borderWidth: 1, borderColor: c.border.default,
-  },
-  payIconWrap: {
-    width: 52, height: 52, borderRadius: radius.full,
-    backgroundColor: c.accent.blue + '18',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  payTitle:  { fontSize: 10, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  payName:   { fontSize: 20, fontWeight: '800', color: c.text.primary, textAlign: 'center' },
-  payAmount: { fontSize: 28, fontWeight: '800', color: c.accent.blue },
-  payHint:   { fontSize: 14, color: c.text.secondary, textAlign: 'center' },
-  payQueue:  { fontSize: 11, color: c.text.muted },
-  payBtns:   { flexDirection: 'row', gap: spacing[3], width: '100%', marginTop: spacing[2] },
-  payBtnNo: {
-    flex: 1, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: c.bg.elevated, alignItems: 'center',
-    borderWidth: 1, borderColor: c.border.default,
-  },
-  payBtnNoText: { fontSize: 14, fontWeight: '600', color: c.text.secondary },
-  payBtnYes: {
-    flex: 2, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: c.tabs.tasks, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center', gap: spacing[2],
-  },
-  payBtnYesText: { fontSize: 14, fontWeight: '700', color: c.bg.primary },
 });

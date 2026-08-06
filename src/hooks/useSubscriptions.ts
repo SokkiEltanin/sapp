@@ -36,6 +36,7 @@ export function useSubscriptions() {
     if (created.reminderDaysBefore > 0) {
       notificationsService.scheduleSubscriptionReminder(created).catch(() => {});
     }
+    notificationsService.scheduleRenewalHeadsUp(created).catch(() => {});
     return created;
   }, []);
 
@@ -44,8 +45,12 @@ export function useSubscriptions() {
     updateSubscription(id, updates);
     const updated = { ...subscriptions.find((s) => s.id === id)!, ...updates };
     notificationsService.cancelSubscriptionReminder(id).catch(() => {});
+    notificationsService.cancelRenewalHeadsUp(id).catch(() => {});
     if (updated.active && updated.reminderDaysBefore > 0) {
       notificationsService.scheduleSubscriptionReminder(updated).catch(() => {});
+    }
+    if (updated.active) {
+      notificationsService.scheduleRenewalHeadsUp(updated).catch(() => {});
     }
   }, [subscriptions]);
 
@@ -53,6 +58,7 @@ export function useSubscriptions() {
     await subscriptionsService.remove(id);
     deleteSubscription(id);
     notificationsService.cancelSubscriptionReminder(id).catch(() => {});
+    notificationsService.cancelRenewalHeadsUp(id).catch(() => {});
   }, []);
 
   const stats = useMemo(() => {
