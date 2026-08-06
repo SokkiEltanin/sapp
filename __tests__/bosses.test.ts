@@ -1,4 +1,4 @@
-import { weaknessMult, bossGuarded, weaknessMet, bossTier, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
+import { weaknessMult, bossGuarded, weaknessMet, bossTier, counterDamage, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 
 const ctx = (o: Partial<WeaknessCtx> = {}): WeaknessCtx => ({
@@ -48,6 +48,18 @@ describe('bosses — bossTier (derywowana z unlockLevel)', () => {
     const elite = BOSSES.filter(b => bossTier(b) === 'elite');
     expect(common.length).toBe(8);
     expect(elite.map(b => b.id)).toEqual(['insomnia', 'compare', 'drought', 'procrast', 'doubt', 'devourer']);
+  });
+});
+
+describe('bosses — counterDamage (fundament v4, jeszcze niepodpięty)', () => {
+  test('skaluje z HP bossa, bez uniku', () => {
+    expect(counterDamage(boss({ hp: 300 }), 0)).toBe(12);   // 300 * 0.04
+    expect(counterDamage(boss({ hp: 1000 }), 0)).toBe(40);  // 1000 * 0.04
+  });
+  test('unik redukuje obrażenia, cap 90%', () => {
+    expect(counterDamage(boss({ hp: 1000 }), 0.5)).toBe(20);   // połowa
+    expect(counterDamage(boss({ hp: 1000 }), 0.9)).toBe(4);    // 10% zostaje
+    expect(counterDamage(boss({ hp: 1000 }), 1.5)).toBe(4);    // cap na 0.9, nie ujemne
   });
 });
 

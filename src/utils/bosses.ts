@@ -205,6 +205,17 @@ export function atkMultiplier(level: number, bonuses: Bonuses): number {
   return 1 + level * 0.03 + bonuses.atk;
 }
 
+// ── Kontratak bossa (v4 redesign, fundament — patrz memory boss_design.md) ────────
+// Czysta funkcja, NIC jeszcze jej nie wywołuje w grze — bezpieczny krok przygotowawczy.
+// Skaluje z HP bossa (większy boss = mocniejszy kontratak), nie z poziomem gracza —
+// tak jak walka z bossem samym w sobie już skaluje trudność. `dodge` z Bonuses redukuje
+// obrażenia (0 = pełny cios, 0.9 = maks. redukcja — ten sam cap co przy regen bossa).
+const COUNTER_PCT = 0.04; // ułamek max HP bossa zadawany kotkowi na kontratak
+export function counterDamage(boss: Boss, dodge: number): number {
+  const base = boss.hp * COUNTER_PCT;
+  return Math.round(base * (1 - Math.min(0.9, Math.max(0, dodge))));
+}
+
 // One attack: spends all banked energy into a hit (crit doubles it).
 export function computeDamage(energy: number, level: number, bonuses: Bonuses, boss: Boss, wc: WeaknessCtx): { damage: number; crit: boolean } {
   const base = energy * atkMultiplier(level, bonuses) * weaknessMult(boss, wc);
