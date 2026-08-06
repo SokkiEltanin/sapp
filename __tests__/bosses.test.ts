@@ -1,4 +1,4 @@
-import { weaknessMult, bossGuarded, weaknessMet, bossTier, counterDamage, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
+import { weaknessMult, bossGuarded, weaknessMet, bossTier, counterDamage, simulateFight, Bonuses, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 
 const ctx = (o: Partial<WeaknessCtx> = {}): WeaknessCtx => ({
@@ -60,6 +60,43 @@ describe('bosses — counterDamage (fundament v4, jeszcze niepodpięty)', () => 
     expect(counterDamage(boss({ hp: 1000 }), 0.5)).toBe(20);   // połowa
     expect(counterDamage(boss({ hp: 1000 }), 0.9)).toBe(4);    // 10% zostaje
     expect(counterDamage(boss({ hp: 1000 }), 1.5)).toBe(4);    // cap na 0.9, nie ujemne
+  });
+});
+
+describe('bosses — simulateFight (silnik rund, jeszcze niepodpięty)', () => {
+  const noCrit: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+
+  test('miażdżąca przewaga energii → wygrana, kotek bez zadrapania', () => {
+    const b = boss({ hp: 10 }); // trywialnie mało HP
+    const r = simulateFight(100000, 1, noCrit, b, ctx(), 100);
+    expect(r.won).toBe(true);
+    expect(r.catFainted).toBe(false);
+    expect(r.bossHpLeft).toBe(0);
+    expect(r.rounds.length).toBeLessThanOrEqual(3); // ubity zanim rundy się skończą
+  });
+
+  test('boss za mocny na kontratak → kotek pada, walka przegrana', () => {
+    const b = boss({ hp: 1_000_000 }); // gracz go nie zadrapie w 3 rundach
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 5); // 5 HP kotka, wielki kontratak
+    expect(r.won).toBe(false);
+    expect(r.catFainted).toBe(true);
+    expect(r.catHpLeft).toBe(0);
+  });
+
+  test('walka kończy się natychmiast po zabiciu bossa — brak kontrataku w tej rundzie', () => {
+    const b = boss({ hp: 1 }); // padnie na pierwszym ciosie
+    const r = simulateFight(1000, 1, noCrit, b, ctx(), 100);
+    expect(r.rounds).toHaveLength(1);
+    expect(r.rounds[0].counterDmg).toBe(0); // boss umarł, nie zdążył kontratakować
+    expect(r.catHpLeft).toBe(100); // kotek nietknięty
+  });
+
+  test('remis rund (nikt nie padł) → nie wygrana, kotek żyje — próba nieudana, nie porażka', () => {
+    const b = boss({ hp: 1_000_000 });
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 1_000_000, 3); // ogromne HP kotka, boss za twardy
+    expect(r.won).toBe(false);
+    expect(r.catFainted).toBe(false);
+    expect(r.rounds).toHaveLength(3);
   });
 });
 

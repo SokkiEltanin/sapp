@@ -223,6 +223,57 @@ export function computeDamage(energy: number, level: number, bonuses: Bonuses, b
   return { damage: Math.round(base * (crit ? 2 : 1)), crit };
 }
 
+// ── Symulacja walki 1v1 (v4 redesign, S&F-style — patrz memory boss_design.md) ────
+// Czysta funkcja, NIC jeszcze jej nie wywołuje w grze (bezpieczny krok przygotowawczy,
+// jak counterDamage wyżej). Cała walka rozstrzyga się w jednym wywołaniu — kilka RUND
+// wymiany ciosów, nie jeden cios: energia dzielona równo między rundy, każda runda =
+// Twój cios (z szansą kryt) → jeśli boss przeżył → jego kontratak na kotka. Walka
+// kończy się NATYCHMIAST gdy któraś strona spadnie do 0 HP (reszta rund się nie
+// dogrywa) — trafienie w bossa zawsze rozstrzyga się PRZED jego kontratakiem, więc
+// nie ma martwego remisu „oboje padli w tej samej rundzie".
+// PRZEGRANA (catHp=0) LUB wyczerpanie rund bez zabicia = to samo dla bossa kampanii:
+// jego HP resetuje się do pełna na następną próbę (karczma S&F) — `won` to jedyny
+// wynik, który się liczy trwale; `catFainted` jest tylko do komunikatu w UI.
+export const FIGHT_ROUNDS = 3;
+
+export interface FightRound {
+  playerDmg: number;
+  playerCrit: boolean;
+  bossHpAfter: number;
+  counterDmg: number;
+  catHpAfter: number;
+}
+
+export interface FightResult {
+  rounds: FightRound[];
+  won: boolean;         // HP bossa spadło do 0
+  catFainted: boolean;  // HP kotka spadło do 0 (walka przegrana, nie wygrana)
+  bossHpLeft: number;
+  catHpLeft: number;
+}
+
+export function simulateFight(
+  energy: number, level: number, bonuses: Bonuses, boss: Boss, wc: WeaknessCtx,
+  catHpStart: number, roundCount: number = FIGHT_ROUNDS,
+): FightResult {
+  const perRoundEnergy = energy / Math.max(1, roundCount);
+  let bossHp = boss.hp;
+  let catHp = catHpStart;
+  const rounds: FightRound[] = [];
+  for (let i = 0; i < roundCount; i++) {
+    if (bossHp <= 0 || catHp <= 0) break;
+    const { damage, crit } = computeDamage(perRoundEnergy, level, bonuses, boss, wc);
+    bossHp = Math.max(0, bossHp - damage);
+    let counterDmg = 0;
+    if (bossHp > 0) {
+      counterDmg = counterDamage(boss, bonuses.dodge);
+      catHp = Math.max(0, catHp - counterDmg);
+    }
+    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, counterDmg, catHpAfter: catHp });
+  }
+  return { rounds, won: bossHp <= 0, catFainted: catHp <= 0 && bossHp > 0, bossHpLeft: bossHp, catHpLeft: catHp };
+}
+
 export type BossStatus = 'locked' | 'active' | 'defeated';
 export function bossStatus(boss: Boss, level: number, defeated: string[]): BossStatus {
   if (defeated.includes(boss.id)) return 'defeated';
