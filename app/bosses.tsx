@@ -268,83 +268,71 @@ export default function Bosses() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* ── RAID TYGODNIOWY ── */}
-        <View style={s.raidCard}>
-          <View style={s.raidHead}>
-            <Text style={s.raidKicker}>RAID TYGODNIA</Text>
-            <View style={s.raidEnergyPill}><Zap size={11} color="#38BDF8" /><Text style={s.raidEnergyTxt}>{raidEnergy}</Text></View>
-            <View style={s.raidMedals}><Text style={s.raidMedalsTxt}>🏆 {raidWon.length}</Text></View>
-          </View>
-          <View style={s.raidBody}>
-            <View style={s.raidAvatarWrap}>
-              <View style={[s.auraSmall, { backgroundColor: (WEAK_COLOR[raid.weakness] ?? '#888') + '22', borderColor: (WEAK_COLOR[raid.weakness] ?? '#888') + '55' }]} pointerEvents="none" />
-              <Animated.Text style={[s.raidEmoji, { transform: [{ translateX: rShakeX }] }]}>{raid.emoji}</Animated.Text>
-              {raidHit && (
-                <Animated.Text style={[s.rDmgFloat, { opacity: rFloatOp, transform: [{ translateY: rFloatY }], color: raidHit.crit ? '#FDE047' : '#F87171' }]}>-{raidHit.dmg}{raidHit.crit ? ' KRYT!' : ''}</Animated.Text>
-              )}
+        {/* ── RAID + WYDARZENIE: kompaktowe kafle obok siebie — boss poniżej jest bohaterem
+            ekranu, te dwa mają być odznaczalnym dodatkiem, nie konkurować kolorem/rozmiarem. ── */}
+        <View style={s.miniRow}>
+          <View style={s.miniCard}>
+            <View style={s.miniHead}>
+              <Text style={s.miniKicker}>RAID · 🏆{raidWon.length}</Text>
+              <Text style={s.miniEnergy}>⚡{raidEnergy}</Text>
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={s.raidName} numberOfLines={1}>{raid.name}</Text>
-              <Text style={s.raidTaunt} numberOfLines={1}>„{raid.taunt}"</Text>
-              <View style={s.hpTrackSm}><View style={[s.hpFill, { width: `${Math.round((raidDone ? 0 : raidRemaining) / raidMaxHp * 100)}%` }]} /></View>
-              <Text style={s.raidHpTxt}>{raidDone ? 'POKONANY ✓' : `${raidRemaining} / ${raidMaxHp} HP`} · słaby na {raid.weaknessLabel}</Text>
-            </View>
-          </View>
-          {raidDone ? (
-            <Text style={s.raidDoneTxt}>Medal zdobyty! Nowy raid w poniedziałek.</Text>
-          ) : raidUnlocked ? (
-            <PressableScale onPress={doRaid}>
-              <View style={[s.raidBtn, raidEnergy <= 0 && { opacity: 0.5 }]}>
-                <Swords size={16} color="#0B0E1A" /><Text style={s.raidBtnTxt}>Uderz w raid · ~{raidPreviewDmg}</Text>
-              </View>
-            </PressableScale>
-          ) : (
-            <Text style={s.raidLockTxt}>Raid odblokujesz na poziomie 3 (masz {level}).</Text>
-          )}
-          <Text style={s.raidReward}>Nagroda: {raid.trophyEmoji} medal tygodnia · +{raidCoins(level)} 🪙 · +{raidXp(level)} XP</Text>
-        </View>
-
-        {/* ── WYDARZENIE: sezonowe święto lub „nemesis miesiąca" ── */}
-        {eventBoss && eventKey && (
-          <View style={[s.raidCard, { borderColor: '#F4B74055' }]}>
-            <View style={s.raidHead}>
-              <Text style={[s.raidKicker, { color: '#F4B740' }]}>
-                {eventBoss.kind === 'seasonal' ? 'WYDARZENIE SEZONOWE' : 'NEMESIS MIESIĄCA'}
-              </Text>
-              <View style={s.raidEnergyPill}><Zap size={11} color="#38BDF8" /><Text style={s.raidEnergyTxt}>{eventEnergy}</Text></View>
-              <View style={[s.raidMedals, { backgroundColor: '#F4B74018', borderColor: '#F4B74040' }]}>
-                <Text style={[s.raidMedalsTxt, { color: '#F4B740' }]}>🏆 {eventWon.length}</Text>
-              </View>
-            </View>
-            <View style={s.raidBody}>
-              <View style={s.raidAvatarWrap}>
-                <View style={[s.auraSmall, { backgroundColor: (WEAK_COLOR[eventBoss.weakness] ?? '#888') + '22', borderColor: (WEAK_COLOR[eventBoss.weakness] ?? '#888') + '55' }]} pointerEvents="none" />
-                <Animated.Text style={[s.raidEmoji, { transform: [{ translateX: eShakeX }] }]}>{eventBoss.emoji}</Animated.Text>
-                {eventHitFx && (
-                  <Animated.Text style={[s.rDmgFloat, { opacity: eFloatOp, transform: [{ translateY: eFloatY }], color: eventHitFx.crit ? '#FDE047' : '#F87171' }]}>-{eventHitFx.dmg}{eventHitFx.crit ? ' KRYT!' : ''}</Animated.Text>
+            <View style={s.miniBody}>
+              <View>
+                <Animated.Text style={[s.miniEmoji, { transform: [{ translateX: rShakeX }] }]}>{raid.emoji}</Animated.Text>
+                {raidHit && (
+                  <Animated.Text style={[s.miniDmgFloat, { opacity: rFloatOp, transform: [{ translateY: rFloatY }], color: raidHit.crit ? '#FDE047' : '#F87171' }]}>-{raidHit.dmg}</Animated.Text>
                 )}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.raidName} numberOfLines={1}>{eventBoss.name}</Text>
-                <Text style={s.raidTaunt} numberOfLines={1}>„{eventBoss.taunt}"</Text>
-                <View style={s.hpTrackSm}><View style={[s.hpFill, { width: `${Math.round((eventDone ? 0 : eventRemaining) / eventMaxHp * 100)}%` }]} /></View>
-                <Text style={s.raidHpTxt}>{eventDone ? 'POKONANY ✓' : `${eventRemaining} / ${eventMaxHp} HP`} · słaby na {eventBoss.weaknessLabel}</Text>
+                <Text style={s.miniName} numberOfLines={1}>{raid.name}</Text>
+                <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((raidDone ? 0 : raidRemaining) / raidMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[raid.weakness] ?? '#888' }]} /></View>
               </View>
             </View>
-            {eventDone ? (
-              <Text style={s.raidDoneTxt}>Medal zdobyty!</Text>
-            ) : eventUnlocked ? (
-              <PressableScale onPress={doEvent}>
-                <View style={[s.raidBtn, { backgroundColor: '#F4B740' }, eventEnergy <= 0 && { opacity: 0.5 }]}>
-                  <Swords size={16} color="#0B0E1A" /><Text style={s.raidBtnTxt}>Uderz · ~{eventPreviewDmg}</Text>
+            {raidDone ? (
+              <Text style={s.miniDoneTxt}>Pokonany ✓ · nowy w pon.</Text>
+            ) : raidUnlocked ? (
+              <PressableScale onPress={doRaid}>
+                <View style={[s.miniBtn, { backgroundColor: '#A78BFA' }, raidEnergy <= 0 && { opacity: 0.5 }]}>
+                  <Text style={s.miniBtnTxt}>Atakuj · ~{raidPreviewDmg}</Text>
                 </View>
               </PressableScale>
             ) : (
-              <Text style={s.raidLockTxt}>Wydarzenia odblokujesz na poziomie 2 (masz {level}).</Text>
+              <Text style={s.miniLockTxt}>Odblokuj: lvl 3</Text>
             )}
-            <Text style={s.raidReward}>Nagroda: {eventBoss.trophyEmoji} medal · +{eventCoins(level)} 🪙 · +{eventXp(level)} XP</Text>
           </View>
-        )}
+
+          {eventBoss && eventKey && (
+            <View style={s.miniCard}>
+              <View style={s.miniHead}>
+                <Text style={s.miniKicker} numberOfLines={1}>{eventBoss.kind === 'seasonal' ? 'WYDARZENIE' : 'NEMESIS'} · 🏆{eventWon.length}</Text>
+                <Text style={s.miniEnergy}>⚡{eventEnergy}</Text>
+              </View>
+              <View style={s.miniBody}>
+                <View>
+                  <Animated.Text style={[s.miniEmoji, { transform: [{ translateX: eShakeX }] }]}>{eventBoss.emoji}</Animated.Text>
+                  {eventHitFx && (
+                    <Animated.Text style={[s.miniDmgFloat, { opacity: eFloatOp, transform: [{ translateY: eFloatY }], color: eventHitFx.crit ? '#FDE047' : '#F87171' }]}>-{eventHitFx.dmg}</Animated.Text>
+                  )}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={s.miniName} numberOfLines={1}>{eventBoss.name}</Text>
+                  <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((eventDone ? 0 : eventRemaining) / eventMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[eventBoss.weakness] ?? '#888' }]} /></View>
+                </View>
+              </View>
+              {eventDone ? (
+                <Text style={s.miniDoneTxt}>Pokonany ✓</Text>
+              ) : eventUnlocked ? (
+                <PressableScale onPress={doEvent}>
+                  <View style={[s.miniBtn, { backgroundColor: '#F4B740' }, eventEnergy <= 0 && { opacity: 0.5 }]}>
+                    <Text style={s.miniBtnTxt}>Atakuj · ~{eventPreviewDmg}</Text>
+                  </View>
+                </PressableScale>
+              ) : (
+                <Text style={s.miniLockTxt}>Odblokuj: lvl 2</Text>
+              )}
+            </View>
+          )}
+        </View>
 
         {!current ? (
           <View style={s.done}>
@@ -587,28 +575,23 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   mechNoteHeal: { fontSize: 11.5, color: '#7DD3FC', fontWeight: '800', marginTop: 2, textAlign: 'center' },
   mechHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: 3, lineHeight: 15 },
 
-  // raid tygodniowy
-  raidCard: { backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: '#A78BFA55', padding: spacing[3], marginBottom: spacing[3], gap: spacing[2] },
-  raidHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  raidKicker: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2, color: '#A78BFA' },
-  raidMedals: { backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
-  raidMedalsTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
-  raidEnergyPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#38BDF840' },
-  raidEnergyTxt: { fontSize: 11.5, fontWeight: '800', color: '#38BDF8' },
-  raidBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  raidAvatarWrap: { width: 76, height: 76, alignItems: 'center', justifyContent: 'center' },
-  auraSmall: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: 1 },
-  raidEmoji: { fontSize: 46 },
-  rDmgFloat: { position: 'absolute', top: -6, fontSize: 16, fontWeight: '900' },
-  raidName: { fontSize: 15, fontWeight: '900', color: c.text.primary },
-  raidTaunt: { fontSize: 11.5, color: c.text.muted, fontStyle: 'italic', marginTop: 1 },
-  hpTrackSm: { width: '100%', height: 10, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 6 },
-  raidHpTxt: { fontSize: 11, fontWeight: '700', color: c.text.secondary, marginTop: 3 },
-  raidBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#A78BFA', borderRadius: radius.lg, paddingVertical: 13 },
-  raidBtnTxt: { fontSize: 14, fontWeight: '900', color: '#0B0E1A' },
-  raidDoneTxt: { fontSize: 12, fontWeight: '800', color: '#2AC68F', textAlign: 'center' },
-  raidLockTxt: { fontSize: 12, color: c.text.muted, textAlign: 'center' },
-  raidReward: { fontSize: 11, color: c.text.muted, textAlign: 'center' },
+  // raid + wydarzenie — kompaktowe kafle obok siebie (bez dużej aury/kolorowej ramki;
+  // boss poniżej zostaje wizualnym bohaterem ekranu).
+  miniRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[3] },
+  miniCard: { flex: 1, minWidth: 0, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: 6 },
+  miniHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  miniKicker: { flex: 1, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, color: c.text.muted },
+  miniEnergy: { fontSize: 10.5, fontWeight: '800', color: '#38BDF8' },
+  miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  miniEmoji: { fontSize: 30 },
+  miniDmgFloat: { position: 'absolute', top: -8, left: 0, fontSize: 12, fontWeight: '900' },
+  miniName: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
+  miniHpTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4 },
+  miniHpFill: { height: '100%', borderRadius: 3 },
+  miniBtn: { alignItems: 'center', borderRadius: radius.md, paddingVertical: 8 },
+  miniBtnTxt: { fontSize: 11.5, fontWeight: '800', color: '#0B0E1A' },
+  miniDoneTxt: { fontSize: 10.5, fontWeight: '700', color: '#2AC68F', textAlign: 'center' },
+  miniLockTxt: { fontSize: 10.5, color: c.text.muted, textAlign: 'center' },
   medalWall: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   medal: { width: 64, alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingVertical: spacing[2] },
   medalEmoji: { fontSize: 24 },

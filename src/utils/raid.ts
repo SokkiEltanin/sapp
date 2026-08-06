@@ -35,8 +35,15 @@ export function raidForWeek(weekKey: string): Raid {
 }
 
 // HP raidu — rośnie z poziomem (zawsze wyzwanie) + lekka wariacja tygodniowa.
+// Skalibrowane pod realny tygodniowy output: energia banked ~raz/dzień (attackAtak zeruje
+// pulę, syncRaidEnergy nie dobija ponad dzisiejszy próg) = maks ~350×(1+energyMult) dziennie,
+// × atkMultiplier(level) × weaknessMult(~1.15 śr.) × drobny bonus z critów. Stary base
+// (8000 + level×900) dawał raid killowalny w ~20-30% w tydzień — im wyższy poziom, tym
+// GORZEJ (HP rosło ×900/lvl, output tylko ~×0.03/lvl) = odwrotność zamierzonego. Nowy
+// base trzyma się blisko realnego tygodniowego dmg na każdym poziomie (do ubicia przy
+// codziennym graniu, ciasno gdy odpuścisz dzień-dwa).
 export function raidHpFor(level: number, weekKey: string): number {
-  const base = 8000 + Math.max(0, level) * 900;
+  const base = 2000 + Math.max(0, level) * 220;
   const variance = 100 + (hashOf(weekKey, 17) % 20);   // 100..119%
   return Math.round(base * variance / 100 / 100) * 100;
 }
