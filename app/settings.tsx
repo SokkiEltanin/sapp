@@ -32,7 +32,7 @@ import BackupSection from '@/components/settings/BackupSection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { CATEGORY_META } from '@/utils/categories';
-import { ExpenseCategory } from '@/types';
+import { ExpenseCategory, DEFAULT_WORK_SETTINGS } from '@/types';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 import { runSelfTest } from '@/utils/selfTest';
@@ -271,6 +271,12 @@ export default function SettingsScreen() {
   // value the app reads (previous-month calendar hours / last [JD] paycheck).
   const [hoursOvrField, setHoursOvrField]   = useState(workSettings.hoursOverride != null ? String(workSettings.hoursOverride) : '');
   const [salaryOvrField, setSalaryOvrField] = useState(workSettings.salaryOverride != null ? String(workSettings.salaryOverride) : '');
+  // Manual-mode fields — plain monthlySalary/hoursPerMonth (NOT the overrides above,
+  // which only apply on top of calendar detection). useWorkEarnings already falls
+  // back to exactly these two fields whenever workColor/workPrefix are both empty,
+  // so manual mode needs no changes to the earnings engine — only these two inputs.
+  const [manualHoursField, setManualHoursField]   = useState(String(workSettings.hoursPerMonth ?? DEFAULT_WORK_SETTINGS.hoursPerMonth));
+  const [manualSalaryField, setManualSalaryField] = useState(String(workSettings.monthlySalary ?? DEFAULT_WORK_SETTINGS.monthlySalary));
 
   useEffect(() => {
     workService.getSettings().then(s => {
@@ -278,6 +284,8 @@ export default function SettingsScreen() {
       setWorkPrefix(s.workPrefix ?? '');
       setHoursOvrField(s.hoursOverride != null ? String(s.hoursOverride) : '');
       setSalaryOvrField(s.salaryOverride != null ? String(s.salaryOverride) : '');
+      setManualHoursField(String(s.hoursPerMonth ?? DEFAULT_WORK_SETTINGS.hoursPerMonth));
+      setManualSalaryField(String(s.monthlySalary ?? DEFAULT_WORK_SETTINGS.monthlySalary));
     }).catch(() => {});
   }, []);
 
@@ -295,6 +303,42 @@ export default function SettingsScreen() {
   const saveWorkPrefix = async (prefix: string) => {
     const trimmed = prefix.trim();
     const newS = { ...workSettings, workPrefix: trimmed || undefined };
+    setWorkSettings(newS);
+    try { await workService.saveSettings(newS); } catch {}
+  };
+
+  const saveManualHours = async (raw: string) => {
+    const v = parseFloat(raw.replace(',', '.'));
+    const hours = (!isNaN(v) && v > 0) ? v : DEFAULT_WORK_SETTINGS.hoursPerMonth;
+    setManualHoursField(String(hours));
+    const newS = { ...workSettings, hoursPerMonth: hours };
+    setWorkSettings(newS);
+    try { await workService.saveSettings(newS); } catch {}
+  };
+
+  const saveManualSalary = async (raw: string) => {
+    const v = parseFloat(raw.replace(',', '.'));
+    const salary = (!isNaN(v) && v > 0) ? v : DEFAULT_WORK_SETTINGS.monthlySalary;
+    setManualSalaryField(String(salary));
+    const newS = { ...workSettings, monthlySalary: salary };
+    setWorkSettings(newS);
+    try { await workService.saveSettings(newS); } catch {}
+  };
+
+  // Toggling to 'manual' clears workPrefix/workColor — useWorkEarnings (the shared
+  // hook behind the dashboard's live earnings ticker) branches purely on whether
+  // those two are set, not on workMode, so this is what actually makes manual mode
+  // take effect app-wide, not just in this screen's diagnostics. Toggling back to
+  // 'calendar' just flips the mode — prefix is re-typed (kept simple on purpose,
+  // no hidden stash/restore magic that could silently reactivate a stale prefix).
+  const saveWorkMode = async (mode: 'calendar' | 'manual') => {
+    haptic.tap();
+    const newS: typeof workSettings = { ...workSettings, workMode: mode };
+    if (mode === 'manual') {
+      delete newS.workPrefix;
+      delete newS.workColor;
+      setWorkPrefix('');
+    }
     setWorkSettings(newS);
     try { await workService.saveSettings(newS); } catch {}
   };
@@ -583,6 +627,7 @@ export default function SettingsScreen() {
   // builders) opt out via `kind: 'custom'` and render their own JSX — they still
   // carry title/keywords so search reaches them, they just own their layout.
   const [query, setQuery] = useState('');
+  const workMode = workSettings.workMode ?? 'calendar';
 
   const sections: SettingsSectionDef[] = [
     {
@@ -606,8 +651,95 @@ export default function SettingsScreen() {
     },
     {
       id: 'praca', title: 'Praca', icon: LucideIcons.Briefcase, color: '#60A5FA', defaultOpen: false,
-      keywords: ['zmiana', 'kalendarz', 'zarobki', 'stawka godzinowa'],
+      keywords: ['zmiana', 'kalendarz', 'zarobki', 'stawka godzinowa', 'tryb ręczny', 'bez kalendarza'],
       items: [
+        {
+          id: 'work-mode', title: 'Tryb liczenia godzin',
+          subtitle: workMode === 'manual'
+            ? 'Ręcznie — bez tagowania kalendarza'
+            : 'Z kalendarza (prefiks/kolor eventu)',
+          keywords: ['tryb', 'ręcznie', 'manualnie', 'kalendarz', 'bez kalendarza', 'godziny pracy', 'przełącznik'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#60A5FA18' }]}>
+                  <LucideIcons.ToggleLeft size={16} color="#60A5FA" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Tryb liczenia godzin</Text>
+                  <Text style={styles.rowSub}>
+                    {workMode === 'manual' ? 'Ręcznie — bez tagowania kalendarza' : 'Z kalendarza (prefiks/kolor eventu)'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {([['calendar', 'Kalendarz'], ['manual', 'Ręcznie']] as const).map(([m, lbl]) => {
+                  const on = workMode === m;
+                  return (
+                    <PressableScale key={m} onPress={() => saveWorkMode(m)} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#60A5FA22' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#60A5FA' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#60A5FA' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+              {workMode === 'manual' && (
+                <Text style={[styles.rowSub, { paddingTop: 2 }]}>
+                  Jeśli nie chcesz oznaczać zmian w kalendarzu — wpisz stałe godziny i wypłatę miesięczną poniżej. Możesz wrócić do kalendarza w każdej chwili.
+                </Text>
+              )}
+            </View>
+          ) },
+        },
+        ...(workMode === 'manual' ? [
+          {
+            id: 'manual-hours', title: 'Godziny pracy miesięcznie',
+            subtitle: 'Ile godzin średnio pracujesz w miesiącu',
+            icon: Clock, accentColor: '#60A5FA',
+            keywords: ['godziny', 'ręcznie', 'miesiąc', 'bez kalendarza', 'stałe godziny'],
+            control: {
+              kind: 'text' as const, value: manualHoursField, onChangeText: setManualHoursField,
+              onBlur: () => saveManualHours(manualHoursField), keyboardType: 'numeric' as const, placeholder: '168', width: 64,
+            },
+          },
+          {
+            id: 'manual-salary', title: 'Wypłata miesięczna (zł)',
+            subtitle: 'Twoja typowa pensja miesięczna',
+            icon: Wallet, accentColor: '#2AC68F',
+            keywords: ['wypłata', 'pensja', 'miesięcznie', 'zł', 'stała wypłata'],
+            control: {
+              kind: 'text' as const, value: manualSalaryField, onChangeText: setManualSalaryField,
+              onBlur: () => saveManualSalary(manualSalaryField), keyboardType: 'numeric' as const, placeholder: '5000', width: 80,
+            },
+          },
+          {
+            id: 'manual-diag', title: 'Wyliczona stawka',
+            keywords: ['stawka', 'zł/h', 'ręczna stawka', 'wyliczenie'],
+            control: { kind: 'custom' as const, render: () => {
+              const hrs = parseFloat(manualHoursField.replace(',', '.')) || workSettings.hoursPerMonth || DEFAULT_WORK_SETTINGS.hoursPerMonth;
+              const sal = parseFloat(manualSalaryField.replace(',', '.')) || workSettings.monthlySalary || DEFAULT_WORK_SETTINGS.monthlySalary;
+              const rate = hrs > 0 ? sal / hrs : 0;
+              return (
+                <View style={styles.diagBox}>
+                  <View style={styles.rateResultRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rateResultRate}>{rate.toFixed(2)} <Text style={styles.rateResultUnit}>zł/h</Text></Text>
+                      <Text style={styles.rateResultSub}>= {sal.toFixed(0)} zł ÷ {hrs.toFixed(0)} h / miesiąc</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.diagHint}>
+                    Tryb ręczny — bez kalendarza. Ta sama stawka zasila też licznik zarobków na dashboardzie (widoczny, gdy trwa aktywna zmiana z kalendarza — w trybie ręcznym po prostu nie ma „teraz pracujesz").
+                  </Text>
+                </View>
+              );
+            } },
+          },
+        ] : [
         {
           id: 'work-prefix', title: 'Prefix eventów pracy',
           subtitle: workPrefix.trim()
@@ -615,7 +747,7 @@ export default function SettingsScreen() {
             : 'Np. [JD], [PRACA] — eventy z tym prefixem = zmiana',
           icon: Briefcase, accentColor: '#60A5FA',
           keywords: ['prefiks', 'praca', 'kalendarz', 'zmiana', 'tag', 'event', 'jd'],
-          control: { kind: 'text', value: workPrefix, onChangeText: setWorkPrefix, onBlur: () => saveWorkPrefix(workPrefix), placeholder: '[JD]', width: 72 },
+          control: { kind: 'text' as const, value: workPrefix, onChangeText: setWorkPrefix, onBlur: () => saveWorkPrefix(workPrefix), placeholder: '[JD]', width: 72 },
         },
         {
           id: 'work-hours', title: `Godziny — miesiąc liczony${workDiag ? ` (${workDiag.basisMonth})` : ''}`,
@@ -627,8 +759,8 @@ export default function SettingsScreen() {
           icon: Clock, accentColor: '#60A5FA',
           keywords: ['godziny', 'ręcznie', 'nadpisz', 'miesiąc', 'override', 'godziny pracy'],
           control: {
-            kind: 'text', value: hoursOvrField, onChangeText: setHoursOvrField, onBlur: () => saveOverride('hoursOverride', hoursOvrField),
-            keyboardType: 'numeric', placeholder: workDiag ? workDiag.basisHours.toFixed(0) : '—', placeholderColor: 'accent', width: 64,
+            kind: 'text' as const, value: hoursOvrField, onChangeText: setHoursOvrField, onBlur: () => saveOverride('hoursOverride', hoursOvrField),
+            keyboardType: 'numeric' as const, placeholder: workDiag ? workDiag.basisHours.toFixed(0) : '—', placeholderColor: 'accent' as const, width: 64,
           },
         },
         {
@@ -641,14 +773,14 @@ export default function SettingsScreen() {
           icon: Wallet, accentColor: '#2AC68F',
           keywords: ['wypłata', 'pensja', 'przychód', 'jd', 'stawka', 'zł', 'pieniądze za pracę'],
           control: {
-            kind: 'text', value: salaryOvrField, onChangeText: setSalaryOvrField, onBlur: () => saveOverride('salaryOverride', salaryOvrField),
-            keyboardType: 'numeric', placeholder: workDiag?.lastPaycheck ? workDiag.lastPaycheck.amount.toFixed(0) : '2104', placeholderColor: 'accent', width: 80,
+            kind: 'text' as const, value: salaryOvrField, onChangeText: setSalaryOvrField, onBlur: () => saveOverride('salaryOverride', salaryOvrField),
+            keyboardType: 'numeric' as const, placeholder: workDiag?.lastPaycheck ? workDiag.lastPaycheck.amount.toFixed(0) : '2104', placeholderColor: 'accent' as const, width: 80,
           },
         },
         {
           id: 'work-diag', title: 'Wyliczona stawka i zmiany',
           keywords: ['stawka', 'zł/h', 'zmiany', 'godziny liczone', 'zarobki', 'dzienna stawka', 'ostrzeżenie', 'średnia'],
-          control: { kind: 'custom', render: () => workDiag && (
+          control: { kind: 'custom' as const, render: () => workDiag && (
             <View style={styles.diagBox}>
               <View style={styles.rateResultRow}>
                 <View style={{ flex: 1 }}>
@@ -709,8 +841,9 @@ export default function SettingsScreen() {
         {
           id: 'work-confirmed-months', title: 'Potwierdzone miesiące',
           keywords: ['potwierdzone miesiące', 'historia', 'średnia stawka'],
-          control: { kind: 'custom', render: () => <ConfirmedMonths payMonths={payMonths} /> },
+          control: { kind: 'custom' as const, render: () => <ConfirmedMonths payMonths={payMonths} /> },
         },
+        ]),
       ],
     },
     {

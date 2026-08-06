@@ -331,6 +331,10 @@ export interface WorkSettings {
   hoursPerMonth: number;
   currency: string;
   notifyEveryMinutes: number; // 0 = off
+  // 'manual' = no calendar tagging at all; rate is monthlySalary ÷ hoursPerMonth
+  // directly (both fields already existed — useWorkEarnings already falls back to
+  // them when workColor/workPrefix are both empty). undefined behaves as 'calendar'.
+  workMode?: 'calendar' | 'manual';
   workColor?: string;         // hex color — calendar events with this color count as work
   workPrefix?: string;        // title prefix — events starting with this count as work (e.g. "[JD]")
   rateOverride?: number;      // fixed zł/h, overrides the computed rate PERMANENTLY
