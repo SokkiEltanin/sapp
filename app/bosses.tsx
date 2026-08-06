@@ -7,10 +7,10 @@ import { ChevronLeft, Zap, Lock, Check, Swords } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import Confetti from '@/components/achievements/Confetti';
-import { usePetStore, levelFromXp } from '@/store/petStore';
+import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
 import {
-  BOSSES, Boss, bossBonuses, energyFromData, weaknessMult, atkMultiplier, computeDamage, bossRemaining,
-  bossGuarded, weaknessMet, WeaknessCtx,
+  BOSSES, Boss, bossBonuses, energyFromData, weaknessMult, atkMultiplier, computeDamage,
+  simulateFight, FIGHT_ROUNDS, WeaknessCtx,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventBossFromKey } from '@/utils/seasonalEvents';
@@ -44,8 +44,9 @@ export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, bossHp, syncEnergy, syncRaidEnergy, syncEventEnergy,
-    attackBoss, defeatBoss, healBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim, eventHp, eventWon, eventAttack, eventClaim,
+    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
+    defeatBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim, eventHp, eventWon, eventAttack, eventClaim,
+    catHp, catMaxHpBonus, damageCat, resetCatHp,
   } = usePetStore();
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
@@ -109,10 +110,12 @@ export default function Bosses() {
   }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, habits, level, raidEnsure]);
   useFocusEffect(reload);
 
-  // sequential campaign: current = first not-yet-defeated boss
+  // sequential campaign: current = first not-yet-defeated boss. HP kampanii RESETUJE
+  // SIĘ co próbę (v4 — patrz memory boss_design.md), więc nie ma już "pozostałego HP"
+  // do pokazania między próbami: pasek jest zawsze pełny aż do defeatedBosses.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
   const unlocked = current ? level >= current.unlockLevel : false;
-  const remaining = current ? bossRemaining(current, bossHp) : 0;
+  const catMax = catMaxHp(catMaxHpBonus);
 
   // ── raid tygodniowy ──
   const weekKey = weekKeyOf();
@@ -179,23 +182,27 @@ export default function Bosses() {
     ]).start();
   };
 
+  // v4: cała walka (kilka rund, kontratak bossa na kotka) rozstrzyga się w jednym
+  // wywołaniu simulateFight — patrz memory boss_design.md. Boss zawsze zaczyna z
+  // pełnym HP (resetuje się co próbę); kotek też zaczyna pełny (resetCatHp) — obie
+  // strony "świeże" na start każdej próby, energia to jedyny dzienny limit.
   const attack = () => {
     if (!current || !unlocked) return;
     if (energy <= 0) { haptic.error(); toast.info('Brak energii — zadbaj o siebie, by naładować cios'); return; }
-    let { damage, crit } = computeDamage(energy, level, bonuses, current, wc);
-    const guarded = bossGuarded(current, wc);
-    if (guarded) damage = Math.round(damage * 0.5);   // OSŁONA — dziś nakarmiłeś bossa
-    let healed = 0;
-    if (current.regenPct && !weaknessMet(current, wc)) {   // REGENERACJA — zaniedbałeś jego słabość
-      healed = Math.round(current.hp * current.regenPct);
-      if (healed > 0) healBoss(current.id, healed, current.hp);
-    }
+    resetCatHp();
+    const result = simulateFight(energy, level, bonuses, current, wc, catMax);
+    const dmgToCat = catMax - result.catHpLeft;
+    if (dmgToCat > 0) damageCat(dmgToCat);
+    const lastRound = result.rounds[result.rounds.length - 1] ?? null;
     haptic.medium();
-    setLastHit({ dmg: damage, crit, guarded, healed });
-    playHitFx(crit);
-    const res = attackBoss(current.id, current.hp, damage, bonuses.dodge);
-    if (res.defeated) {
+    setLastHit({ dmg: lastRound?.playerDmg ?? 0, crit: lastRound?.playerCrit ?? false, guarded: result.guarded, healed: lastRound?.healed ?? 0 });
+    playHitFx(lastRound?.playerCrit ?? false);
+    if (result.won) {
       setTimeout(() => { defeatBoss(current.id, current.loot.id, current.coins, current.xp); haptic.success(); setVictory(current); }, 320);
+    } else if (result.catFainted) {
+      setTimeout(() => { haptic.error(); toast.error('Kotek padł! Spróbuj ponownie z nową energią.'); }, 320);
+    } else {
+      setTimeout(() => { haptic.warn(); toast.info('Boss przetrwał — spróbuj ponownie z nową energią.'); }, 320);
     }
   };
 
@@ -356,15 +363,22 @@ export default function Bosses() {
             {lastHit?.guarded && <Text style={s.mechNote}>🛡️ Osłona: dziś nakarmiłeś bossa — cios ×0.5</Text>}
             {!!lastHit?.healed && <Text style={s.mechNoteHeal}>🩹 Boss zregenerował +{lastHit.healed} (zaniedbanie: {current.weaknessLabel})</Text>}
 
-            {/* HP */}
-            <View style={s.hpTrack}><View style={[s.hpFill, { width: `${Math.round(remaining / current.hp * 100)}%` }]} /></View>
-            <Text style={s.hpTxt}>{remaining} / {current.hp} HP</Text>
+            {/* HP bossa — ZAWSZE pełne: kampania resetuje HP co próbę (karczma S&F), więc
+                nie ma "pozostałego" HP do pokazania między próbami. */}
+            <View style={s.hpTrack}><View style={[s.hpFill, { width: '100%' }]} /></View>
+            <Text style={s.hpTxt}>{current.hp} HP</Text>
+
+            {/* HP kotka — nowe w v4: walka teraz ma dwie strony. */}
+            <View style={[s.hpTrack, { marginTop: 6 }]}>
+              <View style={[s.hpFill, { width: `${Math.round(catHp / catMax * 100)}%`, backgroundColor: '#2AC68F' }]} />
+            </View>
+            <Text style={s.hpTxt}>🐱 {catHp} / {catMax} HP</Text>
 
             {unlocked ? (
               <>
                 <View style={s.weakBox}>
                   <Text style={s.weakTxt}>Słaby na: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text> · dziś ×{weaknessMult(current, wc).toFixed(2)}</Text>
-                  <Text style={s.previewTxt}>Twój cios: ~{previewDmg} obrażeń (energia {energy})</Text>
+                  <Text style={s.previewTxt}>Twój cios: ~{Math.round(previewDmg / FIGHT_ROUNDS)} obrażeń/rundę × {FIGHT_ROUNDS} rundy (energia {energy})</Text>
                   {(current.guard || current.regenPct) && (
                     <Text style={s.mechHint}>
                       {current.guard === 'sweets' ? '🛡️ dziś bez słodyczy — inaczej cios ×0.5. ' : current.guard === 'poorSleep' ? '🛡️ wyśpij się (7h+) — inaczej cios ×0.5. ' : ''}
