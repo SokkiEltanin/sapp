@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   X, Plus, ChevronLeft, RefreshCcw, Trash2,
-  Check, Bell, BellOff, Calendar, Edit2, CreditCard,
+  Check, Bell, BellOff, Calendar, Edit2,
 } from 'lucide-react-native';
 import * as LucideIcons from 'lucide-react-native';
 
@@ -17,7 +17,6 @@ import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
 import { todayISO, ymd } from '@/utils/date';
 import { Subscription, BillingCycle, ExpenseCategory } from '@/types';
-import { expensesService } from '@/services/expensesService';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -141,9 +140,6 @@ export default function SubscriptionsScreen() {
   const [saving, setSaving] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
 
-  // Payment confirmation modal
-  const [paymentQueue, setPaymentQueue] = useState<Subscription[]>([]);
-  const [paymentConfirming, setPaymentConfirming] = useState(false);
   const checkedRef = useRef(false);
 
   const setF = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -152,7 +148,11 @@ export default function SubscriptionsScreen() {
   const openAdd = () => { setEditing(null); setForm(emptyForm()); setModalVisible(true); };
   const openEdit = (s: Subscription) => { setEditing(s); setForm(subToForm(s)); setModalVisible(true); };
 
-  // Auto-deactivate expired-duration subs and build payment queue on load
+  // Auto-deactivate expired-duration subs; silently roll a due one's nextBillingDate
+  // forward (no expense added, no question asked — see [[settings_manifest]]/memory for
+  // why: the old "Czy opłaciłeś?" modal nagged up to twice a day and could stack on top
+  // of the dashboard's mood check-in. The renewal heads-up notifications (7 days + 1 day
+  // before, scheduled in useSubscriptions) tell the user ahead of time instead.
   useEffect(() => {
     if (checkedRef.current || subscriptions.length === 0) return;
     checkedRef.current = true;
@@ -166,43 +166,13 @@ export default function SubscriptionsScreen() {
       }
     });
 
-    const due = subscriptions.filter(
-      (sub) => sub.active && !isDurationExpired(sub) && sub.nextBillingDate <= todayStr,
-    );
-    if (due.length > 0) setPaymentQueue(due);
-  }, [subscriptions]);
-
-  const currentPayment = paymentQueue[0] ?? null;
-
-  const handlePaymentYes = useCallback(async () => {
-    if (!currentPayment) return;
-    haptic.success();
-    setPaymentConfirming(true);
-    try {
-      const today = todayISO();
-      await expensesService.add({
-        type: 'expense',
-        amount: currentPayment.amount,
-        currency: currentPayment.currency,
-        category: currentPayment.category,
-        tags: currentPayment.tags ?? [],
-        note: `Subskrypcja: ${currentPayment.name}`,
-        date: today,
-      });
-      const next = advanceNextBillingDate(currentPayment.nextBillingDate, currentPayment.billingCycle);
-      await update(currentPayment.id, { nextBillingDate: next });
-    } catch {
-      // silently skip
-    } finally {
-      setPaymentConfirming(false);
-      setPaymentQueue((q) => q.slice(1));
+    for (const sub of subscriptions) {
+      if (!sub.active || isDurationExpired(sub) || sub.nextBillingDate > todayStr) continue;
+      let next = sub.nextBillingDate;
+      do { next = advanceNextBillingDate(next, sub.billingCycle); } while (next <= todayStr);
+      update(sub.id, { nextBillingDate: next }).catch(() => {});
     }
-  }, [currentPayment, update]);
-
-  const handlePaymentNo = useCallback(() => {
-    haptic.tap();
-    setPaymentQueue((q) => q.slice(1));
-  }, []);
+  }, [subscriptions]);
 
   const saveForm = useCallback(async () => {
     const { name, amount, billingCycle, nextBillingDate, reminderDaysBefore, category, note, durationMonths, tags } = form;
@@ -311,39 +281,6 @@ export default function SubscriptionsScreen() {
           </View>
         )}
       </ScrollView>
-
-      {/* Payment confirmation modal */}
-      {currentPayment && (
-        <Modal visible transparent animationType="fade" onRequestClose={handlePaymentNo}>
-          <View style={s.payOverlay}>
-            <View style={s.payCard}>
-              <View style={s.payIconWrap}>
-                <CreditCard size={24} color={colors.accent.blue} />
-              </View>
-              <Text style={s.payTitle}>Płatność należna</Text>
-              <Text style={s.payName}>{currentPayment.name}</Text>
-              <Text style={s.payAmount}>{currentPayment.amount.toFixed(2)} zł</Text>
-              <Text style={s.payHint}>Czy opłaciłeś tę subskrypcję?</Text>
-              {paymentQueue.length > 1 && (
-                <Text style={s.payQueue}>+{paymentQueue.length - 1} kolejnych</Text>
-              )}
-              <View style={s.payBtns}>
-                <PressableScale onPress={handlePaymentNo} style={s.payBtnNo}>
-                  <Text style={s.payBtnNoText}>Nie teraz</Text>
-                </PressableScale>
-                <PressableScale
-                  onPress={handlePaymentYes}
-                  style={[s.payBtnYes, paymentConfirming && { opacity: 0.6 }]}
-                  disabled={paymentConfirming}
-                >
-                  <Check size={16} color={colors.bg.primary} />
-                  <Text style={s.payBtnYesText}>{paymentConfirming ? 'Zapisuję...' : 'Tak, opłaciłem'}</Text>
-                </PressableScale>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
 
       {/* Add/Edit Modal */}
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setModalVisible(false)}>
@@ -640,41 +577,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: spacing[12], gap: spacing[4] },
   emptyTitle: { ...typography.h3, color: c.text.secondary },
   emptyText: { ...typography.body, color: c.text.muted, textAlign: 'center', lineHeight: 22 },
-
-  // ── Payment confirmation overlay ──────────────────────────────────────────
-  payOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: spacing[6],
-  },
-  payCard: {
-    backgroundColor: c.bg.card, borderRadius: radius.xl,
-    borderWidth: 1, borderColor: c.border.default,
-    padding: spacing[6], alignItems: 'center', gap: spacing[2], width: '100%',
-  },
-  payIconWrap: {
-    width: 52, height: 52, borderRadius: radius.full,
-    backgroundColor: c.accent.blue + '18',
-    alignItems: 'center', justifyContent: 'center', marginBottom: spacing[1],
-  },
-  payTitle: { ...typography.caption, color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  payName: { ...typography.h3, color: c.text.primary, textAlign: 'center' },
-  payAmount: { fontSize: 28, fontWeight: '800', color: c.accent.blue },
-  payHint: { ...typography.body, color: c.text.secondary, textAlign: 'center', marginTop: spacing[1] },
-  payQueue: { fontSize: 11, color: c.text.muted, marginTop: 2 },
-  payBtns: { flexDirection: 'row', gap: spacing[3], marginTop: spacing[3], width: '100%' },
-  payBtnNo: {
-    flex: 1, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default,
-    alignItems: 'center',
-  },
-  payBtnNoText: { ...typography.bodySmall, color: c.text.secondary, fontWeight: '600' },
-  payBtnYes: {
-    flex: 2, paddingVertical: spacing[3], borderRadius: radius.md,
-    backgroundColor: c.accent.blue, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center', gap: spacing[2],
-  },
-  payBtnYesText: { ...typography.bodySmall, color: c.bg.primary, fontWeight: '700' },
 
   // ── Modal / form ──────────────────────────────────────────────────────────
   modal: { flex: 1, backgroundColor: c.bg.secondary },
