@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame, Heart } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import StartupPreview from '@/components/pet/StartupPreview';
-import { usePetStore, loginBonusCoins } from '@/store/petStore';
+import { usePetStore, loginBonusCoins, catMaxHp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
@@ -21,6 +21,9 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
+// Ulepszenie HP kotka (v4 walki — patrz memory boss_design.md) — trwałe, rosnący koszt.
+const HP_UPGRADE_AMOUNT = 20;   // +HP za jeden zakup
+const hpUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / HP_UPGRADE_AMOUNT) * 15;
 const WHISKERS_COST = 55;   // wąsy
 const LEGSTRIPES_COST = 65; // pręgi na łapkach
 const EYE_COST = 50;        // kolor oczu (każdy poza domyślnym)
@@ -67,7 +70,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak, catMaxHpBonus, buyMaxHp } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -97,6 +100,15 @@ export default function PetShop() {
     if (coins < FREEZE_COST) { haptic.error(); toast.error(`Za mało monet — potrzeba ${FREEZE_COST}`); return; }
     confirmBuy('Zamrożenie serii', FREEZE_COST, () => {
       if (spendCoins(FREEZE_COST)) { addFreezes(1); haptic.success(); toast.success('Kupione: Zamrożenie serii ❄'); }
+    });
+  };
+
+  const hpCost = hpUpgradeCost(catMaxHpBonus);
+  const onBuyMaxHp = () => {
+    haptic.tap();
+    if (coins < hpCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${hpCost}`); return; }
+    confirmBuy('Ulepszenie HP kotka', hpCost, () => {
+      if (buyMaxHp(hpCost, HP_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${HP_UPGRADE_AMOUNT} max HP kotka 💚`); }
     });
   };
 
@@ -310,6 +322,18 @@ export default function PetShop() {
               <Text style={s.freezeSub}>ratuje serię za 1 pominięty dzień · masz: {freezes}</Text>
             </View>
             <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
+          </View>
+        </PressableScale>
+
+        {/* HP kotka do walk z bossami (v4) — trwałe ulepszenie, rosnący koszt */}
+        <PressableScale onPress={onBuyMaxHp}>
+          <View style={[s.freezeHero, { borderColor: '#2AC68F44', backgroundColor: '#2AC68F12', marginTop: spacing[2] }]}>
+            <View style={[s.freezeIcon, { backgroundColor: '#2AC68F1E', borderColor: '#2AC68F44' }]}><Heart size={22} color="#2AC68F" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.freezeTitle}>Ulepsz HP kotka</Text>
+              <Text style={s.freezeSub}>+{HP_UPGRADE_AMOUNT} max HP do walk z bossami · masz: {catMaxHp(catMaxHpBonus)}</Text>
+            </View>
+            <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text></View>
           </View>
         </PressableScale>
 
