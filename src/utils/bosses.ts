@@ -240,6 +240,7 @@ export interface FightRound {
   playerDmg: number;
   playerCrit: boolean;
   bossHpAfter: number;
+  healed: number;       // REGENERACJA tej rundy (0 = brak)
   counterDmg: number;
   catHpAfter: number;
 }
@@ -248,30 +249,42 @@ export interface FightResult {
   rounds: FightRound[];
   won: boolean;         // HP bossa spadło do 0
   catFainted: boolean;  // HP kotka spadło do 0 (walka przegrana, nie wygrana)
+  guarded: boolean;      // OSŁONA aktywna cały ten fight (dziś zrobiłeś złą rzecz — Twoje ciosy ×0.5)
   bossHpLeft: number;
   catHpLeft: number;
 }
 
+// `guarded`/regen czytane RAZ na starcie fightu z dzisiejszego wc (nie zmieniają się
+// w trakcie walki — to wciąż te same mechaniki co attackBoss/healBoss, tylko przeniesione
+// na skalę „jedna próba" zamiast „wiele dni" teraz gdy boss resetuje HP co próbę.
 export function simulateFight(
   energy: number, level: number, bonuses: Bonuses, boss: Boss, wc: WeaknessCtx,
   catHpStart: number, roundCount: number = FIGHT_ROUNDS,
 ): FightResult {
   const perRoundEnergy = energy / Math.max(1, roundCount);
+  const guarded = bossGuarded(boss, wc);
+  const willRegen = !!boss.regenPct && !weaknessMet(boss, wc);
   let bossHp = boss.hp;
   let catHp = catHpStart;
   const rounds: FightRound[] = [];
   for (let i = 0; i < roundCount; i++) {
     if (bossHp <= 0 || catHp <= 0) break;
-    const { damage, crit } = computeDamage(perRoundEnergy, level, bonuses, boss, wc);
+    let { damage, crit } = computeDamage(perRoundEnergy, level, bonuses, boss, wc);
+    if (guarded) damage = Math.round(damage * 0.5);
     bossHp = Math.max(0, bossHp - damage);
     let counterDmg = 0;
+    let healed = 0;
     if (bossHp > 0) {
+      if (willRegen) {
+        healed = Math.round(boss.hp * boss.regenPct!);
+        bossHp = Math.min(boss.hp, bossHp + healed);
+      }
       counterDmg = counterDamage(boss, bonuses.dodge);
       catHp = Math.max(0, catHp - counterDmg);
     }
-    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, counterDmg, catHpAfter: catHp });
+    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, catHpAfter: catHp });
   }
-  return { rounds, won: bossHp <= 0, catFainted: catHp <= 0 && bossHp > 0, bossHpLeft: bossHp, catHpLeft: catHp };
+  return { rounds, won: bossHp <= 0, catFainted: catHp <= 0 && bossHp > 0, guarded, bossHpLeft: bossHp, catHpLeft: catHp };
 }
 
 export type BossStatus = 'locked' | 'active' | 'defeated';

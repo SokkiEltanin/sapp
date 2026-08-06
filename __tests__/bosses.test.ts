@@ -98,6 +98,24 @@ describe('bosses — simulateFight (silnik rund, jeszcze niepodpięty)', () => {
     expect(r.catFainted).toBe(false);
     expect(r.rounds).toHaveLength(3);
   });
+
+  test('OSŁONA: dziś zrobiłeś złą rzecz → Twoje ciosy w całej walce ×0.5', () => {
+    const b = boss({ hp: 1000, guard: 'sweets' });
+    const guardedCtx = ctx({ boughtSweetToday: true });
+    const freeCtx = ctx({ boughtSweetToday: false });
+    const guardedFight = simulateFight(100, 1, noCrit, b, guardedCtx, 100, 1);
+    const freeFight = simulateFight(100, 1, noCrit, b, freeCtx, 100, 1);
+    expect(guardedFight.guarded).toBe(true);
+    expect(freeFight.guarded).toBe(false);
+    expect(guardedFight.rounds[0].playerDmg).toBe(Math.round(freeFight.rounds[0].playerDmg / 2));
+  });
+
+  test('REGENERACJA: zaniedbana słabość → boss leczy się co rundę, którą przeżyje', () => {
+    const b = boss({ hp: 10000, regenPct: 0.1 }); // 10% za rundę, nie zabijemy w 1 ciosie
+    const r = simulateFight(50, 1, noCrit, b, ctx({ moodLoggedToday: false }), 100, 2);
+    // słaby cios (energia 50) nie zabija bossa 10000 hp → boss przeżywa → leczy się
+    expect(r.rounds.some(rd => rd.healed > 0)).toBe(true);
+  });
 });
 
 describe('raid — deterministyczny', () => {
