@@ -1,4 +1,4 @@
-import { weaknessMult, bossGuarded, weaknessMet, Boss, WeaknessCtx } from '@/utils/bosses';
+import { weaknessMult, bossGuarded, weaknessMet, bossTier, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 
 const ctx = (o: Partial<WeaknessCtx> = {}): WeaknessCtx => ({
@@ -33,6 +33,21 @@ describe('bosses — mechaniki', () => {
   test('weaknessMet sweetless = dziś bez słodyczy', () => {
     expect(weaknessMet(boss({ weakness: 'sweetless' }), ctx({ boughtSweetToday: false }))).toBe(true);
     expect(weaknessMet(boss({ weakness: 'sweetless' }), ctx({ boughtSweetToday: true }))).toBe(false);
+  });
+});
+
+describe('bosses — bossTier (derywowana z unlockLevel)', () => {
+  test('poniżej 26 = common, od 26 = elite', () => {
+    expect(bossTier(boss({ unlockLevel: 2 }))).toBe('common');
+    expect(bossTier(boss({ unlockLevel: 22 }))).toBe('common');
+    expect(bossTier(boss({ unlockLevel: 26 }))).toBe('elite');
+    expect(bossTier(boss({ unlockLevel: 52 }))).toBe('elite');
+  });
+  test('kampania: pierwsze 8 bossów common, endgame (insomnia+) elite', () => {
+    const common = BOSSES.filter(b => bossTier(b) === 'common');
+    const elite = BOSSES.filter(b => bossTier(b) === 'elite');
+    expect(common.length).toBe(8);
+    expect(elite.map(b => b.id)).toEqual(['insomnia', 'compare', 'drought', 'procrast', 'doubt', 'devourer']);
   });
 });
 

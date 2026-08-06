@@ -122,6 +122,16 @@ export const BOSSES: Boss[] = [
 
 export function bossById(id: string): Boss | undefined { return BOSSES.find(b => b.id === id); }
 
+// Ranga bossa kampanii — DERYWOWANA z unlockLevel, nie osobne pole do ręcznego tagowania
+// (mniej okazji do pomyłki, nowe bossy klasyfikują się same). Granica 26 = już istniejący
+// komentarz „endgame" przy insomnia niżej. Podstawa pod przyszłą pasywkę „blokuj % ataków
+// common bossów" — raid/wydarzenia mają OSOBNE typy (Raid/EventBoss), więc są „event" z
+// definicji, bez potrzeby dodatkowego pola.
+export type BossTier = 'common' | 'elite';
+export function bossTier(boss: Boss): BossTier {
+  return boss.unlockLevel >= 26 ? 'elite' : 'common';
+}
+
 export interface EnergyCtx {
   stepsToday: number;
   habitsDone: number;
