@@ -46,7 +46,7 @@ export default function Bosses() {
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
     defeatBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim, eventHp, eventWon, eventAttack, eventClaim,
-    catHp, catMaxHpBonus, damageCat, resetCatHp,
+    catHp, catMaxHpBonus, damageCat, resetCatHp, spendEnergy,
   } = usePetStore();
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
@@ -61,6 +61,8 @@ export default function Bosses() {
   const [victory, setVictory] = useState<Boss | null>(null);
   const [raidVictory, setRaidVictory] = useState(false);
   const [eventVictory, setEventVictory] = useState(false);
+  const [fighting, setFighting] = useState(false);            // walka w trakcie animacji rund — blokuje spam
+  const [liveBossHp, setLiveBossHp] = useState<number | null>(null); // null = poza walką (pasek pełny)
   const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
@@ -182,28 +184,47 @@ export default function Bosses() {
     ]).start();
   };
 
-  // v4: cała walka (kilka rund, kontratak bossa na kotka) rozstrzyga się w jednym
-  // wywołaniu simulateFight — patrz memory boss_design.md. Boss zawsze zaczyna z
-  // pełnym HP (resetuje się co próbę); kotek też zaczyna pełny (resetCatHp) — obie
-  // strony "świeże" na start każdej próby, energia to jedyny dzienny limit.
+  // v4: cała walka (kilka rund, kontratak bossa na kotka) liczy się od razu w jednym
+  // wywołaniu simulateFight (patrz memory boss_design.md), ale ODGRYWA SIĘ rundami —
+  // sekwencja setTimeout, żeby było widać każdy cios, nie tylko wynik końcowy. Boss
+  // zawsze zaczyna z pełnym HP (resetuje się co próbę); kotek też (resetCatHp) — obie
+  // strony "świeże" na start, energia to jedyny dzienny limit (spendEnergy na starcie,
+  // TU była luka w poprzednim commicie — attackBoss zerował energię przy okazji, nowy
+  // kod nie wołał niczego równoważnego, więc atak nic nie kosztował).
   const attack = () => {
-    if (!current || !unlocked) return;
+    if (!current || !unlocked || fighting) return;
     if (energy <= 0) { haptic.error(); toast.info('Brak energii — zadbaj o siebie, by naładować cios'); return; }
     resetCatHp();
     const result = simulateFight(energy, level, bonuses, current, wc, catMax);
-    const dmgToCat = catMax - result.catHpLeft;
-    if (dmgToCat > 0) damageCat(dmgToCat);
-    const lastRound = result.rounds[result.rounds.length - 1] ?? null;
-    haptic.medium();
-    setLastHit({ dmg: lastRound?.playerDmg ?? 0, crit: lastRound?.playerCrit ?? false, guarded: result.guarded, healed: lastRound?.healed ?? 0 });
-    playHitFx(lastRound?.playerCrit ?? false);
-    if (result.won) {
-      setTimeout(() => { defeatBoss(current.id, current.loot.id, current.coins, current.xp); haptic.success(); setVictory(current); }, 320);
-    } else if (result.catFainted) {
-      setTimeout(() => { haptic.error(); toast.error('Kotek padł! Spróbuj ponownie z nową energią.'); }, 320);
-    } else {
-      setTimeout(() => { haptic.warn(); toast.info('Boss przetrwał — spróbuj ponownie z nową energią.'); }, 320);
-    }
+    spendEnergy();
+    setFighting(true);
+    setLiveBossHp(current.hp);
+    let i = 0;
+    const playRound = () => {
+      const round = result.rounds[i];
+      haptic.medium();
+      setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed });
+      playHitFx(round.playerCrit);
+      setLiveBossHp(round.bossHpAfter);
+      if (round.counterDmg > 0) damageCat(round.counterDmg);
+      i++;
+      if (i < result.rounds.length) {
+        setTimeout(playRound, 750);
+      } else {
+        setTimeout(() => {
+          setFighting(false);
+          setLiveBossHp(null);
+          if (result.won) {
+            defeatBoss(current.id, current.loot.id, current.coins, current.xp); haptic.success(); setVictory(current);
+          } else if (result.catFainted) {
+            haptic.error(); toast.error('Kotek padł! Spróbuj ponownie z nową energią.');
+          } else {
+            haptic.warn(); toast.info('Boss przetrwał — spróbuj ponownie z nową energią.');
+          }
+        }, 500);
+      }
+    };
+    playRound();
   };
 
   const doRaid = () => {
@@ -363,10 +384,10 @@ export default function Bosses() {
             {lastHit?.guarded && <Text style={s.mechNote}>🛡️ Osłona: dziś nakarmiłeś bossa — cios ×0.5</Text>}
             {!!lastHit?.healed && <Text style={s.mechNoteHeal}>🩹 Boss zregenerował +{lastHit.healed} (zaniedbanie: {current.weaknessLabel})</Text>}
 
-            {/* HP bossa — ZAWSZE pełne: kampania resetuje HP co próbę (karczma S&F), więc
-                nie ma "pozostałego" HP do pokazania między próbami. */}
-            <View style={s.hpTrack}><View style={[s.hpFill, { width: '100%' }]} /></View>
-            <Text style={s.hpTxt}>{current.hp} HP</Text>
+            {/* HP bossa — pełne poza walką (resetuje się co próbę, karczma S&F); w trakcie
+                animacji rund pokazuje liveBossHp rundę-po-rundzie. */}
+            <View style={s.hpTrack}><View style={[s.hpFill, { width: `${Math.round((liveBossHp ?? current.hp) / current.hp * 100)}%` }]} /></View>
+            <Text style={s.hpTxt}>{liveBossHp ?? current.hp} / {current.hp} HP</Text>
 
             {/* HP kotka — nowe w v4: walka teraz ma dwie strony. */}
             <View style={[s.hpTrack, { marginTop: 6 }]}>
@@ -389,9 +410,9 @@ export default function Bosses() {
                 <View style={s.fightRow}>
                   <CatArt size={80} expression="content" />
                   <PressableScale onPress={attack} style={{ flex: 1 }}>
-                    <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
+                    <View style={[s.attackBtn, (energy <= 0 || fighting) && { opacity: 0.5 }]}>
                       <Swords size={18} color="#0B0E1A" />
-                      <Text style={s.attackTxt}>Atakuj!</Text>
+                      <Text style={s.attackTxt}>{fighting ? 'Walka trwa…' : 'Atakuj!'}</Text>
                     </View>
                   </PressableScale>
                 </View>

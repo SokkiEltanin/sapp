@@ -129,6 +129,7 @@ interface PetState {
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // jak syncEnergy, ale osobna pula raidu
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
+  spendEnergy: () => void;   // v4: simulateFight consumes the whole bank per attempt, same as attackBoss did
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number) => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
@@ -418,6 +419,7 @@ export const usePetStore = create<PetState>()(
         set({ energy: 0, bossHp: { ...s.bossHp, [bossId]: remaining } });
         return { remaining, defeated };
       },
+      spendEnergy: () => set({ energy: 0 }),
       defeatBoss: (bossId, lootId, coins, xp) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
         defeatedBosses: [...s.defeatedBosses, bossId],
         ownedItems: s.ownedItems.includes(lootId) ? s.ownedItems : [...s.ownedItems, lootId],
