@@ -39,7 +39,10 @@ describe('bosses — bossTier (derywowana z unlockLevel)', () => {
     const common = BOSSES.filter(b => bossTier(b) === 'common');
     const elite = BOSSES.filter(b => bossTier(b) === 'elite');
     expect(common.length).toBe(8);
-    expect(elite.map(b => b.id)).toEqual(['insomnia', 'compare', 'drought', 'procrast', 'doubt', 'devourer']);
+    expect(elite.map(b => b.id)).toEqual([
+      'insomnia', 'compare', 'drought', 'procrast', 'doubt', 'devourer',
+      'samurai', 'jaguar', 'dinosaur', 'piratecapitan', 'hades', 'clown', 'princess', 'wizard',
+    ]);
   });
 });
 

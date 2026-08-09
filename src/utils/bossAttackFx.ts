@@ -27,6 +27,15 @@ export const BOSS_ATTACK_FX: Record<string, ImageSourcePropType> = {
   procrast: require('../../assets/ikonybosów/BOSSATTACK_magicspell.png'),                     // BOLTATTACK = lightning
   doubt:    require('../../assets/ikonybosów/BOSSATTACK_zadrapaniepazury_claw-marks.png'),   // pazurattack = claw
   devourer: require('../../assets/ikonybosów/BOSSATTACK_priateattack_blade.png'),            // axeattack
+  // ── prestiż (2026-08-09) ──
+  samurai:       require('../../assets/ikonybosów/BOSSATTACK_priateattack_blade.png'),        // atakkatana = sword
+  jaguar:        require('../../assets/ikonybosów/BOSSATTACK_zadrapaniepazury_claw-marks.png'), // atakpazurty = claw
+  dinosaur:      require('../../assets/ikonybosów/BOSSATTACK_zadrapaniepazury_claw-marks.png'), // atakpazury = claw
+  piratecapitan: require('../../assets/ikonybosów/BOSSATTACK_priateattack_blade.png'),        // attaksword
+  hades:         require('../../assets/ikonybosów/BOSSATTACK_FIRE.png'),                      // fireattack
+  clown:         require('../../assets/ikonybosów/BOSSATTACK_handattack_fist.png'),           // handattack
+  princess:      require('../../assets/ikonybosów/BOSSATTACK_handattack_fist.png'),           // handattack
+  wizard:        require('../../assets/ikonybosów/BOSSATTACK_magicspell.png'),                // magicattack
 };
 
 export function bossAttackFx(id: string): ImageSourcePropType | undefined {

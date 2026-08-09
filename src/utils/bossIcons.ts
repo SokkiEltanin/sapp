@@ -22,6 +22,15 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   procrast:  require('../../assets/ikonybosów/BOSS_BOLTATTACK_zeus.png'),
   doubt:     require('../../assets/ikonybosów/BOSS_pazurattack_cerberus.png'),
   devourer:  require('../../assets/ikonybosów/BOSS_axeattack_executioner.png'),
+  // ── prestiż (2026-08-09) ──
+  samurai:       require('../../assets/ikonybosów/BOSS_atakkatana_samurai.png'),
+  jaguar:        require('../../assets/ikonybosów/BOSS_atakpazurty_jaguar.png'),
+  dinosaur:      require('../../assets/ikonybosów/BOSS_atakpazury_dinosaur.png'),
+  piratecapitan: require('../../assets/ikonybosów/BOSS_attaksword_piratecapitan.png'),
+  hades:         require('../../assets/ikonybosów/BOSS_fireattack_hades.png'),
+  clown:         require('../../assets/ikonybosów/BOSS_handattack_clown.png'),
+  princess:      require('../../assets/ikonybosów/BOSS_handattack_princess.png'),
+  wizard:        require('../../assets/ikonybosów/BOSS_magicattack_wizard.png'),
 };
 
 export function bossPng(id: string): ImageSourcePropType | undefined {

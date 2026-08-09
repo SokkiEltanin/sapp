@@ -130,6 +130,56 @@ export const BOSSES: Boss[] = [
     loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +8% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.08, energyMult: 0.08, crit: 0.05 } },
     coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true, regenPct: 0.04,
   },
+  // ── prestiż (2026-08-09) — 8 nowych, z zapasowych portretów w assets/ikonybosów/;
+  // kontynuuje krzywą HP/coins/xp devourera (~×1.4/krok, rosnące odstępy poziomów).
+  {
+    id: 'samurai', name: 'Duch Perfekcjonizmu', emoji: '🥷', order: 15, unlockLevel: 58, hp: 57000,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_katana', name: 'Katana Honoru', emoji: '🗡️', desc: '+9% siły ataku', bonus: { atk: 0.09 } },
+    coins: 1300, xp: 13500, taunt: 'Musisz zrobić to idealnie, inaczej się nie liczy…', guard: true,
+  },
+  {
+    id: 'jaguar', name: 'Cień Impulsu', emoji: '🐆', order: 16, unlockLevel: 65, hp: 78000,
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+9% uniku', bonus: { dodge: 0.09 } },
+    coins: 2000, xp: 20000, taunt: 'Kup to teraz, pomyślisz później…',
+  },
+  {
+    id: 'dinosaur', name: 'Skamieniały Nawyk', emoji: '🦖', order: 17, unlockLevel: 72, hp: 106000,
+    weakness: 'steps', weaknessLabel: 'kroki',
+    loot: { id: 'loot_fossil', name: 'Skamielina Mocy', emoji: '🦴', desc: '+10% atak, +3% kryt', bonus: { atk: 0.10, crit: 0.03 } },
+    coins: 3000, xp: 30000, taunt: 'Zawsze tak robiłeś, po co coś zmieniać…',
+  },
+  {
+    id: 'piratecapitan', name: 'Kapitan Zachłanności', emoji: '🏴‍☠️', order: 18, unlockLevel: 80, hp: 145000,
+    weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
+    loot: { id: 'loot_treasuremap', name: 'Mapa Skarbów', emoji: '🗺️', desc: '+10% energii, +4% atak', bonus: { energyMult: 0.10, atk: 0.04 } },
+    coins: 4500, xp: 45000, taunt: 'Jeszcze jedno, jeszcze trochę więcej…',
+  },
+  {
+    id: 'hades', name: 'Władca Katastrof', emoji: '🔥', order: 19, unlockLevel: 88, hp: 198000,
+    weakness: 'sleep', weaknessLabel: 'sen (7h+)',
+    loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+11% uniku, +4% atak', bonus: { dodge: 0.11, atk: 0.04 } },
+    coins: 6800, xp: 68000, taunt: 'Wszystko na pewno się posypie…', regenPct: 0.04,
+  },
+  {
+    id: 'clown', name: 'Maska Uśmiechu', emoji: '🤡', order: 20, unlockLevel: 97, hp: 270000,
+    weakness: 'mood', weaknessLabel: 'wpisy nastroju',
+    loot: { id: 'loot_truthmask', name: 'Maska Prawdy', emoji: '🎭', desc: '+9% kryt, +5% atak', bonus: { crit: 0.09, atk: 0.05 } },
+    coins: 10000, xp: 100000, taunt: 'Uśmiechnij się, nikt nie musi wiedzieć…',
+  },
+  {
+    id: 'princess', name: 'Czekanie Na Ratunek', emoji: '👸', order: 21, unlockLevel: 106, hp: 368000,
+    weakness: 'habits', weaknessLabel: 'nawyki',
+    loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +5% uniku', bonus: { energyMult: 0.12, dodge: 0.05 } },
+    coins: 15000, xp: 150000, taunt: 'Ktoś w końcu to za ciebie naprawi…',
+  },
+  {
+    id: 'wizard', name: 'Iluzja Kontroli', emoji: '🧙', order: 22, unlockLevel: 116, hp: 500000,
+    weakness: 'water', weaknessLabel: 'woda (cel dnia)',
+    loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +10% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.10, energyMult: 0.10, crit: 0.08 } },
+    coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true, regenPct: 0.05,
+  },
 ];
 
 export function bossById(id: string): Boss | undefined { return BOSSES.find(b => b.id === id); }
