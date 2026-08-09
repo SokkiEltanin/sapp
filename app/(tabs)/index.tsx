@@ -1108,6 +1108,7 @@ export default function DashboardScreen() {
   // (stan rozwinięcia wariantów przeniesiony do TopProductsSection — patrz memo poniżej)
   const [finPeriod, setFinPeriod]   = useState<'week' | 'month'>('week');
   const [workHoursChart, setWorkHoursChart] = useState(false);
+  const [sleepDashRange, setSleepDashRange] = useState<7 | 30>(30);
   const [weather, setWeather]       = useState<WeatherData | null>(null);
   const [todayPomCount, setTodayPomCount] = useState(0);
   const [nameAliases, setNameAliases] = useState<Record<string, string>>({});
@@ -3720,6 +3721,59 @@ export default function DashboardScreen() {
                     );
                   })}
                 </View>
+              </View>
+            );
+
+            // Sleep — total-minutes bars only, no phase breakdown: readHealthRange() (which
+            // feeds `healthDays`) doesn't carry sleep-stage data, and it's unverified whether
+            // Samsung Health even exports stages for this watch (see the "Diagnostyka faz
+            // snu" probe in the Zdrowie tab). Reuses `healthDays`, already loaded below for
+            // correlations/records — no new fetch for this card.
+            const sleepDays30 = Array.from({ length: 30 }, (_, i) => {
+              const d = new Date(); d.setDate(d.getDate() - (29 - i));
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              return { date: key, sleepMinutes: healthDays[key]?.sleepMinutes ?? 0 };
+            });
+            const sleepDaysShown = sleepDashRange === 7 ? sleepDays30.slice(-7) : sleepDays30;
+            const sleepMaxMin = Math.max(...sleepDays30.map(d => d.sleepMinutes), 1);
+            const sleepNights = sleepDays30.filter(d => d.sleepMinutes > 0);
+            const sleepAvgMin = sleepNights.length ? Math.round(sleepNights.reduce((sum, d) => sum + d.sleepMinutes, 0) / sleepNights.length) : 0;
+            const SLEEP_DOW = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
+
+            nodes['sleep-chart'] = sleepNights.length > 0 && (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Moon size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Sen</Text>
+                  <Text style={[s.cdDays, { marginLeft: 4 }]}>śr. {(sleepAvgMin / 60).toFixed(1).replace('.0', '')}h</Text>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity onPress={() => { haptic.tap(); setSleepDashRange(r => r === 7 ? 30 : 7); }} style={s.workToggle} activeOpacity={0.8}>
+                    <Text style={[s.workToggleText, { color: accentColor }]}>{sleepDashRange === 7 ? 'Tydzień' : 'Miesiąc'}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: sleepDashRange === 7 ? 4 : 1.5, height: 56, marginTop: spacing[3] }}>
+                  {sleepDaysShown.map(d => {
+                    const h = d.sleepMinutes > 0 ? Math.max(3, (d.sleepMinutes / sleepMaxMin) * 56) : 2;
+                    return (
+                      <View key={d.date} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 56 }}>
+                        <View style={{
+                          width: '100%', height: h, borderRadius: 2, minHeight: 2,
+                          backgroundColor: d.sleepMinutes === 0 ? colors.border.subtle : d.sleepMinutes >= 420 ? accentColor : colors.text.muted,
+                          opacity: d.sleepMinutes === 0 ? 0.5 : 0.85,
+                        }} />
+                      </View>
+                    );
+                  })}
+                </View>
+                {sleepDashRange === 7 && (
+                  <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+                    {sleepDaysShown.map(d => (
+                      <Text key={d.date} style={[s.cdDays, { flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '600', color: colors.text.muted }]}>
+                        {SLEEP_DOW[new Date(d.date + 'T00:00:00').getDay()]}
+                      </Text>
+                    ))}
+                  </View>
+                )}
               </View>
             );
 
