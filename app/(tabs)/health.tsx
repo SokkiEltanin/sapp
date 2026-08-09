@@ -22,7 +22,7 @@ import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, probeSleep } from '@/services/healthConnectService';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography, fonts } from '@/theme';
@@ -302,6 +302,7 @@ export default function HealthScreen() {
   }, [monthData, stepGoal]);
 
   const [stepsRange, setStepsRange] = useState<7 | 30>(30);
+  const [sleepRange, setSleepRange] = useState<7 | 30>(30);
   const [detail, setDetail] = useState<null | 'steps' | 'sleep' | 'body'>(null);
   const [energyOpen, setEnergyOpen] = useState(false); // calorie card is collapsed by default (de-emphasised)
   const [bodyEdit, setBodyEdit] = useState(false); // manual body-composition entry open in the body sheet
@@ -1335,6 +1336,9 @@ export default function HealthScreen() {
 
               {detail === 'sleep' && healthStats && (() => {
                 const hm = (m: number) => `${Math.floor(m / 60)}h ${pad(m % 60)}m`;
+                // Date.getDay() is Sunday-first (0=Nd); DOW_LABELS above is Monday-first —
+                // indexing it with getDay() directly would shift every label by a day.
+                const DOW = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
                 const maxSleepMin = Math.max(...monthData.map(p => p.sleepMinutes), 1);
                 const deep = (hcExtra.sleepDeepMin as number) || 0;
                 const rem = (hcExtra.sleepRemMin as number) || 0;
@@ -1371,6 +1375,32 @@ export default function HealthScreen() {
                         </View>
                       </>
                     )}
+                    {/* Empirical check: does Samsung Health actually export sleep STAGES
+                        (not just total duration) to Health Connect for this watch? Nobody
+                        had verified this — "Samsung populates these" was an unconfirmed
+                        comment, unlike water/calories which got probes after being reported
+                        broken. A multi-day phase chart has no data path either way until
+                        this comes back positive. */}
+                    <TouchableOpacity
+                      style={styles.diagBtn}
+                      activeOpacity={0.8}
+                      onPress={async () => {
+                        haptic.tap();
+                        const p = await probeSleep(7);
+                        const lines = [
+                          `Sesje snu (SleepSession): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.sessions} sesji (7 dni)${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
+                          `Z fazami: ${p.sessionsWithStages}/${p.sessions} sesji · ${p.stageRecords} rekordów faz${p.stageTypesSeen.length ? `\ntypy faz: ${p.stageTypesSeen.join(', ')} (1=czuwanie,2=sen,3=poza łóżkiem,4=lekki,5=głęboki,6=REM)` : ''}`,
+                        ];
+                        let verdict: string;
+                        if (!p.permission) verdict = 'Brak dostępu — w Health Connect włącz dla Sappa „Sen", potem Synchronizuj.';
+                        else if (p.sessions === 0) verdict = 'Brak sesji snu w ogóle w ostatnich 7 dniach — sprawdź czy zegarek w ogóle synchronizuje sen do Samsung Health.';
+                        else if (p.sessionsWithStages > 0) verdict = 'Fazy SĄ eksportowane ✓ — mogę dobudować wykres z fazami na wielu dniach, napisz mi.';
+                        else verdict = 'Sesje snu są, ale BEZ faz — Samsung Health wysyła tylko łączny czas snu, nie REM/lekki/głęboki. Wykres z fazami nie jest możliwy z tych danych (chyba że coś się zmieni w eksporcie Samsunga).';
+                        Alert.alert('Diagnostyka faz snu', lines.join('\n\n') + '\n\n' + verdict);
+                      }}
+                    >
+                      <Text style={styles.diagBtnText}>Diagnostyka faz snu z zegarka</Text>
+                    </TouchableOpacity>
                     {healthStats.sleepBest && healthStats.sleepBest.sleepMinutes > 0 && (
                       <View style={styles.detailRecord}>
                         <Award size={14} color={T.accent} />
@@ -1392,11 +1422,45 @@ export default function HealthScreen() {
                     {worstDow >= 0 && dowAvg[worstDow] > 0 && (
                       <Text style={styles.detailInsight}>Najmniej śpisz w: {DOW_FULL[worstDow]} (śr. {hm(dowAvg[worstDow])}).</Text>
                     )}
-                    <Text style={styles.detailSectionLabel}>OSTATNIE 30 DNI</Text>
-                    <View style={styles.detailBars}>
-                      {monthData.map(p => {
+                    <View style={styles.cardRow}>
+                      <Text style={styles.detailSectionLabel}>{sleepRange === 7 ? 'OSTATNIE 7 DNI' : 'OSTATNIE 30 DNI'}</Text>
+                      <View style={{ flex: 1 }} />
+                      <View style={styles.rangeToggle}>
+                        {([7, 30] as const).map(r => (
+                          <TouchableOpacity key={r} onPress={() => { haptic.tap(); setSleepRange(r); }} style={[styles.rangeBtn, sleepRange === r && styles.rangeBtnOn]}>
+                            <Text style={[styles.rangeBtnText, sleepRange === r && styles.rangeBtnTextOn]}>{r === 7 ? 'Tydzień' : 'Miesiąc'}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                    {/* Each bar is total duration only (HC never gives us stage minutes
+                        across a range — see the "Diagnostyka faz snu" probe above). Once
+                        that comes back positive this is where a stacked REM/light/deep/
+                        awake fill would replace the flat T.accent/T.muted block. */}
+                    <View style={styles.monthChartRow}>
+                      {(sleepRange === 7 ? monthData.slice(-7) : monthData).map((p, i, arr) => {
                         const h = p.sleepMinutes > 0 ? Math.max(3, (p.sleepMinutes / maxSleepMin) * 70) : 2;
-                        return <View key={p.date} style={[styles.detailBar, { height: h, backgroundColor: p.sleepMinutes >= 420 ? T.accent : T.muted, opacity: p.sleepMinutes === 0 ? 0.4 : 1 }]} />;
+                        const isLast = i === arr.length - 1;
+                        return (
+                          <View key={p.date} style={styles.stepCol}>
+                            {sleepRange === 7 && (
+                              <Text style={[styles.stepValLabel, p.sleepMinutes === 0 && { opacity: 0 }, p.sleepMinutes >= 420 && { color: T.accent, fontWeight: '800' }]}>
+                                {(p.sleepMinutes / 60).toFixed(1).replace('.0', '')}h
+                              </Text>
+                            )}
+                            <View style={styles.stepBarWrap}>
+                              <View style={{
+                                width: sleepRange === 7 ? '72%' : '100%',
+                                height: h, borderRadius: 2, minHeight: 2,
+                                backgroundColor: p.sleepMinutes === 0 ? colors.border.subtle : p.sleepMinutes >= 420 ? T.accent : T.muted,
+                                opacity: p.sleepMinutes === 0 ? 0.5 : (isLast ? 1 : 0.85),
+                              }} />
+                            </View>
+                            {sleepRange === 7 && (
+                              <Text style={styles.weekDayLabel}>{DOW[new Date(p.date + 'T00:00:00').getDay()]}</Text>
+                            )}
+                          </View>
+                        );
                       })}
                     </View>
                   </>
@@ -1707,6 +1771,8 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   detailDowLabel: { fontSize: 8.5, color: c.text.muted, fontWeight: '600' },
   detailDowVal: { fontSize: 8, color: c.text.secondary, fontWeight: '700', marginBottom: 1 },
   detailInsight: { fontSize: 11.5, fontWeight: '600', color: c.text.secondary, marginTop: spacing[2], lineHeight: 16 },
+  diagBtn: { width: '100%', paddingVertical: spacing[3], marginTop: spacing[2], alignItems: 'center' },
+  diagBtnText: { fontSize: 12, fontWeight: '600', color: c.text.muted, textDecorationLine: 'underline' },
   glassRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[3] },
   glass: {
     width: 42, height: 42, borderRadius: radius.md,

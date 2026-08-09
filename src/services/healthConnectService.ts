@@ -197,6 +197,51 @@ export async function probeHydration(days = 7): Promise<WaterProbe> {
   }
 }
 
+// Sleep-STAGE diagnostic — unlike water/calories (each got a probe after being reported
+// broken), nobody has ever empirically checked whether this watch/Samsung Health pairing
+// actually populates SleepSessionRecord.stages[] (REM/light/deep/awake sub-records) —
+// readHealthDay() parses `stages` if present, but readHealthRange()/the history cache
+// never has, so a multi-day phase chart has no data path today regardless. This tells
+// the two failure modes apart: sessions with 0 stage records (Samsung isn't exporting
+// stages, only a total duration) vs. sessions that DO have stages (our own range-read
+// just needs to start collecting them).
+export interface SleepProbe {
+  permission: boolean;
+  sessions: number;          // SleepSession records in the window
+  sessionsWithStages: number;// of those, how many have a non-empty stages[]
+  stageRecords: number;      // total individual stage sub-records across all sessions
+  stageTypesSeen: number[];  // distinct HC stage enum values seen (1 AWAKE..6 REM)
+  sources: string[];
+}
+export async function probeSleep(days = 7): Promise<SleepProbe> {
+  const permission = await isPermissionGranted('SleepSession');
+  const out: SleepProbe = { permission, sessions: 0, sessionsWithStages: 0, stageRecords: 0, stageTypesSeen: [], sources: [] };
+  const hc = mod();
+  if (!hc) return out;
+  try {
+    if (!(await ensureInit(hc))) return out;
+    const end = new Date();
+    const start = new Date(); start.setDate(start.getDate() - days);
+    const filter = { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() } as const;
+    const recs = await read(hc, 'SleepSession', filter);
+    out.sessions = recs.length;
+    const sources = new Set<string>();
+    const stageTypes = new Set<number>();
+    for (const r of recs) {
+      const s = srcOf(r); if (s) sources.add(s);
+      const stages = r.stages ?? [];
+      if (stages.length > 0) out.sessionsWithStages++;
+      out.stageRecords += stages.length;
+      for (const stg of stages) if (typeof stg.stage === 'number') stageTypes.add(stg.stage);
+    }
+    out.sources = Array.from(sources);
+    out.stageTypesSeen = Array.from(stageTypes).sort((a, b) => a - b);
+    return out;
+  } catch {
+    return out;
+  }
+}
+
 // Calorie diagnostic — reads RAW Active/Total/BMR records HC holds for the last `days`
 // so we can see whether Samsung actually exports activity calories to Health Connect
 // ("nie czyta z zegarka"). activeRecords 0 = Samsung isn't exporting active calories.
