@@ -9,6 +9,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
+import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
@@ -565,6 +566,8 @@ export default function Pet() {
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         onClose={() => setBoxReveal(null)}
       />
+
+      <PupilNavbar current="pet" />
     </SafeAreaView>
   );
 }
@@ -577,7 +580,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   coinPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#FBBF2440', marginLeft: 6 },
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
   shopBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#A78BFA18', marginLeft: 6 },
-  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[8], alignItems: 'center' },
+  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110, alignItems: 'center' },
 
   stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },

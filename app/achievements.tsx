@@ -131,7 +131,7 @@ export default function Achievements() {
             </View>
           );
         })}
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Detail */}

@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame, Heart } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame, Heart, Swords } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import StartupPreview from '@/components/pet/StartupPreview';
+import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, loginBonusCoins, catMaxHp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
@@ -24,6 +25,14 @@ const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 // Ulepszenie HP kotka (v4 walki — patrz memory boss_design.md) — trwałe, rosnący koszt.
 const HP_UPGRADE_AMOUNT = 20;   // +HP za jeden zakup
 const hpUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / HP_UPGRADE_AMOUNT) * 15;
+
+// Ulepszenie ATK (v5 pivot — patrz memory boss_design.md) — jedyny sposób na wydanie monet
+// na siłę ataku teraz, gdy dmg już NIE liczy się z danych. Ta sama krzywa kosztu co HP, ale
+// mniejszy krok (+5 zamiast +20) bo atkStatBonus dokłada się wprost do BASE_ATK=40 i mnoży
+// się przez atkMultiplier — mocniejszy stat niż HP przy tej samej cenie. TODO-balance: brak
+// jeszcze danych z playtestów, krzywa 1:1 skopiowana z HP jako bezpieczny punkt startowy.
+const ATK_UPGRADE_AMOUNT = 5;   // +ATK za jeden zakup
+const atkUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / ATK_UPGRADE_AMOUNT) * 15;
 const WHISKERS_COST = 55;   // wąsy
 const LEGSTRIPES_COST = 65; // pręgi na łapkach
 const EYE_COST = 50;        // kolor oczu (każdy poza domyślnym)
@@ -70,7 +79,7 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak, catMaxHpBonus, buyMaxHp } = usePetStore();
+  const { coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak, catMaxHpBonus, buyMaxHp, atkStatBonus, buyAtkStat } = usePetStore();
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -109,6 +118,15 @@ export default function PetShop() {
     if (coins < hpCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${hpCost}`); return; }
     confirmBuy('Ulepszenie HP kotka', hpCost, () => {
       if (buyMaxHp(hpCost, HP_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${HP_UPGRADE_AMOUNT} max HP kotka 💚`); }
+    });
+  };
+
+  const atkCost = atkUpgradeCost(atkStatBonus);
+  const onBuyAtk = () => {
+    haptic.tap();
+    if (coins < atkCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${atkCost}`); return; }
+    confirmBuy('Ulepszenie ATK', atkCost, () => {
+      if (buyAtkStat(atkCost, ATK_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${ATK_UPGRADE_AMOUNT} ATK ⚔️`); }
     });
   };
 
@@ -337,6 +355,18 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
+        {/* ATK (v5 pivot) — jedyne trwałe źródło siły ciosu poza poziomem/łupem/itemami */}
+        <PressableScale onPress={onBuyAtk}>
+          <View style={[s.freezeHero, { borderColor: '#F8717144', backgroundColor: '#F8717112', marginTop: spacing[2] }]}>
+            <View style={[s.freezeIcon, { backgroundColor: '#F871711E', borderColor: '#F8717144' }]}><Swords size={22} color="#F87171" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.freezeTitle}>Ulepsz ATK</Text>
+              <Text style={s.freezeSub}>+{ATK_UPGRADE_AMOUNT} siły ataku do walk z bossami · masz: {atkStatBonus}</Text>
+            </View>
+            <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{atkCost}</Text></View>
+          </View>
+        </PressableScale>
+
         {/* KATEGORIE */}
         <View style={s.chips}>
           {CATS.map(({ id, label, Icon }) => {
@@ -498,7 +528,7 @@ export default function PetShop() {
         )}
 
         <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota.</Text>
-        <View style={{ height: 40 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       <BoxRevealModal
@@ -508,6 +538,8 @@ export default function PetShop() {
         boxEmoji={reveal?.box.emoji ?? '🎁'}
         onClose={() => setReveal(null)}
       />
+
+      <PupilNavbar current="shop" />
     </SafeAreaView>
   );
 }

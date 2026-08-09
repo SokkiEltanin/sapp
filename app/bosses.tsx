@@ -7,6 +7,7 @@ import { ChevronLeft, Zap, Lock, Check, Swords } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import BossArt from '@/components/bosses/BossArt';
+import PupilNavbar from '@/components/pet/PupilNavbar';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
 import {
@@ -500,6 +501,8 @@ export default function Bosses() {
           <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
         </Pressable>
       </Modal>
+
+      <PupilNavbar current="bosses" />
     </SafeAreaView>
   );
 }
@@ -511,7 +514,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
-  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: spacing[8] },
+  scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110 },
 
   done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   doneTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
