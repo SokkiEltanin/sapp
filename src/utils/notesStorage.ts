@@ -8,6 +8,7 @@ export interface Note {
   tags: string[];
   folder?: string;    // catalog name, undefined = uncategorized
   pinned: boolean;
+  counterId?: string; // linked to a Counter (odliczanie) — see app/counters/[id].tsx
   createdAt: string;
   updatedAt: string;
 }
@@ -39,7 +40,7 @@ export async function getAllNotes(): Promise<Note[]> {
 }
 
 export async function createNote(
-  data: Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder'>,
+  data: Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder'> & Partial<Pick<Note, 'counterId'>>,
 ): Promise<Note> {
   const notes = await load();
   const now = new Date().toISOString();
@@ -50,6 +51,7 @@ export async function createNote(
     bodyRich: data.bodyRich,
     tags: data.tags,
     folder: data.folder,
+    counterId: data.counterId,
     pinned: false,
     createdAt: now,
     updatedAt: now,
@@ -61,7 +63,7 @@ export async function createNote(
 
 export async function updateNote(
   id: string,
-  updates: Partial<Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder' | 'pinned'>>,
+  updates: Partial<Pick<Note, 'title' | 'body' | 'bodyRich' | 'tags' | 'folder' | 'pinned' | 'counterId'>>,
 ): Promise<void> {
   const notes = await load();
   const idx = notes.findIndex(n => n.id === id);

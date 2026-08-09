@@ -8,10 +8,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft, Plus, Pin, PinOff, Trash2, Search, X, Tag,
   FileText, Bold, Italic, Underline, Type, ClipboardList,
-  Folder, FolderOpen, FolderPlus, ChevronDown,
+  Folder, FolderOpen, FolderPlus, ChevronDown, CalendarClock,
 } from 'lucide-react-native';
 
 import { useTasks } from '@/hooks/useTasks';
+import { useCounters } from '@/store/countersStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import PressableScale from '@/components/ui/PressableScale';
 import {
@@ -510,12 +511,14 @@ const makeEm = (c: any) => StyleSheet.create({
 
 // ─── Note card ────────────────────────────────────────────────────────────────
 
-function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
+function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOpenCounter }: {
   note: Note;
   onPress: () => void;
   onPin: () => void;
   onDelete: () => void;
   onConvert: () => void;
+  counterName?: string;      // set when note.counterId resolves to a live counter
+  onOpenCounter?: () => void;
 }) {
   const colors = useColors();
   const nc = useMemo(() => makeNc(colors), [colors]);
@@ -569,6 +572,12 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert }: {
             <Folder size={8} color={colors.accent.purple + 'CC'} />
             <Text style={nc.folderText}>{note.folder}</Text>
           </View>
+        )}
+        {!!counterName && (
+          <TouchableOpacity style={nc.folderBadge} onPress={onOpenCounter} hitSlop={4}>
+            <CalendarClock size={8} color={colors.accent.blue + 'CC'} />
+            <Text style={nc.folderText} numberOfLines={1}>{counterName}</Text>
+          </TouchableOpacity>
         )}
         {note.tags.length > 0 && (
           <View style={nc.tagRow}>
@@ -635,6 +644,8 @@ export default function NotesScreen() {
   const [newFolderMode, setNewFolderMode] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const { create: createTask }        = useTasks();
+  const { counters } = useCounters();
+  const counterName = (counterId?: string) => counterId ? counters.find(cn => cn.id === counterId)?.name : undefined;
 
   const loadAll = useCallback(async () => {
     const [loaded, loadedFolders] = await Promise.all([getAllNotes(), loadFolders()]);
@@ -930,6 +941,8 @@ export default function NotesScreen() {
                   onPin={() => handlePin(note)}
                   onDelete={() => handleDelete(note)}
                   onConvert={() => handleConvert(note)}
+                  counterName={counterName(note.counterId)}
+                  onOpenCounter={() => note.counterId && router.push(`/counters/${note.counterId}` as any)}
                 />
               ))}
             </>

@@ -241,6 +241,7 @@ export interface Task {
   reminderTime?: string;    // HH:mm — custom reminder time
   reminderDate?: string;    // YYYY-MM-DD — day the reminder fires; independent of deadline
   reminderMessage?: string; // custom notification text
+  counterId?: string;       // linked to a Counter (odliczanie) — see app/counters/[id].tsx
   createdAt: string;
   updatedAt: string;
 }

@@ -131,7 +131,7 @@ export default function Counters() {
             : cn.endDate && !over ? `${cn.date} → ${cn.endDate}${left > 1 ? ` · start za ${left} dni` : ''}`
             : `${cn.date}${!over && left > 1 ? ` · ${Math.round(prog * 100)}% drogi za Tobą` : ''}`;
           return (
-            <View key={cn.id} style={s.card}>
+            <TouchableOpacity key={cn.id} style={s.card} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.85}>
               <View style={s.cardTop}>
                 {during ? <Car size={16} color="#2AC68F" /> : <CalendarClock size={15} color={ACCENT} />}
                 <Text style={s.cardName} numberOfLines={1}>{cn.name}</Text>
@@ -141,7 +141,7 @@ export default function Counters() {
               </View>
               <WalkProgress progress={prog} color={during ? '#2AC68F' : ACCENT} mode={during ? 'drive' : 'walk'} emoji={cn.emoji} />
               <Text style={s.cardMeta}>{meta}</Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
 
@@ -150,7 +150,7 @@ export default function Counters() {
           const auto = cn.mode === 'auto';
           const n = daysFor(cn);
           return (
-            <View key={cn.id} style={s.card}>
+            <TouchableOpacity key={cn.id} style={s.card} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.85}>
               <View style={s.cardTop}>
                 {auto ? <Ban size={15} color={ACCENT} /> : <RotateCcw size={15} color={ACCENT} />}
                 <Text style={s.cardName} numberOfLines={1}>{auto ? `bez ${cn.name}` : cn.name}</Text>
@@ -172,7 +172,7 @@ export default function Counters() {
               </View>
               <View style={{ marginTop: spacing[3] }}><WeekStrip days={n} color={streakColor(n)} /></View>
               <Text style={s.cardMeta}>{auto ? 'liczy się automatycznie z paragonów' : `ostatnio: ${cn.date}`}</Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
         <View style={{ height: 60 }} />

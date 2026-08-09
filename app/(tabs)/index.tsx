@@ -3710,13 +3710,13 @@ export default function DashboardScreen() {
                       ? (endLeft <= 0 ? 'ostatni dzień!' : endLeft === 1 ? 'koniec jutro' : `koniec za ${endLeft} dni`)
                       : (left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`);
                     return (
-                      <View key={cn.id}>
+                      <TouchableOpacity key={cn.id} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.7}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 1 }}>
                           <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
                           <Text style={[s.cdDays, during && { color: '#2AC68F' }]}>{label}</Text>
                         </View>
                         <WalkProgress progress={during ? eventProgress(cn) : untilProgress(cn)} color={during ? '#2AC68F' : accentColor} mode={during ? 'drive' : 'walk'} emoji={cn.emoji} />
-                      </View>
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
