@@ -4,6 +4,12 @@
 // drops a trophy with a passive combat bonus that helps against tougher bosses —
 // so difficulty scales up (boss HP) while YOU scale up (pet level + loot).
 
+import {
+  CombatItemId, HEADSHOT_CHANCE, HEAL_ONCE_PCT, dodgeChanceAt, reflectPctAt,
+  executeThresholdAt, fireProcChanceAt, FIRE_DOT_PCT, MIND_CONTROL_CHANCE,
+  SHIELD_REDUCTION_PCT, THORN_PCT,
+} from '@/utils/combatItems';
+
 export type WeaknessKey = 'steps' | 'sweetless' | 'habits' | 'mood' | 'sleep' | 'water';
 
 export interface BossLoot {
@@ -240,8 +246,9 @@ export interface FightRound {
   playerDmg: number;
   playerCrit: boolean;
   bossHpAfter: number;
-  healed: number;       // REGENERACJA tej rundy (0 = brak)
+  healed: number;       // REGENERACJA bossa tej rundy (0 = brak)
   counterDmg: number;
+  catHealed: number;    // item „heal" zadziałał tej rundy (0 = brak)
   catHpAfter: number;
 }
 
@@ -254,35 +261,82 @@ export interface FightResult {
   catHpLeft: number;
 }
 
+export interface EquippedItem { id: CombatItemId; level: number }
+
 // `guarded`/regen czytane RAZ na starcie fightu z dzisiejszego wc (nie zmieniają się
 // w trakcie walki — to wciąż te same mechaniki co attackBoss/healBoss, tylko przeniesione
 // na skalę „jedna próba" zamiast „wiele dni" teraz gdy boss resetuje HP co próbę.
+// `items` DOMYŚLNIE PUSTA — dopóki nie ma UI do zakładania (ekwipunek w petStore już
+// istnieje, ale nic go jeszcze nie ustawia), każde dotychczasowe wywołanie zachowuje
+// się DOKŁADNIE jak przed tym commitem. Zero ryzyka dla żywej gry.
 export function simulateFight(
   energy: number, level: number, bonuses: Bonuses, boss: Boss, wc: WeaknessCtx,
-  catHpStart: number, roundCount: number = FIGHT_ROUNDS,
+  catHpStart: number, roundCount: number = FIGHT_ROUNDS, items: EquippedItem[] = [],
 ): FightResult {
   const perRoundEnergy = energy / Math.max(1, roundCount);
   const guarded = bossGuarded(boss, wc);
   const willRegen = !!boss.regenPct && !weaknessMet(boss, wc);
+  const levelOf = (id: CombatItemId) => items.find(it => it.id === id)?.level ?? 0;
+  const has = (id: CombatItemId) => levelOf(id) > 0;
+
   let bossHp = boss.hp;
   let catHp = catHpStart;
+  let ignited = false;   // item 'fire' — raz podpalony, DoT do końca walki
+  let healUsed = false;  // item 'heal' — jednorazowe w całej walce
   const rounds: FightRound[] = [];
+
   for (let i = 0; i < roundCount; i++) {
     if (bossHp <= 0 || catHp <= 0) break;
     let { damage, crit } = computeDamage(perRoundEnergy, level, bonuses, boss, wc);
     if (guarded) damage = Math.round(damage * 0.5);
+    if (has('headshot') && Math.random() < HEADSHOT_CHANCE) damage = Math.round(damage * 2);
     bossHp = Math.max(0, bossHp - damage);
+
+    // 'fire' — szansa na podpalenie (raz), potem gwarantowany DoT co rundę do końca walki
+    if (has('fire') && !ignited && bossHp > 0 && Math.random() < fireProcChanceAt(levelOf('fire'))) ignited = true;
+    if (ignited && bossHp > 0) bossHp = Math.max(0, bossHp - Math.round(boss.hp * FIRE_DOT_PCT));
+
     let counterDmg = 0;
     let healed = 0;
     if (bossHp > 0) {
-      if (willRegen) {
-        healed = Math.round(boss.hp * boss.regenPct!);
-        bossHp = Math.min(boss.hp, bossHp + healed);
+      // 'execute' — HP bossa poniżej progu → instakill (sprawdzone PRZED regeneracją,
+      // żeby regen nie mógł "uratować" bossa z progu egzekucji tej samej rundy)
+      if (has('execute') && bossHp / boss.hp < executeThresholdAt(levelOf('execute'))) {
+        bossHp = 0;
+      } else {
+        if (willRegen) {
+          healed = Math.round(boss.hp * boss.regenPct!);
+          bossHp = Math.min(boss.hp, bossHp + healed);
+        }
+        // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
+        const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
+        if (!controlled) {
+          counterDmg = counterDamage(boss, bonuses.dodge);
+          // 'dodge' — całkowity unik kontrataku
+          if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
+          // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka
+          if (counterDmg > 0 && has('reflect') && Math.random() < reflectPctAt(levelOf('reflect'))) {
+            bossHp = Math.max(0, bossHp - counterDmg);
+            counterDmg = 0;
+          }
+          // 'shield' — stała redukcja tego co faktycznie dolatuje do kotka
+          if (counterDmg > 0 && has('shield')) counterDmg = Math.round(counterDmg * (1 - SHIELD_REDUCTION_PCT));
+          if (counterDmg > 0) catHp = Math.max(0, catHp - counterDmg);
+          // 'thorn' — gwarantowane małe odbicie, bez szansy, niezależnie od 'reflect'
+          if (has('thorn') && bossHp > 0) bossHp = Math.max(0, bossHp - Math.round(boss.hp * THORN_PCT));
+        }
       }
-      counterDmg = counterDamage(boss, bonuses.dodge);
-      catHp = Math.max(0, catHp - counterDmg);
     }
-    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, catHpAfter: catHp });
+
+    // 'heal' — pierwszy raz w tej walce, gdy HP kotka spadnie <50%
+    let catHealed = 0;
+    if (has('heal') && !healUsed && catHp > 0 && catHp / catHpStart < 0.5) {
+      catHealed = Math.round(catHpStart * HEAL_ONCE_PCT);
+      catHp = Math.min(catHpStart, catHp + catHealed);
+      healUsed = true;
+    }
+
+    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, catHealed, catHpAfter: catHp });
   }
   return { rounds, won: bossHp <= 0, catFainted: catHp <= 0 && bossHp > 0, guarded, bossHpLeft: bossHp, catHpLeft: catHp };
 }

@@ -1,4 +1,4 @@
-import { weaknessMult, bossGuarded, weaknessMet, bossTier, counterDamage, simulateFight, Bonuses, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
+import { weaknessMult, bossGuarded, weaknessMet, bossTier, counterDamage, simulateFight, EquippedItem, Bonuses, BOSSES, Boss, WeaknessCtx } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 
 const ctx = (o: Partial<WeaknessCtx> = {}): WeaknessCtx => ({
@@ -115,6 +115,100 @@ describe('bosses — simulateFight (silnik rund, jeszcze niepodpięty)', () => {
     const r = simulateFight(50, 1, noCrit, b, ctx({ moodLoggedToday: false }), 100, 2);
     // słaby cios (energia 50) nie zabija bossa 10000 hp → boss przeżywa → leczy się
     expect(r.rounds.some(rd => rd.healed > 0)).toBe(true);
+  });
+});
+
+describe('bosses — simulateFight z itemami bojowymi (v4.1, jeszcze bez UI do zakładania)', () => {
+  const noCrit: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+  const item = (id: EquippedItem['id'], level = 1): EquippedItem[] => [{ id, level }];
+  let randSpy: jest.SpyInstance;
+  afterEach(() => { randSpy?.mockRestore(); });
+
+  test('bez itemów (domyślne []) — zachowanie identyczne jak przed itemami', () => {
+    const b = boss({ hp: 10 });
+    const withDefault = simulateFight(100000, 1, noCrit, b, ctx(), 100);
+    const withEmpty = simulateFight(100000, 1, noCrit, b, ctx(), 100, 3, []);
+    expect(withDefault.won).toBe(withEmpty.won);
+    expect(withDefault.bossHpLeft).toBe(withEmpty.bossHpLeft);
+  });
+
+  test('headshot: gdy proc — cios ×2', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // < każdy próg → zawsze proc
+    const withItem = simulateFight(100, 1, noCrit, b, ctx(), 100, 1, item('headshot'));
+    randSpy.mockRestore();
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0.999); // nigdy nie proc
+    const without = simulateFight(100, 1, noCrit, b, ctx(), 100, 1, item('headshot'));
+    expect(withItem.rounds[0].playerDmg).toBe(without.rounds[0].playerDmg * 2);
+  });
+
+  test('dodge: gdy proc — kontratak w pełni unikany (0 obrażeń kotka)', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 1000, 1, item('dodge'));
+    expect(r.rounds[0].counterDmg).toBe(0);
+    expect(r.catHpLeft).toBe(1000);
+  });
+
+  test('mindcontrol: gdy proc — boss w ogóle nie kontratakuje tej rundy', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 1000, 1, item('mindcontrol'));
+    expect(r.rounds[0].counterDmg).toBe(0);
+  });
+
+  test('shield: redukuje obrażenia kontrataku o stały procent', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0.999); // bez shield-niezwiązanych procków
+    const withItem = simulateFight(1, 1, noCrit, b, ctx(), 100000, 1, item('shield'));
+    const without = simulateFight(1, 1, noCrit, b, ctx(), 100000, 1, []);
+    expect(withItem.rounds[0].counterDmg).toBeLessThan(without.rounds[0].counterDmg);
+  });
+
+  test('thorn: gwarantowane odbicie co rundę, NIEZALEŻNIE od losowania', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0.999); // wszystkie SZANSOWE efekty nie procują
+    const withItem = simulateFight(1, 1, noCrit, b, ctx(), 100000, 1, item('thorn'));
+    const without = simulateFight(1, 1, noCrit, b, ctx(), 100000, 1, []);
+    expect(withItem.bossHpLeft).toBeLessThan(without.bossHpLeft); // thorn ugryzł bossa mimo braku procków
+  });
+
+  test('reflect: gdy proc — kontratak przekierowany na bossa, kotek nietknięty', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 1000, 1, item('reflect'));
+    expect(r.rounds[0].counterDmg).toBe(0);
+    expect(r.catHpLeft).toBe(1000);
+    expect(r.bossHpLeft).toBeLessThan(b.hp); // boss dostał odbite obrażenia
+  });
+
+  test('execute: HP bossa poniżej progu → instakill', () => {
+    // dobrany tak, że sam cios zbija bossa do 0,09% HP (NIE zabija go samym atakiem —
+    // zostaje 90/100000), a execute (próg 4,5% na poziomie 3) dobija resztę.
+    const b = boss({ hp: 100000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0.999);
+    const r = simulateFight(97000, 1, noCrit, b, ctx(), 1000, 1, item('execute', 3));
+    expect(r.won).toBe(true);
+  });
+
+  test('fire: po podpaleniu, DoT działa w KOLEJNYCH rundach', () => {
+    const b = boss({ hp: 1_000_000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // podpala się od razu
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 100000, 3, item('fire'));
+    expect(r.rounds.length).toBeGreaterThan(1);
+    // każda kolejna runda boss traci dodatkowo z DoT — HP spada bardziej niż samym atakiem
+    expect(r.rounds[1].bossHpAfter).toBeLessThan(r.rounds[0].bossHpAfter);
+  });
+
+  test('heal: pierwszy raz <50% HP kotka w walce → jednorazowe leczenie', () => {
+    // boss.hp dobrany tak, żeby kontratak (round(1000*0.04)=40) obniżał HP kotka (100)
+    // STOPNIOWO przez próg 50% (100→60→20), zamiast zabić go od razu jednym ciosem —
+    // wtedy nigdy nie złapalibyśmy stanu "<50% i wciąż żywy", który uruchamia heal.
+    const b = boss({ hp: 1000 });
+    randSpy = jest.spyOn(Math, 'random').mockReturnValue(0.999); // bez innych procków
+    const r = simulateFight(1, 1, noCrit, b, ctx(), 100, 3, item('heal'));
+    const healedRound = r.rounds.find(rd => rd.catHealed > 0);
+    expect(healedRound).toBeDefined();
   });
 });
 
