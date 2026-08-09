@@ -5,6 +5,7 @@ import { ACHIEVEMENTS, TIER_COLOR, BAD_COLOR } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
 import BadgeArt from './BadgeArt';
 import Confetti from './Confetti';
+import RadialGlow from '@/components/ui/RadialGlow';
 import { haptic } from '@/utils/haptics';
 
 // Full-screen celebration shown when a badge unlocks (queued in celebrationStore).
@@ -48,7 +49,9 @@ export default function BadgeCelebration() {
           <Animated.View style={[st.badgeWrap, {
             transform: [{ scale }, { rotate: scale.interpolate({ inputRange: [0, 1], outputRange: ['-14deg', '0deg'] }) }],
           }]}>
-            <View style={[st.glow, { backgroundColor: accent }]} />
+            <View style={st.glow} pointerEvents="none">
+              <RadialGlow size={220} color={accent} opacity={0.55} />
+            </View>
             <BadgeArt id={a.id} tier={a.tier} unlocked size={156} bad={bad} />
           </Animated.View>
           <Animated.View style={{ opacity: textOp, transform: [{ translateY: textY }], alignItems: 'center' }}>
@@ -68,7 +71,7 @@ const st = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   center: { alignItems: 'center', gap: 22 },
   badgeWrap: { width: 156, height: 156, alignItems: 'center', justifyContent: 'center' },
-  glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, opacity: 0.22, top: -32, left: -32 },
+  glow: { position: 'absolute', width: 220, height: 220, top: -32, left: -32 },
   label: { fontSize: 13, fontWeight: '900', letterSpacing: 2, marginBottom: 6 },
   title: { fontSize: 28, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5, textAlign: 'center' },
   desc: { fontSize: 14, color: 'rgba(255,255,255,0.72)', textAlign: 'center', marginTop: 6, lineHeight: 20 },

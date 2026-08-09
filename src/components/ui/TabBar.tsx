@@ -11,6 +11,7 @@ import {
   Utensils, UtensilsCrossed, Apple, Smile, ChefHat,
 } from 'lucide-react-native';
 import { useUiActions } from '@/store/uiActions';
+import RadialGlow from '@/components/ui/RadialGlow';
 import { colors, spacing, radius } from '@/theme';
 import { useColors, useIsLight } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -190,11 +191,12 @@ export default function TabBar({ currentIndex }: Props) {
                       <Animated.View
                         pointerEvents="none"
                         style={[s.pingGlow, {
-                          backgroundColor: badgeColor,
                           opacity: taskPulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, urgentPing ? 0.5 : 0.36] }),
                           transform: [{ scale: taskPulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, urgentPing ? 1.7 : 1.45] }) }],
                         }]}
-                      />
+                      >
+                        <RadialGlow size={34} color={badgeColor} opacity={0.9} />
+                      </Animated.View>
                     )}
                     <Icon
                       size={focused ? 23 : 20}
