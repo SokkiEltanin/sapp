@@ -53,6 +53,19 @@ export default function BossFight() {
   // otwiera (karczma S&F — HP kampanii resetuje się co próbę, patrz memory).
   useEffect(() => { resetCatHp(); }, []);
 
+  // Walka rund odgrywa się przez łańcuch setTimeout (patrz playRound niżej). Jeśli user
+  // wyjdzie z ekranu W TRAKCIE animacji (np. cofnij tuż po "Atakuj!"), te timeouty same
+  // się nie anulują — bez tej straży walka dokończyłaby się PO CICHU w tle (dalej mutując
+  // coiny/pokonanych bossów w store) mimo że ekran już zniknął. `roundTimer` + `alive`
+  // dają czysty stop: cofnięcie w trakcie walki po prostu PRZERYWA ją, nic więcej się
+  // nie liczy do końca (runda w trakcie animacji się nie dogrywa).
+  const alive = useRef(true);
+  const roundTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    alive.current = false;
+    if (roundTimer.current) clearTimeout(roundTimer.current);
+  }, []);
+
   const shake = useRef(new Animated.Value(0)).current;
   const dmgY = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(0)).current;
@@ -93,6 +106,7 @@ export default function BossFight() {
     setLiveBossHp(current.hp);
     let i = 0;
     const playRound = () => {
+      if (!alive.current) return;   // cofnięto z ekranu w trakcie animacji — walka się zatrzymuje, nic dalej się nie liczy
       const round = result.rounds[i];
       haptic.medium();
       setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed, catHealed: round.catHealed });
@@ -102,9 +116,10 @@ export default function BossFight() {
       if (round.counterDmg > 0) damageCat(round.counterDmg);
       i++;
       if (i < result.rounds.length) {
-        setTimeout(playRound, 750);
+        roundTimer.current = setTimeout(playRound, 750);
       } else {
-        setTimeout(() => {
+        roundTimer.current = setTimeout(() => {
+          if (!alive.current) return;
           setFighting(false);
           setLiveBossHp(null);
           if (result.won) {
