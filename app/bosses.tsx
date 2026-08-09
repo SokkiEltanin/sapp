@@ -54,6 +54,7 @@ export default function Bosses() {
   const [eventVictory, setEventVictory] = useState(false);
   const [fighting, setFighting] = useState(false);            // walka w trakcie animacji rund — blokuje spam
   const [liveBossHp, setLiveBossHp] = useState<number | null>(null); // null = poza walką (pasek pełny)
+  const [attackPulse, setAttackPulse] = useState(0);           // ++ co rundę → CatArt bije łapką
   const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
@@ -160,6 +161,7 @@ export default function Bosses() {
       haptic.medium();
       setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed });
       playHitFx(round.playerCrit);
+      setAttackPulse(n => n + 1);   // kotek bije łapką w rytm rundy (patrz CatArt `attack` prop)
       setLiveBossHp(round.bossHpAfter);
       if (round.counterDmg > 0) damageCat(round.counterDmg);
       i++;
@@ -363,7 +365,7 @@ export default function Bosses() {
                   )}
                 </View>
                 <View style={s.fightRow}>
-                  <CatArt size={80} expression="content" />
+                  <CatArt size={80} expression="content" attack={attackPulse} />
                   <PressableScale onPress={attack} style={{ flex: 1 }}>
                     <View style={[s.attackBtn, (energy <= 0 || fighting) && { opacity: 0.5 }]}>
                       <Swords size={18} color="#0B0E1A" />

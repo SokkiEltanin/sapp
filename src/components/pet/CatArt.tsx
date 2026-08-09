@@ -49,7 +49,7 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
   palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
-  eyeColor = '', noseColor = '', whiskers = false, legStripes = false,
+  eyeColor = '', noseColor = '', whiskers = false, legStripes = false, attack = 0,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
@@ -60,6 +60,7 @@ export default function CatArt({
   noseColor?: string;  // '' = domyślny p.ink; inaczej hex koloru noska
   whiskers?: boolean;  // wąsy
   legStripes?: boolean; // pręgi na łapkach
+  attack?: number;     // increment to make the cat swat + pull a battle face (boss fights)
 }) {
   const p = palette;
   const breathe = useRef(new Animated.Value(0)).current;
@@ -73,6 +74,7 @@ export default function CatArt({
   const [look, setLook] = useState({ x: 0, y: 0 });
   const [petting, setPetting] = useState(false);
   const [angry, setAngry] = useState(false);
+  const [battleFace, setBattleFace] = useState(false);   // fierce eyes, no halo/side-effects — see `attack` prop
   const [licking, setLicking] = useState(false);
   const [swatting, setSwatting] = useState(false);
   const [particles, setParticles] = useState<{ id: number; kind: 'heart' | 'spark'; dx: number }[]>([]);
@@ -106,7 +108,8 @@ export default function CatArt({
 
   const asleep = expression === 'sleeping';
   const shut = blink || asleep || licking;
-  const half = !shut && !angry && (petting || expression === 'content');
+  const half = !shut && !angry && !battleFace && (petting || expression === 'content');
+  const fierce = angry || battleFace;   // shared eye/mouth treatment; halo stays angry-only (see below)
 
   // ── idle: very light breathing (a visible pulse read as wrong) ──
   useEffect(() => {
@@ -206,7 +209,7 @@ export default function CatArt({
   }, [animate, asleep, angry, licking]);
 
   // ── angry ──
-  const doSwat = () => {
+  const doSwat = (vibrate: boolean = true) => {
     swat.setValue(0);
     setSwatting(true);   // without this the arm stayed hidden and the swat was invisible
     Animated.sequence([
@@ -216,7 +219,7 @@ export default function CatArt({
       Animated.timing(swat, { toValue: -0.9, duration: 90, useNativeDriver: true }),
       Animated.timing(swat, { toValue: 0, duration: 180, useNativeDriver: true }),
     ]).start(() => setSwatting(false));
-    try { Vibration.vibrate([0, 25, 45, 25]); } catch {}
+    if (vibrate) { try { Vibration.vibrate([0, 25, 45, 25]); } catch {} }
   };
   const goAngry = () => {
     if (angry) return;
@@ -238,6 +241,19 @@ export default function CatArt({
       s.stop(); shake.setValue(0); setAngry(false); taps.current = [];
     }, 3000);
   };
+
+  // ── attack (boss fights) — reuses the exact same swat + fierce-eyes rendering as
+  // `angry`/`doSwat` above, just without the halo or the anger STATE (no onAngry callback,
+  // no 3s cooldown, no interaction with the pet-page tap-counter) so a fight screen can
+  // trigger it freely every round without fighting the petting-anger mechanic.
+  const firstAttack = useRef(true);
+  useEffect(() => {
+    if (firstAttack.current) { firstAttack.current = false; return; }
+    if (!animate || asleep) return;
+    setBattleFace(true);
+    doSwat(false);
+    setTimeout(() => setBattleFace(false), 260);
+  }, [attack]);
 
   // HOLD (long press) = a cuddle: distinct from a tap. The cat licks its paw (a cute,
   // slower move), a warmer shower of hearts drifts up, a longer soft purr buzzes, and it
@@ -416,11 +432,11 @@ export default function CatArt({
                     <Path d={`M${RX - 70} ${EYY} Q${RX} ${EYY + 46} ${RX + 70} ${EYY}`} fill="none" stroke={p.ink} strokeWidth={16} strokeLinecap="round" />
                   </G>
                 ) : (
-                  <G mask={`url(#${angry ? 'eyesAngry' : half ? 'eyesHalf' : 'eyesFull'})`}>
+                  <G mask={`url(#${fierce ? 'eyesAngry' : half ? 'eyesHalf' : 'eyesFull'})`}>
                     <Ellipse cx={794} cy={785} rx={78} ry={85} fill="#fff" />
                     <Ellipse cx={1107} cy={787} rx={80} ry={87} fill="#fff" />
                     <G transform={`translate(${look.x} ${look.y})`}>
-                      {angry ? (
+                      {fierce ? (
                         // slit pupils: a round pupil simply fills the narrowed eye, so all
                         // you saw was a dark wedge — and slits are what an angry cat has
                         <G>
@@ -456,13 +472,13 @@ export default function CatArt({
                     <Path d="M1030 760 Q1107 778 1184 760" fill="none" stroke={p.ink} strokeWidth={11} strokeLinecap="round" />
                   </G>
                 )}
-                {angry && (
+                {fierce && (
                   <G>
                     <Path d="M700 664 Q788 680 876 720" fill="none" stroke={p.ink} strokeWidth={19} strokeLinecap="round" />
                     <Path d="M1202 666 Q1114 682 1026 722" fill="none" stroke={p.ink} strokeWidth={19} strokeLinecap="round" />
                   </G>
                 )}
-                {mouthFor(expression, angry, petting || licking, p.ink)}
+                {mouthFor(expression, fierce, petting || licking, p.ink)}
                 {/* wąsy — cienkie kreski od pyszczka na boki (statyczne, animacji nie ruszają) */}
                 {whiskers && (
                   <G stroke={p.ink} strokeWidth={5} strokeLinecap="round" fill="none" opacity={0.5}>
