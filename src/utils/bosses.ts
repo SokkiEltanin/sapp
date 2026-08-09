@@ -1,8 +1,11 @@
-// Boss battles (etap 4). You beat bosses by taking care of yourself: self-care
-// banks "energia", you tap FIGHT to unleash it. Bosses unlock with the pet's level
-// and can be fought once. Each is weak to one healthy habit (bonus damage) and
-// drops a trophy with a passive combat bonus that helps against tougher bosses —
-// so difficulty scales up (boss HP) while YOU scale up (pet level + loot).
+// Boss battles (etap 4, v5 pivot 2026-08-07 — patrz memory boss_design.md). Damage
+// comes ONLY from purchased/leveled stats (ATK bought with coins, pet level, loot,
+// equipped items) — NOT from today's self-care data. That data still earns you coins/
+// XP/crates through the existing quest economy, it just no longer scales a hit or
+// gates a weakness bonus. "Energia" stays as a simple DAILY ATTEMPT COUNT (how many
+// times you can fight today), refilled flat each day — not computed from steps/sleep/
+// mood/sweets like before. `guard`/`regenPct` on a Boss are now INNATE traits (some
+// bosses are just tankier/regenerate), not conditional on "did you do X today".
 
 import {
   CombatItemId, HEADSHOT_CHANCE, HEAL_ONCE_PCT, dodgeChanceAt, reflectPctAt,
@@ -10,6 +13,8 @@ import {
   SHIELD_REDUCTION_PCT, THORN_PCT,
 } from '@/utils/combatItems';
 
+// Czysty temat/flavor bossa (art/aura) — NIE wpływa już na obrażenia. Zostaje jako
+// wizualna tożsamość (kolor aury w bosses.tsx) i opis w kampanii.
 export type WeaknessKey = 'steps' | 'sweetless' | 'habits' | 'mood' | 'sleep' | 'water';
 
 export interface BossLoot {
@@ -27,15 +32,16 @@ export interface Boss {
   order: number;
   unlockLevel: number;
   hp: number;
-  weakness: WeaknessKey;
+  weakness: WeaknessKey;        // flavor/theme only (patrz komentarz typu wyżej)
   weaknessLabel: string;
   loot: BossLoot;
   coins: number;
   xp: number;
   taunt: string;
-  // ── mechaniki (opcjonalne) ──
-  guard?: 'sweets' | 'poorSleep';  // OSŁONA: jeśli DZIŚ zrobiłeś tę złą rzecz → Twój cios ×0.5
-  regenPct?: number;               // REGENERACJA: jeśli DZIŚ zaniedbałeś jego słabość → leczy ten % max HP przy ciosie
+  // ── mechaniki WRODZONE (opcjonalne) — stała cecha bossa, nie zależy już od
+  // dzisiejszych danych samo-opieki ──
+  guard?: boolean;    // OSŁONA: ten boss zawsze redukuje Twój cios ×0.5 (tankowy typ)
+  regenPct?: number;  // REGENERACJA: ten boss zawsze leczy ten % max HP co przeżytą rundę (enrage)
 }
 
 export const BOSSES: Boss[] = [
@@ -49,7 +55,7 @@ export const BOSSES: Boss[] = [
     id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 520,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
-    coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: 'sweets',
+    coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: true,
   },
   {
     id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 820,
@@ -79,7 +85,7 @@ export const BOSSES: Boss[] = [
     id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 4500,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_veg', name: 'Korona Warzyw', emoji: '🥦', desc: '+5% siły ataku, +2% kryt', bonus: { atk: 0.05, crit: 0.02 } },
-    coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…', guard: 'sweets',
+    coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…', guard: true,
   },
   {
     id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 6500,
@@ -92,7 +98,7 @@ export const BOSSES: Boss[] = [
     id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 9000,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
-    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: 'poorSleep', regenPct: 0.03,
+    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true, regenPct: 0.03,
   },
   {
     id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 12000,
@@ -122,7 +128,7 @@ export const BOSSES: Boss[] = [
     id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 42000,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +8% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.08, energyMult: 0.08, crit: 0.05 } },
-    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: 'sweets', regenPct: 0.04,
+    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true, regenPct: 0.04,
   },
 ];
 
@@ -138,22 +144,6 @@ export function bossTier(boss: Boss): BossTier {
   return boss.unlockLevel >= 26 ? 'elite' : 'common';
 }
 
-export interface EnergyCtx {
-  stepsToday: number;
-  habitsDone: number;
-  moodLoggedToday: boolean;
-  boughtSweetToday: boolean;
-}
-
-// Today's earned attack energy from self-care (capped so it can't run away).
-export function energyFromData(c: EnergyCtx): number {
-  const e = Math.floor(c.stepsToday / 1000) * 10
-    + c.habitsDone * 8
-    + (c.moodLoggedToday ? 10 : 0)
-    + (c.boughtSweetToday ? 0 : 12);
-  return Math.min(350, Math.max(0, e));
-}
-
 export interface Bonuses { atk: number; dodge: number; crit: number; energyMult: number }
 
 export function bossBonuses(ownedItems: string[]): Bonuses {
@@ -166,53 +156,25 @@ export function bossBonuses(ownedItems: string[]): Bonuses {
   return b;
 }
 
-export interface WeaknessCtx {
-  stepsToday: number;
-  sweetlessDays: number;
-  habitsRatio: number;      // 0..1 (done/total today)
-  moodLoggedToday: boolean;
-  boughtSweetToday: boolean;
-  sleepMinutes: number;     // dziś (0 = brak danych)
-  waterRatio: number;       // 0..1 (szklanki dziś / cel)
-}
-
-// Bonus damage multiplier for hitting a boss's weakness with the right habit.
-export function weaknessMult(boss: Boss, c: WeaknessCtx): number {
-  switch (boss.weakness) {
-    case 'steps':     return 1 + Math.min(1.5, c.stepsToday / 10000) * 0.2;
-    case 'sweetless': return 1 + Math.min(30, c.sweetlessDays) * 0.02;
-    case 'habits':    return 1 + c.habitsRatio * 0.3;
-    case 'mood':      return 1 + (c.moodLoggedToday ? 0.25 : 0);
-    case 'sleep':     return 1 + Math.min(1, c.sleepMinutes / 420) * 0.25;   // 7h+ = pełny bonus
-    case 'water':     return 1 + Math.min(1, c.waterRatio) * 0.25;
-  }
-}
-
-// OSŁONA: dziś zrobiłeś złą rzecz, na którą boss „żeruje" → Twój cios jest słabszy.
-export function bossGuarded(boss: Boss, c: WeaknessCtx): boolean {
-  if (boss.guard === 'sweets') return c.boughtSweetToday;
-  if (boss.guard === 'poorSleep') return c.sleepMinutes > 0 && c.sleepMinutes < 360; // <6h
-  return false;
-}
-
-// Czy DZIŚ spełniłeś zdrowe zachowanie tego bossa (jeśli NIE → regeneruje się).
-export function weaknessMet(boss: Boss, c: WeaknessCtx): boolean {
-  switch (boss.weakness) {
-    case 'steps':     return c.stepsToday >= 6000;
-    case 'sweetless': return !c.boughtSweetToday;
-    case 'habits':    return c.habitsRatio >= 0.5;
-    case 'mood':      return c.moodLoggedToday;
-    case 'sleep':     return c.sleepMinutes >= 360;
-    case 'water':     return c.waterRatio >= 0.5;
-  }
-}
-
 export function atkMultiplier(level: number, bonuses: Bonuses): number {
   return 1 + level * 0.03 + bonuses.atk;
 }
 
+// Bazowa moc ataku, ZANIM doliczysz poziom/staty/łup — jedna stała, żeby balans żył
+// w jednym miejscu. Realna moc = (BASE_ATK + atkStatBonus-za-monety) × atkMultiplier.
+export const BASE_ATK = 40;
+export function atkPower(atkStatBonus: number, level: number, bonuses: Bonuses): number {
+  return (BASE_ATK + Math.max(0, atkStatBonus)) * atkMultiplier(level, bonuses);
+}
+
+// Ile prób walki dziennie — FLAT, nie liczone z danych zdrowia (v5 pivot). Loot z
+// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower).
+export const BASE_DAILY_ATTEMPTS = 3;
+export function dailyAttempts(energyMult: number): number {
+  return Math.max(1, Math.round(BASE_DAILY_ATTEMPTS * (1 + Math.max(0, energyMult))));
+}
+
 // ── Kontratak bossa (v4 redesign, fundament — patrz memory boss_design.md) ────────
-// Czysta funkcja, NIC jeszcze jej nie wywołuje w grze — bezpieczny krok przygotowawczy.
 // Skaluje z HP bossa (większy boss = mocniejszy kontratak), nie z poziomem gracza —
 // tak jak walka z bossem samym w sobie już skaluje trudność. `dodge` z Bonuses redukuje
 // obrażenia (0 = pełny cios, 0.9 = maks. redukcja — ten sam cap co przy regen bossa).
@@ -222,11 +184,12 @@ export function counterDamage(boss: Boss, dodge: number): number {
   return Math.round(base * (1 - Math.min(0.9, Math.max(0, dodge))));
 }
 
-// One attack: spends all banked energy into a hit (crit doubles it).
-export function computeDamage(energy: number, level: number, bonuses: Bonuses, boss: Boss, wc: WeaknessCtx): { damage: number; crit: boolean } {
-  const base = energy * atkMultiplier(level, bonuses) * weaknessMult(boss, wc);
+// One hit: pełna moc ataku (staty+poziom+łup), lekka losowa wariancja (0.85–1.15) żeby
+// nie było matematycznie identyczne co runda, kryt dubluje. ZERO wpływu danych zdrowia.
+export function computeDamage(atkStatBonus: number, level: number, bonuses: Bonuses): { damage: number; crit: boolean } {
+  const variance = 0.85 + Math.random() * 0.3;
   const crit = Math.random() < bonuses.crit;
-  return { damage: Math.round(base * (crit ? 2 : 1)), crit };
+  return { damage: Math.round(atkPower(atkStatBonus, level, bonuses) * variance * (crit ? 2 : 1)), crit };
 }
 
 // ── Symulacja walki 1v1 (v4 redesign, S&F-style — patrz memory boss_design.md) ────
@@ -256,26 +219,23 @@ export interface FightResult {
   rounds: FightRound[];
   won: boolean;         // HP bossa spadło do 0
   catFainted: boolean;  // HP kotka spadło do 0 (walka przegrana, nie wygrana)
-  guarded: boolean;      // OSŁONA aktywna cały ten fight (dziś zrobiłeś złą rzecz — Twoje ciosy ×0.5)
+  guarded: boolean;      // ten boss ma wrodzoną osłonę — Twoje ciosy ×0.5 (nie zależy już od dziś)
   bossHpLeft: number;
   catHpLeft: number;
 }
 
 export interface EquippedItem { id: CombatItemId; level: number }
 
-// `guarded`/regen czytane RAZ na starcie fightu z dzisiejszego wc (nie zmieniają się
-// w trakcie walki — to wciąż te same mechaniki co attackBoss/healBoss, tylko przeniesione
-// na skalę „jedna próba" zamiast „wiele dni" teraz gdy boss resetuje HP co próbę.
 // `items` DOMYŚLNIE PUSTA — dopóki nie ma UI do zakładania (ekwipunek w petStore już
 // istnieje, ale nic go jeszcze nie ustawia), każde dotychczasowe wywołanie zachowuje
-// się DOKŁADNIE jak przed tym commitem. Zero ryzyka dla żywej gry.
+// się DOKŁADNIE jak przed tym commitem dla graczy bez itemów. `atkStatBonus` = trwały
+// stat kupiony za monety (v5 pivot) — jedyne źródło mocy poza poziomem/łupem/itemami.
 export function simulateFight(
-  energy: number, level: number, bonuses: Bonuses, boss: Boss, wc: WeaknessCtx,
+  atkStatBonus: number, level: number, bonuses: Bonuses, boss: Boss,
   catHpStart: number, roundCount: number = FIGHT_ROUNDS, items: EquippedItem[] = [],
 ): FightResult {
-  const perRoundEnergy = energy / Math.max(1, roundCount);
-  const guarded = bossGuarded(boss, wc);
-  const willRegen = !!boss.regenPct && !weaknessMet(boss, wc);
+  const guarded = !!boss.guard;         // wrodzona cecha, nie zależy od wc
+  const willRegen = !!boss.regenPct;    // wrodzona cecha (enrage), nie zależy od wc
   const levelOf = (id: CombatItemId) => items.find(it => it.id === id)?.level ?? 0;
   const has = (id: CombatItemId) => levelOf(id) > 0;
 
@@ -287,7 +247,7 @@ export function simulateFight(
 
   for (let i = 0; i < roundCount; i++) {
     if (bossHp <= 0 || catHp <= 0) break;
-    let { damage, crit } = computeDamage(perRoundEnergy, level, bonuses, boss, wc);
+    let { damage, crit } = computeDamage(atkStatBonus, level, bonuses);
     if (guarded) damage = Math.round(damage * 0.5);
     if (has('headshot') && Math.random() < HEADSHOT_CHANCE) damage = Math.round(damage * 2);
     bossHp = Math.max(0, bossHp - damage);

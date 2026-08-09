@@ -9,21 +9,16 @@ import CatArt from '@/components/pet/CatArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
 import {
-  BOSSES, Boss, bossBonuses, energyFromData, weaknessMult, atkMultiplier, computeDamage,
-  simulateFight, FIGHT_ROUNDS, WeaknessCtx,
+  BOSSES, Boss, bossBonuses, atkPower, dailyAttempts, computeDamage,
+  simulateFight, FIGHT_ROUNDS,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventBossFromKey } from '@/utils/seasonalEvents';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
-import { sweetlessDaysFrom, weekKeyOf } from '@/utils/quests';
-import { useHabits } from '@/hooks/useHabits';
-import { getCounts, getWaterGlasses } from '@/utils/habits';
-import { getHealthGoals } from '@/utils/healthGoals';
-import { useMoodStore } from '@/store/moodStore';
+import { weekKeyOf } from '@/utils/quests';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
-import { getHealthHistory } from '@/utils/healthHistory';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -46,18 +41,12 @@ export default function Bosses() {
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
     defeatBoss, raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim, eventHp, eventWon, eventAttack, eventClaim,
-    catHp, catMaxHpBonus, damageCat, resetCatHp, spendEnergy,
+    catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
   } = usePetStore();
-  const { habits, todayDone } = useHabits();
-  const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
 
-  const [steps, setSteps] = useState(0);
-  const [sleepMin, setSleepMin] = useState(0);
-  const [waterToday, setWaterToday] = useState(0);
-  const [waterGoal, setWaterGoal] = useState(8);
   const [victory, setVictory] = useState<Boss | null>(null);
   const [raidVictory, setRaidVictory] = useState(false);
   const [eventVictory, setEventVictory] = useState(false);
@@ -66,50 +55,16 @@ export default function Bosses() {
   const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
-  const t = todayISO();
-  const moodLoggedToday = moodEntries.some(e => e.date === t);
-  const boughtSweetToday = useMemo(() => expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === t
-    && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski'))), [expenses]);
-  const sweetlessDays = useMemo(() => sweetlessDaysFrom(expenses), [expenses]);
-  const habitsRatio = habits.length ? todayDone.length / habits.length : 0;
-  const waterRatio = waterGoal > 0 ? waterToday / waterGoal : 0;
-  const wc: WeaknessCtx = { stepsToday: steps, sweetlessDays, habitsRatio, moodLoggedToday, boughtSweetToday, sleepMinutes: sleepMin, waterRatio };
-
-  // Energy = self-care over a ROLLING window, NOT the calendar day. The old version
-  // reset to ~0 every morning (today's habits/mood are empty right after midnight) even
-  // though you were active yesterday — nonsense that nagged you at dawn. Now energy is
-  // max(today, 70% of yesterday): yesterday's activity carries you into the morning and
-  // today's takes over as it builds up. Steps already use a rolling ~24 h estimate.
+  // v5 pivot: energia to płaski dzienny limit prób (dailyAttempts), NIE liczony już z
+  // danych samo-opieki (kroki/sen/nastrój/nawyki) — patrz memory boss_design.md. Ten sam
+  // limit dobija niezależnie 3 pule (boss/raid/wydarzenie), tak jak wcześniej.
   const reload = useCallback(() => {
-    getHealthHistory(3).then(async h => {
-      const today = new Date();
-      const y = new Date(today); y.setDate(y.getDate() - 1);
-      const yISO = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
-      const stepsToday = h[todayISO()]?.steps ?? 0;
-      const stepsYest  = h[yISO]?.steps ?? 0;
-      const dayFrac = (today.getHours() * 60 + today.getMinutes()) / 1440;
-      const st = Math.round(stepsToday + stepsYest * (1 - dayFrac));          // rolling ~24 h estimate
-      setSteps(st);
-      setSleepMin(h[todayISO()]?.sleepMinutes ?? 0);
-      const todayE = energyFromData({ stepsToday: st, habitsDone: todayDone.length, moodLoggedToday: moodEntries.some(m => m.date === todayISO()), boughtSweetToday });
-      // Yesterday's completed self-care as a floor (decayed), so a fresh morning ≠ 0.
-      let yestE = 0;
-      try {
-        const yc = await getCounts(yISO);
-        const yHabits = habits.filter(hb => (yc[hb.id] ?? 0) >= (hb.type === 'count' ? (hb.dailyGoal ?? 1) : 1)).length;
-        yestE = energyFromData({ stepsToday: stepsYest, habitsDone: yHabits, moodLoggedToday: moodEntries.some(m => m.date === yISO), boughtSweetToday: false });
-      } catch {}
-      // Same self-care number banks into BOTH pools independently — attacking the
-      // boss doesn't drain what you can spend on the raid, and vice versa.
-      const banked = Math.max(todayE, Math.round(yestE * 0.7));
-      syncEnergy(banked, bonuses.energyMult);
-      syncRaidEnergy(banked, bonuses.energyMult);
-      syncEventEnergy(banked, bonuses.energyMult);
-    }).catch(() => {});
-    getWaterGlasses(todayISO()).then(setWaterToday).catch(() => {});
-    getHealthGoals().then(g => setWaterGoal(g.waterGoal || 8)).catch(() => {});
+    const attempts = dailyAttempts(bonuses.energyMult);
+    syncEnergy(attempts, 0);
+    syncRaidEnergy(attempts, 0);
+    syncEventEnergy(attempts, 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
-  }, [todayDone.length, moodEntries, boughtSweetToday, bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, habits, level, raidEnsure]);
+  }, [bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
   useFocusEffect(reload);
 
   // sequential campaign: current = first not-yet-defeated boss. HP kampanii RESETUJE
@@ -126,8 +81,7 @@ export default function Bosses() {
   const raidRemaining = raidWeek === weekKey ? raidHp : raidMaxHp;
   const raidDone = raidWon.includes(weekKey);
   const raidUnlocked = level >= 3;
-  const raidWeakMult = weaknessMult({ weakness: raid.weakness } as Boss, wc);
-  const raidPreviewDmg = Math.round(raidEnergy * atkMultiplier(level, bonuses) * raidWeakMult);
+  const raidPreviewDmg = Math.round(atkPower(atkStatBonus, level, bonuses));
 
   // ── wydarzenie (sezonowe święto LUB „nemesis miesiąca" — Twój najbardziej odstający
   // wskaźnik tego miesiąca). Sezonowy zawsze wygrywa, gdy oba by pasowały. null = karta
@@ -147,8 +101,7 @@ export default function Bosses() {
   const eventRemaining = eventKey ? (eventHp[eventKey] ?? eventMaxHp) : 0;
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
   const eventUnlocked = level >= 2;
-  const eventWeakMult = eventBoss ? weaknessMult({ weakness: eventBoss.weakness } as Boss, wc) : 1;
-  const eventPreviewDmg = Math.round(eventEnergy * atkMultiplier(level, bonuses) * eventWeakMult);
+  const eventPreviewDmg = Math.round(atkPower(atkStatBonus, level, bonuses));
 
   // attack animation
   const shake = useRef(new Animated.Value(0)).current;
@@ -193,9 +146,9 @@ export default function Bosses() {
   // kod nie wołał niczego równoważnego, więc atak nic nie kosztował).
   const attack = () => {
     if (!current || !unlocked || fighting) return;
-    if (energy <= 0) { haptic.error(); toast.info('Brak energii — zadbaj o siebie, by naładować cios'); return; }
+    if (energy <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     resetCatHp();
-    const result = simulateFight(energy, level, bonuses, current, wc, catMax);
+    const result = simulateFight(atkStatBonus, level, bonuses, current, catMax);
     spendEnergy();
     setFighting(true);
     setLiveBossHp(current.hp);
@@ -217,9 +170,9 @@ export default function Bosses() {
           if (result.won) {
             defeatBoss(current.id, current.loot.id, current.coins, current.xp); haptic.success(); setVictory(current);
           } else if (result.catFainted) {
-            haptic.error(); toast.error('Kotek padł! Spróbuj ponownie z nową energią.');
+            haptic.error(); toast.error('Kotek padł! Spróbuj ponownie.');
           } else {
-            haptic.warn(); toast.info('Boss przetrwał — spróbuj ponownie z nową energią.');
+            haptic.warn(); toast.info('Boss przetrwał — spróbuj ponownie.');
           }
         }, 500);
       }
@@ -230,9 +183,8 @@ export default function Bosses() {
   const doRaid = () => {
     if (raidDone) { haptic.tap(); toast.info('Raid tego tygodnia pokonany! Nowy w poniedziałek.'); return; }
     if (!raidUnlocked) { haptic.error(); toast.info('Raid odblokujesz na poziomie 3'); return; }
-    if (raidEnergy <= 0) { haptic.error(); toast.info('Brak energii raidu — zadbaj o siebie, by naładować cios'); return; }
-    const crit = Math.random() < bonuses.crit;
-    const damage = Math.round(raidEnergy * atkMultiplier(level, bonuses) * raidWeakMult * (crit ? 2 : 1));
+    if (raidEnergy <= 0) { haptic.error(); toast.info('Brak prób ataku raidu na dziś — wróć jutro po nowe.'); return; }
+    const { damage, crit } = computeDamage(atkStatBonus, level, bonuses);
     haptic.medium();
     setRaidHit({ dmg: damage, crit });
     rShake.setValue(0); rDmgY.setValue(0);
@@ -254,9 +206,8 @@ export default function Bosses() {
     if (!eventBoss || !eventKey) return;
     if (eventDone) { haptic.tap(); toast.info('Wydarzenie już pokonane w tym okresie!'); return; }
     if (!eventUnlocked) { haptic.error(); toast.info('Wydarzenia odblokujesz na poziomie 2'); return; }
-    if (eventEnergy <= 0) { haptic.error(); toast.info('Brak energii wydarzenia — zadbaj o siebie, by naładować cios'); return; }
-    const crit = Math.random() < bonuses.crit;
-    const damage = Math.round(eventEnergy * atkMultiplier(level, bonuses) * eventWeakMult * (crit ? 2 : 1));
+    if (eventEnergy <= 0) { haptic.error(); toast.info('Brak prób ataku wydarzenia na dziś — wróć jutro po nowe.'); return; }
+    const { damage, crit } = computeDamage(atkStatBonus, level, bonuses);
     haptic.medium();
     setEventHitFx({ dmg: damage, crit });
     eShake.setValue(0); eDmgY.setValue(0);
@@ -274,7 +225,7 @@ export default function Bosses() {
     }
   };
 
-  const previewDmg = current ? Math.round(energy * atkMultiplier(level, bonuses) * weaknessMult(current, wc)) : 0;
+  const previewDmg = current ? Math.round(atkPower(atkStatBonus, level, bonuses)) : 0;
   const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] });
   const popScale = pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
   const flashOp = flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.8] });
@@ -381,8 +332,8 @@ export default function Bosses() {
             </View>
             <Text style={s.bossName}>{current.name}</Text>
             <Text style={s.bossTaunt}>„{current.taunt}"</Text>
-            {lastHit?.guarded && <Text style={s.mechNote}>🛡️ Osłona: dziś nakarmiłeś bossa — cios ×0.5</Text>}
-            {!!lastHit?.healed && <Text style={s.mechNoteHeal}>🩹 Boss zregenerował +{lastHit.healed} (zaniedbanie: {current.weaknessLabel})</Text>}
+            {lastHit?.guarded && <Text style={s.mechNote}>🛡️ Osłona: ten boss redukuje ciosy ×0.5</Text>}
+            {!!lastHit?.healed && <Text style={s.mechNoteHeal}>🩹 Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text>}
 
             {/* HP bossa — pełne poza walką (resetuje się co próbę, karczma S&F); w trakcie
                 animacji rund pokazuje liveBossHp rundę-po-rundzie. */}
@@ -398,12 +349,12 @@ export default function Bosses() {
             {unlocked ? (
               <>
                 <View style={s.weakBox}>
-                  <Text style={s.weakTxt}>Słaby na: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text> · dziś ×{weaknessMult(current, wc).toFixed(2)}</Text>
-                  <Text style={s.previewTxt}>Twój cios: ~{Math.round(previewDmg / FIGHT_ROUNDS)} obrażeń/rundę × {FIGHT_ROUNDS} rundy (energia {energy})</Text>
+                  <Text style={s.weakTxt}>Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text></Text>
+                  <Text style={s.previewTxt}>Twój cios: ~{previewDmg} obrażeń/rundę × {FIGHT_ROUNDS} rundy · prób dziś: {energy}</Text>
                   {(current.guard || current.regenPct) && (
                     <Text style={s.mechHint}>
-                      {current.guard === 'sweets' ? '🛡️ dziś bez słodyczy — inaczej cios ×0.5. ' : current.guard === 'poorSleep' ? '🛡️ wyśpij się (7h+) — inaczej cios ×0.5. ' : ''}
-                      {current.regenPct ? '🩹 leczy się, gdy zaniedbasz jego słabość.' : ''}
+                      {current.guard ? '🛡️ ten boss ma wrodzoną osłonę — Twoje ciosy ×0.5. ' : ''}
+                      {current.regenPct ? '🩹 ten boss regeneruje się, gdy przeżyje rundę.' : ''}
                     </Text>
                   )}
                 </View>
@@ -439,7 +390,7 @@ export default function Bosses() {
                 <Text style={[s.rowEmoji, (def || lock) && { opacity: 0.5 }]}>{b.emoji}</Text>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
-                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.emoji} ${b.loot.name}` : lock ? `Poziom ${b.unlockLevel}` : `${b.hp} HP · słaby na ${b.weaknessLabel}`}</Text>
+                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.emoji} ${b.loot.name}` : lock ? `Poziom ${b.unlockLevel}` : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
                 </View>
                 {def ? <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
                   : lock ? <Lock size={15} color={c.text.muted} />
