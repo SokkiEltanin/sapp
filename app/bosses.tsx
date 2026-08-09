@@ -6,6 +6,7 @@ import { ChevronLeft, Zap, Lock, Check, Swords } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
+import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
 import {
@@ -322,7 +323,9 @@ export default function Bosses() {
           <View style={s.arena}>
             <View style={s.bossTop}>
               <View style={[s.aura, { backgroundColor: (WEAK_COLOR[current.weakness] ?? '#888') + '22', borderColor: (WEAK_COLOR[current.weakness] ?? '#888') + '55' }]} pointerEvents="none" />
-              <Animated.Text style={[s.bossEmoji, { transform: [{ translateX: shakeX }, { scale: popScale }] }]}>{current.emoji}</Animated.Text>
+              <Animated.View style={{ transform: [{ translateX: shakeX }, { scale: popScale }] }}>
+                <BossArt id={current.id} emoji={current.emoji} size={82} />
+              </Animated.View>
               <Animated.View pointerEvents="none" style={[s.hitFlash, { opacity: flashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
               {lastHit && (
                 <Animated.Text style={[s.dmgFloat, { opacity: floatOp, transform: [{ translateY: floatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
@@ -387,7 +390,9 @@ export default function Bosses() {
             const lock = !def && level < b.unlockLevel;
             return (
               <View key={b.id} style={[s.row, isCur && { borderColor: '#38BDF8' }]}>
-                <Text style={[s.rowEmoji, (def || lock) && { opacity: 0.5 }]}>{b.emoji}</Text>
+                <View style={(def || lock) && { opacity: 0.5 }}>
+                  <BossArt id={b.id} emoji={b.emoji} size={32} />
+                </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
                   <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.emoji} ${b.loot.name}` : lock ? `Poziom ${b.unlockLevel}` : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
@@ -450,7 +455,9 @@ export default function Bosses() {
           {victory && (
             <View style={s.vCenter} pointerEvents="none">
               <Text style={s.vKicker}>POKONANY!</Text>
-              <Text style={s.vBoss}>{victory.emoji}</Text>
+              <View style={{ opacity: 0.6 }}>
+                <BossArt id={victory.id} emoji={victory.emoji} size={78} />
+              </View>
               <Text style={s.vName}>{victory.name}</Text>
               <View style={s.vLoot}>
                 <Text style={s.vLootEmoji}>{victory.loot.emoji}</Text>
