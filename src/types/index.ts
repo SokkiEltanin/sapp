@@ -56,6 +56,7 @@ export interface Expense {
   bankMatched?: boolean;    // confirmed against / created from a bank notification
   vehicleId?: string;       // manual link to a vehicle (Pojazdy) — overrides tag/category auto-match
   paymentMethod?: PaymentMethod; // cash vs card; undefined treated as 'card'
+  viaScan?: boolean;        // added by pasting+parsing a receipt (expenses/scan.tsx), not typed
   createdAt: string;
   updatedAt: string;
 }

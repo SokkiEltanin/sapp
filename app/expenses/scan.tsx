@@ -468,6 +468,7 @@ export default function ScanReceiptModal() {
           ...(payer ? { payer } : {}),
           paymentMethod,
           receiptItems,
+          viaScan: true,   // "Za Kulisami" achievement — this receipt was pasted+parsed, not typed line-by-line
           createdAt: now,
           updatedAt: now,
         };

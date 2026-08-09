@@ -17,6 +17,10 @@ import { getHealthHistory } from '@/utils/healthHistory';
 import { getBudgets } from '@/utils/budgets';
 import { updateCardBalancePeak } from '@/utils/accountBalance';
 import { useCelebration } from '@/store/celebrationStore';
+import { usePetStore } from '@/store/petStore';
+import { getLastBackup } from '@/services/backupService';
+import { loadMerchantMemory } from '@/utils/merchantMemory';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AchCtx, buildAchCtx, evaluateAchievements, syncEarned, getEarned, EarnedMap,
   fmtProgress, AchState, AchGroup, TIER_COLOR, BAD_COLOR,
@@ -52,13 +56,35 @@ export default function Achievements() {
   useEffect(() => { getBudgets().then(b => setBudgetTotal(Object.values(b).reduce((s2, v) => s2 + (v ?? 0), 0))).catch(() => {}); }, []);
   useEffect(() => { updateCardBalancePeak(expenses).then(setCardPeak).catch(() => {}); }, [expenses]);
 
+  const [achFlags, setAchFlags] = useState({ bankCorrections: 0, statsVisits: 0, backupDone: false, selfTestClean: false, autoMerchantReached: false });
+  useEffect(() => {
+    (async () => {
+      const [bc, sv, backup, clean, mem] = await Promise.all([
+        AsyncStorage.getItem('ach_bank_corrections'),
+        AsyncStorage.getItem('ach_stats_visits'),
+        getLastBackup().catch(() => null),
+        AsyncStorage.getItem('ach_selftest_clean'),
+        loadMerchantMemory().catch(() => ({})),
+      ]);
+      setAchFlags({
+        bankCorrections: parseInt(bc ?? '0', 10) || 0,
+        statsVisits: parseInt(sv ?? '0', 10) || 0,
+        backupDone: !!backup,
+        selfTestClean: clean === 'true',
+        autoMerchantReached: Object.values(mem).some(m => m.auto),
+      });
+    })().catch(() => {});
+  }, []);
+
   const ctx = useMemo<AchCtx>(() => buildAchCtx({
     expenses, moodEntries, workEvents: [...events, ...gcalEvents], workSettings,
     habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
     healthDays, tasksDone: tasks.filter(t => t.status === 'done').length,
     budgetTotal, billTracked: subscriptions.some(sub => sub.active), cardBalancePeak: cardPeak,
     foodMeals, dishesCreated,
-  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions, cardPeak, foodMeals, dishesCreated]);
+    loginStreak: usePetStore.getState().loginStreak,
+    ...achFlags,
+  }), [expenses, moodEntries, events, gcalEvents, workSettings, habits, getStreak, healthDays, tasks, budgetTotal, subscriptions, cardPeak, foodMeals, dishesCreated, achFlags]);
 
   const celebrate = useCelebration(st => st.celebrate);
   const states = useMemo(() => evaluateAchievements(ctx), [ctx]);

@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
   PanResponder, Modal, TouchableOpacity,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import {
@@ -316,6 +317,13 @@ export default function CalendarTabScreen() {
   ).current;
 
   useEffect(() => { load(); checkGcal(); }, []);
+  // "Cichy Obserwator" achievement — counts mounts of this screen across app sessions
+  // (the screen stays mounted once visited, so this fires once per launch, not per tap).
+  useEffect(() => {
+    AsyncStorage.getItem('ach_stats_visits').then(v => {
+      AsyncStorage.setItem('ach_stats_visits', String((parseInt(v ?? '0', 10) || 0) + 1)).catch(() => {});
+    }).catch(() => {});
+  }, []);
 
   // Screens stay mounted (lazy:false), so a one-shot mount load goes stale once
   // you add an event/task elsewhere and come back. Re-fetch silently on focus

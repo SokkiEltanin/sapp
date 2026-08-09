@@ -97,6 +97,8 @@ import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout, isDu
 import { useUiActions } from '@/store/uiActions';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
+import { getLastBackup } from '@/services/backupService';
+import { loadMerchantMemory } from '@/utils/merchantMemory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame, { streakColor, streakTier } from '@/components/counters/StreakFlame';
@@ -1699,6 +1701,30 @@ export default function DashboardScreen() {
     })(),
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
 
+  // Achievements — AsyncStorage-backed signals the badge counters need (bank
+  // corrections, stats visits, self-test/backup flags, auto-merchant graduation).
+  // Reloaded on focus so e.g. accepting a bank correction elsewhere shows up here
+  // without needing a full app restart.
+  const [achFlags, setAchFlags] = useState({ bankCorrections: 0, statsVisits: 0, backupDone: false, selfTestClean: false, autoMerchantReached: false });
+  useFocusEffect(useCallback(() => {
+    (async () => {
+      const [bc, sv, backup, clean, mem] = await Promise.all([
+        AsyncStorage.getItem('ach_bank_corrections'),
+        AsyncStorage.getItem('ach_stats_visits'),
+        getLastBackup().catch(() => null),
+        AsyncStorage.getItem('ach_selftest_clean'),
+        loadMerchantMemory().catch(() => ({})),
+      ]);
+      setAchFlags({
+        bankCorrections: parseInt(bc ?? '0', 10) || 0,
+        statsVisits: parseInt(sv ?? '0', 10) || 0,
+        backupDone: !!backup,
+        selfTestClean: clean === 'true',
+        autoMerchantReached: Object.values(mem).some(m => m.auto),
+      });
+    })().catch(() => {});
+  }, []));
+
   // Achievements — evaluate against live data so a newly-earned badge fires a
   // toast + haptic the moment you land on the dashboard (the ADHD dopamine hit).
   const achStates = useMemo(() => evaluateAchievements(buildAchCtx({
@@ -1708,7 +1734,9 @@ export default function DashboardScreen() {
     budgetTotal: Object.values(budgets).reduce((s2, v) => s2 + (v ?? 0), 0),
     billTracked: subscriptions.some(sb => sb.active), cardBalancePeak: cardPeak,
     foodMeals, dishesCreated,
-  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions, cardPeak, foodMeals, dishesCreated]);
+    loginStreak: usePetStore.getState().loginStreak,
+    ...achFlags,
+  })), [expenses, moodEntries, allEvents, workSettings, habits, getStreak, healthDays, tasks, budgets, subscriptions, cardPeak, foodMeals, dishesCreated, achFlags]);
   const earnedBadges = useMemo(() => achStates.filter(st => st.unlocked && st.a.kind !== 'bad').length, [achStates]);
   const celebrate = useCelebration(st => st.celebrate);
   useEffect(() => {

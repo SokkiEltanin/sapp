@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Check, X, Landmark, Zap, Sparkles, AlertTriangle } from 'lucide-react-native';
@@ -44,6 +45,12 @@ export default function BankReview() {
     }
     haptic.success();
     const corrected = p.category !== p.suggestedCategory; // reader guessed wrong → don't reward trust
+    if (corrected) {
+      // "Prostuję Zeznania" achievement — counts how many times the parser guessed wrong.
+      AsyncStorage.getItem('ach_bank_corrections').then(v => {
+        AsyncStorage.setItem('ach_bank_corrections', String((parseInt(v ?? '0', 10) || 0) + 1)).catch(() => {});
+      }).catch(() => {});
+    }
     const res = await commitBankTx(p, { corrected, plnOverride });
     if (!res.ok) { toast.error('Nie udało się dodać'); return; }
     const saved = foreign ? plnOverride! : p.amount;   // what actually landed in the summary

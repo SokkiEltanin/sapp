@@ -51,6 +51,32 @@ export interface AchCtx {
   foodDaysLogged: number;    // distinct days with ≥1 meal logged
   foodLogStreak: number;     // consecutive days (→ today) with a meal logged
   dishesCreated: number;     // own dishes/recipes saved to the library
+
+  // ── bagesv2 batch (2026-08-09) — see memory backlog_2026-08-07 ──
+  distinctProduceAllTime: number;  // distinct fruit/veg KINDS ever bought (by keyword, not raw name)
+  maxDailyProduceVariety: number;  // most distinct fruit/veg kinds bought in one day
+  produceVarietyStreak: number;    // consecutive days (→ today) with ≥5 distinct fruit/veg kinds
+  fishItems: number;               // fish/seafood purchases (occurrences, like japanItems)
+  fishWeekMaxKg: number;           // most kg of fish in any rolling 7-day window
+  monthsUnderBudgetStreak: number; // consecutive CLOSED months under budget (trailing)
+  monthWithinBudgetBand: boolean;  // any closed month landed within ±5% of budget
+  selfTransferCount: number;       // COUNT of self-transfer transactions (not their sum)
+  depositItemsReturned: number;    // receipt items with kind 'deposit' (kaucja)
+  pirateTreasure: boolean;         // saver-1000 + fat-wallet + under-limit all true at once
+  moodMastery: boolean;            // chronicler + full-range + statue(30) + moodBounceBack all true
+  moodBounceBack: boolean;         // a day with mood ≤2 immediately followed by a day with mood ≥4
+  bankCorrections: number;         // times you fixed the bank-notification parser's category guess
+  autoMerchantReached: boolean;    // at least one merchant graduated to bank auto-accept
+  scannedReceipts: number;         // expenses added via "Wklej paragon" (parsed), not typed
+  statsVisits: number;             // app-session visits to the stats/calendar tab
+  backupDone: boolean;             // a cloud backup or restore has ever succeeded
+  selfTestClean: boolean;          // Ustawienia → self-test passed with 0 errors, at least once
+  loginStreak: number;             // consecutive days (→ today) the app was opened (petStore)
+  agsDayEver: boolean;             // ANY day ever with >2 distinct non-staple purchases ("AGŚ")
+  agsEdgeDayEver: boolean;         // ANY day ever with EXACTLY 2 distinct non-staple purchases
+  agsDaysThisMonthMax: number;     // most AGŚ-days seen within any single month
+  agsMonthStreak: number;          // consecutive months (trailing) with ≥1 AGŚ-day
+  cleanMonthNoAgs: boolean;        // any CLOSED month with zero AGŚ-days
 }
 
 export type AchGroup = 'Nawyki' | 'Jedzenie' | 'Oszczędzanie' | 'Praca' | 'Nastrój' | 'Zdrowie' | 'Konsekwencja' | 'Życie' | 'Legendy' | 'Grzeszki';
@@ -73,151 +99,243 @@ export const TIER_COLOR: Record<Tier, string> = { 1: '#CD7F32', 2: '#C4CAD4', 3:
 export const BAD_COLOR = '#E5484D';
 
 export const ACHIEVEMENTS: Achievement[] = [
-  // ── Start / Konsekwencja (custom icons) ──
-  { id: 'first-key', title: 'Pierwszy klucz', desc: 'Pierwszy zalogowany wydatek', group: 'Konsekwencja', tier: 1, target: 1,
-    lore: 'Klucz do skarbca Twoich finansów. Pierwszy wpis go przekręca — bez niego cała reszta statystyk pozostaje zamknięta na głucho.', value: c => c.receiptsCount >= 1 ? 1 : 0 },
-  { id: 'scanner',   title: 'Skaner',         desc: '50 zalogowanych wydatków',     group: 'Konsekwencja', tier: 2, target: 50, unit: '×',
-    lore: 'Odcisk palca jest niepowtarzalny — jak Twój wzorzec wydatków. Po 50 paragonach apka rozpoznaje Twoje nawyki na pierwszy „skan".', value: c => c.receiptsCount },
-  { id: 'groceries-100', title: 'Zakupowicz', desc: '100 zalogowanych wydatków',    group: 'Konsekwencja', tier: 3, target: 100, unit: '×',
-    lore: 'Ta torba już się nie domyka. 100 wpisów dźwiganych jak weteran działu spożywczego — znasz każdą alejkę na pamięć.', value: c => c.receiptsCount },
-  { id: 'on-track',  title: 'Na kursie',      desc: '7 dni z rzędu coś zalogowane', group: 'Konsekwencja', tier: 2, target: 7, unit: 'dni',
-    lore: 'Kompas nie gubi północy. Tydzień bez ani jednego pominiętego dnia — trzymasz kurs nawet, gdy łatwiej byłoby zboczyć.', value: c => c.logStreak },
-  { id: 'loyal',     title: 'Wierny',         desc: '30 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 3, target: 30, unit: 'dni',
-    lore: 'Inne apki dawno skamieniały na ekranie jak ta prehistoryczna czaszka. Ty zostałeś — okaz wytrwałości godny muzeum.', value: c => c.activeDays },
-  { id: 'goal-set',  title: 'Wyznaczony cel', desc: 'Ustawiony pierwszy budżet',    group: 'Konsekwencja', tier: 1, target: 1,
-    lore: 'Drogowskaz na finansowym rozstaju. Ustawiłeś budżet — od teraz wiadomo, dokąd naprawdę zmierzają Twoje pieniądze.', value: c => c.hasBudget ? 1 : 0 },
-  { id: 'first-week', title: 'Świeżo wyklute', desc: '7 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 1, target: 7, unit: 'dni',
-    lore: 'Coś się właśnie wykluło z jaja. Pierwszy tydzień za Tobą — Twoja przygoda z apką dopiero rozprostowuje łapki.', value: c => c.activeDays },
-
-  // ── Nastrój (custom icons) ──
-  { id: 'sunny-week', title: 'Słoneczny tydzień', desc: '7 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 2, target: 7, unit: 'dni',
-    lore: 'Wewnętrzne słońce nie zaszło ani razu przez cały tydzień. Siedem dni pogody ducha — świeć dalej.', value: c => c.goodMoodStreak },
-  { id: 'self-care',  title: 'Dbam o siebie',     desc: '30 dni z wpisem nastroju',  group: 'Nastrój', tier: 2, target: 30, unit: 'dni',
-    lore: 'Serce nie tylko bije — Ty go słuchasz. Przez 30 dni sprawdzałeś, jak naprawdę się czujesz. To jest troska.', value: c => c.moodDays },
-  { id: 'full-range', title: 'Pełnia emocji',     desc: 'Zalogowane wszystkie nastroje 1–5', group: 'Nastrój', tier: 1, target: 5, unit: '/5',
-    lore: 'Komedia i tragedia, i wszystko pomiędzy. Zagrałeś pełną gamę masek — prawdziwy teatr jednego aktora.', value: c => c.moodLevelsSeen },
-  { id: 'chronicler', title: 'Kronikarz',         desc: '60 dni z wpisem nastroju',  group: 'Nastrój', tier: 3, target: 60, unit: 'dni',
-    lore: 'Twój nastrój ma już własny zwój kroniki. 60 wpisów spisanych jak starożytny papirus — historia jednej duszy.', value: c => c.moodDays },
-  { id: 'zen', title: 'Rozkwit', desc: '14 dni z rzędu nastrój ≥ 4', group: 'Nastrój', tier: 3, target: 14, unit: 'dni',
-    lore: 'Dwa tygodnie pogody ducha i wewnętrzna róża rozkwitła. Nawet kolce zamieniły się w płatki.', value: c => c.goodMoodStreak },
-  { id: 'poker-face', title: 'Poker Face', desc: '7 dni z rzędu nastrój dokładnie 3', group: 'Nastrój', tier: 1, target: 7, unit: 'dni',
-    lore: 'Ani wzlotów, ani upadków — kamienna twarz przez cały tydzień. Krupier nie odczytałby z niej nic. Może czas coś poczuć?', value: c => c.neutralMoodStreak },
-
-  // ── Zdrowie / Praca (custom icons) ──
-  { id: 'marathon', title: 'Maraton dnia', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków',
-    lore: 'Te trekkingowe buty dziś zarobiły na odpoczynek. 10 000 kroków — Twój prywatny maraton bez mety.', value: c => c.bestStepsDay },
-  { id: 'well-rested', title: 'Wyspany', desc: '7 nocy z rzędu snu ≥ 7 h', group: 'Zdrowie', tier: 2, target: 7, unit: 'nocy',
-    lore: 'Siedem nocy pod miękką kołdrą, każda po pełne 7 godzin. Zzz… Twój mózg dziękuje za regenerację.', value: c => c.goodSleepStreak },
-  { id: 'doer',     title: 'Wykonawca',    desc: '25 ukończonych zadań',        group: 'Praca',   tier: 2, target: 25, unit: '×',
-    lore: 'Nie odkładasz — naciskasz przycisk i robisz. Klik. Zrobione. 25 razy palec wylądował na „wykonaj".', value: c => c.tasksDone },
-  { id: 'tasks-50', title: 'Listoholik',   desc: '50 ukończonych zadań',        group: 'Praca',   tier: 3, target: 50, unit: '×',
-    lore: 'Odhaczasz szybciej, niż zdążysz dopisać. 50 zadań przekreślonych na liście — ptaszek za ptaszkiem.', value: c => c.tasksDone },
-
-  // ── Oszczędzanie (justice-scale custom + lucide) ──
-  { id: 'balanced',   title: 'W równowadze', desc: 'Miesiąc na plusie (przychód ≥ wydatki)', group: 'Oszczędzanie', tier: 2, target: 1,
-    lore: 'Szala przychodów przeważyła wydatki. Waga sprawiedliwości tym razem po Twojej stronie — miesiąc na plusie.', value: c => c.balancedMonth ? 1 : 0 },
-  { id: 'under-limit', title: 'Pod limitem',  desc: 'Miesiąc zamknięty pod budżetem', group: 'Oszczędzanie', tier: 2, target: 1,
-    lore: 'Znak ograniczenia był po Twojej stronie. Zwolniłeś w porę i zmieściłeś się w budżecie — zero mandatu.', value: c => c.monthUnderBudget ? 1 : 0 },
-  { id: 'power-saver', title: 'Oszczędny prąd', desc: 'Rachunek za prąd ≥20% pod średnią', group: 'Oszczędzanie', tier: 2, target: 1,
-    lore: 'Zgaszone światła, wyłączone czuwanie. Twój ostatni rachunek za prąd spadł grubo pod średnią — licznik zwolnił, portfel odetchnął.', value: c => c.cutElectricity ? 1 : 0 },
-  { id: 'fat-wallet', title: 'Gruby portfel', desc: 'Saldo karty przekroczyło 5 000 zł (rekord)', group: 'Oszczędzanie', tier: 3, target: 5000, unit: 'zł',
-    lore: 'Worek pełen po brzegi. Na koncie zabłysło ponad 5 000 zł — a licznik pokazuje Twój życiowy rekord grubości portfela.', value: c => c.cardBalancePeak },
-  { id: 'saver-1000', title: 'Tysiąc',       desc: 'Łącznie 1 000 zł odłożone',  group: 'Oszczędzanie', tier: 1, target: 1000,  unit: 'zł',
-    lore: 'Pierwszy tysiąc odłożony do koperty. Banknot z sercem — bo odkładanie na siebie to najczystsza forma dbania o przyszłość.', value: c => c.savingsTotal },
-  { id: 'saver-5000', title: 'Poduszka',     desc: 'Łącznie 5 000 zł odłożone',  group: 'Oszczędzanie', tier: 2, target: 5000,  unit: 'zł',
-    lore: 'Stos monet urósł w miękką poduszkę bezpieczeństwa. 5 000 zł — na takiej poduszce śpi się spokojniej.', value: c => c.savingsTotal },
-  { id: 'saver-10000',title: 'Forteca',      desc: 'Łącznie 10 000 zł odłożone', group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł',
-    lore: 'Szlachetny kamień w Twoim skarbcu. 10 000 zł — twarde jak rubin i tak samo trudne do skruszenia.', value: c => c.savingsTotal },
-
-  // ── Loyalty / brand (custom) ──
-  { id: 'loyal-heart', title: 'Z sercem', desc: '60 aktywnych dni — apka to nawyk', group: 'Konsekwencja', tier: 3, target: 60, unit: 'dni',
-    lore: 'Medal z sercem w środku. Nie chodzi już o obowiązek — wracasz z sentymentu. Wy dwoje: związek na medal.', value: c => c.activeDays },
-
-  // ── Lucide-only (no custom icon yet) ──
-  { id: 'habit-streak-7',  title: 'Tydzień mocy', desc: '7 dni nawyku z rzędu',  group: 'Nawyki', tier: 2, target: 7,  unit: 'dni',
-    lore: 'Kaktus nie potrzebuje wiele, by przetrwać i rosnąć każdego dnia. Tydzień nawyku — Ty też kwitniesz na uporze.', value: c => c.habitBestStreak },
-  { id: 'habit-streak-30', title: 'Żelazna wola', desc: '30 dni nawyku z rzędu', group: 'Nawyki', tier: 3, target: 30, unit: 'dni',
-    lore: 'Z małego pnia wystrzelił pęd. 30 dni i nawyk zakorzenił się na dobre — teraz to część Ciebie.', value: c => c.habitBestStreak },
-  { id: 'no-junk-7',  title: 'Tydzień fit', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
-    lore: 'Siedem dni i ani jednego cukrowego poślizgu. Twój organizm przybija Ci piątkę.', value: c => c.noJunkStreak },
-
-  // ── Liczenie kalorii (nowe — ikony do podmiany na własne PNG) ──
-  { id: 'first-bite', title: 'Pierwszy kęs', desc: 'Zalogowany pierwszy posiłek', group: 'Jedzenie', tier: 1, target: 1,
-    lore: 'Widelec wbity w pierwszy zapisany posiłek. Liczenie kalorii właśnie się zaczęło — reszta to już tylko powtórki.', value: c => c.mealsLogged >= 1 ? 1 : 0 },
-  { id: 'kcal-week', title: 'Tydzień pod kontrolą', desc: '7 dni z rzędu z zapisanym jedzeniem', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
-    lore: 'Siedem dni bez luki w dzienniku jedzenia. Wiesz dokładnie, co wjechało na talerz — i to widać.', value: c => c.foodLogStreak },
-  { id: 'kcal-month', title: 'Miesiąc świadomości', desc: '30 dni z zapisanym jedzeniem', group: 'Jedzenie', tier: 3, target: 30, unit: 'dni',
-    lore: 'Trzydzieści dni liczenia — jedzenie nie ma już przed Tobą tajemnic. Każdy gram policzony, każda kaloria znana.', value: c => c.foodDaysLogged },
-  { id: 'meals-100', title: 'Setka posiłków', desc: '100 zapisanych posiłków', group: 'Jedzenie', tier: 2, target: 100, unit: '×',
-    lore: 'Sto posiłków w dzienniku. Talerz za talerzem złożyły się w solidny nawyk — apka zna już Twój apetyt na pamięć.', value: c => c.mealsLogged },
-  { id: 'home-chef', title: 'Domowy kucharz', desc: 'Zapisany pierwszy własny przepis / danie', group: 'Jedzenie', tier: 1, target: 1,
-    lore: 'Fartuch założony, danie zważone, kalorie policzone. Gotujesz po swojemu — i wiesz dokładnie, ile to ma.', value: c => c.dishesCreated >= 1 ? 1 : 0 },
-  { id: 'meal-prepper', title: 'Meal prep', desc: '5 własnych dań w bibliotece', group: 'Jedzenie', tier: 2, target: 5, unit: 'dań',
-    lore: 'Pięć autorskich dań na półce. Naleśniki, puree, ciasto — masz własną książkę kucharską z kaloriami w komplecie.', value: c => c.dishesCreated },
-  { id: 'work-100h',  title: 'Maszyna',     desc: 'Łącznie 100 h pracy',        group: 'Praca', tier: 2, target: 100, unit: 'h',
-    lore: 'Pracujesz jak dobrze naoliwiony mechanizm — bez zacięć, bez postoju. 100 godzin na liczniku maszyny.', value: c => c.workHoursTotal },
-  { id: 'work-1000h', title: 'Weteran',     desc: 'Łącznie 1 000 h pracy',      group: 'Praca', tier: 3, target: 1000, unit: 'h',
-    lore: 'Tysiąc godzin za sobą. Grafik nie ma już przed Tobą tajemnic — jesteś weteranem z odznaczeniami za wysługę.', value: c => c.workHoursTotal },
-  { id: 'payday-first', title: 'Pierwsza wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1,
-    lore: 'Pierwszy banknot wpadł do systemu. Od teraz apka wie, ile realnie zarabiasz — i pilnuje reszty.', value: c => c.paydayLogged ? 1 : 0 },
-
-  // ── Życie (styl życia, konsumpcja) ──
-  { id: 'traveler', title: 'Podróżnik', desc: '5 przejazdów pociągiem', group: 'Życie', tier: 2, target: 5, unit: '×',
-    lore: 'Bilet skasowany, peron za peronem. PKP, Intercity, Koleo — świat jest Twoją siecią połączeń, a Ty jej stałym pasażerem.', value: c => c.trainTrips },
-  { id: 'otaku', title: 'Otaku', desc: 'Kupiony japoński produkt (matcha, mochi, sushi…)', group: 'Życie', tier: 1, target: 1,
-    lore: 'Matcha, mochi, kawałek sushi. Wpuściłeś do koszyka kawałek Kraju Kwitnącej Wiśni — 日本 na Twoim paragonie.', value: c => c.japanItems },
-  { id: 'carnivore', title: 'Drapieżnik', desc: '3 kg mięsa w jednym tygodniu', group: 'Życie', tier: 2, target: 3, unit: 'kg',
-    lore: 'Kły wyszczerzone, karta w dłoni. 3 kg mięsa w tydzień — dział mięsny drży, gdy wchodzisz do sklepu.', value: c => c.meatWeekMaxKg },
-  { id: 'butcher', title: 'Rzeźnik', desc: '5 kg mięsa w jednym tygodniu', group: 'Życie', tier: 3, target: 5, unit: 'kg',
-    lore: 'Nóż naostrzony, apetyt nienasycony. 5 kg mięsa w siedem dni — to już nie dieta, to rzeźnia domowa.', value: c => c.meatWeekMaxKg },
-  { id: 'alchemist', title: 'Alchemik', desc: 'Wydatki w 6 różnych kategoriach', group: 'Życie', tier: 2, target: 6, unit: '/6',
-    lore: 'Miksujesz kategorie jak eliksiry w kotle. Sześć różnych żywiołów wydatków — prawdziwy mistrz finansowej magii.', value: c => c.distinctCategories },
-  { id: 'unplugged', title: 'Wyluzowany', desc: '3 dni z rzędu bez żadnego wydatku', group: 'Życie', tier: 2, target: 3, unit: 'dni',
-    lore: 'Telefon w kieszeni, portfel zamknięty. Trzy dni bez ani jednego wydatku — cyfrowy i finansowy detoks w jednym.', value: c => c.noSpendStreak },
-
-  // ── Legendy (tier 4 — rzadkie, trudne) ──
-  { id: 'legend-saver', title: 'Legenda oszczędzania', desc: '25 000 zł odłożone',        group: 'Legendy', tier: 4, target: 25000, unit: 'zł',
-    lore: 'To już nie poduszka — to skarbiec pełen klejnotów. 25 000 zł, na które smoki patrzą z zazdrością.', value: c => c.savingsTotal },
-  { id: 'centurion',    title: 'Centurion',            desc: '100 dni z rzędu w aplikacji', group: 'Legendy', tier: 4, target: 100, unit: 'dni',
-    lore: 'Sto dni w szyku bez jednej wyrwy. Rzymski legionista salutuje — dyscyplina godna dowódcy setki.', value: c => c.logStreak },
-  { id: 'unbreakable',  title: 'Nieugięty',            desc: '100 dni nawyku z rzędu',      group: 'Legendy', tier: 4, target: 100, unit: 'dni',
-    lore: 'Sto dni tego samego nawyku. Nie ma siły, która to złamie — diament ukuty pod presją czasu.', value: c => c.habitBestStreak },
-  { id: 'year-one',     title: 'Rok z aplikacją',      desc: '365 aktywnych dni',           group: 'Legendy', tier: 4, target: 365, unit: 'dni',
+  // ══════════════════════════════════════════════════════════════════════════
+  // LEGENDY (tier 4 — rzadkie, trudne)
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'year-one', title: 'Rok z Aplikacją', desc: '365 aktywnych dni', group: 'Legendy', tier: 4, target: 365, unit: 'dni',
     lore: 'Pełne okrążenie Słońca razem. 365 dni — rocznica, na którą zasłużyliście oboje.', value: c => c.activeDays },
-  { id: 'clean-month',  title: 'Czysty miesiąc',       desc: '30 dni z rzędu bez słodyczy', group: 'Legendy', tier: 4, target: 30, unit: 'dni',
-    lore: 'Trzydzieści dni bez grama cukru. Detoks zaliczony — organizm lśni jak nowy.', value: c => c.noJunkStreak },
-  { id: 'ultra-walk',   title: 'Ultramaraton',         desc: '20 000 kroków w jeden dzień', group: 'Legendy', tier: 4, target: 20000, unit: 'kroków',
-    lore: '20 000 kroków w jeden dzień. Nogi mają pełne prawo złożyć wypowiedzenie — a Ty i tak idziesz dalej.', value: c => c.bestStepsDay },
-  { id: 'titan',        title: 'Tytan pracy',          desc: '5 000 h pracy łącznie',       group: 'Legendy', tier: 4, target: 5000, unit: 'h',
-    lore: 'Atlas dźwigał niebo, Ty dźwigasz grafik. 5 000 godzin — praca godna tytana, mierzona w latach, nie tygodniach.', value: c => c.workHoursTotal },
+  { id: 'fossil-300', title: 'Skamielina', desc: '300 aktywnych dni w aplikacji', group: 'Legendy', tier: 4, target: 300, unit: 'dni',
+    lore: 'Inne apki dawno skamieniały na ekranie — ta przetrwała.', value: c => c.activeDays },
+  { id: 'legend-saver', title: 'Legenda Oszczędzania', desc: '25 000 zł odłożone', group: 'Legendy', tier: 4, target: 25000, unit: 'zł',
+    lore: 'Miecz, na który smoki patrzą z zazdrością.', value: c => c.savingsTotal },
+  { id: 'unbreakable', title: 'Nieugięty', desc: '100 dni tego samego nawyku z rzędu', group: 'Legendy', tier: 4, target: 100, unit: 'dni',
+    lore: 'Nie ma siły, która by to złamała.', value: c => c.habitBestStreak },
+  { id: 'centurion', title: 'Centurion', desc: '100 dni z rzędu w aplikacji', group: 'Legendy', tier: 4, target: 100, unit: 'dni',
+    lore: 'Legionista salutuje — dyscyplina godna dowódcy setki.', value: c => c.logStreak },
+  { id: 'clean-month', title: 'Czysty Miesiąc', desc: '30 dni z rzędu bez słodyczy', group: 'Legendy', tier: 4, target: 30, unit: 'dni',
+    lore: 'Cytrusowy detoks zaliczony — organizm lśni jak nowy.', value: c => c.noJunkStreak },
+  { id: 'cyborg-365', title: 'To Już Nie Człowiek To Maszyna', desc: '365 dni tego samego nawyku z rzędu', group: 'Legendy', tier: 4, target: 365, unit: 'dni',
+    lore: 'Gratulacje człowieku... maszyno? Za rok wytrwałości.', value: c => c.habitBestStreak },
 
-  // ── Grzeszki (anti-achievements, custom icons) ──
-  { id: 'crime-scene', title: 'Miejsce zbrodni',   desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad',
-    lore: 'Kredowy obrys, taśma policyjna i portfel w roli ofiary. Budżet padł, a wszyscy wiemy, kto pociągnął za spust.', value: c => Math.round(c.overBudgetPct * 100) },
-  { id: 'undead',      title: 'Żywy trup',         desc: '3 noce z rzędu sen poniżej 5 h',  group: 'Grzeszki', tier: 1, target: 3, unit: 'noce', kind: 'bad',
-    lore: 'Trzy noce po niecałe 5 h snu. Chodzisz, mrugasz, mówisz — ale to już nie życie, to tryb zombie. Idź spać.', value: c => c.badSleepStreak },
-  { id: 'bottomless',  title: 'Bezdenny żołądek',  desc: '5 dni z rzędu ze słodyczami',     group: 'Grzeszki', tier: 1, target: 5, unit: 'dni', kind: 'bad',
-    lore: 'Pięć dni cukru z rzędu. Twój żołądek to czarna dziura na słodycze — nic z niej nie ucieka.', value: c => c.junkStreak },
-  { id: 'sweet-tooth', title: 'Słodki ząb',        desc: '15 zakupów słodyczy w miesiącu',  group: 'Grzeszki', tier: 1, target: 15, unit: '×', kind: 'bad',
-    lore: 'Piętnasty słodki zakup w miesiącu. Ten pączek ma już Twoje imię wygrawerowane na lukrze.', value: c => c.junkPurchasesMonth },
-  { id: 'fast-food',   title: 'Fast food',         desc: '5 razy fast food / pizza',        group: 'Grzeszki', tier: 1, target: 5, unit: '×', kind: 'bad',
-    lore: 'Piąta pizza w drodze. Kurier zna Twój adres lepiej niż listonosz — i macha Ci już na dzień dobry.', value: c => c.fastFoodCount },
-  { id: 'red-light',   title: 'Czerwone światło',  desc: 'Przekroczony budżet miesiąca',    group: 'Grzeszki', tier: 1, target: 100, unit: '%', kind: 'bad',
-    lore: 'Budżet krzyczał STOP, Ty wcisnąłeś gaz do dechy. Mandat wystawiony — płaci portfel.', value: c => Math.round(c.overBudgetPct * 100) },
-  { id: 'panic',       title: 'Panikarz',          desc: 'Zakupy za 300+ zł w jeden dzień', group: 'Grzeszki', tier: 1, target: 300, unit: 'zł', kind: 'bad',
-    lore: 'Ponad 300 zł w jeden dzień. Tryb pandemicznego chomika włączony — brakuje już tylko wieży z papieru toaletowego.', value: c => c.maxDaySpend },
-  { id: 'grumpy',      title: 'Zrzęda',            desc: '3 dni z rzędu nastrój ≤ 2',       group: 'Grzeszki', tier: 1, target: 3, unit: 'dni', kind: 'bad',
-    lore: 'Trzy dni z tą samą naburmuszoną miną. Chmura gradowa zawisła nad głową — może pora coś z tym zrobić?', value: c => c.lowMoodStreak },
-  { id: 'rollercoaster', title: 'Rollercoaster',  desc: 'W tygodniu nastrój od ≤2 do ≥4',   group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
-    lore: 'W jednym tygodniu z piekła w niebo i z powrotem. Emocjonalny rollercoaster bez pasów — trzymaj się, robi się wyboiście.', value: c => c.moodSwing7 ? 1 : 0 },
-  { id: 'chemist',     title: 'Chemik',            desc: '10 słodkich napojów w miesiącu',   group: 'Grzeszki', tier: 1, target: 10, unit: '×', kind: 'bad',
-    lore: 'Kolorowe mikstury zamiast wody z filtra. 10 dziwnych napojów w miesiąc — Twój organizm zasługuje na coś prostszego niż H₂O++.', value: c => c.drinkPurchasesMonth },
-  { id: 'high-roller', title: 'Hazardzista',       desc: 'Pojedynczy zakup za 1000+ zł',     group: 'Grzeszki', tier: 1, target: 1000, unit: 'zł', kind: 'bad',
-    lore: 'Postawiłeś wszystko na jedną kartę — jeden zakup za ponad tysiaka. Va banque! Miejmy nadzieję, że było warto.', value: c => c.maxSinglePurchase },
-  { id: 'va-banque',   title: 'Va banque',         desc: 'Zakup u bukmachera / na lotto',    group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
-    lore: 'Kości rzucone, los kupiony. Fortuna kołem się toczy — a Ty właśnie oddałeś jej stery nad swoim portfelem.', value: c => c.bettingBought ? 1 : 0 },
-  { id: 'jester',      title: 'Błazen',            desc: '8 osobnych zakupów w jeden dzień', group: 'Grzeszki', tier: 1, target: 8, unit: '×', kind: 'bad',
-    lore: 'Osiem transakcji w jeden dzień — kup tu, kliknij tam, żonglujesz paragonami jak dworski błazen piłeczkami.', value: c => c.maxTxPerDay },
+  // ══════════════════════════════════════════════════════════════════════════
+  // NAWYKI
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'habit-streak-30', title: 'Dyscyplina Miecza', desc: '30 dni nawyku z rzędu', group: 'Nawyki', tier: 3, target: 30, unit: 'dni',
+    lore: 'Codzienna praktyka, bez wyjątków.', value: c => c.habitBestStreak },
+  { id: 'habit-streak-7', title: 'Tydzień Mocy', desc: '7 dni nawyku z rzędu', group: 'Nawyki', tier: 2, target: 7, unit: 'dni',
+    lore: 'Tydzień nawyku — kwitniesz na uporze.', value: c => c.habitBestStreak },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // JEDZENIE
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'first-bite', title: 'Pierwszy Kęs', desc: 'Zalogowany pierwszy posiłek', group: 'Jedzenie', tier: 1, target: 1,
+    lore: 'Liczenie kalorii właśnie się zaczęło.', value: c => c.mealsLogged >= 1 ? 1 : 0 },
+  { id: 'kcal-week', title: 'Tydzień Pod Kontrolą', desc: '7 dni z rzędu z zapisanym jedzeniem', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
+    lore: 'Siedem dni bez luki w dzienniku jedzenia. Wiesz dokładnie, co wjechało na talerz.', value: c => c.foodLogStreak },
+  { id: 'kcal-month', title: 'Miesiąc Świadomości', desc: '30 dni z zapisanym jedzeniem', group: 'Jedzenie', tier: 3, target: 30, unit: 'dni',
+    lore: 'Jedzenie nie ma już przed Tobą tajemnic.', value: c => c.foodDaysLogged },
+  { id: 'meals-100', title: 'Setka Posiłków', desc: '100 zapisanych posiłków', group: 'Jedzenie', tier: 2, target: 100, unit: '×',
+    lore: 'Talerz za talerzem złożyły się w solidny nawyk — apka zna już Twój apetyt na pamięć.', value: c => c.mealsLogged },
+  { id: 'meal-prepper', title: 'Meal Prep', desc: '5 własnych dań w bibliotece', group: 'Jedzenie', tier: 2, target: 5, unit: 'dań',
+    lore: 'Masz już własną książkę kucharską z kaloriami w komplecie.', value: c => c.dishesCreated },
+  { id: 'home-chef', title: 'Domowy Kucharz', desc: 'Zapisany pierwszy własny przepis', group: 'Jedzenie', tier: 1, target: 1,
+    lore: 'Gotujesz po swojemu — i wiesz dokładnie, ile to ma.', value: c => c.dishesCreated >= 1 ? 1 : 0 },
+  { id: 'no-junk-7', title: 'Cierpliwość Bonsai', desc: '7 dni z rzędu bez słodyczy', group: 'Jedzenie', tier: 2, target: 7, unit: 'dni',
+    lore: 'Małe, systematyczne przycinanie nawyku.', value: c => c.noJunkStreak },
+  { id: 'veg-variety', title: 'Warzywniak', desc: '20 różnych warzyw i owoców zalogowanych', group: 'Jedzenie', tier: 3, target: 20, unit: 'rodzajów',
+    lore: 'Tęczowy talerz, nie tylko ziemniaki.', value: c => c.distinctProduceAllTime },
+  { id: 'five-a-day', title: 'Pięć Porcji', desc: '5 różnych warzyw/owoców jednego dnia', group: 'Jedzenie', tier: 1, target: 5, unit: '/dzień',
+    lore: 'Talerz, który dietetyk by przybił piątką.', value: c => c.maxDailyProduceVariety },
+  { id: 'produce-week', title: 'Owocowy Tydzień', desc: '„5 porcji dziennie" 7 dni z rzędu', group: 'Jedzenie', tier: 3, target: 7, unit: 'dni',
+    lore: 'Nie jednorazowo — tydzień w tydzień.', value: c => c.produceVarietyStreak },
+  { id: 'fish-menu', title: 'Rybne Menu', desc: 'Pierwszy zalogowany produkt rybny', group: 'Jedzenie', tier: 1, target: 1,
+    lore: 'Coś innego niż kurczak dla odmiany.', value: c => c.fishItems >= 1 ? 1 : 0 },
+  { id: 'fish-master', title: 'Mistrz Wędki', desc: '5 kg ryb w jednym tygodniu', group: 'Jedzenie', tier: 2, target: 5, unit: 'kg',
+    lore: 'Dział rybny zna Cię z imienia.', value: c => c.fishWeekMaxKg },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // OSZCZĘDZANIE
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'saver-5000', title: 'Poduszka', desc: 'Łącznie 5 000 zł odłożone', group: 'Oszczędzanie', tier: 2, target: 5000, unit: 'zł',
+    lore: 'Na takiej poduszce śpi się spokojniej.', value: c => c.savingsTotal },
+  { id: 'saver-10000', title: 'Forteca', desc: 'Łącznie 10 000 zł odłożone', group: 'Oszczędzanie', tier: 3, target: 10000, unit: 'zł',
+    lore: 'Twardo jak rubin i tak samo trudne do skruszenia.', value: c => c.savingsTotal },
+  { id: 'saver-1000', title: 'Tysiąc', desc: 'Łącznie 1 000 zł odłożone', group: 'Oszczędzanie', tier: 1, target: 1000, unit: 'zł',
+    lore: 'Najczystsza forma dbania o przyszłość.', value: c => c.savingsTotal },
+  { id: 'fat-wallet', title: 'Gruby Portfel', desc: 'Saldo karty przekroczyło 5 000 zł', group: 'Oszczędzanie', tier: 3, target: 5000, unit: 'zł',
+    lore: 'Twój rekord grubości portfela.', value: c => c.cardBalancePeak },
+  { id: 'under-limit', title: 'Pod Limitem', desc: 'Miesiąc zamknięty pod budżetem', group: 'Oszczędzanie', tier: 2, target: 1,
+    lore: 'Zero mandatu, pełna ochrona.', value: c => c.monthUnderBudget ? 1 : 0 },
+  { id: 'balanced', title: 'Kapitan Swojego Budżetu', desc: 'Miesiąc na plusie (przychód ≥ wydatki)', group: 'Oszczędzanie', tier: 2, target: 1,
+    lore: 'Ster mocno w Twoich rękach.', value: c => c.balancedMonth ? 1 : 0 },
+  { id: 'power-saver', title: 'Oszczędny Prąd', desc: 'Rachunek za prąd ≥20% pod średnią', group: 'Oszczędzanie', tier: 2, target: 1,
+    lore: 'Piorąc oszczędnie, licznik zwalnia.', value: c => c.cutElectricity ? 1 : 0 },
+  { id: 'bill-tracked', title: 'Ster We Własne Ręce', desc: 'Pierwszy dodany rachunek cykliczny', group: 'Oszczędzanie', tier: 1, target: 1,
+    lore: 'Wiesz teraz dokładnie, co odpływa co miesiąc.', value: c => c.billTracked ? 1 : 0 },
+  { id: 'budget-streak-3', title: 'Pancerz Budżetu', desc: '3 miesiące z rzędu pod budżetem', group: 'Oszczędzanie', tier: 3, target: 3, unit: 'msc',
+    lore: 'Nic dziś nie przebije tej obrony.', value: c => c.monthsUnderBudgetStreak },
+  { id: 'budget-precision', title: 'W Dziesiątkę', desc: 'Miesiąc w granicach ±5% budżetu', group: 'Oszczędzanie', tier: 3, target: 1,
+    lore: 'Ani grosza za dużo, ani za mało.', value: c => c.monthWithinBudgetBand ? 1 : 0 },
+  { id: 'slow-saver', title: 'Żółwik', desc: '20 małych, regularnych „odłożeń"', group: 'Oszczędzanie', tier: 2, target: 20, unit: '×',
+    lore: 'Powoli, ale systematycznie.', value: c => c.selfTransferCount },
+  { id: 'deposit-collector', title: 'Zbieracz Kaucji', desc: '20 butelek/puszek z kaucją zwróconych', group: 'Oszczędzanie', tier: 1, target: 20, unit: 'szt',
+    lore: 'Grosz do grosza, a jednak coś z tego jest.', value: c => c.depositItemsReturned },
+  { id: 'pirate-treasure', title: 'Piracki Skarbiec', desc: 'Tysiąc + Gruby Portfel + Pod Limitem naraz', group: 'Oszczędzanie', tier: 3, target: 1,
+    lore: 'Cała mapa skarbów odkryta.', value: c => c.pirateTreasure ? 1 : 0 },
+  { id: 'bank-detective', title: 'Prostuję Zeznania', desc: '10 poprawionych wpisów z banku', group: 'Oszczędzanie', tier: 2, target: 10, unit: '×',
+    lore: 'Automat się myli — Ty to łapiesz.', value: c => c.bankCorrections },
+  { id: 'auto-merchant', title: 'Zautomatyzowany', desc: 'Sklep osiągnął status automatu', group: 'Oszczędzanie', tier: 1, target: 1,
+    lore: 'Twoje wydatki księgują się już same.', value: c => c.autoMerchantReached ? 1 : 0 },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PRACA
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'doer', title: 'Wykonawca', desc: '25 ukończonych zadań', group: 'Praca', tier: 2, target: 25, unit: '×',
+    lore: 'Nie odkładasz — słyszysz sygnał i działasz.', value: c => c.tasksDone },
+  { id: 'tasks-50', title: 'Celny Strzał', desc: '50 ukończonych zadań', group: 'Praca', tier: 3, target: 50, unit: '×',
+    lore: 'Odhaczasz szybciej, niż zdążysz dopisać kolejne.', value: c => c.tasksDone },
+  { id: 'tasks-200', title: 'Mędrzec', desc: '200 ukończonych zadań', group: 'Praca', tier: 3, target: 200, unit: '×',
+    lore: 'Lista rzeczy-do-zrobienia nie ma już przed Tobą tajemnic.', value: c => c.tasksDone },
+  { id: 'work-100h', title: 'Maszyna', desc: 'Łącznie 100 h pracy', group: 'Praca', tier: 2, target: 100, unit: 'h',
+    lore: 'Pracujesz jak dobrze naoliwiony mechanizm.', value: c => c.workHoursTotal },
+  { id: 'work-1000h', title: 'Pilot Weteran', desc: 'Łącznie 1 000 h pracy', group: 'Praca', tier: 3, target: 1000, unit: 'h',
+    lore: 'Grafik nie ma już przed Tobą tajemnic.', value: c => c.workHoursTotal },
+  { id: 'payday-first', title: 'Pierwsza Wypłata', desc: 'Zalogowana pierwsza wypłata', group: 'Praca', tier: 1, target: 1,
+    lore: 'Od teraz apka wie, ile realnie zarabiasz.', value: c => c.paydayLogged ? 1 : 0 },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NASTRÓJ
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'self-care', title: 'Serce Na Dłoni', desc: '30 dni z wpisem nastroju', group: 'Nastrój', tier: 2, target: 30, unit: 'dni',
+    lore: 'Nie tylko czujesz — sprawdzasz, jak naprawdę Ci jest.', value: c => c.moodDays },
+  { id: 'full-range', title: 'Teatr Jednego Aktora', desc: 'Zalogowane wszystkie nastroje 1–5', group: 'Nastrój', tier: 1, target: 5, unit: '/5',
+    lore: 'Komedia, tragedia i wszystko pomiędzy — pełen repertuar.', value: c => c.moodLevelsSeen },
+  { id: 'chronicler', title: 'Analityk Nastroju', desc: '60 dni z wpisem nastroju', group: 'Nastrój', tier: 3, target: 60, unit: 'dni',
+    lore: 'Twój mózg ma już własny zwój notatek o sobie samym.', value: c => c.moodDays },
+  { id: 'sunny-week', title: 'Słoneczny Tydzień', desc: '7 dni z rzędu nastrój ≥4', group: 'Nastrój', tier: 2, target: 7, unit: 'dni',
+    lore: 'Wewnętrzne ognisko nie zgasło ani razu przez cały tydzień.', value: c => c.goodMoodStreak },
+  { id: 'zen', title: 'Ulga', desc: '14 dni z rzędu nastrój ≥4', group: 'Nastrój', tier: 3, target: 14, unit: 'dni',
+    lore: 'Można było w końcu odetchnąć.', value: c => c.goodMoodStreak },
+  { id: 'stoic-30', title: 'Stoicki Spokój', desc: '30 dni z rzędu nastrój ≥4', group: 'Nastrój', tier: 4, target: 30, unit: 'dni',
+    lore: 'Niewzruszony jak posąg — nic dziś Cię nie rusza (w dobrym sensie).', value: c => c.goodMoodStreak },
+  { id: 'mood-bounce', title: 'Pierwsza Pomoc', desc: 'Zły dzień, a zaraz potem dobry', group: 'Nastrój', tier: 1, target: 1,
+    lore: 'Upadłeś i wstałeś — to się liczy bardziej niż brak upadku.', value: c => c.moodBounceBack ? 1 : 0 },
+  { id: 'mood-mastery', title: 'Nagroda Akademii', desc: 'Zdobyte wszystkie odznaki w grupie Nastrój', group: 'Nastrój', tier: 4, target: 1,
+    lore: 'Pełna, nagrodzona rola.', value: c => c.moodMastery ? 1 : 0 },
+  { id: 'poker-face', title: 'Poker Face', desc: '7 dni z rzędu nastrój dokładnie 3', group: 'Nastrój', tier: 1, target: 7, unit: 'dni',
+    lore: 'Ani wzlotów, ani upadków — kamienna twarz przez cały tydzień. Może czas coś poczuć?', value: c => c.neutralMoodStreak },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ZDROWIE
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'marathon', title: 'Odcisk Stopy', desc: '10 000 kroków w jeden dzień', group: 'Zdrowie', tier: 1, target: 10000, unit: 'kroków',
+    lore: 'Ten odcisk dziś naprawdę zapracował.', value: c => c.bestStepsDay },
+  { id: 'step-beast', title: 'Bestia Formy', desc: '15 000 kroków w jeden dzień', group: 'Zdrowie', tier: 2, target: 15000, unit: 'kroków',
+    lore: 'Między maratonem a ultramaratonem — środkowy stopień siły.', value: c => c.bestStepsDay },
+  { id: 'ultra-walk', title: 'Ultramaraton', desc: '20 000 kroków w jeden dzień', group: 'Legendy', tier: 4, target: 20000, unit: 'kroków',
+    lore: 'Nogi mają pełne prawo złożyć wypowiedzenie — a Ty i tak idziesz dalej.', value: c => c.bestStepsDay },
+  { id: 'well-rested', title: 'Latarnia w Ciemności', desc: '7 nocy z rzędu snu ≥7h', group: 'Zdrowie', tier: 2, target: 7, unit: 'nocy',
+    lore: 'Ktoś tu wreszcie gasi światło na czas.', value: c => c.goodSleepStreak },
+  { id: 'titan', title: 'Tytan Pracy', desc: '5 000 h pracy łącznie', group: 'Legendy', tier: 4, target: 5000, unit: 'h',
+    lore: 'Atlas dźwigał niebo, Ty dźwigasz grafik.', value: c => c.workHoursTotal },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ŻYCIE
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'traveler', title: 'Podróżnik', desc: '5 przejazdów pociągiem', group: 'Życie', tier: 2, target: 5, unit: '×',
+    lore: 'Świat to Twoja sieć połączeń.', value: c => c.trainTrips },
+  { id: 'carnivore', title: 'Drapieżnik', desc: '3 kg mięsa w jednym tygodniu', group: 'Życie', tier: 2, target: 3, unit: 'kg',
+    lore: 'Dział mięsny drży, gdy wchodzisz do sklepu.', value: c => c.meatWeekMaxKg },
+  { id: 'butcher', title: 'Rzeźnik', desc: '5 kg mięsa w jednym tygodniu', group: 'Życie', tier: 3, target: 5, unit: 'kg',
+    lore: 'To już nie dieta, to rzeźnia domowa.', value: c => c.meatWeekMaxKg },
+  { id: 'alchemist', title: 'Alchemik', desc: 'Wydatki w 6 różnych kategoriach', group: 'Życie', tier: 2, target: 6, unit: '/6',
+    lore: 'Mieszasz kategorie jak eliksiry w kotle.', value: c => c.distinctCategories },
+  { id: 'unplugged', title: 'Wyluzowany', desc: '3 dni z rzędu bez żadnego wydatku', group: 'Życie', tier: 2, target: 3, unit: 'dni',
+    lore: 'Telefon w kieszeni, portfel zamknięty — cyfrowy i finansowy detoks w jednym.', value: c => c.noSpendStreak },
+  { id: 'unplugged-7', title: 'Kręgosłup', desc: '7 dni z rzędu bez żadnego wydatku', group: 'Życie', tier: 3, target: 7, unit: 'dni',
+    lore: 'Tydzień cyfrowego i finansowego detoksu.', value: c => c.noSpendStreak },
+  { id: 'otaku', title: 'Sakura', desc: 'Pierwszy japoński produkt w koszyku', group: 'Życie', tier: 1, target: 1,
+    lore: '日本 na Twoim paragonie.', value: c => c.japanItems },
+  { id: 'otaku-koi', title: 'Karp Koi', desc: '7 japońskich produktów kupionych', group: 'Życie', tier: 2, target: 7, unit: '×',
+    lore: 'Płyniesz pod prąd jak koi — z uporem i stylem.', value: c => c.japanItems },
+  { id: 'otaku-samurai', title: 'Droga Samuraja', desc: '25 japońskich produktów kupionych', group: 'Życie', tier: 3, target: 25, unit: '×',
+    lore: 'Bushido w wersji „matcha i mochi co tydzień".', value: c => c.japanItems },
+  { id: 'eco-warrior', title: 'Eko Wojownik', desc: 'Miesiąc bez ani jednego dnia AGŚ', group: 'Życie', tier: 2, target: 1,
+    lore: 'Zero śmieci, czyste sumienie.', value: c => c.cleanMonthNoAgs ? 1 : 0 },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // KONSEKWENCJA
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'first-key', title: 'Pierwszy Klucz', desc: 'Pierwszy zalogowany wydatek', group: 'Konsekwencja', tier: 1, target: 1,
+    lore: 'Klucz do skarbca Twoich finansów. Bez niego cała reszta statystyk pozostaje zamknięta na głucho.', value: c => c.receiptsCount >= 1 ? 1 : 0 },
+  { id: 'scanner', title: 'Sokole Oko', desc: '50 zalogowanych wydatków', group: 'Konsekwencja', tier: 2, target: 50, unit: '×',
+    lore: 'Nic Ci nie umknie.', value: c => c.receiptsCount },
+  { id: 'groceries-100', title: 'Zakupowicz', desc: '100 zalogowanych wydatków', group: 'Konsekwencja', tier: 3, target: 100, unit: '×',
+    lore: 'Ta torba już się nie domyka — znasz każdą alejkę na pamięć.', value: c => c.receiptsCount },
+  { id: 'first-week', title: 'Pierwszy Tydzień', desc: '7 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 1, target: 7, unit: 'dni',
+    lore: 'Krok pierwszy z wielu — dopiero się rozkręcasz.', value: c => c.activeDays },
+  { id: 'loyal', title: 'Świeżo Wyklute', desc: '30 aktywnych dni w aplikacji', group: 'Konsekwencja', tier: 3, target: 30, unit: 'dni',
+    lore: 'Pierwszy miesiąc za Tobą — Twoja przygoda z apką dopiero raczkuje.', value: c => c.activeDays },
+  { id: 'goal-set', title: 'Mapa Skarbów', desc: 'Ustawiony pierwszy budżet', group: 'Konsekwencja', tier: 1, target: 1,
+    lore: 'Od teraz wiadomo, dokąd zmierzają pieniądze.', value: c => c.hasBudget ? 1 : 0 },
+  { id: 'on-track', title: 'Kurs Wyznaczony', desc: '7 dni z rzędu coś zalogowane', group: 'Konsekwencja', tier: 2, target: 7, unit: 'dni',
+    lore: 'Kompas nie gubi północy.', value: c => c.logStreak },
+  { id: 'loyal-heart', title: 'Z Sercem', desc: '60 aktywnych dni — apka to nawyk', group: 'Konsekwencja', tier: 3, target: 60, unit: 'dni',
+    lore: 'Apka to już nie obowiązek, to nawyk z sentymentu.', value: c => c.activeDays },
+  { id: 'backup-done', title: 'Papierologia Ogarnięta', desc: 'Wykonany eksport/backup danych', group: 'Konsekwencja', tier: 1, target: 1,
+    lore: 'Nawet jak telefon umrze, historia przeżyje.', value: c => c.backupDone ? 1 : 0 },
+  { id: 'login-streak-14', title: 'Wierny Piesek', desc: '14 dni z rzędu z otwartą apką', group: 'Konsekwencja', tier: 2, target: 14, unit: 'dni',
+    lore: 'Nieważne co, zawsze wracasz sprawdzić pupila.', value: c => c.loginStreak },
+  { id: 'selftest-clean', title: 'Bez Skazy', desc: 'Self-test bez błędów', group: 'Konsekwencja', tier: 1, target: 1,
+    lore: 'Kruche, ale nienaruszone.', value: c => c.selfTestClean ? 1 : 0 },
+  { id: 'stats-watcher', title: 'Cichy Obserwator', desc: '20 wizyt na ekranie statystyk', group: 'Konsekwencja', tier: 1, target: 20, unit: '×',
+    lore: 'Nikt Cię nie widzi, ale Ty widzisz wszystko.', value: c => c.statsVisits },
+  { id: 'scan-master', title: 'Za Kulisami', desc: '20 paragonów dodanych przez wklejenie', group: 'Konsekwencja', tier: 2, target: 20, unit: '×',
+    lore: 'Wklejasz i parsujesz — nie przepisujesz linijka po linijce.', value: c => c.scannedReceipts },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // GRZESZKI (antyodznaki)
+  // ══════════════════════════════════════════════════════════════════════════
+  { id: 'undead', title: 'Żywy Trup', desc: '3 noce z rzędu sen poniżej 5h', group: 'Grzeszki', tier: 1, target: 3, unit: 'noce', kind: 'bad',
+    lore: 'Chodzisz, mówisz — ale to już tryb zombie.', value: c => c.badSleepStreak },
+  { id: 'undead-7', title: 'Do Szpiku Zmęczony', desc: '7 nocy z rzędu sen poniżej 5h', group: 'Grzeszki', tier: 3, target: 7, unit: 'noce', kind: 'bad',
+    lore: 'To już nie zmęczenie, to stan chroniczny.', value: c => c.badSleepStreak },
+  { id: 'bottomless', title: 'Bezdenny Żołądek', desc: '5 dni z rzędu ze słodyczami', group: 'Grzeszki', tier: 1, target: 5, unit: 'dni', kind: 'bad',
+    lore: 'Czarna dziura na cukier — nic z niej nie ucieka.', value: c => c.junkStreak },
+  { id: 'fast-food', title: 'Ostre Combo', desc: '5 razy fast food / pizza', group: 'Grzeszki', tier: 1, target: 5, unit: '×', kind: 'bad',
+    lore: 'Kurier zna Twój adres lepiej niż listonosz.', value: c => c.fastFoodCount },
+  { id: 'sweet-tooth', title: 'Słodki Ząb', desc: '15 zakupów słodyczy w miesiącu', group: 'Grzeszki', tier: 1, target: 15, unit: '×', kind: 'bad',
+    lore: 'Ten pączek ma już Twoje imię wygrawerowane na lukrze.', value: c => c.junkPurchasesMonth },
+  { id: 'chemist', title: 'Chemik', desc: '10 słodkich napojów w miesiącu', group: 'Grzeszki', tier: 1, target: 10, unit: '×', kind: 'bad',
+    lore: 'Kolorowe mikstury zamiast wody z filtra.', value: c => c.drinkPurchasesMonth },
+  { id: 'panic', title: 'Panikarz', desc: 'Zakupy za 300+ zł w jeden dzień', group: 'Grzeszki', tier: 1, target: 300, unit: 'zł', kind: 'bad',
+    lore: 'Tryb pandemicznego chomika: włączony.', value: c => c.maxDaySpend },
+  { id: 'kraken', title: 'Pożarty Przez Kraken', desc: 'Pojedynczy zakup za 3000+ zł', group: 'Grzeszki', tier: 3, target: 3000, unit: 'zł', kind: 'bad',
+    lore: 'Coś wielkiego wciągnęło Twój budżet pod wodę.', value: c => c.maxSinglePurchase },
+  { id: 'red-light', title: 'Czerwone Światło', desc: 'Przekroczony budżet miesiąca', group: 'Grzeszki', tier: 1, target: 100, unit: '%', kind: 'bad',
+    lore: 'Portfel dosłownie płonie.', value: c => Math.round(c.overBudgetPct * 100) },
+  { id: 'crime-scene', title: 'Miejsce Zbrodni', desc: 'Budżet przekroczony o ponad 50%', group: 'Grzeszki', tier: 1, target: 150, unit: '%', kind: 'bad',
+    lore: 'Kredowy obrys, taśma policyjna i portfel w roli ofiary. Wszyscy wiemy, kto pociągnął za spust.', value: c => Math.round(c.overBudgetPct * 100) },
+  { id: 'meltdown', title: 'Katastrofa Nuklearna', desc: 'Budżet przekroczony o ponad 250%', group: 'Grzeszki', tier: 4, target: 250, unit: '%', kind: 'bad',
+    lore: 'Rdzeń stopiony, portfel w strefie skażenia.', value: c => Math.round(c.overBudgetPct * 100) },
+  { id: 'rollercoaster', title: 'Rollercoaster', desc: 'W tygodniu nastrój od ≤2 do ≥4', group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
+    lore: 'Emocjonalny rollercoaster bez pasów.', value: c => c.moodSwing7 ? 1 : 0 },
+  { id: 'grumpy', title: 'Zrzęda', desc: '3 dni z rzędu nastrój ≤2', group: 'Grzeszki', tier: 1, target: 3, unit: 'dni', kind: 'bad',
+    lore: 'Chmura gradowa zawisła nad głową — może pora coś z tym zrobić?', value: c => c.lowMoodStreak },
+  { id: 'high-roller', title: 'Hazardzista', desc: 'Pojedynczy zakup za 1000+ zł', group: 'Grzeszki', tier: 1, target: 1000, unit: 'zł', kind: 'bad',
+    lore: 'Postawiłeś wszystko na jedną kartę.', value: c => c.maxSinglePurchase },
+  { id: 'va-banque', title: 'Va Banque', desc: 'Zakup u bukmachera / na lotto', group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
+    lore: 'Fortuna właśnie przejęła stery Twojego portfela.', value: c => c.bettingBought ? 1 : 0 },
+  { id: 'jester', title: 'Błazen', desc: '8 osobnych zakupów w jeden dzień', group: 'Grzeszki', tier: 1, target: 8, unit: '×', kind: 'bad',
+    lore: 'Kup tu, kliknij tam — żonglujesz paragonami jak dworski błazen piłeczkami.', value: c => c.maxTxPerDay },
+  { id: 'ags-edge', title: 'Kaszlnięcie Ostrzegawcze', desc: 'Dzień z dokładnie 2 różnymi niestałymi zakupami', group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
+    lore: 'Jeszcze nic, ale już warto uważać.', value: c => c.agsEdgeDayEver ? 1 : 0 },
+  { id: 'ags-month', title: 'Uczulenie Na Promocje', desc: '5 dni AGŚ w jednym miesiącu', group: 'Grzeszki', tier: 2, target: 5, unit: 'dni', kind: 'bad',
+    lore: 'Coś tu regularnie wpada do koszyka bez planu.', value: c => c.agsDaysThisMonthMax },
+  { id: 'ags-streak', title: 'Alarm Smogowy', desc: 'AGŚ 3 miesiące z rzędu', group: 'Grzeszki', tier: 3, target: 3, unit: 'msc', kind: 'bad',
+    lore: 'To już nie wypadek, to styl życia.', value: c => c.agsMonthStreak },
+  { id: 'ags-trash', title: 'AGŚ', desc: 'Automatyczny Generator Śmieci', group: 'Grzeszki', tier: 1, target: 1, kind: 'bad',
+    lore: 'Niby mem, ale efekt zakupocholizmu jest prawdziwy.', value: c => c.agsDayEver ? 1 : 0 },
 ];
 
 // ── Build context (single source of truth — dashboard + gablota call this) ───
@@ -228,11 +346,29 @@ const JAPAN = ['matcha', 'mochi', 'sushi', 'ramen', 'wasabi', 'nori', 'miso', 's
 const DRINKS = ['sok ', 'napój', 'napoj', 'cola', 'pepsi', 'sprite', 'fanta', 'oranżad', 'oranzad', 'lemoniad', 'energetyk', 'monster', 'red bull', 'redbull', 'tymbark', 'kubuś', 'kubus', 'ice tea', 'lipton', 'powerade', 'nestea', 'mirinda', '7up', 'mirinda', 'hoop', 'żywiec zdrój smak', 'frugo', 'toma', 'caprio'];
 const MEAT = ['mięso', 'mieso', 'kurczak', 'wołowin', 'wolowin', 'schab', 'karków', 'karkow', 'boczek', 'kiełbas', 'kielbas', 'szynk', 'mielone', 'indyk', 'żeberk', 'zeberk', 'parów', 'parow', 'pierś', 'piers', 'wieprz', 'polędwic', 'poledwic', 'filet z'];
 const BETTING = ['lotto', 'zakład', 'zaklad', 'totalizator', 'kasyno', 'lottomat', 'obstaw', 'betclic', 'betfan', 'fortuna zakład', 'sts '];
+// bagesv2 batch — fruit/veg and fish keyword lists, same "keyword hit on item name" pattern as MEAT/JAPAN/DRINKS.
+const VEG_FRUIT = ['ziemniak', 'marchew', 'pomidor', 'ogórek', 'ogorek', 'cebul', 'czosnek', 'sałat', 'salat', 'brokuł', 'brokul', 'kalafior', 'papryk', 'cukini', 'bakłażan', 'baklazan', 'burak', 'rzodkiew', 'szpinak', 'kapust', 'por ', 'fasol', 'groch', 'dynia', 'jabłk', 'jablk', 'banan', 'pomarańcz', 'pomaranc', 'cytryn', 'gruszk', 'winogron', 'truskaw', 'malin', 'jagod', 'śliwk', 'sliwk', 'brzoskwi', 'arbuz', 'melon', 'kiwi', 'mandarynk', 'grejpfrut'];
+const FISH = ['łosoś', 'losos', 'tuńczyk', 'tunczyk', 'dorsz', 'makrel', 'śledź', 'sledz', 'pstrąg', 'pstrag', 'sandacz', 'karp', 'sardynk', 'krewet', 'małż', 'malz', 'kalmar', 'ryba', 'ryby', 'flądra', 'fladra', 'morszczuk', 'mintaj', 'halibut'];
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 // walk back from today counting consecutive days for which pred(dayKey) holds
 function streakBack(pred: (k: string) => boolean): number {
   let n = 0; const base = new Date();
   for (let i = 0; i < 400; i++) { const d = new Date(base); d.setDate(d.getDate() - i); if (!pred(dayKey(d))) break; n++; }
+  return n;
+}
+// same walk, but for "streak of days WITHOUT X" (no junk, no spending…): pred is
+// vacuously true on any day with zero data, so the walk stops at `floorDay` (the
+// earliest day tracking exists) instead of running to the 400-day cap — otherwise a
+// brand-new user with an empty ctx would show a multi-hundred-day "clean" streak.
+function absenceStreakBack(pred: (k: string) => boolean, floorDay: string | null): number {
+  if (!floorDay) return 0;
+  return streakBack(k => k >= floorDay && pred(k));
+}
+// same walk, but months instead of days — for AGŚ month-streaks / budget-streaks
+function monthStreakBack(sortedMonthKeys: string[], thisMonth: string, pred: (m: string) => boolean): number {
+  const closed = sortedMonthKeys.filter(m => m !== thisMonth).sort();
+  let n = 0;
+  for (let i = closed.length - 1; i >= 0; i--) { if (!pred(closed[i])) break; n++; }
   return n;
 }
 
@@ -249,6 +385,14 @@ export function buildAchCtx(args: {
   cardBalancePeak?: number;
   foodMeals?: { date?: string }[];   // calorie-counter meals
   dishesCreated?: number;            // own dishes/recipes in the library
+  // bagesv2 batch — all optional, all default to "not yet" so old callers keep working.
+  bankCorrections?: number;
+  autoMerchantReached?: boolean;
+  scannedReceipts?: number;
+  statsVisits?: number;
+  backupDone?: boolean;
+  selfTestClean?: boolean;
+  loginStreak?: number;
 }): AchCtx {
   const { expenses, moodEntries, workEvents, workSettings, healthDays } = args;
   const foodMeals = args.foodMeals ?? [];
@@ -262,15 +406,22 @@ export function buildAchCtx(args: {
 
   let savingsTotal = 0, receiptsCount = 0, thisMonthExp = 0, junkPurchasesMonth = 0, fastFoodCount = 0;
   let trainTrips = 0, japanItems = 0, drinkPurchasesMonth = 0, maxSinglePurchase = 0, bettingBought = false;
+  let fishItems = 0, selfTransferCount = 0, depositItemsReturned = 0;
   const thisMonth = dayKey(new Date()).slice(0, 7);
   const junkDays = new Set<string>();
   const loggedDays = new Set<string>();
+  const expenseDays = new Set<string>(); // days with a real (non-income, non-transfer) expense —
+  // bounds the "clean streak" walks below so a day BEFORE tracking started never counts as "clean".
   const daySpend: Record<string, number> = {};
   const txByDay: Record<string, number> = {};
   const meatByDay: Record<string, number> = {};
+  const fishByDay: Record<string, number> = {};
   const elecByMonth: Record<string, number> = {};
   const catSet = new Set<string>();
   const monthAgg: Record<string, { inc: number; exp: number }> = {};
+  const produceByDay: Record<string, Set<string>> = {};
+  const allProduce = new Set<string>();
+  const purchaseNamesByDay: Record<string, Set<string>> = {};
   for (const e of expenses) {
     const day = (e.date ?? '').slice(0, 10);
     if (day) loggedDays.add(day);
@@ -279,7 +430,8 @@ export function buildAchCtx(args: {
     if (m) (monthAgg[m] ??= { inc: 0, exp: 0 });
     if (isInc) { if (m && !isSelfTransfer(e)) monthAgg[m].inc += e.amount; continue; }
     receiptsCount++;
-    if (isSelfTransfer(e)) { savingsTotal += e.amount; continue; }
+    if (day) expenseDays.add(day);
+    if (isSelfTransfer(e)) { savingsTotal += e.amount; selfTransferCount++; continue; }
     if (m) monthAgg[m].exp += e.amount;
     if (m === thisMonth) thisMonthExp += e.amount;
     if (day) { daySpend[day] = (daySpend[day] ?? 0) + e.amount; txByDay[day] = (txByDay[day] ?? 0) + 1; }
@@ -291,12 +443,26 @@ export function buildAchCtx(args: {
     if (TRAIN.some(k => hay.includes(k))) trainTrips++;
     if (BETTING.some(k => hay.includes(k))) bettingBought = true;
     if (/prąd|prad|\bpge\b|tauron|energa|\benea\b/.test(hay) && m) elecByMonth[m] = (elecByMonth[m] ?? 0) + e.amount;
-    // product-level detection (meat kg / japan / drinks)
-    for (const it of e.receiptItems ?? []) {
+    // "AGŚ" — distinct non-staple item names bought that day (every receipt item counts;
+    // recurring bills aren't receipt items in this app, so nothing to exclude further).
+    // Falls back to the expense's own note when there's no item breakdown (quick-add).
+    const items = e.receiptItems ?? [];
+    for (const it of items) {
+      if (it.kind === 'deposit') { depositItemsReturned++; continue; }
+      const inm = (it.name ?? '').trim().toLowerCase();
+      if (inm && day) (purchaseNamesByDay[day] ??= new Set()).add(inm);
+    }
+    if (items.length === 0 && day && e.note) (purchaseNamesByDay[day] ??= new Set()).add(e.note.trim().toLowerCase());
+    // product-level detection (meat/fish/produce kg, japan, drinks)
+    for (const it of items) {
       if (it.kind === 'deposit') continue;
       const nm = (it.name ?? '').toLowerCase();
       const isMeat = (it.tags ?? []).includes('mięso') || MEAT.some(k => nm.includes(k));
       if (isMeat && day) meatByDay[day] = (meatByDay[day] ?? 0) + (it.weightKg && it.weightKg > 0 ? it.weightKg : (it.quantity || 1));
+      const isFish = FISH.some(k => nm.includes(k));
+      if (isFish) { fishItems++; if (day) fishByDay[day] = (fishByDay[day] ?? 0) + (it.weightKg && it.weightKg > 0 ? it.weightKg : (it.quantity || 1)); }
+      const produceHit = VEG_FRUIT.find(k => nm.includes(k));
+      if (produceHit && day) { (produceByDay[day] ??= new Set()).add(produceHit); allProduce.add(produceHit); }
       if (JAPAN.some(k => nm.includes(k))) japanItems++;
       if (m === thisMonth && !nm.includes('woda') && DRINKS.some(k => nm.includes(k))) drinkPurchasesMonth++;
     }
@@ -304,19 +470,25 @@ export function buildAchCtx(args: {
   const maxDaySpend = Object.values(daySpend).reduce((mx, v) => Math.max(mx, v), 0);
   const maxTxPerDay = Object.values(txByDay).reduce((mx, v) => Math.max(mx, v), 0);
   const monthUnderBudget = args.budgetTotal > 0 && Object.entries(monthAgg).some(([m, v]) => m !== thisMonth && v.exp > 0 && v.exp <= args.budgetTotal);
+  const firstExpenseDay = expenseDays.size ? [...expenseDays].sort()[0] : null;
 
-  // meat: most kg in any rolling 7-day window
-  let meatWeekMaxKg = 0;
-  const meatDays = Object.keys(meatByDay);
-  for (const d of meatDays) {
-    const end = new Date(d + 'T00:00:00').getTime();
-    let sum = 0;
-    for (const d2 of meatDays) {
-      const t2 = new Date(d2 + 'T00:00:00').getTime();
-      if (t2 <= end && t2 > end - 7 * 86400000) sum += meatByDay[d2];
+  // meat/fish: most kg in any rolling 7-day window
+  const rollingMaxKg = (byDay: Record<string, number>): number => {
+    let max = 0;
+    const days = Object.keys(byDay);
+    for (const d of days) {
+      const end = new Date(d + 'T00:00:00').getTime();
+      let sum = 0;
+      for (const d2 of days) {
+        const t2 = new Date(d2 + 'T00:00:00').getTime();
+        if (t2 <= end && t2 > end - 7 * 86400000) sum += byDay[d2];
+      }
+      if (sum > max) max = sum;
     }
-    if (sum > meatWeekMaxKg) meatWeekMaxKg = sum;
-  }
+    return max;
+  };
+  const meatWeekMaxKg = rollingMaxKg(meatByDay);
+  const fishWeekMaxKg = rollingMaxKg(fishByDay);
 
   // electricity: latest month with a bill well under the average of the earlier ones
   const elecMonths = Object.keys(elecByMonth).sort();
@@ -346,6 +518,13 @@ export function buildAchCtx(args: {
       if (moodByDay[k] != null) swHi = Math.max(swHi, moodByDay[k]);
       if (moodMinByDay[k] != null) swLo = Math.min(swLo, moodMinByDay[k]); } }
   const moodSwing7 = swHi >= 4 && swLo <= 2;
+  // a day with mood ≤2 immediately followed (next calendar day) by a day with mood ≥4
+  let moodBounceBack = false;
+  { const sortedDays = Object.keys(moodByDay).sort();
+    for (let i = 0; i < sortedDays.length - 1; i++) {
+      const a = new Date(sortedDays[i] + 'T00:00:00'); a.setDate(a.getDate() + 1);
+      if (dayKey(a) === sortedDays[i + 1] && (moodMinByDay[sortedDays[i]] ?? 99) <= 2 && moodByDay[sortedDays[i + 1]] >= 4) { moodBounceBack = true; break; }
+    } }
 
   // sleep (best step + bad-sleep streak)
   let bestStepsDay = 0;
@@ -353,13 +532,35 @@ export function buildAchCtx(args: {
 
   const balancedMonth = Object.values(monthAgg).some(m => m.exp > 0 && m.inc >= m.exp);
 
+  // budget streaks/precision — walk CLOSED months (excludes the still-open current one)
+  const closedMonthKeys = Object.keys(monthAgg).filter(m => m !== thisMonth && monthAgg[m].exp > 0);
+  const monthsUnderBudgetStreak = args.budgetTotal > 0
+    ? monthStreakBack(closedMonthKeys, thisMonth, m => monthAgg[m].exp <= args.budgetTotal) : 0;
+  const monthWithinBudgetBand = args.budgetTotal > 0
+    && closedMonthKeys.some(m => Math.abs(monthAgg[m].exp - args.budgetTotal) <= args.budgetTotal * 0.05);
+
+  // AGŚ — day/month/streak views over the same purchaseNamesByDay accumulator
+  const agsDay = (k: string) => (purchaseNamesByDay[k]?.size ?? 0) > 2;
+  const agsEdgeDay = (k: string) => (purchaseNamesByDay[k]?.size ?? 0) === 2;
+  const agsDayEver = Object.keys(purchaseNamesByDay).some(agsDay);
+  const agsEdgeDayEver = Object.keys(purchaseNamesByDay).some(agsEdgeDay);
+  const agsDaysByMonth: Record<string, number> = {};
+  for (const k of Object.keys(purchaseNamesByDay)) if (agsDay(k)) { const mm = k.slice(0, 7); agsDaysByMonth[mm] = (agsDaysByMonth[mm] ?? 0) + 1; }
+  const agsDaysThisMonthMax = Object.values(agsDaysByMonth).reduce((mx, v) => Math.max(mx, v), 0);
+  const agsMonthStreak = monthStreakBack(closedMonthKeys.length ? closedMonthKeys : Object.keys(agsDaysByMonth), thisMonth, m => (agsDaysByMonth[m] ?? 0) > 0);
+  const cleanMonthNoAgs = closedMonthKeys.some(m => !(agsDaysByMonth[m] > 0));
+
+  const savingsTotalFinal = savingsTotal > 0 ? savingsTotal : (args.cardBalancePeak ?? 0);
+  const cardBalancePeakFinal = args.cardBalancePeak ?? 0;
+  const scannedReceipts = args.scannedReceipts ?? expenses.filter(e => e.viaScan).length;
+
   return {
     habitBestStreak: args.habitBestStreak,
-    noJunkStreak: streakBack(k => !junkDays.has(k)),
+    noJunkStreak: absenceStreakBack(k => !junkDays.has(k), firstExpenseDay),
     // "Odłożone" = tagged self-transfers if you use them; otherwise fall back to the
     // highest balance you ever reached, so the saver badges reflect real money even
     // without a separate savings account.
-    savingsTotal: savingsTotal > 0 ? savingsTotal : (args.cardBalancePeak ?? 0),
+    savingsTotal: savingsTotalFinal,
     receiptsCount, moodDays, workHoursTotal,
     paydayLogged: expenses.some(e => e.type === 'income' && (e.category === 'salary' || (!!wp && `${e.note ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase().includes(wp)))),
     bestStepsDay, billTracked: args.billTracked,
@@ -376,15 +577,32 @@ export function buildAchCtx(args: {
     lowMoodStreak: streakBack(k => { const mn = moodMinByDay[k]; return mn != null && mn <= 2; }),
     neutralMoodStreak: streakBack(k => moodByDay[k] === 3 && moodMinByDay[k] === 3),
     moodSwing7,
-    noSpendStreak: streakBack(k => !daySpend[k]),
+    noSpendStreak: absenceStreakBack(k => !daySpend[k], firstExpenseDay),
     trainTrips, japanItems, drinkPurchasesMonth, meatWeekMaxKg, cutElectricity,
     maxSinglePurchase, bettingBought, maxTxPerDay, distinctCategories: catSet.size,
-    cardBalancePeak: args.cardBalancePeak ?? 0,
+    cardBalancePeak: cardBalancePeakFinal,
     monthUnderBudget,
     junkStreak: streakBack(k => junkDays.has(k)),
     badSleepStreak: streakBack(k => { const s = healthDays[k]?.sleepMinutes; return !!s && s > 0 && s < 300; }),
     overBudgetPct: args.budgetTotal > 0 ? thisMonthExp / args.budgetTotal : 0,
     junkPurchasesMonth, fastFoodCount, maxDaySpend,
+    distinctProduceAllTime: allProduce.size,
+    maxDailyProduceVariety: Object.values(produceByDay).reduce((mx, s) => Math.max(mx, s.size), 0),
+    produceVarietyStreak: streakBack(k => (produceByDay[k]?.size ?? 0) >= 5),
+    fishItems, fishWeekMaxKg,
+    monthsUnderBudgetStreak, monthWithinBudgetBand,
+    selfTransferCount, depositItemsReturned,
+    pirateTreasure: savingsTotalFinal >= 1000 && cardBalancePeakFinal >= 5000 && monthUnderBudget,
+    moodMastery: moodDays >= 60 && moodLevels.size >= 5 && streakBack(k => (moodByDay[k] ?? 0) >= 4) >= 30 && moodBounceBack,
+    moodBounceBack,
+    bankCorrections: args.bankCorrections ?? 0,
+    autoMerchantReached: args.autoMerchantReached ?? false,
+    scannedReceipts,
+    statsVisits: args.statsVisits ?? 0,
+    backupDone: args.backupDone ?? false,
+    selfTestClean: args.selfTestClean ?? false,
+    loginStreak: args.loginStreak ?? 0,
+    agsDayEver, agsEdgeDayEver, agsDaysThisMonthMax, agsMonthStreak, cleanMonthNoAgs,
   };
 }
 

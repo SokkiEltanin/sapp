@@ -111,7 +111,10 @@ export default function SettingsScreen() {
       const res = await runSelfTest();
       const pass = res.filter(r => r.ok).length;
       const body = res.map(r => `${r.ok ? '✓' : '✗'}  ${r.name}\n     ${r.detail}`).join('\n\n');
-      if (pass === res.length) haptic.success(); else haptic.warn();
+      if (pass === res.length) {
+        haptic.success();
+        AsyncStorage.setItem('ach_selftest_clean', 'true').catch(() => {});   // "Bez Skazy" achievement
+      } else haptic.warn();
       Alert.alert(`Self-test: ${pass}/${res.length} OK`, body, [{ text: 'OK' }]);
     } catch (e: any) {
       Alert.alert('Self-test', 'Nie udało się uruchomić: ' + String(e?.message ?? e));
