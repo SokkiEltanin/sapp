@@ -8,10 +8,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import {
   ArrowLeft, Trash2, Check, Timer, Edit3, Save,
   Calendar, Flag, AlignLeft, Tag, Clock, RefreshCw, BellOff, Bell,
-  Plus, CheckSquare, Square, X as XIcon, ChevronUp, ChevronDown,
+  Plus, CheckSquare, Square, X as XIcon,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import DatePickerField from '@/components/ui/DatePickerField';
+import TimePickerField from '@/components/ui/TimePickerField';
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { toast } from '@/store/toastStore';
@@ -166,9 +168,8 @@ export default function TaskDetailScreen() {
   const [subtaskInput, setSubtaskInput] = useState('');
   const [saving, setSaving]             = useState(false);
   const [reminderOn, setReminderOn]     = useState(!!task?.reminderTime);
-  const reminderParts = task?.reminderTime?.split(':').map(Number) ?? [9, 0];
-  const [reminderHour, setReminderHour] = useState(reminderParts[0]);
-  const [reminderMin, setReminderMin]   = useState(reminderParts[1]);
+  const [reminderClock, setReminderClock] = useState(task?.reminderTime ?? '09:00');
+  const [reminderDate, setReminderDate] = useState(task?.reminderDate ?? '');
   const [reminderMsg, setReminderMsg]   = useState(task?.reminderMessage ?? '');
   const [moodModal, setMoodModal]       = useState(false);
   const [moodTaskTitle, setMoodTaskTitle] = useState('');
@@ -193,7 +194,8 @@ export default function TaskDetailScreen() {
     setSaving(true);
     try {
       const deadlineIso = deadline.trim() ? deadline.trim() + 'T23:59:00.000Z' : undefined;
-      const reminderTime = reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : undefined;
+      const reminderTime = reminderOn ? reminderClock : undefined;
+      const reminderDateEff = reminderOn ? (reminderDate || deadline.trim() || todayStr()) : undefined;
       const reminderMessage = reminderOn && reminderMsg.trim() ? reminderMsg.trim() : undefined;
 
       await update(id!, {
@@ -206,14 +208,15 @@ export default function TaskDetailScreen() {
         tags,
         recurring,
         reminderTime,
+        reminderDate: reminderDateEff,
         reminderMessage,
       });
 
       // Reschedule or cancel reminder
       notificationsService.cancelTaskReminder(id!).catch(() => {});
-      if (reminderTime) {
+      if (reminderTime && reminderDateEff) {
         notificationsService.scheduleCustomTaskReminder(
-          id!, title.trim(), deadline.trim() || todayStr(), reminderTime, reminderMessage,
+          id!, title.trim(), reminderDateEff, reminderTime, reminderMessage,
         ).catch(() => {});
       }
 
@@ -531,27 +534,22 @@ export default function TaskDetailScreen() {
                       : <BellOff size={13} color={colors.text.muted} />
                     }
                     <Text style={[styles.reminderBtnText, reminderOn && { color: G.accent }]}>
-                      {reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : 'Dodaj przypomnienie'}
+                      {reminderOn ? `${reminderDate || deadline.trim() || todayStr()} o ${reminderClock}` : 'Dodaj przypomnienie'}
                     </Text>
                   </TouchableOpacity>
                   {reminderOn && (
                     <>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-                        <TouchableOpacity onPress={() => setReminderHour(h => (h + 23) % 24)} style={styles.stepBtn}>
-                          <ChevronUp size={12} color={G.accent} />
-                        </TouchableOpacity>
-                        <Text style={styles.stepVal}>{pad(reminderHour)}</Text>
-                        <TouchableOpacity onPress={() => setReminderHour(h => (h + 1) % 24)} style={styles.stepBtn}>
-                          <ChevronDown size={12} color={G.accent} />
-                        </TouchableOpacity>
-                        <Text style={{ color: G.muted, fontSize: 18, fontWeight: '700' }}>:</Text>
-                        <TouchableOpacity onPress={() => setReminderMin(m => (m + 55) % 60)} style={styles.stepBtn}>
-                          <ChevronUp size={12} color={G.accent} />
-                        </TouchableOpacity>
-                        <Text style={styles.stepVal}>{pad(reminderMin)}</Text>
-                        <TouchableOpacity onPress={() => setReminderMin(m => (m + 5) % 60)} style={styles.stepBtn}>
-                          <ChevronDown size={12} color={G.accent} />
-                        </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                        <DatePickerField
+                          value={reminderDate || deadline.trim() || todayStr()}
+                          onChange={setReminderDate}
+                          style={{ flex: 1 }}
+                        />
+                        <TimePickerField
+                          value={reminderClock}
+                          onChange={setReminderClock}
+                          style={{ flex: 1 }}
+                        />
                       </View>
                       <TextInput
                         value={reminderMsg}
@@ -567,7 +565,7 @@ export default function TaskDetailScreen() {
               ) : (
                 <Text style={styles.fieldValue}>
                   {task.reminderTime
-                    ? `${task.reminderTime}${task.reminderMessage ? ` — "${task.reminderMessage}"` : ''}`
+                    ? `${task.reminderDate ?? ''} ${task.reminderTime}${task.reminderMessage ? ` — "${task.reminderMessage}"` : ''}`.trim()
                     : 'Brak'}
                 </Text>
               )}

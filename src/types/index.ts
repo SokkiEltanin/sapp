@@ -237,6 +237,7 @@ export interface Task {
   postCompletionMood?: MoodLevel;
   subtasks?: Subtask[];
   reminderTime?: string;    // HH:mm — custom reminder time
+  reminderDate?: string;    // YYYY-MM-DD — day the reminder fires; independent of deadline
   reminderMessage?: string; // custom notification text
   createdAt: string;
   updatedAt: string;

@@ -15,6 +15,8 @@ import {
 import { EventPriority, TaskDifficulty, TaskStatus, TaskRecurring, Subtask, TaskKind } from '@/types';
 import { KIND_META, KIND_ORDER, inferKind } from '@/utils/taskKind';
 import { tasksService } from '@/services/calendarService';
+import DatePickerField from '@/components/ui/DatePickerField';
+import TimePickerField from '@/components/ui/TimePickerField';
 import { notificationsService } from '@/services/notificationsService';
 import { useCalendarStore } from '@/store/calendarStore';
 import { taskCoins } from '@/hooks/useTasks';
@@ -65,47 +67,8 @@ const PRIORITIES: { value: EventPriority; label: string; color: string }[] = [
 
 // ─── Time picker ──────────────────────���───────────────────────────��───────────
 
-function TimePicker({ hour, minute, onChange }: {
-  hour: number; minute: number; onChange: (h: number, m: number) => void;
-}) {
-  const colors = useColors();
-  const tp = useMemo(() => makeTp(colors), [colors]);
-  return (
-    <View style={tp.row}>
-      <View style={tp.unit}>
-        <TouchableOpacity onPress={() => onChange((hour + 23) % 24, minute)} style={tp.arrow} activeOpacity={0.7}>
-          <ChevronUp size={14} color={G.accent} />
-        </TouchableOpacity>
-        <Text style={tp.digit}>{pad(hour)}</Text>
-        <TouchableOpacity onPress={() => onChange((hour + 1) % 24, minute)} style={tp.arrow} activeOpacity={0.7}>
-          <ChevronDown size={14} color={G.accent} />
-        </TouchableOpacity>
-      </View>
-      <Text style={tp.sep}>:</Text>
-      <View style={tp.unit}>
-        <TouchableOpacity onPress={() => onChange(hour, (minute + 55) % 60)} style={tp.arrow} activeOpacity={0.7}>
-          <ChevronUp size={14} color={G.accent} />
-        </TouchableOpacity>
-        <Text style={tp.digit}>{pad(minute)}</Text>
-        <TouchableOpacity onPress={() => onChange(hour, (minute + 5) % 60)} style={tp.arrow} activeOpacity={0.7}>
-          <ChevronDown size={14} color={G.accent} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-const makeTp = themedStyles((c: any) => StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  unit: { alignItems: 'center', gap: 2 },
-  arrow: {
-    width: 36, height: 28, borderRadius: radius.sm,
-    backgroundColor: G.accentDim, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: G.cardBorder,
-  },
-  digit: { fontSize: 24, fontWeight: '800', color: G.accent, minWidth: 40, textAlign: 'center' },
-  sep: { fontSize: 24, fontWeight: '800', color: G.muted, marginBottom: 2 },
-}));
+// TimePicker/makeTp (chevron ±1/±5 stepper) removed 2026-08-09 — replaced by
+// TimePickerField (scroll wheel, src/components/ui/TimePickerField.tsx).
 
 // ─── Section card ────────────────────��───────────────────────────────────���────
 
@@ -158,8 +121,8 @@ export default function AddTaskScreen() {
 
   // Reminder
   const [reminderOn, setReminderOn]       = useState(false);
-  const [reminderHour, setReminderHour]   = useState(9);
-  const [reminderMin, setReminderMin]     = useState(0);
+  const [reminderClock, setReminderClock] = useState('09:00');   // 'HH:MM'
+  const [reminderDate, setReminderDate]   = useState('');        // '' = follow deadline||dziś (see handleSave)
   const [reminderMsg, setReminderMsg]     = useState('');
 
   // Milestones — break the task into small steps up front (easier to start)
@@ -208,7 +171,10 @@ export default function AddTaskScreen() {
     setSaving(true);
     try {
       const deadlineIso = deadline ? deadline + 'T23:59:00.000Z' : undefined;
-      const reminderTime = reminderOn ? `${pad(reminderHour)}:${pad(reminderMin)}` : undefined;
+      const reminderTime = reminderOn ? reminderClock : undefined;
+      // reminderDate empty = never touched the day-picker → keep the old implicit
+      // behaviour (deadline, else today) exactly; only a deliberate pick overrides it.
+      const reminderDateEff = reminderOn ? (reminderDate || deadline || todayStr()) : undefined;
       const reminderMessage = reminderOn && reminderMsg.trim() ? reminderMsg.trim() : undefined;
 
       const task = await tasksService.addTask({
@@ -227,17 +193,17 @@ export default function AddTaskScreen() {
         tags,
         recurring,
         reminderTime,
+        reminderDate: reminderDateEff,
         reminderMessage,
         subtasks: milestones.length > 0
           ? milestones.map((t, i): Subtask => ({ id: `${Date.now()}_${i}`, title: t, done: false }))
           : undefined,
       });
 
-      // Schedule reminder — use deadline date or today if no deadline
-      if (reminderTime) {
+      if (reminderTime && reminderDateEff) {
         notificationsService.scheduleCustomTaskReminder(
           task.id, task.title,
-          deadline || todayStr(),
+          reminderDateEff,
           reminderTime,
           reminderMessage,
         ).catch(() => {});
@@ -419,7 +385,7 @@ export default function AddTaskScreen() {
               }
               <Text style={[s.reminderToggleText, reminderOn && { color: G.accent }]}>
                 {reminderOn
-                  ? `Przypomnienie o ${pad(reminderHour)}:${pad(reminderMin)}`
+                  ? `Przypomnienie ${reminderDate || deadline || todayStr()} o ${reminderClock}`
                   : 'Dodaj przypomnienie'}
               </Text>
               {reminderOn && (
@@ -435,11 +401,18 @@ export default function AddTaskScreen() {
 
             {reminderOn && (
               <>
-                <TimePicker
-                  hour={reminderHour}
-                  minute={reminderMin}
-                  onChange={(h, m) => { setReminderHour(h); setReminderMin(m); }}
-                />
+                <View style={s.reminderFieldsRow}>
+                  <DatePickerField
+                    value={reminderDate || deadline || todayStr()}
+                    onChange={setReminderDate}
+                    style={{ flex: 1 }}
+                  />
+                  <TimePickerField
+                    value={reminderClock}
+                    onChange={setReminderClock}
+                    style={{ flex: 1 }}
+                  />
+                </View>
                 <TextInput
                   value={reminderMsg}
                   onChangeText={setReminderMsg}
@@ -749,6 +722,7 @@ const makeS = (c: any) => StyleSheet.create({
   },
   reminderToggleText: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text.muted },
   reminderClear: { padding: 4 },
+  reminderFieldsRow: { flexDirection: 'row', gap: spacing[2] },
   reminderMsgInput: {
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: radius.md, borderWidth: 1,
