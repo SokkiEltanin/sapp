@@ -14,7 +14,10 @@ export async function processAutoBankQueue(): Promise<number> {
   try {
     const q = useBankQueue.getState();
     if (!q.enabled) return 0;
-    const auto = q.pending.filter(p => p.auto);
+    // Foreign-currency pushes never auto-accept, even from a trusted merchant — the real
+    // PLN figure depends on that transaction's card FX rate, which only a human can supply
+    // (see bank-review.tsx). They stay queued for manual review regardless of trust level.
+    const auto = q.pending.filter(p => p.auto && (p.currency || 'PLN') === 'PLN');
     if (!auto.length) return 0;
 
     let done = 0;

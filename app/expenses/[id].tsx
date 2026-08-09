@@ -586,6 +586,14 @@ export default function ExpenseDetailScreen() {
               </View>
             )}
 
+            {/* Original foreign-currency amount — set once, at bank-review time; never
+                edited here, just kept visible so it isn't captured-but-invisible. */}
+            {!!expense.originalAmount && !!expense.originalCurrency && (
+              <Text style={[s.currencyLabel, { color: heroAccent + '90', marginTop: -4 }]}>
+                Pierwotnie: {expense.originalAmount.toFixed(2)} {expense.originalCurrency}
+              </Text>
+            )}
+
             {/* Date chip */}
             <View style={s.heroMeta}>
               <View style={[s.dateBadge, { borderColor: heroAccent + '30' }]}>

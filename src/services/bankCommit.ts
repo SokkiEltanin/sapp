@@ -45,11 +45,23 @@ export interface CommitResult {
 // otherwise add a fresh expense. Then teach the merchant memory (unless learn:false).
 // Shared by the manual review screen and the auto-accept processor so both behave
 // identically. Reads/writes the live expenses store, so run it with expenses loaded.
+//
+// plnOverride: every monthly/weekly/yearly summary sums Expense.amount raw, assuming
+// PLN — a foreign-currency push (EUR etc.) would otherwise silently pollute those totals
+// with the raw foreign digits. When the currency isn't PLN and a human-confirmed PLN
+// figure is supplied (bank-review.tsx), that figure becomes `amount`/currency 'PLN' and
+// the original foreign amount is kept on originalAmount/originalCurrency for display —
+// left absent (as today) this falls through to the old raw-amount behaviour untouched.
 export async function commitBankTx(
   p: PendingBankTx,
-  opts?: { corrected?: boolean; learn?: boolean },
+  opts?: { corrected?: boolean; learn?: boolean; plnOverride?: number },
 ): Promise<CommitResult> {
   const st = useExpensesStore.getState();
+  const foreign = (p.currency || 'PLN') !== 'PLN';
+  const useOverride = foreign && opts?.plnOverride != null && opts.plnOverride > 0;
+  const finalAmount = useOverride ? opts!.plnOverride! : p.amount;
+  const finalCurrency = useOverride ? 'PLN' : (p.currency || 'PLN');
+  const originalFields = useOverride ? { originalAmount: p.amount, originalCurrency: p.currency } : {};
 
   // ── Incoming transfer → income ──────────────────────────────────────────────
   if (p.direction === 'in') {
@@ -63,10 +75,11 @@ export async function commitBankTx(
       const wp = (useWorkStore.getState().settings.workPrefix ?? '').trim();
       const note = p.jd && wp ? `${wp} ${p.store || 'Wynagrodzenie'}` : (p.store || 'Przychód');
       const exp = await expensesService.add({
-        type: 'income', amount: p.amount, currency: p.currency || 'PLN',
+        type: 'income', amount: finalAmount, currency: finalCurrency,
         category: (p.jd ? 'salary' : 'other') as any,
         tags: p.jd && wp ? [wp] : [],
         note, date: p.dateISO, paymentMethod: 'card', bankMatched: true,
+        ...originalFields,
       } as any);
       st.addExpense(exp);
       // Teach the paycheck-sender memory so next month's transfer from this employer
@@ -108,10 +121,11 @@ export async function commitBankTx(
       expensesService.update(match.id, { bankMatched: true }).catch(() => {});
     } else {
       const exp = await expensesService.add({
-        type: 'expense', amount: p.amount, currency: p.currency || 'PLN', category: p.category,
+        type: 'expense', amount: finalAmount, currency: finalCurrency, category: p.category,
         tags: p.tags ?? [], note: p.store || (p.selfTransfer ? 'Przelew na oszczędności' : 'Płatność'), date: p.dateISO,
         ...(p.store ? { storeName: p.store } : {}),
         paymentMethod: p.method === 'cash' ? 'cash' : 'card', bankMatched: true,
+        ...originalFields,
       });
       st.addExpense(exp);
     }

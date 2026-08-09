@@ -15,6 +15,10 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
+// 'PLN'/undefined -> 'zł' (matches every other zł label in the app); anything else is
+// shown as its own ISO code so a EUR push is never mislabeled as PLN.
+const curLabel = (cur?: string) => (!cur || cur === 'PLN') ? 'zł' : cur;
+
 const CATS: [ExpenseCategory, string][] = [
   ['groceries', 'Spożywcze'], ['transport', 'Transport'], ['entertainment', 'Rozrywka'],
   ['health', 'Zdrowie'], ['clothing', 'Ubrania'], ['housing', 'Mieszkanie'],
@@ -26,18 +30,27 @@ export default function BankReview() {
   const s = useMemo(() => makeS(c), [c]);
   const { pending, update, remove } = useBankQueue();
   const [mem, setMem] = useState<MerchantMemory>({});
+  const [plnDrafts, setPlnDrafts] = useState<Record<string, string>>({});   // pending.id -> typed PLN string
   const reloadMem = useCallback(() => { loadMerchantMemory().then(setMem).catch(() => {}); }, []);
   useFocusEffect(reloadMem);
 
   const accept = async (p: PendingBankTx) => {
+    const foreign = !!p.currency && p.currency !== 'PLN';
+    const plnOverride = foreign ? parseFloat((plnDrafts[p.id] ?? '').replace(',', '.')) : undefined;
+    if (foreign && !(plnOverride! > 0)) {
+      haptic.error();
+      toast.error(`Wpisz ile to było w PLN (${p.amount.toFixed(2)} ${p.currency} — kurs karty bywa inny niż w banku)`);
+      return;
+    }
     haptic.success();
     const corrected = p.category !== p.suggestedCategory; // reader guessed wrong → don't reward trust
-    const res = await commitBankTx(p, { corrected });
+    const res = await commitBankTx(p, { corrected, plnOverride });
     if (!res.ok) { toast.error('Nie udało się dodać'); return; }
+    const saved = foreign ? plnOverride! : p.amount;   // what actually landed in the summary
     if (p.direction === 'in') {
       toast.success(res.matched
-        ? `Dopasowano do istniejącego przychodu: +${p.amount.toFixed(2)} zł`
-        : `Dodano przychód: +${p.amount.toFixed(2)} zł${p.jd ? ' (wypłata)' : ''}`);
+        ? `Dopasowano do istniejącego przychodu: +${saved.toFixed(2)} zł`
+        : `Dodano przychód: +${saved.toFixed(2)} zł${p.jd ? ' (wypłata)' : ''}`);
       reloadMem(); remove(p.id); return;
     }
     if (res.matched) {
@@ -46,9 +59,9 @@ export default function BankReview() {
       toast.success(`${p.store || 'Sklep'} przechodzi na automat — kolejne płatności dodam sam`);
     } else if (!corrected && res.merchant) {
       const left = Math.max(0, AUTO_THRESHOLD - (res.merchant.cleanAccepts ?? 0));
-      toast.success(left > 0 ? `Dodano · jeszcze ${left} do automatu` : `Dodano: ${p.amount.toFixed(2)} zł`);
+      toast.success(left > 0 ? `Dodano · jeszcze ${left} do automatu` : `Dodano: ${saved.toFixed(2)} zł`);
     } else {
-      toast.success(`Dodano: ${p.amount.toFixed(2)} zł · ${p.store || 'płatność'}`);
+      toast.success(`Dodano: ${saved.toFixed(2)} zł · ${p.store || 'płatność'}`);
     }
     reloadMem();
     remove(p.id);
@@ -90,6 +103,7 @@ export default function BankReview() {
           const info = mem[p.storeKey];
           const accepts = info?.cleanAccepts ?? 0;
           const isIn = p.direction === 'in';
+          const foreign = !!p.currency && p.currency !== 'PLN';
           return (
             <View key={p.id} style={[s.card, p.flagReason && { borderColor: '#FBBF2455' }]}>
               {p.flagReason && (
@@ -99,9 +113,27 @@ export default function BankReview() {
                 </View>
               )}
               <View style={s.cardTop}>
-                <Text style={[s.amount, isIn && { color: '#2AC68F' }]}>{isIn ? '+' : ''}{p.amount.toFixed(2)} zł</Text>
+                <Text style={[s.amount, isIn && { color: '#2AC68F' }]}>{isIn ? '+' : ''}{p.amount.toFixed(2)} {curLabel(p.currency)}</Text>
                 <Text style={s.time}>{d.toLocaleDateString('pl-PL', { day: '2-digit', month: 'short' })} · {d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</Text>
               </View>
+
+              {foreign && (
+                <View style={s.fxBox}>
+                  <AlertTriangle size={13} color="#FBBF24" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.fxText}>Zapłacono w {p.currency} — kurs karty bywa inny niż w banku. Ile to było w PLN?</Text>
+                    <TextInput
+                      value={plnDrafts[p.id] ?? ''}
+                      onChangeText={v => setPlnDrafts(d2 => ({ ...d2, [p.id]: v }))}
+                      style={s.fxInput}
+                      keyboardType="decimal-pad"
+                      placeholder="np. 95,20"
+                      placeholderTextColor={c.text.muted}
+                    />
+                  </View>
+                </View>
+              )}
+
               <Text style={s.fieldLabel}>{isIn ? 'Nadawca / tytuł' : 'Sklep'}</Text>
               <TextInput value={p.store} onChangeText={v => update(p.id, { store: v })} style={s.input} placeholderTextColor={c.text.muted} placeholder={isIn ? 'Nadawca' : 'Sklep'} />
 
@@ -147,7 +179,10 @@ export default function BankReview() {
                 <TouchableOpacity style={[s.actBtn, s.rejectBtn]} onPress={() => reject(p)} activeOpacity={0.85}>
                   <X size={16} color={c.accent.red} /><Text style={[s.actText, { color: c.accent.red }]}>Odrzuć</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.actBtn, s.acceptBtn]} onPress={() => accept(p)} activeOpacity={0.85}>
+                <TouchableOpacity
+                  style={[s.actBtn, s.acceptBtn, foreign && !(parseFloat((plnDrafts[p.id] ?? '').replace(',', '.')) > 0) && s.acceptBtnDisabled]}
+                  onPress={() => accept(p)} activeOpacity={0.85}
+                >
                   <Check size={16} color="#fff" /><Text style={[s.actText, { color: '#fff' }]}>Zatwierdź</Text>
                 </TouchableOpacity>
               </View>
@@ -189,6 +224,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   card: { backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], marginBottom: spacing[3] },
   flagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FBBF2414', borderRadius: radius.md, paddingHorizontal: 8, paddingVertical: 6, marginBottom: spacing[2] },
   flagText: { flex: 1, fontSize: 12, fontWeight: '700', color: '#FBBF24' },
+  fxBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FBBF2414', borderRadius: radius.md, borderWidth: 1, borderColor: '#FBBF2440', padding: spacing[3], marginTop: spacing[3] },
+  fxText: { fontSize: 12, fontWeight: '600', color: c.text.secondary, lineHeight: 16, marginBottom: 6 },
+  fxInput: { backgroundColor: c.bg.primary, borderRadius: radius.md, borderWidth: 1, borderColor: '#FBBF2455', paddingHorizontal: spacing[3], paddingVertical: 9, fontSize: 15, fontWeight: '700', color: c.text.primary },
   cardTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   amount: { fontSize: 24, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
   time: { fontSize: 12, color: c.text.muted, fontWeight: '600' },
@@ -219,5 +257,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   actBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.lg },
   rejectBtn: { borderWidth: 1, borderColor: c.accent.red + '55', backgroundColor: c.accent.red + '12' },
   acceptBtn: { backgroundColor: '#46B0DE' },
+  acceptBtnDisabled: { backgroundColor: '#46B0DE55' },
   actText: { fontSize: 14, fontWeight: '800' },
 }));

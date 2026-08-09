@@ -43,6 +43,8 @@ export interface Expense {
   type?: TransactionType; // undefined treated as 'expense' for backward compat
   amount: number;
   currency: string;
+  originalAmount?: number;    // set when a bank push arrived in a foreign currency —
+  originalCurrency?: string;  // amount/currency above hold the human-confirmed PLN figure
   category: ExpenseCategory | IncomeCategory;
   tags: string[];
   note: string;
