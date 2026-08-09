@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Lock, Swords, Zap } from 'lucide-react-native';
@@ -10,6 +10,7 @@ import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
 import { BOSSES, Boss, bossBonuses, atkPower, simulateFight, FIGHT_ROUNDS, EquippedItem } from '@/utils/bosses';
+import { bossAttackFx } from '@/utils/bossAttackFx';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -125,6 +126,12 @@ export default function BossFight() {
   const flashOp = flash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.8] });
   const floatY = dmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -50] });
   const floatOp = dmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
+  // Custom attack burst per boss ("dodałem jako ATTACKBOSS" — assets/ikonybosów/
+  // BOSSATTACK_*, patrz src/utils/bossAttackFx.ts). Punches in with `pop`, fades with
+  // `flash` — same two values already driving the boss's own hit-react, so the burst
+  // stays perfectly in sync with the shake/flash without a 3rd Animated.Value.
+  const attackFx = current ? bossAttackFx(current.id) : undefined;
+  const fxScale = pop.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.35] });
 
   const closeVictory = () => { setVictory(null); router.back(); };
 
@@ -155,6 +162,11 @@ export default function BossFight() {
                 <BossArt id={current.id} emoji={current.emoji} size={96} />
               </Animated.View>
               <Animated.View pointerEvents="none" style={[s.hitFlash, { opacity: flashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
+              {attackFx && lastHit && (
+                <Animated.View pointerEvents="none" style={[s.attackFx, { opacity: flashOp, transform: [{ scale: fxScale }, { rotate: '-10deg' }] }]}>
+                  <Image source={attackFx} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
+                </Animated.View>
+              )}
               {lastHit && (
                 <Animated.Text style={[s.dmgFloat, { opacity: floatOp, transform: [{ translateY: floatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
                   -{lastHit.dmg}{lastHit.crit ? ' KRYT!' : ''}
@@ -269,6 +281,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   aura: { position: 'absolute', width: 132, height: 132, borderRadius: 66, borderWidth: 1 },
   hitFlash: { position: 'absolute', width: 104, height: 104, borderRadius: 52 },
+  attackFx: { position: 'absolute', width: 150, height: 150 },
   mechNote: { fontSize: 11.5, color: '#F4B740', fontWeight: '800', marginTop: 4, textAlign: 'center' },
   mechNoteHeal: { fontSize: 11.5, color: '#7DD3FC', fontWeight: '800', marginTop: 2, textAlign: 'center' },
   mechHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: 3, lineHeight: 15 },
