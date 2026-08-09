@@ -21,7 +21,7 @@
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/LOGONOWEpupildoapki.png",
-        "backgroundColor": "#083A64"
+        "backgroundColor": "#14171A"
       },
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",

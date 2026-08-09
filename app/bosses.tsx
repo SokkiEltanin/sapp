@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Zap, Lock, Check, Swords } from 'lucide-react-native';
+import { ChevronLeft, Zap, Lock, Check, Swords, Trophy, Coins, Shield, HeartPulse } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
@@ -171,8 +171,15 @@ export default function Bosses() {
         <View style={s.miniRow}>
           <View style={s.miniCard}>
             <View style={s.miniHead}>
-              <Text style={s.miniKicker}>RAID · 🏆{raidWon.length}</Text>
-              <Text style={s.miniEnergy}>⚡{raidEnergy}</Text>
+              <View style={s.miniKickerRow}>
+                <Text style={s.miniKicker}>RAID</Text>
+                <Trophy size={9} color={c.text.muted} />
+                <Text style={s.miniKicker}>{raidWon.length}</Text>
+              </View>
+              <View style={s.miniEnergyRow}>
+                <Zap size={10} color="#38BDF8" />
+                <Text style={s.miniEnergy}>{raidEnergy}</Text>
+              </View>
             </View>
             <View style={s.miniBody}>
               <View>
@@ -202,8 +209,15 @@ export default function Bosses() {
           {eventBoss && eventKey && (
             <View style={s.miniCard}>
               <View style={s.miniHead}>
-                <Text style={s.miniKicker} numberOfLines={1}>{eventBoss.kind === 'seasonal' ? 'WYDARZENIE' : 'NEMESIS'} · 🏆{eventWon.length}</Text>
-                <Text style={s.miniEnergy}>⚡{eventEnergy}</Text>
+                <View style={s.miniKickerRow}>
+                  <Text style={s.miniKicker} numberOfLines={1}>{eventBoss.kind === 'seasonal' ? 'WYDARZENIE' : 'NEMESIS'}</Text>
+                  <Trophy size={9} color={c.text.muted} />
+                  <Text style={s.miniKicker}>{eventWon.length}</Text>
+                </View>
+                <View style={s.miniEnergyRow}>
+                  <Zap size={10} color="#38BDF8" />
+                  <Text style={s.miniEnergy}>{eventEnergy}</Text>
+                </View>
               </View>
               <View style={s.miniBody}>
                 <View>
@@ -253,10 +267,10 @@ export default function Bosses() {
               <>
                 <Text style={s.previewTxt}>Twój cios: ~{previewDmg} obrażeń/rundę × {FIGHT_ROUNDS} rundy · prób dziś: {energy}</Text>
                 {(current.guard || current.regenPct) && (
-                  <Text style={s.mechHint}>
-                    {current.guard ? '🛡️ ten boss ma wrodzoną osłonę — Twoje ciosy ×0.5. ' : ''}
-                    {current.regenPct ? '🩹 ten boss regeneruje się, gdy przeżyje rundę.' : ''}
-                  </Text>
+                  <View style={s.mechRow}>
+                    {current.guard && <><Shield size={11} color={c.text.muted} /><Text style={s.mechHint}>wrodzona osłona (ciosy ×0.5)</Text></>}
+                    {current.regenPct && <><HeartPulse size={11} color={c.text.muted} /><Text style={s.mechHint}>regeneruje się, gdy przeżyje rundę</Text></>}
+                  </View>
                 )}
                 <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight' as any); }} style={{ width: '100%' }}>
                   <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
@@ -264,7 +278,11 @@ export default function Bosses() {
                     <Text style={s.attackTxt}>WALCZ!</Text>
                   </View>
                 </PressableScale>
-                <Text style={s.loot}>Nagroda: {current.loot.emoji} {current.loot.name} · {current.loot.desc} · +{current.coins} 🪙</Text>
+                <View style={s.lootRow}>
+                  <Text style={s.loot}>Nagroda: {current.loot.emoji} {current.loot.name} · {current.loot.desc} ·</Text>
+                  <Coins size={11} color="#FBBF24" />
+                  <Text style={s.lootCoins}>{current.coins}</Text>
+                </View>
               </>
             ) : (
               <View style={s.lockBox}>
@@ -348,7 +366,10 @@ function RaidVictoryModal({ visible, onClose, raid, level, c, s }: any) {
           <Text style={s.vKicker}>RAID POKONANY!</Text>
           <Text style={s.vBoss}>{raid.trophyEmoji}</Text>
           <Text style={s.vName}>{raid.name}</Text>
-          <Text style={s.vReward}>Medal tygodnia · +{raidCoins(level)} 🪙 · +{raidXp(level)} XP</Text>
+          <View style={s.vRewardRow}>
+            <Coins size={15} color="#FDE047" />
+            <Text style={s.vReward}>Medal tygodnia · {raidCoins(level)} · +{raidXp(level)} XP</Text>
+          </View>
         </View>
         <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
       </Pressable>
@@ -365,7 +386,10 @@ function EventVictoryModal({ visible, onClose, eventBoss, level, c, s }: any) {
             <Text style={s.vKicker}>WYDARZENIE POKONANE!</Text>
             <Text style={s.vBoss}>{eventBoss.trophyEmoji}</Text>
             <Text style={s.vName}>{eventBoss.name}</Text>
-            <Text style={s.vReward}>Medal · +{eventCoins(level)} 🪙 · +{eventXp(level)} XP</Text>
+            <View style={s.vRewardRow}>
+              <Coins size={15} color="#FDE047" />
+              <Text style={s.vReward}>Medal · {eventCoins(level)} · +{eventXp(level)} XP</Text>
+            </View>
           </View>
         )}
         <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
@@ -395,7 +419,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   previewTxt: { fontSize: 12, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
   attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FBBF24', borderRadius: radius.lg, paddingVertical: 16, marginTop: spacing[3], width: '100%' },
   attackTxt: { fontSize: 17, fontWeight: '900', color: '#0B0E1A' },
-  loot: { fontSize: 11.5, color: c.text.muted, textAlign: 'center', marginTop: spacing[3] },
+  lootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: spacing[3], flexWrap: 'wrap' },
+  loot: { fontSize: 11.5, color: c.text.muted, textAlign: 'center' },
+  lootCoins: { fontSize: 11.5, color: '#FBBF24', fontWeight: '800' },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[3], paddingHorizontal: spacing[3] },
   lockTxt: { flex: 1, fontSize: 12.5, color: c.text.muted, lineHeight: 17 },
 
@@ -410,16 +436,20 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vKicker: { fontSize: 14, fontWeight: '900', letterSpacing: 3, color: '#FDE047', marginBottom: 10 },
   vBoss: { fontSize: 72, opacity: 0.6 },
   vName: { fontSize: 22, fontWeight: '900', color: '#fff', marginTop: 6 },
-  vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047', marginTop: spacing[4] },
+  vRewardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4] },
+  vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047' },
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
   aura: { position: 'absolute', width: 116, height: 116, borderRadius: 58, borderWidth: 1 },
-  mechHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: 3, lineHeight: 15 },
+  mechRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, justifyContent: 'center', flexWrap: 'wrap' },
+  mechHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', lineHeight: 15 },
 
   miniRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[3] },
   miniCard: { flex: 1, minWidth: 0, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: 6 },
   miniHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  miniKicker: { flex: 1, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, color: c.text.muted },
+  miniKickerRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3, minWidth: 0 },
+  miniKicker: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8, color: c.text.muted },
+  miniEnergyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   miniEnergy: { fontSize: 10.5, fontWeight: '800', color: '#38BDF8' },
   miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   miniEmoji: { fontSize: 30 },
