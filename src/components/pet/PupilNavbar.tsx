@@ -2,27 +2,31 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Cat, Swords, ShoppingBag, Trophy } from 'lucide-react-native';
+import { Cat, Swords, ShoppingBag, BarChart3 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
-// Floating tab bar for the pupil section (Pupil/Bossy/Sklep/Trofea) — these 4
+// Floating tab bar for the pupil section (Pupil/Bosy/Sklep/Statystyki) — these 4
 // screens are flat sibling routes with no shared layout (app/pet.tsx, bosses.tsx,
-// pet-shop.tsx, achievements.tsx), and today the ONLY way to move between them is
+// pet-shop.tsx, pet-stats.tsx), and the only way to move between them otherwise is
 // router.back() to wherever you came from and tap again (user complaint: "nie
 // zrobiłeś navbar... i wgle"). Mirrors the main TabBar's frosted-pill + sliding-
 // island visual language (src/components/ui/TabBar.tsx) since these screens are
 // never on screen at the same time as the main tab bar (they're root-level Stack
 // routes outside the (tabs) group), so there's no visual clash to worry about.
-export type PupilTab = 'pet' | 'bosses' | 'shop' | 'trophies';
+// `trophies`/achievements.tsx was dropped from this bar (2026-08-09, user gave an
+// explicit 4-tab list without it) — general life achievements still reach it via
+// Settings/dashboard, just not from here; `stats` (pet power + boss loot/items) took
+// its slot since it's the pupil-specific screen the achievements shortcut wasn't.
+export type PupilTab = 'pet' | 'bosses' | 'shop' | 'stats';
 
 const TABS: { key: PupilTab; Icon: typeof Cat; path: string; accent: string }[] = [
-  { key: 'pet',      Icon: Cat,         path: '/pet',          accent: '#2AC68F' },
-  { key: 'bosses',   Icon: Swords,      path: '/bosses',       accent: '#38BDF8' },
-  { key: 'shop',     Icon: ShoppingBag, path: '/pet-shop',     accent: '#A78BFA' },
-  { key: 'trophies', Icon: Trophy,      path: '/achievements', accent: '#FBBF24' },
+  { key: 'pet',    Icon: Cat,         path: '/pet',        accent: '#2AC68F' },
+  { key: 'bosses', Icon: Swords,      path: '/bosses',     accent: '#38BDF8' },
+  { key: 'shop',   Icon: ShoppingBag, path: '/pet-shop',   accent: '#A78BFA' },
+  { key: 'stats',  Icon: BarChart3,   path: '/pet-stats',  accent: '#FBBF24' },
 ];
 
 export default function PupilNavbar({ current }: { current: PupilTab }) {

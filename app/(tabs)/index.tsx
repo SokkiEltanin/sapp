@@ -1511,7 +1511,11 @@ export default function DashboardScreen() {
     // if it ran within 10 min, so switching tabs doesn't re-hit Health Connect + rewrite
     // the per-day cache every time (that setHealthDays churn kept re-dirtying this frozen
     // screen, so returning to the dashboard had a bigger thaw to reconcile → the lag).
-    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(7, force)).then(n => { if (n > 0) read(); }).catch(() => {});
+    // force=true (cold start/resume) backfills the FULL 30-day window the sleep-chart
+    // card actually displays — a plain 7-day window (used on lighter focus-only syncs
+    // below) left the other ~23 days permanently empty for anyone who never visited
+    // Zdrowie's manual "Zsynchronizuj z zegarka" button (the only other 30-day sync).
+    import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(force ? 30 : 7, force)).then(n => { if (n > 0) read(); }).catch(() => {});
   }, []);
   useEffect(() => { reloadHealth(true); }, [reloadHealth]);  // cold start → force fresh
   // Re-read local health on focus (cheap multiGet) so a weight/steps logged elsewhere

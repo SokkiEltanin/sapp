@@ -110,3 +110,8 @@ export const SHIELD_REDUCTION_PCT = 0.05;  // -5% wszystkich obrażeń przychodz
 export const THORN_PCT = 0.02;             // gwarantowane -2% hp bossa co rundę (mały, pewny odzew)
 
 export function itemById(id: CombatItemId): CombatItemDef { return COMBAT_ITEMS[id]; }
+
+// Ulepszanie itemów bojowych (UI w app/pet-stats.tsx) — taniej niż HP/ATK w sklepie, bo
+// te itemy trzeba NAJPIERW wylosować ze skrzynki (COMBAT_ITEM_DROP_CHANCE=0.01 w
+// crates.ts), więc samo posiadanie już jest rzadkie. TODO-balance: brak danych z playtestów.
+export const combatItemUpgradeCost = (currentLevel: number) => 25 + (currentLevel - 1) * 20;
