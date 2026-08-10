@@ -17,11 +17,19 @@ import { toast } from '@/store/toastStore';
 
 const ITEM_IDS = Object.keys(COMBAT_ITEMS) as CombatItemId[];
 
+// Ulepszenia HP/ATK — przeniesione tu z pet-shop.tsx (2026-08-10, user: "ulepszenia statystyk
+// niech będą w statystykach a nie w sklepie"). Trwały, rosnący koszt, ta sama krzywa dla obu.
+const HP_UPGRADE_AMOUNT = 20;   // +HP za jeden zakup
+const hpUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / HP_UPGRADE_AMOUNT) * 15;
+const ATK_UPGRADE_AMOUNT = 5;   // +ATK za jeden zakup — mniejszy krok niż HP, bo atkStatBonus
+// dokłada się wprost do BASE_ATK i mnoży się przez atkMultiplier (mocniejszy stat na monetę).
+const atkUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / ATK_UPGRADE_AMOUNT) * 15;
+
 export default function PetStats() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    coins, xp, ownedItems, defeatedBosses, catMaxHpBonus, atkStatBonus,
+    coins, xp, ownedItems, defeatedBosses, catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
     ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem,
   } = usePetStore();
 
@@ -31,6 +39,8 @@ export default function PetStats() {
   const mult = atkMultiplier(lvl.level, bonuses);
   const maxHp = catMaxHp(catMaxHpBonus);
   const attempts = dailyAttempts(bonuses.energyMult);
+  const hpCost = hpUpgradeCost(catMaxHpBonus);
+  const atkCost = atkUpgradeCost(atkStatBonus);
 
   const trophies = useMemo(() => BOSSES.filter(b => ownedItems.includes(b.loot.id)), [ownedItems]);
 
@@ -39,6 +49,20 @@ export default function PetStats() {
       { text: 'Anuluj', style: 'cancel' },
       { text: 'Ulepsz', onPress: onYes },
     ]);
+  };
+  const onBuyMaxHp = () => {
+    haptic.tap();
+    if (coins < hpCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${hpCost}`); return; }
+    confirmUpgrade('Ulepszenie HP kotka', hpCost, () => {
+      if (buyMaxHp(hpCost, HP_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${HP_UPGRADE_AMOUNT} max HP kotka`); }
+    });
+  };
+  const onBuyAtk = () => {
+    haptic.tap();
+    if (coins < atkCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${atkCost}`); return; }
+    confirmUpgrade('Ulepszenie ATK', atkCost, () => {
+      if (buyAtkStat(atkCost, ATK_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${ATK_UPGRADE_AMOUNT} ATK`); }
+    });
   };
   const onToggleEquip = (id: CombatItemId) => {
     haptic.tap();
@@ -78,12 +102,18 @@ export default function PetStats() {
             <Text style={s.statVal}>{power}</Text>
             <Text style={s.statLabel}>Moc ataku</Text>
             <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
+            <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT} · {atkCost}</Text>
+            </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#2AC68F44', backgroundColor: '#2AC68F12' }]}>
             <Heart size={18} color="#2AC68F" />
             <Text style={s.statVal}>{maxHp}</Text>
             <Text style={s.statLabel}>Max HP kotka</Text>
             <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}</Text>
+            <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT} · {hpCost}</Text>
+            </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
             <Zap size={18} color="#38BDF8" />

@@ -43,29 +43,29 @@ const dark = (hex: string, a: number) => shade(hex, -a);
 const nat = (id: string, name: string, coat: string, ink: string, cost: number): Omit<CatPalette, 'mark'> =>
   ({ id, name, coat, shade: dark(coat, 0.07), ear: dark(coat, 0.16), ink, cost });
 
+// Przycięte 19→10 (2026-08-10, user: "wywal niektóre kolory kota, są bez sensu powtarzają
+// się i są super podobne"). Usunięte jako niemal-duplikaty tych, co zostały: silver/slate/
+// smoke (3 dodatkowe odcienie szarości — grey już jest), honey/caramel/sand (3 dodatkowe
+// ciepłe beże — ginger+cream+brown już pokrywają tę przestrzeń), snow (prawie identyczny
+// z white), coffee (prawie identyczny z chocolate), charcoal/platinum (prawie identyczne
+// z midnight/grey). Zostają TYLKO wizualnie odróżnialne kolory. Wycofane id-ki NIE są nigdzie
+// indziej używane (tylko tu), więc jeśli miałeś któryś z nich kupiony/założony, `paletteById`
+// po prostu wróci do domyślnego niebieskiego (nie crashuje, patrz DEFAULT_PALETTE fallback).
+//
+// Wszystkie zwykłe, jednolite kolory to teraz CENA „common"/basic (<60) — user: "to będą
+// common wydatki nie epickie". Epicki tier zostaje wolny na coś co faktycznie na niego
+// zasługuje (gradient/mieszanka kolorów — PROPOZYCJA do zaprezentowania, jeszcze nie budowane).
 const BASE: Omit<CatPalette, 'mark'>[] = [
   { id: 'blue',   name: 'Niebieski', coat: '#A7CCF5', shade: '#93C1F4', ear: '#8AB5E7', ink: '#3B3C4E', cost: 0 },
-  { id: 'grey',   name: 'Szary',     coat: '#B9BFC7', shade: '#A7AEB7', ear: '#8F97A1', ink: '#3B3C4E', cost: 60 },
-  { id: 'ginger', name: 'Rudy',      coat: '#EDA968', shade: '#E39A55', ear: '#CE8544', ink: '#4A3524', cost: 60 },
-  { id: 'cream',  name: 'Kremowy',   coat: '#F0DFC2', shade: '#E6D2AF', ear: '#D4BE97', ink: '#4A3E2A', cost: 80 },
-  { id: 'brown',  name: 'Brązowy',   coat: '#A97B54', shade: '#986C48', ear: '#85593A', ink: '#38281B', cost: 80 },
-  { id: 'black',  name: 'Czarny',    coat: '#4A4F5C', shade: '#40444F', ear: '#363A44', ink: '#9BA3B4', cost: 120 },
-  { id: 'white',  name: 'Biały',     coat: '#F1F3F6', shade: '#E3E7EC', ear: '#CFD6DE', ink: '#3B3C4E', cost: 120 },
-  // ── więcej naturalnych futer (dłuższy cel na monety) ──
-  nat('silver',   'Srebrny',       '#C6CCD4', '#3B3C4E', 70),
-  nat('honey',    'Miodowy',       '#E9C078', '#4A3A20', 75),
-  nat('slate',    'Popielaty',     '#7E8A99', '#E4E9EF', 90),
-  nat('chocolate','Czekoladowy',   '#6E4B34', '#E7D8CC', 100),
-  nat('smoke',    'Dymny',         '#6B717D', '#DDE1E8', 110),
-  nat('caramel',  'Karmelowy',     '#C88A4E', '#3A2818', 130),
-  nat('charcoal', 'Grafitowy',     '#363B45', '#AEB6C4', 150),
-  nat('snow',     'Śnieżny',       '#FBFCFE', '#3B3C4E', 160),
-  // ── premium (długoterminowe cele na monety) ──
-  nat('rose',     'Różany szary',  '#C9AEB0', '#4A3A3C', 180),
-  nat('coffee',   'Kawowy',        '#5A4636', '#E6DAD0', 190),
-  nat('platinum', 'Platynowy',     '#DDE1E7', '#3B3C4E', 210),
-  nat('midnight', 'Nocny',         '#2C3140', '#9FB0D0', 240),
-  nat('sand',     'Piaskowy',      '#DCC9A6', '#4A3E2A', 200),
+  { id: 'grey',   name: 'Szary',     coat: '#B9BFC7', shade: '#A7AEB7', ear: '#8F97A1', ink: '#3B3C4E', cost: 25 },
+  { id: 'cream',  name: 'Kremowy',   coat: '#F0DFC2', shade: '#E6D2AF', ear: '#D4BE97', ink: '#4A3E2A', cost: 30 },
+  { id: 'ginger', name: 'Rudy',      coat: '#EDA968', shade: '#E39A55', ear: '#CE8544', ink: '#4A3524', cost: 35 },
+  { id: 'brown',  name: 'Brązowy',   coat: '#A97B54', shade: '#986C48', ear: '#85593A', ink: '#38281B', cost: 40 },
+  { id: 'white',  name: 'Biały',     coat: '#F1F3F6', shade: '#E3E7EC', ear: '#CFD6DE', ink: '#3B3C4E', cost: 45 },
+  { id: 'black',  name: 'Czarny',    coat: '#4A4F5C', shade: '#40444F', ear: '#363A44', ink: '#9BA3B4', cost: 50 },
+  nat('chocolate','Czekoladowy',   '#6E4B34', '#E7D8CC', 55),
+  nat('midnight', 'Nocny',        '#2C3140', '#9FB0D0', 55),
+  nat('rose',     'Różany szary', '#C9AEB0', '#4A3A3C', 55),
 ];
 
 export const CAT_PALETTES: CatPalette[] = BASE.map(p => ({ ...p, mark: markFor(p.coat) }));
