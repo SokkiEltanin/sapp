@@ -3,6 +3,13 @@ import { WeaknessKey } from '@/utils/bosses';
 // RAID TYGODNIOWY — jeden gruby boss na cały tydzień, inny co tydzień (świeżość). Bijesz go
 // całotygodniową dbałością o siebie (energia banked jak w kampanii). Pokonanie = kolekcjonerski
 // medal (rośnie ściana trofeów) + monety/XP. Reset w poniedziałek (weekKeyOf z quests).
+//
+// UWAGA: ten plik NIE importuje lucide-react-native mimo że UI teraz renderuje raidy jako
+// ikony — lucide-react-native ciągnie za sobą react-native-svg, którego Jest nie potrafi
+// sparsować z poziomu czystego pliku logiki (raid.ts jest importowany bezpośrednio przez
+// testy). Mapowanie id→ikona żyje osobno w src/utils/bossUiIcons.ts (mirror bossIcons.ts),
+// importowane TYLKO przez ekrany (bosses.tsx), nigdy przez testy. Ten sam wzorzec dla
+// seasonalEvents.ts i lootIcon() z bosses.ts.
 
 export interface Raid {
   id: string;

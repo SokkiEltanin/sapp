@@ -12,6 +12,10 @@ import {
   executeThresholdAt, fireProcChanceAt, FIRE_DOT_PCT, MIND_CONTROL_CHANCE,
   SHIELD_REDUCTION_PCT, THORN_PCT,
 } from '@/utils/combatItems';
+// UWAGA: żadnych importów z lucide-react-native w tym pliku — ciągnie za sobą
+// react-native-svg, którego Jest nie potrafi sparsować z poziomu pliku importowanego
+// bezpośrednio przez testy (bosses.test.ts importuje bosses.ts). Ikony (loot/raid/
+// wydarzenia) żyją osobno w src/utils/bossUiIcons.ts, importowane tylko przez ekrany.
 
 // Czysty temat/flavor bossa (art/aura) — NIE wpływa już na obrażenia. Zostaje jako
 // wizualna tożsamość (kolor aury w bosses.tsx) i opis w kampanii.

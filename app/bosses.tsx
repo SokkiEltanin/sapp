@@ -12,6 +12,7 @@ import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, atkPower, dailyAttempts, computeDamage, FIGHT_ROUNDS } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventBossFromKey } from '@/utils/seasonalEvents';
+import { lootIcon, raidIcon, eventIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf } from '@/utils/quests';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -70,10 +71,12 @@ export default function Bosses() {
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
   const unlocked = current ? level >= current.unlockLevel : false;
   const previewDmg = current ? Math.round(atkPower(atkStatBonus, level, bonuses)) : 0;
+  const CurrentLootIcon = current ? lootIcon(current.loot) : Coins;
 
   // ── raid tygodniowy ──
   const weekKey = weekKeyOf();
   const raid = raidForWeek(weekKey);
+  const RaidIcon = raidIcon(raid.id);
   const raidMaxHp = raidHpFor(level, weekKey);
   const raidRemaining = raidWeek === weekKey ? raidHp : raidMaxHp;
   const raidDone = raidWon.includes(weekKey);
@@ -91,6 +94,7 @@ export default function Bosses() {
     sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg,
   };
   const eventBoss = currentEventBoss(now, menaceCtx);
+  const EventIcon = eventBoss ? eventIcon(eventBoss.id) : null;
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
   const eventMaxHp = eventHpFor(level);
   const eventRemaining = eventKey ? (eventHp[eventKey] ?? eventMaxHp) : 0;
@@ -183,7 +187,9 @@ export default function Bosses() {
             </View>
             <View style={s.miniBody}>
               <View>
-                <Animated.Text style={[s.miniEmoji, { transform: [{ translateX: rShakeX }] }]}>{raid.emoji}</Animated.Text>
+                <Animated.View style={[s.miniIconWrap, { backgroundColor: (WEAK_COLOR[raid.weakness] ?? '#888') + '1E', transform: [{ translateX: rShakeX }] }]}>
+                  <RaidIcon size={26} color={WEAK_COLOR[raid.weakness] ?? c.text.primary} />
+                </Animated.View>
                 {raidHit && (
                   <Animated.Text style={[s.miniDmgFloat, { opacity: rFloatOp, transform: [{ translateY: rFloatY }], color: raidHit.crit ? '#FDE047' : '#F87171' }]}>-{raidHit.dmg}</Animated.Text>
                 )}
@@ -221,7 +227,9 @@ export default function Bosses() {
               </View>
               <View style={s.miniBody}>
                 <View>
-                  <Animated.Text style={[s.miniEmoji, { transform: [{ translateX: eShakeX }] }]}>{eventBoss.emoji}</Animated.Text>
+                  <Animated.View style={[s.miniIconWrap, { backgroundColor: (WEAK_COLOR[eventBoss.weakness] ?? '#888') + '1E', transform: [{ translateX: eShakeX }] }]}>
+                    {EventIcon && <EventIcon size={26} color={WEAK_COLOR[eventBoss.weakness] ?? c.text.primary} />}
+                  </Animated.View>
                   {eventHitFx && (
                     <Animated.Text style={[s.miniDmgFloat, { opacity: eFloatOp, transform: [{ translateY: eFloatY }], color: eventHitFx.crit ? '#FDE047' : '#F87171' }]}>-{eventHitFx.dmg}</Animated.Text>
                   )}
@@ -279,7 +287,8 @@ export default function Bosses() {
                   </View>
                 </PressableScale>
                 <View style={s.lootRow}>
-                  <Text style={s.loot}>Nagroda: {current.loot.emoji} {current.loot.name} · {current.loot.desc} ·</Text>
+                  <CurrentLootIcon size={12} color="#2AC68F" />
+                  <Text style={s.loot}>Nagroda: {current.loot.name} · {current.loot.desc} ·</Text>
                   <Coins size={11} color="#FBBF24" />
                   <Text style={s.lootCoins}>{current.coins}</Text>
                 </View>
@@ -307,7 +316,7 @@ export default function Bosses() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
-                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.emoji} ${b.loot.name}` : lock ? `Poziom ${b.unlockLevel}` : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
+                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.name}` : lock ? `Poziom ${b.unlockLevel}` : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
                 </View>
                 {def ? <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
                   : lock ? <Lock size={15} color={c.text.muted} />
@@ -321,12 +330,15 @@ export default function Bosses() {
           <>
             <Text style={s.section}>Medale raidów ({raidWon.length})</Text>
             <View style={s.medalWall}>
-              {raidWon.slice().reverse().map(wk => (
-                <View key={wk} style={s.medal}>
-                  <Text style={s.medalEmoji}>{raidForWeek(wk).trophyEmoji}</Text>
-                  <Text style={s.medalWk} numberOfLines={1}>{wk}</Text>
-                </View>
-              ))}
+              {raidWon.slice().reverse().map(wk => {
+                const MedalIcon = raidIcon(raidForWeek(wk).id);
+                return (
+                  <View key={wk} style={s.medal}>
+                    <MedalIcon size={22} color="#FBBF24" />
+                    <Text style={s.medalWk} numberOfLines={1}>{wk}</Text>
+                  </View>
+                );
+              })}
             </View>
           </>
         )}
@@ -334,12 +346,15 @@ export default function Bosses() {
           <>
             <Text style={s.section}>Medale wydarzeń ({eventWon.length})</Text>
             <View style={s.medalWall}>
-              {eventWon.slice().reverse().map(key => (
-                <View key={key} style={s.medal}>
-                  <Text style={s.medalEmoji}>{eventBossFromKey(key)?.trophyEmoji ?? '🏆'}</Text>
-                  <Text style={s.medalWk} numberOfLines={1}>{key}</Text>
-                </View>
-              ))}
+              {eventWon.slice().reverse().map(key => {
+                const MedalIcon = eventIcon(eventBossFromKey(key)?.id ?? '');
+                return (
+                  <View key={key} style={s.medal}>
+                    <MedalIcon size={22} color="#FBBF24" />
+                    <Text style={s.medalWk} numberOfLines={1}>{key}</Text>
+                  </View>
+                );
+              })}
             </View>
           </>
         )}
@@ -358,13 +373,14 @@ export default function Bosses() {
 // Małe, lokalne modale (raid/wydarzenie zostają na tym ekranie — patrz komentarz u góry
 // pliku). Wydzielone z JSX głównego komponentu tylko żeby return() był czytelny.
 function RaidVictoryModal({ visible, onClose, raid, level, c, s }: any) {
+  const RaidTrophyIcon = raidIcon(raid.id);
   return (
     <Modal visible={visible} transparent statusBarTranslucent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.vBackdrop} onPress={onClose}>
         <Confetti colors={['#FDE047', '#38BDF8', '#2AC68F', '#F472B6']} />
         <View style={s.vCenter} pointerEvents="none">
           <Text style={s.vKicker}>RAID POKONANY!</Text>
-          <Text style={s.vBoss}>{raid.trophyEmoji}</Text>
+          <View style={s.vBossIconWrap}><RaidTrophyIcon size={56} color="#FDE047" /></View>
           <Text style={s.vName}>{raid.name}</Text>
           <View style={s.vRewardRow}>
             <Coins size={15} color="#FDE047" />
@@ -377,14 +393,15 @@ function RaidVictoryModal({ visible, onClose, raid, level, c, s }: any) {
   );
 }
 function EventVictoryModal({ visible, onClose, eventBoss, level, c, s }: any) {
+  const EventTrophyIcon = eventBoss ? eventIcon(eventBoss.id) : null;
   return (
     <Modal visible={visible} transparent statusBarTranslucent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.vBackdrop} onPress={onClose}>
         <Confetti colors={['#F4B740', '#FDE047', '#38BDF8', '#F472B6']} />
-        {eventBoss && (
+        {eventBoss && EventTrophyIcon && (
           <View style={s.vCenter} pointerEvents="none">
             <Text style={s.vKicker}>WYDARZENIE POKONANE!</Text>
-            <Text style={s.vBoss}>{eventBoss.trophyEmoji}</Text>
+            <View style={s.vBossIconWrap}><EventTrophyIcon size={56} color="#FDE047" /></View>
             <Text style={s.vName}>{eventBoss.name}</Text>
             <View style={s.vRewardRow}>
               <Coins size={15} color="#FDE047" />
@@ -434,7 +451,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,8,16,0.94)', paddingHorizontal: 32 },
   vCenter: { alignItems: 'center' },
   vKicker: { fontSize: 14, fontWeight: '900', letterSpacing: 3, color: '#FDE047', marginBottom: 10 },
-  vBoss: { fontSize: 72, opacity: 0.6 },
+  vBossIconWrap: { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(253,224,71,0.12)', alignItems: 'center', justifyContent: 'center', opacity: 0.85 },
   vName: { fontSize: 22, fontWeight: '900', color: '#fff', marginTop: 6 },
   vRewardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4] },
   vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047' },
@@ -452,7 +469,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   miniEnergyRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   miniEnergy: { fontSize: 10.5, fontWeight: '800', color: '#38BDF8' },
   miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  miniEmoji: { fontSize: 30 },
+  miniIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   miniDmgFloat: { position: 'absolute', top: -8, left: 0, fontSize: 12, fontWeight: '900' },
   miniName: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
   miniHpTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4 },
@@ -463,6 +480,5 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   miniLockTxt: { fontSize: 10.5, color: c.text.muted, textAlign: 'center' },
   medalWall: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   medal: { width: 64, alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingVertical: spacing[2] },
-  medalEmoji: { fontSize: 24 },
   medalWk: { fontSize: 9, color: c.text.muted, marginTop: 2 },
 }));

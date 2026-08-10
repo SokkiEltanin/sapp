@@ -3806,6 +3806,18 @@ export default function DashboardScreen() {
                     ))}
                   </View>
                 )}
+                {/* Rzadkie dane (mniej niż tydzień realnych nocy w 30-dniowym oknie) —
+                    zamiast milcząco pustego wykresu, jasny powód + akcja. Automatyczny sync
+                    przy starcie apki dobija tylko do 30 dni wstecz OD TERAZ, więc nie ma jak
+                    magicznie wypełnić starszej historii — jedyny sposób to ręczny "Zsynchronizuj
+                    z zegarka" w Zdrowiu (force=true, pełne okno), patrz memory backlog_2026-08-07. */}
+                {sleepNights.length < 7 && (
+                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/health' as any); }} activeOpacity={0.7} style={{ marginTop: 6 }}>
+                    <Text style={[s.cdDays, { fontSize: 10, color: colors.text.muted }]}>
+                      Tylko {sleepNights.length} {sleepNights.length === 1 ? 'noc' : 'nocy'} z danymi — otwórz Zdrowie i „Zsynchronizuj z zegarka" po więcej historii
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
 

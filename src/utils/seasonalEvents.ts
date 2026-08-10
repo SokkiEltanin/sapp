@@ -5,6 +5,10 @@ import { WeaknessKey } from '@/utils/bosses';
 // najbardziej zaniedbane dane TEGO miesiąca stają się bossem — za dużo nadgodzin, za
 // dużo słodyczy). Sezonowy ZAWSZE wygrywa z nemesis, gdy oba pasują — święta są rzadsze
 // i bardziej „wydarzeniowe" niż zwykłe miesięczne zaniedbanie.
+//
+// UWAGA: bez lucide-react-native tutaj — patrz komentarz w raid.ts (ten sam powód: Jest
+// nie parsuje react-native-svg z poziomu pliku importowanego bezpośrednio przez testy).
+// Mapowanie id→ikona w src/utils/bossUiIcons.ts, importowane tylko przez bosses.tsx.
 
 export interface EventBoss {
   id: string;

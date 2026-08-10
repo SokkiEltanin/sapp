@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins } from 'lucide-react-native';
+import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -11,6 +11,7 @@ import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
 import { BOSSES, Boss, bossBonuses, atkPower, simulateFight, FIGHT_ROUNDS, EquippedItem } from '@/utils/bosses';
 import { bossAttackFx } from '@/utils/bossAttackFx';
+import { lootIcon } from '@/utils/bossUiIcons';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -58,6 +59,7 @@ export default function BossFight() {
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
   const unlocked = current ? level >= current.unlockLevel : false;
   const catMax = catMaxHp(catMaxHpBonus);
+  const CurrentLootIcon = current ? lootIcon(current.loot) : Coins;
   useEffect(() => { resetCatHp(); }, []);
 
   // Walka rund odgrywa się przez łańcuch setTimeout (patrz playerBeat/counterBeat niżej).
@@ -121,6 +123,18 @@ export default function BossFight() {
     ]).start();
   };
 
+  // Pociski lecące między kafelkami (2026-08-10, user: "łapka leci od kota i uderza
+  // wroga... od wroga lecą pociski na kotka, z góry"). 0→1 = leci; JSX niżej interpoluje
+  // na translateX WZDŁUŻ całego wiersza kafelków (płaski tor, bez łuku — "z góry" =
+  // widok pionowy, nie boczny). Rzut trwa PRZED wylądowaniem ciosu (patrz throwDuration
+  // w playerBeat/counterBeat) — HP/shake/flash/liczba obrażeń odpalają się dopiero gdy
+  // pocisk faktycznie dotrze na miejsce, nie w tej samej chwili co start rzutu.
+  const pawTravel = useRef(new Animated.Value(0)).current;
+  const boltTravel = useRef(new Animated.Value(0)).current;
+  const [pawFlying, setPawFlying] = useState(false);
+  const [boltFlying, setBoltFlying] = useState(false);
+  const THROW_MS = 320;
+
   // Cała walka (kilka rund) liczy się od razu w jednym wywołaniu simulateFight, ale
   // ODGRYWA SIĘ dwoma fazami na rundę: Twój cios ląduje na bossie → krótka pauza →
   // kontratak bossa ląduje na kotku → pauza → kolejna runda.
@@ -152,27 +166,45 @@ export default function BossFight() {
     const counterBeat = () => {
       if (!alive.current) return;
       const round = result.rounds[i];
+      const advance = () => {
+        i++;
+        roundTimer.current = setTimeout(i < result.rounds.length ? playerBeat : finish, i < result.rounds.length ? 420 : 550);
+      };
       if (round.counterDmg > 0) {
-        haptic.medium();
-        setCatHit({ dmg: round.counterDmg, healed: round.catHealed });
-        playCatHitFx();
-        damageCat(round.counterDmg);
-      } else if (round.catHealed > 0) {
-        setCatHit({ dmg: 0, healed: round.catHealed });
+        setBoltFlying(true);
+        boltTravel.setValue(0);
+        Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+        roundTimer.current = setTimeout(() => {
+          if (!alive.current) return;
+          setBoltFlying(false);
+          haptic.medium();
+          setCatHit({ dmg: round.counterDmg, healed: round.catHealed });
+          playCatHitFx();
+          damageCat(round.counterDmg);
+          advance();
+        }, THROW_MS);
+      } else {
+        if (round.catHealed > 0) setCatHit({ dmg: 0, healed: round.catHealed });
+        advance();
       }
-      i++;
-      roundTimer.current = setTimeout(i < result.rounds.length ? playerBeat : finish, i < result.rounds.length ? 420 : 550);
     };
 
     const playerBeat = () => {
       if (!alive.current) return;
       const round = result.rounds[i];
-      haptic.medium();
-      setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed });
-      playBossHitFx(round.playerCrit);
-      setAttackPulse(n => n + 1);
-      setLiveBossHp(round.bossHpAfter);
-      roundTimer.current = setTimeout(counterBeat, 480);
+      setPawFlying(true);
+      pawTravel.setValue(0);
+      Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      roundTimer.current = setTimeout(() => {
+        if (!alive.current) return;
+        setPawFlying(false);
+        haptic.medium();
+        setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed });
+        playBossHitFx(round.playerCrit);
+        setAttackPulse(n => n + 1);
+        setLiveBossHp(round.bossHpAfter);
+        roundTimer.current = setTimeout(counterBeat, 480);
+      }, THROW_MS);
     };
 
     playerBeat();
@@ -191,9 +223,18 @@ export default function BossFight() {
   // Custom attack burst per boss (assets/ikonybosów/BOSSATTACK_*) na Twoim ciosie.
   const attackFx = current ? bossAttackFx(current.id) : undefined;
   const fxScale = bPop.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.35] });
+  // Tor lotu = procent szerokości s.vsRow, od środka lewego kafelka (Pupil) do środka
+  // prawego (Boss) i z powrotem. Płasko (bez łuku) — patrz komentarz przy pawTravel wyżej.
+  const pawX = pawTravel.interpolate({ inputRange: [0, 1], outputRange: ['16%', '84%'] });
+  const pawOp = pawTravel.interpolate({ inputRange: [0, 0.08, 0.85, 1], outputRange: [0, 1, 1, 0] });
+  const pawScale = pawTravel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] });
+  const boltX = boltTravel.interpolate({ inputRange: [0, 1], outputRange: ['84%', '16%'] });
+  const boltOp = boltTravel.interpolate({ inputRange: [0, 0.08, 0.85, 1], outputRange: [0, 1, 1, 0] });
+  const boltScale = boltTravel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] });
 
   const closeVictory = () => { setVictory(null); router.back(); };
   const closeDefeat = () => { setDefeat(false); router.back(); };
+  const VictoryLootIcon = victory ? lootIcon(victory.loot) : Coins;
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -217,6 +258,7 @@ export default function BossFight() {
         ) : (
           <View style={s.arena}>
             {/* dwa symetryczne kafelki — Pupil / Boss */}
+            <View style={{ width: '100%', position: 'relative' }}>
             <View style={s.vsRow}>
               <View style={s.tile}>
                 <Text style={s.tileLabel} numberOfLines={1}>Pupil</Text>
@@ -257,6 +299,22 @@ export default function BossFight() {
               </View>
             </View>
 
+            {/* pociski między kafelkami — łapka kota (Twój cios) i "broń" bossa
+                (kontratak), płaski tor wzdłuż wiersza, patrz komentarz przy pawTravel */}
+            {pawFlying && (
+              <Animated.View pointerEvents="none" style={[s.projectile, { left: pawX, opacity: pawOp, transform: [{ scale: pawScale }, { translateX: -14 }] }]}>
+                <PawPrint size={28} color="#FBBF24" />
+              </Animated.View>
+            )}
+            {boltFlying && (
+              <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
+                {attackFx
+                  ? <Image source={attackFx} resizeMode="contain" style={{ width: 32, height: 32 }} />
+                  : <Swords size={26} color="#F87171" />}
+              </Animated.View>
+            )}
+            </View>
+
             <Text style={s.bossTaunt}>„{current.taunt}"</Text>
             {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
             {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
@@ -279,7 +337,7 @@ export default function BossFight() {
               </View>
             </PressableScale>
             <View style={s.lootRow}>
-              <Text style={s.lootEmoji}>{current.loot.emoji}</Text>
+              <CurrentLootIcon size={14} color="#2AC68F" />
               <Text style={s.loot}>{current.loot.name} · {current.loot.desc}</Text>
               <Coins size={12} color="#FBBF24" />
               <Text style={s.lootCoins}>{current.coins}</Text>
@@ -299,7 +357,7 @@ export default function BossFight() {
               </View>
               <Text style={s.vName}>{victory.name} pokonany</Text>
               <View style={s.vLoot}>
-                <Text style={s.vLootEmoji}>{victory.loot.emoji}</Text>
+                <VictoryLootIcon size={30} color="#2AC68F" />
                 <Text style={s.vLootName}>{victory.loot.name}</Text>
                 <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
               </View>
@@ -367,7 +425,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FBBF24', borderRadius: radius.lg, paddingVertical: 16, marginTop: spacing[4], width: '100%' },
   attackTxt: { fontSize: 17, fontWeight: '900', color: '#0B0E1A' },
   lootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: spacing[3], flexWrap: 'wrap' },
-  lootEmoji: { fontSize: 15 },
   loot: { fontSize: 11.5, color: c.text.muted, textAlign: 'center' },
   lootCoins: { fontSize: 11.5, color: '#FBBF24', fontWeight: '800' },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[6], paddingHorizontal: spacing[3] },
@@ -379,7 +436,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vName: { fontSize: 20, fontWeight: '900', color: '#fff', marginTop: 6, textAlign: 'center' },
   vDefeatSub: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 10, textAlign: 'center', maxWidth: 260 },
   vLoot: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.lg, paddingVertical: spacing[3], paddingHorizontal: spacing[5], marginTop: spacing[4] },
-  vLootEmoji: { fontSize: 34 },
   vLootName: { fontSize: 15, fontWeight: '800', color: '#fff', marginTop: 4 },
   vLootDesc: { fontSize: 12, color: '#2AC68F', fontWeight: '700', marginTop: 1 },
   vRewardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4] },
@@ -388,4 +444,5 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   aura: { position: 'absolute', width: 132, height: 132, borderRadius: 66, borderWidth: 1 },
   attackFx: { position: 'absolute', width: 150, height: 150 },
+  projectile: { position: 'absolute', top: 96, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));
