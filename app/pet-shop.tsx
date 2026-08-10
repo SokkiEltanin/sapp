@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame, Heart, Swords } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame, Heart, Swords, Backpack } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -67,12 +67,13 @@ const todayKey = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-type Cat = 'boxes' | 'colors' | 'startups' | 'extras';
+type Cat = 'boxes' | 'colors' | 'startups' | 'extras' | 'owned';
 const CATS: { id: Cat; label: string; Icon: any }[] = [
-  { id: 'boxes',    label: 'Skrzynki', Icon: Gift },
-  { id: 'colors',   label: 'Kolory',   Icon: Palette },
-  { id: 'startups', label: 'Startupy', Icon: Rocket },
-  { id: 'extras',   label: 'Dodatki',  Icon: Sparkles },
+  { id: 'boxes',    label: 'Skrzynki',  Icon: Gift },
+  { id: 'colors',   label: 'Kolory',    Icon: Palette },
+  { id: 'startups', label: 'Startupy',  Icon: Rocket },
+  { id: 'extras',   label: 'Dodatki',   Icon: Sparkles },
+  { id: 'owned',    label: 'Posiadane', Icon: Backpack },
 ];
 const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 
@@ -284,6 +285,43 @@ export default function PetShop() {
     );
   };
 
+  const renderEyeCell = (ec: typeof EYE_COLORS[number]) => {
+    const owned = ec.hex === '' || ownedItems.includes(`eye:${ec.id}`);
+    const on = catEyeColor === ec.hex;
+    const hetero = ec.hex.includes('|');
+    const [hl, hr] = hetero ? ec.hex.split('|') : [ec.hex || '#2A2B36', ec.hex || '#2A2B36'];
+    return (
+      <PressableScale key={ec.id} onPress={() => onEye(ec.id, ec.hex, ec.hex === '' ? 0 : EYE_COST, ec.name)}>
+        <View style={[s.eyeCell, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+          <View style={[s.eyeDot, { backgroundColor: hl, overflow: 'hidden' }]}>
+            {hetero && <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '50%', backgroundColor: hr }} />}
+            {on && <Check size={12} color="#fff" />}
+          </View>
+          <Text style={s.eyeName} numberOfLines={1}>{ec.name}</Text>
+          {!owned
+            ? <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{EYE_COST}</Text></View>
+            : <Text style={[s.cellState, { color: on ? '#4DA8FF' : c.text.muted }]}>{on ? 'na oczach' : 'masz'}</Text>}
+        </View>
+      </PressableScale>
+    );
+  };
+
+  const renderNoseCell = (nc: typeof NOSE_COLORS[number]) => {
+    const owned = nc.hex === '' || ownedItems.includes(`nose:${nc.id}`);
+    const on = catNoseColor === nc.hex;
+    return (
+      <PressableScale key={nc.id} onPress={() => onNose(nc.id, nc.hex, nc.hex === '' ? 0 : NOSE_COST, nc.name)}>
+        <View style={[s.eyeCell, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
+          <View style={[s.eyeDot, { backgroundColor: nc.hex || '#2A2B36' }]}>{on && <Check size={12} color="#fff" />}</View>
+          <Text style={s.eyeName} numberOfLines={1}>{nc.name}</Text>
+          {!owned
+            ? <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{NOSE_COST}</Text></View>
+            : <Text style={[s.cellState, { color: on ? '#4DA8FF' : c.text.muted }]}>{on ? 'na nosku' : 'masz'}</Text>}
+        </View>
+      </PressableScale>
+    );
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
@@ -406,9 +444,10 @@ export default function PetShop() {
           </View>
         )}
 
-        {/* ── KOLORY (grupowane wg rzadkości = kategorie) ───────────── */}
+        {/* ── KOLORY (grupowane wg rzadkości = kategorie) — tylko NIEPOSIADANE,
+            kupione żyją w zakładce Posiadane, żeby siatka nie robiła się bałaganem ── */}
         {cat === 'colors' && TIER_ORDER.map(tier => {
-          const items = SHOP_COLORS.filter(sc => sc.tier === tier);
+          const items = SHOP_COLORS.filter(sc => sc.tier === tier && !ownedItems.includes(sc.id));
           if (!items.length) return null;
           return (
             <View key={tier} style={{ gap: spacing[2] }}>
@@ -420,6 +459,9 @@ export default function PetShop() {
             </View>
           );
         })}
+        {cat === 'colors' && SHOP_COLORS.every(sc => sc.cost === 0 || ownedItems.includes(sc.id)) && (
+          <Text style={s.blurbTop}>Masz już wszystkie kolory — zobacz w Posiadane.</Text>
+        )}
 
         {/* ── STARTUPY (ekran ładowania) ───────────────────────────── */}
         {cat === 'startups' && (
@@ -437,7 +479,7 @@ export default function PetShop() {
               );
             })()}
             {TIER_ORDER.map(tier => {
-              const items = STARTUPS.filter(x => x.tier === tier);
+              const items = STARTUPS.filter(x => x.tier === tier && !ownedItems.includes(`startup:${x.id}`));
               if (!items.length) return null;
               return (
                 <View key={tier} style={{ gap: spacing[2] }}>
@@ -449,58 +491,29 @@ export default function PetShop() {
                 </View>
               );
             })}
+            {STARTUPS.every(x => x.cost === 0 || ownedItems.includes(`startup:${x.id}`)) && (
+              <Text style={s.blurbTop}>Masz już wszystkie startupy — zobacz w Posiadane.</Text>
+            )}
           </View>
         )}
 
         {/* ── DODATKI ──────────────────────────────────────────────── */}
         {cat === 'extras' && (
           <View style={{ gap: spacing[2] }}>
-            {/* Kolor oczu — mini paleta; stuknięcie od razu podgląda na kocie */}
+            {/* Kolor oczu — mini paleta; stuknięcie od razu podgląda na kocie.
+                Nieposiadane + zawsze Domyślne (nie jest „kupione", to reset). */}
             <View style={{ gap: 6 }}>
               <Text style={s.cellName}>Kolor oczu</Text>
               <View style={s.grid}>
-                {EYE_COLORS.map(ec => {
-                  const owned = ec.hex === '' || ownedItems.includes(`eye:${ec.id}`);
-                  const on = catEyeColor === ec.hex;
-                  const hetero = ec.hex.includes('|');
-                  const [hl, hr] = hetero ? ec.hex.split('|') : [ec.hex || '#2A2B36', ec.hex || '#2A2B36'];
-                  return (
-                    <PressableScale key={ec.id} onPress={() => onEye(ec.id, ec.hex, ec.hex === '' ? 0 : EYE_COST, ec.name)}>
-                      <View style={[s.eyeCell, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
-                        <View style={[s.eyeDot, { backgroundColor: hl, overflow: 'hidden' }]}>
-                          {hetero && <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '50%', backgroundColor: hr }} />}
-                          {on && <Check size={12} color="#fff" />}
-                        </View>
-                        <Text style={s.eyeName} numberOfLines={1}>{ec.name}</Text>
-                        {!owned
-                          ? <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{EYE_COST}</Text></View>
-                          : <Text style={[s.cellState, { color: on ? '#4DA8FF' : c.text.muted }]}>{on ? 'na oczach' : 'masz'}</Text>}
-                      </View>
-                    </PressableScale>
-                  );
-                })}
+                {EYE_COLORS.filter(ec => ec.hex === '' || !ownedItems.includes(`eye:${ec.id}`)).map(renderEyeCell)}
               </View>
             </View>
 
-            {/* Kolor noska — mini paleta (solidne kolory) */}
+            {/* Kolor noska — mini paleta (solidne kolory), tak samo nieposiadane + Domyślny */}
             <View style={{ gap: 6 }}>
               <Text style={s.cellName}>Kolor noska</Text>
               <View style={s.grid}>
-                {NOSE_COLORS.map(nc => {
-                  const owned = nc.hex === '' || ownedItems.includes(`nose:${nc.id}`);
-                  const on = catNoseColor === nc.hex;
-                  return (
-                    <PressableScale key={nc.id} onPress={() => onNose(nc.id, nc.hex, nc.hex === '' ? 0 : NOSE_COST, nc.name)}>
-                      <View style={[s.eyeCell, on && { borderColor: '#4DA8FF', backgroundColor: '#4DA8FF1E' }]}>
-                        <View style={[s.eyeDot, { backgroundColor: nc.hex || '#2A2B36' }]}>{on && <Check size={12} color="#fff" />}</View>
-                        <Text style={s.eyeName} numberOfLines={1}>{nc.name}</Text>
-                        {!owned
-                          ? <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{NOSE_COST}</Text></View>
-                          : <Text style={[s.cellState, { color: on ? '#4DA8FF' : c.text.muted }]}>{on ? 'na nosku' : 'masz'}</Text>}
-                      </View>
-                    </PressableScale>
-                  );
-                })}
+                {NOSE_COLORS.filter(nc => nc.hex === '' || !ownedItems.includes(`nose:${nc.id}`)).map(renderNoseCell)}
               </View>
             </View>
 
@@ -526,6 +539,63 @@ export default function PetShop() {
               () => onToggleExtra('legstripes', LEGSTRIPES_COST, 'Pręgi na łapkach', catLegStripes, setPvLeg, buyLegStripes))}
           </View>
         )}
+
+        {/* ── POSIADANE — wszystko kupione, w jednym miejscu (nie rozrzucone po siatkach) ── */}
+        {cat === 'owned' && (() => {
+          const ownedColors = SHOP_COLORS.filter(sc => ownedItems.includes(sc.id));
+          const ownedStartups = STARTUPS.filter(su => ownedItems.includes(`startup:${su.id}`));
+          const ownedEyes = EYE_COLORS.filter(ec => ec.hex !== '' && ownedItems.includes(`eye:${ec.id}`));
+          const ownedNoses = NOSE_COLORS.filter(nc => nc.hex !== '' && ownedItems.includes(`nose:${nc.id}`));
+          const hasStripes = ownedItems.includes('stripes');
+          const hasWhiskers = ownedItems.includes('whiskers');
+          const hasLeg = ownedItems.includes('legstripes');
+          const totalOwned = ownedColors.length + ownedStartups.length + ownedEyes.length + ownedNoses.length
+            + (hasStripes ? 1 : 0) + (hasWhiskers ? 1 : 0) + (hasLeg ? 1 : 0);
+          const totalPossible = SHOP_COLORS.filter(sc => sc.cost > 0).length + STARTUPS.filter(su => su.cost > 0).length
+            + EYE_COLORS.length - 1 + NOSE_COLORS.length - 1 + 3;
+
+          if (totalOwned === 0) {
+            return (
+              <View style={s.emptyOwned}>
+                <Backpack size={30} color={c.text.muted} />
+                <Text style={s.emptyOwnedTxt}>Nic jeszcze nie kupione — zajrzyj do Kolorów, Startupów albo Dodatków.</Text>
+              </View>
+            );
+          }
+
+          return (
+            <View style={{ gap: spacing[3] }}>
+              <Text style={s.blurbTop}>Masz {totalOwned} z {totalPossible}.</Text>
+
+              {ownedColors.length > 0 && (
+                <View style={{ gap: spacing[2] }}>
+                  <Text style={[s.subSection, { color: c.text.secondary }]}>Kolory</Text>
+                  <View style={s.grid}>{ownedColors.map(renderColorCell)}</View>
+                </View>
+              )}
+
+              {ownedStartups.length > 0 && (
+                <View style={{ gap: spacing[2] }}>
+                  <Text style={[s.subSection, { color: c.text.secondary }]}>Startupy</Text>
+                  <View style={s.grid}>{ownedStartups.map(renderStartupCell)}</View>
+                </View>
+              )}
+
+              {(ownedEyes.length > 0 || ownedNoses.length > 0 || hasStripes || hasWhiskers || hasLeg) && (
+                <View style={{ gap: spacing[2] }}>
+                  <Text style={[s.subSection, { color: c.text.secondary }]}>Dodatki</Text>
+                  {ownedEyes.length > 0 && <View style={s.grid}>{ownedEyes.map(renderEyeCell)}</View>}
+                  {ownedNoses.length > 0 && <View style={s.grid}>{ownedNoses.map(renderNoseCell)}</View>}
+                  {hasStripes && extraRow('stripes', STRIPES.name, 'paski na ogonie', catStripes, STRIPES.cost, onStripes)}
+                  {hasWhiskers && extraRow('whiskers', 'Wąsy', 'cienkie wąsy od pyszczka', catWhiskers, WHISKERS_COST,
+                    () => onToggleExtra('whiskers', WHISKERS_COST, 'Wąsy', catWhiskers, setPvWhiskers, buyWhiskers))}
+                  {hasLeg && extraRow('legstripes', 'Pręgi na łapkach', 'poziome pręgi na łapkach', catLegStripes, LEGSTRIPES_COST,
+                    () => onToggleExtra('legstripes', LEGSTRIPES_COST, 'Pręgi na łapkach', catLegStripes, setPvLeg, buyLegStripes))}
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota.</Text>
         <View style={{ height: 100 }} />
@@ -616,4 +686,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   animTag: { fontSize: 9, color: c.text.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
 
   hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
+
+  // Posiadane — pusty stan
+  emptyOwned: { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[6] },
+  emptyOwnedTxt: { fontSize: 12.5, color: c.text.muted, textAlign: 'center', lineHeight: 17, maxWidth: 220 },
 }));
