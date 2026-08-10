@@ -188,7 +188,7 @@ export default function RootLayout() {
     Airstrike:     require('../assets/fonts/airstrike.ttf'),
     AirstrikeBold: require('../assets/fonts/airstrikebold.ttf'),
     AirstrikeCond: require('../assets/fonts/airstrikecond.ttf'),
-    LexendTera:    require('../assets/fonts/LexendTera.ttf'),   // CAPS-owe nagłówki (mockup serii)
+    Oswald:        require('../assets/fonts/Oswald.ttf'),       // CAPS-owe nagłówki sekcji (2026-08-10, zastąpił Lexend Tera — "dziwna")
     ArchivoBlack:  require('../assets/fonts/ArchivoBlack.ttf'), // wielkie liczby (heavy 900)
   });
 
