@@ -62,6 +62,28 @@ const SEASONAL: SeasonalDef[] = [
     taunt: 'Wakacje — olej dziś wszystko…', trophyEmoji: '🌴', kind: 'seasonal',
     isActive: d => (d.getMonth() === 5 && d.getDate() >= 15) || d.getMonth() === 6 || d.getMonth() === 7, // 15 cze – 31 sie
   },
+  // ── 4 pory roku, mitologiczne portrety usera (2026-08-10, assets/ikonybosów/BOSS_*)
+  // — wcześniej brakowało generycznej wiosny/jesieni/zimy (tylko święta konkretne). CELOWO
+  // wąskie 2-tygodniowe okna, nie całe pory roku: pierwsza wersja pokrywała 100% roku, co
+  // zabijało „nemesis miesiąca" na zawsze (activeSeasonalEvent nigdy nie zwracałoby null,
+  // currentEventBoss nigdy nie sprawdzałby menace — patrz pickMenace/MENACE_POOL). Te okna
+  // stoją bezpiecznie MIĘDZY istniejącymi świętami (nie dotykają Mikołaja/Wielkanocy/Wakacji
+  // ani dat z __tests__/seasonalEvents.test.ts), więc menace ma nadal ~10 miesięcy okazji. ──
+  {
+    id: 'wiosna', name: 'Wiosenna Nike', emoji: '🏆', weakness: 'steps', weaknessLabel: 'kroki',
+    taunt: 'Jeszcze jeden dzień na kanapie nikomu nie zaszkodzi…', trophyEmoji: '🌸', kind: 'seasonal',
+    isActive: d => d.getMonth() === 4 && d.getDate() <= 14, // 1–14 maja
+  },
+  {
+    id: 'jesien', name: 'Jesienna Demeter', emoji: '🌾', weakness: 'water', weaknessLabel: 'woda (cel dnia)',
+    taunt: 'Jedna kawa zamiast wody nikomu nie zaszkodzi…', trophyEmoji: '🌾', kind: 'seasonal',
+    isActive: d => d.getMonth() === 9 && d.getDate() <= 14, // 1–14 października
+  },
+  {
+    id: 'zima', name: 'Zimowa Hera', emoji: '👑', weakness: 'sleep', weaknessLabel: 'sen (7h+)',
+    taunt: 'Jeszcze jeden odcinek zamiast spać nikomu nie zaszkodzi…', trophyEmoji: '❄️', kind: 'seasonal',
+    isActive: d => d.getMonth() === 1 && d.getDate() <= 14, // 1–14 lutego
+  },
 ];
 
 export function activeSeasonalEvent(d: Date): EventBoss | null {

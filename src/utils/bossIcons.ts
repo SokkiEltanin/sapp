@@ -31,6 +31,12 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   clown:         require('../../assets/ikonybosów/BOSS_handattack_clown.png'),
   princess:      require('../../assets/ikonybosów/BOSS_handattack_princess.png'),
   wizard:        require('../../assets/ikonybosów/BOSS_magicattack_wizard.png'),
+  // ── sezonowe wydarzenia (seasonalEvents.ts) — TEN SAM plik/mapa co kampania,
+  // id-e się nie kolidują, więc BossArt działa 1:1 bez osobnego komponentu (2026-08-10) ──
+  wakacje:       require('../../assets/ikonybosów/BOSS_WAKACYJNYSŁONECZNYBOSS_pegasus.png'),
+  wiosna:        require('../../assets/ikonybosów/BOSS_WIOSENNYBOSS_nike.png'),
+  jesien:        require('../../assets/ikonybosów/BOSS_JESIENNYBOSS_demeter.png'),
+  zima:          require('../../assets/ikonybosów/BOSS_ZIOMOWYBOSS_hera.png'),
 };
 
 export function bossPng(id: string): ImageSourcePropType | undefined {
