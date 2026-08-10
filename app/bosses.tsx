@@ -264,7 +264,6 @@ export default function Bosses() {
         ) : (
           <View style={s.heroCard}>
             <View style={s.bossTop}>
-              <View style={[s.aura, { backgroundColor: (WEAK_COLOR[current.weakness] ?? '#888') + '22', borderColor: (WEAK_COLOR[current.weakness] ?? '#888') + '55' }]} pointerEvents="none" />
               <BossArt id={current.id} emoji={current.emoji} size={82} />
             </View>
             <Text style={s.bossName}>{current.name}</Text>
@@ -457,7 +456,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047' },
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
-  aura: { position: 'absolute', width: 116, height: 116, borderRadius: 58, borderWidth: 1 },
   mechRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, justifyContent: 'center', flexWrap: 'wrap' },
   mechHint: { fontSize: 11, color: c.text.muted, textAlign: 'center', lineHeight: 15 },
 

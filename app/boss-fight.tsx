@@ -280,7 +280,6 @@ export default function BossFight() {
                 <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round((liveBossHp ?? current.hp) / current.hp * 100)}%` }]} /></View>
                 <Text style={s.tileHpTxt}>{liveBossHp ?? current.hp} / {current.hp}</Text>
                 <View style={s.tilePortrait}>
-                  <View style={[s.aura, { backgroundColor: (WEAK_COLOR[current.weakness] ?? '#888') + '22', borderColor: (WEAK_COLOR[current.weakness] ?? '#888') + '55' }]} pointerEvents="none" />
                   <Animated.View style={{ transform: [{ translateX: bShakeX }, { scale: bPopScale }] }}>
                     <BossArt id={current.id} emoji={current.emoji} size={104} />
                   </Animated.View>
@@ -442,7 +441,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047' },
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
-  aura: { position: 'absolute', width: 132, height: 132, borderRadius: 66, borderWidth: 1 },
   attackFx: { position: 'absolute', width: 150, height: 150 },
   projectile: { position: 'absolute', top: 96, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));
