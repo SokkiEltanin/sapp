@@ -5519,7 +5519,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   },
   habitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   habitsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  habitsTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  habitsTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.9 },
   habitsBadge: { fontSize: 14, fontWeight: '800', color: c.text.secondary },
   habitsTrack: {
     height: 8, backgroundColor: c.border.subtle,

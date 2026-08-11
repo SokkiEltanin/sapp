@@ -5,7 +5,7 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, ChevronDown, ArrowRight, X, SlidersHorizontal, Check,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { spacing, radius } from '@/theme';
+import { spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { StatCtx, metricSeries } from '@/utils/statWidgets';
@@ -288,7 +288,7 @@ export default function WeeklyBoard({ statCtx, notes, accent }: { statCtx: StatC
 const makeStyles = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.subtle },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
-  title: { fontSize: 13, fontWeight: '800', color: c.text.primary, letterSpacing: 0.3 },
+  title: { fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.9 },
 
   periodToggle: { flexDirection: 'row', backgroundColor: c.bg.primary, borderRadius: radius.full, padding: 2 },
   periodBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },

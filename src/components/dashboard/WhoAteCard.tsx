@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Users, Info } from 'lucide-react-native';
-import { spacing, radius } from '@/theme';
+import { spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { PersonConsumption } from '@/utils/personConsumption';
@@ -68,7 +68,7 @@ export default function WhoAteCard({ data, monthLabel }: { data: PersonConsumpti
 const makeStyles = themedStyles((c: any) => StyleSheet.create({
   card: { borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: c.border.default },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
-  title: { fontSize: 14, fontWeight: '700', color: c.text.primary },
+  title: { fontFamily: fonts.label, fontSize: 11, color: c.text.primary, textTransform: 'uppercase', letterSpacing: 0.9 },
   month: { marginLeft: 'auto', fontSize: 11, fontWeight: '700', color: c.text.muted },
   bar: { flexDirection: 'row', height: 10, borderRadius: 6, overflow: 'hidden', gap: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
