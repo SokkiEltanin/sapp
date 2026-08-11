@@ -76,6 +76,14 @@ interface PetState {
   // ── personalized training quests (self-reported — no sensor can count reps) ──
   pushupsDay: string | null;    // day today's pushup quest was marked done (null = not yet)
   squatsDay: string | null;     // day today's squat quest was marked done
+  situpsDay: string | null;
+  plankDay: string | null;
+  stretchDay: string | null;
+  // day → true for any day a training quest (any of the 6) was CLAIMED — feeds the
+  // m_training milestone streak (quests.ts trainingStreakFrom). Keyed by day, not by
+  // quest, because the streak is "did ANY training happen today", not per-exercise
+  // (the daily pool rotates, so no single exercise is guaranteed to appear every day).
+  trainingDays: Record<string, true>;
   // ── boss battles ──
   energy: number;               // pozostałe dzienne próby ataku (kampania bossów, v5 = flat count)
   energyDate: string | null;    // day the top-up counter belongs to
@@ -142,6 +150,10 @@ interface PetState {
   petCat: (inc: number) => { value: number; justFull: boolean }; // tap-to-pet; full bar → a crate
   markPushupsDone: () => void;           // self-report today's pushup quest (no sensor can count reps)
   markSquatsDone: () => void;            // self-report today's squat quest
+  markSitupsDone: () => void;
+  markPlankDone: () => void;
+  markStretchDone: () => void;
+  markTrainingDay: () => void;   // called once per claimed training quest — feeds m_training streak
   openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null } | null; // open one pending crate
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
@@ -203,6 +215,10 @@ export const usePetStore = create<PetState>()(
       pendingCrates: 0,
       pushupsDay: null,
       squatsDay: null,
+      situpsDay: null,
+      plankDay: null,
+      stretchDay: null,
+      trainingDays: {},
       energy: 0,
       energyDate: null,
       energyToday: 0,
@@ -399,6 +415,10 @@ export const usePetStore = create<PetState>()(
       },
       markPushupsDone: () => set({ pushupsDay: todayISO() }),
       markSquatsDone: () => set({ squatsDay: todayISO() }),
+      markSitupsDone: () => set({ situpsDay: todayISO() }),
+      markPlankDone: () => set({ plankDay: todayISO() }),
+      markStretchDone: () => set({ stretchDay: todayISO() }),
+      markTrainingDay: () => set((s) => ({ trainingDays: { ...s.trainingDays, [todayISO()]: true } })),
       openCrate: () => {
         const s = get();
         if ((s.pendingCrates ?? 0) <= 0) return null;
@@ -561,6 +581,7 @@ export const usePetStore = create<PetState>()(
         weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
         pushupsDay: s.pushupsDay, squatsDay: s.squatsDay,
+        situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, trainingDays: s.trainingDays,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,

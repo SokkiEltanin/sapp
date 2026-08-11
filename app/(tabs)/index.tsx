@@ -2670,6 +2670,7 @@ export default function DashboardScreen() {
       bestStepDay: Object.values(healthDays).reduce((m, d) => Math.max(m, d.steps ?? 0), 0),
       habitBestStreak: habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0,
       cardsCollected: monthCards.filter(c => !c.inProgress).length,
+      trainingStreak: 0, // ta karta nie liczy questów treningowych (brak profileStore tutaj) — patrz pet.tsx dla realnej wartości
       boughtSweetToday: expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === tISO && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski'))),
       stepTarget: avgSteps > 0 ? Math.max(8000, Math.ceil(avgSteps * 1.1 / 500) * 500) : 0,
       sleepMinutes: healthDays[tISO]?.sleepMinutes ?? 0,

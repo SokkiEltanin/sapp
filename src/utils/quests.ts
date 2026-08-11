@@ -13,6 +13,7 @@ export interface QuestCtx {
   bestStepDay: number;     // all-time best single-day step count on record
   habitBestStreak: number;
   cardsCollected: number;
+  trainingStreak: number;  // consecutive days with ANY training quest claimed (rotates, see personalQuests.ts)
   // ── optional (drives dynamic daily + weekly + monthly quests when provided) ──
   boughtSweetToday?: boolean;
   stepTarget?: number;         // adaptive "beat your form" step goal
@@ -29,9 +30,15 @@ export interface QuestCtx {
   // absent target = quest doesn't appear, see BONUS `available` below) ──
   pushupTarget?: number;       // reps, from personalQuests.ts targetsFor()
   squatTarget?: number;
+  situpTarget?: number;
+  plankTarget?: number;        // seconds
+  stretchTarget?: number;      // minutes
   bikeTarget?: number;         // minutes
   pushupsToday?: boolean;      // self-reported (no sensor can count reps)
   squatsToday?: boolean;       // self-reported
+  situpsToday?: boolean;
+  plankToday?: boolean;
+  stretchToday?: boolean;
   bikeMinutesToday?: number;   // from Health Connect ExerciseSession (biking)
 }
 
@@ -69,6 +76,11 @@ const MILESTONES: MilestoneDef[] = [
     tiers: [{ at: 7, coins: 2 }, { at: 30, coins: 5 }, { at: 100, coins: 15 }, { at: 200, coins: 30 }] },
   { id: 'm_cards', label: 'Karty miesiąca', unit: 'kart', value: c => c.cardsCollected,
     tiers: [{ at: 3, coins: 2 }, { at: 6, coins: 3 }, { at: 12, coins: 6 }, { at: 24, coins: 12 }] },
+  // Seria DOWOLNEGO questu treningowego z rzędu — nie jednego konkretnego (pula się rotuje,
+  // patrz personalQuests.ts dailyExercisePool, więc np. "10 dni z rzędu pompek" dosłownie nie
+  // ma już sensu skoro pompki nie muszą wypaść codziennie). Ta sama krzywa co m_streak.
+  { id: 'm_training', label: 'Seria treningu', unit: 'dni', value: c => c.trainingStreak,
+    tiers: [{ at: 7, coins: 2 }, { at: 30, coins: 5 }, { at: 100, coins: 15 }, { at: 200, coins: 30 }] },
 ];
 
 export interface MilestoneTierState { id: string; at: number; coins: number; xp: number; reached: boolean; claimed: boolean }
@@ -92,10 +104,19 @@ const BONUS: BonusDef[] = [
     label: c => `Zrób ${c.pushupTarget} pompek`, note: c => c.pushupsToday ? 'zrobione 💪' : 'stuknij po zrobieniu', done: c => !!c.pushupsToday },
   { id: 'b_squats', coins: 2, xp: 6, available: c => (c.squatTarget ?? 0) > 0,
     label: c => `Zrób ${c.squatTarget} przysiadów`, note: c => c.squatsToday ? 'zrobione 🦵' : 'stuknij po zrobieniu', done: c => !!c.squatsToday },
+  { id: 'b_situps', coins: 2, xp: 6, available: c => (c.situpTarget ?? 0) > 0,
+    label: c => `Zrób ${c.situpTarget} brzuszków`, note: c => c.situpsToday ? 'zrobione 🔥' : 'stuknij po zrobieniu', done: c => !!c.situpsToday },
+  { id: 'b_plank', coins: 2, xp: 6, available: c => (c.plankTarget ?? 0) > 0,
+    label: c => `Deska — ${c.plankTarget}s`, note: c => c.plankToday ? 'zrobione 🧘' : 'stuknij po zrobieniu', done: c => !!c.plankToday },
+  { id: 'b_stretch', coins: 2, xp: 5, available: c => (c.stretchTarget ?? 0) > 0,
+    label: c => `Rozciąganie — ${c.stretchTarget} min`, note: c => c.stretchToday ? 'zrobione 🤸' : 'stuknij po zrobieniu', done: c => !!c.stretchToday },
   { id: 'b_bikeride', coins: 3, xp: 8, available: c => (c.bikeTarget ?? 0) > 0,
     label: c => `Przejażdżka rowerem (${c.bikeTarget} min)`, note: c => `${c.bikeMinutesToday ?? 0}/${c.bikeTarget} min`,
     done: c => (c.bikeMinutesToday ?? 0) >= (c.bikeTarget ?? Infinity) },
 ];
+// Wszystkie 6 questów treningowych — do rozpoznania "czy ten claim liczy się do streaka" w
+// pet.tsx (bumpTrainingDay) i do MILESTONES `m_training` niżej, bez duplikowania listy id.
+export const TRAINING_QUEST_IDS = ['b_pushups', 'b_squats', 'b_situps', 'b_plank', 'b_stretch', 'b_bikeride'];
 
 // ─── Monthly challenges (claim once per month) ──────────────────────────────
 interface MonthlyDef { id: string; label: string; unit: string; coins: number; xp: number; target: number; value: (c: QuestCtx) => number | undefined }

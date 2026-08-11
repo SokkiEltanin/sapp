@@ -34,7 +34,7 @@ import BackupSection from '@/components/settings/BackupSection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useProfileStore, Gender, TrainingLevel } from '@/store/profileStore';
-import { ageFrom } from '@/utils/personalQuests';
+import { ageFrom, DAILY_EXERCISE_COUNT } from '@/utils/personalQuests';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory, DEFAULT_WORK_SETTINGS } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -707,7 +707,7 @@ export default function SettingsScreen() {
         {
           id: 'personal-training', title: 'Poziom treningowy',
           subtitle: trainingLevel === 'poczatkujacy' ? 'Początkujący' : trainingLevel === 'sredni' ? 'Średni' : trainingLevel === 'zaawansowany' ? 'Zaawansowany' : 'Nieustawiony — questy treningowe ukryte',
-          keywords: ['trening', 'poziom', 'pompki', 'przysiady', 'rower', 'fitness', 'kondycja', 'questy'],
+          keywords: ['trening', 'poziom', 'pompki', 'przysiady', 'brzuszki', 'deska', 'rozciąganie', 'rower', 'fitness', 'kondycja', 'questy'],
           control: { kind: 'custom', render: () => (
             <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
@@ -716,7 +716,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={styles.rowText}>
                   <Text style={styles.rowLabel}>Poziom treningowy</Text>
-                  <Text style={styles.rowSub}>Odblokowuje questy pupila: pompki, przysiady, przejażdżka rowerem</Text>
+                  <Text style={styles.rowSub}>Odblokowuje rotujące questy pupila: pompki, przysiady, brzuszki, deska, rozciąganie, rower — {DAILY_EXERCISE_COUNT} losowe dziennie</Text>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: spacing[2] }}>

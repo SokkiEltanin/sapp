@@ -15,9 +15,9 @@ import { SHOP_COLORS } from '@/utils/petShop';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { useProfileStore } from '@/store/profileStore';
-import { ageFrom, targetsFor } from '@/utils/personalQuests';
+import { ageFrom, targetsFor, dailyExercisePool, trainingStreakFrom } from '@/utils/personalQuests';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
+import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
 import { paletteById } from '@/utils/catPalettes';
 import { bossById } from '@/utils/bosses';
 import { getBudgets } from '@/utils/budgets';
@@ -44,7 +44,9 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses, claimDailyBox, buyItem, grantStartup, addCoins, pushupsDay, squatsDay, markPushupsDone, markSquatsDone } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses, claimDailyBox, buyItem, grantStartup, addCoins,
+    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
+    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markTrainingDay } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
@@ -140,6 +142,10 @@ export default function Pet() {
     () => trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null,
     [trainingLevel, birthdate, gender],
   );
+  // Rotacja (user 2026-08-11: "w stylu S&F lepiej działa pula z losowym podzbiorem
+  // dziennie") — DAILY_EXERCISE_COUNT z 6 możliwych, deterministyczne po dacie (ten sam
+  // dzień = ten sam zestaw, nie tasuje się przy re-renderze).
+  const todaysPool = useMemo(() => dailyExercisePool(todayISO()), []);
   const questCtx: QuestCtx = useMemo(() => {
     const t = todayISO();
     const month = t.slice(0, 7);
@@ -163,14 +169,21 @@ export default function Pet() {
       moodDaysThisWeek: new Set(moodEntries.filter(e => (e.date ?? '') >= weekKeyOf()).map(e => e.date)).size,
       stepsThisWeek: health.stepsThisWeek,
       affectionFull: affToday >= 100,
-      pushupTarget: personalTargets?.pushups,
-      squatTarget: personalTargets?.squats,
-      bikeTarget: personalTargets?.bikeMinutes,
+      trainingStreak: trainingStreakFrom(trainingDays, t),
+      pushupTarget: personalTargets && todaysPool.includes('pushups') ? personalTargets.pushups : undefined,
+      squatTarget: personalTargets && todaysPool.includes('squats') ? personalTargets.squats : undefined,
+      situpTarget: personalTargets && todaysPool.includes('situps') ? personalTargets.situps : undefined,
+      plankTarget: personalTargets && todaysPool.includes('plank') ? personalTargets.plankSeconds : undefined,
+      stretchTarget: personalTargets && todaysPool.includes('stretch') ? personalTargets.stretchMinutes : undefined,
+      bikeTarget: personalTargets && todaysPool.includes('bike') ? personalTargets.bikeMinutes : undefined,
       pushupsToday: pushupsDay === t,
       squatsToday: squatsDay === t,
+      situpsToday: situpsDay === t,
+      plankToday: plankDay === t,
+      stretchToday: stretchDay === t,
       bikeMinutesToday: health.cyclingMinutesToday,
     };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, personalTargets, pushupsDay, squatsDay]);
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay]);
   const quests = useMemo(
     () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }),
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims],
@@ -187,7 +200,7 @@ export default function Pet() {
       moodLoggedToday: moodEntries.some(e => e.date === y),
       habitsDone: habitsDoneOn(habits, completions, y).length,
       habitsTotal: habits.length,
-      sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0,
+      sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0, trainingStreak: 0,
       waterToday: yData.water, waterGoal,
       sleepMinutes: yData.sleep,
     };
@@ -228,7 +241,10 @@ export default function Pet() {
   };
 
   const onClaimDaily = (id: string, c2: number, x: number, label: string) => {
-    if (claimDaily(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
+    if (claimDaily(id, c2, x)) {
+      haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1);
+      if (TRAINING_QUEST_IDS.includes(id)) markTrainingDay();
+    }
   };
   const onClaimTier = (id: string, c2: number, x: number) => {
     claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
@@ -431,13 +447,17 @@ export default function Pet() {
               {(() => {
                 const active = quests.bonusDaily.filter(q => !q.claimed);
                 const claimedN = quests.bonusDaily.length - active.length;
+                // Bodyweight questy (poza rowerem) nie mają czujnika liczącego powtórzenia —
+                // stuknięcie "Zrobione" to jedyny sposób, żeby quest w ogóle mógł stać się
+                // `done` (patrz mark*Done w petStore, i komentarz w quests.ts).
+                const selfReportActions: Record<string, () => void> = {
+                  b_pushups: markPushupsDone, b_squats: markSquatsDone,
+                  b_situps: markSitupsDone, b_plank: markPlankDone, b_stretch: markStretchDone,
+                };
                 return (
                   <>
                     {active.map((q, i) => {
-                      // Pompki/przysiady nie mają czujnika liczącego powtórzenia — stuknięcie
-                      // "Zrobione" to jedyny sposób, żeby quest w ogóle mógł stać się `done`
-                      // (patrz markPushupsDone/markSquatsDone w petStore, i komentarz w quests.ts).
-                      const selfReport = q.id === 'b_pushups' ? markPushupsDone : q.id === 'b_squats' ? markSquatsDone : null;
+                      const selfReport = selfReportActions[q.id];
                       return (
                         <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
                           <View style={{ flex: 1, minWidth: 0 }}>
