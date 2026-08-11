@@ -22,7 +22,7 @@ import { foodKcalForDate, avgFoodKcal } from '@/utils/calories';
 import { loadKcalMemory, KcalMemory } from '@/utils/productMemory';
 import { getHealthGoals, saveHealthGoals } from '@/utils/healthGoals';
 import { useColors } from '@/theme/useColors';
-import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, probeSleep } from '@/services/healthConnectService';
+import { isHealthConnectAvailable, ensureHealthConnect, readHealthDay, readHealthRange, HealthDayPoint, openHealthConnect, probeHealthConnect, isPermissionGranted, probeHydration, probeSleep, sleepProbeVerdict } from '@/services/healthConnectService';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { colors, spacing, radius, typography, fonts } from '@/theme';
@@ -1387,15 +1387,7 @@ export default function HealthScreen() {
                       onPress={async () => {
                         haptic.tap();
                         const p = await probeSleep(7);
-                        const lines = [
-                          `Sesje snu (SleepSession): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.sessions} sesji (7 dni)${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
-                          `Z fazami: ${p.sessionsWithStages}/${p.sessions} sesji · ${p.stageRecords} rekordów faz${p.stageTypesSeen.length ? `\ntypy faz: ${p.stageTypesSeen.join(', ')} (1=czuwanie,2=sen,3=poza łóżkiem,4=lekki,5=głęboki,6=REM)` : ''}`,
-                        ];
-                        let verdict: string;
-                        if (!p.permission) verdict = 'Brak dostępu — w Health Connect włącz dla Sappa „Sen", potem Synchronizuj.';
-                        else if (p.sessions === 0) verdict = 'Brak sesji snu w ogóle w ostatnich 7 dniach — sprawdź czy zegarek w ogóle synchronizuje sen do Samsung Health.';
-                        else if (p.sessionsWithStages > 0) verdict = 'Fazy SĄ eksportowane ✓ — mogę dobudować wykres z fazami na wielu dniach, napisz mi.';
-                        else verdict = 'Sesje snu są, ale BEZ faz — Samsung Health wysyła tylko łączny czas snu, nie REM/lekki/głęboki. Wykres z fazami nie jest możliwy z tych danych (chyba że coś się zmieni w eksporcie Samsunga).';
+                        const { lines, verdict } = sleepProbeVerdict(p);
                         Alert.alert('Diagnostyka faz snu', lines.join('\n\n') + '\n\n' + verdict);
                       }}
                     >

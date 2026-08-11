@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Modal,
+  View, Text, StyleSheet, ScrollView, Modal, Alert,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
   TextInput, KeyboardAvoidingView, Platform, Image, Pressable, InteractionManager,
 } from 'react-native';
@@ -3531,7 +3531,12 @@ export default function DashboardScreen() {
             const sleepAvgMin = sleepNights.length ? Math.round(sleepNights.reduce((sum, d) => sum + d.sleepMinutes, 0) / sleepNights.length) : 0;
             const SLEEP_DOW = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
 
-            nodes['sleep-chart'] = sleepNights.length > 0 && (
+            // Pusto (0 nocy w 30-dniowym oknie) renderuje TERAZ własną kartę zamiast znikać
+            // całkiem — user zgłaszał puste dane 4× z rzędu, a milczące `&& null` znaczyło
+            // że nie było nawet gdzie stuknąć "sprawdź dlaczego" (przycisk był schowany w
+            // Zdrowiu). Diagnostyka to ten sam probeSleep()/sleepProbeVerdict() co tam,
+            // patrz memory sleep_widget_investigation.md.
+            nodes['sleep-chart'] = sleepNights.length > 0 ? (
               <View style={[s.card, { backgroundColor: cardBgDark }]}>
                 <View style={s.cardHeader}>
                   <Moon size={13} color={accentColor} />
@@ -3577,6 +3582,29 @@ export default function DashboardScreen() {
                     </Text>
                   </TouchableOpacity>
                 )}
+              </View>
+            ) : (
+              <View style={[s.card, { backgroundColor: cardBgDark }]}>
+                <View style={s.cardHeader}>
+                  <Moon size={13} color={accentColor} />
+                  <Text style={s.cardTitle}>Sen</Text>
+                </View>
+                <Text style={[s.factText, { marginTop: spacing[2] }]}>
+                  Brak danych o śnie z ostatnich 30 dni.
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    haptic.tap();
+                    const { probeSleep, sleepProbeVerdict } = await import('@/services/healthConnectService');
+                    const p = await probeSleep(7);
+                    const { lines, verdict } = sleepProbeVerdict(p);
+                    Alert.alert('Diagnostyka faz snu', lines.join('\n\n') + '\n\n' + verdict);
+                  }}
+                  activeOpacity={0.8}
+                  style={[s.workToggle, { alignSelf: 'flex-start', marginTop: spacing[2] }]}
+                >
+                  <Text style={[s.workToggleText, { color: accentColor }]}>Sprawdź dlaczego</Text>
+                </TouchableOpacity>
               </View>
             );
 

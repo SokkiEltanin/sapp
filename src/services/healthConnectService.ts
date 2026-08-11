@@ -213,6 +213,22 @@ export interface SleepProbe {
   stageTypesSeen: number[];  // distinct HC stage enum values seen (1 AWAKE..6 REM)
   sources: string[];
 }
+// Shared verdict-building for the probe above — used by BOTH the Zdrowie "Diagnostyka faz
+// snu" button and the dashboard's empty sleep-card button (2026-08-11), so the message the
+// user sees is identical wherever they trigger it from, and only needs updating in one place.
+export function sleepProbeVerdict(p: SleepProbe): { lines: string[]; verdict: string } {
+  const lines = [
+    `Sesje snu (SleepSession): ${p.permission ? 'dostęp ✓' : 'BRAK dostępu'} · ${p.sessions} sesji (7 dni)${p.sources.length ? `\nźródło: ${p.sources.join(', ')}` : ''}`,
+    `Z fazami: ${p.sessionsWithStages}/${p.sessions} sesji · ${p.stageRecords} rekordów faz${p.stageTypesSeen.length ? `\ntypy faz: ${p.stageTypesSeen.join(', ')} (1=czuwanie,2=sen,3=poza łóżkiem,4=lekki,5=głęboki,6=REM)` : ''}`,
+  ];
+  let verdict: string;
+  if (!p.permission) verdict = 'Brak dostępu — w Health Connect włącz dla Sappa „Sen", potem Synchronizuj.';
+  else if (p.sessions === 0) verdict = 'Brak sesji snu w ogóle w ostatnich 7 dniach — sprawdź czy zegarek w ogóle synchronizuje sen do Samsung Health.';
+  else if (p.sessionsWithStages > 0) verdict = 'Fazy SĄ eksportowane ✓ — mogę dobudować wykres z fazami na wielu dniach, napisz mi.';
+  else verdict = 'Sesje snu są, ale BEZ faz — Samsung Health wysyła tylko łączny czas snu, nie REM/lekki/głęboki. Wykres z fazami nie jest możliwy z tych danych (chyba że coś się zmieni w eksporcie Samsunga).';
+  return { lines, verdict };
+}
+
 export async function probeSleep(days = 7): Promise<SleepProbe> {
   const permission = await isPermissionGranted('SleepSession');
   const out: SleepProbe = { permission, sessions: 0, sessionsWithStages: 0, stageRecords: 0, stageTypesSeen: [], sources: [] };
