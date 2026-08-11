@@ -43,6 +43,12 @@ export default function PetStats() {
   const atkCost = atkUpgradeCost(atkStatBonus);
 
   const trophies = useMemo(() => BOSSES.filter(b => ownedItems.includes(b.loot.id)), [ownedItems]);
+  // Posiadane na górze (user, 2026-08-11) — reszta ("???" zablokowane) niżej, stabilne
+  // sortowanie więc kolejność w obrębie każdej grupy zostaje jak w COMBAT_ITEMS.
+  const sortedItemIds = useMemo(
+    () => [...ITEM_IDS].sort((a, b) => (ownedCombatItems[a] ? 0 : 1) - (ownedCombatItems[b] ? 0 : 1)),
+    [ownedCombatItems],
+  );
 
   const confirmUpgrade = (name: string, cost: number, onYes: () => void) => {
     Alert.alert('Potwierdź ulepszenie', `${name} — ${cost} monet`, [
@@ -103,7 +109,7 @@ export default function PetStats() {
             <Text style={s.statLabel}>Moc ataku</Text>
             <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
             <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
-              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT} · {atkCost}</Text>
+              <Swords size={10} color="#F87171" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT} · {atkCost}</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#2AC68F44', backgroundColor: '#2AC68F12' }]}>
@@ -112,7 +118,7 @@ export default function PetStats() {
             <Text style={s.statLabel}>Max HP kotka</Text>
             <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}</Text>
             <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
-              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT} · {hpCost}</Text>
+              <Heart size={10} color="#2AC68F" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT} · {hpCost}</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
@@ -155,7 +161,7 @@ export default function PetStats() {
         <Text style={s.sectionTitle}>Ekwipunek bojowy ({equippedCombatItems.length}/3 założone)</Text>
         <Text style={s.blurb}>Losowany ze skrzynek z głaskania. Załóż do 3 naraz — działają w każdej walce kampanii.</Text>
         <View style={{ gap: spacing[2], marginTop: spacing[2] }}>
-          {ITEM_IDS.map(id => {
+          {sortedItemIds.map(id => {
             const def = COMBAT_ITEMS[id];
             const level = ownedCombatItems[id] ?? 0;
             const owned = level > 0;
