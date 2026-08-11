@@ -267,6 +267,8 @@ export interface FightRound {
   counterDmg: number;
   catHealed: number;    // item „heal" zadziałał tej rundy (0 = brak)
   catHpAfter: number;
+  thornDmg: number;     // item „cierń" zadziałał tej rundy (0 = brak) — było liczone w bossHpAfter
+                         // bez własnego pola, więc UI nie miało jak pokazać że w ogóle coś zrobił
 }
 
 export interface FightResult {
@@ -312,6 +314,7 @@ export function simulateFight(
 
     let counterDmg = 0;
     let healed = 0;
+    let thornDmg = 0;
     if (bossHp > 0) {
       // 'execute' — HP bossa poniżej progu → instakill (sprawdzone PRZED regeneracją,
       // żeby regen nie mógł "uratować" bossa z progu egzekucji tej samej rundy)
@@ -336,8 +339,13 @@ export function simulateFight(
           // 'shield' — stała redukcja tego co faktycznie dolatuje do kotka
           if (counterDmg > 0 && has('shield')) counterDmg = Math.round(counterDmg * (1 - SHIELD_REDUCTION_PCT));
           if (counterDmg > 0) catHp = Math.max(0, catHp - counterDmg);
-          // 'thorn' — gwarantowane małe odbicie, bez szansy, niezależnie od 'reflect'
-          if (has('thorn') && bossHp > 0) bossHp = Math.max(0, bossHp - Math.round(boss.hp * THORN_PCT));
+          // 'thorn' — gwarantowane małe odbicie, bez szansy, niezależnie od 'reflect'. Osobne
+          // pole (nie tylko wliczone w bossHpAfter) — inaczej UI nie miało jak pokazać że w
+          // ogóle coś zrobił, user: "nie widzę żeby był aktywny jakoś podczas walki realnie".
+          if (has('thorn') && bossHp > 0) {
+            thornDmg = Math.min(bossHp, Math.round(boss.hp * THORN_PCT));
+            bossHp = Math.max(0, bossHp - thornDmg);
+          }
         }
       }
     }
@@ -350,7 +358,7 @@ export function simulateFight(
       healUsed = true;
     }
 
-    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, catHealed, catHpAfter: catHp });
+    rounds.push({ playerDmg: damage, playerCrit: crit, bossHpAfter: bossHp, healed, counterDmg, catHealed, catHpAfter: catHp, thornDmg });
   }
   return { rounds, won: bossHp <= 0, catFainted: catHp <= 0 && bossHp > 0, guarded, bossHpLeft: bossHp, catHpLeft: catHp };
 }

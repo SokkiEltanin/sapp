@@ -13,6 +13,7 @@ import { BOSSES, bossBonuses, computeDamage, simulateFight, FIGHT_ROUNDS, Equipp
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp } from '@/utils/seasonalEvents';
 import { bossAttackFx } from '@/utils/bossAttackFx';
+import { COMBAT_ITEMS } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf } from '@/utils/quests';
@@ -60,7 +61,12 @@ export default function BossFight() {
   const { settings: workSettings } = useWorkStore();
 
   const [victory, setVictory] = useState<VictoryInfo | null>(null);
-  const [defeat, setDefeat] = useState(false);
+  // `fainted` odróżnia PRAWDZIWĄ porażkę (HP kotka spadło do 0) od zwykłego wyczerpania rund
+  // bez zabicia bossa — poprzednio oba pokazywały to samo "PRZEGRANA", nawet gdy kotek miał
+  // jeszcze połowę HP (user, 2026-08-11: "walka pokazuje przegrana nawet jak jeszcze mam
+  // połowę zdrowia kotka"). `result.won`/`result.catFainted` z simulateFight NIE są
+  // dopełnieniem siebie — przy 3 rundach bez zabicia żadnej ze stron oba są false.
+  const [defeat, setDefeat] = useState<{ fainted: boolean } | null>(null);
   const [fighting, setFighting] = useState(false);
   const [liveBossHp, setLiveBossHp] = useState<number | null>(null);
   const [attackPulse, setAttackPulse] = useState(0);
@@ -127,7 +133,7 @@ export default function BossFight() {
   const bDmgY = useRef(new Animated.Value(0)).current;
   const bPop = useRef(new Animated.Value(0)).current;
   const bFlash = useRef(new Animated.Value(0)).current;
-  const [lastHit, setLastHit] = useState<{ dmg: number; crit: boolean; guarded: boolean; healed: number } | null>(null);
+  const [lastHit, setLastHit] = useState<{ dmg: number; crit: boolean; guarded: boolean; healed: number; thornDmg: number } | null>(null);
   const playBossHitFx = (crit: boolean) => {
     bShake.setValue(0); bDmgY.setValue(0); bPop.setValue(0); bFlash.setValue(0);
     Animated.parallel([
@@ -204,7 +210,7 @@ export default function BossFight() {
         setVictory({ kind: 'campaign', id: campaignBoss.id, name: campaignBoss.name, emoji: campaignBoss.emoji, coins: campaignBoss.coins, xp: campaignBoss.xp, loot: campaignBoss.loot });
       } else {
         haptic.error();
-        setDefeat(true);
+        setDefeat({ fainted: result.catFainted });
       }
     };
 
@@ -244,7 +250,7 @@ export default function BossFight() {
         if (!alive.current) return;
         setPawFlying(false);
         haptic.medium();
-        setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed });
+        setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed, thornDmg: round.thornDmg });
         playBossHitFx(round.playerCrit);
         setAttackPulse(n => n + 1);
         setLiveBossHp(round.bossHpAfter);
@@ -272,7 +278,7 @@ export default function BossFight() {
       if (!alive.current) return;
       setPawFlying(false);
       haptic.medium();
-      setLastHit({ dmg: damage, crit, guarded: false, healed: 0 });
+      setLastHit({ dmg: damage, crit, guarded: false, healed: 0, thornDmg: 0 });
       playBossHitFx(crit);
       setAttackPulse(n => n + 1);
       setFighting(false);
@@ -326,7 +332,7 @@ export default function BossFight() {
   const boltScale = boltTravel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] });
 
   const closeVictory = () => { setVictory(null); router.back(); };
-  const closeDefeat = () => { setDefeat(false); router.back(); };
+  const closeDefeat = () => { setDefeat(null); router.back(); };
   const VictoryLootIcon = victory?.loot ? lootIcon(victory.loot) : Trophy;
 
   return (
@@ -420,6 +426,15 @@ export default function BossFight() {
             {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
             {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
             {!!catHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></View>}
+            {/* Item "Cierń" liczył się już wcześniej w silniku, ale bez własnego pola w
+                FightRound UI nie miało jak pokazać że w ogóle coś zrobił — user (2026-08-11):
+                "nie widzę żeby był aktywny jakoś podczas walki realnie". */}
+            {!!lastHit?.thornDmg && (
+              <View style={s.mechRow}>
+                <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} resizeMode="contain" />
+                <Text style={[s.mechNoteHeal, { color: '#4ADE80' }]}>Cierń: dodatkowe -{lastHit.thornDmg} bossowi</Text>
+              </View>
+            )}
 
             {target.done ? (
               <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : 'wróć w kolejnym okresie'}</Text>
@@ -465,16 +480,20 @@ export default function BossFight() {
         </Pressable>
       </Modal>
 
-      <Modal visible={defeat} transparent statusBarTranslucent animationType="fade" onRequestClose={closeDefeat}>
+      <Modal visible={!!defeat} transparent statusBarTranslucent animationType="fade" onRequestClose={closeDefeat}>
         <Pressable style={s.vBackdrop} onPress={closeDefeat}>
-          {campaignBoss && (
+          {campaignBoss && defeat && (
             <View style={s.vCenter} pointerEvents="none">
-              <Text style={[s.vKicker, { color: '#F87171' }]}>PRZEGRANA</Text>
+              <Text style={[s.vKicker, { color: defeat.fainted ? '#F87171' : '#F4B740' }]}>{defeat.fainted ? 'PRZEGRANA' : 'BOSS PRZETRWAŁ'}</Text>
               <View style={{ opacity: 0.5 }}>
                 <BossArt id={campaignBoss.id} emoji={campaignBoss.emoji} size={78} />
               </View>
               <Text style={s.vName}>{campaignBoss.name} przetrwał</Text>
-              <Text style={s.vDefeatSub}>HP resetuje się — spróbuj ponownie, kiedy będziesz gotowy.</Text>
+              <Text style={s.vDefeatSub}>
+                {defeat.fainted
+                  ? 'Kotek zemdlał — HP resetuje się, spróbuj ponownie, kiedy będziesz gotowy.'
+                  : `Nie zdążyłeś dobić przeciwnika w ${FIGHT_ROUNDS} rundy — spróbuj ponownie.`}
+              </Text>
             </View>
           )}
           <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
