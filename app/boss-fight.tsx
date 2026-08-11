@@ -9,7 +9,7 @@ import CatArt from '@/components/pet/CatArt';
 import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
-import { BOSSES, bossBonuses, computeDamage, simulateFight, FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
+import { BOSSES, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp } from '@/utils/seasonalEvents';
 import { bossAttackFx } from '@/utils/bossAttackFx';
@@ -61,11 +61,10 @@ export default function BossFight() {
   const { settings: workSettings } = useWorkStore();
 
   const [victory, setVictory] = useState<VictoryInfo | null>(null);
-  // `fainted` odróżnia PRAWDZIWĄ porażkę (HP kotka spadło do 0) od zwykłego wyczerpania rund
-  // bez zabicia bossa — poprzednio oba pokazywały to samo "PRZEGRANA", nawet gdy kotek miał
-  // jeszcze połowę HP (user, 2026-08-11: "walka pokazuje przegrana nawet jak jeszcze mam
-  // połowę zdrowia kotka"). `result.won`/`result.catFainted` z simulateFight NIE są
-  // dopełnieniem siebie — przy 3 rundach bez zabicia żadnej ze stron oba są false.
+  // `fainted` odróżnia PRAWDZIWĄ porażkę (HP kotka spadło do 0) od skrajnie rzadkiego
+  // wyczerpania bezpieczeństwa-sufitu rund bez zabicia bossa (patrz MAX_FIGHT_ROUNDS w
+  // bosses.ts — walka teraz leci do faktycznego 0 HP jednej ze stron, nie sztywnych 3
+  // rund). `result.won`/`result.catFainted` z simulateFight NIE są dopełnieniem siebie.
   const [defeat, setDefeat] = useState<{ fainted: boolean } | null>(null);
   const [fighting, setFighting] = useState(false);
   const [liveBossHp, setLiveBossHp] = useState<number | null>(null);
@@ -193,7 +192,7 @@ export default function BossFight() {
     if (!campaignBoss || !target || !target.unlocked || fighting) return;
     if (energy <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     resetCatHp();
-    const result = simulateFight(atkStatBonus, level, bonuses, campaignBoss, catMax, FIGHT_ROUNDS, equippedItems);
+    const result = simulateFight(atkStatBonus, level, bonuses, campaignBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
     spendEnergy();
     setFighting(true);
     setLiveBossHp(campaignBoss.hp);
@@ -492,7 +491,7 @@ export default function BossFight() {
               <Text style={s.vDefeatSub}>
                 {defeat.fainted
                   ? 'Kotek zemdlał — HP resetuje się, spróbuj ponownie, kiedy będziesz gotowy.'
-                  : `Nie zdążyłeś dobić przeciwnika w ${FIGHT_ROUNDS} rundy — spróbuj ponownie.`}
+                  : 'Przeciwnik zbyt szybko się leczy/broni — wróć mocniejszy (staty, poziom, łup) i spróbuj znów.'}
               </Text>
             </View>
           )}

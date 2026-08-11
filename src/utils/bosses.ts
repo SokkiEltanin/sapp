@@ -248,16 +248,22 @@ export function computeDamage(atkStatBonus: number, level: number, bonuses: Bonu
 
 // ── Symulacja walki 1v1 (v4 redesign, S&F-style — patrz memory boss_design.md) ────
 // Czysta funkcja, NIC jeszcze jej nie wywołuje w grze (bezpieczny krok przygotowawczy,
-// jak counterDamage wyżej). Cała walka rozstrzyga się w jednym wywołaniu — kilka RUND
-// wymiany ciosów, nie jeden cios: energia dzielona równo między rundy, każda runda =
-// Twój cios (z szansą kryt) → jeśli boss przeżył → jego kontratak na kotka. Walka
-// kończy się NATYCHMIAST gdy któraś strona spadnie do 0 HP (reszta rund się nie
-// dogrywa) — trafienie w bossa zawsze rozstrzyga się PRZED jego kontratakiem, więc
-// nie ma martwego remisu „oboje padli w tej samej rundzie".
-// PRZEGRANA (catHp=0) LUB wyczerpanie rund bez zabicia = to samo dla bossa kampanii:
-// jego HP resetuje się do pełna na następną próbę (karczma S&F) — `won` to jedyny
-// wynik, który się liczy trwale; `catFainted` jest tylko do komunikatu w UI.
-export const FIGHT_ROUNDS = 3;
+// jak counterDamage wyżej). Cała walka rozstrzyga się w jednym wywołaniu — RUNDY
+// wymiany ciosów aż KTOŚ padnie, nie sztywna liczba: Twój cios (z szansą kryt) → jeśli
+// boss przeżył → jego kontratak na kotka, i tak w kółko. Walka kończy się NATYCHMIAST
+// gdy któraś strona spadnie do 0 HP — trafienie w bossa zawsze rozstrzyga się PRZED
+// jego kontratakiem, więc nie ma martwego remisu „oboje padli w tej samej rundzie".
+// User (2026-08-11), po tym jak walka kończyła się „PRZEGRANA" mimo połowy HP kotka:
+// "chcialem do końca na hp kto ma zero ten przegrywa a nie na 3 rundy" — poprzednio
+// walka NIEZALEŻNIE od wyniku ucinała się po 3 wymianach ciosów (a nawet boss #1 miał
+// za dużo HP żeby zabić go w 3 ciosach bez zakupionych statów, więc w praktyce prawie
+// zawsze kończyło się „wyczerpaniem rund", nie realną wygraną/porażką). Teraz limit to
+// czysto DEFENSYWNY sufit (nigdy nie powinien być osiągnięty w normalnej grze — trafia
+// się tylko w skrajnym teoretycznym remisie regen+guard), nie normalny wynik walki.
+// PRZEGRANA (catHp=0) LUB (skrajnie rzadkie) wyczerpanie sufitu bez zabicia = to samo
+// dla bossa kampanii: jego HP resetuje się do pełna na następną próbę (karczma S&F) —
+// `won` to jedyny wynik, który się liczy trwale; `catFainted` jest tylko do komunikatu w UI.
+export const MAX_FIGHT_ROUNDS = 200;
 
 export interface FightRound {
   playerDmg: number;
@@ -288,7 +294,7 @@ export interface EquippedItem { id: CombatItemId; level: number }
 // stat kupiony za monety (v5 pivot) — jedyne źródło mocy poza poziomem/łupem/itemami.
 export function simulateFight(
   atkStatBonus: number, level: number, bonuses: Bonuses, boss: Boss,
-  catHpStart: number, roundCount: number = FIGHT_ROUNDS, items: EquippedItem[] = [],
+  catHpStart: number, roundCount: number = MAX_FIGHT_ROUNDS, items: EquippedItem[] = [],
 ): FightResult {
   const guarded = !!boss.guard;         // wrodzona cecha, nie zależy od wc
   const willRegen = !!boss.regenPct;    // wrodzona cecha (enrage), nie zależy od wc

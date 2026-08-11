@@ -92,6 +92,17 @@ describe('bosses — simulateFight (silnik rund)', () => {
     expect(r.rounds).toHaveLength(3);
   });
 
+  test('domyślny sufit rund NIE ucina prawdziwej walki wcześniej niż HP=0 po którejś stronie — regresja na "3 rundy to za mało" (user 2026-08-11)', () => {
+    // boss #1 kampanii przy odblokowaniu, bazowe staty gracza (bez zakupów) — pod starym
+    // sztywnym FIGHT_ROUNDS=3 to ZAWSZE kończyło się remisem (300 HP bossa, ~40 dmg/cios),
+    // więc walkę dało się TYLKO przegrać przez wyczerpanie, nigdy realnie wygrać/przegrać.
+    const sloth = BOSSES[0];
+    const bonuses: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+    const r = simulateFight(0, sloth.unlockLevel, bonuses, sloth, 100); // domyślny roundCount = MAX_FIGHT_ROUNDS
+    expect(r.rounds.length).toBeGreaterThan(3); // nie ucięte po 3 wymianach
+    expect(r.won || r.catFainted).toBe(true);   // realny wynik: ktoś padł, nie "czas się skończył"
+  });
+
   test('OSŁONA: wrodzona cecha bossa → Twoje ciosy w całej walce o połowę słabsze', () => {
     const guardedBoss = boss({ hp: 1_000_000, guard: true });
     const freeBoss = boss({ hp: 1_000_000, guard: false });
