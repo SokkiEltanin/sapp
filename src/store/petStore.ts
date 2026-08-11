@@ -73,6 +73,9 @@ interface PetState {
   affectionDay: string | null;  // day the current affection belongs to
   affectionRewardDay: string | null; // day the "full affection" bonus was paid
   pendingCrates: number;        // unopened sardine crates earned from full affection
+  // ── personalized training quests (self-reported — no sensor can count reps) ──
+  pushupsDay: string | null;    // day today's pushup quest was marked done (null = not yet)
+  squatsDay: string | null;     // day today's squat quest was marked done
   // ── boss battles ──
   energy: number;               // pozostałe dzienne próby ataku (kampania bossów, v5 = flat count)
   energyDate: string | null;    // day the top-up counter belongs to
@@ -137,6 +140,8 @@ interface PetState {
   claimMonthly: (id: string, coins: number, xp: number) => boolean;  // monthly (once/month)
   careTick: (xp: number) => void;        // once/day passive growth from good care
   petCat: (inc: number) => { value: number; justFull: boolean }; // tap-to-pet; full bar → a crate
+  markPushupsDone: () => void;           // self-report today's pushup quest (no sensor can count reps)
+  markSquatsDone: () => void;            // self-report today's squat quest
   openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null } | null; // open one pending crate
   // boss battles
   syncEnergy: (todayEnergy: number, mult: number) => void;  // top up the bank from today's self-care
@@ -196,6 +201,8 @@ export const usePetStore = create<PetState>()(
       affectionDay: null,
       affectionRewardDay: null,
       pendingCrates: 0,
+      pushupsDay: null,
+      squatsDay: null,
       energy: 0,
       energyDate: null,
       energyToday: 0,
@@ -390,6 +397,8 @@ export const usePetStore = create<PetState>()(
         });
         return { value, justFull };
       },
+      markPushupsDone: () => set({ pushupsDay: todayISO() }),
+      markSquatsDone: () => set({ squatsDay: todayISO() }),
       openCrate: () => {
         const s = get();
         if ((s.pendingCrates ?? 0) <= 0) return null;
@@ -551,6 +560,7 @@ export const usePetStore = create<PetState>()(
         claimedQuests: s.claimedQuests, dailyClaims: s.dailyClaims, dayClaims: s.dayClaims,
         weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
+        pushupsDay: s.pushupsDay, squatsDay: s.squatsDay,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,

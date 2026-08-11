@@ -22,6 +22,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import InputField from '@/components/ui/InputField';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import DatePickerField from '@/components/ui/DatePickerField';
 import { notificationsService } from '@/services/notificationsService';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -32,6 +33,8 @@ import { getPayers } from '@/utils/payers';
 import BackupSection from '@/components/settings/BackupSection';
 import ConfirmedMonths from '@/components/settings/ConfirmedMonths';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
+import { useProfileStore, Gender, TrainingLevel } from '@/store/profileStore';
+import { ageFrom } from '@/utils/personalQuests';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory, DEFAULT_WORK_SETTINGS } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -102,6 +105,8 @@ export default function SettingsScreen() {
   const themeMode = useThemeStore(s => s.mode);
   const liteMode = useUiPrefs(s => s.liteMode);
   const setLiteMode = useUiPrefs(s => s.setLiteMode);
+  const { birthdate, gender, trainingLevel, setBirthdate, setGender, setTrainingLevel } = useProfileStore();
+  const age = ageFrom(birthdate);
 
   const [backfillBusy, setBackfillBusy] = useState(false);
   const [selfTestBusy, setSelfTestBusy] = useState(false);
@@ -639,6 +644,99 @@ export default function SettingsScreen() {
           icon: LucideIcons.Zap, accentColor: '#2AC68F',
           keywords: ['animacje', 'płynność', 'fps', 'klatkowanie', 'wydajność', 'lag', 'tło'],
           control: { kind: 'switch', value: liteMode, onChange: (v) => { haptic.tap(); setLiteMode(v); } },
+        },
+      ],
+    },
+    {
+      id: 'personalizacja', title: 'Personalizacja', icon: LucideIcons.UserRound, color: '#F472B6', defaultOpen: false,
+      keywords: ['wiek', 'data urodzenia', 'płeć', 'trening', 'poziom treningowy', 'pompki', 'przysiady', 'rower', 'questy pupila'],
+      items: [
+        {
+          id: 'personal-birthdate', title: 'Data urodzenia',
+          subtitle: age != null ? `Wiek: ${age} lat` : 'Ustaw, żeby dopasować cele questów pupila',
+          keywords: ['wiek', 'data urodzenia', 'urodziny', 'rocznik'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#F472B618' }]}>
+                  <LucideIcons.Cake size={16} color="#F472B6" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Data urodzenia</Text>
+                  <Text style={styles.rowSub}>{age != null ? `Wiek: ${age} lat` : 'Ustaw, żeby dopasować cele questów pupila'}</Text>
+                </View>
+              </View>
+              <DatePickerField value={birthdate ?? ''} onChange={(d) => { haptic.tap(); setBirthdate(d || null); }} placeholder="RRRR-MM-DD" />
+            </View>
+          ) },
+        },
+        {
+          id: 'personal-gender', title: 'Płeć',
+          subtitle: gender === 'kobieta' ? 'Kobieta' : gender === 'mężczyzna' ? 'Mężczyzna' : gender === 'inna' ? 'Inna' : 'Nieustawiona',
+          keywords: ['płeć', 'kobieta', 'mężczyzna'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#F472B618' }]}>
+                  <LucideIcons.Users size={16} color="#F472B6" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Płeć</Text>
+                  <Text style={styles.rowSub}>Do dopasowania celów questów treningowych</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {([['kobieta', 'Kobieta'], ['mężczyzna', 'Mężczyzna'], ['inna', 'Inna']] as [Gender, string][]).map(([g, lbl]) => {
+                  const on = gender === g;
+                  return (
+                    <PressableScale key={g} onPress={() => { haptic.tap(); setGender(g); }} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#F472B622' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#F472B6' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#F472B6' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+          ) },
+        },
+        {
+          id: 'personal-training', title: 'Poziom treningowy',
+          subtitle: trainingLevel === 'poczatkujacy' ? 'Początkujący' : trainingLevel === 'sredni' ? 'Średni' : trainingLevel === 'zaawansowany' ? 'Zaawansowany' : 'Nieustawiony — questy treningowe ukryte',
+          keywords: ['trening', 'poziom', 'pompki', 'przysiady', 'rower', 'fitness', 'kondycja', 'questy'],
+          control: { kind: 'custom', render: () => (
+            <View style={[styles.row, { flexDirection: 'column', alignItems: 'stretch', gap: spacing[2] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                <View style={[styles.iconWrap, { backgroundColor: '#F472B618' }]}>
+                  <LucideIcons.Dumbbell size={16} color="#F472B6" />
+                </View>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>Poziom treningowy</Text>
+                  <Text style={styles.rowSub}>Odblokowuje questy pupila: pompki, przysiady, przejażdżka rowerem</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                {([['poczatkujacy', 'Początkujący'], ['sredni', 'Średni'], ['zaawansowany', 'Zaawansowany']] as [TrainingLevel, string][]).map(([lv, lbl]) => {
+                  const on = trainingLevel === lv;
+                  return (
+                    <PressableScale key={lv} onPress={() => { haptic.tap(); setTrainingLevel(lv); }} style={{ flex: 1 }}>
+                      <View style={{
+                        paddingVertical: 9, borderRadius: radius.md, alignItems: 'center',
+                        backgroundColor: on ? '#F472B622' : colors.bg.elevated,
+                        borderWidth: 1, borderColor: on ? '#F472B6' : colors.border.default,
+                      }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: on ? '#F472B6' : colors.text.secondary }}>{lbl}</Text>
+                      </View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </View>
+          ) },
         },
       ],
     },

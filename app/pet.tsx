@@ -14,6 +14,8 @@ import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
+import { useProfileStore } from '@/store/profileStore';
+import { ageFrom, targetsFor } from '@/utils/personalQuests';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { paletteById } from '@/utils/catPalettes';
@@ -42,7 +44,8 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses, claimDailyBox, buyItem, grantStartup, addCoins } = usePetStore();
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses, claimDailyBox, buyItem, grantStartup, addCoins, pushupsDay, squatsDay, markPushupsDone, markSquatsDone } = usePetStore();
+  const { birthdate, gender, trainingLevel } = useProfileStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
@@ -73,7 +76,7 @@ export default function Pet() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
 
-  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number; stepsThisWeek: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0, stepsThisWeek: 0 });
+  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number; stepsThisWeek: number; cyclingMinutesToday: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0, stepsThisWeek: 0, cyclingMinutesToday: 0 });
   const [stepGoal, setStepGoal] = useState(10000);
   const [waterGoal, setWaterGoal] = useState(8);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
@@ -104,7 +107,8 @@ export default function Pet() {
       const recent = Object.values(h).map(d => d.steps).filter(x => x > 0).slice(0, 14);
       const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
       const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
-      setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek });
+      const cyclingMinutesToday = h[t]?.cyclingMinutes ?? 0;
+      setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek, cyclingMinutesToday });
       // yesterday's health + water, for the missed-rewards catch-up (habits come from
       // the useHabits `completions` map, which already holds the last 30 days)
       const y = yesterdayISO();
@@ -129,6 +133,13 @@ export default function Pet() {
   useFocusEffect(reload);
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
+  // Personalizacja (Ustawienia) → cele questów treningowych. Brak trainingLevel = questy
+  // po prostu się nie pokazują (available: c => (c.pushupTarget ?? 0) > 0 w quests.ts),
+  // więc nikogo nie zaskakują dopóki nie wypełni Personalizacji.
+  const personalTargets = useMemo(
+    () => trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null,
+    [trainingLevel, birthdate, gender],
+  );
   const questCtx: QuestCtx = useMemo(() => {
     const t = todayISO();
     const month = t.slice(0, 7);
@@ -152,8 +163,14 @@ export default function Pet() {
       moodDaysThisWeek: new Set(moodEntries.filter(e => (e.date ?? '') >= weekKeyOf()).map(e => e.date)).size,
       stepsThisWeek: health.stepsThisWeek,
       affectionFull: affToday >= 100,
+      pushupTarget: personalTargets?.pushups,
+      squatTarget: personalTargets?.squats,
+      bikeTarget: personalTargets?.bikeMinutes,
+      pushupsToday: pushupsDay === t,
+      squatsToday: squatsDay === t,
+      bikeMinutesToday: health.cyclingMinutesToday,
     };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday]);
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, personalTargets, pushupsDay, squatsDay]);
   const quests = useMemo(
     () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }),
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims],
@@ -416,18 +433,26 @@ export default function Pet() {
                 const claimedN = quests.bonusDaily.length - active.length;
                 return (
                   <>
-                    {active.map((q, i) => (
-                      <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
-                          {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                    {active.map((q, i) => {
+                      // Pompki/przysiady nie mają czujnika liczącego powtórzenia — stuknięcie
+                      // "Zrobione" to jedyny sposób, żeby quest w ogóle mógł stać się `done`
+                      // (patrz markPushupsDone/markSquatsDone w petStore, i komentarz w quests.ts).
+                      const selfReport = q.id === 'b_pushups' ? markPushupsDone : q.id === 'b_squats' ? markSquatsDone : null;
+                      return (
+                        <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
+                            {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                          </View>
+                          <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                          {q.done
+                            ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                            : selfReport
+                              ? <PressableScale onPress={() => { haptic.tap(); selfReport(); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Zrobione</Text></View></PressableScale>
+                              : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
                         </View>
-                        <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
-                        {q.done
-                          ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
-                          : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
-                      </View>
-                    ))}
+                      );
+                    })}
                     {claimedN > 0 && (
                       <View style={[s.qClaimedFoot, active.length > 0 && s.qRowBorder]}>
                         <CheckIcon size={12} color="#2AC68F" />
@@ -659,6 +684,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qClaimedTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, letterSpacing: 0.2 },
   qLocked: { width: 30, alignItems: 'center' },
   qLockedTxt: { fontSize: 14, color: c.text.muted, fontWeight: '800' },
+  qSelfReport: { backgroundColor: c.bg.elevated, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: c.border.default },
+  qSelfReportTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
 
   mCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
   mTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[2] },

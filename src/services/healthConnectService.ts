@@ -434,7 +434,13 @@ export interface HealthDayPoint {
   totalCalories: number;   // kcal spalone łącznie (jeśli zegarek podaje)
   bmr: number;             // kcal/dzień (spoczynek) — 0 gdy brak
   hydrationMl?: number;    // woda z zegarka (ml) tego dnia — do retroaktywnego leczenia serii
+  cyclingMinutes: number;  // suma sesji roweru (zwykły + stacjonarny) tego dnia — quest „przejażdżka"
 }
+
+// Health Connect ExerciseType kodów, których potrzebujemy filtrować z ExerciseSession
+// (biblioteka eksportuje pełną listę, bierzemy tylko rower — patrz personalQuests.ts).
+const EXERCISE_TYPE_BIKING = 8;
+const EXERCISE_TYPE_BIKING_STATIONARY = 9;
 
 function localKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -452,7 +458,7 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
   const byDay = new Map<string, HealthDayPoint>();
   for (let i = 0; i < days; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
-    const p: HealthDayPoint = { date: localKey(d), steps: 0, sleepMinutes: 0, weightKg: null, activeCalories: 0, totalCalories: 0, bmr: 0 };
+    const p: HealthDayPoint = { date: localKey(d), steps: 0, sleepMinutes: 0, weightKg: null, activeCalories: 0, totalCalories: 0, bmr: 0, cyclingMinutes: 0 };
     byDay.set(p.date, p); out.push(p);
   }
 
@@ -542,7 +548,18 @@ export async function readHealthRange(days: number, end: Date = new Date()): Pro
       if (p && ml > 0) p.hydrationMl = (p.hydrationMl ?? 0) + ml;
     }
   } catch {}
-  for (const p of out) { p.activeCalories = Math.round(p.activeCalories); p.totalCalories = Math.round(p.totalCalories); p.hydrationMl = Math.round(p.hydrationMl ?? 0); }
+  // Rower per dzień — tylko sesje BIKING/BIKING_STATIONARY z ExerciseSession, sumowane
+  // po dniu startu. Karmi quest „przejażdżka rowerem" (personalQuests.ts).
+  try {
+    for (const r of await read(hc, 'ExerciseSession', filter)) {
+      if (r.exerciseType !== EXERCISE_TYPE_BIKING && r.exerciseType !== EXERCISE_TYPE_BIKING_STATIONARY) continue;
+      const st = new Date(r.startTime).getTime(), en = new Date(r.endTime).getTime();
+      if (en <= st) continue;
+      const p = byDay.get(localKey(new Date(r.startTime)));
+      if (p) p.cyclingMinutes += Math.round((en - st) / 60000);
+    }
+  } catch {}
+  for (const p of out) { p.activeCalories = Math.round(p.activeCalories); p.totalCalories = Math.round(p.totalCalories); p.hydrationMl = Math.round(p.hydrationMl ?? 0); p.cyclingMinutes = Math.round(p.cyclingMinutes); }
 
   return out;
 }

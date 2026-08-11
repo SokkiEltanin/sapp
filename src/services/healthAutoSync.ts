@@ -55,7 +55,7 @@ export async function autoSyncHealth(days = 30, force = false): Promise<number> 
     const writes: [string, string][] = [];
     let latestWeight: number | null = null;
     for (const p of range) {
-      if (!(p.steps > 0 || p.sleepMinutes > 0 || p.weightKg != null || p.activeCalories > 0 || p.totalCalories > 0 || p.bmr > 0)) continue; // empty day
+      if (!(p.steps > 0 || p.sleepMinutes > 0 || p.weightKg != null || p.activeCalories > 0 || p.totalCalories > 0 || p.bmr > 0 || p.cyclingMinutes > 0)) continue; // empty day
       const key = `health_${p.date}`;
       let prev: any = {};
       const raw = existingByKey.get(key);
@@ -72,11 +72,12 @@ export async function autoSyncHealth(days = 30, force = false): Promise<number> 
       if (p.weightKg != null) latestWeight = p.weightKg;            // range is oldest→newest, so last wins
       // Calories from the watch → per-day blob (so the food tab / calorie widgets have
       // burn EVERY day, not only when Zdrowie was opened). Merge, never zero-out good data.
-      if (p.activeCalories > 0 || p.totalCalories > 0 || p.bmr > 0) {
+      if (p.activeCalories > 0 || p.totalCalories > 0 || p.bmr > 0 || p.cyclingMinutes > 0) {
         const hc = { ...(prev.hc ?? {}) };
         if (p.activeCalories > 0) hc.activeCalories = p.activeCalories;
         if (p.totalCalories > 0) hc.totalCalories = p.totalCalories;
         if (p.bmr > 0) hc.bmr = p.bmr;
+        if (p.cyclingMinutes > 0) hc.cyclingMin = p.cyclingMinutes;
         next.hc = hc;
       }
       writes.push([key, JSON.stringify(next)]);

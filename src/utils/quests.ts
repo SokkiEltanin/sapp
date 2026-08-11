@@ -25,6 +25,14 @@ export interface QuestCtx {
   habitDaysThisWeek?: number;  // days this week with ALL habits done
   moodDaysThisMonth?: number;  // distinct days with a mood entry this month
   stepsThisMonth?: number;     // total steps this month
+  // ── personalized training quests (Ustawienia → Personalizacja must be filled in;
+  // absent target = quest doesn't appear, see BONUS `available` below) ──
+  pushupTarget?: number;       // reps, from personalQuests.ts targetsFor()
+  squatTarget?: number;
+  bikeTarget?: number;         // minutes
+  pushupsToday?: boolean;      // self-reported (no sensor can count reps)
+  squatsToday?: boolean;       // self-reported
+  bikeMinutesToday?: number;   // from Health Connect ExerciseSession (biking)
 }
 
 export interface ClaimState {
@@ -75,6 +83,18 @@ const BONUS: BonusDef[] = [
     label: c => `Wypij ${c.waterGoal} szklanek wody`, note: c => `${c.waterToday ?? 0}/${c.waterGoal}`, done: c => (c.waterToday ?? 0) >= (c.waterGoal ?? Infinity) },
   { id: 'b_sleep', coins: 2, xp: 6, available: c => (c.sleepMinutes ?? 0) > 0,
     label: () => 'Prześpij 7 godzin', note: c => `${((c.sleepMinutes ?? 0) / 60).toFixed(1)}h / 7h`, done: c => (c.sleepMinutes ?? 0) >= 420 },
+  // Personalized training quests — only show once Ustawienia → Personalizacja is filled
+  // in (targets computed there). Pushups/squats are self-reported (tap when done, see
+  // markPushupsDone/markSquatsDone in petStore — no sensor can count reps); the bike
+  // ride is verified from Health Connect cycling minutes, same as the other data-driven
+  // dailies above.
+  { id: 'b_pushups', coins: 2, xp: 6, available: c => (c.pushupTarget ?? 0) > 0,
+    label: c => `Zrób ${c.pushupTarget} pompek`, note: c => c.pushupsToday ? 'zrobione 💪' : 'stuknij po zrobieniu', done: c => !!c.pushupsToday },
+  { id: 'b_squats', coins: 2, xp: 6, available: c => (c.squatTarget ?? 0) > 0,
+    label: c => `Zrób ${c.squatTarget} przysiadów`, note: c => c.squatsToday ? 'zrobione 🦵' : 'stuknij po zrobieniu', done: c => !!c.squatsToday },
+  { id: 'b_bikeride', coins: 3, xp: 8, available: c => (c.bikeTarget ?? 0) > 0,
+    label: c => `Przejażdżka rowerem (${c.bikeTarget} min)`, note: c => `${c.bikeMinutesToday ?? 0}/${c.bikeTarget} min`,
+    done: c => (c.bikeMinutesToday ?? 0) >= (c.bikeTarget ?? Infinity) },
 ];
 
 // ─── Monthly challenges (claim once per month) ──────────────────────────────

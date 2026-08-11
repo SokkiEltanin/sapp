@@ -211,7 +211,7 @@ export default function HealthScreen() {
         for (let i = 29; i >= 0; i--) {
           const d = new Date(today); d.setDate(today.getDate() - i);
           const key = ymd(d); const h = hist[key];
-          range.push({ date: key, steps: h?.steps ?? 0, sleepMinutes: h?.sleepMinutes ?? 0, weightKg: h && h.weight > 0 ? h.weight : null, activeCalories: 0, totalCalories: h?.burn ?? 0, bmr: 0 });
+          range.push({ date: key, steps: h?.steps ?? 0, sleepMinutes: h?.sleepMinutes ?? 0, weightKg: h && h.weight > 0 ? h.weight : null, activeCalories: 0, totalCalories: h?.burn ?? 0, bmr: 0, cyclingMinutes: h?.cyclingMinutes ?? 0 });
         }
       } catch {}
       // ZAWSZE ustaw monthData (30-dniowy szkielet), żeby karta wykresu kroków się nie

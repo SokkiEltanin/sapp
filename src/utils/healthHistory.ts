@@ -8,6 +8,7 @@ export interface HealthDayHistory {
   weight: number;         // kg, 0 = not logged
   steps: number;
   burn: number;           // total kcal burned that day (0 = unknown)
+  cyclingMinutes: number; // rower (zwykły + stacjonarny) z zegarka, 0 = brak
 }
 
 // The day's total burn from the stored Health Connect blob. Samsung often shares
@@ -80,7 +81,7 @@ export async function getHealthHistory(days = 60, fallbackBmr = 0, defaultWeight
         const sleepMinutes = isFakeSleep ? 0 : (Number(d.sleepH) || 0) * 60 + (Number(d.sleepM) || 0);
         const stepsN = Number(d.steps) || 0;
         const wKg = Number(d.weight) || defaultWeightKg;
-        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: stepsN, burn: dailyBurnFromHc(d.hc, fallbackBmr, stepsN, wKg, floorFrac) };
+        out[dates[i]] = { sleepMinutes, weight: Number(d.weight) || 0, steps: stepsN, burn: dailyBurnFromHc(d.hc, fallbackBmr, stepsN, wKg, floorFrac), cyclingMinutes: Number(d.hc?.cyclingMin) || 0 };
       } catch {}
     });
   } catch {}
