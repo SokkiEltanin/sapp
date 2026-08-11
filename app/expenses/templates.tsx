@@ -11,6 +11,7 @@ import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { templatesService } from '@/services/templatesService';
 import { expensesService } from '@/services/expensesService';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -110,19 +111,13 @@ export default function TemplatesScreen() {
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    Alert.alert('Usuń szablon', `Usunąć "${name}"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      {
-        text: 'Usuń', style: 'destructive',
-        onPress: async () => {
-          haptic.medium();
-          await templatesService.remove(id).catch(() => {});
-          setTemplates(prev => prev.filter(t => t.id !== id));
-          toast.success('Szablon usunięty');
-        },
-      },
-    ]);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const handleDelete = (id: string, name: string) => { haptic.tap(); setConfirmDelete({ id, name }); };
+  const doDelete = async (id: string) => {
+    haptic.medium();
+    await templatesService.remove(id).catch(() => {});
+    setTemplates(prev => prev.filter(t => t.id !== id));
+    toast.success('Szablon usunięty');
   };
 
   const useTemplate = (tmpl: ExpenseTemplate) => {
@@ -296,6 +291,14 @@ export default function TemplatesScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmDelete}
+        title="Usuń szablon"
+        message={confirmDelete ? `Usunąć "${confirmDelete.name}"?` : undefined}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { if (confirmDelete) doDelete(confirmDelete.id); setConfirmDelete(null); }}
+      />
     </SafeAreaView>
   );
 }

@@ -15,6 +15,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useCounters } from '@/store/countersStore';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import {
   Note, getAllNotes, createNote, updateNote, deleteNote,
   loadFolders, createFolder, renameFolder, deleteFolder,
@@ -643,6 +644,7 @@ export default function NotesScreen() {
   const [editorOpen, setEditorOpen]   = useState(false);
   const [newFolderMode, setNewFolderMode] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<{ kind: 'note'; note: Note } | { kind: 'folder'; name: string } | null>(null);
   const { create: createTask }        = useTasks();
   const { counters } = useCounters();
   const counterName = (counterId?: string) => counterId ? counters.find(cn => cn.id === counterId)?.name : undefined;
@@ -744,19 +746,12 @@ export default function NotesScreen() {
     );
   };
 
-  const handleDelete = (note: Note) => {
-    Alert.alert('Usuń notatkę', `Usunąć "${note.title || 'tę notatkę'}"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      {
-        text: 'Usuń', style: 'destructive',
-        onPress: async () => {
-          haptic.medium();
-          await deleteNote(note.id);
-          toast.info('Usunięto');
-          loadAll();
-        },
-      },
-    ]);
+  const handleDelete = (note: Note) => { haptic.tap(); setConfirmDelete({ kind: 'note', note }); };
+  const doDeleteNote = async (note: Note) => {
+    haptic.medium();
+    await deleteNote(note.id);
+    toast.info('Usunięto');
+    loadAll();
   };
 
   const handleCreateFolder = async () => {
@@ -770,26 +765,12 @@ export default function NotesScreen() {
     toast.success(`Katalog "${name}" utworzony`);
   };
 
-  const handleDeleteFolder = (name: string) => {
-    const count = folderCount(name);
-    Alert.alert(
-      'Usuń katalog',
-      count > 0
-        ? `Usunąć katalog "${name}"? ${count} notatek trafi do bez katalogu.`
-        : `Usunąć katalog "${name}"?`,
-      [
-        { text: 'Anuluj', style: 'cancel' },
-        {
-          text: 'Usuń', style: 'destructive',
-          onPress: async () => {
-            haptic.medium();
-            await deleteFolder(name);
-            if (activeFolder === name) setActiveFolder(null);
-            loadAll();
-          },
-        },
-      ],
-    );
+  const handleDeleteFolder = (name: string) => { haptic.tap(); setConfirmDelete({ kind: 'folder', name }); };
+  const doDeleteFolder = async (name: string) => {
+    haptic.medium();
+    await deleteFolder(name);
+    if (activeFolder === name) setActiveFolder(null);
+    loadAll();
   };
 
   return (
@@ -969,6 +950,26 @@ export default function NotesScreen() {
         onClose={() => setEditorOpen(false)}
         onSave={handleSave}
         folders={folders}
+      />
+
+      <ConfirmDialog
+        visible={!!confirmDelete}
+        title={confirmDelete?.kind === 'folder' ? 'Usuń katalog' : 'Usuń notatkę'}
+        message={
+          confirmDelete?.kind === 'folder'
+            ? (folderCount(confirmDelete.name) > 0
+              ? `Usunąć katalog "${confirmDelete.name}"? ${folderCount(confirmDelete.name)} notatek trafi do bez katalogu.`
+              : `Usunąć katalog "${confirmDelete.name}"?`)
+            : confirmDelete?.kind === 'note'
+              ? `Usunąć "${confirmDelete.note.title || 'tę notatkę'}"?`
+              : undefined
+        }
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => {
+          if (confirmDelete?.kind === 'note') doDeleteNote(confirmDelete.note);
+          else if (confirmDelete?.kind === 'folder') doDeleteFolder(confirmDelete.name);
+          setConfirmDelete(null);
+        }}
       />
     </SafeAreaView>
   );

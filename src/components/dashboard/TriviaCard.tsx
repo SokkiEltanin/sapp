@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FlaskConical, BookOpen, Lightbulb, Globe, Sparkles, Check, GraduationCap } from 'lucide-react-native';
 import { haptic } from '@/utils/haptics';
 import { TRIVIA, Trivia, TriviaCat } from '@/data/trivia';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
@@ -106,22 +107,32 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
     return () => { alive = false; };
   }, []);
 
+  const [confirmDismiss, setConfirmDismiss] = useState(false);
   const onKnowIt = () => {
     if (!st?.currentKey) return;
     haptic.tap();
-    Alert.alert('To znam', 'Nie pokazywać już tej ciekawostki?', [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Nie pokazuj', style: 'destructive', onPress: () => {
-        const today = todayStr();
-        const dismissed = { ...(st.dismissed ?? {}), [st.currentKey!]: true as const };
-        const r = advance(st.counts, st.lastShown ?? {}, dismissed, st.currentKey, today);
-        const p: Persist = { counts: r.counts, lastShown: r.lastShown, dismissed, currentKey: r.key, day: today };
-        AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
-        setSt(p);
-        haptic.success();
-      } },
-    ]);
+    setConfirmDismiss(true);
   };
+  const doDismiss = () => {
+    if (!st?.currentKey) return;
+    const today = todayStr();
+    const dismissed = { ...(st.dismissed ?? {}), [st.currentKey]: true as const };
+    const r = advance(st.counts, st.lastShown ?? {}, dismissed, st.currentKey, today);
+    const p: Persist = { counts: r.counts, lastShown: r.lastShown, dismissed, currentKey: r.key, day: today };
+    AsyncStorage.setItem(KEY, JSON.stringify(p)).catch(() => {});
+    setSt(p);
+    haptic.success();
+  };
+  const dismissDialog = (
+    <ConfirmDialog
+      visible={confirmDismiss}
+      title="To znam"
+      message="Nie pokazywać już tej ciekawostki?"
+      confirmLabel="Nie pokazuj"
+      onCancel={() => setConfirmDismiss(false)}
+      onConfirm={() => { setConfirmDismiss(false); doDismiss(); }}
+    />
+  );
 
   // wszystkie oznaczone „to znam" → miły stan końcowy
   if (st && st.currentKey === null) {
@@ -132,6 +143,7 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
           <Text style={s.title}>Ciekawostka dnia</Text>
         </View>
         <Text style={s.text}>Przerobiłeś wszystkie ciekawostki 🎓 Szacun.</Text>
+        {dismissDialog}
       </View>
     );
   }
@@ -159,6 +171,7 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
         <Check size={12} color={c.text.muted} />
         <Text style={s.knowTxt}>To znam — nie pokazuj</Text>
       </TouchableOpacity>
+      {dismissDialog}
     </View>
   );
 }

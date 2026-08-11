@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { ChevronLeft, Plus, Hourglass, CalendarClock, Trash2, Pencil, Check, X, CalendarDays, RotateCcw, Ban, LayoutDashboard, LayoutGrid, Car, PersonStanding } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
@@ -89,10 +90,8 @@ export default function Counters() {
     }
     setOpen(false);
   };
-  const del = (cn: Counter) => Alert.alert('Usunąć?', `„${cn.name}" zniknie.`, [
-    { text: 'Anuluj', style: 'cancel' },
-    { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); remove(cn.id); } },
-  ]);
+  const [confirmDel, setConfirmDel] = useState<Counter | null>(null);
+  const del = (cn: Counter) => { haptic.tap(); setConfirmDel(cn); };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -319,6 +318,14 @@ export default function Counters() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmDel}
+        title="Usunąć?"
+        message={confirmDel ? `„${confirmDel.name}" zniknie.` : undefined}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={() => { if (confirmDel) { haptic.medium(); remove(confirmDel.id); } setConfirmDel(null); }}
+      />
     </SafeAreaView>
   );
 }

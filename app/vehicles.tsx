@@ -13,6 +13,7 @@ import {
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { vehiclesService } from '@/services/vehiclesService';
 import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
@@ -116,16 +117,13 @@ export default function VehiclesScreen() {
     } catch { haptic.error(); toast.error('Nie zapisano — sprawdź połączenie'); }
     finally { setSaving(false); }
   };
-  const removeVehicle = (v: Vehicle) => {
-    Alert.alert('Usuń pojazd', `Usunąć „${v.name}"? Wydatki zostaną.`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: async () => {
-        haptic.medium();
-        await vehiclesService.remove(v.id).catch(() => {});
-        setVehicles(prev => prev.filter(x => x.id !== v.id));
-        toast.info('Usunięto');
-      } },
-    ]);
+  const [confirmDeleteVehicle, setConfirmDeleteVehicle] = useState<Vehicle | null>(null);
+  const removeVehicle = (v: Vehicle) => { haptic.tap(); setConfirmDeleteVehicle(v); };
+  const doRemoveVehicle = async (v: Vehicle) => {
+    haptic.medium();
+    await vehiclesService.remove(v.id).catch(() => {});
+    setVehicles(prev => prev.filter(x => x.id !== v.id));
+    toast.info('Usunięto');
   };
 
   // ── Maintenance ───────────────────────────────────────────────────────────
@@ -465,6 +463,14 @@ export default function VehiclesScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmDeleteVehicle}
+        title={confirmDeleteVehicle ? `Usunąć „${confirmDeleteVehicle.name}"?` : ''}
+        message="Wydatki zostaną."
+        onCancel={() => setConfirmDeleteVehicle(null)}
+        onConfirm={() => { if (confirmDeleteVehicle) doRemoveVehicle(confirmDeleteVehicle); setConfirmDeleteVehicle(null); }}
+      />
     </SafeAreaView>
   );
 }

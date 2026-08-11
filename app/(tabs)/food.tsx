@@ -11,6 +11,7 @@ import { getHealthHistory, saveTodayWeight, activeFromSteps } from '@/utils/heal
 import { getHealthGoals, saveHealthGoals, bmrMifflin, ACTIVITY_FACTOR, ACTIVITY_LABEL, ACTIVITY_DESC, type ActivityLevel } from '@/utils/healthGoals';
 import { useWaterTracker } from '@/hooks/useWaterTracker';
 import DatePickerField from '@/components/ui/DatePickerField';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { spacing, radius, colors, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -46,6 +47,7 @@ export default function Food() {
   const setGoal    = useFoodStore(st => st.setGoal);
   const removeMeal = useFoodStore(st => st.removeMeal);
 
+  const [confirmDeleteMeal, setConfirmDeleteMeal] = useState<MealEntry | null>(null);
   const [burnByDay, setBurnByDay] = useState<Record<string, number>>({});  // date → kcal burned (watch)
   const [activeToday, setActiveToday] = useState(0);   // ruch (spalone w ruchu, z zegarka)
   const [stepsToday, setStepsToday] = useState(0);     // kroki dziś (fallback ruchu, gdy brak aktywnych kcal)
@@ -514,13 +516,7 @@ export default function Food() {
                       <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); router.push(`/food/add?date=${viewDate}&edit=${m.id}` as any); }}>
                         <Pencil size={14} color={c.text.muted} />
                       </TouchableOpacity>
-                      <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => {
-                        haptic.tap();
-                        Alert.alert('Usunąć posiłek?', `${m.items.length} ${m.items.length === 1 ? 'pozycja' : 'pozycje'} · ${m.kcal.toLocaleString('pl-PL')} kcal`, [
-                          { text: 'Anuluj', style: 'cancel' },
-                          { text: 'Usuń', style: 'destructive', onPress: () => removeMeal(m.id) },
-                        ]);
-                      }}>
+                      <TouchableOpacity hitSlop={8} style={{ paddingLeft: spacing[2] }} onPress={() => { haptic.tap(); setConfirmDeleteMeal(m); }}>
                         <Trash2 size={15} color={c.text.muted} />
                       </TouchableOpacity>
                     </View>
@@ -640,6 +636,14 @@ export default function Food() {
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmDeleteMeal}
+        title="Usunąć posiłek?"
+        message={confirmDeleteMeal ? `${confirmDeleteMeal.items.length} ${confirmDeleteMeal.items.length === 1 ? 'pozycja' : 'pozycje'} · ${confirmDeleteMeal.kcal.toLocaleString('pl-PL')} kcal` : undefined}
+        onCancel={() => setConfirmDeleteMeal(null)}
+        onConfirm={() => { if (confirmDeleteMeal) removeMeal(confirmDeleteMeal.id); setConfirmDeleteMeal(null); }}
+      />
     </SafeAreaView>
   );
 }

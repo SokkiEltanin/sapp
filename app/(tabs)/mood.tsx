@@ -8,6 +8,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGrad, Stop, Circle } from 'react-
 
 import ScreenHeader from '@/components/ui/ScreenHeader';
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 
 // mono (redesign czarno-biały) — chrome nastroju = biel; SAME kolory nastrojów
@@ -1067,18 +1068,13 @@ export default function MoodScreen() {
     setModalOpen(true);
   };
 
-  const handleDeleteEntry = (entry: MoodEntry) => {
-    Alert.alert('Usuń wpis', 'Na pewno usunąć ten check-in?', [
-      { text: 'Anuluj', style: 'cancel' },
-      {
-        text: 'Usuń', style: 'destructive', onPress: async () => {
-          haptic.medium();
-          deleteEntry(entry.id);
-          await moodService.remove(entry.id).catch(() => {});
-          toast.info('Usunięto');
-        },
-      },
-    ]);
+  const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<MoodEntry | null>(null);
+  const handleDeleteEntry = (entry: MoodEntry) => { haptic.tap(); setConfirmDeleteEntry(entry); };
+  const doDeleteEntry = async (entry: MoodEntry) => {
+    haptic.medium();
+    deleteEntry(entry.id);
+    await moodService.remove(entry.id).catch(() => {});
+    toast.info('Usunięto');
   };
 
   return (
@@ -1239,6 +1235,14 @@ export default function MoodScreen() {
         visible={modalOpen}
         onClose={() => { setModalOpen(false); setEditingEntry(null); }}
         existingEntry={editingEntry}
+      />
+
+      <ConfirmDialog
+        visible={!!confirmDeleteEntry}
+        title="Usuń wpis"
+        message="Na pewno usunąć ten check-in?"
+        onCancel={() => setConfirmDeleteEntry(null)}
+        onConfirm={() => { if (confirmDeleteEntry) doDeleteEntry(confirmDeleteEntry); setConfirmDeleteEntry(null); }}
       />
     </SafeAreaView>
   );

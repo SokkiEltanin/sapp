@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
+  TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { ArrowLeft, Trash2, Edit3, Save, Calendar, Clock, Flag, Circle } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { calendarService } from '@/services/calendarService';
 import { googleCalendarService } from '@/services/googleCalendarService';
@@ -135,24 +136,19 @@ export default function EventDetailScreen() {
     }
   };
 
-  const handleDelete = () => {
-    Alert.alert('Usuń wydarzenie', 'Na pewno usunąć?', [
-      { text: 'Anuluj', style: 'cancel' },
-      {
-        text: 'Usuń', style: 'destructive', onPress: async () => {
-          haptic.medium();
-          deleteEvent(id!);
-          if (isGCal) {
-            await googleCalendarService.deleteEvent(id!).catch(() => {});
-          } else {
-            await calendarService.deleteEvent(id!).catch(() => {});
-            notificationsService.cancelEventReminder(id!).catch(() => {});
-          }
-          toast.info('Usunięto');
-          router.back();
-        },
-      },
-    ]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const handleDelete = () => { haptic.tap(); setConfirmDelete(true); };
+  const doDelete = async () => {
+    haptic.medium();
+    deleteEvent(id!);
+    if (isGCal) {
+      await googleCalendarService.deleteEvent(id!).catch(() => {});
+    } else {
+      await calendarService.deleteEvent(id!).catch(() => {});
+      notificationsService.cancelEventReminder(id!).catch(() => {});
+    }
+    toast.info('Usunięto');
+    router.back();
   };
 
   const evColor = editing ? color : (event.color ?? colors.accent.blue);
@@ -316,6 +312,14 @@ export default function EventDetailScreen() {
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="Usuń wydarzenie"
+        message="Na pewno usunąć?"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => { setConfirmDelete(false); doDelete(); }}
+      />
     </SafeAreaView>
   );
 }

@@ -17,6 +17,7 @@ import { haptic } from '@/utils/haptics';
 import PressableScale from '@/components/ui/PressableScale';
 import Chip from '@/components/ui/Chip';
 import DatePickerField from '@/components/ui/DatePickerField';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useExpensesStore } from '@/store/expensesStore';
 import { saveMerchant } from '@/utils/merchantMemory';
 import { expensesService } from '@/services/expensesService';
@@ -499,19 +500,14 @@ export default function ExpenseDetailScreen() {
     }
   };
 
-  const handleDelete = () => {
-    Alert.alert('Usuń transakcję', 'Na pewno usunąć?', [
-      { text: 'Anuluj', style: 'cancel' },
-      {
-        text: 'Usuń', style: 'destructive', onPress: async () => {
-          haptic.medium();
-          deleteExpense(id!);
-          await expensesService.remove(id!).catch(() => {});
-          toast.info('Usunięto');
-          router.back();
-        },
-      },
-    ]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const handleDelete = () => { haptic.tap(); setConfirmDelete(true); };
+  const doDelete = async () => {
+    haptic.medium();
+    deleteExpense(id!);
+    await expensesService.remove(id!).catch(() => {});
+    toast.info('Usunięto');
+    router.back();
   };
 
   const displayAmt = editing ? amount : expense.amount.toFixed(2);
@@ -944,6 +940,14 @@ export default function ExpenseDetailScreen() {
           </PressableScale>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="Usuń transakcję"
+        message="Na pewno usunąć?"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => { setConfirmDelete(false); doDelete(); }}
+      />
     </SafeAreaView>
   );
 }

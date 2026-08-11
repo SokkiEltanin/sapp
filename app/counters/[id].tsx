@@ -8,6 +8,7 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import DatePickerField from '@/components/ui/DatePickerField';
 import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame, { streakColor } from '@/components/counters/StreakFlame';
@@ -123,10 +124,8 @@ export default function CounterDetail() {
     setAddingTask(false); setTaskTitle(''); setTaskDate('');
     toast.success('Zadanie dodane');
   };
-  const delTask = (title: string, taskId: string) => Alert.alert('Usunąć zadanie?', `„${title}" zniknie.`, [
-    { text: 'Anuluj', style: 'cancel' },
-    { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); removeTask(taskId); } },
-  ]);
+  const [confirmDelTask, setConfirmDelTask] = useState<{ title: string; id: string } | null>(null);
+  const delTask = (title: string, taskId: string) => { haptic.tap(); setConfirmDelTask({ title, id: taskId }); };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -267,6 +266,14 @@ export default function CounterDetail() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmDelTask}
+        title="Usunąć zadanie?"
+        message={confirmDelTask ? `„${confirmDelTask.title}" zniknie.` : undefined}
+        onCancel={() => setConfirmDelTask(null)}
+        onConfirm={() => { if (confirmDelTask) { haptic.medium(); removeTask(confirmDelTask.id); } setConfirmDelTask(null); }}
+      />
     </SafeAreaView>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -264,13 +265,8 @@ export default function RecipeBuilder() {
     saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry, semi, roughSoup });
     router.back();
   };
-  const del = () => {
-    if (!editId) return;
-    Alert.alert('Usunąć „' + name + '"?', 'Usuniesz to danie z biblioteki. Zjedzone wcześniej porcje zostają w historii.', [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.tap(); removeProduct(editId); router.back(); } },
-    ]);
-  };
+  const [confirmDel, setConfirmDel] = useState(false);
+  const del = () => { if (editId) { haptic.tap(); setConfirmDel(true); } };
 
   const unitLabel = (u: FoodUnit) => UNIT_META[u].label;
 
@@ -552,6 +548,14 @@ export default function RecipeBuilder() {
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={confirmDel}
+        title={`Usunąć „${name}"?`}
+        message="Usuniesz to danie z biblioteki. Zjedzone wcześniej porcje zostają w historii."
+        onCancel={() => setConfirmDel(false)}
+        onConfirm={() => { setConfirmDel(false); haptic.tap(); if (editId) removeProduct(editId); router.back(); }}
+      />
     </SafeAreaView>
   );
 }

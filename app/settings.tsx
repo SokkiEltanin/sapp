@@ -21,6 +21,7 @@ import { auth } from '@/services/firebase';
 import PressableScale from '@/components/ui/PressableScale';
 import InputField from '@/components/ui/InputField';
 import AnimatedButton from '@/components/ui/AnimatedButton';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { notificationsService } from '@/services/notificationsService';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -602,22 +603,11 @@ export default function SettingsScreen() {
     }
   };
 
-  const clearNotifications = () => {
-    Alert.alert(
-      'Wyczyść powiadomienia',
-      'Czy na pewno chcesz anulować wszystkie zaplanowane powiadomienia?',
-      [
-        { text: 'Anuluj', style: 'cancel' },
-        {
-          text: 'Wyczyść',
-          style: 'destructive',
-          onPress: async () => {
-            await notificationsService.cancelAll();
-            Alert.alert('Gotowe', 'Wszystkie powiadomienia anulowane');
-          },
-        },
-      ],
-    );
+  const [confirmClearNotif, setConfirmClearNotif] = useState(false);
+  const clearNotifications = () => { haptic.tap(); setConfirmClearNotif(true); };
+  const doClearNotifications = async () => {
+    await notificationsService.cancelAll();
+    Alert.alert('Gotowe', 'Wszystkie powiadomienia anulowane');
   };
 
   // ── Search / structure ──────────────────────────────────────────────────────
@@ -1614,6 +1604,15 @@ export default function SettingsScreen() {
         ))}
 
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmClearNotif}
+        title="Wyczyść powiadomienia"
+        message="Czy na pewno chcesz anulować wszystkie zaplanowane powiadomienia?"
+        confirmLabel="Wyczyść"
+        onCancel={() => setConfirmClearNotif(false)}
+        onConfirm={() => { setConfirmClearNotif(false); doClearNotifications(); }}
+      />
     </SafeAreaView>
   );
 }

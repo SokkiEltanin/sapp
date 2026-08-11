@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Plus, X, Trash2, HandCoins, CreditCard, Banknote, Check, ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 
 import DatePickerField from '@/components/ui/DatePickerField';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { debtsService } from '@/services/debtsService';
 import { expensesService } from '@/services/expensesService';
 import { Debt, PaymentMethod } from '@/types';
@@ -79,11 +80,8 @@ export default function DebtsScreen() {
     } catch (e: any) { Alert.alert('Błąd', e.message); }
   };
 
-  const confirmDelete = (d: Debt) =>
-    Alert.alert('Usuń dług', `Usunąć „${d.person} · ${d.amount} zł"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { debtsService.remove(d.id).then(reload).catch(() => {}); } },
-    ]);
+  const [pendingDelete, setPendingDelete] = useState<Debt | null>(null);
+  const confirmDelete = (d: Debt) => { haptic.tap(); setPendingDelete(d); };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -204,6 +202,14 @@ export default function DebtsScreen() {
           })()}
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!pendingDelete}
+        title="Usuń dług"
+        message={pendingDelete ? `Usunąć „${pendingDelete.person} · ${pendingDelete.amount} zł"?` : undefined}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) debtsService.remove(pendingDelete.id).then(reload).catch(() => {}); setPendingDelete(null); }}
+      />
     </SafeAreaView>
   );
 }

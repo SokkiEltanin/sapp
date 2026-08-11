@@ -13,6 +13,7 @@ import {
 
 import PressableScale from '@/components/ui/PressableScale';
 import DatePickerField from '@/components/ui/DatePickerField';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import TimePickerField from '@/components/ui/TimePickerField';
 import { useTasks } from '@/hooks/useTasks';
 import { usePomodoroStore } from '@/store/pomodoroStore';
@@ -239,18 +240,13 @@ export default function TaskDetailScreen() {
     }
   };
 
-  const handleDelete = () => {
-    Alert.alert('Usuń zadanie', 'Na pewno usunąć?', [
-      { text: 'Anuluj', style: 'cancel' },
-      {
-        text: 'Usuń', style: 'destructive', onPress: async () => {
-          haptic.medium();
-          await remove(id!);
-          toast.info('Usunięto');
-          router.back();
-        },
-      },
-    ]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const handleDelete = () => { haptic.tap(); setConfirmDelete(true); };
+  const doDelete = async () => {
+    haptic.medium();
+    await remove(id!);
+    toast.info('Usunięto');
+    router.back();
   };
 
   const handleMoodSelect = async (mood: MoodLevel) => {
@@ -667,6 +663,14 @@ export default function TaskDetailScreen() {
         taskTitle={moodTaskTitle}
         onSelect={handleMoodSelect}
         onDismiss={() => setMoodModal(false)}
+      />
+
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="Usuń zadanie"
+        message="Na pewno usunąć?"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => { setConfirmDelete(false); doDelete(); }}
       />
     </SafeAreaView>
   );

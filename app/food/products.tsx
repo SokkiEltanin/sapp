@@ -9,6 +9,7 @@ import {
 } from '@/store/foodStore';
 import { FOOD_SUBCAT_META } from '@/utils/food';
 import { normalizeProductName } from '@/utils/productMemory';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { spacing, radius, colors } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -117,12 +118,8 @@ export default function FoodBase() {
     if (e.kind === 'recipe') router.push(`/food/recipe?dup=${e.id}` as any);
     else router.push(`/food/add?dupPreset=${e.id}` as any);
   };
-  const del = (e: Entry) => {
-    Alert.alert('Usunąć „' + e.name + '"?', e.kind === 'recipe' ? 'Usuniesz to danie z biblioteki. Zjedzone wcześniej porcje zostają w historii.' : 'Usuniesz ten preset.', [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.tap(); e.kind === 'recipe' ? removeProduct(e.id) : removePreset(e.id); } },
-    ]);
-  };
+  const [confirmDel, setConfirmDel] = useState<Entry | null>(null);
+  const del = (e: Entry) => { haptic.tap(); setConfirmDel(e); };
   const rowMenu = (e: Entry) => {
     haptic.tap();
     const opts: any[] = [];
@@ -232,6 +229,13 @@ export default function FoodBase() {
           </>
         )}
       </ScrollView>
+      <ConfirmDialog
+        visible={!!confirmDel}
+        title={confirmDel ? `Usunąć „${confirmDel.name}"?` : ''}
+        message={confirmDel ? (confirmDel.kind === 'recipe' ? 'Usuniesz to danie z biblioteki. Zjedzone wcześniej porcje zostają w historii.' : 'Usuniesz ten preset.') : undefined}
+        onCancel={() => setConfirmDel(null)}
+        onConfirm={() => { if (confirmDel) { haptic.tap(); confirmDel.kind === 'recipe' ? removeProduct(confirmDel.id) : removePreset(confirmDel.id); } setConfirmDel(null); }}
+      />
     </SafeAreaView>
   );
 }

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as Updates from 'expo-updates';
 import { CloudUpload, RotateCcw, Cloud, ShieldCheck, ShieldAlert, FileDown, ChevronDown } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -74,35 +75,26 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
     }
   };
 
-  const onRestore = (b: BackupMeta) => {
-    const total = Object.values(b.counts ?? {}).reduce((s, n) => s + n, 0);
-    Alert.alert(
-      'Przywrócić kopię?',
-      `Z dnia ${fmtWhen(b.createdAt)}.\n\nObecne dane zostaną zastąpione danymi z tej kopii (${total} rekordów + ustawienia). Tego nie można cofnąć.`,
-      [
-        { text: 'Anuluj', style: 'cancel' },
-        {
-          text: 'Przywróć', style: 'destructive', onPress: async () => {
-            setBusy('restore');
-            try {
-              await restoreBackup(b.id);
-              haptic.success();
-              Alert.alert(
-                'Przywrócono',
-                'Aplikacja zostanie przeładowana, aby wczytać przywrócone dane.',
-                [{ text: 'OK', onPress: () => { Updates.reloadAsync().catch(() => {}); } }],
-              );
-            } catch (e: any) {
-              haptic.error();
-              toast.error('Nie udało się przywrócić kopii');
-            } finally {
-              setBusy(null);
-            }
-          },
-        },
-      ],
-    );
+  const [confirmRestore, setConfirmRestore] = useState<BackupMeta | null>(null);
+  const onRestore = (b: BackupMeta) => { haptic.tap(); setConfirmRestore(b); };
+  const doRestore = async (b: BackupMeta) => {
+    setBusy('restore');
+    try {
+      await restoreBackup(b.id);
+      haptic.success();
+      Alert.alert(
+        'Przywrócono',
+        'Aplikacja zostanie przeładowana, aby wczytać przywrócone dane.',
+        [{ text: 'OK', onPress: () => { Updates.reloadAsync().catch(() => {}); } }],
+      );
+    } catch (e: any) {
+      haptic.error();
+      toast.error('Nie udało się przywrócić kopii');
+    } finally {
+      setBusy(null);
+    }
   };
+  const restoreTotal = confirmRestore ? Object.values(confirmRestore.counts ?? {}).reduce((s, n) => s + n, 0) : 0;
 
   return (
     <View style={s.card}>
@@ -200,6 +192,15 @@ export default function BackupSection({ appBuild, googleUser, onConnectGoogle }:
           <Text style={s.overlayText}>Przywracam…</Text>
         </View>
       )}
+
+      <ConfirmDialog
+        visible={!!confirmRestore}
+        title="Przywrócić kopię?"
+        message={confirmRestore ? `Z dnia ${fmtWhen(confirmRestore.createdAt)}.\n\nObecne dane zostaną zastąpione danymi z tej kopii (${restoreTotal} rekordów + ustawienia). Tego nie można cofnąć.` : undefined}
+        confirmLabel="Przywróć"
+        onCancel={() => setConfirmRestore(null)}
+        onConfirm={() => { const b = confirmRestore; setConfirmRestore(null); if (b) doRestore(b); }}
+      />
     </View>
   );
 }

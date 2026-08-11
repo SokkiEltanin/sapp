@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Modal, Alert,
+  View, Text, StyleSheet, ScrollView, Modal,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
   TextInput, KeyboardAvoidingView, Platform, Image, Pressable, InteractionManager,
 } from 'react-native';
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
@@ -1092,9 +1093,11 @@ export default function DashboardScreen() {
   const [nonFoodVer, setNonFoodVer] = useState(0);             // bumps when the "nie jedzenie" list changes
   useEffect(() => { loadNonFood().then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
   const markNotFood = useCallback((name: string) => { haptic.tap(); addNonFood(name).then(() => setNonFoodVer(v => v + 1)).catch(() => {}); }, []);
+  const [confirmNotFood, setConfirmNotFood] = useState<string | null>(null);
   const [nonShopVer, setNonShopVer] = useState(0);             // bumps when the "to nie sklep" list changes
   useEffect(() => { loadNonShop().then(() => setNonShopVer(v => v + 1)).catch(() => {}); }, []);
   const markNotShop = useCallback((name: string) => { haptic.tap(); addNonShop(name).then(() => setNonShopVer(v => v + 1)).catch(() => {}); }, []);
+  const [confirmNotShop, setConfirmNotShop] = useState<string | null>(null);
   const foodMeals    = useFoodStore(st => st.meals);           // calorie log (for the balance widget)
   const foodProducts = useFoodStore(st => st.products);        // for the "dishes created" achievement
   const foodGoalMode = useFoodStore(st => st.goalMode);
@@ -1131,6 +1134,7 @@ export default function DashboardScreen() {
   const toggleHiddenSection = useDashboardLayout(s => s.toggleHidden);
   const addCustomTile  = useDashboardLayout(s => s.addCustomTile);
   const removeCustomTile = useDashboardLayout(s => s.removeCustomTile);
+  const [confirmRemoveTile, setConfirmRemoveTile] = useState<{ id: string; title: string } | null>(null);
   const resetLayout    = useDashboardLayout(s => s.reset);
   const editRequested  = useDashboardLayout(s => s.editRequested);
   const clearEditRequest = useDashboardLayout(s => s.clearEditRequest);
@@ -4003,15 +4007,20 @@ export default function DashboardScreen() {
                 <View style={s.shopWrap}>
                   {shopsCollection.rows.slice(0, 12).map(([name, cnt]) => (
                     <TouchableOpacity key={name} style={s.shopChip} activeOpacity={0.7}
-                      onLongPress={() => Alert.alert('To nie sklep?', `Usunąć „${name}" z kolekcji sklepów? (np. przelew, osoba)`, [
-                        { text: 'Anuluj', style: 'cancel' },
-                        { text: 'To nie sklep', style: 'destructive', onPress: () => markNotShop(name) },
-                      ])}>
+                      onLongPress={() => { haptic.tap(); setConfirmNotShop(name); }}>
                       <Text style={s.shopChipName} numberOfLines={1}>{name}</Text>
                       <View style={[s.shopChipCount, { backgroundColor: accentColor + '26' }]}><Text style={[s.shopChipCountTxt, { color: accentColor }]}>{cnt}</Text></View>
                     </TouchableOpacity>
                   ))}
                 </View>
+                <ConfirmDialog
+                  visible={!!confirmNotShop}
+                  title="To nie sklep?"
+                  message={confirmNotShop ? `Usunąć „${confirmNotShop}" z kolekcji sklepów? (np. przelew, osoba)` : undefined}
+                  confirmLabel="To nie sklep"
+                  onCancel={() => setConfirmNotShop(null)}
+                  onConfirm={() => { if (confirmNotShop) markNotShop(confirmNotShop); setConfirmNotShop(null); }}
+                />
                 <Text style={s.shopHint}>Przytrzymaj sklep, aby usunąć (to nie sklep)</Text>
               </View>
             );
@@ -4513,14 +4522,18 @@ export default function DashboardScreen() {
                           onMoveDir={moveVisible}
                           onMoveTo={handleMoveTo}
                           onToggleHidden={toggleHiddenSection}
-                          onRemove={(rid) => Alert.alert('Usuń kafelek', `Na pewno usunąć „${title}"?`, [
-                            { text: 'Anuluj', style: 'cancel' },
-                            { text: 'Usuń', style: 'destructive', onPress: () => removeCustomTile(rid) },
-                          ])}
+                          onRemove={(rid) => { haptic.tap(); setConfirmRemoveTile({ id: rid, title }); }}
                           onEdit={undefined}
                         />
                       );
                     })}
+                    <ConfirmDialog
+                      visible={!!confirmRemoveTile}
+                      title="Usuń kafelek"
+                      message={confirmRemoveTile ? `Na pewno usunąć „${confirmRemoveTile.title}"?` : undefined}
+                      onCancel={() => setConfirmRemoveTile(null)}
+                      onConfirm={() => { if (confirmRemoveTile) removeCustomTile(confirmRemoveTile.id); setConfirmRemoveTile(null); }}
+                    />
 
                     {/* Hidden sections live in a collapsible pool — tap + to bring one back. */}
                     {(() => {
@@ -5199,10 +5212,7 @@ export default function DashboardScreen() {
                           <ChevronRight size={13} color={colors.text.muted} />
                         </TouchableOpacity>
                         <TouchableOpacity style={s.notFoodBtn} hitSlop={6}
-                          onPress={() => Alert.alert('To nie jedzenie?', `„${name}" zniknie z liczenia jedzenia (wszędzie). Można cofnąć w paragonie.`, [
-                            { text: 'Anuluj', style: 'cancel' },
-                            { text: 'Nie jedzenie', style: 'destructive', onPress: () => markNotFood(name) },
-                          ])}>
+                          onPress={() => { haptic.tap(); setConfirmNotFood(name); }}>
                           <Ban size={15} color={colors.accent.red} />
                         </TouchableOpacity>
                       </View>
@@ -5223,6 +5233,15 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmNotFood}
+        title="To nie jedzenie?"
+        message={confirmNotFood ? `„${confirmNotFood}" zniknie z liczenia jedzenia (wszędzie). Można cofnąć w paragonie.` : undefined}
+        confirmLabel="Nie jedzenie"
+        onCancel={() => setConfirmNotFood(null)}
+        onConfirm={() => { if (confirmNotFood) markNotFood(confirmNotFood); setConfirmNotFood(null); }}
+      />
 
       {/* Payday — enter the paycheck amount */}
       <Modal visible={paydayModal} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPaydayModal(false)}>

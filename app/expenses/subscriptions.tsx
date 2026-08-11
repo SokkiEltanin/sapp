@@ -12,6 +12,7 @@ import {
 import * as LucideIcons from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import { useSubscriptions, MONTHLY_FACTOR } from '@/hooks/useSubscriptions';
 import { getCategoryMeta, CATEGORY_META } from '@/utils/categories';
@@ -209,11 +210,8 @@ export default function SubscriptionsScreen() {
     }
   }, [form, editing]);
 
-  const confirmDelete = (s: Subscription) =>
-    Alert.alert('Usuń subskrypcję', `Usunąć "${s.name}"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); remove(s.id); } },
-    ]);
+  const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
+  const confirmDelete = (s: Subscription) => { haptic.tap(); setPendingDelete(s); };
 
   const active   = subscriptions.filter((s) => s.active);
   const inactive = subscriptions.filter((s) => !s.active);
@@ -451,6 +449,14 @@ export default function SubscriptionsScreen() {
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!pendingDelete}
+        title="Usuń subskrypcję"
+        message={pendingDelete ? `Usunąć "${pendingDelete.name}"?` : undefined}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) { haptic.medium(); remove(pendingDelete.id); } setPendingDelete(null); }}
+      />
     </SafeAreaView>
   );
 }

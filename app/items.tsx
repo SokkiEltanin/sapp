@@ -12,6 +12,7 @@ import {
 import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { MaintenanceItem } from '@/types';
 import { toast } from '@/store/toastStore';
@@ -93,16 +94,13 @@ export default function ItemsScreen() {
     toast.success(`Odświeżono: ${it.name}`);
   };
 
-  const removeItem = (it: MaintenanceItem) => {
-    Alert.alert('Usuń przedmiot', `Usunąć „${it.name}"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: async () => {
-        haptic.medium();
-        await maintenanceService.remove(it.id).catch(() => {});
-        setItems(prev => prev.filter(x => x.id !== it.id));
-        toast.info('Usunięto');
-      } },
-    ]);
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<MaintenanceItem | null>(null);
+  const removeItem = (it: MaintenanceItem) => { haptic.tap(); setConfirmDeleteItem(it); };
+  const doRemoveItem = async (it: MaintenanceItem) => {
+    haptic.medium();
+    await maintenanceService.remove(it.id).catch(() => {});
+    setItems(prev => prev.filter(x => x.id !== it.id));
+    toast.info('Usunięto');
   };
 
   const dueLabel = (d: number) => d < 0 ? `${-d} dni po terminie` : d === 0 ? 'dziś!' : d === 1 ? 'jutro' : `za ${d} dni`;
@@ -215,6 +213,13 @@ export default function ItemsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirmDeleteItem}
+        title={confirmDeleteItem ? `Usunąć „${confirmDeleteItem.name}"?` : ''}
+        onCancel={() => setConfirmDeleteItem(null)}
+        onConfirm={() => { if (confirmDeleteItem) doRemoveItem(confirmDeleteItem); setConfirmDeleteItem(null); }}
+      />
     </SafeAreaView>
   );
 }

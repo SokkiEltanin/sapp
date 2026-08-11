@@ -12,6 +12,7 @@ import {
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useHabits, DayState } from '@/hooks/useHabits';
 
 const ICE = '#7DD3FC';   // dzień uratowany zamrożeniem serii = niebieski
@@ -703,12 +704,8 @@ export default function HabitsScreen() {
     [habits, todayDone],
   );
 
-  const handleDelete = (habit: Habit) => {
-    Alert.alert('Usuń nawyk', `Usunąć "${habit.title}"?`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Usuń', style: 'destructive', onPress: () => { haptic.medium(); remove(habit.id); toast.info('Usunięto'); } },
-    ]);
-  };
+  const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null);
+  const handleDelete = (habit: Habit) => { haptic.tap(); setConfirmDelete(habit); };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -828,6 +825,14 @@ export default function HabitsScreen() {
           setEditing(null);
           setShowAdd(false);
         }}
+      />
+
+      <ConfirmDialog
+        visible={!!confirmDelete}
+        title="Usuń nawyk"
+        message={confirmDelete ? `Usunąć "${confirmDelete.title}"?` : undefined}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { if (confirmDelete) { haptic.medium(); remove(confirmDelete.id); toast.info('Usunięto'); } setConfirmDelete(null); }}
       />
     </SafeAreaView>
   );
