@@ -339,9 +339,15 @@ export default function AddTaskScreen() {
                 );
               })}
             </View>
-            {deadline ? (
-              <Text style={s.deadlineDate}>{deadline}</Text>
-            ) : null}
+            {/* Chipy pokrywają tylko dziś/jutro/+7 dni — dowolna inna data wymagała
+                ręcznego wpisywania (user, 2026-08-11: "niewygodnie"). Ten sam
+                DatePickerField co przy przypomnieniu niżej, dowolny dzień z kalendarza. */}
+            <DatePickerField
+              value={deadline}
+              onChange={(d) => { haptic.tap(); setDeadline(d); }}
+              placeholder="Wybierz dowolny dzień"
+              style={{ marginTop: spacing[2] }}
+            />
           </SectionCard>
 
           {/* ── Priority ── */}

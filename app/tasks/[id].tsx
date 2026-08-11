@@ -486,13 +486,12 @@ export default function TaskDetailScreen() {
             <Row icon={<Calendar size={12} color={colors.text.muted} />} label="Termin">
               {editing ? (
                 <View style={{ gap: spacing[2] }}>
-                  <TextInput
+                  {/* Był surowy TextInput z ręcznym wpisywaniem daty (user, 2026-08-11:
+                      "niewygodnie") — ten sam DatePickerField co przy przypomnieniu niżej. */}
+                  <DatePickerField
                     value={deadline}
-                    onChangeText={setDeadline}
+                    onChange={setDeadline}
                     placeholder={todayStr()}
-                    placeholderTextColor={colors.text.muted}
-                    style={styles.fieldInput}
-                    keyboardType="numbers-and-punctuation"
                   />
                   <View style={styles.quickDateRow}>
                     {([
