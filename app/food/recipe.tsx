@@ -7,6 +7,7 @@ import { ChevronLeft, Search, Plus, Minus, X, Check, Trash2, ChefHat, Scale, Cop
 import {
   useFoodStore, UNIT_META, unitToGrams, computeItemMacros,
   MealItem, FoodUnit, PRESET_CATS, recipeDensity, recipeTotals, PrepType,
+  ROUGH_TIER_GRAMS, roughDensity,
 } from '@/store/foodStore';
 import { searchFoodBase } from '@/data/foodBase';
 import { normalizeProductName } from '@/utils/productMemory';
@@ -21,7 +22,10 @@ const PREP_TYPES: { id: PrepType; label: string; hint: string }[] = [
   { id: 'raw',    label: 'Mieszanka', hint: 'sałatka / ciasto na surowo / shake — waga = suma składników' },
   { id: 'cooked', label: 'Gotowane',  hint: 'ugotowane / upieczone — zważ gotowe (woda odparowała)' },
   { id: 'fried',  label: 'Smażone',   hint: 'zważ gotowe + wybierz na czym (tłuszcz = więcej kcal)' },
+  { id: 'rough',  label: 'Nie wiem ile czego', hint: 'zupa / danie na oko — stukasz składniki bez ważenia, ważysz tylko swoją porcję na końcu' },
 ];
+// Tier control dla trybu "Nie wiem ile czego" — zamiast gramów, trzy grube kubełki.
+const TIER_LABEL: Record<1 | 2 | 3, string> = { 1: 'mało', 2: 'średnio', 3: 'dużo' };
 // Frying fats — quick pick + amount in spoons. Absorbed fat adds calories.
 const FRY_FATS: { id: string; name: string; kcal100: number; gPerSpoon: number }[] = [
   { id: 'olej',   name: 'Olej',   kcal100: 884, gPerSpoon: 13 },
@@ -68,6 +72,7 @@ export default function RecipeBuilder() {
   const [fatSpoons, setFatSpoons] = useState('1');     // łyżki tłuszczu
   const [ings, setIngs]     = useState<MealItem[]>([]);
   const [semi, setSemi]     = useState(false);             // półprodukt = baza do innych dań
+  const [roughSoup, setRoughSoup] = useState(false);        // prep==='rough': "to głównie płyn"
   const [query, setQuery]   = useState('');
 
   // ingredient portion picker
@@ -91,9 +96,10 @@ export default function RecipeBuilder() {
     setCat(p.cat && PRESET_CATS.some((pc: any) => pc.tag === p.cat) ? p.cat : 'dania');
     const pr: PrepType = p.recipe.prep ?? 'cooked';
     setPrep(pr);
-    setCooked(pr === 'raw' ? '' : String(p.recipe.cookedWeight || ''));
+    setCooked(pr === 'raw' || pr === 'rough' ? '' : String(p.recipe.cookedWeight || ''));
     setIngs(p.recipe.ingredients.map((it: MealItem) => ({ ...it })));
     setSemi(!!p.semi);
+    setRoughSoup(!!p.recipe.roughSoup);
     if (p.recipe.fryFat) {
       const f = FRY_FATS.find(x => x.name === p.recipe.fryFat.name);
       if (f) { setFryFatId(f.id); setFatSpoons(String(Math.max(1, Math.round(p.recipe.fryFat.grams / f.gPerSpoon)))); }
@@ -121,8 +127,12 @@ export default function RecipeBuilder() {
     return grams > 0 ? { name: f.name, grams, kcal: Math.round(grams / 100 * f.kcal100) } : undefined;
   }, [prep, fryFatId, fatSpoons]);
   // raw = mixture → weight is the summed ingredient weight unless the user typed one
-  const effWeight = prep === 'raw' ? (cookedG > 0 ? cookedG : totals.grams) : cookedG;
-  const density = useMemo(() => recipeDensity(ings, effWeight, fry?.kcal ?? 0, fry?.grams ?? 0), [ings, effWeight, fry]);
+  // rough = no real weight anywhere — roughDensity works off the tier-guessed grams only
+  const effWeight = prep === 'raw' ? (cookedG > 0 ? cookedG : totals.grams) : prep === 'rough' ? totals.grams : cookedG;
+  const density = useMemo(
+    () => prep === 'rough' ? roughDensity(ings, roughSoup) : recipeDensity(ings, effWeight, fry?.kcal ?? 0, fry?.grams ?? 0),
+    [ings, effWeight, fry, prep, roughSoup],
+  );
 
   // ── candidates (own products first, then base) ─────────────────────────────
   const candidates: Candidate[] = useMemo(() => {
@@ -172,6 +182,38 @@ export default function RecipeBuilder() {
   };
   const addNew = () => { const nm = query.trim(); if (nm) openPicker({ name: nm, source: 'base' }); };
 
+  // ── tryb "Nie wiem ile czego" — dodaj bez pytania o gramy/jednostkę, domyślnie
+  // "średnio" (tier 2); podbicie/zmniejszenie tieru PO dodaniu jest opcjonalne. ──
+  const addRoughIngredient = (cand: Candidate) => {
+    haptic.tap();
+    const kcalPer100g = cand.kcalPer100g ?? 0;
+    const grams = ROUGH_TIER_GRAMS[2];
+    let productId = cand.productId;
+    if (!productId) {
+      const p = upsertProductByName(cand.name, { kcalPer100g: kcalPer100g || undefined, fromBase: cand.source === 'base' });
+      productId = p.id;
+    }
+    const item: MealItem = { name: cand.name, productId, qty: 1, unit: 'g', grams, kcal: Math.round(grams / 100 * kcalPer100g) };
+    setIngs(prev => [...prev, item]);
+    setQuery('');
+  };
+  // Zmiana tieru PO dodaniu — odzyskuje gęstość ze stosunku kcal/grams (oba ustawione
+  // z tej samej gęstości przy dodaniu), więc nie trzeba osobno pamiętać kcal/100g.
+  const setRoughTier = (i: number, tier: 1 | 2 | 3) => {
+    haptic.tap();
+    setIngs(prev => prev.map((it, j) => {
+      if (j !== i) return it;
+      const density100 = it.grams > 0 ? (it.kcal / it.grams) * 100 : 0;
+      const grams = ROUGH_TIER_GRAMS[tier];
+      return { ...it, grams, kcal: Math.round(grams / 100 * density100) };
+    }));
+  };
+  const tierOf = (it: MealItem): 1 | 2 | 3 => {
+    if (it.grams >= ROUGH_TIER_GRAMS[3]) return 3;
+    if (it.grams <= ROUGH_TIER_GRAMS[1]) return 1;
+    return 2;
+  };
+
   const dens = () => { const k = parseFloat(kcal100.replace(',', '.')); return k > 0 ? k : (sel?.kcalPer100g ?? 0); };
   const pickerGrams = () => {
     if (!sel) return 0;
@@ -215,11 +257,11 @@ export default function RecipeBuilder() {
     setSel(null); setQuery('');
   };
 
-  const canSave = !!name.trim() && ings.length > 0 && (prep === 'raw' || cookedG > 0);
+  const canSave = !!name.trim() && ings.length > 0 && (prep === 'raw' || prep === 'rough' || cookedG > 0);
   const save = () => {
     if (!canSave) return;
     haptic.success();
-    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry, semi });
+    saveRecipeProduct({ name: name.trim(), ingredients: ings, weight: effWeight, cat, id: editId, prep, fryFat: fry, semi, roughSoup });
     router.back();
   };
   const del = () => {
@@ -249,7 +291,11 @@ export default function RecipeBuilder() {
         {/* jak to działa */}
         <View style={s.explain}>
           <ChefHat size={16} color={ACCENT} />
-          <Text style={s.explainTxt}>Dodaj składniki (w szklankach, jajkach, łyżkach — jak chcesz). Mieszanka = waga liczy się sama z sumy. Gotowane/Smażone = zważ gotowe danie. Policzę kcal na gram, a Ty zjesz ważąc porcję.</Text>
+          <Text style={s.explainTxt}>
+            {prep === 'rough'
+              ? 'Stukasz składniki bez podawania ilości (domyślnie „średnio", podbij/zmniejsz jeśli chcesz). Zero ważenia garnka. Policzę orientacyjne kcal, a Ty zjesz ważąc TYLKO swoją porcję.'
+              : 'Dodaj składniki (w szklankach, jajkach, łyżkach — jak chcesz). Mieszanka = waga liczy się sama z sumy. Gotowane/Smażone = zważ gotowe danie. Policzę kcal na gram, a Ty zjesz ważąc porcję.'}
+          </Text>
         </View>
 
         {/* nazwa + kategoria */}
@@ -295,14 +341,27 @@ export default function RecipeBuilder() {
         <Text style={s.prepHint}>{PREP_TYPES.find(p => p.id === prep)?.hint}</Text>
 
         {/* składniki */}
-        <View style={s.sectionHead}><Text style={s.sectionTitle}>Składniki</Text><Text style={s.sectionSum}>{totals.kcal} kcal · {Math.round(totals.grams)} g surowych</Text></View>
+        <View style={s.sectionHead}><Text style={s.sectionTitle}>Składniki</Text><Text style={s.sectionSum}>{totals.kcal} kcal{prep !== 'rough' ? ` · ${Math.round(totals.grams)} g surowych` : ''}</Text></View>
         {ings.length > 0 && (
           <View style={s.card}>
             {ings.map((it, i) => (
               <View key={i} style={[s.ingRow, i > 0 && s.itemBorder]}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.ingName} numberOfLines={1}>{it.name}</Text>
-                  <Text style={s.ingMeta} numberOfLines={1}>{it.unit === 'g' ? `${it.grams} g` : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}</Text>
+                  {prep === 'rough' ? (
+                    <View style={s.tierRow}>
+                      {([1, 2, 3] as const).map(t => {
+                        const on = tierOf(it) === t;
+                        return (
+                          <TouchableOpacity key={t} onPress={() => setRoughTier(i, t)} style={[s.tierChip, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '88' }]}>
+                            <Text style={[s.tierTxt, on && { color: ACCENT }]}>{TIER_LABEL[t]}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={s.ingMeta} numberOfLines={1}>{it.unit === 'g' ? `${it.grams} g` : `${it.qty > 1 ? `${it.qty} × ` : ''}${unitLabel(it.unit)}${it.grams > 0 ? ` · ${it.grams} g` : ''}`}</Text>
+                  )}
                 </View>
                 <Text style={s.ingKcal}>{it.kcal} kcal</Text>
                 <TouchableOpacity hitSlop={8} onPress={() => { haptic.tap(); setIngs(prev => prev.filter((_, j) => j !== i)); }}><Trash2 size={15} color={c.text.muted} /></TouchableOpacity>
@@ -319,12 +378,12 @@ export default function RecipeBuilder() {
         </View>
         {query.trim().length > 0 && !exactExists && (
           <TouchableOpacity style={s.addNewRow} onPress={addNew}>
-            <Plus size={17} color={ACCENT} /><Text style={s.addNewTxt}>Dodaj nowy: „{query.trim()}" (gramy + kcal/100g)</Text>
+            <Plus size={17} color={ACCENT} /><Text style={s.addNewTxt}>Dodaj nowy: „{query.trim()}" ({prep === 'rough' ? 'podaj tylko kcal/100g' : 'gramy + kcal/100g'})</Text>
           </TouchableOpacity>
         )}
         <View style={s.card}>
           {candidates.map((cand, i) => (
-            <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
+            <TouchableOpacity key={cand.productId ?? `b-${cand.name}`} onPress={() => prep === 'rough' && cand.kcalPer100g != null ? addRoughIngredient(cand) : openPicker(cand)} style={[s.candRow, i > 0 && s.itemBorder]}>
               <View style={{ flex: 1 }}>
                 <View style={s.candNameRow}>
                   <Text style={s.candName} numberOfLines={1}>{cand.name}</Text>
@@ -339,8 +398,21 @@ export default function RecipeBuilder() {
 
         <Text style={s.prepHint}>Dodatki (nutella, banan) dołożysz przy jedzeniu: w „Co zjadłem" przytrzymaj to danie → „Dodaj dodatki" i zapisz jako naleśnik z dodatkami. Tu tylko składniki samego ciasta/dania.</Text>
 
-        {/* waga — tylko gdy gotowane / smażone */}
-        {prep === 'raw' ? (
+        {/* waga — tylko gdy gotowane / smażone / mieszanka. "Nie wiem ile czego" NIE
+            pyta o wagę w ogóle (user: "ja nie zważę garnka całego") — zamiast tego
+            przełącznik rozcieńczenia, bo zupa to głównie woda/bulion. */}
+        {prep === 'rough' ? (
+          <TouchableOpacity activeOpacity={0.8} onPress={() => { haptic.tap(); setRoughSoup(v => !v); }}
+            style={[s.semiToggle, roughSoup && { backgroundColor: ACCENT + '18', borderColor: ACCENT + '88' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.semiTitle, roughSoup && { color: ACCENT }]}>To głównie płyn (zupa / bulion)</Text>
+              <Text style={s.semiHint}>reszta wagi to woda/bulion (prawie 0 kcal) — bez tego wynik byłby zawyżony</Text>
+            </View>
+            <View style={[s.semiBox, roughSoup && { backgroundColor: ACCENT, borderColor: ACCENT }]}>
+              {roughSoup && <Check size={15} color="#1A1206" strokeWidth={3} />}
+            </View>
+          </TouchableOpacity>
+        ) : prep === 'raw' ? (
           <>
             <View style={s.sectionHead}><Scale size={15} color={ACCENT} /><Text style={s.sectionTitle}>Waga całości</Text></View>
             <View style={s.weightCard}>
@@ -389,13 +461,19 @@ export default function RecipeBuilder() {
           </>
         )}
 
-        {/* wynik */}
+        {/* wynik — w trybie "rough" nie pokazuj "kcal całość" (to suma tierów, nie
+            realna waga garnka, więc byłoby mylące) — liczy się tylko gęstość/100g,
+            bo TYLKO ta przekłada się na Twoją realnie zważoną porcję. */}
         <View style={s.resultCard}>
-          <View style={s.resultTop}>
-            <View><Text style={s.resultBig}>{density.kcalPer100g || '—'}</Text><Text style={s.resultSub}>kcal / 100 g</Text></View>
-            <View style={s.resultDivider} />
-            <View><Text style={s.resultBig}>{density.totalKcal}</Text><Text style={s.resultSub}>kcal całość</Text></View>
-          </View>
+          {prep === 'rough' ? (
+            <View><Text style={s.resultBig}>{density.kcalPer100g || '—'}</Text><Text style={s.resultSub}>kcal / 100 g (orientacyjnie)</Text></View>
+          ) : (
+            <View style={s.resultTop}>
+              <View><Text style={s.resultBig}>{density.kcalPer100g || '—'}</Text><Text style={s.resultSub}>kcal / 100 g</Text></View>
+              <View style={s.resultDivider} />
+              <View><Text style={s.resultBig}>{density.totalKcal}</Text><Text style={s.resultSub}>kcal całość</Text></View>
+            </View>
+          )}
           {(density.protein100 || density.carbs100 || density.fat100) ? (
             <Text style={s.resultMacros}>na 100 g:  B {density.protein100 ?? 0}  ·  W {density.carbs100 ?? 0}  ·  T {density.fat100 ?? 0}</Text>
           ) : null}
@@ -517,6 +595,9 @@ const makeS = themedStyles((c: typeof colors) => StyleSheet.create({
   ingName: { fontSize: 14, fontWeight: '700', color: c.text.primary },
   ingMeta: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
   ingKcal: { fontSize: 13, fontWeight: '800', color: c.text.secondary, fontVariant: ['tabular-nums'] },
+  tierRow:  { flexDirection: 'row', gap: 5, marginTop: 3 },
+  tierChip: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
+  tierTxt:  { fontSize: 10.5, fontWeight: '700', color: c.text.muted },
 
   searchBox:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.subtle, paddingHorizontal: spacing[3], height: 46 },
   searchInput: { flex: 1, fontSize: 15, color: c.text.primary },

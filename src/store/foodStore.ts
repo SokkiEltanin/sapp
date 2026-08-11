@@ -82,7 +82,13 @@ export interface MealItem {
 //             (auto, editable). No evaporation, kcal = Σ ingredients.
 //  • cooked = boiled/baked: you WEIGH the finished dish (water evaporated).
 //  • fried  = like cooked + a frying fat is absorbed → adds that fat's calories.
-export type PrepType = 'raw' | 'cooked' | 'fried';
+//  • rough  = "nie wiem ile czego" — you don't weigh ANYTHING, not even the finished
+//             pot (user, 2026-08-11: "ja nie zważę garnka całego"). Ingredients are
+//             tapped in with a rough 1-3 tier (default 2/medium) instead of grams;
+//             see roughDensity(). Only the FINAL served portion gets weighed, at
+//             log time, same as any other product — see foodStore not needing a
+//             separate "eat this" path for it.
+export type PrepType = 'raw' | 'cooked' | 'fried' | 'rough';
 
 // A dish stored ON a product: the ingredients + how it was prepared. kcal/100g is
 // DERIVED — total kcal ÷ weight — so you log it by WEIGHING your portion. (Dodatki à la
@@ -92,6 +98,36 @@ export interface RecipeMeta {
   cookedWeight: number;   // g of the finished dish (for raw = the summed/edited weight)
   prep?: PrepType;        // undefined = 'cooked' (back-compat with dishes saved earlier)
   fryFat?: { name: string; grams: number; kcal: number };  // fried: the fat that got added
+  roughSoup?: boolean;    // prep==='rough': "to głównie płyn" — apply SOUP_SOLIDS_FRACTION
+}
+
+// Rough-mode tiers — a per-ingredient "how much, roughly" instead of a real weight.
+// Values are arbitrary but internally consistent (only RATIOS between ingredients
+// matter for the resulting kcal/100g — the user never sees these numbers).
+export const ROUGH_TIER_GRAMS: Record<1 | 2 | 3, number> = { 1: 80, 2: 160, 3: 260 };
+// A soup/broth dish is mostly water — averaging the listed (solid) ingredients' density
+// straight would wildly overestimate a barszcz. Assume solids are ~30% of the final
+// dish's weight, rest is water/bulion (~0 kcal). A documented estimate, not a measurement
+// — shown as "orientacyjnie" in the UI, not presented as exact.
+export const SOUP_SOLIDS_FRACTION = 0.3;
+
+// Density for rough-mode dishes: same idea as recipeDensity, but there's no real
+// "weight" to divide by (nothing was weighed except each tier-guessed ingredient) — the
+// ingredients' OWN summed weight stands in for it, then the soup dilution (if any)
+// scales the result down. Same return shape as recipeDensity so callers don't care which
+// one they got.
+export function roughDensity(ings: MealItem[], isSoup: boolean): {
+  kcalPer100g: number; protein100?: number; carbs100?: number; fat100?: number; sugar100?: number; totalKcal: number; weight: number;
+} {
+  const t = recipeTotals(ings);
+  if (!(t.grams > 0)) return { kcalPer100g: 0, totalKcal: 0, weight: 0 };
+  const factor = isSoup ? SOUP_SOLIDS_FRACTION : 1;
+  const per = (v: number) => { const x = Math.round((v * factor / t.grams) * 1000) / 10; return x > 0 ? x : undefined; };
+  return {
+    kcalPer100g: Math.round((t.kcal * factor / t.grams) * 100),
+    protein100: per(t.protein), carbs100: per(t.carbs), fat100: per(t.fat), sugar100: per(t.sugar),
+    totalKcal: Math.round(t.kcal * factor), weight: t.grams,
+  };
 }
 
 // Resolved macro grams for a portion of a product (density × grams). 0s when unknown.
@@ -279,7 +315,7 @@ interface FoodState {
   saveRecipeProduct: (input: {
     name: string; ingredients: MealItem[]; weight: number; cat?: string; id?: string;
     prep?: PrepType; fryFat?: { name: string; grams: number; kcal: number };
-    semi?: boolean;
+    semi?: boolean; roughSoup?: boolean;
   }) => FoodProduct;
   markFresh: (name: string) => void;            // one product bought
   markFreshMany: (names: string[]) => void;     // a receipt's worth (already-counted only)
@@ -341,11 +377,12 @@ export const useFoodStore = create<FoodState>()(
         }));
       },
       togglePinProduct: (id) => set(s => ({ products: s.products.map(p => (p.id === id ? { ...p, pinned: !p.pinned } : p)) })),
-      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, semi }) => {
+      saveRecipeProduct: ({ name, ingredients, weight, cat, id, prep = 'cooked', fryFat, semi, roughSoup }) => {
         const t = recipeTotals(ingredients);
         // raw = a mixture → weight is the summed ingredient weight (unless the user set one)
+        // rough = no real weight at all — roughDensity ignores `weight`, uses tier-grams
         const w = prep === 'raw' ? (weight > 0 ? weight : t.grams) : weight;
-        const d = recipeDensity(ingredients, w, fryFat?.kcal ?? 0, fryFat?.grams ?? 0);
+        const d = prep === 'rough' ? roughDensity(ingredients, !!roughSoup) : recipeDensity(ingredients, w, fryFat?.kcal ?? 0, fryFat?.grams ?? 0);
         const patch: Partial<FoodProduct> = {
           name: name.trim(),
           kcalPer100g: d.kcalPer100g, kcalPerPortion: undefined,
@@ -354,6 +391,7 @@ export const useFoodStore = create<FoodState>()(
           recipe: {
             ingredients: ingredients.map(it => ({ ...it })), cookedWeight: Math.round(d.weight),
             prep, fryFat: fryFat && fryFat.grams > 0 ? fryFat : undefined,
+            roughSoup: prep === 'rough' ? !!roughSoup : undefined,
           },
         };
         const existing = id ? get().products.find(p => p.id === id) : undefined;
