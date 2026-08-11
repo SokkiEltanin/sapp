@@ -7,7 +7,6 @@ import {
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText, Circle as SvgCircle, Line as SvgLine } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import {
@@ -46,7 +45,7 @@ import { groceryTotal, allSpend, weekIncome, sweetsTotal, SWEETS_TAGS, weekdaySp
 import { moodColor, plTasks, tagLimitMsg, metricTagLabel, fmtChartPt } from '@/utils/dashboard/format';
 import { isDurationExpired, advanceNextBillingDate } from '@/utils/dashboard/subs';
 import { MONTH_SHORT, getWeekDates, weekLabel, dayAvg, moodStreakFrom } from '@/utils/dashboard/dates';
-import { carryForward, lastNonZero, zoomFloor, compareVerdict, buildWavePath, WAVE_W, WAVE_H } from '@/utils/dashboard/chart';
+import { carryForward, lastNonZero, zoomFloor, compareVerdict } from '@/utils/dashboard/chart';
 import { humorLine } from '@/utils/dashboard/humor';
 import { pctChange, monthSpendCompare } from '@/utils/dashboard/compare';
 import { strongestLinks, DailyMetrics } from '@/utils/dashboard/correlations';
@@ -56,7 +55,7 @@ import { getTagBudgetRules, TagBudgetRule, ruleTags, ruleLabel, attributedPrice 
 import { getPayers } from '@/utils/payers';
 import { setSunTimes, hydrateSunTimes, isoToDecimalHour } from '@/utils/sunTimes';
 import { useStatsScope, inScope, countsForConsumption, consumesInScope, StatsScope } from '@/store/statsScope';
-import { useHeroFont, heroFontById, HeroFont } from '@/store/heroFont';
+import { heroFontById } from '@/store/heroFont';
 import { loadNameAliases, canonicalProductName, normalizeProductName, productGroupKey, productGroupLabel, loadWeightMemory, weightFor, WeightMemory } from '@/utils/productMemory';
 import { getCategoryMeta } from '@/utils/categories';
 import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META, addNonFood, loadNonFood } from '@/utils/food';
@@ -73,6 +72,12 @@ import MonthCardUnlock from '@/components/dashboard/MonthCardUnlock';
 import { buildMonthCards, buildMonthPace, MonthCard } from '@/utils/monthCards';
 import WhoAteCard from '@/components/dashboard/WhoAteCard';
 import PersonalRecordsCard from '@/components/dashboard/PersonalRecordsCard';
+import SpendDelta from '@/components/dashboard/SpendDelta';
+import DualWaveChart from '@/components/dashboard/DualWaveChart';
+import WaveChart from '@/components/dashboard/WaveChart';
+import StatDonut from '@/components/dashboard/StatDonut';
+import MoodMiniCal from '@/components/dashboard/MoodMiniCal';
+import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
@@ -243,257 +248,6 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
-// A spend delta chip: lower spend = green, higher = red (opposite of "growth good").
-function SpendDelta({ pct, label, muted }: { pct: number; label: string; muted: string }) {
-  const up = pct > 0;
-  const color = pct === 0 ? muted : up ? '#F87171' : '#2AC68F';
-  return (
-    <View style={sd.chip}>
-      {up ? <TrendingUp size={11} color={color} /> : <TrendingDown size={11} color={color} />}
-      <Text style={[sd.val, { color }]}>{up ? '+' : ''}{pct}%</Text>
-      <Text style={[sd.label, { color: muted }]} numberOfLines={1}>{label}</Text>
-    </View>
-  );
-}
-const sd = StyleSheet.create({
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 1 },
-  val: { fontSize: 12, fontWeight: '800' },
-  label: { fontSize: 11, fontWeight: '600' },
-});
-// ─── Wave charts ──────────────────────────────────────────────────────────────
-
-// Dual-line wave chart: data1 = primary (e.g. food), data2 = secondary (e.g. sweets)
-function DualWaveChart({ data1, data2, color1, color2, independent, min1 = 0, min2 = 0 }: {
-  data1: number[]; data2: number[]; color1: string; color2: string; independent?: boolean;
-  min1?: number; min2?: number;
-}) {
-  if (data1.length < 2) return null;
-  // Shared scale by default (comparable magnitudes, e.g. food vs sweets); when
-  // `independent`, each line uses its own max so cross-unit trends are visible.
-  // min1/min2 zoom a narrow high band (e.g. weight) so its variance is visible.
-  const shared = Math.max(...data1, ...data2, 1);
-  const max1 = independent ? Math.max(...data1, 1) : shared;
-  const max2 = independent ? Math.max(...data2, 1) : shared;
-  const p1  = buildWavePath(data1, max1, min1);
-  const p2  = buildWavePath(data2, max2, min2);
-  return (
-    <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
-      <Defs>
-        <SvgLinearGradient id="dwg1" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={color1} stopOpacity="0.28" />
-          <Stop offset="1" stopColor={color1} stopOpacity="0" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id="dwg2" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={color2} stopOpacity="0.16" />
-          <Stop offset="1" stopColor={color2} stopOpacity="0" />
-        </SvgLinearGradient>
-      </Defs>
-      <Path d={p1.fill} fill="url(#dwg1)" />
-      <Path d={p2.fill} fill="url(#dwg2)" />
-      <Path d={p1.line} stroke={color1} strokeWidth="2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-      <Path d={p2.line} stroke={color2} strokeWidth="1.5" fill="none" strokeLinejoin="round" strokeLinecap="round" strokeDasharray="4 3" />
-      {p1.pts.map((p, i) => (
-        <Path key={`d1_${i}`}
-          d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3 0 a 3 3 0 1 0 6 0 a 3 3 0 1 0 -6 0`}
-          fill={color1} opacity={data1[i] > 0 ? '1' : '0.15'}
-        />
-      ))}
-    </Svg>
-  );
-}
-
-function WaveChart({ data, color, dotColors, target, zoom }: { data: number[]; color: string; dotColors?: (string | null)[]; target?: number; zoom?: boolean }) {
-  if (data.length < 2) return null;
-  let min = 0;
-  let max = Math.max(...data, target ?? 0, 1);
-  // zoom (e.g. weight): when the values sit in a narrow band well above 0, scale to
-  // that band so small week-to-week changes are actually visible instead of a flat line.
-  if (zoom) {
-    const nz = data.filter(v => v > 0);
-    if (nz.length >= 2) {
-      const lo = Math.min(...nz), hi = Math.max(...nz, target && target > 0 ? target : 0);
-      if (hi - lo > 0 && lo > hi * 0.3) {
-        const pad = (hi - lo) * 0.35;
-        min = Math.max(0, lo - pad);
-        max = hi + pad;
-      }
-    }
-  }
-  const span = max - min || 1;
-  const { line, fill, pts } = buildWavePath(data, max, min);
-  const gradId = `wg_${color.replace('#', '')}`;
-  const targetY = target && target > 0 ? WAVE_H - 6 - (Math.max(0, Math.min(1, (target - min) / span)) * (WAVE_H - 18)) : null;
-  return (
-    <Svg width="100%" height={WAVE_H} viewBox={`0 0 ${WAVE_W} ${WAVE_H}`} preserveAspectRatio="none">
-      <Defs>
-        <SvgLinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={color} stopOpacity="0.3" />
-          <Stop offset="1" stopColor={color} stopOpacity="0" />
-        </SvgLinearGradient>
-      </Defs>
-      <Path d={fill} fill={`url(#${gradId})`} />
-      {targetY != null && (
-        <SvgLine x1="0" y1={targetY} x2={WAVE_W} y2={targetY} stroke="#FBBF24" strokeWidth="1" strokeDasharray="5 4" opacity="0.8" />
-      )}
-      <Path d={line} stroke={color} strokeWidth="1.8" fill="none" strokeLinejoin="round" strokeLinecap="round" />
-      {pts.map((p, i) => {
-        const dc = dotColors?.[i] ?? color;
-        return (
-          <Path key={i}
-            d={`M ${p.x.toFixed(1)} ${p.y.toFixed(1)} m -3.5 0 a 3.5 3.5 0 1 0 7 0 a 3.5 3.5 0 1 0 -7 0`}
-            fill={dc} opacity={data[i] > 0 ? '1' : '0.2'}
-          />
-        );
-      })}
-    </Svg>
-  );
-}
-
-// ─── Donut chart (stat widgets) ─────────────────────────────────────────────────
-
-const DONUT_COLORS = ['#6C9EFF', '#4ECBA8', '#FBBF24', '#F472B6', '#A78BFA', '#FB923C', '#9CA3AF'];
-
-function StatDonut({ rows, fmt }: { rows: { label: string; value: number; unit: string }[]; fmt: (v: number, u: string) => string }) {
-  const colors = useColors();
-  const total = rows.reduce((s, r) => s + r.value, 0) || 1;
-  const R = 30, SW = 12, C = 2 * Math.PI * R;
-  let acc = 0;
-  const unit = rows[0]?.unit ?? '';
-  const totalLabel = unit === 'zł' ? `${Math.round(total)}` : unit === '×' ? `${Math.round(total)}` : `${Math.round(total)}`;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-      <View style={{ width: 84, height: 84, alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={84} height={84} viewBox="0 0 84 84" style={{ position: 'absolute' }}>
-          <SvgCircle cx={42} cy={42} r={R} stroke={colors.border.default} strokeWidth={SW} fill="none" />
-          {rows.map((r, i) => {
-            const frac = r.value / total;
-            const dash = `${(frac * C).toFixed(2)} ${C.toFixed(2)}`;
-            const off = -(acc * C);
-            acc += frac;
-            return (
-              <SvgCircle key={i} cx={42} cy={42} r={R}
-                stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth={SW} fill="none"
-                strokeDasharray={dash} strokeDashoffset={off} transform="rotate(-90 42 42)" />
-            );
-          })}
-        </Svg>
-        <Text style={{ fontSize: 15, fontWeight: '900', color: colors.text.primary }}>{totalLabel}</Text>
-        <Text style={{ fontSize: 8, color: colors.text.muted, fontWeight: '700' }}>{unit === 'zł' ? 'zł' : 'razem'}</Text>
-      </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        {rows.map((r, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-            <Text style={{ flex: 1, fontSize: 11.5, color: colors.text.secondary }} numberOfLines={1}>{r.label}</Text>
-            <Text style={{ fontSize: 11.5, fontWeight: '700', color: colors.text.primary }}>{fmt(r.value, r.unit)}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ─── Mood mini calendar ────────────────────────────────────────────────────────
-
-const MINI_DAYS = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb', 'Nd'];
-
-function MoodMiniCal({ moodByDay }: { moodByDay: Record<string, MoodEntry[]> }) {
-  const colors = useColors();
-  const now = new Date();
-  const year  = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = now.getDate();
-  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
-  const p2 = (n: number) => String(n).padStart(2, '0');
-
-  const cells: (number | null)[] = [
-    ...Array(firstDow).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const rows: (number | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
-
-  return (
-    <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: 'row' }}>
-        {MINI_DAYS.map(d => (
-          <View key={d} style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontSize: 7, fontWeight: '700', color: colors.text.muted, letterSpacing: 0.4 }}>{d}</Text>
-          </View>
-        ))}
-      </View>
-      {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: 'row' }}>
-          {row.map((day, ci) => {
-            if (!day) return <View key={ci} style={{ flex: 1 }} />;
-            const dateStr = `${year}-${p2(month + 1)}-${p2(day)}`;
-            const entries = moodByDay[dateStr] ?? [];
-            const avgM = entries.length ? entries.reduce((a, b) => a + b.mood, 0) / entries.length : null;
-            const mc = avgM != null ? moodColor(avgM) : null;
-            const isT = day === today;
-            return (
-              <View key={ci} style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
-                <View style={{
-                  width: 14, height: 14, borderRadius: 7,
-                  backgroundColor: mc ? mc : colors.border.subtle,
-                  opacity: mc ? 0.88 : 1,
-                  borderWidth: isT ? 1.5 : 0,
-                  borderColor: isT ? colors.border.focus : 'transparent',
-                }} />
-              </View>
-            );
-          })}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-// ─── Gradient greeting (big bold title with a subtle top-light gradient) ───────
-
-function GradientGreeting({ text, baseColor, font }: { text: string; baseColor: string; font: HeroFont }) {
-  // Title with a LIGHT gradient (accent washing in from the LEFT). Font family,
-  // size and line box come from the chosen preset; the user can additionally
-  // scale the size and nudge the position, and pick a custom-loaded font family.
-  const scale = useHeroFont(s => s.sizeScale);
-  const offsetX = useHeroFont(s => s.offsetX);
-  const offsetY = useHeroFont(s => s.offsetY);
-  const customFamily = useHeroFont(s => s.customFamily);
-
-  const label = font.upper ? text.toUpperCase() : text;
-  // Shrink long greetings so they never clip (e.g. "DOBRY WIECZÓR" vs "DOBRANOC").
-  const fit = label.length > 11 ? 11 / label.length : 1;
-  const size = font.size * scale * fit;
-  const baseY = font.baseY * scale + offsetY;
-  const height = Math.ceil(font.height * scale) + Math.max(0, offsetY) + 6;
-  return (
-    <Svg height={height} width="100%">
-      <Defs>
-        <SvgLinearGradient id="greetGrad" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0"    stopColor={baseColor} stopOpacity="1" />
-          <Stop offset="0.32" stopColor="#FFFFFF"   stopOpacity="0.97" />
-          <Stop offset="1"    stopColor="#FFFFFF"   stopOpacity="0.86" />
-        </SvgLinearGradient>
-      </Defs>
-      <SvgText
-        x={offsetX}
-        y={baseY}
-        fontSize={size}
-        fontWeight={font.weight as any}
-        fontFamily={customFamily || font.family}
-        fontStyle={font.italic ? 'italic' : 'normal'}
-        fill="url(#greetGrad)"
-        letterSpacing={font.spacing}
-      >
-        {label}
-      </SvgText>
-    </Svg>
-  );
-}
-
 // ─── Edit-mode draggable row ──────────────────────────────────────────────────
 
 // Row pitch used to turn a drag distance into an index. Measured, not guessed:
