@@ -41,6 +41,19 @@ class ${SERVICE_CLASS} : NotificationListenerService() {
     handle(sbn)
   }
 
+  // Second capture point: if the service was asleep (OEM battery-saver) when the
+  // notification POSTED, onNotificationPosted never fired — the only recovery was
+  // onListenerConnected sweeping whatever's STILL in the tray. If the user dismisses
+  // it before the service wakes back up, that sweep finds nothing and the expense is
+  // gone for good (user report, 2026-08-11: "jak mi się zamkną powiadomienia
+  // niechcący to nie doda się"). Android still hands us the full notification content
+  // on removal, so handling it here too turns "dismissed before we woke up" into a
+  // second chance instead of a dead end — append()'s time+title+text dedup already
+  // protects against double-counting if both callbacks end up firing for the same one.
+  override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+    handle(sbn)
+  }
+
   // When the system (re)binds the listener — e.g. after an OEM battery-saver killed
   // it and it came back — sweep any bank notifications still in the tray so a kill
   // doesn't silently drop the ones that arrived while we were down.
