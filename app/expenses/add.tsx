@@ -152,10 +152,31 @@ export default function AddExpenseModal() {
     if (!isIncome && !catTouched && sugCat && note.trim()) setExpCat(sugCat);
   }, [sugCat, isIncome, catTouched, note]);
 
-  // Suggested tags first (highlighted), then the usual quick tags — deduped.
+  // Tags historically used with the currently selected category, independent of what's
+  // typed in the description — e.g. picking "Mieszkanie" surfaces tags you've tagged
+  // housing expenses with before (user: "poleca [tagi] które używam lub są związane z
+  // kategoriami które wybieram").
+  const catSugTags = useMemo(() => {
+    const cat = isIncome ? incCat : expCat;
+    const freq: Record<string, number> = {};
+    for (const e of expenses) {
+      const isExpenseType = !e.type || e.type === 'expense';
+      if (isIncome ? e.type !== 'income' : !isExpenseType) continue;
+      if (e.category !== cat) continue;
+      for (const t of e.tags ?? []) freq[t] = (freq[t] ?? 0) + 1;
+    }
+    return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
+  }, [expenses, isIncome, expCat, incCat]);
+
+  // Suggested tags first (from description, then from category history), then the usual
+  // quick tags — deduped.
   const displayTags = useMemo(
-    () => Array.from(new Set([...sugTags.filter(t => !tags.includes(t)), ...quickTags])),
-    [sugTags, quickTags, tags],
+    () => Array.from(new Set([
+      ...sugTags.filter(t => !tags.includes(t)),
+      ...catSugTags.filter(t => !tags.includes(t)),
+      ...quickTags,
+    ])),
+    [sugTags, catSugTags, quickTags, tags],
   );
 
   const nowM = monthISO();
@@ -495,13 +516,13 @@ export default function AddExpenseModal() {
           <View style={styles.section}>
             <View style={styles.labelRow}>
               <Text style={styles.sectionLabel}>Tagi</Text>
-              {sugTags.filter(t => !tags.includes(t)).length > 0 && (
-                <Text style={styles.autoHint}>✦ proponowane wg opisu</Text>
+              {(sugTags.some(t => !tags.includes(t)) || catSugTags.some(t => !tags.includes(t))) && (
+                <Text style={styles.autoHint}>✦ proponowane wg opisu / kategorii</Text>
               )}
             </View>
             <View style={styles.tagsWrap}>
               {displayTags.map((tag) => {
-                const isSug = sugTags.includes(tag) && !tags.includes(tag);
+                const isSug = (sugTags.includes(tag) || catSugTags.includes(tag)) && !tags.includes(tag);
                 return (
                   <Chip
                     key={tag}
