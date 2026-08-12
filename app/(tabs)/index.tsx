@@ -3909,7 +3909,21 @@ export default function DashboardScreen() {
                           key={h.id}
                           activeOpacity={0.7}
                           onPress={() => {
-                            haptic.tap();
+                            // Odhaczenie/dobicie celu, które WŁAŚNIE dziś przedłuża serię, dostaje
+                            // toast z nową liczbą — user (2026-08-12): "dodajmy TOAST do streaków
+                            // na dashboardzie". `streak` powyżej to seria WŁĄCZNIE z wczoraj, gdy
+                            // dziś jeszcze nie zrobione (patrz getStreak w useHabits) — stąd +1 daje
+                            // dokładnie nową wartość bez ponownego (potencjalnie nieaktualnego z
+                            // domknięcia) odpytania store'u. Osobne od rzadkiej celebracji progu w
+                            // StreakWallCard (tam tylko przy przekroczeniu 7/14/30/60/100).
+                            const willComplete = isCount ? (!done && count + 1 >= goal) : !done;
+                            if (willComplete) {
+                              haptic.success();
+                              const newStreak = streak + 1;
+                              toast.success(`🔥 ${h.title}: ${newStreak} ${newStreak === 1 ? 'dzień' : 'dni'}!`);
+                            } else {
+                              haptic.tap();
+                            }
                             if (isCount) incrementHabit(h.id); else toggleHabit(h.id);
                           }}
                           style={s.hRow}
