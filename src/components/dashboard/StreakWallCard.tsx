@@ -26,7 +26,10 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
   const c = useColors();
   const s = makeS(c);
   const freezes = useStreakFreezeStore(st => st.freezes);
-  const rows = streaks.filter(x => x.days > 0).sort((a, b) => b.days - a.days).slice(0, 6);
+  // BEZ ucinania do 6 — ucięcie chowało realne, poprawnie policzone serie (np. 18-dniowa
+  // Woda spadała poniżej progu, gdy inne nawyki/liczniki miały dłuższe serie) bez ŻADNEGO
+  // sygnału że coś zostało ukryte (nagłówek pokazywał już PO ucięciu). User zgłosił 2026-08-12.
+  const rows = streaks.filter(x => x.days > 0).sort((a, b) => b.days - a.days);
 
   // Celebracja progu — porównaj bieżące progi z ostatnio widzianymi. Pierwsze uruchomienie
   // tylko zapisuje baseline (bez spamu toastów). Odpala się raz na montaż.
