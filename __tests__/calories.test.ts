@@ -43,6 +43,32 @@ describe('calories — foodKcalByName (dopasowanie po nazwie)', () => {
   });
 });
 
+// Polska liczba mnoga bywa zmienia rdzeń (ruchome e: serek→serki; zmiana końcówki:
+// jabłko→jabłka) więc sam prefix-match by cicho nie łapał produktów kupowanych w
+// liczbie mnogiej — a to DOMINUJĄCA forma dla warzyw/owoców na paragonie. Naprawione
+// przez DODANIE drugiego, pełnego klucza (nie skracanie — skracanie było wypróbowane
+// i odrzucone, bo np. rdzeń "ogor" łapał "zupa ogórkowa" jako surowy ogórek).
+describe('calories — foodKcalByName: liczba mnoga (rdzeń się zmienia)', () => {
+  test('owoce/warzywa: liczba mnoga trafia w tę samą wartość co liczba pojedyncza', () => {
+    expect(foodKcalByName('Jabłka')).toBe(52);
+    expect(foodKcalByName('Winogrona')).toBe(67);
+    expect(foodKcalByName('Ogórki')).toBe(15);
+    expect(foodKcalByName('Pomarańcze')).toBe(47);
+  });
+
+  test('ruchome e (serek→serki) — najbardziej krucha odmiana, osobno pilnowana', () => {
+    expect(foodKcalByName('Serki wiejskie')).toBe(95); // NIE "ser" (350)
+  });
+
+  test('dodanie liczby mnogiej NIE złapało pochodnego przymiotnika -owy/-owa (fałszywe trafienie)', () => {
+    // "ogor" jako sam rdzeń złapałoby to jako surowy ogórek (15) — dlatego dodany
+    // klucz to pełne "ogorki", które NIE jest prefiksem "ogorkowa".
+    expect(foodKcalByName('Zupa ogórkowa')).toBe(45); // trafia w "zupa", nie w ogórek
+    // podobnie sałatka (danie) nie może przypadkiem trafić w samą sałatę (surowy liść)
+    expect(foodKcalByName('Sałatka jarzynowa')).toBeNull();
+  });
+});
+
 // Realna kolejność w kcalPer100g (potwierdzona uruchomieniem, nie zgadywaniem — pierwsza
 // wersja tego testu zakładała odwrotnie i ZŁAPAŁA SIĘ NA WŁASNYM teście): mem (nauczone) >
 // NAZWA > tag > kategoria. Nazwa jest bardziej specyficzna niż ogólny tag, więc wygrywa.

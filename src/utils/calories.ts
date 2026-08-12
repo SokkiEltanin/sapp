@@ -7,24 +7,32 @@ import { KcalMemory, kcalFor, normalizeProductName } from '@/utils/productMemory
 // matching key wins, so "ser zolty" beats "ser". This is the main accuracy lever:
 // raw ingredients ("ziemniaki", "mleko") get a real value instead of a category
 // guess. Prepared dishes (puree, zapiekanka…) are best set per-product in Produkty.
+// Kilka kluczy ma jawnie dodaną liczbę mnogą obok (jablko/jablka, ogorek/ogorki...).
+// Powód: polska liczba mnoga czasem zmienia rdzeń (ruchome e: serek→serki; zmiana
+// końcówki: jablko→jablka) więc "jablka".startsWith("jablko") jest FAŁSZEM — dopasowanie
+// po nazwie by cicho nie trafiało we frytki/warzywa/owoce kupowane w liczbie mnogiej
+// (a to jest DOMINUJĄCA forma dla produktów na paragonie). Skracanie klucza do samego
+// rdzenia bywa NIEBEZPIECZNE (np. "ogor" złapałoby "zupa ogórkowa" jako surowy ogórek),
+// więc zamiast skracać — DODAJEMY drugi, pełny klucz (ten sam wzorzec co już jaj/jajk niżej).
 const FOOD_KCAL: Record<string, number> = {
   // warzywa / ziemniaki
-  ziemniak: 77, frytki: 312, puree: 90, pomidor: 18, ogorek: 15, cebula: 40, czosnek: 110,
-  marchew: 35, papryka: 30, salata: 15, kapusta: 25, brokul: 34, kalafior: 25, pieczarki: 22,
-  cukinia: 17, baklazan: 25, burak: 43, dynia: 26, szpinak: 23, fasolka: 31, groszek: 81, kukurydza: 86,
+  ziemniak: 77, frytki: 312, puree: 90, pomidor: 18, ogorek: 15, ogorki: 15, cebula: 40, cebule: 40, czosnek: 110,
+  marchew: 35, papryka: 30, papryki: 30, salata: 15, salaty: 15, kapusta: 25, brokul: 34, kalafior: 25, pieczarki: 22,
+  cukinia: 17, cukinie: 17, baklazan: 25, burak: 43, dynia: 26, dynie: 26, szpinak: 23, fasolka: 31, groszek: 81, kukurydza: 86,
   // owoce
-  jablko: 52, banan: 89, pomarancza: 47, gruszka: 57, winogrono: 67, truskawk: 32, borowk: 57,
+  jablko: 52, jablka: 52, banan: 89, pomarancza: 47, pomarancze: 47, gruszka: 57, gruszki: 57,
+  winogrono: 67, winogrona: 67, truskawk: 32, borowk: 57,
   malin: 52, sliwk: 46, brzoskwin: 39, mandarynk: 53, cytryn: 29, arbuz: 30, ananas: 50, kiwi: 61, awokado: 160,
   // nabiał / jaja
-  mleko: 50, jogurt: 60, kefir: 50, maslanka: 40, smietana: 200, smietanka: 120, masl: 720,
-  serek: 95, twarog: 100, ser: 350, mozzarella: 280, feta: 265, parmezan: 400, jaj: 145, jajk: 145,
+  mleko: 50, jogurt: 60, kefir: 50, maslanka: 40, maslanki: 40, smietana: 200, smietanka: 120, masl: 720,
+  serek: 95, serki: 95, twarog: 100, ser: 350, mozzarella: 280, feta: 265, parmezan: 400, jaj: 145, jajk: 145,
   // pieczywo / zboża
-  chleb: 250, bulk: 280, pieczyw: 265, tortilla: 310, bagietka: 270, makaron: 350, ryz: 350,
+  chleb: 250, bulk: 280, pieczyw: 265, tortilla: 310, bagietka: 270, bagietki: 270, makaron: 350, ryz: 350,
   kasza: 340, platki: 370, owsian: 370, musli: 380, granola: 450, maka: 360, otreby: 320,
   // mięso / ryby
   kurczak: 165, piers: 165, indyk: 150, wolowin: 250, wieprzow: 240, schab: 240, karkowk: 260,
   mielone: 240, kielbas: 300, szynk: 145, parowk: 270, boczek: 540, salami: 380, kabanos: 460, pasztet: 300,
-  ryba: 90, dorsz: 80, losos: 200, makrela: 200, tunczyk: 130, sledz: 160, panga: 90, krewetk: 85,
+  ryba: 90, ryby: 90, dorsz: 80, losos: 200, makrela: 200, makrele: 200, tunczyk: 130, sledz: 160, panga: 90, pangi: 90, krewetk: 85,
   // tłuszcze / sosy
   oliwa: 880, olej: 880, majonez: 680, ketchup: 110, musztard: 100, sos: 120, smalec: 890,
   // słodycze / przekąski
