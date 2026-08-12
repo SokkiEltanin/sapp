@@ -7,7 +7,7 @@ import { ChevronLeft, Coins, Swords, Heart, Zap, Lock, Check } from 'lucide-reac
 import PressableScale from '@/components/ui/PressableScale';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
-import { BOSSES, bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
+import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -42,7 +42,6 @@ export default function PetStats() {
   const hpCost = hpUpgradeCost(catMaxHpBonus);
   const atkCost = atkUpgradeCost(atkStatBonus);
 
-  const trophies = useMemo(() => BOSSES.filter(b => ownedItems.includes(b.loot.id)), [ownedItems]);
   // Posiadane na górze (user, 2026-08-11) — reszta ("???" zablokowane) niżej, stabilne
   // sortowanie więc kolejność w obrębie każdej grupy zostaje jak w COMBAT_ITEMS.
   const sortedItemIds = useMemo(
@@ -138,25 +137,6 @@ export default function PetStats() {
           <Text style={s.blurb}>Z łupu bossów: {bonuses.dodge > 0 ? `+${Math.round(bonuses.dodge * 100)}% unik ` : ''}{bonuses.crit > 0 ? `+${Math.round(bonuses.crit * 100)}% kryt` : ''}</Text>
         )}
 
-        {/* ── TROFEA Z BOSSÓW ──────────────────────────────────────── */}
-        <Text style={s.sectionTitle}>Trofea ({trophies.length}/{BOSSES.length})</Text>
-        {trophies.length === 0 ? (
-          <Text style={s.blurb}>Pokonaj bossa, żeby zdobyć pierwsze trofeum z pasywnym bonusem.</Text>
-        ) : (
-          <View style={{ gap: spacing[2] }}>
-            {trophies.map(b => (
-              <View key={b.id} style={s.trophyRow}>
-                <Text style={s.trophyEmoji}>{b.loot.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.cellName}>{b.loot.name}</Text>
-                  <Text style={s.cellState}>{b.loot.desc}</Text>
-                </View>
-                <Text style={s.trophySrc}>{b.name}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
         {/* ── EKWIPUNEK BOJOWY ─────────────────────────────────────── */}
         <Text style={s.sectionTitle}>Ekwipunek bojowy ({equippedCombatItems.length}/3 założone)</Text>
         <Text style={s.blurb}>Losowany ze skrzynek z głaskania. Załóż do 3 naraz — działają w każdej walce kampanii.</Text>
@@ -224,9 +204,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   xpBarTrack: { height: 5, borderRadius: 3, backgroundColor: c.fill.subtle, marginTop: 4, overflow: 'hidden' },
   xpBarFill: { height: '100%', borderRadius: 3, backgroundColor: '#FBBF24' },
 
-  trophyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
-  trophyEmoji: { fontSize: 24 },
-  trophySrc: { fontSize: 9.5, color: c.text.muted, maxWidth: 70, textAlign: 'right' },
   cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   cellState: { fontSize: 10, color: c.text.muted },
 

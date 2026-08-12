@@ -19,7 +19,6 @@ import { ageFrom, targetsFor, dailyExercisePool, trainingStreakFrom } from '@/ut
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
 import { paletteById } from '@/utils/catPalettes';
-import { bossById } from '@/utils/bosses';
 import { getBudgets } from '@/utils/budgets';
 import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
 import { getWaterGlasses } from '@/utils/habits';
@@ -44,7 +43,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, defeatedBosses, claimDailyBox, buyItem, grantStartup, addCoins,
+  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, addCoins,
     pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markTrainingDay } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
@@ -65,15 +64,9 @@ export default function Pet() {
   };
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
-  const [trophiesOpen, setTrophiesOpen] = useState(false);
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const palette = useMemo(() => paletteById(catColor), [catColor]);
-  const trophies = useMemo(
-    () => (defeatedBosses ?? []).map(id => bossById(id)).filter((b): b is NonNullable<typeof b> => !!b)
-      .map(b => ({ emoji: b.loot.emoji, boss: b.name, loot: b.loot.name, desc: b.loot.desc })),
-    [defeatedBosses],
-  );
   const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -570,31 +563,6 @@ export default function Pet() {
           </Text>
         </View>
 
-        {/* ── Gablota trofeów (na dole, zwijana): loot z pokonanych bossów ── */}
-        {trophies.length > 0 && (
-          <View style={s.collapseCard}>
-            <PressableScale onPress={() => { haptic.tap(); setTrophiesOpen(v => !v); }}>
-              <View style={s.collapseHead}>
-                <Text style={s.collapseTitle}>🏆 Gablota trofeów ({trophies.length})</Text>
-                <Text style={s.collapseChev}>{trophiesOpen ? '▲' : '▼'}</Text>
-              </View>
-            </PressableScale>
-            {trophiesOpen && (
-              <>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2, marginTop: spacing[2] }}>
-                  {trophies.map((t, i) => (
-                    <View key={i} style={s.trophyItem}>
-                      <View style={s.trophyPedestal}><Text style={{ fontSize: 26 }}>{t.emoji}</Text></View>
-                      <Text style={s.trophyLoot} numberOfLines={1}>{t.loot}</Text>
-                      <Text style={s.trophyBoss} numberOfLines={1}>{t.boss}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-                <Text style={s.addonHint}>Loot daje pasywne bonusy w walkach. Pokonuj bossów w zakładce ⚔.</Text>
-              </>
-            )}
-          </View>
-        )}
       </ScrollView>
 
       <CrateModal visible={crateOpen} onClose={() => setCrateOpen(false)} onOpened={() => setCelebrate(c => c + 1)} />
@@ -663,19 +631,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   addonState: { fontSize: 9.5, fontWeight: '700' },
   addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
-  addonHint: { fontSize: 10.5, color: c.text.muted, marginTop: 6 },
-
-  // Collapsible cards (room add-ons + trophies)
-  collapseCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[3] },
-  collapseHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  collapseTitle: { flex: 1, fontSize: 12, fontWeight: '800', color: c.text.secondary, letterSpacing: 0.4, textTransform: 'uppercase' },
-  collapseChev: { fontSize: 11, color: c.text.muted, fontWeight: '700' },
-
-  // Trophy cabinet
-  trophyItem: { width: 84, alignItems: 'center', gap: 3 },
-  trophyPedestal: { width: 54, height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
-  trophyLoot: { fontSize: 11, fontWeight: '800', color: c.text.primary, textAlign: 'center' },
-  trophyBoss: { fontSize: 9.5, fontWeight: '600', color: c.text.muted, textAlign: 'center' },
   needs: { width: '100%', gap: spacing[2] },
   needRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   needLabel: { width: 62, fontSize: 13, fontWeight: '700', color: c.text.secondary },

@@ -52,7 +52,11 @@ export const BOSSES: Boss[] = [
   {
     id: 'sloth', name: 'Kanapowy Leniwiec', emoji: '🦥', order: 1, unlockLevel: 2, hp: 300,
     weakness: 'steps', weaknessLabel: 'kroki',
-    loot: { id: 'loot_pillow', name: 'Poduszka Leniwca', emoji: '🛏️', desc: '+6% energii z dbania o siebie', bonus: { energyMult: 0.06 } },
+    // id zostaje 'loot_pillow' mimo zmiany nazwy/emoji (2026-08-12, gablota trofeów
+    // wywalona z pupila) — to trwały klucz w ownedItems, zmiana złamałaby już zdobyty
+    // przedmiot. Sama poduszka jako trofeum za pokonanie LENIWCA była tematycznie
+    // odwrotna (nagroda-symbol lenistwa za POKONANIE lenistwa) — tylko reflavor.
+    loot: { id: 'loot_pillow', name: 'Iskra Poranka', emoji: '⚡', desc: '+6% energii z dbania o siebie', bonus: { energyMult: 0.06 } },
     coins: 8, xp: 60, taunt: 'Po co dziś wstawać…',
   },
   {
