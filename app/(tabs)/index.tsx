@@ -268,10 +268,17 @@ export default function DashboardScreen() {
   const heroFont = heroFontById('black'); // single, fixed greeting font (picker removed)
 
   // ── Stores & hooks ────────────────────────────────────────────────────────
-  const pomodoro = usePomodoroStore();
+  // Wąskie selektory zamiast całych store'ów (2026-08-12, krok 3 z hardening_index.md) —
+  // wołanie useXStore() bez selektora subskrybuje WSZYSTKO w tym store, więc ten (ogromny)
+  // ekran re-renderował się przy zmianie DOWOLNEGO pola, nawet niezwiązanego z dashboardem
+  // (np. inny ekran woła setExpenses → dashboard re-renderuje się nawet jeśli akurat czyta
+  // tylko `stats`). Ten sam wzorzec co już istniejące usePetStore(st => st.x)/useFoodStore
+  // niżej — tylko dociągnięty do reszty store'ów, które tego jeszcze nie miały.
+  const pomodoroStartFor = usePomodoroStore(s => s.startFor);
   const { stats, isLoading: finLoading, reload: reloadFin } = useExpenses();
   const insets = useSafeAreaInsets();
-  const { expenses: liveExpenses, setExpenses } = useExpensesStore();
+  const liveExpenses = useExpensesStore(s => s.expenses);
+  const setExpenses = useExpensesStore(s => s.setExpenses);
   // ── Trigger-based stats snapshot ────────────────────────────────────────────
   // Every heavy widget memo below reads THIS `expenses` (a snapshot), NOT the live
   // store. The store churns constantly (bank sync, other screens calling setExpenses,
@@ -291,10 +298,19 @@ export default function DashboardScreen() {
   const { tasks, isLoading: tasksLoading, reload: reloadTasks, toggle: toggleTask } = useTasks();
   const { habits, todayDone: habitsDoneIds, toggle: toggleHabit, increment: incrementHabit, getTodayCount, getStreak } = useHabits();
   const { todayEntry, modalVisible, openCheckIn, closeCheckIn } = useMoodCheckIn();
-  const { entries: moodEntries, setEntries: setMood, addEntry } = useMoodStore();
-  const { events, gcalEvents, tasks: calTasks, setEvents, setGcalEvents } = useCalendarStore();
+  const moodEntries = useMoodStore(s => s.entries);
+  const setMood = useMoodStore(s => s.setEntries);
+  const addEntry = useMoodStore(s => s.addEntry);
+  const events = useCalendarStore(s => s.events);
+  const gcalEvents = useCalendarStore(s => s.gcalEvents);
+  const calTasks = useCalendarStore(s => s.tasks);
+  const setEvents = useCalendarStore(s => s.setEvents);
+  const setGcalEvents = useCalendarStore(s => s.setGcalEvents);
   const { subscriptions, update: updateSub, add: addSub } = useSubscriptions();
-  const { shifts: workShifts, settings: workSettings, setShifts: setWorkShifts, setSettings: setWorkSettings } = useWorkStore();
+  const workShifts = useWorkStore(s => s.shifts);
+  const workSettings = useWorkStore(s => s.settings);
+  const setWorkShifts = useWorkStore(s => s.setShifts);
+  const setWorkSettings = useWorkStore(s => s.setSettings);
   const [budgets, setBudgets]       = useState<MonthlyBudgets>({});
   const [weatherPanel, setWeatherPanel] = useState(false);
   const workPanel    = useUiActions(s => s.workPanelOpen);   // boolean w store → brak podwójnego otwarcia
@@ -2931,7 +2947,7 @@ export default function DashboardScreen() {
                           onPress={(e) => {
                             (e as any).stopPropagation?.();
                             haptic.tap();
-                            pomodoro.startFor(task.id, task.title);
+                            pomodoroStartFor(task.id, task.title);
                             router.navigate('/pomodoro' as any);
                           }}
                           hitSlop={8}
