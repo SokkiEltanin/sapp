@@ -8,7 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts } from '@/utils/bosses';
+import { BOSSES, bossBonuses, dailyAttempts, EVENT_DAILY_ATTEMPTS } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey } from '@/utils/seasonalEvents';
 import { raidIcon, eventIcon } from '@/utils/bossUiIcons';
@@ -39,7 +39,7 @@ export default function Bosses() {
   const s = useMemo(() => makeS(c), [c]);
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
-    raidWeek, raidHp, raidWon, raidEnsure, eventHp, eventWon,
+    raidWeek, raidHp, raidWon, raidEnsure, eventWon,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -49,13 +49,15 @@ export default function Bosses() {
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
   // v5 pivot: energia to płaski dzienny limit prób (dailyAttempts), NIE liczony już z
-  // danych samo-opieki — patrz memory boss_design.md. Ten sam limit dobija niezależnie
-  // 3 pule (boss/raid/wydarzenie).
+  // danych samo-opieki — patrz memory boss_design.md. Boss/raid dzielą ten sam limit
+  // (dailyAttempts, bazowo 3). Wydarzenie ma WŁASNY, flat sufit (2026-08-12, user: "mamy
+  // jedno podejście eventowe dziennie") — walka eventowa jest teraz pełną symulacją jak
+  // kampania (realny kontratak, można przegrać), więc dostaje mniej prób, nie tyle co reszta.
   const reload = useCallback(() => {
     const attempts = dailyAttempts(bonuses.energyMult);
     syncEnergy(attempts, 0);
     syncRaidEnergy(attempts, 0);
-    syncEventEnergy(attempts, 0);
+    syncEventEnergy(EVENT_DAILY_ATTEMPTS, 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
   }, [bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
   useFocusEffect(reload);
@@ -85,8 +87,9 @@ export default function Bosses() {
   };
   const eventBoss = currentEventBoss(now, menaceCtx);
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
+  // HP resetuje się co próbę (jak kampania) — nie ma już trwałego banku do pokazania jako
+  // pasek postępu tutaj, patrz eventAsBoss w seasonalEvents.ts.
   const eventMaxHp = eventHpFor(level);
-  const eventRemaining = eventKey ? (eventHp[eventKey] ?? eventMaxHp) : 0;
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
   const eventUnlocked = level >= 2;
 
@@ -150,7 +153,7 @@ export default function Bosses() {
                 <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={40} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.miniName} numberOfLines={1}>{eventBoss.name}</Text>
-                  <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((eventDone ? 0 : eventRemaining) / eventMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[eventBoss.weakness] ?? '#888' }]} /></View>
+                  <Text style={s.miniSub} numberOfLines={1}>{eventMaxHp} HP · {eventBoss.weaknessLabel}</Text>
                 </View>
               </View>
               {eventDone ? (
@@ -303,6 +306,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   miniEnergy: { fontSize: 10.5, fontWeight: '800', color: '#38BDF8' },
   miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   miniName: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
+  miniSub: { fontSize: 10, color: c.text.muted, marginTop: 2 },
   miniHpTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4 },
   miniHpFill: { height: '100%', borderRadius: 3 },
   miniBtn: { alignItems: 'center', borderRadius: radius.md, paddingVertical: 8, backgroundColor: '#EF4444' },

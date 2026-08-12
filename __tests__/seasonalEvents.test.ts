@@ -1,6 +1,8 @@
 import {
   easterSunday, activeSeasonalEvent, pickMenace, currentEventBoss, eventPeriodKey, eventBossFromKey, MENACE_POOL,
+  eventHpFor, eventAsBoss,
 } from '@/utils/seasonalEvents';
+import { atkPower, counterDamage } from '@/utils/bosses';
 
 describe('seasonalEvents — easterSunday', () => {
   test('matches known Gregorian Easter dates', () => {
@@ -91,5 +93,47 @@ describe('seasonalEvents — eventBossFromKey', () => {
     expect(eventBossFromKey('mikolaj-2026')?.id).toBe('mikolaj');
     expect(eventBossFromKey('overtime-2026-01')?.id).toBe('overtime');
     expect(eventBossFromKey('nieznany-2026')).toBeUndefined();
+  });
+});
+
+// 2026-08-12: walki eventowe przeszły z "jedno uderzenie/próbę w trwały bank HP rozłożony na
+// cały okres" na "identyczne jak kampania — pełna round-based walka, 1 próba/dzień". eventHpFor
+// zostało przebalansowane pod TEN model — testy pilnują, żeby ktoś przypadkiem nie wrócił do
+// starej (o rząd wielkości większej) skali, która przy nowym modelu byłaby praktycznie
+// niewygrywalna (patrz komentarz przy eventHpFor w seasonalEvents.ts).
+describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 2026-08-12)', () => {
+  test('rośnie z poziomem, nigdy nie spada poniżej bazy', () => {
+    expect(eventHpFor(0)).toBeGreaterThan(0);
+    expect(eventHpFor(50)).toBeGreaterThan(eventHpFor(1));
+  });
+
+  test('zabijalny w rozsądnej liczbie ciosów (~5-6) na bazowych statach, na kilku poziomach', () => {
+    const noBonus = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+    for (const level of [2, 25, 50, 100]) {
+      const hp = eventHpFor(level);
+      const hit = atkPower(0, level, noBonus); // dolna granica (bez wariancji/krytu)
+      const hitsNeeded = hp / hit;
+      expect(hitsNeeded).toBeGreaterThan(2);   // nie trywialne
+      expect(hitsNeeded).toBeLessThan(10);     // ale realnie kończy się w jednej walce
+    }
+  });
+
+  test('kontratak nie zabija kotka (base 100 HP) w 1 rundzie na żadnym z tych poziomów', () => {
+    for (const level of [2, 25, 50, 100]) {
+      const hp = eventHpFor(level);
+      const counter = counterDamage({ hp } as any, 0);
+      expect(counter).toBeLessThan(100);
+    }
+  });
+
+  test('eventAsBoss przenosi tożsamość eventBossa i podpina hp z eventHpFor', () => {
+    const eb = MENACE_POOL.overtime;
+    const boss = eventAsBoss(eb, 40);
+    expect(boss.id).toBe(eb.id);
+    expect(boss.name).toBe(eb.name);
+    expect(boss.weakness).toBe(eb.weakness);
+    expect(boss.hp).toBe(eventHpFor(40));
+    expect(boss.guard).toBeUndefined();
+    expect(boss.regenPct).toBeUndefined();
   });
 });

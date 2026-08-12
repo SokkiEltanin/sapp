@@ -1,4 +1,4 @@
-import { WeaknessKey } from '@/utils/bosses';
+import { WeaknessKey, Boss, BossLoot } from '@/utils/bosses';
 
 // TRZECI tor walki (obok kampanii bossów i cotygodniowego raidu) — WYDARZENIA:
 // świąteczne/sezonowe bossy (data w kalendarzu decyduje) i „nemesis miesiąca" (Twoje
@@ -139,6 +139,33 @@ export function eventBossFromKey(eventKey: string): EventBoss | undefined {
 }
 
 // HP/nagrody skalują z poziomem — lżej niż raid (to bonusowa, sezonowa walka, nie główny grind).
-export const eventHpFor = (level: number) => 5000 + Math.max(0, level) * 500;
+//
+// PRZEBALANSOWANE (2026-08-12) — walki eventowe teraz IDENTYCZNE jak kampania (prawdziwy
+// kontratak, realna walka do 0 HP, można przegrać — patrz eventAsBoss niżej), zamiast
+// dawnego "jedno uderzenie/próbę w trwały bank HP rozłożony na cały okres wydarzenia" (stąd
+// user: "tylko wtedy trzeba ich zoptymalizować HP i DMG pod to że tylko raz mam podejście").
+// Stara wartość (5000+level×500) była skalibrowana pod TAMTEN model — całe okno wydarzenia
+// (np. 26 dni Mikołaja) miało na nią pracować po trochu. W nowym modelu to jedna PRAWDZIWA
+// walka dziennie, więc HP musi być w skali pojedynczego starcia kampanijnego: przy bazowych
+// statach (atkStatBonus=0) to ~5-6 ciosów do zabicia na każdym poziomie (dopasowane do
+// atkPower(0,level) rosnącego liniowo z poziomem), tak żeby kontratak (COUNTER_PCT × ta HP)
+// nie zabijał kotka w 1-2 rundy przy bazowym max HP=100 — patrz counterDamage w bosses.ts.
+export const eventHpFor = (level: number) => 200 + Math.max(0, level) * 6;
 export const eventCoins = (level: number) => 40 + Math.max(0, level) * 4;
 export const eventXp   = (level: number) => 250 + Math.max(0, level) * 25;
+
+// Placeholder loot — wygrana wydarzenia daje MEDAL (kolekcjonerski), nie przedmiot z bonusem
+// jak kampania; simulateFight()/Boss wymaga pola `loot`, ale boss-fight.tsx dla kind='event'
+// nigdy go nie czyta (victory modal ma osobny fallback "Medal wydarzenia").
+const EVENT_PLACEHOLDER_LOOT: BossLoot = { id: '', name: '', emoji: '', desc: '', bonus: {} };
+
+// EventBoss + aktualny poziom → Boss-kształtny obiekt gotowy do simulateFight(). Brak
+// guard/regenPct (żaden event boss ich dziś nie ma — czysta różnorodność HP/motywu na razie).
+export function eventAsBoss(eventBoss: EventBoss, level: number): Boss {
+  return {
+    id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji,
+    order: 0, unlockLevel: 0, hp: eventHpFor(level),
+    weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel,
+    loot: EVENT_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: eventBoss.taunt,
+  };
+}

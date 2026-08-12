@@ -232,6 +232,12 @@ export function dailyAttempts(energyMult: number): number {
   return Math.max(1, Math.round(BASE_DAILY_ATTEMPTS * (1 + Math.max(0, energyMult))));
 }
 
+// Wydarzenia (2026-08-12): user — "musimy zrobić żeby walki eventowe były identyczne [do
+// kampanii]... wtedy mamy jedno podejście eventowe dziennie [UWAGA: zwykłe bossy zostają
+// przy 3/dzień]". Osobna, FLAT stała (nie dailyAttempts()) — celowo NIE rośnie z energyMult
+// z łupu, żeby "jedna próba" zostawało jedną próbą niezależnie od inwestycji.
+export const EVENT_DAILY_ATTEMPTS = 1;
+
 // ── Kontratak bossa (v4 redesign, fundament — patrz memory boss_design.md) ────────
 // Skaluje z HP bossa (większy boss = mocniejszy kontratak), nie z poziomem gracza —
 // tak jak walka z bossem samym w sobie już skaluje trudność. `dodge` z Bonuses redukuje

@@ -115,13 +115,13 @@ interface PetState {
   raidHp: number;               // pozostałe HP raidu tego tygodnia
   raidWon: string[];            // klucze tygodni pokonanych (kolekcjonerskie medale)
   // ── wydarzenia (sezonowe święta / nemesis miesiąca) ──
-  // TRZECIA niezależna pula energii — patrz raidEnergy wyżej, ten sam powód. Klucz
-  // okresu (eventPeriodKey z seasonalEvents.ts) zmienia się z porą roku/miesiącem,
-  // więc HP trzymamy per-klucz (jak bossHp), nie jedną liczbą jak raidHp.
+  // TRZECIA niezależna pula energii — patrz raidEnergy wyżej, ten sam powód.
   eventEnergy: number;
   eventEnergyDate: string | null;
   eventEnergyToday: number;
-  eventHp: Record<string, number>;  // eventKey → pozostałe hp (brak = pełne)
+  // eventHp (bank trwałego HP per eventKey) USUNIĘTY 2026-08-12 — wydarzenia walczą teraz
+  // IDENTYCZNIE jak kampania (simulateFight, HP resetuje się do pełna co próbę), nie ma już
+  // czego trzymać między próbami. eventWon zostaje — to wciąż "czy TEN okres pokonany".
   eventWon: string[];               // eventKeys pokonane (kolekcjonerskie medale)
   _hydrated: boolean;
 
@@ -167,7 +167,7 @@ interface PetState {
   raidClaim: (weekKey: string, coins: number, xp: number) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
   // wydarzenia
   syncEventEnergy: (todayEnergy: number, mult: number) => void;
-  eventAttack: (eventKey: string, maxHp: number, damage: number) => { remaining: number; defeated: boolean };
+  spendEventEnergy: () => void;         // -1 próba (round-based fight jak kampania, patrz spendEnergy)
   eventClaim: (eventKey: string, coins: number, xp: number) => void;
   // HP kotka — fundament v4 (patrz komentarz przy polach wyżej)
   buyMaxHp: (cost: number, amount: number) => boolean;         // trwałe ulepszenie za monety
@@ -231,7 +231,6 @@ export const usePetStore = create<PetState>()(
       eventEnergy: 0,
       eventEnergyDate: null,
       eventEnergyToday: 0,
-      eventHp: {},
       eventWon: [],
       defeatedBosses: [],
       bossHp: {},
@@ -511,13 +510,7 @@ export const usePetStore = create<PetState>()(
           eventEnergyToday: Math.max(grantedToday, target),
         });
       },
-      eventAttack: (eventKey, maxHp, damage) => {
-        const s = get();
-        const cur = s.eventHp[eventKey] ?? maxHp;
-        const remaining = Math.max(0, cur - damage);
-        set({ eventEnergy: Math.max(0, s.eventEnergy - 1), eventHp: { ...s.eventHp, [eventKey]: remaining } });
-        return { remaining, defeated: remaining <= 0 };
-      },
+      spendEventEnergy: () => set((s) => ({ eventEnergy: Math.max(0, s.eventEnergy - 1) })),
       eventClaim: (eventKey, coins, xp) => set((s) => (s.eventWon.includes(eventKey) ? s : { eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp })),
       buyMaxHp: (cost, amount) => {
         const s = get();
@@ -566,7 +559,7 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventHp: {}, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
     }),
     {
       name: 'pet-v1',
@@ -587,7 +580,7 @@ export const usePetStore = create<PetState>()(
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
-        eventHp: s.eventHp, eventWon: s.eventWon,
+        eventWon: s.eventWon,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
       }),
