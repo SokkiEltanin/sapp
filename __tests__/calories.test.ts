@@ -1,4 +1,4 @@
-import { kcalPer100g, estimateItemKcal, looksLikeFood, expenseFoodKcal, foodKcalForDate } from '@/utils/calories';
+import { kcalPer100g, estimateItemKcal, looksLikeFood, expenseFoodKcal, foodKcalForDate, foodKcalByName, avgFoodKcal } from '@/utils/calories';
 import { Expense } from '@/types';
 
 // pozycje bez NAZWY (żeby wynik zależał od TAGU — deterministyczny; nazwy idą przez FOOD_KCAL).
@@ -14,6 +14,47 @@ describe('calories — kcalPer100g (po tagu)', () => {
     expect(kcalPer100g({ tags: ['Warzywa'] })).toBe(35);
     expect(kcalPer100g({ tags: ['chemia'] })).toBe(0);
     expect(kcalPer100g({ tags: [] })).toBe(0);
+  });
+});
+
+// Wcześniej NIETESTOWANE (istniejące testy powyżej celowo omijały nazwę — "pozycje bez
+// NAZWY, żeby wynik zależał od TAGU"): dopasowanie po NAZWIE to najbardziej złożona i
+// najbardziej podatna na regresję część pliku — FOOD_KCAL_ENTRIES sortowane po długości
+// klucza malejąco, więc dłuższy/bardziej specyficzny klucz musi wygrywać z krótszym
+// prefiksem (np. "serek" z "ser") — łatwo to przypadkiem cofnąć przy edycji tabeli.
+describe('calories — foodKcalByName (dopasowanie po nazwie)', () => {
+  test('rozpoznaje znaną nazwę, z polskimi znakami i wielkością liter', () => {
+    expect(foodKcalByName('Ziemniaki')).toBe(77);
+    expect(foodKcalByName('BANANY')).toBe(89);
+  });
+
+  test('DŁUŻSZY/bardziej specyficzny klucz wygrywa z krótszym prefiksem tego samego słowa', () => {
+    expect(foodKcalByName('Serek')).toBe(95);  // NIE "ser" (350), mimo że "serek" zaczyna się na "ser"
+    expect(foodKcalByName('Ser')).toBe(350);   // ale samo "ser" nadal poprawnie trafia w "ser"
+  });
+
+  test('nierozpoznana nazwa → null (NIE 0 — 0 to realna wartość dla np. wody)', () => {
+    expect(foodKcalByName('zupelnie nieznany produkt xyz')).toBeNull();
+    expect(foodKcalByName('')).toBeNull();
+  });
+
+  test('rozpoznana nazwa z realną wartością 0 kcal odróżnialna od braku dopasowania', () => {
+    expect(foodKcalByName('Woda')).toBe(0);
+  });
+});
+
+// Realna kolejność w kcalPer100g (potwierdzona uruchomieniem, nie zgadywaniem — pierwsza
+// wersja tego testu zakładała odwrotnie i ZŁAPAŁA SIĘ NA WŁASNYM teście): mem (nauczone) >
+// NAZWA > tag > kategoria. Nazwa jest bardziej specyficzna niż ogólny tag, więc wygrywa.
+describe('calories — kcalPer100g: nazwa ma pierwszeństwo przed tagiem', () => {
+  test('brak tagu → liczy z nazwy', () => {
+    expect(kcalPer100g({ name: 'Ziemniaki', tags: [] })).toBe(77);
+  });
+  test('nazwa rozpoznana I tag obecny → nazwa wygrywa (bardziej specyficzna)', () => {
+    expect(kcalPer100g({ name: 'Ziemniaki', tags: ['słodycze'] })).toBe(77);
+  });
+  test('nazwa NIE rozpoznana → dopiero wtedy liczy się tag', () => {
+    expect(kcalPer100g({ name: 'zupelnie nieznany xyz', tags: ['słodycze'] })).toBe(450);
   });
 });
 
@@ -52,5 +93,25 @@ describe('calories — expenseFoodKcal / foodKcalForDate', () => {
       e({ date: '2026-08-04T09:00:00', type: 'income', receiptItems: [item({ tags: ['słodycze'], weightKg: 1 })] as any }), // przychód
     ];
     expect(foodKcalForDate(exps, '2026-08-04')).toBe(520); // 450 + 70
+  });
+});
+
+// avgFoodKcal liczy "dziś" wewnętrznie (new Date(), brak parametru do wstrzyknięcia daty —
+// w przeciwieństwie do foodKcalForDate wyżej), więc test buduje daty względem PRAWDZIWEGO
+// "teraz", tym samym sposobem co sama funkcja (lokalny YYYY-MM-DD, nie toISOString — patrz
+// memory date_local_iso.md).
+describe('calories — avgFoodKcal (średnia z N dni, puste dni liczą się jako 0)', () => {
+  test('dzieli sumę przez CAŁE days, nie tylko dni z danymi', () => {
+    const now = new Date();
+    const localYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T09:00:00`;
+    const exps = [
+      // dziś: 450 kcal; wczoraj: brak paragonu → 0
+      e({ date: localYmd(now), receiptItems: [item({ tags: ['słodycze'], weightKg: 0.1 })] as any }),
+    ];
+    expect(avgFoodKcal(exps, 2)).toBe(225); // (450 + 0) / 2
+  });
+
+  test('brak wydatków w ogóle → 0, nie NaN', () => {
+    expect(avgFoodKcal([], 3)).toBe(0);
   });
 });
