@@ -7,7 +7,7 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
-import StreakFlame, { streakTier } from '@/components/counters/StreakFlame';
+import StreakFlame, { streakTier, streakColor } from '@/components/counters/StreakFlame';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
@@ -26,10 +26,13 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
   const c = useColors();
   const s = makeS(c);
   const freezes = useStreakFreezeStore(st => st.freezes);
-  // BEZ ucinania do 6 — ucięcie chowało realne, poprawnie policzone serie (np. 18-dniowa
-  // Woda spadała poniżej progu, gdy inne nawyki/liczniki miały dłuższe serie) bez ŻADNEGO
-  // sygnału że coś zostało ukryte (nagłówek pokazywał już PO ucięciu). User zgłosił 2026-08-12.
-  const rows = streaks.filter(x => x.days > 0).sort((a, b) => b.days - a.days);
+  // BEZ ucinania do 6 (2026-08-12, wcześniejszy fix) I BEZ filtrowania zerowych serii
+  // (2026-08-12, ten fix) — user: "jak nie ma streaku pisze zero na dniach". Dawniej
+  // `days > 0` chowało złamane serie całkowicie (np. zjadłeś słodycz dziś → licznik "bez
+  // słodyczy" spadł na 0 → kafelek znikał zamiast pokazać 0 i zachęcić do zaczęcia od nowa —
+  // dokładnie odwrotność motywacyjnego efektu Duolingo). Teraz pokazujemy WSZYSTKO co ma
+  // nawyk/licznik, posortowane malejąco (zera lądują na końcu naturalnie).
+  const rows = [...streaks].sort((a, b) => b.days - a.days);
 
   // Celebracja progu — porównaj bieżące progi z ostatnio widzianymi. Pierwsze uruchomienie
   // tylko zapisuje baseline (bez spamu toastów). Odpala się raz na montaż.
@@ -87,7 +90,11 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
   );
 
   function renderTile(r: StreakItem) {
-    const t = streakTier(r.days);
+    // streakTier() domyślnie zwraca indeks 0 (Bordo, ciemna czerwień) gdy ŻADEN próg nie
+    // jest spełniony — czyli też przy 0 dniach, mimo że 0 nie powinno "być" żadnym tierem.
+    // streakColor() ma osobny, poprawny fallback (szary) dla days<1 — tego trzeba użyć do
+    // KOLORU kafla, inaczej złamana seria świeci się na czerwono zamiast wyglądać na "zimną".
+    const color = streakColor(r.days);
     const onTile = () => {
       haptic.tap();
       if (r.key.startsWith('h:')) router.push(`/habit-year?id=${r.key.slice(2)}` as any);
@@ -96,7 +103,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     };
     return (
       <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
-        style={[s.tile, { backgroundColor: t.color + '20', borderColor: t.color + '55' }]}>
+        style={[s.tile, { backgroundColor: color + '20', borderColor: color + '55' }]}>
         <StreakFlame days={r.days} size={50} />
         <Text style={s.label} numberOfLines={1}>{r.name}</Text>
       </TouchableOpacity>
