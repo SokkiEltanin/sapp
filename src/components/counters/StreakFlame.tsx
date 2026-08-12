@@ -29,6 +29,54 @@ export function streakColor(days: number): string {
   return streakTier(days).color;
 }
 
+// Three-tone palette for the BIG decorative flame on dashboard streak tiles (StreakWallCard) —
+// a richer flame shade than the tile's own background (STREAK_TIERS.color), a light tint for
+// the sticker-style outline "halo", and a lighter tint for the inner glow. Hand-picked per
+// tier (not derived) to match the exact palette approved in the design comparison artifact —
+// indices line up with STREAK_TIERS.
+interface FlameTone { flame: string; halo: string; core: string }
+const FLAME_PALETTE: FlameTone[] = [
+  { flame: '#7A2836', halo: '#C39EA5', core: '#E39AA6' }, // Bordo
+  { flame: '#B91C1C', halo: '#E09999', core: '#FCA5A5' }, // Czerwień
+  { flame: '#E8630A', halo: '#F5B991', core: '#FFC466' }, // Pomarańcz
+  { flame: '#D63384', halo: '#EDA3C8', core: '#FFB3D6' }, // Róż
+  { flame: '#2563EB', halo: '#9DB9F6', core: '#BFDBFE' }, // Błękit
+  { flame: '#7C3AED', halo: '#C4A6F7', core: '#DDD6FE' }, // Legenda (fiolet)
+];
+const ZERO_FLAME_TONE: FlameTone = { flame: '#3A3F52', halo: '#54596D', core: '#4E5468' };
+
+function flameToneFor(days: number): FlameTone {
+  if (days < 1) return ZERO_FLAME_TONE;
+  return FLAME_PALETTE[streakTier(days).i];
+}
+
+// Big "sticker" flame for the bold dashboard tiles — three flat layers of the SAME lucide
+// Flame silhouette (halo behind, solid flame, lighter core on top), no stroke and no number.
+// A `stroke` outline was tried first and rejected (2026-08-12): it straddles the path edge,
+// so half its width bleeds INTO the fill and washes out the color, and looks uneven around
+// the flame's tighter curves. Layering full shapes gives a clean edge instead. Positioning
+// mirrors the approved HTML mockup exactly (halo scale 1.13 centered, core scale 0.62 shifted
+// down ~12.5% of the full size) — same View-wrapper-per-layer pattern StreakFlame uses above
+// for its own flicker animation, not a `style` prop on the icon itself.
+export function StreakFlameGlow({ days, size = 100 }: { days: number; size?: number }) {
+  const t = flameToneFor(days);
+  const haloSize = size * 1.13;
+  const coreSize = size * 0.62;
+  return (
+    <View style={{ width: size, height: size, opacity: days < 1 ? 0.6 : 1 }}>
+      <View style={{ position: 'absolute', left: -(haloSize - size) / 2, top: -(haloSize - size) / 2 }}>
+        <Flame size={haloSize} color={t.halo} fill={t.halo} strokeWidth={0} />
+      </View>
+      <View style={{ position: 'absolute', left: 0, top: 0 }}>
+        <Flame size={size} color={t.flame} fill={t.flame} strokeWidth={0} />
+      </View>
+      <View style={{ position: 'absolute', left: (size - coreSize) / 2, top: size * 0.315 }}>
+        <Flame size={coreSize} color={t.core} fill={t.core} strokeWidth={0} />
+      </View>
+    </View>
+  );
+}
+
 export default function StreakFlame({ days, size = 48 }: { days: number; size?: number }) {
   const flick = useRef(new Animated.Value(0)).current;
   useEffect(() => {

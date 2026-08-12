@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Flame, Snowflake } from 'lucide-react-native';
@@ -7,13 +8,23 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
-import StreakFlame, { streakTier, streakColor } from '@/components/counters/StreakFlame';
+import { StreakFlameGlow, streakTier, streakColor } from '@/components/counters/StreakFlame';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
 
 export interface StreakItem { key: string; name: string; days: number }
 
 const SEEN_KEY = 'streak_tiers_v1';
+
+// Second gradient stop for a tile — same hue, mixed toward black for depth (matches the
+// diagonal-gradient pattern MonthWrappedCard already uses for its cards).
+function darken(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * (1 - amt));
+  const g = Math.round(((n >> 8) & 255) * (1 - amt));
+  const b = Math.round((n & 255) * (1 - amt));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
 
 // „Twoje serie" — Duolingo-style: kolor kafla wg progu serii (bordo → czerwień → pomarańcz
 // → róż → błękit → fiolet legenda), im dłuższa seria tym "gorętszy" kolor. User (2026-08-12,
@@ -95,17 +106,34 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     // streakColor() ma osobny, poprawny fallback (szary) dla days<1 — tego trzeba użyć do
     // KOLORU kafla, inaczej złamana seria świeci się na czerwono zamiast wyglądać na "zimną".
     const color = streakColor(r.days);
+    const isZero = r.days < 1;
     const onTile = () => {
       haptic.tap();
       if (r.key.startsWith('h:')) router.push(`/habit-year?id=${r.key.slice(2)}` as any);
       else if (r.key.startsWith('c:')) router.push(`/habit-year?counter=${r.key.slice(2)}` as any);
       else router.push('/counters' as any);
     };
+    // Duolingo-porównanie (2026-08-12, artifact 91003a5a): duży płomień "naklejka" w rogu +
+    // duża liczba w lewym górnym rogu, kafel to pełny gradient koloru progu (nie 20%-owy
+    // tint jak wcześniej). Zero dni: płaskie, wygaszone, przerywana ramka — bez gradientu.
+    const content = (
+      <>
+        <View style={s.tileFlame} pointerEvents="none">
+          <StreakFlameGlow days={r.days} size={92} />
+        </View>
+        <Text style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF' }]}>{r.days}</Text>
+        <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)' }]} numberOfLines={1}>{r.name}</Text>
+      </>
+    );
     return (
-      <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile}
-        style={[s.tile, { backgroundColor: color + '20', borderColor: color + '55' }]}>
-        <StreakFlame days={r.days} size={50} />
-        <Text style={s.label} numberOfLines={1}>{r.name}</Text>
+      <TouchableOpacity key={r.key} activeOpacity={0.85} onPress={onTile} style={s.tileTouch}>
+        {isZero ? (
+          <View style={[s.tile, s.tileZero]}>{content}</View>
+        ) : (
+          <LinearGradient colors={[color, darken(color, 0.16)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tile}>
+            {content}
+          </LinearGradient>
+        )}
       </TouchableOpacity>
     );
   }
@@ -121,17 +149,18 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   // JEDNOLITE KWADRATY, 2 na rząd. BEZ flexGrow → samotny kafel zostaje pół-szerokości
-  // (nie rozciąga się na cały ekran). Uproszczone (2026-08-12) — sam StreakFlame (liczba +
-  // animowany płomień) + etykieta, wyśrodkowane; próg/pasek/historia żyją po stuknięciu
-  // (habit-year), nie tutaj.
+  // (nie rozciąga się na cały ekran). tileTouch = tylko rozmiar/proporcje (żeby LinearGradient
+  // i płaski zero-stan mogły dzielić dokładnie ten sam kształt); tile = wygląd.
+  tileTouch: { flexBasis: '47.5%', minWidth: 128, aspectRatio: 1.22 },
   tile: {
-    flexBasis: '47.5%', minWidth: 128, aspectRatio: 1.62,
-    borderRadius: radius.lg, borderWidth: 1,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    alignItems: 'center', justifyContent: 'center', gap: 4,
-    overflow: 'hidden',
+    flex: 1, borderRadius: radius.lg,
+    paddingHorizontal: spacing[3], paddingTop: spacing[3], paddingBottom: spacing[2],
+    overflow: 'hidden', position: 'relative',
   },
-  label: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
+  tileZero: { backgroundColor: '#23273A', borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle },
+  tileFlame: { position: 'absolute', right: -18, bottom: -16 },
+  tileNum: { fontFamily: fonts.display, fontSize: 34, fontWeight: '900', letterSpacing: -0.5, lineHeight: 36 },
+  tileLabel: { fontFamily: fonts.label, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', marginTop: 2 },
 }));
 
 export default memo(StreakWallCard);
