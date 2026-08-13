@@ -43,8 +43,14 @@ type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins:
 //   3 próby/dzień (dailyAttempts), wydarzenie ma FLAT 1 próbę/dzień (EVENT_DAILY_ATTEMPTS w
 //   bosses.ts) — HP/DMG wydarzenia PRZEBALANSOWANE pod ten model, patrz eventHpFor w
 //   seasonalEvents.ts. attackRoundBased() obsługuje obie.
-// — RAID zostaje jedyny na starym modelu: pojedyncze uderzenie na próbę w trwały bank HP
-//   (bez kontrataku — nigdy nie było, user o tym nie prosił), attackSimple() poniżej.
+// — RAID: HP bossa zostaje na starym modelu (trwały bank przez cały tydzień, NIE resetuje
+//   się co próbę — to celowe, żeby dało się odrabiać po trochu). Ale (2026-08-12, user:
+//   "nadal nie ma normalnej walki") każda próba dostaje teraz REALNY kontratak na kotka,
+//   jedna czysta wymiana na próbę (kotek resetuje HP do pełna PRZED każdą), skalowany od
+//   catMax a nie raidMaxHp (ta pula jest z założenia dużo większa, więc ta sama skala co w
+//   kampanii by prawie zabiła kotka jednym ciosem). Wciąż BEZ stanu porażki — user o to nie
+//   prosił, raid dalej nie da się "przegrać", kontratak jest czysto poglądowy. attackSimple()
+//   poniżej. Pierwsze podejście do wyważenia obrażeń, niesprawdzone na urządzeniu.
 export default function BossFight() {
   const { kind: kindParam } = useLocalSearchParams<{ kind?: string }>();
   const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : 'campaign';
@@ -120,7 +126,7 @@ export default function BossFight() {
   // kontrataku). Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
   const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : null;
 
-  useEffect(() => { if (kind === 'campaign' || kind === 'event') resetCatHp(); }, [kind]);
+  useEffect(() => { resetCatHp(); }, [kind]);
 
   // Walka rund odgrywa się przez łańcuch setTimeout (patrz playerBeat/counterBeat/attackSimple
   // niżej). Jeśli user wyjdzie z ekranu W TRAKCIE animacji, te timeouty same się nie anulują —
@@ -182,9 +188,14 @@ export default function BossFight() {
     ]).start();
   };
 
-  // Pociski lecące między kafelkami. 0→1 = leci; JSX niżej interpoluje na translateX wzdłuż
-  // całego wiersza kafelków (płaski tor). Rzut trwa PRZED wylądowaniem ciosu — HP/shake/flash/
-  // liczba obrażeń odpalają się dopiero gdy pocisk faktycznie dotrze na miejsce.
+  // Pociski lecące między kafelkami. 0→1 = leci; JSX niżej interpoluje na `left` (% szerokości
+  // wiersza kafelków) wzdłuż całego wiersza (płaski tor). Rzut trwa PRZED wylądowaniem ciosu —
+  // HP/shake/flash/liczba obrażeń odpalają się dopiero gdy pocisk faktycznie dotrze na miejsce.
+  // WAŻNE: obie animacje niżej MUSZĄ mieć `useNativeDriver: false` — sterują stylem `left`
+  // (właściwość layoutu), a native driver obsługuje TYLKO `opacity`/`transform`. Z `true` cios
+  // wizualnie "utyka" w pozycji startowej (opacity/scale nadal się animują natywnie, ale `left`
+  // się nie rusza) — user zgłosił dokładnie to (2026-08-12): cios bossa "pojawia się na nim i
+  // znika w miejscu zamiast lecieć". NIE włączać `true` z powrotem "dla wydajności".
   const pawTravel = useRef(new Animated.Value(0)).current;
   const boltTravel = useRef(new Animated.Value(0)).current;
   const [pawFlying, setPawFlying] = useState(false);
@@ -242,7 +253,7 @@ export default function BossFight() {
       if (round.counterDmg > 0) {
         setBoltFlying(true);
         boltTravel.setValue(0);
-        Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+        Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
         roundTimer.current = setTimeout(() => {
           if (!alive.current) return;
           setBoltFlying(false);
@@ -263,7 +274,7 @@ export default function BossFight() {
       const round = result.rounds[i];
       setPawFlying(true);
       pawTravel.setValue(0);
-      Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
       roundTimer.current = setTimeout(() => {
         if (!alive.current) return;
         setPawFlying(false);
@@ -279,19 +290,28 @@ export default function BossFight() {
     playerBeat();
   };
 
-  // Raid: JEDYNY tryb zostający na starym modelu — pojedyncze uderzenie na próbę w trwały bank
-  // HP (jak wcześniej na liście w bosses.tsx), świadomie BEZ kontrataku/paska HP kotka — ten
-  // mechanizm nigdy tam nie istniał i nie wprowadzam nowej porażki-w-trakcie-walki bez pytania.
-  // Ta sama animacja rzutu łapką co wyżej, tylko jedna faza zamiast rund, i można walić dalej
-  // od razu (nie trzeba wracać na listę między próbami).
+  // Raid: HP bossa zostaje na starym modelu — trwały bank przez cały tydzień, nie resetuje się
+  // co próbę jak kampania/wydarzenie (ten sam tydzień = ta sama pula, celowo, żeby dało się
+  // odrabiać po trochu). ALE każda próba (2026-08-12, user: "nadal nie ma normalnej walki")
+  // dostaje teraz REALNY kontratak na kotka, jak kampania/wydarzenie — jedno uderzenie, jedna
+  // wymiana. Kotek resetuje się do pełna PRZED każdą próbą (jak w attackRoundBased), więc jeden
+  // kontratak nigdy nie kumuluje się między próbami — to zawsze "jedna czysta wymiana", bez
+  // nowego stanu porażki w raidzie (user o tym nie prosił, raid dalej nie da się "przegrać").
+  // Obrażenia kontrataku skalowane od `catMax`, NIE od `raidMaxHp` — pula raidu jest z założenia
+  // dużo większa (ma wytrzymać cały tydzień dobijania), więc ten sam × wskaźnik co w kampanii
+  // policzony na surowym raidMaxHp prawie zabijałby kotka jednym ciosem. Pierwsze podejście do
+  // wyważenia, nie grane na urządzeniu — może wymagać korekty po realnym teście.
+  const RAID_COUNTER_PCT = 0.04;
   const attackSimple = () => {
     if (kind !== 'raid' || !target || !target.unlocked || fighting || target.done) return;
     if (target.energy <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     const { damage, crit } = computeDamage(atkStatBonus, level, bonuses);
+    resetCatHp();
+    setCatHit(null);
     setFighting(true);
     setPawFlying(true);
     pawTravel.setValue(0);
-    Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
     roundTimer.current = setTimeout(() => {
       if (!alive.current) return;
       setPawFlying(false);
@@ -299,18 +319,42 @@ export default function BossFight() {
       setLastHit({ dmg: damage, crit, guarded: false, healed: 0, thornDmg: 0 });
       playBossHitFx(crit);
       setAttackPulse(n => n + 1);
-      setFighting(false);
 
       const res = raidAttack(damage);
       setLiveBossHp(res.remaining);
-      if (res.defeated) {
+
+      const afterCounter = () => {
+        setFighting(false);
+        if (res.defeated) {
+          roundTimer.current = setTimeout(() => {
+            if (!alive.current) return;
+            raidClaim(weekKey, raidCoins(level), raidXp(level));
+            haptic.success();
+            setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
+          }, 500);
+        }
+      };
+
+      // Boss padł tym ciosem → od razu do zwycięstwa, bez zbędnego kontrataku "z tamtego świata".
+      if (res.defeated) { afterCounter(); return; }
+
+      roundTimer.current = setTimeout(() => {
+        if (!alive.current) return;
+        const variance = 0.85 + Math.random() * 0.3;
+        const counterDmg = Math.round(catMax * RAID_COUNTER_PCT * variance * (1 - Math.min(0.9, Math.max(0, bonuses.dodge))));
+        setBoltFlying(true);
+        boltTravel.setValue(0);
+        Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
         roundTimer.current = setTimeout(() => {
           if (!alive.current) return;
-          raidClaim(weekKey, raidCoins(level), raidXp(level));
-          haptic.success();
-          setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
-        }, 500);
-      }
+          setBoltFlying(false);
+          haptic.medium();
+          setCatHit({ dmg: counterDmg, healed: 0 });
+          playCatHitFx();
+          damageCat(counterDmg);
+          afterCounter();
+        }, THROW_MS);
+      }, 480);
     }, THROW_MS);
   };
 
@@ -367,12 +411,10 @@ export default function BossFight() {
             <View style={s.vsRow}>
               <View style={s.tile}>
                 <Text style={s.tileLabel} numberOfLines={1}>Pupil</Text>
-                {kind === 'campaign' || kind === 'event' ? (
-                  <>
-                    <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(catHp / catMax * 100)}%`, backgroundColor: '#2AC68F' }]} /></View>
-                    <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
-                  </>
-                ) : <View style={{ height: 18 }} />}
+                {/* Wszystkie 3 tryby mają teraz realny kontratak (2026-08-12) — pasek HP kotka
+                    pokazuje się zawsze, nie tylko w kampanii/wydarzeniu. */}
+                <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(catHp / catMax * 100)}%`, backgroundColor: '#2AC68F' }]} /></View>
+                <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
                 <View style={s.tilePortrait}>
                   <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
                     <CatArt size={104} expression="content" attack={attackPulse} />
@@ -411,7 +453,11 @@ export default function BossFight() {
                 (kontratak, TYLKO kampania — boltFlying nigdy nie ustawia się w attackSimple) */}
             {pawFlying && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: pawX, opacity: pawOp, transform: [{ scale: pawScale }, { translateX: -14 }] }]}>
-                <PawPrint size={28} color="#FBBF24" />
+                {/* Był stroke-only bursztynowy #FBBF24 — nierozpoznawalne jako "łapka" w ruchu,
+                    user: "nie używa swojej łapki tylko czegoś żółtego nie wiem co to" (2026-08-12).
+                    Solidne wypełnienie (fill) + różowo-koralowy odcień poduszki łapki, żeby czytało
+                    się jednoznacznie jako łapka nawet przy 28px i szybkim locie. */}
+                <PawPrint size={30} color="#F4A6A6" fill="#F4A6A6" />
               </Animated.View>
             )}
             {/* Kontratak bossa = zwykła pięść, ZAWSZE — user (2026-08-12): poprzednio leciał
@@ -421,7 +467,7 @@ export default function BossFight() {
                 niżej) — tam nikt się nie skarżył, to inny moment (Twój cios ląduje na NIM). */}
             {boltFlying && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
-                <HandFist size={26} color="#F87171" />
+                <HandFist size={28} color="#F87171" fill="#F87171" />
               </Animated.View>
             )}
             </View>
