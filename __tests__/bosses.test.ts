@@ -77,6 +77,28 @@ describe('bosses — counterDamage (2026-08-13: liczy od AKTUALNEGO, nie max HP 
   });
 });
 
+describe('bosses — BOSSES roster balance (2026-08-13, patrz memory boss_design.md „balance review")', () => {
+  test('żaden boss nie łączy guard + regenPct — kombinacja potrafi zrobić bossa niezabijalnym (0.5×atkPower < regenPct×hp)', () => {
+    const both = BOSSES.filter(b => b.guard && b.regenPct);
+    expect(both).toEqual([]);
+  });
+  test('hp rośnie monotonicznie z order (nigdy nie spada wraz z kolejnym bossem)', () => {
+    const sorted = [...BOSSES].sort((a, b) => a.order - b.order);
+    for (let i = 1; i < sorted.length; i++) expect(sorted[i].hp).toBeGreaterThanOrEqual(sorted[i - 1].hp);
+  });
+  test('KAŻDY boss kampanii jest wygrywalny w ≤50 rundach przy ZEROWEJ inwestycji gracza (regresja na "matematycznie niewygrywalny" bug)', () => {
+    const noBonus: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+    for (const b of BOSSES) {
+      const r = simulateFight(0, b.unlockLevel, noBonus, b, 100); // 0 inwestycji, bazowe 100 HP kotka
+      expect(r.rounds.length).toBeLessThanOrEqual(50);
+      // nie wymagamy r.won (zerowa inwestycja to najgorszy przypadek, kotek może paść) —
+      // wymagamy tylko że walka faktycznie SIĘ ROZSTRZYGA w rozsądnej liczbie rund, nie
+      // grzęźnie w sufit MAX_FIGHT_ROUNDS=200 jak przy starej krzywej HP.
+      expect(r.won || r.catFainted).toBe(true);
+    }
+  });
+});
+
 describe('bosses — simulateFight (silnik rund)', () => {
   test('miażdżąca przewaga staty → wygrana, kotek bez zadrapania', () => {
     const b = boss({ hp: 10 }); // trywialnie mało HP

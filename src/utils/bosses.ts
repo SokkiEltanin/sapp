@@ -59,9 +59,23 @@ export interface Boss {
   regenPct?: number;  // REGENERACJA: ten boss zawsze leczy ten % max HP co przeżytą rundę (enrage)
 }
 
+// BALANCE REVIEW (2026-08-13, patrz memory boss_design.md „balance review") — `hp` wartości
+// niżej PRZEPISANE z powrotem do rozsądnej krzywej. Stara krzywa (300→368000→500000, ~×1.4
+// na bossa złożone przez 22 bossy) w połączeniu z fixem counterDamage() (liczy się teraz od
+// AKTUALNEGO HP bossa, nie stałego max — patrz komentarz przy COUNTER_PCT niżej) dawała
+// bossom-endgame setki-tysiące ciosów do zabicia (ponad MAX_FIGHT_ROUNDS=200) — matematycznie
+// niewygrywalne niezależnie od inwestycji. Nowe `hp` = atkPower(0, unlockLevel) × docelowa
+// liczba realnych ciosów (rośnie łagodnie 6→14 przez roster, NIE wykładniczo), więc trudność
+// skaluje się RAZEM z tym jak rośnie moc gracza z poziomem, zamiast go wyprzedzać. Każdy boss
+// killowalny w ≤~31 rundach przy ZEROWEJ inwestycji (node -e verified) — z zakupionym
+// catMaxHpBonus/atkStatBonus (do tego służy ekonomia monet) jest łatwiej, to oczekiwana
+// ścieżka, nie wymóg. Przy okazji: żaden boss już nie łączy `guard` + `regenPct` naraz
+// (insomnia/devourer/wizard miały oba) — ta kombinacja potrafiła zrobić z bossa dosłownie
+// niezabijalnego, gdy `0.5×atkPower < regenPct×hp` (kotek zadaje mniej niż boss leczy,
+// każda runda). Nadal PIERWSZA WERSJA tej krzywej — niesprawdzona na urządzeniu.
 export const BOSSES: Boss[] = [
   {
-    id: 'sloth', name: 'Kanapowy Leniwiec', emoji: '🦥', order: 1, unlockLevel: 2, hp: 300,
+    id: 'sloth', name: 'Kanapowy Leniwiec', emoji: '🦥', order: 1, unlockLevel: 2, hp: 250,
     weakness: 'steps', weaknessLabel: 'kroki',
     // id zostaje 'loot_pillow' mimo zmiany nazwy/emoji (2026-08-12, gablota trofeów
     // wywalona z pupila) — to trwały klucz w ownedItems, zmiana złamałaby już zdobyty
@@ -71,133 +85,134 @@ export const BOSSES: Boss[] = [
     coins: 8, xp: 60, taunt: 'Po co dziś wstawać…',
   },
   {
-    id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 520,
+    id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 310,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
     coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: true,
   },
   {
-    id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 820,
+    id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 330,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_snakefig', name: 'Figurka Węża', emoji: '🐍', desc: '+5% szansy na cios krytyczny', bonus: { crit: 0.05 } },
     coins: 18, xp: 160, taunt: 'Odpuść dziś nawyki…',
   },
   {
-    id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 1400,
+    id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 410,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_dragon', name: 'Trofeum Smoka', emoji: '🐲', desc: '+5% uniku, +3% siły ataku', bonus: { dodge: 0.05, atk: 0.03 } },
     coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
   },
   {
-    id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 2200,
+    id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 440,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_hourglass', name: 'Klepsydra Skupienia', emoji: '⏳', desc: '+7% energii z dbania o siebie', bonus: { energyMult: 0.07 } },
     coins: 45, xp: 450, taunt: 'Jeszcze tylko jeden filmik…',
   },
   {
-    id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 3200,
+    id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 460,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+6% uniku', bonus: { dodge: 0.06 } },
     coins: 60, xp: 600, taunt: 'Martw się wszystkim naraz…',
   },
   {
-    id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 4500,
+    id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 550,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_veg', name: 'Korona Warzyw', emoji: '🥦', desc: '+5% siły ataku, +2% kryt', bonus: { atk: 0.05, crit: 0.02 } },
     coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…', guard: true,
   },
   {
-    id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 6500,
+    id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 600,
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +5% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.05, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
   },
   // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
   {
-    id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 9000,
+    id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 710,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
-    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true, regenPct: 0.03,
+    coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true,
   },
   {
-    id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 12000,
+    id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 760,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+7% uniku, +3% atak', bonus: { dodge: 0.07, atk: 0.03 } },
     coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
   },
   {
-    id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 16000,
+    id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 820,
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
     coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?', regenPct: 0.03,
   },
   {
-    id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 22000,
+    id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 970,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_gear', name: 'Mechanizm Czasu', emoji: '⚙️', desc: '+9% energii, +3% atak', bonus: { energyMult: 0.09, atk: 0.03 } },
     coins: 380, xp: 3800, taunt: 'Zrobisz to jutro… na pewno…',
   },
   {
-    id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 30000,
+    id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 1050,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +6% uniku', bonus: { atk: 0.08, dodge: 0.06 } },
     coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
   },
   {
-    id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 42000,
+    id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 1230,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +8% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.08, energyMult: 0.08, crit: 0.05 } },
-    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true, regenPct: 0.04,
+    coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true,
   },
   // ── prestiż (2026-08-09) — 8 nowych, z zapasowych portretów w assets/ikonybosów/;
-  // kontynuuje krzywą HP/coins/xp devourera (~×1.4/krok, rosnące odstępy poziomów).
+  // HP już NIE kontynuuje starej krzywej devourera (~×1.4/krok) — patrz balance-review
+  // komentarz nad BOSSES.
   {
-    id: 'samurai', name: 'Duch Perfekcjonizmu', emoji: '🥷', order: 15, unlockLevel: 58, hp: 57000,
+    id: 'samurai', name: 'Duch Perfekcjonizmu', emoji: '🥷', order: 15, unlockLevel: 58, hp: 1320,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_katana', name: 'Katana Honoru', emoji: '🗡️', desc: '+9% siły ataku', bonus: { atk: 0.09 } },
     coins: 1300, xp: 13500, taunt: 'Musisz zrobić to idealnie, inaczej się nie liczy…', guard: true,
   },
   {
-    id: 'jaguar', name: 'Cień Impulsu', emoji: '🐆', order: 16, unlockLevel: 65, hp: 78000,
+    id: 'jaguar', name: 'Cień Impulsu', emoji: '🐆', order: 16, unlockLevel: 65, hp: 1420,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+9% uniku', bonus: { dodge: 0.09 } },
     coins: 2000, xp: 20000, taunt: 'Kup to teraz, pomyślisz później…',
   },
   {
-    id: 'dinosaur', name: 'Skamieniały Nawyk', emoji: '🦖', order: 17, unlockLevel: 72, hp: 106000,
+    id: 'dinosaur', name: 'Skamieniały Nawyk', emoji: '🦖', order: 17, unlockLevel: 72, hp: 1640,
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_fossil', name: 'Skamielina Mocy', emoji: '🦴', desc: '+10% atak, +3% kryt', bonus: { atk: 0.10, crit: 0.03 } },
     coins: 3000, xp: 30000, taunt: 'Zawsze tak robiłeś, po co coś zmieniać…',
   },
   {
-    id: 'piratecapitan', name: 'Kapitan Zachłanności', emoji: '🏴‍☠️', order: 18, unlockLevel: 80, hp: 145000,
+    id: 'piratecapitan', name: 'Kapitan Zachłanności', emoji: '🏴‍☠️', order: 18, unlockLevel: 80, hp: 1770,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_treasuremap', name: 'Mapa Skarbów', emoji: '🗺️', desc: '+10% energii, +4% atak', bonus: { energyMult: 0.10, atk: 0.04 } },
     coins: 4500, xp: 45000, taunt: 'Jeszcze jedno, jeszcze trochę więcej…',
   },
   {
-    id: 'hades', name: 'Władca Katastrof', emoji: '🔥', order: 19, unlockLevel: 88, hp: 198000,
+    id: 'hades', name: 'Władca Katastrof', emoji: '🔥', order: 19, unlockLevel: 88, hp: 2040,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+11% uniku, +4% atak', bonus: { dodge: 0.11, atk: 0.04 } },
     coins: 6800, xp: 68000, taunt: 'Wszystko na pewno się posypie…', regenPct: 0.04,
   },
   {
-    id: 'clown', name: 'Maska Uśmiechu', emoji: '🤡', order: 20, unlockLevel: 97, hp: 270000,
+    id: 'clown', name: 'Maska Uśmiechu', emoji: '🤡', order: 20, unlockLevel: 97, hp: 2190,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_truthmask', name: 'Maska Prawdy', emoji: '🎭', desc: '+9% kryt, +5% atak', bonus: { crit: 0.09, atk: 0.05 } },
     coins: 10000, xp: 100000, taunt: 'Uśmiechnij się, nikt nie musi wiedzieć…',
   },
   {
-    id: 'princess', name: 'Czekanie Na Ratunek', emoji: '👸', order: 21, unlockLevel: 106, hp: 368000,
+    id: 'princess', name: 'Czekanie Na Ratunek', emoji: '👸', order: 21, unlockLevel: 106, hp: 2340,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +5% uniku', bonus: { energyMult: 0.12, dodge: 0.05 } },
     coins: 15000, xp: 150000, taunt: 'Ktoś w końcu to za ciebie naprawi…',
   },
   {
-    id: 'wizard', name: 'Iluzja Kontroli', emoji: '🧙', order: 22, unlockLevel: 116, hp: 500000,
+    id: 'wizard', name: 'Iluzja Kontroli', emoji: '🧙', order: 22, unlockLevel: 116, hp: 2690,
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +10% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.10, energyMult: 0.10, crit: 0.08 } },
-    coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true, regenPct: 0.05,
+    coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true,
   },
 ];
 

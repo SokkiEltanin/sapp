@@ -119,7 +119,7 @@ function StreakWallCard({ streaks, cardBg }: { streaks: StreakItem[]; cardBg: st
     const content = (
       <>
         <View style={s.tileFlame} pointerEvents="none">
-          <StreakFlameGlow days={r.days} size={92} />
+          <StreakFlameGlow days={r.days} size={64} />
         </View>
         <Text style={[s.tileNum, { color: isZero ? c.text.muted : '#FFFFFF' }]}>{r.days}</Text>
         <Text style={[s.tileLabel, { color: isZero ? c.text.muted : 'rgba(255,255,255,0.88)' }]} numberOfLines={1}>{r.name}</Text>
@@ -151,22 +151,25 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // JEDNOLITE KWADRATY, 2 na rząd. BEZ flexGrow → samotny kafel zostaje pół-szerokości
   // (nie rozciąga się na cały ekran). tileTouch = tylko rozmiar/proporcje (żeby LinearGradient
   // i płaski zero-stan mogły dzielić dokładnie ten sam kształt); tile = wygląd.
-  tileTouch: { flexBasis: '47.5%', minWidth: 128, aspectRatio: 1.22 },
+  // Skurczone (2026-08-13, user: "kafelki są za długie") — niższy aspectRatio (szerszy
+  // względem wysokości) + mniejszy minWidth, żeby cała sekcja nie zajmowała tyle miejsca
+  // na dashboardzie przy kilku seriach naraz.
+  tileTouch: { flexBasis: '47.5%', minWidth: 104, aspectRatio: 1.7 },
   tile: {
     flex: 1, borderRadius: radius.lg,
-    paddingHorizontal: spacing[3], paddingTop: spacing[3], paddingBottom: spacing[2],
+    paddingHorizontal: spacing[2], paddingTop: spacing[2], paddingBottom: spacing[1],
     overflow: 'hidden', position: 'relative',
   },
   tileZero: { backgroundColor: '#23273A', borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle },
-  tileFlame: { position: 'absolute', right: -18, bottom: -16 },
+  tileFlame: { position: 'absolute', right: -12, bottom: -10 },
   // BEZ fontWeight — ArchivoBlack to already-heavy font (jedyny plik/waga zarejestrowana
   // w useFonts), a fontWeight obok custom fontFamily na Androidzie potrafi po cichu cofnąć
   // się do systemowego (cienkiego) fontu, bo RN szuka pliku "ArchivoBlack-Bold" którego nie
   // ma. Ten sam wzorzec co WSZĘDZIE indziej z fonts.display (TopPill/StreakCard/
   // PersonalRecordsCard/DailyRings) — tileNum był jedynym miejscem z dodanym fontWeight,
   // user (2026-08-13): "Twoje serie używają cienkiej czcionki dla LICZBY".
-  tileNum: { fontFamily: fonts.display, fontSize: 34, letterSpacing: -0.5, lineHeight: 36 },
-  tileLabel: { fontFamily: fonts.label, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', marginTop: 2 },
+  tileNum: { fontFamily: fonts.display, fontSize: 24, letterSpacing: -0.5, lineHeight: 26 },
+  tileLabel: { fontFamily: fonts.label, fontSize: 9, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', marginTop: 1 },
 }));
 
 export default memo(StreakWallCard);
