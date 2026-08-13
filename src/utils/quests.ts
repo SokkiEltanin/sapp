@@ -54,12 +54,21 @@ export interface ClaimState {
 
 // ─── Daily quests ───────────────────────────────────────────────────────────
 interface DailyDef { id: string; label: string; coins: number; xp: number; done: (c: QuestCtx) => boolean; note?: (c: QuestCtx) => string }
+// Nagrody podwojone (2026-08-12, user: "zadania pupila powinny być lepiej oceniane... dają
+// bardzo mało względem tego jak dużo trzeba wydawać na upgrady"). Policzone, nie zgadywane:
+// upgrade HP/ATK w pet-stats.tsx kosztuje `40 + floor(bonus/krok)×15` — 10 zakupów pod rząd
+// (np. +200 max HP) to 1075 monet. Przy STARYCH stawkach (dailies=1, bonus=2, weekly/monthly
+// niżej) realny dzienny dochód zaangażowanego usera (wszystkie dailies + ~3 bonusy + darmowa
+// skrzynka dnia + rozłożone weekly/monthly) wychodził ~27,5 monety/dzień → ~39 dni na jedno
+// +200 HP. Po podwyżce ~40,4/dzień → ~27 dni — wyraźnie krócej, wciąż realny cel średnioterminowy,
+// nie natychmiastowy. Milestone'y (jednorazowe, kolekcjonerskie) NIE ruszone — to nie jest
+// powtarzalny dochód konkurujący z upgradami na co dzień, tylko okazjonalny bonus za rekord.
 const DAILY: DailyDef[] = [
-  { id: 'd_mood',    label: 'Wpisz humor dziś',      coins: 1, xp: 3, done: c => c.moodLoggedToday },
-  { id: 'd_steps10', label: '10 000 kroków',          coins: 1, xp: 3, done: c => c.stepsToday >= 10000, note: c => `${c.stepsToday}/10000` },
-  { id: 'd_steps20', label: '20 000 kroków',          coins: 1, xp: 4, done: c => c.stepsToday >= 20000, note: c => `${c.stepsToday}/20000` },
-  { id: 'd_habits',  label: 'Wszystkie nawyki',       coins: 1, xp: 3, done: c => c.habitsTotal > 0 && c.habitsDone >= c.habitsTotal, note: c => c.habitsTotal > 0 ? `${c.habitsDone}/${c.habitsTotal}` : 'brak nawyków' },
-  { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 1, xp: 3, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione ❤️' : 'stuknij kota' },
+  { id: 'd_mood',    label: 'Wpisz humor dziś',      coins: 2, xp: 5, done: c => c.moodLoggedToday },
+  { id: 'd_steps10', label: '10 000 kroków',          coins: 2, xp: 5, done: c => c.stepsToday >= 10000, note: c => `${c.stepsToday}/10000` },
+  { id: 'd_steps20', label: '20 000 kroków',          coins: 2, xp: 6, done: c => c.stepsToday >= 20000, note: c => `${c.stepsToday}/20000` },
+  { id: 'd_habits',  label: 'Wszystkie nawyki',       coins: 2, xp: 5, done: c => c.habitsTotal > 0 && c.habitsDone >= c.habitsTotal, note: c => c.habitsTotal > 0 ? `${c.habitsDone}/${c.habitsTotal}` : 'brak nawyków' },
+  { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 2, xp: 5, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione ❤️' : 'stuknij kota' },
 ];
 
 export interface DailyQuestState { id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string }
@@ -89,28 +98,28 @@ export interface MilestoneQuestState { id: string; label: string; unit: string; 
 // ─── Dynamic bonus dailies (higher reward, adaptive to you) ─────────────────
 interface BonusDef { id: string; coins: number; xp: number; available: (c: QuestCtx) => boolean; label: (c: QuestCtx) => string; note?: (c: QuestCtx) => string; done: (c: QuestCtx) => boolean }
 const BONUS: BonusDef[] = [
-  { id: 'b_stepbeat', coins: 2, xp: 6, available: c => (c.stepTarget ?? 0) > 0,
+  { id: 'b_stepbeat', coins: 4, xp: 10, available: c => (c.stepTarget ?? 0) > 0,
     label: c => `Pobij formę: ${c.stepTarget!.toLocaleString('pl-PL')} kroków`, note: c => `${c.stepsToday}/${c.stepTarget}`, done: c => c.stepsToday >= (c.stepTarget ?? Infinity) },
-  { id: 'b_water', coins: 2, xp: 6, available: c => (c.waterGoal ?? 0) > 0,
+  { id: 'b_water', coins: 4, xp: 10, available: c => (c.waterGoal ?? 0) > 0,
     label: c => `Wypij ${c.waterGoal} szklanek wody`, note: c => `${c.waterToday ?? 0}/${c.waterGoal}`, done: c => (c.waterToday ?? 0) >= (c.waterGoal ?? Infinity) },
-  { id: 'b_sleep', coins: 2, xp: 6, available: c => (c.sleepMinutes ?? 0) > 0,
+  { id: 'b_sleep', coins: 4, xp: 10, available: c => (c.sleepMinutes ?? 0) > 0,
     label: () => 'Prześpij 7 godzin', note: c => `${((c.sleepMinutes ?? 0) / 60).toFixed(1)}h / 7h`, done: c => (c.sleepMinutes ?? 0) >= 420 },
   // Personalized training quests — only show once Ustawienia → Personalizacja is filled
   // in (targets computed there). Pushups/squats are self-reported (tap when done, see
   // markPushupsDone/markSquatsDone in petStore — no sensor can count reps); the bike
   // ride is verified from Health Connect cycling minutes, same as the other data-driven
   // dailies above.
-  { id: 'b_pushups', coins: 2, xp: 6, available: c => (c.pushupTarget ?? 0) > 0,
+  { id: 'b_pushups', coins: 4, xp: 10, available: c => (c.pushupTarget ?? 0) > 0,
     label: c => `Zrób ${c.pushupTarget} pompek`, note: c => c.pushupsToday ? 'zrobione 💪' : 'stuknij po zrobieniu', done: c => !!c.pushupsToday },
-  { id: 'b_squats', coins: 2, xp: 6, available: c => (c.squatTarget ?? 0) > 0,
+  { id: 'b_squats', coins: 4, xp: 10, available: c => (c.squatTarget ?? 0) > 0,
     label: c => `Zrób ${c.squatTarget} przysiadów`, note: c => c.squatsToday ? 'zrobione 🦵' : 'stuknij po zrobieniu', done: c => !!c.squatsToday },
-  { id: 'b_situps', coins: 2, xp: 6, available: c => (c.situpTarget ?? 0) > 0,
+  { id: 'b_situps', coins: 4, xp: 10, available: c => (c.situpTarget ?? 0) > 0,
     label: c => `Zrób ${c.situpTarget} brzuszków`, note: c => c.situpsToday ? 'zrobione 🔥' : 'stuknij po zrobieniu', done: c => !!c.situpsToday },
-  { id: 'b_plank', coins: 2, xp: 6, available: c => (c.plankTarget ?? 0) > 0,
+  { id: 'b_plank', coins: 4, xp: 10, available: c => (c.plankTarget ?? 0) > 0,
     label: c => `Deska — ${c.plankTarget}s`, note: c => c.plankToday ? 'zrobione 🧘' : 'stuknij po zrobieniu', done: c => !!c.plankToday },
-  { id: 'b_stretch', coins: 2, xp: 5, available: c => (c.stretchTarget ?? 0) > 0,
+  { id: 'b_stretch', coins: 4, xp: 9, available: c => (c.stretchTarget ?? 0) > 0,
     label: c => `Rozciąganie — ${c.stretchTarget} min`, note: c => c.stretchToday ? 'zrobione 🤸' : 'stuknij po zrobieniu', done: c => !!c.stretchToday },
-  { id: 'b_bikeride', coins: 3, xp: 8, available: c => (c.bikeTarget ?? 0) > 0,
+  { id: 'b_bikeride', coins: 5, xp: 13, available: c => (c.bikeTarget ?? 0) > 0,
     label: c => `Przejażdżka rowerem (${c.bikeTarget} min)`, note: c => `${c.bikeMinutesToday ?? 0}/${c.bikeTarget} min`,
     done: c => (c.bikeMinutesToday ?? 0) >= (c.bikeTarget ?? Infinity) },
 ];
@@ -121,9 +130,9 @@ export const TRAINING_QUEST_IDS = ['b_pushups', 'b_squats', 'b_situps', 'b_plank
 // ─── Monthly challenges (claim once per month) ──────────────────────────────
 interface MonthlyDef { id: string; label: string; unit: string; coins: number; xp: number; target: number; value: (c: QuestCtx) => number | undefined }
 const MONTHLY: MonthlyDef[] = [
-  { id: 'mo_mood',    label: 'Nastrój przez 20 dni',       unit: 'dni',    coins: 15, xp: 120, target: 20,     value: c => c.moodDaysThisMonth },
-  { id: 'mo_steps',   label: '150 000 kroków w miesiącu',  unit: 'kroków', coins: 12, xp: 100, target: 150000, value: c => c.stepsThisMonth },
-  { id: 'mo_nosweet', label: '7 dni bez słodyczy z rzędu', unit: 'dni',    coins: 10, xp: 90,  target: 7,      value: c => c.sweetlessDays },
+  { id: 'mo_mood',    label: 'Nastrój przez 20 dni',       unit: 'dni',    coins: 22, xp: 170, target: 20,     value: c => c.moodDaysThisMonth },
+  { id: 'mo_steps',   label: '150 000 kroków w miesiącu',  unit: 'kroków', coins: 18, xp: 145, target: 150000, value: c => c.stepsThisMonth },
+  { id: 'mo_nosweet', label: '7 dni bez słodyczy z rzędu', unit: 'dni',    coins: 15, xp: 130, target: 7,      value: c => c.sweetlessDays },
 ];
 
 export interface MonthlyQuestState { id: string; label: string; unit: string; value: number; target: number; coins: number; xp: number; done: boolean; claimed: boolean; progress: number }
@@ -131,9 +140,9 @@ export interface MonthlyQuestState { id: string; label: string; unit: string; va
 // ─── Weekly challenges (claim once per Mon-based week) ──────────────────────
 interface WeeklyDef { id: string; label: string; unit: string; coins: number; xp: number; target: number; value: (c: QuestCtx) => number | undefined }
 const WEEKLY: WeeklyDef[] = [
-  { id: 'w_mood',   label: 'Nastrój przez 5 dni w tygodniu', unit: 'dni',    coins: 5, xp: 40, target: 5,     value: c => c.moodDaysThisWeek },
-  { id: 'w_steps',  label: '70 000 kroków w tygodniu',       unit: 'kroków', coins: 6, xp: 45, target: 70000, value: c => c.stepsThisWeek },
-  { id: 'w_habits', label: 'Wszystkie nawyki przez 4 dni',   unit: 'dni',    coins: 5, xp: 40, target: 4,     value: c => c.habitDaysThisWeek },
+  { id: 'w_mood',   label: 'Nastrój przez 5 dni w tygodniu', unit: 'dni',    coins: 8, xp: 60, target: 5,     value: c => c.moodDaysThisWeek },
+  { id: 'w_steps',  label: '70 000 kroków w tygodniu',       unit: 'kroków', coins: 9, xp: 65, target: 70000, value: c => c.stepsThisWeek },
+  { id: 'w_habits', label: 'Wszystkie nawyki przez 4 dni',   unit: 'dni',    coins: 8, xp: 60, target: 4,     value: c => c.habitDaysThisWeek },
 ];
 export interface WeeklyQuestState { id: string; label: string; unit: string; value: number; target: number; coins: number; xp: number; done: boolean; claimed: boolean; progress: number }
 
