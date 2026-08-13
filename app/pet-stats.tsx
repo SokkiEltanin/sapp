@@ -6,7 +6,7 @@ import { ChevronLeft, Coins, Swords, Heart, Zap, Lock, Check } from 'lucide-reac
 
 import PressableScale from '@/components/ui/PressableScale';
 import PupilNavbar from '@/components/pet/PupilNavbar';
-import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
+import { usePetStore, levelFromXp, catMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
 import { spacing, radius, typography } from '@/theme';
@@ -41,6 +41,7 @@ export default function PetStats() {
   const attempts = dailyAttempts(bonuses.energyMult);
   const hpCost = hpUpgradeCost(catMaxHpBonus);
   const atkCost = atkUpgradeCost(atkStatBonus);
+  const itemSlots = combatItemSlotsFor(lvl.level);
 
   // Posiadane na górze (user, 2026-08-11) — reszta ("???" zablokowane) niżej, stabilne
   // sortowanie więc kolejność w obrębie każdej grupy zostaje jak w COMBAT_ITEMS.
@@ -72,7 +73,7 @@ export default function PetStats() {
   const onToggleEquip = (id: CombatItemId) => {
     haptic.tap();
     if (equippedCombatItems.includes(id)) { unequipCombatItem(id); return; }
-    if (!equipCombatItem(id)) { haptic.error(); toast.error('Masz już 3 założone itemy — zdejmij coś najpierw'); return; }
+    if (!equipCombatItem(id)) { haptic.error(); toast.error(`Masz już ${itemSlots} założone itemy — zdejmij coś najpierw`); return; }
     haptic.success();
   };
   const onUpgradeItem = (id: CombatItemId, level: number, maxLevel: number) => {
@@ -138,8 +139,8 @@ export default function PetStats() {
         )}
 
         {/* ── EKWIPUNEK BOJOWY ─────────────────────────────────────── */}
-        <Text style={s.sectionTitle}>Ekwipunek bojowy ({equippedCombatItems.length}/3 założone)</Text>
-        <Text style={s.blurb}>Losowany ze skrzynek z głaskania. Załóż do 3 naraz — działają w każdej walce kampanii.</Text>
+        <Text style={s.sectionTitle}>Ekwipunek bojowy ({equippedCombatItems.length}/{itemSlots} założone)</Text>
+        <Text style={s.blurb}>Losowany ze skrzynek z głaskania. Załóż do {itemSlots} naraz (rośnie z poziomem, max 6) — działają w każdej walce kampanii.</Text>
         <View style={{ gap: spacing[2], marginTop: spacing[2] }}>
           {sortedItemIds.map(id => {
             const def = COMBAT_ITEMS[id];

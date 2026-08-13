@@ -1,6 +1,6 @@
 import {
   bossTier, counterDamage, atkPower, atkMultiplier, dailyAttempts, simulateFight,
-  EquippedItem, Bonuses, BOSSES, Boss,
+  EquippedItem, Bonuses, BOSSES, Boss, combatItemSlotsFor, COMBAT_ITEM_SLOTS,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 
@@ -25,6 +25,21 @@ describe('bosses — atkPower / dailyAttempts (v5 pivot: staty zamiast danych zd
     expect(dailyAttempts(0)).toBe(3);
     expect(dailyAttempts(0.5)).toBeGreaterThan(3);
     expect(dailyAttempts(-5)).toBeGreaterThanOrEqual(1); // nigdy 0
+  });
+});
+
+describe('bosses — combatItemSlotsFor (2026-08-13: sloty rosną z poziomem)', () => {
+  test('baza = COMBAT_ITEM_SLOTS na niskim poziomie', () => {
+    expect(combatItemSlotsFor(1)).toBe(COMBAT_ITEM_SLOTS);
+    expect(combatItemSlotsFor(5)).toBe(COMBAT_ITEM_SLOTS);
+  });
+  test('+1 slot co 6 poziomów', () => {
+    expect(combatItemSlotsFor(6)).toBe(COMBAT_ITEM_SLOTS + 1);
+    expect(combatItemSlotsFor(12)).toBe(COMBAT_ITEM_SLOTS + 2);
+  });
+  test('cap na 6 slotach nawet przy bardzo wysokim poziomie', () => {
+    expect(combatItemSlotsFor(18)).toBe(6);
+    expect(combatItemSlotsFor(100)).toBe(6);
   });
 });
 

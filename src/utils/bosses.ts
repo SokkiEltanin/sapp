@@ -6,6 +6,12 @@
 // times you can fight today), refilled flat each day — not computed from steps/sleep/
 // mood/sweets like before. `guard`/`regenPct` on a Boss are now INNATE traits (some
 // bosses are just tankier/regenerate), not conditional on "did you do X today".
+//
+// EXCEPTION (2026-08-13, patrz bossWeakness.ts): a boss's `weakness` category CAN weaken
+// it again, but through a wielodniowa SERIA (habits/water/steps/sweetless/mood/sleep
+// streak), not a same-day number — so it can't flip a fight from "did X today" alone. The
+// weakening happens OUTSIDE this file (weakenBoss() clones a Boss with reduced `hp` before
+// simulateFight/raid see it) — this file's own functions stay pure and unaware of streaks.
 
 import {
   CombatItemId, HEADSHOT_CHANCE, HEAL_ONCE_PCT, dodgeChanceAt, reflectPctAt,
@@ -17,8 +23,13 @@ import {
 // bezpośrednio przez testy (bosses.test.ts importuje bosses.ts). Ikony (loot/raid/
 // wydarzenia) żyją osobno w src/utils/bossUiIcons.ts, importowane tylko przez ekrany.
 
-// Czysty temat/flavor bossa (art/aura) — NIE wpływa już na obrażenia. Zostaje jako
-// wizualna tożsamość (kolor aury w bosses.tsx) i opis w kampanii.
+// Temat/flavor bossa (art/aura, kolor aury w bosses.tsx) — v5 pivot (2026-08-07) odłączył
+// to od DZISIEJSZYCH danych samoopieki. Od 2026-08-13 (patrz bossWeakness.ts) ta sama etykieta
+// znów coś robi, ale inaczej niż przed pivotem: wielodniowa SERIA (nie dzisiejsza liczba)
+// osłabia effective HP bossa tego typu — "osłabiona obrona", stabilna, nie znika po jednym
+// potknięciu. computeDamage/atkPower/simulateFight w tym pliku nadal o tym nic nie wiedzą —
+// osłabianie dzieje się PRZED wywołaniem (weakenBoss() na sklonowanym Boss/raidMaxHp), więc
+// silnik walki zostaje czystą funkcją bez nowej zależności.
 export type WeaknessKey = 'steps' | 'sweetless' | 'habits' | 'mood' | 'sleep' | 'water';
 
 export interface BossLoot {
@@ -36,7 +47,7 @@ export interface Boss {
   order: number;
   unlockLevel: number;
   hp: number;
-  weakness: WeaknessKey;        // flavor/theme only (patrz komentarz typu wyżej)
+  weakness: WeaknessKey;        // temat + (od 2026-08-13) kategoria realnej serii, patrz bossWeakness.ts
   weaknessLabel: string;
   loot: BossLoot;
   coins: number;
@@ -216,6 +227,18 @@ export function bossBonuses(ownedItems: string[]): Bonuses {
 
 export function atkMultiplier(level: number, bonuses: Bonuses): number {
   return 1 + level * 0.03 + bonuses.atk;
+}
+
+// Ile itemów bojowych naraz w ekwipunku (v4 — patrz memory boss_design.md). Bazowo 3
+// (mieści headshot+jedną obronę+jedną ofensywę). Od 2026-08-13 (user: "co jakiś lvl kotek
+// upgraduje ilość slotów itemów") rośnie z poziomem — +1 co 6 poziomów, cap 6 przy Lv18
+// (pokrywa się z growthStage 'adult' od Lv12 w petStore.ts, więc dorosły kotek jest już
+// w połowie drogi do maksa). Żyje tu (nie w petStore.ts) — czysta funkcja poziom→liczba,
+// ten sam wzorzec co atkMultiplier/dailyAttempts wyżej/niżej, łatwa do testowania bez
+// odpalania całego Zustand store.
+export const COMBAT_ITEM_SLOTS = 3;
+export function combatItemSlotsFor(level: number): number {
+  return Math.min(6, COMBAT_ITEM_SLOTS + Math.floor(Math.max(1, level) / 6));
 }
 
 // Bazowa moc ataku, ZANIM doliczysz poziom/staty/łup — jedna stała, żeby balans żył

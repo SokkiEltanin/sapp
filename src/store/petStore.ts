@@ -4,10 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weekKeyOf } from '@/utils/quests';
 import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
+import { COMBAT_ITEM_SLOTS, combatItemSlotsFor } from '@/utils/bosses';
 
-// Ile itemów bojowych naraz w ekwipunku (v4 — patrz memory boss_design.md). TODO-balance,
-// user nie podał liczby — 3 to rozsądny start (mieści headshot+jedną obronę+jedną ofensywę).
-export const COMBAT_ITEM_SLOTS = 3;
+export { COMBAT_ITEM_SLOTS, combatItemSlotsFor };
 
 // Bazowe max HP kotka w walkach (v4 redesign, patrz memory boss_design.md) — przed
 // trwałymi ulepszeniami za monety (`catMaxHpBonus`). Osobna stała, nie magic number
@@ -554,7 +553,7 @@ export const usePetStore = create<PetState>()(
         const s = get();
         if (!s.ownedCombatItems[id]) return false;
         if (s.equippedCombatItems.includes(id)) return true;
-        if (s.equippedCombatItems.length >= COMBAT_ITEM_SLOTS) return false;
+        if (s.equippedCombatItems.length >= combatItemSlotsFor(levelFromXp(s.xp).level)) return false;
         set({ equippedCombatItems: [...s.equippedCombatItems, id] });
         return true;
       },

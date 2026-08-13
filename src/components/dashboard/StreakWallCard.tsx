@@ -159,7 +159,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   },
   tileZero: { backgroundColor: '#23273A', borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.border.subtle },
   tileFlame: { position: 'absolute', right: -18, bottom: -16 },
-  tileNum: { fontFamily: fonts.display, fontSize: 34, fontWeight: '900', letterSpacing: -0.5, lineHeight: 36 },
+  // BEZ fontWeight — ArchivoBlack to already-heavy font (jedyny plik/waga zarejestrowana
+  // w useFonts), a fontWeight obok custom fontFamily na Androidzie potrafi po cichu cofnąć
+  // się do systemowego (cienkiego) fontu, bo RN szuka pliku "ArchivoBlack-Bold" którego nie
+  // ma. Ten sam wzorzec co WSZĘDZIE indziej z fonts.display (TopPill/StreakCard/
+  // PersonalRecordsCard/DailyRings) — tileNum był jedynym miejscem z dodanym fontWeight,
+  // user (2026-08-13): "Twoje serie używają cienkiej czcionki dla LICZBY".
+  tileNum: { fontFamily: fonts.display, fontSize: 34, letterSpacing: -0.5, lineHeight: 36 },
   tileLabel: { fontFamily: fonts.label, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', marginTop: 2 },
 }));
 

@@ -17,9 +17,13 @@ import { COMBAT_ITEMS } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf } from '@/utils/quests';
+import { computeWeaknessStreaks, weaknessHpFactor, weakenBoss } from '@/utils/bossWeakness';
+import { getHealthHistory } from '@/utils/healthHistory';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
+import { useMoodStore } from '@/store/moodStore';
+import { useHabits } from '@/hooks/useHabits';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -67,6 +71,24 @@ export default function BossFight() {
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
+  const { entries: moodEntries } = useMoodStore();
+  const { habits, getStreak: getHabitStreak } = useHabits();
+
+  // Sen (nights ≥7h) do liczenia serii "sleep" — jedyny kawałek `weaknessStreaks` który nie
+  // ma już gotowego źródła na tym ekranie (habits/water/steps idą przez useHabits, sweetless
+  // przez expenses, mood przez moodStore). Lekki fetch, tylko sleepMinutes, raz przy wejściu
+  // na ekran — walka jest sesją, nie czymś co stoi otwarte cały dzień jak dashboard, więc bez
+  // AppState-resume patrzy [[focus_vs_appstate_refresh]] tu nie trzeba.
+  const [sleepHealthDays, setSleepHealthDays] = useState<Record<string, { sleepMinutes?: number }>>({});
+  useEffect(() => { getHealthHistory(60).then(setSleepHealthDays).catch(() => {}); }, []);
+
+  // Osłabiona obrona bossa wg realnej serii samoopieki (2026-08-13, patrz bossWeakness.ts) —
+  // user: "dodajmy bossom że jak mam streak... to on ma osłabioną obronę, im większy tym
+  // mniej obrony i innych też niezależnie na co są słabi".
+  const weaknessStreaks = useMemo(
+    () => computeWeaknessStreaks({ habits, getHabitStreak, expenses, moodEntries, healthDays: sleepHealthDays }),
+    [habits, getHabitStreak, expenses, moodEntries, sleepHealthDays],
+  );
 
   const [victory, setVictory] = useState<VictoryInfo | null>(null);
   // `fainted` odróżnia PRAWDZIWĄ porażkę (HP kotka spadło do 0) od skrajnie rzadkiego
@@ -86,12 +108,13 @@ export default function BossFight() {
   const catMax = catMaxHp(catMaxHpBonus);
 
   // ── kampania: sekwencyjna, zawsze pierwszy niepokonany ──
-  const campaignBoss = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
+  const campaignBossRaw = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
+  const campaignBoss = campaignBossRaw ? weakenBoss(campaignBossRaw, weaknessStreaks[campaignBossRaw.weakness]) : null;
 
   // ── raid: zawsze istnieje (deterministyczny wybór z tygodnia) ──
   const weekKey = weekKeyOf();
   const raid = raidForWeek(weekKey);
-  const raidMaxHp = raidHpFor(level, weekKey);
+  const raidMaxHp = Math.round(raidHpFor(level, weekKey) * weaknessHpFactor(weaknessStreaks[raid.weakness]));
   const raidRemaining = raidWeek === weekKey ? raidHp : raidMaxHp;
   const raidDone = raidWon.includes(weekKey);
   useEffect(() => { if (kind === 'raid') raidEnsure(weekKey, raidMaxHp); }, [kind, weekKey, raidMaxHp]);
@@ -105,10 +128,12 @@ export default function BossFight() {
   const menaceCtx = { workHoursThisMonth: workVsAvg.thisMonth, workHoursAvg: workVsAvg.avg, sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg };
   const eventBoss = currentEventBoss(now, menaceCtx);
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
-  const eventMaxHp = eventHpFor(level);
+  const eventMaxHp = eventBoss ? Math.round(eventHpFor(level) * weaknessHpFactor(weaknessStreaks[eventBoss.weakness])) : eventHpFor(level);
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
 
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
+  // maxHp już uwzględnia osłabienie z realnej serii (patrz weaknessStreaks/weakenBoss wyżej) —
+  // ekran zawsze pokazuje FAKTYCZNY pasek HP, nie "surowy" numer z bosses.ts/raid.ts.
   type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean };
   let target: Target | null = null;
   if (kind === 'campaign' && campaignBoss) {
@@ -118,6 +143,9 @@ export default function BossFight() {
   } else if (kind === 'event' && eventBoss && eventKey) {
     target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: eventMaxHp, energy: eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone };
   }
+  // Streak realny za kategorię AKTUALNEGO celu — do UI-notki "osłabiona obrona" niżej.
+  const targetWeaknessStreak = target ? weaknessStreaks[target.weakness as keyof typeof weaknessStreaks] : 0;
+  const targetWeakenFactor = weaknessHpFactor(targetWeaknessStreak);
   // Kampania i wydarzenie resetują HP do pełna co próbę (liveBossHp podczas walki, inaczej
   // pełne maxHp) — tylko raid ma trwały bank (raidRemaining).
   const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : raidRemaining) : (liveBossHp ?? target.maxHp)) : 0;
@@ -211,7 +239,7 @@ export default function BossFight() {
     if (!target || !target.unlocked || fighting) return;
     const roundBoss: Boss | null =
       kind === 'campaign' ? campaignBoss :
-      kind === 'event' && eventBoss ? eventAsBoss(eventBoss, level) :
+      kind === 'event' && eventBoss ? weakenBoss(eventAsBoss(eventBoss, level), weaknessStreaks[eventBoss.weakness]) :
       null;
     if (!roundBoss) return;
     const pool = kind === 'campaign' ? energy : eventEnergy;
@@ -477,6 +505,17 @@ export default function BossFight() {
                 user (2026-08-10): "zbyt dużo opisu bossa". Reaktywne linijki niżej (co się
                 WŁAŚNIE stało w walce) zostają — to nie spoiler, to informacja zwrotna. */}
             <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
+            {/* Osłabiona obrona z realnej serii (2026-08-13, patrz bossWeakness.ts) — im dłuższa
+                seria w kategorii słabości TEGO bossa, tym niższe jego effective HP (już wliczone
+                w target.maxHp/pasek wyżej — ta linijka tylko TŁUMACZY skąd wzięła się różnica). */}
+            {targetWeakenFactor < 1 && (
+              <View style={s.mechRow}>
+                <Zap size={13} color={WEAK_COLOR[target.weakness] ?? '#4ADE80'} />
+                <Text style={[s.mechNoteHeal, { color: WEAK_COLOR[target.weakness] ?? '#4ADE80' }]}>
+                  Osłabiony: {targetWeaknessStreak} dni serii → -{Math.round((1 - targetWeakenFactor) * 100)}% HP bossa
+                </Text>
+              </View>
+            )}
             {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
             {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
             {!!catHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></View>}
