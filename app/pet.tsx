@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
@@ -126,6 +126,18 @@ export default function Pet() {
       .catch(() => {});
   }, [readHealth]);
   useFocusEffect(reload);
+  // useFocusEffect ŁAPIE TYLKO nawigację (wejście na ten ekran) — NIE łapie powrotu z tła,
+  // gdy Pupil był JUŻ aktywnym ekranem kiedy telefon zasnął (react-navigation "focus" to co
+  // innego niż app foreground/background). User zgłosił (2026-08-12): otworzył telefon o 6:00
+  // z Pupilem już otwartym od wczoraj, i odebrał nagrodę za nawyki wczorajsze — `todayISO()`
+  // w reload() liczy się na bieżąco (poprawnie), ale samo reload() nigdy się nie odpaliło po
+  // przebudzeniu, więc questCtx (habitsDone itp.) dalej trzymał wczorajsze dane mimo poprawnej
+  // daty. Ten sam wzorzec AppState co index.tsx (dashboard) już ma — tam też screeny stoją
+  // zamontowane i to jest udokumentowany, rozwiązany problem.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
+    return () => sub.remove();
+  }, [reload]);
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
   // Personalizacja (Ustawienia) → cele questów treningowych. Brak trainingLevel = questy
