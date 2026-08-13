@@ -4,6 +4,10 @@
 mapa: gdzie co żyje, jak się łączy, i „jak dodać X" wg wzorca (żeby nie zostawić
 dead-endów). Gdy dodajesz sekcję/metrykę/store/subsystem — **zaktualizuj ARCHITECTURE.md**.
 
+**[`NEXT_STEPS.md`](./NEXT_STEPS.md) = aktualna lista "co dalej"** (do przetestowania na
+urządzeniu, znane niezałatane gap'y, odłożone rzeczy). Zaktualizuj ją po skończeniu/odkryciu
+czegoś nowego — to jedyne miejsce w repo śledzące otwarte zadania między sesjami.
+
 ## Zasady, których nie łamać (najczęstsze powody psucia buildów)
 
 1. **Style tylko przez `themedStyles((c)=>StyleSheet.create(...))`** — nigdy per-komponent
