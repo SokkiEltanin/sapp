@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  Modal, Pressable, KeyboardAvoidingView, Platform,
+  Modal, Pressable, KeyboardAvoidingView, Platform, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -69,6 +69,12 @@ export default function ProductsScreen() {
     loadWeightMemory().then(setWeightMem).catch(() => {});
   }, []);
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
+    return () => sub.remove();
+  }, [reload]);
 
   // Distinct food products actually bought, canonicalised, most-bought first.
   const products = useMemo(() => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Vibration, ScrollView, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, Vibration, ScrollView, TextInput, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -124,6 +124,12 @@ export default function PomodoroScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { loadTodaySessions(); }, [loadTodaySessions]));
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') loadTodaySessions(); });
+    return () => sub.remove();
+  }, [loadTodaySessions]);
 
   const prevTaskId = useRef(taskId);
   useEffect(() => {

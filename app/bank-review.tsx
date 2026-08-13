@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -34,6 +34,12 @@ export default function BankReview() {
   const [plnDrafts, setPlnDrafts] = useState<Record<string, string>>({});   // pending.id -> typed PLN string
   const reloadMem = useCallback(() => { loadMerchantMemory().then(setMem).catch(() => {}); }, []);
   useFocusEffect(reloadMem);
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reloadMem(); });
+    return () => sub.remove();
+  }, [reloadMem]);
 
   const accept = async (p: PendingBankTx) => {
     const foreign = !!p.currency && p.currency !== 'PLN';

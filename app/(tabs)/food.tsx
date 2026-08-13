@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, KeyboardAvoidingView, Platform, Alert, AppState } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
@@ -144,6 +144,12 @@ export default function Food() {
     // Zdrowie; throttled inside autoSyncHealth. Reload the cache if it wrote anything.
     import('@/services/healthAutoSync').then(({ autoSyncHealth }) => autoSyncHealth(30)).then(n => { if (n > 0) loadBody(); }).catch(() => {});
   }, [loadBody]));
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') loadBody(); });
+    return () => sub.remove();
+  }, [loadBody]);
 
   // Spalanie. PRIORYTET: całkowity wydatek z zegarka (pełny dzień, np. 2061) — bo Samsung
   // często NIE eksportuje aktywnych kalorii, ale eksportuje TotalCaloriesBurned. Inaczej

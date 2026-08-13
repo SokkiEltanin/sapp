@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl, Alert, AppState } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, X, Award } from 'lucide-react-native';
@@ -185,7 +185,7 @@ export default function HealthScreen() {
 
   // Auto-pull from the watch on focus — silent (no permission prompt; that's the
   // Synchronizuj button's job). Does nothing gracefully when HC is unavailable.
-  useFocusEffect(useCallback(() => {
+  const focusRefreshHealth = useCallback(() => {
     let active = true;
     (async () => {
       // Weight is now edited in the Jedzenie tab too — re-read the stored value on
@@ -259,7 +259,14 @@ export default function HealthScreen() {
       } catch {}
     })();
     return () => { active = false; };
-  }, [applyHealthRange]));
+  }, [applyHealthRange]);
+  useFocusEffect(focusRefreshHealth);
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') focusRefreshHealth(); });
+    return () => sub.remove();
+  }, [focusRefreshHealth]);
 
   const maxBar = Math.max(...weekSteps, 1);
   const stepPct = Math.min(1, steps / stepGoal);

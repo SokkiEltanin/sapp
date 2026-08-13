@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, RefreshControl, SectionList,
-  ScrollView, TouchableOpacity, Modal, TextInput, Pressable,
+  ScrollView, TouchableOpacity, Modal, TextInput, Pressable, AppState,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -115,6 +115,12 @@ export default function FinancesScreen() {
   useFocusEffect(useCallback(() => {
     getBalanceOffset().then(setBalanceOffset).catch(() => {});
   }, []));
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') getBalanceOffset().then(setBalanceOffset).catch(() => {}); });
+    return () => sub.remove();
+  }, []);
 
   const availableTags = useMemo(() => {
     const freq: Record<string, number> = {};

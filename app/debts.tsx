@@ -1,7 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  Modal, Pressable, KeyboardAvoidingView, Platform, Alert,
+  Modal, Pressable, KeyboardAvoidingView, Platform, Alert, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -38,6 +38,12 @@ export default function DebtsScreen() {
 
   const reload = useCallback(() => { debtsService.getAll().then(setDebts).catch(() => {}); }, []);
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
+    return () => sub.remove();
+  }, [reload]);
 
   const open = useMemo(() => debts.filter(d => !d.settled), [debts]);
   const settled = useMemo(() => debts.filter(d => d.settled), [debts]);

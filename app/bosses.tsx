@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useCallback, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-native';
@@ -61,6 +61,13 @@ export default function Bosses() {
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
   }, [bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
   useFocusEffect(reload);
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md). Tu
+  // szczególnie ważne: energia/raid-bank potrafiły zostać nieodświeżone po nocy.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
+    return () => sub.remove();
+  }, [reload]);
 
   // sequential campaign: current = pierwszy niepokonany. HP resetuje się co próbę
   // (karczma S&F) — pasek nie ma sensu tutaj, tylko na ekranie walki.

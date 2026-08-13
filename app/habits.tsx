@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
-  TouchableOpacity, Alert, Modal, Pressable,
+  TouchableOpacity, Alert, Modal, Pressable, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -687,6 +687,12 @@ export default function HabitsScreen() {
   const { habits, todayDone, isLoading, toggle, increment, decrement, add, remove, update, getStreak, getLast7, getLast30, getTodayCount, reload } = useHabits();
   // Refresh on focus so HC-fed water (and edits made elsewhere) show up live.
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
+    return () => sub.remove();
+  }, [reload]);
   const [showAdd, setShowAdd]      = useState(false);
   const [showMonth, setShowMonth]  = useState(false);
   const [editingHabit, setEditing] = useState<Habit | null>(null);

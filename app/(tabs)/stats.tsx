@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl, Pressable,
-  PanResponder, Modal, TouchableOpacity,
+  PanResponder, Modal, TouchableOpacity, AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -328,25 +328,30 @@ export default function CalendarTabScreen() {
   // Screens stay mounted (lazy:false), so a one-shot mount load goes stale once
   // you add an event/task elsewhere and come back. Re-fetch silently on focus
   // (no spinner — data is already on screen) so the calendar is always current.
-  useFocusEffect(
-    useCallback(() => {
-      let alive = true;
-      (async () => {
-        try {
-          const [evs, tks] = await Promise.all([calendarService.getAllEvents(), tasksService.getAllTasks()]);
-          if (alive) { setEvents(evs); setTasks(tks); }
-        } catch {}
-        // Service-due markers (vehicles / maintenance items) — non-blocking.
-        Promise.all([vehiclesService.getAll(), maintenanceService.getAll()])
-          .then(([vs, its]) => { if (alive) { setVehicles(vs); setMaintItems(its); } })
-          .catch(() => {});
-      })();
-      // Re-pull Google Calendar on EVERY entry to the tab (not just first mount) — the
-      // screen stays mounted, so a failed/empty first sync used to never retry.
-      checkGcal();
-      return () => { alive = false; };
-    }, [setEvents, setTasks]),
-  );
+  const focusReloadCalendar = useCallback(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [evs, tks] = await Promise.all([calendarService.getAllEvents(), tasksService.getAllTasks()]);
+        if (alive) { setEvents(evs); setTasks(tks); }
+      } catch {}
+      // Service-due markers (vehicles / maintenance items) — non-blocking.
+      Promise.all([vehiclesService.getAll(), maintenanceService.getAll()])
+        .then(([vs, its]) => { if (alive) { setVehicles(vs); setMaintItems(its); } })
+        .catch(() => {});
+    })();
+    // Re-pull Google Calendar on EVERY entry to the tab (not just first mount) — the
+    // screen stays mounted, so a failed/empty first sync used to never retry.
+    checkGcal();
+    return () => { alive = false; };
+  }, [setEvents, setTasks]);
+  useFocusEffect(focusReloadCalendar);
+  // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
+  // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') focusReloadCalendar(); });
+    return () => sub.remove();
+  }, [focusReloadCalendar]);
 
   const checkGcal = async () => {
     const token = await googleCalendarService.getStoredToken();
