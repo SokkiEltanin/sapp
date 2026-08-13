@@ -24,9 +24,10 @@ jeszcze widziana na realnym telefonie:
   celu (`useNativeDriver` bug), łapka była żółta zamiast czytelna.
 - **Kafelki "Twoje serie"** — Duolingo-style redesign (`3bc70a6`), potem skurczone
   (`4faa498`) bo były za długie.
-- **Odświeżanie `pet.tsx` po wznowieniu z tła** (commit `eb591aa`) — `useFocusEffect` nie
-  łapało powrotu z tła, przez co apka dawała nagrody za wczorajsze nawyki. Zobacz sekcję
-  niżej — ten sam gap jest jeszcze w 11 innych ekranach.
+- **Odświeżanie po wznowieniu z tła — WSZYSTKIE 12 ekranów** (commit `eb591aa` dla pet.tsx,
+  `59b5e7d` dla reszty) — `useFocusEffect` nie łapało powrotu z tła, przez co apka dawała np.
+  nagrody za wczorajsze nawyki. `mood.tsx` świadomie pominięty (nie ma tam czego odświeżać,
+  dane idą live z Zustand). Sekcja "znany bug" niżej — USUNIĘTA, bo załatane.
 
 **Priorytet testowania:** zagraj walkę kampanii/raid/event, sprawdź czy sloty/osłabianie
 bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość liczby, rozmiar).
@@ -38,23 +39,6 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   kodzie, jest CZYSTY, więc dalsze zgadywanie w kodzie nic nie da. Odpal przycisk i wyślij co
   pokazuje (permission / liczba sesji / jakie stage'y) — to determinuje czy da się w ogóle
   zbudować wykres faz z tego zegarka/eksportu Samsung Health.
-
-## 🟠 Znany, nie-załatany bug (ten sam wzorzec w 11 miejscach)
-
-`useFocusEffect` (expo-router) łapie tylko nawigację, NIE łapie wznowienia apki z tła. Ekrany
-w tej apce zostają zamontowane (nie odmontowują się przy zmianie zakładki), więc jeśli dany
-ekran BYŁ już aktywną zakładką gdy telefon zasnął, po wznowieniu nie odświeża się sam.
-Naprawione TYLKO w `app/pet.tsx` (dodany `AppState` listener obok `useFocusEffect`, ten sam
-wzorzec co już wcześniej działał w `app/(tabs)/index.tsx`). Te ekrany mają wciąż tę lukę:
-
-`app/habits.tsx`, `app/bosses.tsx`, `app/(tabs)/food.tsx`, `app/(tabs)/health.tsx`,
-`app/(tabs)/finances.tsx`, `app/(tabs)/mood.tsx`, `app/(tabs)/stats.tsx`, `app/debts.tsx`,
-`app/products.tsx`, `app/pomodoro.tsx`, `app/bank-review.tsx`, `app/counters/[id].tsx`
-
-Fix jest zawsze ten sam (kopiuj z `pet.tsx`): dodać obok istniejącego `useFocusEffect(reload)`
-osobny `useEffect` z `AppState.addEventListener('change', s => { if (s === 'active') reload(); })`.
-`habits.tsx`/`bosses.tsx` najbardziej warte naprawy jako pierwsze (realne skutki złych danych),
-reszta to "trochę nieświeże liczby, aż wejdziesz w interakcję" — mniejsza stawka.
 
 ## 🟢 Mniejsze, odłożone rzeczy
 
