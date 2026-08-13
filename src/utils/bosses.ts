@@ -262,12 +262,24 @@ export function dailyAttempts(energyMult: number): number {
 export const EVENT_DAILY_ATTEMPTS = 1;
 
 // ── Kontratak bossa (v4 redesign, fundament — patrz memory boss_design.md) ────────
-// Skaluje z HP bossa (większy boss = mocniejszy kontratak), nie z poziomem gracza —
-// tak jak walka z bossem samym w sobie już skaluje trudność. `dodge` z Bonuses redukuje
-// obrażenia (0 = pełny cios, 0.9 = maks. redukcja — ten sam cap co przy regen bossa).
-const COUNTER_PCT = 0.04; // ułamek max HP bossa zadawany kotkowi na kontratak
-export function counterDamage(boss: Boss, dodge: number): number {
-  const base = boss.hp * COUNTER_PCT;
+// Skaluje z HP bossa, nie z poziomem gracza — tak jak walka z bossem samym w sobie już
+// skaluje trudność. `dodge` z Bonuses redukuje obrażenia (0 = pełny cios, 0.9 = maks.
+// redukcja — ten sam cap co przy regen bossa).
+//
+// FIX (2026-08-13, patrz memory boss_design.md „balance review"): pierwotnie liczyło się
+// od STAŁEGO `boss.hp` (max), więc KAŻDY kontratak w całej walce był tej samej wielkości —
+// bez znaczenia ile bossowi już zostało. Połączone z tym, że „ciosów potrzeba" TEŻ rośnie z
+// boss.hp, całkowite obrażenia na kotka w jednej walce rosły z KWADRATEM HP bossa. Przy
+// rozstępie HP bossów kampanii 300→368000 (×1200) to była gwarantowana śmierć od jednego
+// kontrataku już od ok. połowy roster'a, niezależnie od inwestycji. Teraz bierze AKTUALNE,
+// nie maksymalne HP — słabnie w miarę jak bossa zbijasz, więc nie eksploduje kwadratowo.
+// Nie jest to jeszcze pełne rozwiązanie „endgame jest zbyt trudny" (to osobna decyzja o
+// krzywej HP bossów / mocy ataku — patrz memory), ale usuwa patologiczne, niewygrywalne
+// przypadki i sprawia że kontratak faktycznie reaguje na przebieg walki, nie tylko na to
+// KTÓRY to boss.
+const COUNTER_PCT = 0.04; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kontratak
+export function counterDamage(currentBossHp: number, dodge: number): number {
+  const base = Math.max(0, currentBossHp) * COUNTER_PCT;
   return Math.round(base * (1 - Math.min(0.9, Math.max(0, dodge))));
 }
 
@@ -367,7 +379,7 @@ export function simulateFight(
         // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
         const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
         if (!controlled) {
-          counterDmg = counterDamage(boss, bonuses.dodge);
+          counterDmg = counterDamage(bossHp, bonuses.dodge);
           // 'dodge' — całkowity unik kontrataku
           if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
           // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka

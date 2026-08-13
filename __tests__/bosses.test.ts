@@ -61,15 +61,19 @@ describe('bosses — bossTier (derywowana z unlockLevel)', () => {
   });
 });
 
-describe('bosses — counterDamage', () => {
-  test('skaluje z HP bossa, bez uniku', () => {
-    expect(counterDamage(boss({ hp: 300 }), 0)).toBe(12);   // 300 * 0.04
-    expect(counterDamage(boss({ hp: 1000 }), 0)).toBe(40);  // 1000 * 0.04
+describe('bosses — counterDamage (2026-08-13: liczy od AKTUALNEGO, nie max HP bossa)', () => {
+  test('skaluje z aktualnym HP bossa, bez uniku', () => {
+    expect(counterDamage(300, 0)).toBe(12);   // 300 * 0.04
+    expect(counterDamage(1000, 0)).toBe(40);  // 1000 * 0.04
   });
   test('unik redukuje obrażenia, cap 90%', () => {
-    expect(counterDamage(boss({ hp: 1000 }), 0.5)).toBe(20);   // połowa
-    expect(counterDamage(boss({ hp: 1000 }), 0.9)).toBe(4);    // 10% zostaje
-    expect(counterDamage(boss({ hp: 1000 }), 1.5)).toBe(4);    // cap na 0.9, nie ujemne
+    expect(counterDamage(1000, 0.5)).toBe(20);   // połowa
+    expect(counterDamage(1000, 0.9)).toBe(4);    // 10% zostaje
+    expect(counterDamage(1000, 1.5)).toBe(4);    // cap na 0.9, nie ujemne
+  });
+  test('słabnie w miarę jak boss traci HP — nie stały numer całej walki', () => {
+    expect(counterDamage(1000, 0)).toBeGreaterThan(counterDamage(200, 0));
+    expect(counterDamage(0, 0)).toBe(0); // wybity boss nie kontratakuje
   });
 });
 
@@ -116,6 +120,16 @@ describe('bosses — simulateFight (silnik rund)', () => {
     const r = simulateFight(0, sloth.unlockLevel, bonuses, sloth, 100); // domyślny roundCount = MAX_FIGHT_ROUNDS
     expect(r.rounds.length).toBeGreaterThan(3); // nie ucięte po 3 wymianach
     expect(r.won || r.catFainted).toBe(true);   // realny wynik: ktoś padł, nie "czas się skończył"
+  });
+
+  test('kontratak SŁABNIE w miarę wielorundowej walki — regresja na "kwadratowy" balance bug (2026-08-13: liczony był ze STAŁEGO max HP bossa, więc każdy kontratak całej walki był tej samej, ogromnej wielkości niezależnie od tego ile bossowi zostało)', () => {
+    const b = boss({ hp: 5000 });
+    // słaby gracz → wiele rund, dużo kontrataków do porównania; ogromne HP kotka żeby
+    // walka dobiegła końca (nie interesuje nas tu wynik, tylko TREND kontrataku w rundach)
+    const r = simulateFight(0, 1, noCrit, b, 1_000_000, 200);
+    const hits = r.rounds.filter(x => x.counterDmg > 0);
+    expect(hits.length).toBeGreaterThan(5); // realnie wieloruudowa walka
+    expect(hits[0].counterDmg).toBeGreaterThan(hits[hits.length - 1].counterDmg);
   });
 
   test('OSŁONA: wrodzona cecha bossa → Twoje ciosy w całej walce o połowę słabsze', () => {

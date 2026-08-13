@@ -121,7 +121,7 @@ describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 202
   test('kontratak nie zabija kotka (base 100 HP) w 1 rundzie na żadnym z tych poziomów', () => {
     for (const level of [2, 25, 50, 100]) {
       const hp = eventHpFor(level);
-      const counter = counterDamage({ hp } as any, 0);
+      const counter = counterDamage(hp, 0); // round 1: aktualne HP = max HP
       expect(counter).toBeLessThan(100);
     }
   });
