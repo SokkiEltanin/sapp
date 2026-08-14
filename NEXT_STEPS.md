@@ -64,3 +64,6 @@ Zacznij od [`CLAUDE.md`](./CLAUDE.md) → [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 twarde zasady (style tylko przez `themedStyles`, permissions w app.json zastępują domyślne
 Expo, snapshot statystyk, itd.) i mapa "jak dodać X". Workflow commitów: `tsc --noEmit` →
 `npx jest --silent` → `git add <konkretne pliki>` (nigdy `-A`) → commit z heredoc → push.
+
+Test push z sesji zdalnej (claude.ai/code) przeszedł OK: 2026-08-14, branch
+`claude/workflow-push-verify-c2b0zs`, tsc + jest zielone.
