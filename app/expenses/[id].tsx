@@ -596,6 +596,13 @@ export default function ExpenseDetailScreen() {
                 <Calendar size={10} color={heroAccent + '90'} />
                 <Text style={[s.dateBadgeText, { color: heroAccent + '90' }]}>
                   {new Date(expense.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {/* Godzina zapisania transakcji (2026-08-14, user: chce widzieć o której
+                      dokładnie zarejestrowano przelew — ważne przy powtarzających się tego
+                      samego dnia wpłatach/wypłatach od tej samej osoby, żeby dało się je
+                      odróżnić na oko). expense.date niesie realną godzinę z powiadomienia
+                      bankowego (patrz bankNotification.ts) albo czas zapisu — zawsze coś
+                      sensownego, nie tylko dla przelewów. */}
+                  {', ' + new Date(expense.date).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </View>
             </View>

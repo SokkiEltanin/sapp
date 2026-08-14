@@ -65,6 +65,27 @@ export async function commitBankTx(
 
   // ── Incoming transfer → income ──────────────────────────────────────────────
   if (p.direction === 'in') {
+    // Re-drain guard (2026-08-14, user zgłosił zdublowany przelew od dziewczyny) — ten
+    // sam problem co przy expense'ach niżej (patrz komentarz tam): findMatchingIncome()
+    // ŚWIADOMIE pomija już bankMatched wpisy (żeby złapać RĘCZNIE wpisany przychód i
+    // dopiero go oznaczyć), więc samo w sobie NIE łapie powtórnie dostarczonego /
+    // dwa razy odebranego powiadomienia o TYM SAMYM przelewie — druga dostawa po
+    // prostu nie widziała pierwszej (już bankMatched) i dodawała nowy wpis. Osobny
+    // pass po WSZYSTKICH income (też bankMatched) po kwocie+dniu, identycznie jak
+    // "already" niżej dla wydatków.
+    const pTimeIn = new Date(p.dateISO).getTime();
+    const alreadyIncome = st.expenses.find(e =>
+      e.type === 'income' &&
+      Math.abs(e.amount - p.amount) <= 0.011 &&
+      !!e.date && sameLocalDay(new Date(e.date).getTime(), pTimeIn),
+    );
+    if (alreadyIncome) {
+      if (!alreadyIncome.bankMatched) {
+        st.updateExpense(alreadyIncome.id, { bankMatched: true });
+        expensesService.update(alreadyIncome.id, { bankMatched: true }).catch(() => {});
+      }
+      return { ok: true, matched: true };
+    }
     const dup = findMatchingIncome(p, st.expenses);
     try {
       if (dup) {
