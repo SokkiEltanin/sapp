@@ -190,7 +190,11 @@ export default function BossFight() {
         Animated.timing(bFlash, { toValue: 1, duration: 60, useNativeDriver: true }),
         Animated.timing(bFlash, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]),
-      Animated.timing(bDmgY, { toValue: 1, duration: 800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      // Skrócone z 800→600ms (2026-08-14, patrz komentarz przy shake wyżej) — przy 480ms
+      // odstępie do następnej rundy liczba dawniej jeszcze dogasała, gdy leciał już kolejny
+      // cios; teraz gaśnie z zapasem PRZED kolejnym uderzeniem, mniej nachodzących na siebie
+      // animacji na raz.
+      Animated.timing(bDmgY, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ]).start();
   };
 
@@ -212,7 +216,7 @@ export default function BossFight() {
         Animated.timing(kFlash, { toValue: 1, duration: 60, useNativeDriver: true }),
         Animated.timing(kFlash, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]),
-      Animated.timing(kDmgY, { toValue: 1, duration: 800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(kDmgY, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }),   // skrócone, patrz komentarz przy bDmgY
     ]).start();
   };
 
@@ -389,7 +393,6 @@ export default function BossFight() {
   const attack = kind === 'raid' ? attackSimple : attackRoundBased;
 
   const bShakeX = bShake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] });
-  const bPopScale = bPop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
   const bFlashOp = bFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.8] });
   const bFloatY = bDmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -46] });
   const bFloatOp = bDmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
@@ -459,7 +462,13 @@ export default function BossFight() {
                 <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(targetRemaining / target.maxHp * 100)}%` }]} /></View>
                 <Text style={s.tileHpTxt}>{targetRemaining} / {target.maxHp}</Text>
                 <View style={s.tilePortrait}>
-                  <Animated.View style={{ transform: [{ translateX: bShakeX }, { scale: bPopScale }] }}>
+                  {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
+                      chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
+                      się pokazuje, nic więcej). Shake+scale-pulse NARAZ na tym samym sprite
+                      czytało się jako rozchwiane "wobble", nie czysty cios — scale-pop zostaje
+                      TYLKO na osobnym attackFx burst-image niżej (to naturalnie coś co "wybucha"
+                      i rośnie, nie postać która się trzęsie). */}
+                  <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
                     <BossArt id={target.id} emoji={target.emoji} size={104} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: bFlashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
