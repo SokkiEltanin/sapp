@@ -8,15 +8,16 @@ import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
-import { usePetStore, levelFromXp, catMaxHp } from '@/store/petStore';
+import { usePetStore, levelFromXp, catMaxHp, todayISO } from '@/store/petStore';
 import { BOSSES, Boss, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss } from '@/utils/seasonalEvents';
+import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { bossAttackFx } from '@/utils/bossAttackFx';
 import { COMBAT_ITEMS } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
-import { weekKeyOf } from '@/utils/quests';
+import { weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
 import { computeWeaknessStreaks, weaknessHpFactor, weakenBoss } from '@/utils/bossWeakness';
 import { getHealthHistory } from '@/utils/healthHistory';
 import { useExpensesStore } from '@/store/expensesStore';
@@ -34,7 +35,7 @@ const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
 
-type Kind = 'campaign' | 'raid' | 'event';
+type Kind = 'campaign' | 'raid' | 'event' | 'quest';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot };
 
 // Ekran WALKI (S&F-style, 2026-08-09/10 — patrz memory boss_design.md), wydzielony z listy
@@ -56,8 +57,10 @@ type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins:
 //   prosił, raid dalej nie da się "przegrać", kontratak jest czysto poglądowy. attackSimple()
 //   poniżej. Pierwsze podejście do wyważenia obrażeń, niesprawdzone na urządzeniu.
 export default function BossFight() {
-  const { kind: kindParam } = useLocalSearchParams<{ kind?: string }>();
-  const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : 'campaign';
+  const { kind: kindParam, questId, questCoins, questXp, questLabel } = useLocalSearchParams<{
+    kind?: string; questId?: string; questCoins?: string; questXp?: string; questLabel?: string;
+  }>();
+  const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : kindParam === 'quest' ? 'quest' : 'campaign';
 
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -67,6 +70,7 @@ export default function BossFight() {
     ownedCombatItems, equippedCombatItems,
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
+    dayClaims, claimQuestFight, markTrainingDay,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -131,6 +135,14 @@ export default function BossFight() {
   const eventMaxHp = eventBoss ? Math.round(eventHpFor(level) * weaknessHpFactor(weaknessStreaks[eventBoss.weakness])) : eventHpFor(level);
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
 
+  // ── quest-jako-walka (2026-08-14 v2) — zamiast zwykłego "Odbierz" na wykonanym queście,
+  // pełna walka z minibossem przypisanym do TEGO questu na TEN dzień (patrz minibosses.ts).
+  // Bez energii/limitu prób — quest już wykonany realnie, retry po przegranej jest darmowy.
+  const today = todayISO();
+  const questMb = kind === 'quest' && questId ? minibossForQuest(today, questId) : null;
+  const questBoss = questMb ? minibossAsBoss(questMb, level) : null;
+  const questAlreadyClaimed = kind === 'quest' && questId ? !!dayClaims[`${questId}:${today}`] : false;
+
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   // maxHp już uwzględnia osłabienie z realnej serii (patrz weaknessStreaks/weakenBoss wyżej) —
   // ekran zawsze pokazuje FAKTYCZNY pasek HP, nie "surowy" numer z bosses.ts/raid.ts.
@@ -142,17 +154,21 @@ export default function BossFight() {
     target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: raidEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone };
   } else if (kind === 'event' && eventBoss && eventKey) {
     target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: eventMaxHp, energy: eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone };
+  } else if (kind === 'quest' && questBoss) {
+    target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed };
   }
   // Streak realny za kategorię AKTUALNEGO celu — do UI-notki "osłabiona obrona" niżej.
-  const targetWeaknessStreak = target ? weaknessStreaks[target.weakness as keyof typeof weaknessStreaks] : 0;
+  // Quest-minibossy NIE mają mechaniki osłabiania (weakness na nich jest nieużywanym
+  // placeholderem, patrz minibosses.ts) — stąd 0 zamiast czytania prawdziwego streaku.
+  const targetWeaknessStreak = target && kind !== 'quest' ? weaknessStreaks[target.weakness as keyof typeof weaknessStreaks] : 0;
   const targetWeakenFactor = weaknessHpFactor(targetWeaknessStreak);
-  // Kampania i wydarzenie resetują HP do pełna co próbę (liveBossHp podczas walki, inaczej
-  // pełne maxHp) — tylko raid ma trwały bank (raidRemaining).
+  // Kampania, wydarzenie i quest resetują HP do pełna co próbę (liveBossHp podczas walki,
+  // inaczej pełne maxHp) — tylko raid ma trwały bank (raidRemaining).
   const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : raidRemaining) : (liveBossHp ?? target.maxHp)) : 0;
-  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : 'Walka';
-  // Do modala przegranej — tylko kampania i wydarzenie mogą w ogóle przegrać (raid nie ma
-  // kontrataku). Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
-  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : null;
+  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : 'Walka';
+  // Do modala przegranej — kampania/wydarzenie/quest mogą przegrać (raid nie ma kontrataku).
+  // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
+  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : null;
 
   useEffect(() => { resetCatHp(); }, [kind]);
 
@@ -244,13 +260,17 @@ export default function BossFight() {
     const roundBoss: Boss | null =
       kind === 'campaign' ? campaignBoss :
       kind === 'event' && eventBoss ? weakenBoss(eventAsBoss(eventBoss, level), weaknessStreaks[eventBoss.weakness]) :
+      kind === 'quest' ? questBoss :
       null;
     if (!roundBoss) return;
-    const pool = kind === 'campaign' ? energy : eventEnergy;
-    if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
+    // Quest: bez puli prób — quest już wykonany realnie, przegrana = darmowy retry.
+    if (kind !== 'quest') {
+      const pool = kind === 'campaign' ? energy : eventEnergy;
+      if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
+    }
     resetCatHp();
     const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
-    if (kind === 'campaign') spendEnergy(); else spendEventEnergy();
+    if (kind === 'campaign') spendEnergy(); else if (kind === 'event') spendEventEnergy();
     setFighting(true);
     setLiveBossHp(roundBoss.hp);
     setCatHit(null);
@@ -268,6 +288,13 @@ export default function BossFight() {
         } else if (kind === 'event' && eventBoss && eventKey) {
           eventClaim(eventKey, eventCoins(level), eventXp(level), eventBoss.name, level);
           setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: eventCoins(level), xp: eventXp(level) });
+        } else if (kind === 'quest' && questBoss && questId) {
+          const coinsWon = questFightCoins(Number(questCoins) || 0);
+          const xpWon = questFightXp(Number(questXp) || 0);
+          if (claimQuestFight(questId, coinsWon, xpWon, questBoss.name, level)) {
+            if (TRAINING_QUEST_IDS.includes(questId)) markTrainingDay();
+          }
+          setVictory({ kind: 'quest', id: questBoss.id, name: questBoss.name, emoji: questBoss.emoji, coins: coinsWon, xp: xpWon });
         }
       } else {
         haptic.error();
@@ -419,8 +446,13 @@ export default function BossFight() {
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
         <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color={c.text.primary} /></PressableScale>
-        <Text style={s.headerTitle}>{headerTitle}</Text>
-        <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{target?.energy ?? 0}</Text></View>
+        <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+        {/* Quest-walki nie mają puli prób (patrz komentarz przy questAlreadyClaimed) —
+            pigułka energii nie miałaby tu sensu, więc zajmuje miejsce pusty spacer
+            (żeby tytuł został wyśrodkowany tak jak w pozostałych trybach). */}
+        {kind === 'quest'
+          ? <View style={{ width: 40 }} />
+          : <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{target?.energy ?? 0}</Text></View>}
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -513,7 +545,11 @@ export default function BossFight() {
             {/* Tylko HP + motyw (słabość) — BEZ nagrody i mechanik (osłona/regen) przed walką,
                 user (2026-08-10): "zbyt dużo opisu bossa". Reaktywne linijki niżej (co się
                 WŁAŚNIE stało w walce) zostają — to nie spoiler, to informacja zwrotna. */}
-            <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
+            {/* Quest-minibossy nie mają "motywu"/słabości (placeholder w minibosses.ts) —
+                pokazywanie pustej etykiety byłoby myląco puste, więc linijka schowana. */}
+            {kind !== 'quest' && (
+              <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
+            )}
             {/* Osłabiona obrona z realnej serii (2026-08-13, patrz bossWeakness.ts) — im dłuższa
                 seria w kategorii słabości TEGO bossa, tym niższe jego effective HP (już wliczone
                 w target.maxHp/pasek wyżej — ta linijka tylko TŁUMACZY skąd wzięła się różnica). */}
@@ -539,7 +575,7 @@ export default function BossFight() {
             )}
 
             {target.done ? (
-              <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : 'wróć w kolejnym okresie'}</Text>
+              <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : 'wróć w kolejnym okresie'}</Text>
             ) : (
               <PressableScale onPress={attack} style={{ width: '100%' }}>
                 <View style={[s.attackBtn, (target.energy <= 0 || fighting) && { opacity: 0.5 }]}>
@@ -557,7 +593,7 @@ export default function BossFight() {
           <Confetti colors={['#FDE047', '#2AC68F', '#38BDF8', '#F472B6']} />
           {victory && (
             <View style={s.vCenter} pointerEvents="none">
-              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : 'WYGRANA!'}</Text>
+              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : 'WYGRANA!'}</Text>
               <View style={{ opacity: 0.6 }}>
                 <BossArt id={victory.id} emoji={victory.emoji} size={78} />
               </View>
@@ -570,7 +606,7 @@ export default function BossFight() {
                     <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
                   </>
                 ) : (
-                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : 'Medal wydarzenia'}</Text>
+                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : 'Medal wydarzenia'}</Text>
                 )}
               </View>
               <View style={s.vRewardRow}>

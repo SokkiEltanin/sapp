@@ -351,6 +351,14 @@ export default function ExpenseDetailScreen() {
     const p = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   });
+  // MUSI być zadeklarowany PRZED `if (!expense) return` niżej — 2026-08-14, user
+  // zgłosił "Rendered fewer hooks than expected" po usunięciu transakcji z tego
+  // ekranu. deleteExpense() aktualizuje useExpensesStore SYNCHRONICZNIE (zanim
+  // router.back() zdąży nawigować), więc TEN komponent od razu re-renderuje się z
+  // `expense === undefined` i trafia w guard niżej — który wcześniej stał PRZED tym
+  // hookiem. Render z `expense` a render bez `expense` wołały różną liczbę hooków =
+  // dokładnie ten błąd. Guard musi być OSTATNIĄ rzeczą przed hookami, nigdy pomiędzy.
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!expense) {
     return (
@@ -500,7 +508,6 @@ export default function ExpenseDetailScreen() {
     }
   };
 
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const handleDelete = () => { haptic.tap(); setConfirmDelete(true); };
   const doDelete = async () => {
     haptic.medium();
@@ -596,6 +603,13 @@ export default function ExpenseDetailScreen() {
                 <Calendar size={10} color={heroAccent + '90'} />
                 <Text style={[s.dateBadgeText, { color: heroAccent + '90' }]}>
                   {new Date(expense.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {/* Godzina zapisania transakcji (2026-08-14, user: chce widzieć o której
+                      dokładnie zarejestrowano przelew — ważne przy powtarzających się tego
+                      samego dnia wpłatach/wypłatach od tej samej osoby, żeby dało się je
+                      odróżnić na oko). expense.date niesie realną godzinę z powiadomienia
+                      bankowego (patrz bankNotification.ts) albo czas zapisu — zawsze coś
+                      sensownego, nie tylko dla przelewów. */}
+                  {', ' + new Date(expense.date).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}
                 </Text>
               </View>
             </View>

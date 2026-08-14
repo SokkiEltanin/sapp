@@ -37,6 +37,16 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   wiosna:        require('../../assets/ikonybosów/BOSS_WIOSENNYBOSS_nike.png'),
   jesien:        require('../../assets/ikonybosów/BOSS_JESIENNYBOSS_demeter.png'),
   zima:          require('../../assets/ikonybosów/BOSS_ZIOMOWYBOSS_hera.png'),
+  // ── minibossy questowe (minibosses.ts, 2026-08-14) — TA SAMA mapa/BossArt co reszta,
+  // id-e (mb_*) się nie kolidują z kampanią/wydarzeniami, więc bez osobnego komponentu ──
+  mb_capybara: require('../../assets/minibosses/MINIBOSS_capybara.png'),
+  mb_duck:     require('../../assets/minibosses/MINIBOSS_duck.png'),
+  mb_shark:    require('../../assets/minibosses/MINIBOSS_shark.png'),
+  mb_whale:    require('../../assets/minibosses/MINIBOSS_whale.png'),
+  mb_goat:     require('../../assets/minibosses/MINIBOSS_goat.png'),
+  mb_harpy:    require('../../assets/minibosses/MINIBOSS_harpy-eagle.png'),
+  mb_macaws:   require('../../assets/minibosses/MINIBOSS_macaws.png'),
+  mb_snake:    require('../../assets/minibosses/MINIBOSS_snake.png'),
 };
 
 export function bossPng(id: string): ImageSourcePropType | undefined {
