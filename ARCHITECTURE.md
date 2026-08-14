@@ -248,6 +248,28 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   animacja propów SVG stutteruje. RN nie ma transform-origin → piwot = translate→rotate→translate.
 - **AnimatedSplash** używa CatArt (nie PNG) — te same ID/rozmiar co natywny splash, start
   na pełnej widoczności (bez fade-in), żeby statyczny obrazek płynnie „ożył".
+- **Bossy — PIĘĆ trybów walki, wszystkie przez `simulateFight` w `utils/bosses.ts`
+  (round-based, prawdziwy kontratak, można przegrać):**
+  - **Kampania** (`BOSSES` w `bosses.ts`, sekwencyjna, 22 bossów) i **wydarzenia**
+    (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
+    (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
+    tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
+  - **Minibossy** (2026-08-14, `utils/minibosses.ts` + `minibossIcons.ts`) — CZWARTY tor,
+    ale OSOBNY ekran `app/minibosses.tsx` (nie `?kind=` w boss-fight.tsx, celowo bez
+    animacji pocisków — wynik walki liczy się od razu, UI pokazuje tylko rezultat).
+    Dwa niezależne codzienne tory: `water` (nawyk `kind==='water'` dobija do `dailyGoal`)
+    i `steps` (kroki dziś ≥ `STEPS_MILESTONE`=10k, źródło: `getHealthHistory`). Balans
+    CELOWO dużo niżej niż wydarzenia (`minibossHpFor`/`Coins`/`Xp`) — to DODATKOWA warstwa
+    nad istniejącymi questami pupila (`quests.ts` `b_water`/`b_stepbeat`/`d_steps10`
+    zostają nietknięte, nie usuwane — zamiana zostawiłaby dead-endy). Claim-guard reużywa
+    generyczny `dayClaims` store'u (klucz `miniboss_<lane>:<data>`), nie nowe pola. Wejście:
+    baner w `app/bosses.tsx` nad rzędem Raid/Wydarzenie (NIE w `PupilNavbar` — ten ma
+    świadomie ustalone 4 taby, patrz komentarz w pliku).
+  - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 4
+    torów wyżej), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
+    czytelny tekstowy raport (poziom/staty/pokonani bossowie/log), Ustawienia →
+    Diagnostyka → „Eksportuj postęp pupila" (`Share.share`) / „Zresetuj postęp pupila"
+    (`petStore.reset()`, wcześniej martwa funkcja, teraz podpięta).
 
 ## 10. Inne subsystemy (entry files)
 

@@ -43,10 +43,34 @@ Diagnostyka):
 do sprawdzenia czy krzywa się broni. Alternatywnie może zresetować postęp i zacząć od zera na
 świeżo przetestowanej krzywej.
 
-## 💡 Pomysł: questy jako travel-pointy z minibossami (2026-08-14, NIE zaimplementowane)
+## 🆕 Minibossy — zaimplementowane, NIEsprawdzone na urządzeniu (2026-08-14)
 
-User: kroki → "idziesz" do punktu na mapie, tam miniboss. User doda grafiki zwierząt do
-folderu `MINIBOSSY` w repo — do podjęcia w kolejnej sesji jak grafiki będą wgrane.
+User chciał: zamiast cichego claimu nagrody pupila za wodę/kroki, żeby pasek postępu
+odblokowywał krótką walkę. Zbudowane w tej sesji (grafiki z `assets/minibosses/`, 8 zwierząt
+usera z folderu MINIBOSSY na masterze):
+
+- **Osobny ekran `app/minibosses.tsx`** (link: baner w `app/bosses.tsx` nad Raid/Wydarzenie).
+  Dwa tory: 💧 woda (nawyk wody dobity do celu) i 👣 kroki (10k dziennie, ten sam próg co
+  quest `d_steps10`). Miniboss na dany dzień/tor deterministyczny (ten sam dzień → to samo
+  zwierzę), pula 4 zwierząt/tor (`WATER_MINIBOSSES`/`STEPS_MINIBOSSES` w `utils/minibosses.ts`).
+- Walka to PRAWDZIWY `simulateFight` (jak kampania — realny kontratak, można przegrać), ale
+  BEZ animacji pocisk/łapa jak `boss-fight.tsx` — wynik liczy się od razu, modal pokazuje
+  tylko rezultat + liczbę rund. **To świadome uproszczenie** — jeśli ma dostać pełną
+  choreografię, to osobna decyzja/sesja.
+- HP/nagrody celowo niskie ("stosunkowo łatwy" — user słowo w słowo), bo to DODATKOWA warstwa
+  nad istniejącymi questami pupila (`b_water`/`b_stepbeat`/`d_steps10` w `quests.ts` zostały
+  NIETKNIĘTE, nie usunięte — usuwanie zostawiłoby dead-endy gdzie indziej).
+- `petStore.bossLog` (dodane w tej samej sesji, patrz wyżej) loguje też te walki
+  (`kind: 'miniboss-water'`/`'miniboss-steps'`) — widoczne w eksporcie postępu.
+
+**Priorytet testowania:** zagraj przynajmniej jedną walkę wodną i jedną kroków (napij się do
+celu / wybij 10k), sprawdź czy baner w Bossach nawiguje, czy pasek postępu się zgadza, czy
+walka się kończy sensownie (nie za łatwo/trudno — user chce to ocenić przez eksport postępu,
+patrz sekcja balansu wyżej).
+
+**Odłożone od usera (jego własny pomysł, nie zbudowane, "nie wiem, przemyśl to"):** miesięczna/
+roczna suma kroków jako druga, większa kampania z "MEGABOSSAMI" — user sam niepewny kształtu,
+do zaprojektowania w kolejnej sesji zamiast zgadywania teraz.
 
 ## 🔴 Do przetestowania na urządzeniu (świeże, pierwsza wersja, NIEsprawdzone)
 

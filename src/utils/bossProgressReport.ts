@@ -19,7 +19,10 @@ export interface ProgressReportInput {
   bossLog: BossLogEntry[];
 }
 
-const KIND_LABEL: Record<BossLogEntry['kind'], string> = { campaign: 'kampania', raid: 'raid', event: 'wydarzenie' };
+const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
+  campaign: 'kampania', raid: 'raid', event: 'wydarzenie',
+  'miniboss-water': 'miniboss (woda)', 'miniboss-steps': 'miniboss (kroki)',
+};
 
 export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): string {
   const lvl = levelFromXp(s.xp);

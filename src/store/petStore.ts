@@ -19,7 +19,7 @@ export function catMaxHp(bonus: number): number { return CAT_BASE_MAX_HP + Math.
 // live mood/needs are DERIVED from your real self-care data (see petState.ts) and
 // are not stored here.
 
-function todayISO(): string {
+export function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -40,7 +40,7 @@ export function loginBonusCoins(streak: number): number {
 // defeatedBosses/raidWon/eventWon (te trzymają tylko "czy pokonany raz", bez historii) —
 // bossLog rośnie bez limitu w czasie, więc UI eksportu tnie do ostatnich N wpisów.
 export interface BossLogEntry {
-  kind: 'campaign' | 'raid' | 'event';
+  kind: 'campaign' | 'raid' | 'event' | 'miniboss-water' | 'miniboss-steps';
   id: string;          // bossId / weekKey / eventKey
   name: string;         // nazwa bossa/raidu/wydarzenia w chwili walki (nazwy się zmieniają)
   at: string;            // ISO timestamp
@@ -183,6 +183,9 @@ interface PetState {
   syncEventEnergy: (todayEnergy: number, mult: number) => void;
   spendEventEnergy: () => void;         // -1 próba (round-based fight jak kampania, patrz spendEnergy)
   eventClaim: (eventKey: string, coins: number, xp: number, name: string, level: number) => void;
+  // minibossy (2026-08-14) — patrz src/utils/minibosses.ts. Jedna walka/tor/dzień, guard przez
+  // wspólny dayClaims (reużyty, nie nowe pole) — zwraca false jeśli tor już dziś rozliczony.
+  claimMiniboss: (lane: 'water' | 'steps', coins: number, xp: number, name: string, level: number) => boolean;
   // HP kotka — fundament v4 (patrz komentarz przy polach wyżej)
   buyMaxHp: (cost: number, amount: number) => boolean;         // trwałe ulepszenie za monety
   buyAtkStat: (cost: number, amount: number) => boolean;       // trwałe ulepszenie ATK za monety (v5)
@@ -534,6 +537,18 @@ export const usePetStore = create<PetState>()(
         eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp,
         bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp }],
       })),
+      claimMiniboss: (lane, coins, xp, name, level) => {
+        const t = todayISO();
+        const key = `miniboss_${lane}:${t}`;
+        const st = get();
+        if (st.dayClaims[key]) return false;
+        set((s) => ({
+          dayClaims: { ...s.dayClaims, [key]: true },
+          coins: s.coins + coins, xp: s.xp + xp,
+          bossLog: [...s.bossLog, { kind: lane === 'water' ? 'miniboss-water' : 'miniboss-steps', id: lane, name, at: new Date().toISOString(), level, coins, xp }],
+        }));
+        return true;
+      },
       buyMaxHp: (cost, amount) => {
         const s = get();
         if (!s._hydrated) return false;
