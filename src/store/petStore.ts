@@ -19,7 +19,7 @@ export function catMaxHp(bonus: number): number { return CAT_BASE_MAX_HP + Math.
 // live mood/needs are DERIVED from your real self-care data (see petState.ts) and
 // are not stored here.
 
-function todayISO(): string {
+export function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -33,6 +33,20 @@ function yesterdayISO(): string {
 export function loginBonusCoins(streak: number): number {
   const table = [0, 3, 4, 6, 8, 10, 12, 15];
   return table[Math.min(Math.max(1, streak), 7)];
+}
+
+// Log każdej pokonanej walki (kampania/raid/wydarzenie) — do balance-testowania nowej
+// krzywej bossów (2026-08-14, user chce eksportować to i wklejać do analizy). Osobno od
+// defeatedBosses/raidWon/eventWon (te trzymają tylko "czy pokonany raz", bez historii) —
+// bossLog rośnie bez limitu w czasie, więc UI eksportu tnie do ostatnich N wpisów.
+export interface BossLogEntry {
+  kind: 'campaign' | 'raid' | 'event' | 'miniboss-water' | 'miniboss-steps';
+  id: string;          // bossId / weekKey / eventKey
+  name: string;         // nazwa bossa/raidu/wydarzenia w chwili walki (nazwy się zmieniają)
+  at: string;            // ISO timestamp
+  level: number;         // poziom kotka w chwili pokonania
+  coins: number;
+  xp: number;
 }
 
 interface PetState {
@@ -89,6 +103,7 @@ interface PetState {
   energyToday: number;          // energy already granted today (for daily top-up)
   defeatedBosses: string[];
   bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
+  bossLog: BossLogEntry[];        // historia pokonanych walk (kampania/raid/event) — patrz typ wyżej
   // ── HP kotka (fundament pod v4 walk — S&F-owy redesign, patrz memory boss_design.md) ──
   // NIC jeszcze tego nie czyta/zapisuje poza akcjami niżej — czysto dodatkowy stan, żeby
   // dodanie go było zero-ryzykowne dla działających walk. catMaxHpBonus = TRWAŁE ulepszenia
@@ -159,15 +174,18 @@ interface PetState {
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // jak syncEnergy, ale osobna pula raidu
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
   spendEnergy: () => void;   // v5: -1 próba za attempt (energy to teraz flat dzienny licznik, nie bank)
-  defeatBoss: (bossId: string, lootId: string, coins: number, xp: number) => void;
+  defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number) => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
   raidAttack: (damage: number) => { remaining: number; defeated: boolean };
-  raidClaim: (weekKey: string, coins: number, xp: number) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
+  raidClaim: (weekKey: string, coins: number, xp: number, name: string, level: number) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
   // wydarzenia
   syncEventEnergy: (todayEnergy: number, mult: number) => void;
   spendEventEnergy: () => void;         // -1 próba (round-based fight jak kampania, patrz spendEnergy)
-  eventClaim: (eventKey: string, coins: number, xp: number) => void;
+  eventClaim: (eventKey: string, coins: number, xp: number, name: string, level: number) => void;
+  // minibossy (2026-08-14) — patrz src/utils/minibosses.ts. Jedna walka/tor/dzień, guard przez
+  // wspólny dayClaims (reużyty, nie nowe pole) — zwraca false jeśli tor już dziś rozliczony.
+  claimMiniboss: (lane: 'water' | 'steps', coins: number, xp: number, name: string, level: number) => boolean;
   // HP kotka — fundament v4 (patrz komentarz przy polach wyżej)
   buyMaxHp: (cost: number, amount: number) => boolean;         // trwałe ulepszenie za monety
   buyAtkStat: (cost: number, amount: number) => boolean;       // trwałe ulepszenie ATK za monety (v5)
@@ -233,6 +251,7 @@ export const usePetStore = create<PetState>()(
       eventWon: [],
       defeatedBosses: [],
       bossHp: {},
+      bossLog: [],
       catHp: CAT_BASE_MAX_HP,
       catMaxHpBonus: 0,
       atkStatBonus: 0,
@@ -480,11 +499,12 @@ export const usePetStore = create<PetState>()(
         return { remaining, defeated };
       },
       spendEnergy: () => set((s) => ({ energy: Math.max(0, s.energy - 1) })),
-      defeatBoss: (bossId, lootId, coins, xp) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
+      defeatBoss: (bossId, lootId, coins, xp, name, level) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
         defeatedBosses: [...s.defeatedBosses, bossId],
         ownedItems: s.ownedItems.includes(lootId) ? s.ownedItems : [...s.ownedItems, lootId],
         coins: s.coins + coins,
         xp: s.xp + xp,
+        bossLog: [...s.bossLog, { kind: 'campaign', id: bossId, name, at: new Date().toISOString(), level, coins, xp }],
       })),
       healBoss: (bossId, amount, maxHp) => set((s) => ({ bossHp: { ...s.bossHp, [bossId]: Math.min(maxHp, (s.bossHp[bossId] ?? maxHp) + Math.max(0, amount)) } })),
       raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp })),
@@ -494,7 +514,10 @@ export const usePetStore = create<PetState>()(
         set({ raidEnergy: Math.max(0, s.raidEnergy - 1), raidHp: remaining });
         return { remaining, defeated: remaining <= 0 };
       },
-      raidClaim: (weekKey, coins, xp) => set((s) => (s.raidWon.includes(weekKey) ? s : { raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp })),
+      raidClaim: (weekKey, coins, xp, name, level) => set((s) => (s.raidWon.includes(weekKey) ? s : {
+        raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp,
+        bossLog: [...s.bossLog, { kind: 'raid', id: weekKey, name, at: new Date().toISOString(), level, coins, xp }],
+      })),
       // Identical shape to syncEnergy/syncRaidEnergy, targeting the event's own bank.
       syncEventEnergy: (todayEnergy, mult) => {
         const t = todayISO();
@@ -510,7 +533,22 @@ export const usePetStore = create<PetState>()(
         });
       },
       spendEventEnergy: () => set((s) => ({ eventEnergy: Math.max(0, s.eventEnergy - 1) })),
-      eventClaim: (eventKey, coins, xp) => set((s) => (s.eventWon.includes(eventKey) ? s : { eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp })),
+      eventClaim: (eventKey, coins, xp, name, level) => set((s) => (s.eventWon.includes(eventKey) ? s : {
+        eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp,
+        bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp }],
+      })),
+      claimMiniboss: (lane, coins, xp, name, level) => {
+        const t = todayISO();
+        const key = `miniboss_${lane}:${t}`;
+        const st = get();
+        if (st.dayClaims[key]) return false;
+        set((s) => ({
+          dayClaims: { ...s.dayClaims, [key]: true },
+          coins: s.coins + coins, xp: s.xp + xp,
+          bossLog: [...s.bossLog, { kind: lane === 'water' ? 'miniboss-water' : 'miniboss-steps', id: lane, name, at: new Date().toISOString(), level, coins, xp }],
+        }));
+        return true;
+      },
       buyMaxHp: (cost, amount) => {
         const s = get();
         if (!s._hydrated) return false;
@@ -558,7 +596,7 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, bossLog: [], raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
     }),
     {
       name: 'pet-v1',
@@ -575,7 +613,7 @@ export const usePetStore = create<PetState>()(
         pushupsDay: s.pushupsDay, squatsDay: s.squatsDay,
         situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, trainingDays: s.trainingDays,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
-        defeatedBosses: s.defeatedBosses, bossHp: s.bossHp,
+        defeatedBosses: s.defeatedBosses, bossHp: s.bossHp, bossLog: s.bossLog,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
@@ -590,6 +628,7 @@ export const usePetStore = create<PetState>()(
         state.loginStreak = state.loginStreak ?? 0;
         state.lastLoginDay = state.lastLoginDay ?? null;
         state.loginBonusDay = state.loginBonusDay ?? null;
+        state.bossLog = state.bossLog ?? [];   // stary stan sprzed 2026-08-14 nie miał logu walk
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};
