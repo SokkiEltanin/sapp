@@ -105,7 +105,7 @@ export default function PetStats() {
         <View style={s.statGrid}>
           <View style={[s.statCard, { borderColor: '#F8717144', backgroundColor: '#F8717112' }]}>
             <Swords size={18} color="#F87171" />
-            <Text style={s.statVal}>{power}</Text>
+            <Text style={s.statVal}>{Math.round(power)}</Text>
             <Text style={s.statLabel}>Moc ataku</Text>
             <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
             <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>

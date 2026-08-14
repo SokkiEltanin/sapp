@@ -157,7 +157,25 @@ export interface QuestsResult {
 
 const milestoneXp = (coins: number) => coins * 10;
 
-export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
+// Mnożnik nagród rosnący z poziomem (2026-08-14, patrz memory boss_design.md „balance audit
+// #2" — user chciał sprawdzić czy tempo ekonomii nadąża za krzywą bossów). Bez tego dochód
+// coins/xp z questów jest PŁASKI niezależnie od poziomu, a koszt poziomu (levelFromXp w
+// petStore.ts, 100+(lvl-1)×40) rośnie z każdym levelem — nawet w pełni zaangażowany gracz nie
+// dochodził do Lv72/22 bossów kampanii w >1,5 roku symulowanego grania (6 z 22 bossów
+// praktycznie nieosiągalnych). Ten sam wzorzec co raidCoins/eventCoins/minibossCoins itd
+// (bazowe+poziom×mnożnik) — tu jako POST-multiplier na całym wyniku (dotyczy daily/bonus/
+// weekly/monthly, NIE milestones — te są jednorazowe kolekcjonerskie, nie powtarzalny
+// dochód) zamiast przepisywania każdej z ~20 definicji z osobna. Skalibrowane symulacją
+// (node -e z buildQuests + simulateFight) tak, żeby Lv116 był osiągalny w ~250-300 dni przy
+// pełnym zaangażowaniu, zamiast >1000.
+export function questRewardMult(level: number): number {
+  return 1 + Math.max(0, level - 1) * 0.045;
+}
+
+export function buildQuests(ctx: QuestCtx, claim: ClaimState, level: number = 1): QuestsResult {
+  const mult = questRewardMult(level);
+  const scaleCoins = (n: number) => Math.round(n * mult);
+  const scaleXp = (n: number) => Math.round(n * mult);
   let claimable = 0;
   const month = claim.month ?? claim.today.slice(0, 7);
   const monthlyClaims = claim.monthlyClaims ?? {};
@@ -168,14 +186,14 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
     const done = d.done(ctx);
     const claimed = claim.dailyClaims[d.id] === claim.today;
     if (done && !claimed) claimable++;
-    return { id: d.id, label: d.label, coins: d.coins, xp: d.xp, done, claimed, note: d.note?.(ctx) };
+    return { id: d.id, label: d.label, coins: scaleCoins(d.coins), xp: scaleXp(d.xp), done, claimed, note: d.note?.(ctx) };
   });
 
   const bonusDaily: DailyQuestState[] = BONUS.filter(b => b.available(ctx)).map(b => {
     const done = b.done(ctx);
     const claimed = claim.dailyClaims[b.id] === claim.today;
     if (done && !claimed) claimable++;
-    return { id: b.id, label: b.label(ctx), coins: b.coins, xp: b.xp, done, claimed, note: b.note?.(ctx) };
+    return { id: b.id, label: b.label(ctx), coins: scaleCoins(b.coins), xp: scaleXp(b.xp), done, claimed, note: b.note?.(ctx) };
   });
 
   const milestones: MilestoneQuestState[] = MILESTONES.map(m => {
@@ -199,7 +217,7 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
     const done = value >= def.target;
     const claimed = monthlyClaims[def.id] === month;
     if (done && !claimed) claimable++;
-    return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: def.coins, xp: def.xp, done, claimed, progress: Math.min(1, value / def.target) };
+    return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: scaleCoins(def.coins), xp: scaleXp(def.xp), done, claimed, progress: Math.min(1, value / def.target) };
   });
 
   const weekly: WeeklyQuestState[] = WEEKLY.map(w => ({ def: w, raw: w.value(ctx) }))
@@ -209,7 +227,7 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState): QuestsResult {
       const done = value >= def.target;
       const claimed = weeklyClaims[def.id] === week;
       if (done && !claimed) claimable++;
-      return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: def.coins, xp: def.xp, done, claimed, progress: Math.min(1, value / def.target) };
+      return { id: def.id, label: def.label, unit: def.unit, value, target: def.target, coins: scaleCoins(def.coins), xp: scaleXp(def.xp), done, claimed, progress: Math.min(1, value / def.target) };
     });
 
   return { daily, bonusDaily, weekly, milestones, monthly, claimableCount: claimable };
@@ -230,18 +248,21 @@ const RETRO_DAILY_IDS = ['d_mood', 'd_steps10', 'd_steps20', 'd_habits', 'b_wate
 // holds one date per quest, so claiming yesterday's catch-up overwrote today's claim (and
 // vice-versa): each claim made the other look unclaimed, and the two could be farmed in a
 // loop forever. A per-(quest, day) key can't be clobbered.
-export function buildMissedDaily(ctx: QuestCtx, dayClaims: Record<string, true>, date: string): DailyQuestState[] {
+export function buildMissedDaily(ctx: QuestCtx, dayClaims: Record<string, true>, date: string, level: number = 1): DailyQuestState[] {
   const out: DailyQuestState[] = [];
   const claimed = (id: string) => !!dayClaims[`${id}:${date}`];
+  const mult = questRewardMult(level);   // poziom TERAZ, nie w dniu przegapienia (nie mamy historii) — konserwatywne przybliżenie
+  const scaleCoins = (n: number) => Math.round(n * mult);
+  const scaleXp = (n: number) => Math.round(n * mult);
   for (const d of DAILY) {
     if (!RETRO_DAILY_IDS.includes(d.id)) continue;
     if (!d.done(ctx) || claimed(d.id)) continue;
-    out.push({ id: d.id, label: d.label, coins: d.coins, xp: d.xp, done: true, claimed: false, note: d.note?.(ctx) });
+    out.push({ id: d.id, label: d.label, coins: scaleCoins(d.coins), xp: scaleXp(d.xp), done: true, claimed: false, note: d.note?.(ctx) });
   }
   for (const b of BONUS) {
     if (!RETRO_DAILY_IDS.includes(b.id) || !b.available(ctx)) continue;
     if (!b.done(ctx) || claimed(b.id)) continue;
-    out.push({ id: b.id, label: b.label(ctx), coins: b.coins, xp: b.xp, done: true, claimed: false, note: b.note?.(ctx) });
+    out.push({ id: b.id, label: b.label(ctx), coins: scaleCoins(b.coins), xp: scaleXp(b.xp), done: true, claimed: false, note: b.note?.(ctx) });
   }
   return out;
 }

@@ -18,6 +18,42 @@ było już gdzie zobaczyć co się ma po nazwie. Dodatkowo "Poduszka Leniwca" (�
 Leniwca) tego samego dnia dostała reflavor na "Iskra Poranka" ⚡ — id (`loot_pillow`) zostało,
 tylko nazwa się zmieniła (patrz komentarz w `src/utils/bosses.ts` przy definicji bossa `sloth`).
 
+## 🧪 Balans ekonomii vs bossy — audyt + naprawy (2026-08-14, NIEsprawdzone na urządzeniu)
+
+User poprosił o sprawdzenie czy tempo ekonomii questów nadąża za krzywą trudności bossów.
+Zamiast zgadywać na papierze, napisano tymczasowy skrypt symulujący w pełni zaangażowanego
+gracza (wszystkie dailies/bonusy/weekly/monthly/login codziennie, monety wydawane natychmiast
+na ATK/HP) i przepuszczono przez PRAWDZIWY `simulateFight`/`buildQuests`/`raidHpFor` (skrypt
+skasowany po użyciu, nie ma go w repo — wyniki niżej).
+
+**Znalezione i naprawione:**
+- **Questy dzienne/bonusowe/tygodniowe/miesięczne były PŁASKIE niezależnie od poziomu**
+  (`quests.ts`), mimo że koszt poziomu (`levelFromXp`, 100+(lvl-1)×40) rośnie z każdym
+  levelem. Efekt: nawet maksymalnie zaangażowany gracz nie dochodził do Lv72 w >1,5 roku
+  symulowanego grania — **6 z 22 bossów kampanii (Lv72–116) było praktycznie nieosiągalnych**.
+  Naprawione: `questRewardMult(level)` w `quests.ts` — mnożnik rosnący z poziomem, ten sam
+  wzorzec co już istniejący w `raidCoins`/`eventCoins`/`minibossCoins`. Po zmianie Lv116
+  osiągalny w symulacji w ~441 dni (wcześniej: nigdy w 600). `buildQuests`/`buildMissedDaily`
+  dostały 3./4. opcjonalny param `level` (domyślnie 1 = brak zmiany, więc stare testy i
+  wywołania bez poziomu zachowują się identycznie).
+- **Kampania**: zawsze 100% win-rate na osiągalnych poziomach (bez zmian, to jest OK), ale
+  nierówna — kilku bossów (Widmo Porównań, Hydra Odwodnienia, Tytan Prokrastynacji, Cień
+  Zwątpienia, Cień Impulsu) pada w <3 rundy. Kosmetyczne, NIE naprawione w tej sesji.
+- **Raid**: przy starym `raidHpFor` (2000+level×220) gracz zabijał tylko 34-60% HP w tydzień
+  na Lv3-20 — **matematycznie NIEUKOŃCZALNY przez pierwsze ~25-30 poziomów**, mimo że
+  odblokowuje się na Lv3. Obniżono base do 1000+level×210.
+
+**⚠️ ŚWIADOMIE NIEROZWIĄZANE — raid endgame:** audyt pokazał że output gracza rośnie SZYBCIEJ
+niż jakikolwiek gładki wzór od samego `level` potrafi nadążyć, bo output zależy też od TEGO ILE
+bossów kampanii już pokonanych (kumulujące się % z łupu) — druga, niezależna oś progresji.
+Próbowano kilku wariantów z komponentem `level^1.7-1.8` żeby złapać to zakrzywienie — poprawiały
+mid-game, ale endgame (Lv70+) i tak wychodził z nadwyżką rzędu 400-800% (a bez tego komponentu
+mid-game był z kolei za trudny). Zamiast wymuszać przeforsowany wzór bez pewności że jest
+dobry, zostawiono raid PROSTY (liniowy, tylko naprawiony wczesny zakres) — pełna naprawa
+wymaga policzenia HP też od `defeatedBosses.length`, nie tylko `level` (osobny parametr,
+większa zmiana). Do zrobienia w kolejnej sesji, jeśli user po realnym graniu potwierdzi że
+endgame faktycznie jest za łatwy (nie tylko w symulacji).
+
 ## 🧪 Balans bossów — narzędzia do testowania dodane (2026-08-14, NIEsprawdzone na urządzeniu)
 
 Cała krzywa HP bossów (patrz sekcja niżej) jest pierwszą wersją po przepisaniu — user chce
