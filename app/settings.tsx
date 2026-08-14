@@ -4,7 +4,7 @@ import { getBalanceOffset, setBalanceOffset } from '@/utils/accountBalance';
 import { isMine } from '@/store/statsScope';
 import { shiftHours, shiftClockRange, isWorkEvent } from '@/utils/workEvents';
 import { computePayMonths } from '@/utils/workSummary';
-import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Alert, TextInput, ActivityIndicator, Linking, Platform, LayoutAnimation, UIManager, Pressable, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -38,6 +38,8 @@ import { ageFrom, DAILY_EXERCISE_COUNT } from '@/utils/personalQuests';
 import { CATEGORY_META } from '@/utils/categories';
 import { ExpenseCategory, DEFAULT_WORK_SETTINGS } from '@/types';
 import { toast } from '@/store/toastStore';
+import { usePetStore } from '@/store/petStore';
+import { buildBossProgressReport } from '@/utils/bossProgressReport';
 import { haptic } from '@/utils/haptics';
 import { runSelfTest } from '@/utils/selfTest';
 import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
@@ -1592,6 +1594,45 @@ export default function SettingsScreen() {
                 `${c.message}\n\n${(c.stack || c.component || '').slice(0, 1200)}`,
                 [{ text: 'Wyczyść', onPress: () => AsyncStorage.removeItem('last_crash').catch(() => {}) }, { text: 'OK' }]);
             } catch { Alert.alert('Ostatni błąd', raw.slice(0, 1400)); }
+          } },
+        },
+        {
+          id: 'diag-pet-export', title: 'Eksportuj postęp pupila', subtitle: 'Poziom, staty, pokonani bossowie, log walk — do analizy balansu bossów',
+          icon: LucideIcons.Swords, accentColor: '#F59E0B',
+          keywords: ['pupil', 'bossy', 'walka', 'balans', 'eksport', 'poziom', 'log', 'kotek'],
+          control: { kind: 'link', onPress: async () => {
+            haptic.tap();
+            const report = buildBossProgressReport(usePetStore.getState());
+            try {
+              await Share.share({ message: report });
+            } catch {
+              Alert.alert('Postęp pupila', report);
+            }
+          } },
+        },
+        {
+          id: 'diag-pet-reset', title: 'Zresetuj postęp pupila', subtitle: 'Kasuje poziom, monety, itemy, pokonanych bossów, kolory — zostaje tylko imię',
+          icon: LucideIcons.RotateCcw, accentColor: '#EF4444',
+          keywords: ['pupil', 'reset', 'restart', 'bossy', 'walka', 'wyzeruj', 'kotek'],
+          control: { kind: 'link', onPress: () => {
+            haptic.tap();
+            Alert.alert(
+              'Zresetować postęp pupila?',
+              'Skasuje poziom, XP, monety, wszystkie itemy (też kupione kolory sierści), pokonanych bossów, staty ATK/HP, log walk, serie logowania i odebrane questy. Zostaje tylko imię pupila. Nie da się cofnąć.',
+              [
+                { text: 'Anuluj', style: 'cancel' },
+                { text: 'Resetuj', style: 'destructive', onPress: () => {
+                  Alert.alert('Na pewno?', 'Ostatnie potwierdzenie — to nieodwracalne.', [
+                    { text: 'Anuluj', style: 'cancel' },
+                    { text: 'Tak, zresetuj', style: 'destructive', onPress: () => {
+                      usePetStore.getState().reset();
+                      haptic.success();
+                      toast.success('Postęp pupila zresetowany');
+                    } },
+                  ]);
+                } },
+              ],
+            );
           } },
         },
       ],

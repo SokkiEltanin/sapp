@@ -259,10 +259,10 @@ export default function BossFight() {
       if (result.won) {
         haptic.success();
         if (kind === 'campaign' && campaignBoss) {
-          defeatBoss(campaignBoss.id, campaignBoss.loot.id, campaignBoss.coins, campaignBoss.xp);
+          defeatBoss(campaignBoss.id, campaignBoss.loot.id, campaignBoss.coins, campaignBoss.xp, campaignBoss.name, level);
           setVictory({ kind: 'campaign', id: campaignBoss.id, name: campaignBoss.name, emoji: campaignBoss.emoji, coins: campaignBoss.coins, xp: campaignBoss.xp, loot: campaignBoss.loot });
         } else if (kind === 'event' && eventBoss && eventKey) {
-          eventClaim(eventKey, eventCoins(level), eventXp(level));
+          eventClaim(eventKey, eventCoins(level), eventXp(level), eventBoss.name, level);
           setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: eventCoins(level), xp: eventXp(level) });
         }
       } else {
@@ -356,7 +356,7 @@ export default function BossFight() {
         if (res.defeated) {
           roundTimer.current = setTimeout(() => {
             if (!alive.current) return;
-            raidClaim(weekKey, raidCoins(level), raidXp(level));
+            raidClaim(weekKey, raidCoins(level), raidXp(level), raid.name, level);
             haptic.success();
             setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
           }, 500);

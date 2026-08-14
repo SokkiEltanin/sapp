@@ -3,34 +3,50 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 📱 Setup zdalnego dostępu (claude.ai/code z telefonu) — W TOKU
+## ✅ Setup zdalnego dostępu (claude.ai/code z telefonu) — DZIAŁA
 
-Cel: żeby dało się pisać/pushować do tego repo z telefonu, bez trzymania PC włączonego.
+Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/code). Jeśli kiedyś
+znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
+Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
-**Co już zrobione:**
-- GitHub connector w Ustawieniach claude.ai (Settings → Connectors → "GitHub Integration")
-  jest podłączony (widoczny ✓).
-- Na claude.ai/code przy zakładaniu NOWEGO czatu pojawia się wybór repo — `sapp` jest widoczne
-  na liście.
+## 🐛 "Zgubione" itemy z bossów — WYJAŚNIONE, nie bug (2026-08-14)
 
-**Gdzie utknęliśmy:** wybranie repo `sapp` w nowej sesji nie dawało accessu (nie dało się
-przyznać dostępu, mimo że connector ogólny jest podłączony). Diagnoza: to klasyczny gotcha
-GitHub Appek — samo podłączenie connectora (OAuth) to inny krok niż przyznanie apce dostępu
-do KONKRETNEGO repo. Trzeba to zrobić po stronie GitHuba:
+User pytał czemu nie ma Kryształu Cukru / Poduszki Leniwca po pokonaniu pierwszych bossów.
+Odpowiedź: dane są całe (id itemu trwały w `ownedItems`, bonus liczony po id w `bossBonuses()`),
+tylko **ekran gabloty trofeów został wywalony 12 sierpnia** (razem z pokojem pupila), więc nie
+było już gdzie zobaczyć co się ma po nazwie. Dodatkowo "Poduszka Leniwca" (łup z Kanapowego
+Leniwca) tego samego dnia dostała reflavor na "Iskra Poranka" ⚡ — id (`loot_pillow`) zostało,
+tylko nazwa się zmieniła (patrz komentarz w `src/utils/bosses.ts` przy definicji bossa `sloth`).
 
-1. github.com → avatar (prawy górny róg) → **Settings**
-2. **Applications** → zakładka **Installed GitHub Apps**
-3. Znajdź apkę Claude/Anthropic → **Configure**
-4. Sekcja **Repository access** — jeśli "Only select repositories", sprawdź czy `sapp` jest
-   zaznaczone; jeśli go nie ma, dodaj (albo przełącz na "All repositories")
-5. **Save**, wróć do claude.ai/code, spróbuj ponownie założyć sesję na `sapp`
+## 🧪 Balans bossów — narzędzia do testowania dodane (2026-08-14, NIEsprawdzone na urządzeniu)
 
-**Uwaga:** ekran Ustawienia → **"Claude Code"** w lewym pasku claude.ai to PREFERENCJE (wygląd,
-auto-PR, tokeny) — NIE to samo co ekran zakładania nowej sesji. Nowa sesja/wybór repo zakłada
-się z **claude.ai/code** bezpośrednio (nie przez zębatkę Ustawień).
+Cała krzywa HP bossów (patrz sekcja niżej) jest pierwszą wersją po przepisaniu — user chce
+metodycznie sprawdzać czy nie jest za trudna/za łatwa. Dodane w tej sesji (Ustawienia →
+Diagnostyka):
 
-Status na razie: user przechodzi teraz na zdalny czat żeby dokończyć to na miejscu — jeśli
-w kolejnej sesji to nadal nie działa, ten fragment jest punktem startowym diagnozy.
+- **"Eksportuj postęp pupila"** — generuje czytelny tekstowy raport (poziom, staty ATK/HP,
+  sloty itemów, pokonani bossowie z ✓/🔒, raid/event, posiadane itemy bojowe z poziomem,
+  log ostatnich 30 walk z datą/poziomem/nagrodą) i otwiera natywny share sheet (`Share.share`,
+  bez nowej zależności) — kopiujesz/wysyłasz do wklejenia w rozmowie z Claude do analizy.
+  Kod: `src/utils/bossProgressReport.ts` (+ test `__tests__/bossProgressReport.test.ts`).
+- **"Zresetuj postęp pupila"** — podpina pod przycisk istniejącą (wcześniej martwą, nigdzie
+  niewywoływaną) funkcję `usePetStore().reset()`. Podwójne potwierdzenie (Alert × 2, destrukcyjne).
+  Czyści WSZYSTKO poza imieniem/datą stworzenia: poziom/XP, monety, itemy (też kolory sierści —
+  `ownedItems` trzyma oba naraz), pokonanych bossów, staty ATK/HP, log walk, serie logowania,
+  odebrane questy. Dotyka WYŁĄCZNIE store'u `pet-v1` (AsyncStorage) — nie rusza wydatków,
+  nawyków, kalendarza ani żadnego innego store'a w appce.
+- Nowy log walk `bossLog` w `petStore.ts` (persystowany, rośnie z każdą pokonaną walką
+  kampanii/raidu/wydarzenia — bossId/nazwa/timestamp/poziom/coins/xp) — to źródło danych dla
+  eksportu, wcześniej nic takiego nie istniało.
+
+**Plan testowania:** user gra kilka walk, po ~5 poziomach robi eksport i wkleja raport w czacie
+do sprawdzenia czy krzywa się broni. Alternatywnie może zresetować postęp i zacząć od zera na
+świeżo przetestowanej krzywej.
+
+## 💡 Pomysł: questy jako travel-pointy z minibossami (2026-08-14, NIE zaimplementowane)
+
+User: kroki → "idziesz" do punktu na mapie, tam miniboss. User doda grafiki zwierząt do
+folderu `MINIBOSSY` w repo — do podjęcia w kolejnej sesji jak grafiki będą wgrane.
 
 ## 🔴 Do przetestowania na urządzeniu (świeże, pierwsza wersja, NIEsprawdzone)
 
