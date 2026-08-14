@@ -19,7 +19,7 @@ import {
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronDown, Trash2, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock, Layers,
-  PiggyBank, Utensils, Coins, Apple, ListChecks,
+  PiggyBank, Utensils, Coins, Apple, ListChecks, Search,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -3067,13 +3067,19 @@ export default function DashboardScreen() {
                 )}
               </View>
             ) : (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Moon size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Sen</Text>
+              // Puste, ale nie gołe (2026-08-14, user: "nie ma danych na nim brakuje mi
+              // wyglądowo") — ikona-bąbelek zamiast małego tekstowego linku, wypełniony
+              // przycisk zamiast szarego chipa, żeby karta nie wyglądała jak coś zepsutego
+              // pośród reszty dashboardu. Diagnostyka pod spodem BEZ ZMIAN (patrz
+              // NEXT_STEPS.md „Diagnostyka faz snu" — czy dane w ogóle da się zdobyć z tego
+              // zegarka, to osobne pytanie od tego jak wygląda pusty stan).
+              <View style={[s.card, { backgroundColor: cardBgDark, alignItems: 'center', paddingVertical: spacing[5] }]}>
+                <View style={[s.sleepEmptyIcon, { backgroundColor: accentColor + '18' }]}>
+                  <Moon size={22} color={accentColor} />
                 </View>
-                <Text style={[s.factText, { marginTop: spacing[2] }]}>
-                  Brak danych o śnie z ostatnich 30 dni.
+                <Text style={s.sleepEmptyTitle}>Brak danych o śnie</Text>
+                <Text style={[s.factText, { textAlign: 'center', marginTop: 2 }]}>
+                  Ostatnie 30 dni bez ani jednej nocy z zegarka.
                 </Text>
                 <TouchableOpacity
                   onPress={async () => {
@@ -3083,10 +3089,11 @@ export default function DashboardScreen() {
                     const { lines, verdict } = sleepProbeVerdict(p);
                     Alert.alert('Diagnostyka faz snu', lines.join('\n\n') + '\n\n' + verdict);
                   }}
-                  activeOpacity={0.8}
-                  style={[s.workToggle, { alignSelf: 'flex-start', marginTop: spacing[2] }]}
+                  activeOpacity={0.85}
+                  style={[s.sleepEmptyBtn, { backgroundColor: accentColor }]}
                 >
-                  <Text style={[s.workToggleText, { color: accentColor }]}>Sprawdź dlaczego</Text>
+                  <Search size={14} color={colors.bg.primary} />
+                  <Text style={[s.sleepEmptyBtnText, { color: colors.bg.primary }]}>Sprawdź dlaczego</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -4925,6 +4932,12 @@ const buildStyles = (c: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
   // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
+
+  // ── Pusty stan karty Sen (bąbelek-ikona + wypełniony CTA, nie goły tekst) ──────────
+  sleepEmptyIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  sleepEmptyTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary, marginTop: spacing[3] },
+  sleepEmptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.full, paddingHorizontal: spacing[4], paddingVertical: 9, marginTop: spacing[3] },
+  sleepEmptyBtnText: { fontSize: 12.5, fontWeight: '800' },
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
   forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },
