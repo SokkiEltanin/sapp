@@ -1,7 +1,36 @@
-# Co dalej — stan na 2026-08-13
+# Co dalej — stan na 2026-08-14
 
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
+
+## 📱 Setup zdalnego dostępu (claude.ai/code z telefonu) — W TOKU
+
+Cel: żeby dało się pisać/pushować do tego repo z telefonu, bez trzymania PC włączonego.
+
+**Co już zrobione:**
+- GitHub connector w Ustawieniach claude.ai (Settings → Connectors → "GitHub Integration")
+  jest podłączony (widoczny ✓).
+- Na claude.ai/code przy zakładaniu NOWEGO czatu pojawia się wybór repo — `sapp` jest widoczne
+  na liście.
+
+**Gdzie utknęliśmy:** wybranie repo `sapp` w nowej sesji nie dawało accessu (nie dało się
+przyznać dostępu, mimo że connector ogólny jest podłączony). Diagnoza: to klasyczny gotcha
+GitHub Appek — samo podłączenie connectora (OAuth) to inny krok niż przyznanie apce dostępu
+do KONKRETNEGO repo. Trzeba to zrobić po stronie GitHuba:
+
+1. github.com → avatar (prawy górny róg) → **Settings**
+2. **Applications** → zakładka **Installed GitHub Apps**
+3. Znajdź apkę Claude/Anthropic → **Configure**
+4. Sekcja **Repository access** — jeśli "Only select repositories", sprawdź czy `sapp` jest
+   zaznaczone; jeśli go nie ma, dodaj (albo przełącz na "All repositories")
+5. **Save**, wróć do claude.ai/code, spróbuj ponownie założyć sesję na `sapp`
+
+**Uwaga:** ekran Ustawienia → **"Claude Code"** w lewym pasku claude.ai to PREFERENCJE (wygląd,
+auto-PR, tokeny) — NIE to samo co ekran zakładania nowej sesji. Nowa sesja/wybór repo zakłada
+się z **claude.ai/code** bezpośrednio (nie przez zębatkę Ustawień).
+
+Status na razie: user przechodzi teraz na zdalny czat żeby dokończyć to na miejscu — jeśli
+w kolejnej sesji to nadal nie działa, ten fragment jest punktem startowym diagnozy.
 
 ## 🔴 Do przetestowania na urządzeniu (świeże, pierwsza wersja, NIEsprawdzone)
 
