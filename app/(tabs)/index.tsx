@@ -1913,8 +1913,8 @@ export default function DashboardScreen() {
       sleepMinutes: healthDays[tISO]?.sleepMinutes ?? 0,
       moodDaysThisMonth: new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size,
       stepsThisMonth: Object.entries(healthDays).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0),
-    }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, monthlyClaims: petMonthlyClaims, today: tISO }).claimableCount;
-  }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, monthCards, petClaimedQuests, petDailyClaims, petMonthlyClaims, getStreak]);
+    }, { claimedMilestones: petClaimedQuests, dailyClaims: petDailyClaims, monthlyClaims: petMonthlyClaims, today: tISO }, petLevel).claimableCount;
+  }, [healthDays, moodEntries, habitsDoneIds.length, habits, expenses, monthCards, petClaimedQuests, petDailyClaims, petMonthlyClaims, getStreak, petLevel]);
   // Evening pupil nudge — content matches state (free chest → rewards → misses you).
   // Rescheduled on every open so it never nags about something already handled.
   useEffect(() => {

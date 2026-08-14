@@ -42,15 +42,24 @@ export function raidForWeek(weekKey: string): Raid {
 }
 
 // HP raidu — rośnie z poziomem (zawsze wyzwanie) + lekka wariacja tygodniowa.
-// Skalibrowane pod realny tygodniowy output: energia banked ~raz/dzień (attackAtak zeruje
-// pulę, syncRaidEnergy nie dobija ponad dzisiejszy próg) = maks ~350×(1+energyMult) dziennie,
-// × atkMultiplier(level) × weaknessMult(~1.15 śr.) × drobny bonus z critów. Stary base
-// (8000 + level×900) dawał raid killowalny w ~20-30% w tydzień — im wyższy poziom, tym
-// GORZEJ (HP rosło ×900/lvl, output tylko ~×0.03/lvl) = odwrotność zamierzonego. Nowy
-// base trzyma się blisko realnego tygodniowego dmg na każdym poziomie (do ubicia przy
-// codziennym graniu, ciasno gdy odpuścisz dzień-dwa).
+//
+// PRZEKALIBROWANE (2026-08-14, balance audit #2, patrz memory boss_design.md) — poprzedni
+// base (2000+level×220) był NIEUKOŃCZALNY przez pierwsze ~25-30 poziomów (symulacja w pełni
+// zaangażowanego gracza: 34-60% HP zabitego w tydzień na Lv3-20), mimo że raid odblokowuje
+// się już na Lv3. Nowy, niższy base robi z raidu coś realnie kończalnego blisko odblokowania,
+// nie dopiero po miesiącach.
+//
+// UWAGA — świadomie NIEROZWIĄZANE: to samo audytowanie pokazało, że output gracza rośnie
+// SZYBCIEJ niż jakikolwiek gładki wielomian od `level` potrafi nadążyć w górnych poziomach —
+// bo output zależy nie tylko od poziomu, ale i od tego ILE bossów kampanii już pokonanych
+// (kumulujący się % atk/dodge/energyMult z łupu, patrz bossBonuses w bosses.ts), a to DRUGA,
+// niezależna oś progresji. Formuła licząca tylko `level` z natury nie może dokładnie trafić
+// wszędzie — po ~Lv30-40 raid będzie stawał się coraz łatwiejszy (nadwyżka rosnąca do kilkuset
+// %), to znany, zaakceptowany kompromis, nie przeoczenie. Właściwa naprawa endgame wymagałaby
+// policzenia HP też od `defeatedBosses.length` (osobny parametr), nie tylko poziomu — większa
+// zmiana, odłożona (patrz NEXT_STEPS.md).
 export function raidHpFor(level: number, weekKey: string): number {
-  const base = 2000 + Math.max(0, level) * 220;
+  const base = 1000 + Math.max(0, level) * 210;
   const variance = 100 + (hashOf(weekKey, 17) % 20);   // 100..119%
   return Math.round(base * variance / 100 / 100) * 100;
 }

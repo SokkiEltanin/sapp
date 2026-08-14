@@ -1,4 +1,4 @@
-import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, ClaimState } from '@/utils/quests';
+import { buildQuests, buildMissedDaily, sweetlessDaysFrom, questRewardMult, QuestCtx, ClaimState } from '@/utils/quests';
 
 // weekKeyOf jest już pokryty przez __tests__/weekKey.test.ts — nie duplikujemy tutaj.
 
@@ -134,5 +134,38 @@ describe('sweetlessDaysFrom', () => {
       { date: ymd(now) + 'T10:00:00', receiptItems: [{ tags: ['słodycze'], excluded: true }] }, // wykluczony, pomijany
     ];
     expect(sweetlessDaysFrom(expenses)).toBe(3);
+  });
+});
+
+describe('buildQuests — questRewardMult (nagrody rosną z poziomem, 2026-08-14 balance audit)', () => {
+  test('poziom 1 (domyślny, brak 3. argumentu) = mnożnik ×1, dokładnie bazowe wartości', () => {
+    expect(questRewardMult(1)).toBe(1);
+    const r = buildQuests(baseCtx({ moodLoggedToday: true }), baseClaim());
+    expect(r.daily.find(d => d.id === 'd_mood')!.coins).toBe(2);
+    expect(r.daily.find(d => d.id === 'd_mood')!.xp).toBe(5);
+  });
+
+  test('wyższy poziom → wyższe coins/xp za TEN SAM quest', () => {
+    const lowLvl = buildQuests(baseCtx({ moodLoggedToday: true }), baseClaim(), 1);
+    const highLvl = buildQuests(baseCtx({ moodLoggedToday: true }), baseClaim(), 60);
+    const lowQ = lowLvl.daily.find(d => d.id === 'd_mood')!;
+    const highQ = highLvl.daily.find(d => d.id === 'd_mood')!;
+    expect(highQ.coins).toBeGreaterThan(lowQ.coins);
+    expect(highQ.xp).toBeGreaterThan(lowQ.xp);
+  });
+
+  test('milestone (jednorazowy, kolekcjonerski) NIE skaluje się z poziomem', () => {
+    const lowLvl = buildQuests(baseCtx({ sweetlessDays: 15 }), baseClaim(), 1);
+    const highLvl = buildQuests(baseCtx({ sweetlessDays: 15 }), baseClaim(), 60);
+    const lowTier = lowLvl.milestones.find(m => m.id === 'm_sweetless')!.tiers.find(t => t.at === 10)!;
+    const highTier = highLvl.milestones.find(m => m.id === 'm_sweetless')!.tiers.find(t => t.at === 10)!;
+    expect(highTier.coins).toBe(lowTier.coins);
+  });
+
+  test('buildMissedDaily też skaluje z poziomem (domyślnie level=1 = bez zmian)', () => {
+    const ctx = baseCtx({ moodLoggedToday: true });
+    const base = buildMissedDaily(ctx, {}, '2026-08-14');
+    const scaled = buildMissedDaily(ctx, {}, '2026-08-14', 60);
+    expect(scaled.find(d => d.id === 'd_mood')!.coins).toBeGreaterThan(base.find(d => d.id === 'd_mood')!.coins);
   });
 });

@@ -48,6 +48,7 @@ export default function Pet() {
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markTrainingDay } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
+  const lvl = levelFromXp(xp);
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
@@ -190,8 +191,8 @@ export default function Pet() {
     };
   }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay]);
   const quests = useMemo(
-    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }),
-    [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims],
+    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }, lvl.level),
+    [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],
   );
 
   // Rewards you actually earned YESTERDAY but never opened the app to collect. Built
@@ -209,8 +210,8 @@ export default function Pet() {
       waterToday: yData.water, waterGoal,
       sleepMinutes: yData.sleep,
     };
-    return buildMissedDaily(yCtx, dayClaims, y);
-  }, [yData, moodEntries, habits, completions, waterGoal, dayClaims]);
+    return buildMissedDaily(yCtx, dayClaims, y, lvl.level);
+  }, [yData, moodEntries, habits, completions, waterGoal, dayClaims, lvl.level]);
 
   const claimMissed = (q: { id: string; label: string; coins: number; xp: number }) => {
     if (claimDailyFor(q.id, yesterdayISO(), q.coins, q.xp)) {
@@ -283,7 +284,6 @@ export default function Pet() {
   }, [health, stepGoal, todayDone.length, habits.length, moodEntries, overBudget]);
 
   const pet = useMemo(() => computePetState(input), [input]);
-  const lvl = levelFromXp(xp);
   const stage = growthStage(lvl.level);
 
   // one passive care-XP grant per day, scaled by wellbeing
