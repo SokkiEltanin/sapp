@@ -1,56 +1,52 @@
 import {
-  minibossForDay, minibossAsBoss, minibossHpFor, minibossCoins, minibossXp,
-  WATER_MINIBOSSES, STEPS_MINIBOSSES, STEPS_MILESTONE,
+  minibossForQuest, minibossAsBoss, questBossHpFor, questFightCoins, questFightXp,
+  FIGHT_BONUS, MINIBOSSES,
 } from '@/utils/minibosses';
 
-describe('minibosses — minibossForDay (deterministyczny wybór na dzień/tor)', () => {
-  test('ten sam dzień+tor → zawsze ten sam miniboss', () => {
-    const a = minibossForDay('2026-08-14', 'water');
-    const b = minibossForDay('2026-08-14', 'water');
+describe('minibosses — minibossForQuest (deterministyczny wybór na dzień/quest)', () => {
+  test('ten sam dzień+quest → zawsze ten sam miniboss', () => {
+    const a = minibossForQuest('2026-08-14', 'd_mood');
+    const b = minibossForQuest('2026-08-14', 'd_mood');
     expect(a.id).toBe(b.id);
   });
 
-  test('water i steps ciągną z osobnych, nienachodzących na siebie pul', () => {
-    const waterIds = new Set(WATER_MINIBOSSES.map(m => m.id));
-    const stepsIds = new Set(STEPS_MINIBOSSES.map(m => m.id));
-    for (const id of waterIds) expect(stepsIds.has(id)).toBe(false);
+  test('zwraca kompletny obiekt z rostera', () => {
+    const mb = minibossForQuest('2026-08-14', 'd_mood');
+    expect(MINIBOSSES.map(m => m.id)).toContain(mb.id);
+    expect(mb.name).toBeTruthy();
+    expect(mb.taunt).toBeTruthy();
   });
 
-  test('zwraca kompletny obiekt z właściwej puli dla danego toru', () => {
-    const w = minibossForDay('2026-08-14', 'water');
-    const st = minibossForDay('2026-08-14', 'steps');
-    expect(WATER_MINIBOSSES.map(m => m.id)).toContain(w.id);
-    expect(STEPS_MINIBOSSES.map(m => m.id)).toContain(st.id);
+  test('różne questy tego samego dnia dają realnie różnych minibossów (nie utknięte na jednym)', () => {
+    const quests = ['d_mood', 'd_steps10', 'd_steps20', 'd_habits', 'd_pet', 'b_water', 'b_sleep', 'b_stepbeat'];
+    const ids = new Set(quests.map(q => minibossForQuest('2026-08-14', q).id));
+    expect(ids.size).toBeGreaterThan(1);
   });
 
-  test('różne dni dają realnie różnych minibossów (nie utknięte na jednym)', () => {
+  test('różne dni dla tego samego questu też dają realnie różnych minibossów', () => {
     const days = ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15', '2026-08-16', '2026-08-17'];
-    const ids = new Set(days.map(d => minibossForDay(d, 'water').id));
+    const ids = new Set(days.map(d => minibossForQuest(d, 'd_mood').id));
     expect(ids.size).toBeGreaterThan(1);
   });
 });
 
-describe('minibosses — balans (dużo niżej niż wydarzenia/kampania, "stosunkowo łatwy")', () => {
-  test('HP rośnie z poziomem, ale zostaje niskie', () => {
-    expect(minibossHpFor(1)).toBeLessThan(100);
-    expect(minibossHpFor(20)).toBeGreaterThan(minibossHpFor(1));
+describe('minibosses — balans (rośnie z poziomem, nagroda > standardowy claim)', () => {
+  test('HP rośnie z poziomem', () => {
+    expect(questBossHpFor(20)).toBeGreaterThan(questBossHpFor(1));
   });
 
-  test('coins/xp rosną z poziomem', () => {
-    expect(minibossCoins(10)).toBeGreaterThan(minibossCoins(1));
-    expect(minibossXp(10)).toBeGreaterThan(minibossXp(1));
-  });
-
-  test('próg kroków zgodny z istniejącym questem d_steps10 (10k)', () => {
-    expect(STEPS_MILESTONE).toBe(10000);
+  test('nagroda za wygraną walkę jest WYŻSZA niż bazowa stawka questu (user: "dają więcej monet i XP")', () => {
+    expect(questFightCoins(10)).toBeGreaterThan(10);
+    expect(questFightXp(20)).toBeGreaterThan(20);
+    expect(FIGHT_BONUS).toBeGreaterThan(1);
   });
 });
 
 describe('minibosses — minibossAsBoss (kształt gotowy do simulateFight)', () => {
-  test('HP w Boss-obiekcie zgodne z minibossHpFor na danym poziomie', () => {
-    const mb = WATER_MINIBOSSES[0];
+  test('HP w Boss-obiekcie zgodne z questBossHpFor na danym poziomie', () => {
+    const mb = MINIBOSSES[0];
     const boss = minibossAsBoss(mb, 5);
-    expect(boss.hp).toBe(minibossHpFor(5));
+    expect(boss.hp).toBe(questBossHpFor(5));
     expect(boss.id).toBe(mb.id);
     expect(boss.name).toBe(mb.name);
   });

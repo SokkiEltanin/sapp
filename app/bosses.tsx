@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Zap, Lock, Check, Swords, Trophy, ChevronRight, Droplets, Footprints } from 'lucide-react-native';
+import { ChevronLeft, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
@@ -109,23 +109,6 @@ export default function Bosses() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* ── MINIBOSSY (2026-08-14): osobny ekran/tor, patrz src/utils/minibosses.ts —
-            codzienna, łatwa walka za wypełnienie celu wody/kroków. Sam banner, bez
-            podglądu stanu tutaj (progres/claim żyje tylko na tamtym ekranie). ── */}
-        <PressableScale onPress={() => { haptic.tap(); router.push('/minibosses' as any); }}>
-          <View style={s.minibossBanner}>
-            <View style={s.minibossIcons}>
-              <Droplets size={16} color="#38BDF8" />
-              <Footprints size={16} color="#2AC68F" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.minibossTitle}>Minibossy</Text>
-              <Text style={s.minibossSub}>Codzienna walka za wodę i kroki</Text>
-            </View>
-            <ChevronRight size={18} color={c.text.muted} />
-          </View>
-        </PressableScale>
-
         {/* ── RAID + WYDARZENIE: kompaktowy podgląd, WALCZ nawiguje do boss-fight ── */}
         <View style={s.miniRow}>
           <View style={s.miniCard}>
@@ -320,11 +303,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   rowName: { fontSize: 14, fontWeight: '800', color: c.text.primary },
   rowSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
   rowBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2AC68F1A', alignItems: 'center', justifyContent: 'center' },
-
-  minibossBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginBottom: spacing[3] },
-  minibossIcons: { flexDirection: 'row', gap: 4 },
-  minibossTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
-  minibossSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
 
   miniRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[3] },
   miniCard: { flex: 1, minWidth: 0, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: 6 },

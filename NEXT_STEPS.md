@@ -79,34 +79,35 @@ Diagnostyka):
 do sprawdzenia czy krzywa się broni. Alternatywnie może zresetować postęp i zacząć od zera na
 świeżo przetestowanej krzywej.
 
-## 🆕 Minibossy — zaimplementowane, NIEsprawdzone na urządzeniu (2026-08-14)
+## 🆕 Questy jako walki — v2, zaimplementowane, NIEsprawdzone na urządzeniu (2026-08-14)
 
-User chciał: zamiast cichego claimu nagrody pupila za wodę/kroki, żeby pasek postępu
-odblokowywał krótką walkę. Zbudowane w tej sesji (grafiki z `assets/minibosses/`, 8 zwierząt
-usera z folderu MINIBOSSY na masterze):
+⚠️ Pierwsza wersja tego dnia (osobny ekran `app/minibosses.tsx`, tory woda/kroki, DODANA jako
+bonus nad questami) była **źle zrozumianym pomysłem usera** — usunięta tego samego dnia, zanim
+trafiła na urządzenie. Poprawiona wersja (v2):
 
-- **Osobny ekran `app/minibosses.tsx`** (link: baner w `app/bosses.tsx` nad Raid/Wydarzenie).
-  Dwa tory: 💧 woda (nawyk wody dobity do celu) i 👣 kroki (10k dziennie, ten sam próg co
-  quest `d_steps10`). Miniboss na dany dzień/tor deterministyczny (ten sam dzień → to samo
-  zwierzę), pula 4 zwierząt/tor (`WATER_MINIBOSSES`/`STEPS_MINIBOSSES` w `utils/minibosses.ts`).
-- Walka to PRAWDZIWY `simulateFight` (jak kampania — realny kontratak, można przegrać), ale
-  BEZ animacji pocisk/łapa jak `boss-fight.tsx` — wynik liczy się od razu, modal pokazuje
-  tylko rezultat + liczbę rund. **To świadome uproszczenie** — jeśli ma dostać pełną
-  choreografię, to osobna decyzja/sesja.
-- HP/nagrody celowo niskie ("stosunkowo łatwy" — user słowo w słowo), bo to DODATKOWA warstwa
-  nad istniejącymi questami pupila (`b_water`/`b_stepbeat`/`d_steps10` w `quests.ts` zostały
-  NIETKNIĘTE, nie usunięte — usuwanie zostawiłoby dead-endy gdzie indziej).
-- `petStore.bossLog` (dodane w tej samej sesji, patrz wyżej) loguje też te walki
-  (`kind: 'miniboss-water'`/`'miniboss-steps'`) — widoczne w eksporcie postępu.
+- **Każdy quest dzienny/bonusowy** (`quests.ts` DAILY+BONUS, w `app/pet.tsx`) po wykonaniu
+  pokazuje przycisk **"Walcz"** zamiast zwykłego "Odbierz". Standardowe monety za te questy
+  ZNIKNĘŁY — jedyna droga do nagrody to wygrana walka.
+- Walka to `?kind=quest` w `boss-fight.tsx` — **PEŁNA animacja jak kampania** (łapka/pociski/
+  kontratak, można przegrać, retry darmowy — user explicite wybrał to nad uproszczonym
+  ekranem z pierwszej wersji).
+- Miniboss losowany deterministycznie na dzień+quest (`minibossForQuest`, roster 8 zwierząt z
+  `assets/minibosses/`, art teraz w WSPÓLNEJ mapie `bossIcons.ts`, nie osobnym pliku).
+- HP rośnie z poziomem kotka (`questBossHpFor`); nagroda = bazowa stawka questu (już
+  przeskalowana `questRewardMult` z poprzedniego commita) × 1.6 (`FIGHT_BONUS`) — WIĘCEJ niż
+  dawał zwykły claim, zgodnie z życzeniem usera.
+- Nowa akcja store'u `claimQuestFight` (zastąpiła `claimMiniboss`) — pisze do `dailyClaims`
+  (nie tylko `dayClaims`), bo inaczej `buildQuests()` nie uznałby questu za odebrany.
+- Missed/catch-up questy (zaległe z wczoraj) ZOSTAJĄ instant-claimem — walka z minibossem
+  losowanym na dzisiejszą datę za coś z wczoraj byłaby myląca.
 
-**Priorytet testowania:** zagraj przynajmniej jedną walkę wodną i jedną kroków (napij się do
-celu / wybij 10k), sprawdź czy baner w Bossach nawiguje, czy pasek postępu się zgadza, czy
-walka się kończy sensownie (nie za łatwo/trudno — user chce to ocenić przez eksport postępu,
-patrz sekcja balansu wyżej).
+**Priorytet testowania:** wykonaj dowolny quest dzienny (np. wpisz humor), sprawdź czy pojawia
+się "Walcz", czy walka wygląda jak kampania, czy po wygranej quest znika z listy aktywnych i
+nagroda się zgadza (powinna być widoczna 60% wyższa niż liczba pokazana na liście przed walką).
 
-**Odłożone od usera (jego własny pomysł, nie zbudowane, "nie wiem, przemyśl to"):** miesięczna/
-roczna suma kroków jako druga, większa kampania z "MEGABOSSAMI" — user sam niepewny kształtu,
-do zaprojektowania w kolejnej sesji zamiast zgadywania teraz.
+**Odłożone od usera (jego własny pomysł, nie zbudowane, "czy coś" — sam niepewny kształtu):**
+mapa oparta o kroki ALL-TIME prowadząca do dodatkowych "MEGABOSSÓW" — osobna, większa
+kampania. Do zaprojektowania w kolejnej sesji, nie zgadywane teraz.
 
 ## 🔴 Do przetestowania na urządzeniu (świeże, pierwsza wersja, NIEsprawdzone)
 

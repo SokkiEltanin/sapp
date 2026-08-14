@@ -254,17 +254,24 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
     (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
     tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
-  - **Minibossy** (2026-08-14, `utils/minibosses.ts` + `minibossIcons.ts`) — CZWARTY tor,
-    ale OSOBNY ekran `app/minibosses.tsx` (nie `?kind=` w boss-fight.tsx, celowo bez
-    animacji pocisków — wynik walki liczy się od razu, UI pokazuje tylko rezultat).
-    Dwa niezależne codzienne tory: `water` (nawyk `kind==='water'` dobija do `dailyGoal`)
-    i `steps` (kroki dziś ≥ `STEPS_MILESTONE`=10k, źródło: `getHealthHistory`). Balans
-    CELOWO dużo niżej niż wydarzenia (`minibossHpFor`/`Coins`/`Xp`) — to DODATKOWA warstwa
-    nad istniejącymi questami pupila (`quests.ts` `b_water`/`b_stepbeat`/`d_steps10`
-    zostają nietknięte, nie usuwane — zamiana zostawiłaby dead-endy). Claim-guard reużywa
-    generyczny `dayClaims` store'u (klucz `miniboss_<lane>:<data>`), nie nowe pola. Wejście:
-    baner w `app/bosses.tsx` nad rzędem Raid/Wydarzenie (NIE w `PupilNavbar` — ten ma
-    świadomie ustalone 4 taby, patrz komentarz w pliku).
+  - **Questy-jako-walki** (2026-08-14 v2, `utils/minibosses.ts`) — CZWARTY tor, `?kind=quest`
+    w `boss-fight.tsx` (pełna animacja, TA SAMA co kampania/wydarzenie — user chciał S&F-styl
+    wszędzie). ⚠️ Pierwsza wersja (osobny ekran `app/minibosses.tsx`, tory woda/kroki, DODANA
+    nad questami) była źle zrozumianym pomysłem — usunięta tego samego dnia. Poprawny kształt:
+    **każdy** quest dzienny/bonusowy (`quests.ts` DAILY/BONUS) po wykonaniu pokazuje w
+    `app/pet.tsx` przycisk **"Walcz"** zamiast zwykłego "Odbierz" — standardowe monety za te
+    questy ZNIKNĘŁY, jedyna droga do nagrody to wygrana walka z minibossem PRZYPISANYM do
+    tego questu na ten dzień (`minibossForQuest(date, questId)`, deterministyczne, roster
+    8 zwierząt z `assets/minibosses/`, art dopisany do WSPÓLNEJ mapy `bossIcons.ts` — BossArt
+    działa 1:1, bez osobnego komponentu, jak sezonowe wydarzenia). HP rośnie z poziomem
+    (`questBossHpFor`); nagroda = bazowa stawka questu (już po `questRewardMult` w
+    `quests.ts`) × `FIGHT_BONUS` (1.6×) — WIĘCEJ niż dawał zwykły claim. Rozliczenie na
+    ekranie walki przez nową akcję `petStore.claimQuestFight(questId,...)` — MUSI pisać do
+    `dailyClaims` (nie tylko `dayClaims`), bo `buildQuests()` czyta `dailyClaims[id]===today`
+    żeby uznać quest za odebrany. Bez puli prób/energii — quest już wykonany realnie, retry
+    po przegranej jest darmowy. Missed/catch-up questy (zaległe z wczoraj) ZOSTAJĄ instant-
+    claimem w `pet.tsx` (`claimMissed`/`claimDailyFor`) — walka z minibossem losowanym na
+    DZISIEJSZĄ datę za coś zrobionego wczoraj byłaby myląca.
   - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 4
     torów wyżej), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
     czytelny tekstowy raport (poziom/staty/pokonani bossowie/log), Ustawienia →

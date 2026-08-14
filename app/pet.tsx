@@ -17,7 +17,7 @@ import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
 import { useProfileStore } from '@/store/profileStore';
 import { ageFrom, targetsFor, dailyExercisePool, trainingStreakFrom } from '@/utils/personalQuests';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
+import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { paletteById } from '@/utils/catPalettes';
 import { getBudgets } from '@/utils/budgets';
 import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
@@ -32,7 +32,7 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Coins as CoinsIcon, Check as CheckIcon, Gift } from 'lucide-react-native';
+import { Coins as CoinsIcon, Check as CheckIcon, Gift, Swords } from 'lucide-react-native';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
@@ -43,9 +43,9 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, addCoins,
+  const { name, xp, coins, setName, careTick, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, addCoins,
     pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
-    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markTrainingDay } = usePetStore();
+    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
@@ -246,11 +246,15 @@ export default function Pet() {
     if (claimWeekly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
   };
 
-  const onClaimDaily = (id: string, c2: number, x: number, label: string) => {
-    if (claimDaily(id, c2, x)) {
-      haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1);
-      if (TRAINING_QUEST_IDS.includes(id)) markTrainingDay();
-    }
+  // Questy dzienne/bonusowe (2026-08-14 v2, user: "zamiast monet przyciski walk") — zamiast
+  // odbioru monet od razu, wykonany quest odblokowuje WALKĘ z minibossem (boss-fight.tsx
+  // ?kind=quest); wygrana rozlicza nagrodę TAM (claimQuestFight, > standardowa stawka —
+  // patrz minibosses.ts questFightCoins/Xp), nie tutaj. onClaimDaily zostaje TYLKO dla
+  // zaległych questów sprzed dni (missed/catch-up) — retroaktywna walka za wczoraj byłaby
+  // myląca (miniboss losowany na DZISIEJSZĄ datę), więc te zostają instant-claimem.
+  const onFightQuest = (id: string, coins: number, xp: number, label: string) => {
+    haptic.tap();
+    router.push(`/boss-fight?kind=quest&questId=${id}&questLabel=${encodeURIComponent(label)}&questCoins=${coins}&questXp=${xp}` as any);
   };
   const onClaimTier = (id: string, c2: number, x: number) => {
     claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
@@ -429,7 +433,7 @@ export default function Pet() {
                     </View>
                     <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
                     {q.done
-                      ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                      ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
                       : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
                   </View>
                 ))}
@@ -471,7 +475,7 @@ export default function Pet() {
                           </View>
                           <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
                           {q.done
-                            ? <PressableScale onPress={() => onClaimDaily(q.id, q.coins, q.xp, q.label)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                            ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
                             : selfReport
                               ? <PressableScale onPress={() => { haptic.tap(); selfReport(); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Zrobione</Text></View></PressableScale>
                               : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
@@ -666,6 +670,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qRewardTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
   qClaim: { backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 10, shadowColor: '#2AC68F', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   qClaimTxt: { fontSize: 14, fontWeight: '900', color: '#07160F', letterSpacing: 0.2 },
+  qFight: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10, shadowColor: '#EF4444', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  qFightTxt: { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
   qDone: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2AC68F1A' },
   qClaimedFoot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing[2] },
   qClaimedTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, letterSpacing: 0.2 },
