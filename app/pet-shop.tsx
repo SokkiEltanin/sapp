@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check, Snowflake, Gift, Palette, Sparkles, Rocket, Flame, Backpack } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import StartupPreview from '@/components/pet/StartupPreview';
@@ -88,12 +89,12 @@ export default function PetShop() {
   const clearPreviews = () => { setPvColor(null); setPvStripes(null); setPvEye(null); setPvNose(null); setPvWhiskers(null); setPvLeg(null); };
 
   // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
-  // założenie posiadanego / darmowa skrzynka dnia nie pytają).
+  // założenie posiadanego / darmowa skrzynka dnia nie pytają). Themowany ConfirmDialog
+  // zamiast Alert.alert (2026-08-15, user: "potwierdzenia nie są dokończone" — ten sam
+  // fix co w pet-stats.tsx, patrz komentarz w ConfirmDialog.tsx).
+  const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string } | null>(null);
   const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup') => {
-    Alert.alert('Potwierdź zakup', `${name} — ${cost} monet`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: verb, onPress: onYes },
-    ]);
+    setPendingBuy({ name, cost, onYes, verb });
   };
 
   const onBuyFreeze = () => {
@@ -559,6 +560,16 @@ export default function PetShop() {
       />
 
       <PupilNavbar current="shop" />
+      <ConfirmDialog
+        visible={!!pendingBuy}
+        title="Potwierdź zakup"
+        message={pendingBuy ? `${pendingBuy.name} — ${pendingBuy.cost} monet` : ''}
+        confirmLabel={pendingBuy?.verb ?? 'Kup'}
+        cancelLabel="Anuluj"
+        destructive={false}
+        onConfirm={() => { pendingBuy?.onYes(); setPendingBuy(null); }}
+        onCancel={() => setPendingBuy(null)}
+      />
     </SafeAreaView>
   );
 }
