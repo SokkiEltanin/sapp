@@ -79,7 +79,29 @@ Diagnostyka):
 do sprawdzenia czy krzywa się broni. Alternatywnie może zresetować postęp i zacząć od zera na
 świeżo przetestowanej krzywej.
 
-## 🆕 Questy jako walki — v2, zaimplementowane, NIEsprawdzone na urządzeniu (2026-08-14)
+## ✅ Questy jako walki — v2, POTWIERDZONE na urządzeniu (2026-08-14→15)
+
+User zagrał walkę za quest na telefonie: "walka wygladała super". Od tej pory ten podsystem
+liczy się jako sprawdzony, nie "świeże/nietestowane" — dwie dalsze iteracje na jego bazie:
+
+- **Trudność podniesiona (2026-08-15)** — user: "dają 1hp dmg dla mnie a ja ich wale na 2
+  hity". `questBossHpFor` przepisane z płaskiej krzywej (`50+level×5`) na `atkPower(level)×4`
+  (target 4 ciosy) — skaluje się 1:1 z realną mocą ataku na każdym poziomie, więc nie robi
+  się trywialne w mid-game jak poprzednio. Sprawdzone symulacją (throwaway test, skasowany):
+  teraz stabilnie ~4-4.6 ciosu i 10-45% obrażeń na kotku (rosnące z poziomem) na całym
+  zakresie Lv1-120, zamiast 2 ciosów/<1% już od Lv10. **Priorytet testowania:** stoczyć
+  kilka walk questowych na różnych poziomach, potwierdzić że faktycznie czuć różnicę.
+- **Sesja treningowa self-report (2026-08-15)** — pompki/przysiady/brzuszki/deska/
+  rozciąganie (`b_pushups`/`b_squats`/`b_situps`/`b_plank`/`b_stretch`) miały jedno tapnięcie
+  "Zrobione" (bez czujnika, rower ma osobno przez Health Connect). Teraz przycisk
+  "Rozpocznij" → `TrainingSessionModal` (`components/pet/TrainingSessionModal.tsx`): deska/
+  rozciąganie dostają realnie odliczany timer do celu z `personalQuests.ts`, pompki/
+  przysiady/brzuszki ekran z docelową liczbą powtórzeń + przycisk "UKOŃCZYŁEM". Po
+  ukończeniu quest staje się `done` i wchodzi w ten sam tor "Walcz" co reszta. **NIEsprawdzone
+  na urządzeniu** — priorytet: rozpocznij deskę, sprawdź czy timer faktycznie liczy do zera i
+  quest odblokowuje "Walcz"; rozpocznij pompki, sprawdź ekran licznika + UKOŃCZYŁEM.
+
+## Historia — jak to powstało (2026-08-14, zaimplementowane w jednej sesji)
 
 ⚠️ Pierwsza wersja tego dnia (osobny ekran `app/minibosses.tsx`, tory woda/kroki, DODANA jako
 bonus nad questami) była **źle zrozumianym pomysłem usera** — usunięta tego samego dnia, zanim

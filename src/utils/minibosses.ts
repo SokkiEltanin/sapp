@@ -1,4 +1,4 @@
-import { Boss, BossLoot } from '@/utils/bosses';
+import { Boss, BossLoot, BASE_ATK, atkMultiplier } from '@/utils/bosses';
 
 // MINIBOSSY v2 (2026-08-14) — user sprecyzował że pierwsza wersja (osobny ekran, tory
 // woda/kroki, płaska łatwa walka DODANA nad questami) była źle zrozumiana. Poprawny
@@ -42,9 +42,19 @@ export function minibossForQuest(dateISO: string, questId: string): MiniBoss {
   return MINIBOSSES[hashOf(`${dateISO}:${questId}`, 31) % MINIBOSSES.length];
 }
 
-// HP rośnie z poziomem — realna walka (nie trywialna jak v1), ale nadal krótsza niż boss
-// kampanii na tym samym poziomie (te potrafią wypaść kilka razy dziennie, jeden na quest).
-export const questBossHpFor = (level: number) => 50 + Math.max(0, level) * 5;
+// HP przywiązane do REALNEJ mocy ataku kotka na tym poziomie (atkPower z bosses.ts, bez
+// bonusów z łupu — tak jak v1), nie do osobnej liniowej krzywej. Fix 2026-08-15: user —
+// "dają 1hp dmg dla mnie a ja ich wale na 2 hity" — stara stała krzywa (50 + level×5) rosła
+// WOLNIEJ niż atkMultiplier(level) (asymptota ok. 4 ciosów przy nieskończonym poziomie, ale
+// od level ~10 już tylko 2), więc quest-bossy stawały się trywialne właśnie tam gdzie gracz
+// spędza najwięcej czasu (środek gry). Licząc hp = atkPower × TARGET_HITS trudność SKALUJE
+// się 1:1 z mocą kotka na każdym poziomie — zawsze ten sam docelowy % ciosów, więc nie ma
+// powtórki endgame'owego przesunięcia z raid.ts (raidHpFor). Wciąż krócej niż boss kampanii
+// na tym samym poziomie (te mają setki-tysiące hp) — to nadal SZYBKA, kilka-razy-dziennie
+// walka, nie odpowiednik kampanii/raidu.
+const QUEST_BOSS_TARGET_HITS = 4;
+export const questBossHpFor = (level: number) =>
+  Math.round(BASE_ATK * atkMultiplier(Math.max(0, level), { atk: 0, dodge: 0, crit: 0, energyMult: 0 }) * QUEST_BOSS_TARGET_HITS);
 
 // Nagroda = bazowa stawka questu (już po questRewardMult w quests.ts) × bonus za walkę —
 // user: "przez to dają więcej monet i więcej XP" niż dawał zwykły claim. 1.6 = +60%.

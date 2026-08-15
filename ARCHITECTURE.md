@@ -271,7 +271,22 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     żeby uznać quest za odebrany. Bez puli prób/energii — quest już wykonany realnie, retry
     po przegranej jest darmowy. Missed/catch-up questy (zaległe z wczoraj) ZOSTAJĄ instant-
     claimem w `pet.tsx` (`claimMissed`/`claimDailyFor`) — walka z minibossem losowanym na
-    DZISIEJSZĄ datę za coś zrobionego wczoraj byłaby myląca.
+    DZISIEJSZĄ datę za coś zrobionego wczoraj byłaby myląca. HP (`questBossHpFor`, fix
+    2026-08-15) NIE jest osobną liniową krzywą — liczone jako `atkPower(level) × 4` (target
+    4 ciosy), więc trudność skaluje się 1:1 z realną mocą ataku kotka na KAŻDYM poziomie
+    (stara stała `50+level×5` rosła wolniej niż moc ataku, więc walki stawały się trywialne
+    od ok. level 10 — user: "dają 1hp dmg... wale ich na 2 hity"); bez ryzyka endgame'owego
+    przesunięcia jak w `raid.ts` (`raidHpFor`), bo obie strony formuły rosną z tym samym
+    czynnikiem.
+  - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
+    — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
+    `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).
+    Dawniej jedno tapnięcie "Zrobione"; teraz przycisk **"Rozpocznij"** w `pet.tsx` otwiera
+    modal: dla deski/rozciągania realny ODLICZANY timer (`setInterval`, jak `pomodoroStore`)
+    od celu z `personalQuests.ts` (`plankSeconds`/`stretchMinutes`), dla pompek/przysiadów/
+    brzuszków ekran z docelową liczbą powtórzeń + przycisk "UKOŃCZYŁEM" (bez czujnika liczyć
+    się nie da). Po ukończeniu woła to samo `mark*Done` z `petStore` co wcześniej — quest
+    staje się `done`, dalej idzie przez tor "Questy-jako-walki" wyżej (przycisk "Walcz").
   - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 4
     torów wyżej), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
     czytelny tekstowy raport (poziom/staty/pokonani bossowie/log), Ustawienia →
