@@ -64,6 +64,8 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   siren:    require('../../assets/ikonybosów/BOSS_ataksoundwave_mermaid.png'),
 };
 
+// `mad_<id>` (madBosses.ts, 2026-08-15) reuses the base boss's OWN art (same "powered" red
+// aura trick as raid above) — strip the prefix instead of duplicating all 22 require() lines.
 export function bossPng(id: string): ImageSourcePropType | undefined {
-  return BOSS_PNG[id];
+  return BOSS_PNG[id] ?? (id.startsWith('mad_') ? BOSS_PNG[id.slice(4)] : undefined);
 }

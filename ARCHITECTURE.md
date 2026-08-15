@@ -248,7 +248,7 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   animacja propów SVG stutteruje. RN nie ma transform-origin → piwot = translate→rotate→translate.
 - **AnimatedSplash** używa CatArt (nie PNG) — te same ID/rozmiar co natywny splash, start
   na pełnej widoczności (bez fade-in), żeby statyczny obrazek płynnie „ożył".
-- **Bossy — PIĘĆ trybów walki, wszystkie przez `simulateFight` w `utils/bosses.ts`
+- **Bossy — SZEŚĆ trybów walki, wszystkie przez `simulateFight` w `utils/bosses.ts`
   (round-based, prawdziwy kontratak, można przegrać):**
   - **Kampania** (`BOSSES` w `bosses.ts`, sekwencyjna, 22 bossów) i **wydarzenia**
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
@@ -289,6 +289,37 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     od ok. level 10 — user: "dają 1hp dmg... wale ich na 2 hity"); bez ryzyka endgame'owego
     przesunięcia jak w `raid.ts` (`raidHpFor`), bo obie strony formuły rosną z tym samym
     czynnikiem.
+  - **MAD bossy** (2026-08-15, `utils/madBosses.ts`) — PIĄTY tor, `?kind=mad` w
+    `boss-fight.tsx`. User: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną krzywą
+    HP w nieskończoność (dokładnie problem raidu wyżej), druga fala TYCH SAMYCH 22 bossów
+    kampanii jako trwały endgame cel. User explicite wybrał: zwykła kampania BEZ zmian
+    (`unlockLevel` 2→116 zostaje), MAD to dodatkowa warstwa odblokowywana hurtem na
+    **lvl 50** (`MAD_UNLOCK_LEVEL`) i TYLKO per-boss PO pokonaniu jego zwykłej wersji
+    (`defeatedBosses.includes`) — nie da się przeskoczyć kampanii. Wybór "aktualnego" MAD
+    celu (`madCandidate`) lustrzanie kopiuje `campaignBoss` (`BOSSES.find(b =>
+    !defeated.includes(b.id))`) — jeden wspólny cel po `order`, osobna lista
+    `defeatedMadBosses`/`defeatMadBoss` w `petStore.ts` (bez loot-regrantu — ten item już
+    masz z pokonania zwykłej wersji). Art: POŻYCZONY z kampanii pod `mad_<id>` (prefiks
+    ściągany w `bossPng`/`bossAttackFx`, nie duplikowane require()) + ta sama czerwona
+    `powered` aura co raid.
+    - **HP dynamiczne** (`madBossHpFor(level, order)` = `atkPower(level) × hits(order)`,
+      hits 6→8 przez roster) — liczone z AKTUALNEGO poziomu gracza (jak `questBossHpFor`),
+      nie zamrożone przy `unlockLevel` jak zwykła kampania — MAD nigdy nie robi się
+      przestarzały niezależnie jak wysoko urośnie level (dokładnie unika pułapki raidu).
+    - ⚠️ **Metodologiczna pułapka znaleziona throwaway-symulacją, warta zapamiętania na
+      przyszłość**: pierwsza wersja celowała w 14-25 ciosów (start od góry zakresu kampanii,
+      "dużo silniejsza") — symulacja pokazała że to matematycznie NIEWYGRYWALNE (0% win-rate)
+      już od ok. 8-10 ciosów. Powód: `counterDamage()` liczy % od AKTUALNEGO hp bossa, hp
+      bossa rośnie z `atkPower(level)`, ale pula HP kotka (`catMaxHp`) NIE rośnie automatycznie
+      z levelem (tylko z zakupionym `catMaxHpBonus`) — skumulowany kontratak w całej walce
+      rośnie z KWADRATEM liczby ciosów, nie liniowo. Bezpieczny zakres przy umiarkowanej
+      inwestycji: ~6-8 ciosów (empirycznie, nie zgadywane). Druga pułapka: `guard`/`regenPct`
+      (kilka bossów kampanii, np. wizard) NIE są dziedziczone przez `madBossFor` — odziedziczony
+      `guard` (×0.5 dmg gracza) efektywnie PODWAJA ciosy potrzebne bez podwojenia hits-budżetu
+      formuły, co samo w sobie zawyżało kontratak poza bezpieczny zakres dla tego jednego
+      bossa. Każda przyszła zmiana formuły trudności bossów MUSI przejść przez tę samą
+      throwaway-symulację (jak audyt 14.08/dzisiejsze fixy quest/raid) — papierowe zgadywanie
+      liczby ciosów nie wystarcza, bo `counterDamage` nie skaluje się liniowo.
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

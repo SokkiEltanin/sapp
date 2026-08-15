@@ -13,6 +13,7 @@ import { BOSSES, Boss, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUN
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
+import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { bossAttackFx } from '@/utils/bossAttackFx';
 import { COMBAT_ITEMS } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
@@ -35,7 +36,7 @@ const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
 
-type Kind = 'campaign' | 'raid' | 'event' | 'quest';
+type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot };
 
 // Ekran WALKI (S&F-style, 2026-08-09/10 — patrz memory boss_design.md), wydzielony z listy
@@ -60,12 +61,13 @@ export default function BossFight() {
   const { kind: kindParam, questId, questCoins, questXp, questLabel } = useLocalSearchParams<{
     kind?: string; questId?: string; questCoins?: string; questXp?: string; questLabel?: string;
   }>();
-  const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : kindParam === 'quest' ? 'quest' : 'campaign';
+  const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : kindParam === 'quest' ? 'quest' : kindParam === 'mad' ? 'mad' : 'campaign';
 
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
+    defeatedMadBosses, defeatMadBoss,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
     ownedCombatItems, equippedCombatItems,
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
@@ -143,6 +145,12 @@ export default function BossFight() {
   const questBoss = questMb ? minibossAsBoss(questMb, level) : null;
   const questAlreadyClaimed = kind === 'quest' && questId ? !!dayClaims[`${questId}:${today}`] : false;
 
+  // ── MAD (2026-08-15) — druga, silniejsza fala tych samych 22 bossów kampanii dla lvl 50+,
+  // TYLKO po pokonaniu normalnej wersji (madBosses.ts). Jeden wspólny cel po kolejności
+  // `order`, dokładnie jak campaignBoss wyżej — bez osobnego id w URL.
+  const madBase = kind === 'mad' ? madCandidate(defeatedBosses, defeatedMadBosses) : null;
+  const madBoss = madBase ? weakenBoss(madBossFor(madBase, level), weaknessStreaks[madBase.weakness]) : null;
+
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   // maxHp już uwzględnia osłabienie z realnej serii (patrz weaknessStreaks/weakenBoss wyżej) —
   // ekran zawsze pokazuje FAKTYCZNY pasek HP, nie "surowy" numer z bosses.ts/raid.ts.
@@ -156,6 +164,8 @@ export default function BossFight() {
     target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: eventMaxHp, energy: eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone };
   } else if (kind === 'quest' && questBoss) {
     target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed };
+  } else if (kind === 'mad' && madBoss && madBase) {
+    target = { id: madBoss.id, name: madBoss.name, taunt: madBoss.taunt, weakness: madBoss.weakness, weaknessLabel: madBoss.weaknessLabel, emoji: madBoss.emoji, maxHp: madBoss.hp, energy, unlocked: level >= MAD_UNLOCK_LEVEL, unlockLevel: MAD_UNLOCK_LEVEL, done: false };
   }
   // Streak realny za kategorię AKTUALNEGO celu — do UI-notki "osłabiona obrona" niżej.
   // Quest-minibossy NIE mają mechaniki osłabiania (weakness na nich jest nieużywanym
@@ -165,10 +175,10 @@ export default function BossFight() {
   // Kampania, wydarzenie i quest resetują HP do pełna co próbę (liveBossHp podczas walki,
   // inaczej pełne maxHp) — tylko raid ma trwały bank (raidRemaining).
   const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : raidRemaining) : (liveBossHp ?? target.maxHp)) : 0;
-  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : 'Walka';
-  // Do modala przegranej — kampania/wydarzenie/quest mogą przegrać (raid nie ma kontrataku).
+  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : 'Walka';
+  // Do modala przegranej — kampania/wydarzenie/quest/MAD mogą przegrać (raid nie ma kontrataku).
   // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
-  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : null;
+  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : kind === 'mad' ? madBoss : null;
 
   useEffect(() => { resetCatHp(); }, [kind]);
 
@@ -261,16 +271,18 @@ export default function BossFight() {
       kind === 'campaign' ? campaignBoss :
       kind === 'event' && eventBoss ? weakenBoss(eventAsBoss(eventBoss, level), weaknessStreaks[eventBoss.weakness]) :
       kind === 'quest' ? questBoss :
+      kind === 'mad' ? madBoss :
       null;
     if (!roundBoss) return;
-    // Quest: bez puli prób — quest już wykonany realnie, przegrana = darmowy retry.
+    // Quest: bez puli prób — quest już wykonany realnie, przegrana = darmowy retry. MAD
+    // dzieli pulę energii z kampanią (to jej rozszerzenie, nie osobny tor jak raid/event).
     if (kind !== 'quest') {
-      const pool = kind === 'campaign' ? energy : eventEnergy;
+      const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
       if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     }
     resetCatHp();
     const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
-    if (kind === 'campaign') spendEnergy(); else if (kind === 'event') spendEventEnergy();
+    if (kind === 'campaign' || kind === 'mad') spendEnergy(); else if (kind === 'event') spendEventEnergy();
     setFighting(true);
     setLiveBossHp(roundBoss.hp);
     setCatHit(null);
@@ -295,6 +307,9 @@ export default function BossFight() {
             if (TRAINING_QUEST_IDS.includes(questId)) markTrainingDay();
           }
           setVictory({ kind: 'quest', id: questBoss.id, name: questBoss.name, emoji: questBoss.emoji, coins: coinsWon, xp: xpWon });
+        } else if (kind === 'mad' && madBoss && madBase) {
+          defeatMadBoss(madBase.id, madBoss.coins, madBoss.xp, madBoss.name, level);
+          setVictory({ kind: 'mad', id: madBoss.id, name: madBoss.name, emoji: madBoss.emoji, coins: madBoss.coins, xp: madBoss.xp });
         }
       } else {
         haptic.error();
@@ -459,7 +474,7 @@ export default function BossFight() {
         {!target ? (
           <View style={s.done}>
             <Swords size={30} color={c.text.muted} />
-            <Text style={s.doneTxt}>{kind === 'campaign' ? 'Wszyscy bossowie pokonani! Kolejni wkrótce.' : 'Brak aktywnego wydarzenia teraz — wróć innym razem.'}</Text>
+            <Text style={s.doneTxt}>{kind === 'campaign' ? 'Wszyscy bossowie pokonani! Kolejni wkrótce.' : kind === 'mad' ? 'Brak dostępnego MAD celu — pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.' : 'Brak aktywnego wydarzenia teraz — wróć innym razem.'}</Text>
           </View>
         ) : !target.unlocked ? (
           <View style={s.lockBox}>
@@ -501,7 +516,7 @@ export default function BossFight() {
                       TYLKO na osobnym attackFx burst-image niżej (to naturalnie coś co "wybucha"
                       i rośnie, nie postać która się trzęsie). */}
                   <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
-                    <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid'} />
+                    <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid' || kind === 'mad'} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: bFlashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
                   {attackFx && lastHit && (
@@ -593,9 +608,9 @@ export default function BossFight() {
           <Confetti colors={['#FDE047', '#2AC68F', '#38BDF8', '#F472B6']} />
           {victory && (
             <View style={s.vCenter} pointerEvents="none">
-              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : 'WYGRANA!'}</Text>
+              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : victory.kind === 'mad' ? 'MAD BOSS POKONANY!' : 'WYGRANA!'}</Text>
               <View style={{ opacity: 0.6 }}>
-                <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid'} />
+                <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid' || victory.kind === 'mad'} />
               </View>
               <Text style={s.vName}>{victory.kind === 'campaign' ? `${victory.name} pokonany` : victory.name}</Text>
               <View style={s.vLoot}>
@@ -606,7 +621,7 @@ export default function BossFight() {
                     <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
                   </>
                 ) : (
-                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : 'Medal wydarzenia'}</Text>
+                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : victory.kind === 'mad' ? 'Nagroda MAD' : 'Medal wydarzenia'}</Text>
                 )}
               </View>
               <View style={s.vRewardRow}>
@@ -624,7 +639,7 @@ export default function BossFight() {
             <View style={s.vCenter} pointerEvents="none">
               <Text style={[s.vKicker, { color: defeat.fainted ? '#F87171' : '#F4B740' }]}>{defeat.fainted ? 'PRZEGRANA' : 'BOSS PRZETRWAŁ'}</Text>
               <View style={{ opacity: 0.5 }}>
-                <BossArt id={defeatTarget.id} emoji={defeatTarget.emoji} size={78} />
+                <BossArt id={defeatTarget.id} emoji={defeatTarget.emoji} size={78} powered={kind === 'mad'} />
               </View>
               <Text style={s.vName}>{defeatTarget.name} przetrwał</Text>
               <Text style={s.vDefeatSub}>

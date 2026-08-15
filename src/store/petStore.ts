@@ -40,7 +40,7 @@ export function loginBonusCoins(streak: number): number {
 // defeatedBosses/raidWon/eventWon (te trzymają tylko "czy pokonany raz", bez historii) —
 // bossLog rośnie bez limitu w czasie, więc UI eksportu tnie do ostatnich N wpisów.
 export interface BossLogEntry {
-  kind: 'campaign' | 'raid' | 'event' | 'quest';
+  kind: 'campaign' | 'raid' | 'event' | 'quest' | 'mad';
   id: string;          // bossId / weekKey / eventKey
   name: string;         // nazwa bossa/raidu/wydarzenia w chwili walki (nazwy się zmieniają)
   at: string;            // ISO timestamp
@@ -102,6 +102,8 @@ interface PetState {
   energyDate: string | null;    // day the top-up counter belongs to
   energyToday: number;          // energy already granted today (for daily top-up)
   defeatedBosses: string[];
+  defeatedMadBosses: string[];    // 'MAD' warianty (madBosses.ts, 2026-08-15) — osobna lista,
+                                   // celowo nie miesza się z defeatedBosses (zwykła kampania)
   bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
   bossLog: BossLogEntry[];        // historia pokonanych walk (kampania/raid/event) — patrz typ wyżej
   // ── HP kotka (fundament pod v4 walk — S&F-owy redesign, patrz memory boss_design.md) ──
@@ -175,6 +177,7 @@ interface PetState {
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
   spendEnergy: () => void;   // v5: -1 próba za attempt (energy to teraz flat dzienny licznik, nie bank)
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number) => void;
+  defeatMadBoss: (baseBossId: string, coins: number, xp: number, name: string, level: number) => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
   raidAttack: (damage: number) => { remaining: number; defeated: boolean };
@@ -252,6 +255,7 @@ export const usePetStore = create<PetState>()(
       eventEnergyToday: 0,
       eventWon: [],
       defeatedBosses: [],
+      defeatedMadBosses: [],
       bossHp: {},
       bossLog: [],
       catHp: CAT_BASE_MAX_HP,
@@ -508,6 +512,14 @@ export const usePetStore = create<PetState>()(
         xp: s.xp + xp,
         bossLog: [...s.bossLog, { kind: 'campaign', id: bossId, name, at: new Date().toISOString(), level, coins, xp }],
       })),
+      // Osobna lista od defeatedBosses (madBosses.ts) — bez loot-regrantu, ten item już masz
+      // z pokonania zwykłej wersji tego bossa (madBossFor go tylko powiela).
+      defeatMadBoss: (baseBossId, coins, xp, name, level) => set((s) => s.defeatedMadBosses.includes(baseBossId) ? s : ({
+        defeatedMadBosses: [...s.defeatedMadBosses, baseBossId],
+        coins: s.coins + coins,
+        xp: s.xp + xp,
+        bossLog: [...s.bossLog, { kind: 'mad', id: baseBossId, name, at: new Date().toISOString(), level, coins, xp }],
+      })),
       healBoss: (bossId, amount, maxHp) => set((s) => ({ bossHp: { ...s.bossHp, [bossId]: Math.min(maxHp, (s.bossHp[bossId] ?? maxHp) + Math.max(0, amount)) } })),
       raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp })),
       raidAttack: (damage) => {
@@ -598,7 +610,7 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], bossHp: {}, bossLog: [], raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
+      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], defeatedMadBosses: [], bossHp: {}, bossLog: [], raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
     }),
     {
       name: 'pet-v1',
@@ -615,7 +627,7 @@ export const usePetStore = create<PetState>()(
         pushupsDay: s.pushupsDay, squatsDay: s.squatsDay,
         situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, trainingDays: s.trainingDays,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
-        defeatedBosses: s.defeatedBosses, bossHp: s.bossHp, bossLog: s.bossLog,
+        defeatedBosses: s.defeatedBosses, defeatedMadBosses: s.defeatedMadBosses, bossHp: s.bossHp, bossLog: s.bossLog,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,

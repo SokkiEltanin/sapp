@@ -10,6 +10,7 @@ import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, EVENT_DAILY_ATTEMPTS } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
+import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey } from '@/utils/seasonalEvents';
 import { raidIcon, eventIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
@@ -39,7 +40,7 @@ export default function Bosses() {
   const s = useMemo(() => makeS(c), [c]);
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
-    raidWeek, raidHp, raidWon, raidEnsure, eventWon,
+    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -73,6 +74,13 @@ export default function Bosses() {
   // (karczma S&F) — pasek nie ma sensu tutaj, tylko na ekranie walki.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
   const unlocked = current ? level >= current.unlockLevel : false;
+
+  // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
+  // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
+  // wzorzec co `current` wyżej.
+  const madBase = madCandidate(defeatedBosses, defeatedMadBosses);
+  const madBoss = madBase ? madBossFor(madBase, level) : null;
+  const madUnlocked = level >= MAD_UNLOCK_LEVEL && !!madBase;
 
   // ── raid tygodniowy ──
   const weekKey = weekKeyOf();
@@ -236,6 +244,41 @@ export default function Bosses() {
           })}
         </View>
 
+        {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 50+, tylko po pokonaniu normalnej
+            wersji danego bossa. Ten sam heroCard co kampania wyżej, art dostaje czerwoną
+            aurę (`powered`, patrz BossArt) żeby czytać się jako "wzmocniony wariant". ── */}
+        <Text style={s.section}>MAD bossy</Text>
+        {!madBoss ? (
+          <View style={s.done}>
+            <Swords size={30} color={c.text.muted} />
+            <Text style={s.doneTxt}>Pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.</Text>
+          </View>
+        ) : (
+          <View style={s.heroCard}>
+            <View style={s.bossTop}>
+              <BossArt id={madBoss.id} emoji={madBoss.emoji} size={82} powered />
+            </View>
+            <Text style={s.madKicker}>OSZALAŁY WARIANT</Text>
+            <Text style={s.bossName}>{madBoss.name}</Text>
+            <Text style={s.bossTaunt}>„{madBoss.taunt}"</Text>
+            <Text style={s.hpTxt}>{madBoss.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{madBoss.weaknessLabel}</Text></Text>
+
+            {madUnlocked ? (
+              <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=mad' as any); }} style={{ width: '100%' }}>
+                <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
+                  <Swords size={18} color="#fff" />
+                  <Text style={s.attackTxt}>WALCZ!</Text>
+                </View>
+              </PressableScale>
+            ) : (
+              <View style={s.lockBox}>
+                <Lock size={16} color={c.text.muted} />
+                <Text style={s.lockTxt}>Odblokujesz na poziomie {MAD_UNLOCK_LEVEL} (masz {level}).</Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {raidWon.length > 0 && (
           <>
             <Text style={s.section}>Medale raidów ({raidWon.length})</Text>
@@ -289,6 +332,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   heroCard: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[4] },
   bossTop: { height: 92, justifyContent: 'center', alignItems: 'center' },
+  madKicker: { fontSize: 10.5, fontWeight: '900', color: '#DC2626', letterSpacing: 1.2, marginTop: 6 },
   bossName: { fontSize: 20, fontWeight: '900', color: c.text.primary, marginTop: 4 },
   bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: 2, marginBottom: spacing[2] },
   hpTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
