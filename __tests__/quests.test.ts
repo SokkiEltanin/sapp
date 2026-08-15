@@ -169,3 +169,25 @@ describe('buildQuests — questRewardMult (nagrody rosną z poziomem, 2026-08-14
     expect(scaled.find(d => d.id === 'd_mood')!.coins).toBeGreaterThan(base.find(d => d.id === 'd_mood')!.coins);
   });
 });
+
+describe('buildQuests — progress (pasek postępu na niezrobionych questach, 2026-08-15)', () => {
+  test('quest z mierzalną wartością ma progress 0..1 proporcjonalny do postępu', () => {
+    const r = buildQuests(baseCtx({ stepsToday: 5000 }), baseClaim());
+    expect(r.daily.find(d => d.id === 'd_steps10')!.progress).toBeCloseTo(0.5);
+  });
+
+  test('progress jest CAPOWANY na 1 nawet gdy wartość przekracza cel', () => {
+    const r = buildQuests(baseCtx({ stepsToday: 50000 }), baseClaim());
+    expect(r.daily.find(d => d.id === 'd_steps10')!.progress).toBe(1);
+  });
+
+  test('quest binarny (bez mierzalnej wartości, np. mood) nie ma pola progress', () => {
+    const r = buildQuests(baseCtx(), baseClaim());
+    expect(r.daily.find(d => d.id === 'd_mood')!.progress).toBeUndefined();
+  });
+
+  test('bonus quest (b_water) też liczy progress', () => {
+    const r = buildQuests(baseCtx({ waterGoal: 8, waterToday: 2 }), baseClaim());
+    expect(r.bonusDaily.find(b => b.id === 'b_water')!.progress).toBeCloseTo(0.25);
+  });
+});
