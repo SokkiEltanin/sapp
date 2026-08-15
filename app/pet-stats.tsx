@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Swords, Heart, Zap, Lock, Check } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp, catMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
@@ -50,11 +51,12 @@ export default function PetStats() {
     [ownedCombatItems],
   );
 
+  // Themowany ConfirmDialog zamiast Alert.alert (2026-08-15, user: "potwierdzenia nie są
+  // dokończone" — natywny szary Alert nie pasuje do reszty apki). Ten sam wzorzec co inne
+  // ekrany (patrz komentarz w ConfirmDialog.tsx) — kontrolowany stan, nie globalny hook.
+  const [pendingUpgrade, setPendingUpgrade] = useState<{ name: string; cost: number; onYes: () => void } | null>(null);
   const confirmUpgrade = (name: string, cost: number, onYes: () => void) => {
-    Alert.alert('Potwierdź ulepszenie', `${name} — ${cost} monet`, [
-      { text: 'Anuluj', style: 'cancel' },
-      { text: 'Ulepsz', onPress: onYes },
-    ]);
+    setPendingUpgrade({ name, cost, onYes });
   };
   const onBuyMaxHp = () => {
     haptic.tap();
@@ -109,7 +111,8 @@ export default function PetStats() {
             <Text style={s.statLabel}>Moc ataku</Text>
             <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
             <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
-              <Swords size={10} color="#F87171" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT} · {atkCost}</Text>
+              <Swords size={10} color="#F87171" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT}</Text>
+              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{atkCost}</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#2AC68F44', backgroundColor: '#2AC68F12' }]}>
@@ -118,7 +121,8 @@ export default function PetStats() {
             <Text style={s.statLabel}>Max HP kotka</Text>
             <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}</Text>
             <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
-              <Heart size={10} color="#2AC68F" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT} · {hpCost}</Text>
+              <Heart size={10} color="#2AC68F" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT}</Text>
+              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
@@ -180,6 +184,16 @@ export default function PetStats() {
         </View>
       </ScrollView>
       <PupilNavbar current="stats" />
+      <ConfirmDialog
+        visible={!!pendingUpgrade}
+        title="Potwierdź ulepszenie"
+        message={pendingUpgrade ? `${pendingUpgrade.name} — ${pendingUpgrade.cost} monet` : ''}
+        confirmLabel="Ulepsz"
+        cancelLabel="Anuluj"
+        destructive={false}
+        onConfirm={() => { pendingUpgrade?.onYes(); setPendingUpgrade(null); }}
+        onCancel={() => setPendingUpgrade(null)}
+      />
     </SafeAreaView>
   );
 }
