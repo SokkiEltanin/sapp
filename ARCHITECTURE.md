@@ -255,17 +255,24 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
     (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
     tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
-  - **Art rajdowych bossów (2026-08-15)** — 6 bossów `raid.ts` nie ma własnych rysunków
-    (placeholder/emoji od startu, `RAID_POOL` id-ów nie ma w `BOSS_PNG`). Zamiast czekać na
-    nowy art, `bossIcons.ts` POŻYCZA PNG z kampanii pod tymi samymi id (wyrm→dragon,
-    siren→drought/mermaid, behemoth→sugar/pumpkin — te trzy dzielą motyw/`weakness` z
-    oryginałem; kraken→cerberus, golem→cyclops, phantom→reaper — czysto klimatyczne). Żeby
-    nie wyglądały identycznie jak kampanijny odpowiednik, `BossArt` (`components/bosses/
-    BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow` + powiększona czerwona
-    sylwetka (`tintColor`) za właściwym obrazkiem, ten sam sticker-halo trick co
-    `StreakFlameGlow`. Włączone tam gdzie renderuje się raid: karta w `app/bosses.tsx`,
-    portret walki i modal zwycięstwa w `boss-fight.tsx` (`kind==='raid'`/`victory.kind
-    ==='raid'`). Zero zmian w `raid.ts` — id/logika/nazwy bez zmian, to czysto wizualne.
+  - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
+    własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
+    `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`
+    + powiększona czerwona sylwetka (`tintColor`) za obrazkiem, sticker-halo trick jak
+    `StreakFlameGlow`, żeby nie wyglądały identycznie jak kampanijny odpowiednik. Faza 2
+    (tego samego dnia): user dorysował WŁASNY dedykowany art dla 3 z nich — `golem`/`kraken`/
+    `phantom` (plik `BOSS_UPIOR.png`) dostały prawdziwe pliki w `BOSS_PNG` (zamiast
+    pożyczonych cyclops/cerberus/reaper), PLUS osobne `MADBOSS_*.png` dla ich "powered"
+    wariantu (`POWERED_BOSS_PNG` w `bossIcons.ts`, `poweredBossPng(id)`) — `BossArt` sprawdza
+    to NAJPIERW, i jeśli istnieje, renderuje dedykowany rysunek (z lekką czerwoną poświatą w
+    tle) zamiast programowego tinta. `behemoth`/`wyrm`/`siren` wciąż pożyczają
+    (behemoth/sugar dzielą `weakness` sweetless, wyrm/dragon to ten sam gatunek, siren/drought
+    dzielą motyw wody) i nadal dostają programowy tint-fallback dopóki nie dostaną własnego
+    artu — `POWERED_BOSS_PNG` to CELOWO osobna mapa od `mad_<id>` w `madBosses.ts` (dwa
+    niepowiązane pojęcia "mad/powered": tam druga fala kampanii, tu wariant wizualny raidu).
+    Włączone tam gdzie renderuje się raid: karta w `app/bosses.tsx`, portret walki i modal
+    zwycięstwa w `boss-fight.tsx` (`kind==='raid'`/`victory.kind==='raid'`). Zero zmian w
+    `raid.ts` — id/logika/nazwy bez zmian, to czysto wizualne.
   - **Questy-jako-walki** (2026-08-14 v2, `utils/minibosses.ts`) — CZWARTY tor, `?kind=quest`
     w `boss-fight.tsx` (pełna animacja, TA SAMA co kampania/wydarzenie — user chciał S&F-styl
     wszędzie). ⚠️ Pierwsza wersja (osobny ekran `app/minibosses.tsx`, tory woda/kroki, DODANA
