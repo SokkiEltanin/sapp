@@ -14,6 +14,7 @@ import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
+import { minibossForMission, missionRewardFor } from '@/utils/missions';
 import { bossAttackFx } from '@/utils/bossAttackFx';
 import { COMBAT_ITEMS } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
@@ -36,7 +37,7 @@ const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
 
-type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad';
+type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot };
 
 // Ekran WALKI (S&F-style, 2026-08-09/10 — patrz memory boss_design.md), wydzielony z listy
@@ -61,7 +62,7 @@ export default function BossFight() {
   const { kind: kindParam, questId, questCoins, questXp, questLabel } = useLocalSearchParams<{
     kind?: string; questId?: string; questCoins?: string; questXp?: string; questLabel?: string;
   }>();
-  const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : kindParam === 'quest' ? 'quest' : kindParam === 'mad' ? 'mad' : 'campaign';
+  const kind: Kind = kindParam === 'raid' ? 'raid' : kindParam === 'event' ? 'event' : kindParam === 'quest' ? 'quest' : kindParam === 'mad' ? 'mad' : kindParam === 'mission' ? 'mission' : 'campaign';
 
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
@@ -73,6 +74,7 @@ export default function BossFight() {
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
     dayClaims, claimQuestFight, markTrainingDay,
+    missionStartedAt, missionEndsAt, claimMission,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -151,6 +153,15 @@ export default function BossFight() {
   const madBase = kind === 'mad' ? madCandidate(defeatedBosses, defeatedMadBosses) : null;
   const madBoss = madBase ? weakenBoss(madBossFor(madBase, level), weaknessStreaks[madBase.weakness]) : null;
 
+  // ── Misja (utils/missions.ts, 2026-08-15) — jeden globalny slot w store (petStore.
+  // missionStartedAt/missionEndsAt), bez id w URL: gotowość i tożsamość miniboss'a (seedowany
+  // dokładnym czasem wysłania) czytane wprost ze store'u, nie z parametrów — nawigacja tu z
+  // niegotową misją (np. cofnięcie ekranu) nie da się "oszukać" wcześniejszą walką.
+  const missionReady = kind === 'mission' && !!missionStartedAt && !!missionEndsAt && Date.now() >= new Date(missionEndsAt).getTime();
+  const missionMb = missionReady && missionStartedAt ? minibossForMission(missionStartedAt) : null;
+  const missionBoss = missionMb ? minibossAsBoss(missionMb, level) : null;
+  const missionReward = missionRewardFor(level);
+
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   // maxHp już uwzględnia osłabienie z realnej serii (patrz weaknessStreaks/weakenBoss wyżej) —
   // ekran zawsze pokazuje FAKTYCZNY pasek HP, nie "surowy" numer z bosses.ts/raid.ts.
@@ -166,19 +177,21 @@ export default function BossFight() {
     target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed };
   } else if (kind === 'mad' && madBoss && madBase) {
     target = { id: madBoss.id, name: madBoss.name, taunt: madBoss.taunt, weakness: madBoss.weakness, weaknessLabel: madBoss.weaknessLabel, emoji: madBoss.emoji, maxHp: madBoss.hp, energy, unlocked: level >= MAD_UNLOCK_LEVEL, unlockLevel: MAD_UNLOCK_LEVEL, done: false };
+  } else if (kind === 'mission' && missionBoss) {
+    target = { id: missionBoss.id, name: missionBoss.name, taunt: missionBoss.taunt, weakness: missionBoss.weakness, weaknessLabel: '', emoji: missionBoss.emoji, maxHp: missionBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: false };
   }
   // Streak realny za kategorię AKTUALNEGO celu — do UI-notki "osłabiona obrona" niżej.
   // Quest-minibossy NIE mają mechaniki osłabiania (weakness na nich jest nieużywanym
   // placeholderem, patrz minibosses.ts) — stąd 0 zamiast czytania prawdziwego streaku.
-  const targetWeaknessStreak = target && kind !== 'quest' ? weaknessStreaks[target.weakness as keyof typeof weaknessStreaks] : 0;
+  const targetWeaknessStreak = target && kind !== 'quest' && kind !== 'mission' ? weaknessStreaks[target.weakness as keyof typeof weaknessStreaks] : 0;
   const targetWeakenFactor = weaknessHpFactor(targetWeaknessStreak);
   // Kampania, wydarzenie i quest resetują HP do pełna co próbę (liveBossHp podczas walki,
   // inaczej pełne maxHp) — tylko raid ma trwały bank (raidRemaining).
   const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : raidRemaining) : (liveBossHp ?? target.maxHp)) : 0;
-  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : 'Walka';
-  // Do modala przegranej — kampania/wydarzenie/quest/MAD mogą przegrać (raid nie ma kontrataku).
+  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
+  // Do modala przegranej — kampania/wydarzenie/quest/MAD/misja mogą przegrać (raid nie ma kontrataku).
   // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
-  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : kind === 'mad' ? madBoss : null;
+  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : kind === 'mad' ? madBoss : kind === 'mission' ? missionBoss : null;
 
   useEffect(() => { resetCatHp(); }, [kind]);
 
@@ -272,11 +285,13 @@ export default function BossFight() {
       kind === 'event' && eventBoss ? weakenBoss(eventAsBoss(eventBoss, level), weaknessStreaks[eventBoss.weakness]) :
       kind === 'quest' ? questBoss :
       kind === 'mad' ? madBoss :
+      kind === 'mission' ? missionBoss :
       null;
     if (!roundBoss) return;
-    // Quest: bez puli prób — quest już wykonany realnie, przegrana = darmowy retry. MAD
-    // dzieli pulę energii z kampanią (to jej rozszerzenie, nie osobny tor jak raid/event).
-    if (kind !== 'quest') {
+    // Quest/misja: bez puli prób — quest już wykonany realnie / misja już odczekana realnie,
+    // przegrana = darmowy retry. MAD dzieli pulę energii z kampanią (to jej rozszerzenie, nie
+    // osobny tor jak raid/event).
+    if (kind !== 'quest' && kind !== 'mission') {
       const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
       if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     }
@@ -310,6 +325,9 @@ export default function BossFight() {
         } else if (kind === 'mad' && madBoss && madBase) {
           defeatMadBoss(madBase.id, madBoss.coins, madBoss.xp, madBoss.name, level);
           setVictory({ kind: 'mad', id: madBoss.id, name: madBoss.name, emoji: madBoss.emoji, coins: madBoss.coins, xp: madBoss.xp });
+        } else if (kind === 'mission' && missionBoss) {
+          claimMission(missionReward.coins, missionReward.xp, missionBoss.name, level);
+          setVictory({ kind: 'mission', id: missionBoss.id, name: missionBoss.name, emoji: missionBoss.emoji, coins: missionReward.coins, xp: missionReward.xp });
         }
       } else {
         haptic.error();
@@ -462,10 +480,10 @@ export default function BossFight() {
       <View style={s.header}>
         <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color={c.text.primary} /></PressableScale>
         <Text style={s.headerTitle} numberOfLines={1}>{headerTitle}</Text>
-        {/* Quest-walki nie mają puli prób (patrz komentarz przy questAlreadyClaimed) —
+        {/* Quest/misja-walki nie mają puli prób (patrz komentarz przy questAlreadyClaimed) —
             pigułka energii nie miałaby tu sensu, więc zajmuje miejsce pusty spacer
             (żeby tytuł został wyśrodkowany tak jak w pozostałych trybach). */}
-        {kind === 'quest'
+        {kind === 'quest' || kind === 'mission'
           ? <View style={{ width: 40 }} />
           : <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{target?.energy ?? 0}</Text></View>}
       </View>
@@ -474,7 +492,12 @@ export default function BossFight() {
         {!target ? (
           <View style={s.done}>
             <Swords size={30} color={c.text.muted} />
-            <Text style={s.doneTxt}>{kind === 'campaign' ? 'Wszyscy bossowie pokonani! Kolejni wkrótce.' : kind === 'mad' ? 'Brak dostępnego MAD celu — pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.' : 'Brak aktywnego wydarzenia teraz — wróć innym razem.'}</Text>
+            <Text style={s.doneTxt}>
+              {kind === 'campaign' ? 'Wszyscy bossowie pokonani! Kolejni wkrótce.'
+                : kind === 'mad' ? 'Brak dostępnego MAD celu — pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.'
+                : kind === 'mission' ? (missionStartedAt ? 'Misja jeszcze trwa — wróć jak pupil wróci.' : 'Brak aktywnej misji — wyślij pupila z ekranu Pupil.')
+                : 'Brak aktywnego wydarzenia teraz — wróć innym razem.'}
+            </Text>
           </View>
         ) : !target.unlocked ? (
           <View style={s.lockBox}>
@@ -560,9 +583,9 @@ export default function BossFight() {
             {/* Tylko HP + motyw (słabość) — BEZ nagrody i mechanik (osłona/regen) przed walką,
                 user (2026-08-10): "zbyt dużo opisu bossa". Reaktywne linijki niżej (co się
                 WŁAŚNIE stało w walce) zostają — to nie spoiler, to informacja zwrotna. */}
-            {/* Quest-minibossy nie mają "motywu"/słabości (placeholder w minibosses.ts) —
+            {/* Quest/misja-minibossy nie mają "motywu"/słabości (placeholder w minibosses.ts) —
                 pokazywanie pustej etykiety byłoby myląco puste, więc linijka schowana. */}
-            {kind !== 'quest' && (
+            {kind !== 'quest' && kind !== 'mission' && (
               <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
             )}
             {/* Osłabiona obrona z realnej serii (2026-08-13, patrz bossWeakness.ts) — im dłuższa
@@ -608,7 +631,7 @@ export default function BossFight() {
           <Confetti colors={['#FDE047', '#2AC68F', '#38BDF8', '#F472B6']} />
           {victory && (
             <View style={s.vCenter} pointerEvents="none">
-              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : victory.kind === 'mad' ? 'MAD BOSS POKONANY!' : 'WYGRANA!'}</Text>
+              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : victory.kind === 'mad' ? 'MAD BOSS POKONANY!' : victory.kind === 'mission' ? 'MISJA UKOŃCZONA!' : 'WYGRANA!'}</Text>
               <View style={{ opacity: 0.6 }}>
                 <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid' || victory.kind === 'mad'} />
               </View>
@@ -621,7 +644,7 @@ export default function BossFight() {
                     <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
                   </>
                 ) : (
-                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : victory.kind === 'mad' ? 'Nagroda MAD' : 'Medal wydarzenia'}</Text>
+                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : victory.kind === 'mad' ? 'Nagroda MAD' : victory.kind === 'mission' ? 'Nagroda z misji' : 'Medal wydarzenia'}</Text>
                 )}
               </View>
               <View style={s.vRewardRow}>

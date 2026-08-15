@@ -20,7 +20,7 @@ export interface ProgressReportInput {
 }
 
 const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
-  campaign: 'kampania', raid: 'raid', event: 'wydarzenie', quest: 'quest', mad: 'MAD',
+  campaign: 'kampania', raid: 'raid', event: 'wydarzenie', quest: 'quest', mad: 'MAD', mission: 'misja',
 };
 
 export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): string {
