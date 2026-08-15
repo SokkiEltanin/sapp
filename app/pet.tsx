@@ -9,6 +9,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
+import TrainingSessionModal, { SelfReportExercise } from '@/components/pet/TrainingSessionModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
@@ -256,6 +257,7 @@ export default function Pet() {
     haptic.tap();
     router.push(`/boss-fight?kind=quest&questId=${id}&questLabel=${encodeURIComponent(label)}&questCoins=${coins}&questXp=${xp}` as any);
   };
+  const [training, setTraining] = useState<{ exercise: SelfReportExercise; target: number; action: () => void } | null>(null);
   const onClaimTier = (id: string, c2: number, x: number) => {
     claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
   };
@@ -464,16 +466,21 @@ export default function Pet() {
                 const active = quests.bonusDaily.filter(q => !q.claimed);
                 const claimedN = quests.bonusDaily.length - active.length;
                 // Bodyweight questy (poza rowerem) nie mają czujnika liczącego powtórzenia —
-                // stuknięcie "Zrobione" to jedyny sposób, żeby quest w ogóle mógł stać się
-                // `done` (patrz mark*Done w petStore, i komentarz w quests.ts).
-                const selfReportActions: Record<string, () => void> = {
-                  b_pushups: markPushupsDone, b_squats: markSquatsDone,
-                  b_situps: markSitupsDone, b_plank: markPlankDone, b_stretch: markStretchDone,
+                // sesja w TrainingSessionModal (Rozpocznij → timer/licznik → UKOŃCZYŁEM) to
+                // jedyny sposób, żeby quest w ogóle mógł stać się `done` (patrz mark*Done w
+                // petStore, i komentarz w quests.ts). 2026-08-15 (user): dawniej jedno tapnięcie
+                // "Zrobione" — teraz realny przebieg ćwiczenia, patrz komentarz w modalu.
+                const selfReport: Record<string, { exercise: SelfReportExercise; target: number; action: () => void }> = {
+                  b_pushups: { exercise: 'pushups', target: questCtx.pushupTarget ?? 0, action: markPushupsDone },
+                  b_squats:  { exercise: 'squats',  target: questCtx.squatTarget ?? 0,  action: markSquatsDone },
+                  b_situps:  { exercise: 'situps',  target: questCtx.situpTarget ?? 0,  action: markSitupsDone },
+                  b_plank:   { exercise: 'plank',   target: questCtx.plankTarget ?? 0,  action: markPlankDone },
+                  b_stretch: { exercise: 'stretch', target: questCtx.stretchTarget ?? 0, action: markStretchDone },
                 };
                 return (
                   <>
                     {active.map((q, i) => {
-                      const selfReport = selfReportActions[q.id];
+                      const session = selfReport[q.id];
                       return (
                         <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
                           <View style={{ flex: 1, minWidth: 0 }}>
@@ -486,8 +493,8 @@ export default function Pet() {
                           {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
                           {q.done
                             ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-                            : selfReport
-                              ? <PressableScale onPress={() => { haptic.tap(); selfReport(); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Zrobione</Text></View></PressableScale>
+                            : session
+                              ? <PressableScale onPress={() => { haptic.tap(); setTraining(session); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Rozpocznij</Text></View></PressableScale>
                               : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
                         </View>
                       );
@@ -598,6 +605,13 @@ export default function Pet() {
         boxColor={boxReveal?.box.color ?? '#FBBF24'}
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         onClose={() => setBoxReveal(null)}
+      />
+      <TrainingSessionModal
+        visible={!!training}
+        exercise={training?.exercise ?? 'pushups'}
+        target={training?.target ?? 0}
+        onClose={() => setTraining(null)}
+        onComplete={() => { training?.action(); setCelebrate(c => c + 1); }}
       />
 
       <PupilNavbar current="pet" />
