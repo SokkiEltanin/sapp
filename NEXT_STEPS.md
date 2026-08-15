@@ -38,6 +38,29 @@ Zwykła kampania bez zmian. Pełny opis mechaniki w ARCHITECTURE §"Bossy" → "
    (metoda opisana w ARCHITECTURE, pułapka z `guard`/kwadratowym kontratakiem już
    udokumentowana, nie trzeba jej odkrywać drugi raz).
 
+## 🆕 Misja pupila — nowy, SZÓSTY tor walki (2026-08-15, NIEsprawdzone na urządzeniu)
+
+User: "wyślij pupila na misję... idzie np 5h, i wtedy za to jak dojdzie można zawalczyć i
+zdobywa się trochę więcej xp i coinow jak za daily questa". Doprecyzowane (2 pytania): BEZ
+dziennego limitu (można wysłać kolejną od razu po odebraniu nagrody), czas trwania rośnie z
+levelem od 10 min (nie sztywne 5h) + powiadomienie push przy zakończeniu. Pełny opis mechaniki
+w ARCHITECTURE §"Bossy" → "Misja pupila".
+
+**Priorytet testowania:**
+1. Otwórz Pupila → sekcja "Misja" powinna pokazać przycisk "Wyślij" z podglądem czasu
+   (~10 min na niskim levelu) i nagrody.
+2. Wyślij misję → sprawdź czy karta pokazuje "Pupil w misji… wraca za Xmin" i czy licznik
+   faktycznie odlicza (odśwież ekran po minucie).
+3. **Najważniejsze do sprawdzenia realnie** (nie da się zasymulować bez urządzenia): czy
+   powiadomienie push faktycznie przychodzi gdy misja się kończy Z ZAMKNIĘTĄ appką — to
+   jedyny kawałek tej funkcji którego CI/testy jednostkowe nie mogą zweryfikować.
+4. Po zakończeniu → przycisk "Walcz", stocz walkę, sprawdź czy nagroda wyraźnie wyższa niż
+   zwykły daily quest i czy od razu można wysłać kolejną misję (bez czekania).
+5. Jeśli po realnym graniu czas/nagroda poczuje się źle skalibrowane, kręcić stałe w
+   `src/utils/missions.ts` (`MISSION_BASE_MIN`/`MISSION_MIN_PER_LEVEL`/`MISSION_MAX_MIN`,
+   `MISSION_BASE_COINS`/`MISSION_BASE_XP`) — to proste stałe, nie wymagają throwaway-symulacji
+   jak walka (misja sama w sobie nie ma nowej mechaniki bojowej, reużywa miniboss-fight z quest).
+
 ## 🧪 Balans ekonomii vs bossy — audyt + naprawy (2026-08-14, NIEsprawdzone na urządzeniu)
 
 User poprosił o sprawdzenie czy tempo ekonomii questów nadąża za krzywą trudności bossów.

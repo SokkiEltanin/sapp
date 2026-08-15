@@ -33,12 +33,18 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Coins as CoinsIcon, Check as CheckIcon, Gift, Swords } from 'lucide-react-native';
+import { Coins as CoinsIcon, Check as CheckIcon, Gift, Swords, Compass } from 'lucide-react-native';
+import { missionMinutesFor, missionRewardFor } from '@/utils/missions';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
 const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
+function fmtMissionDuration(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60), m = total % 60;
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
 
 export default function Pet() {
   const c = useColors();
@@ -46,10 +52,24 @@ export default function Pet() {
 
   const { name, xp, coins, setName, careTick, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, addCoins,
     pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
-    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone } = usePetStore();
+    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
+    missionStartedAt, missionEndsAt, startMission } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
+  // Misja (utils/missions.ts, 2026-08-15) — czas trwania to godziny, nie sekundy, więc tik co
+  // 30s (nie co 1s jak TrainingSessionModal) wystarczy żeby licznik czuł się "żywy" bez
+  // zbędnego re-renderu ekranu co sekundę. `missionTick` sam w sobie nieużywany — wymusza
+  // tylko przeliczenie missionRemainingMs poniżej.
+  const [missionTick, setMissionTick] = useState(0);
+  useEffect(() => {
+    if (!missionEndsAt) return;
+    const iv = setInterval(() => setMissionTick(t => t + 1), 30000);
+    return () => clearInterval(iv);
+  }, [missionEndsAt]);
+  const missionRemainingMs = missionEndsAt ? new Date(missionEndsAt).getTime() - Date.now() : 0;
+  void missionTick;
+  const missionReady = !!missionEndsAt && missionRemainingMs <= 0;
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
@@ -258,6 +278,8 @@ export default function Pet() {
     router.push(`/boss-fight?kind=quest&questId=${id}&questLabel=${encodeURIComponent(label)}&questCoins=${coins}&questXp=${xp}` as any);
   };
   const [training, setTraining] = useState<{ exercise: SelfReportExercise; target: number; action: () => void } | null>(null);
+  const onSendMission = () => { haptic.tap(); startMission(lvl.level); };
+  const onFightMission = () => { haptic.tap(); router.push('/boss-fight?kind=mission' as any); };
   const onClaimTier = (id: string, c2: number, x: number) => {
     claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
   };
@@ -389,6 +411,39 @@ export default function Pet() {
               <Text style={[s.needVal, n.unknown && { opacity: 0.5 }]}>{n.unknown ? '—' : `${n.value}%`}</Text>
             </View>
           ))}
+        </View>
+
+        {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
+            (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. Bez
+            dziennego limitu — od razu po odebraniu nagrody można wysłać kolejną. ── */}
+        <Text style={s.section}>Misja</Text>
+        <View style={s.missionCard}>
+          <Compass size={26} color={missionReady ? '#2AC68F' : '#38BDF8'} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {!missionEndsAt ? (
+              <>
+                <Text style={s.missionTitle}>Wyślij pupila na misję</Text>
+                <Text style={s.missionSub} numberOfLines={1}>
+                  ~{fmtMissionDuration(missionMinutesFor(lvl.level))} · +{missionRewardFor(lvl.level).coins} 🪙 +{missionRewardFor(lvl.level).xp} XP po powrocie
+                </Text>
+              </>
+            ) : missionReady ? (
+              <>
+                <Text style={s.missionTitle}>Pupil wrócił z misji!</Text>
+                <Text style={s.missionSub}>Czeka walka i nagroda</Text>
+              </>
+            ) : (
+              <>
+                <Text style={s.missionTitle}>Pupil w misji…</Text>
+                <Text style={s.missionSub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+              </>
+            )}
+          </View>
+          {!missionEndsAt
+            ? <PressableScale onPress={onSendMission}><View style={s.missionBtn}><Text style={s.missionBtnTxt}>Wyślij</Text></View></PressableScale>
+            : missionReady
+              ? <PressableScale onPress={onFightMission}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
+              : null}
         </View>
 
         {/* ── Missed yesterday: rewards earned but never collected ── */}
@@ -677,6 +732,12 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   needTrack: { flex: 1, height: 9, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
   needFill: { height: '100%', borderRadius: 5 },
   needVal: { width: 38, textAlign: 'right', fontSize: 11, fontWeight: '700', color: c.text.muted },
+
+  missionCard: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
+  missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
+  missionSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
+  missionBtn: { backgroundColor: '#38BDF8', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10 },
+  missionBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 
   hintBox: { width: '100%', marginTop: spacing[5], padding: spacing[3], borderRadius: radius.lg, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.subtle },
   hintTxt: { fontSize: 12, color: c.text.muted, lineHeight: 17, textAlign: 'center' },

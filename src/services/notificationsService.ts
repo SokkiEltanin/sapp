@@ -699,6 +699,28 @@ export const notificationsService = {
     await Notifications.cancelScheduledNotificationAsync(`snooze-${taskId}`).catch(() => {});
   },
 
+  // Pupil mission (petStore.startMission, 2026-08-15) — direct consequence of a user action
+  // (sending the pet off), not a passive daily nag, so no `notif_enabled` gate — same reasoning
+  // as scheduleSnoozeReminder above. Fires once the mission's real-time duration has elapsed,
+  // even with the app fully closed (missions can run for hours).
+  async scheduleMissionReady(endsAtIso: string): Promise<void> {
+    const until = new Date(endsAtIso);
+    if (until <= new Date()) return;
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'mission-ready',
+      content: {
+        title: 'Pupil wrócił z misji! 🎒',
+        body: 'Czeka walka i nagroda — wpadnij, zanim zapomnisz.',
+        data: { screen: 'pet' },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: until },
+    }).catch(() => {});
+  },
+
+  async cancelMissionReady(): Promise<void> {
+    await Notifications.cancelScheduledNotificationAsync('mission-ready').catch(() => {});
+  },
+
   async scheduleHabitReminder(habitId: string, title: string, hour: number, minute: number): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(`habit-${habitId}`).catch(() => {});
     await Notifications.scheduleNotificationAsync({

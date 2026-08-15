@@ -248,7 +248,8 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
   animacja propów SVG stutteruje. RN nie ma transform-origin → piwot = translate→rotate→translate.
 - **AnimatedSplash** używa CatArt (nie PNG) — te same ID/rozmiar co natywny splash, start
   na pełnej widoczności (bez fade-in), żeby statyczny obrazek płynnie „ożył".
-- **Bossy — SZEŚĆ trybów walki, wszystkie przez `simulateFight` w `utils/bosses.ts`
+- **Bossy — SZEŚĆ trybów walki (`?kind=campaign|raid|event|quest|mad|mission`), wszystkie
+  przez `simulateFight` w `utils/bosses.ts`
   (round-based, prawdziwy kontratak, można przegrać):**
   - **Kampania** (`BOSSES` w `bosses.ts`, sekwencyjna, 22 bossów) i **wydarzenia**
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
@@ -320,6 +321,28 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       bossa. Każda przyszła zmiana formuły trudności bossów MUSI przejść przez tę samą
       throwaway-symulację (jak audyt 14.08/dzisiejsze fixy quest/raid) — papierowe zgadywanie
       liczby ciosów nie wystarcza, bo `counterDamage` nie skaluje się liniowo.
+  - **Misja pupila** (2026-08-15, `utils/missions.ts`) — SZÓSTY tor, `?kind=mission` w
+    `boss-fight.tsx`. User: "wyślij pupila na misję... idzie np 5h... można zawalczyć i
+    zdobywa się trochę więcej xp i coinow jak za daily questa". Doprecyzowane: BEZ dziennego
+    limitu (można wysłać kolejną od razu po odebraniu nagrody) — jedyny hamulec to sam czas
+    trwania, który rośnie z levelem (`missionMinutesFor`: 10 min na lvl 1 → liniowo, ~5h przy
+    lvl 50, twardy sufit 8h). Stan to JEDEN globalny slot w `petStore` (`missionStartedAt`/
+    `missionEndsAt`, ISO timestampy) — czas trwania liczony RAZ przy wysyłce z ówczesnego
+    poziomu (nie przelicza się ponownie, gdyby level wzrósł W TRAKCIE misji). Po upłynięciu
+    czasu ekran Pupil pokazuje przycisk "Walcz" (`app/pet.tsx`, licznik tika co 30s żeby
+    UI czuł się żywy bez ciągłego rerenderu) — walka to zwykły miniboss z rostera
+    `MINIBOSSES` (minibosses.ts), ale WYBRANY po DOKŁADNYM znaczniku czasu wysłania
+    (`minibossForMission`, nie po dacie jak questy — misje mogą lecieć kilka razy dziennie,
+    data dałaby tego samego zwierzaka za każdym razem). Gotowość/tożsamość miniboss'a
+    czytane wprost ze store'u w `boss-fight.tsx`, NIE z parametrów URL — nie da się "oszukać"
+    walką przed czasem przez ręczną nawigację. Nagroda (`missionRewardFor`) skaluje się
+    TYM SAMYM `questRewardMult` co reszta questów (jedno źródło prawdy dla ekonomii), baza
+    wyraźnie wyższa niż typowy daily quest. **Powiadomienie push** przy zakończeniu misji
+    (`notificationsService.scheduleMissionReady`, deep-link do `pet`) — ⚠️ `notificationsService`
+    NIE jest importowany statycznie w `petStore.ts` (ciągnie `expo-notifications`, którego
+    Jest nie parsuje z poziomu plików czysto-logicznych importowanych przez testy — dokładnie
+    ten sam problem co `lucide-react-native` w `raid.ts`/`minibosses.ts`, ten sam fix: `require()`
+    leniwie WEWNĄTRZ akcji `startMission`/`claimMission`, nie na górze pliku).
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).
