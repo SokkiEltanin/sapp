@@ -220,13 +220,19 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   `TimePickerField`/`WheelPicker` już istnieją i są używane w zadaniach, tylko trzeba podmienić.
 - Tryb ręczny godzin pracy (Ustawienia→Praca→Ręcznie) nie ma odpowiednika na dashboardzie —
   kafelek "work-hours" działa tylko w trybie kalendarzowym.
-- ~~6 bossów rajdowych bez artu~~ — 2026-08-15: pożyczają PNG z kampanii + czerwona aura
-  (`powered` prop w `BossArt`), patrz ARCHITECTURE §"Art rajdowych bossów". Kosmetyczny
-  stopgap, nie docelowy dedykowany art — jeśli kiedyś ktoś narysuje 6 unikalnych bossów,
-  wystarczy dopisać je do `BOSS_PNG` pod tymi samymi id i usunąć `powered` z 3 wywołań
-  `BossArt`. **NIEsprawdzone na urządzeniu** — priorytet: otwórz Bossy, sprawdź czy karta
-  RAID ma czerwoną poświatę i nie wygląda jak zwykły recolor bez sensu.
-- 1 portret event-bossa wciąż bez prawdziwego artu (placeholder/emoji).
+- **Rajdowe bossy — 3 z 6 mają teraz DEDYKOWANY art** (2026-08-15, user dorysował
+  `BOSS_GOLEM/KRAKEN/UPIOR.png` + `MADBOSS_GOLEM/KRAKEN/UPIOR.png`) — golem/kraken/phantom
+  wyszły z prowizorki. `behemoth`/`wyrm`/`siren` WCIĄŻ pożyczają PNG z kampanii + programowy
+  czerwony tint (`powered` w `BossArt`), patrz ARCHITECTURE §"Art rajdowych bossów". Jeśli
+  ktoś dorysuje resztę: dopisać `BOSS_<NAZWA>.png` do `BOSS_PNG` (zastępuje pożyczony wpis)
+  i opcjonalnie `MADBOSS_<NAZWA>.png` do `POWERED_BOSS_PNG` w `bossIcons.ts` — zero zmian w
+  komponencie. **NIEsprawdzone na urządzeniu** — priorytet: otwórz Bossy, sprawdź golem
+  (dedykowany art) i behemoth (wciąż pożyczony + tint) obok siebie, potwierdź że oba czytają
+  się dobrze mimo różnego pochodzenia artu.
+- **4 portrety event-bossów bez prawdziwego artu** (nie 1, jak wcześniej tu napisane —
+  poprawione po sprawdzeniu kodu 2026-08-15): Zły Mikołaj (`mikolaj`), Czekoladowy Zajączek
+  (`wielkanoc`), Widmo Nadgodzin (`overtime`), Demon Słodyczy (`sweettooth`) — tylko 4 z 8
+  eventowych bossów mają PNG w `BOSS_PNG` (wakacje/wiosna/jesień/zima).
 - Odznaki czekające w `assets/bagesv2/` bez wpięcia: `gnome.png` (brak pomysłu),
   `radar.png` (wykrywanie ominiętych przypomnień — złożone), `4th-of-july.png` (wymaga
   nowego pola daty urodzenia w Ustawieniach — większy prerequisite).

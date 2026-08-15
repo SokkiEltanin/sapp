@@ -1,5 +1,5 @@
 import { Image, Text, View } from 'react-native';
-import { bossPng } from '@/utils/bossIcons';
+import { bossPng, poweredBossPng } from '@/utils/bossIcons';
 import RadialGlow from '@/components/ui/RadialGlow';
 
 // Boss portrait: real art if we have it (assets/ikonybosów via bossIcons.ts),
@@ -8,17 +8,30 @@ import RadialGlow from '@/components/ui/RadialGlow';
 // wrap THIS in their own Animated.View (see app/bosses.tsx) rather than this
 // component owning any transform state itself.
 //
-// `powered` (2026-08-15) — raid bosses reuse campaign PNGs (bossIcons.ts, no dedicated
-// art yet), so they'd look IDENTICAL to their campaign counterpart without something to
-// mark them as the "enraged/empowered" raid variant. Same halo-behind-shape sticker trick
-// as StreakFlameGlow (counters/StreakFlame.tsx): soft red RadialGlow behind the art, plus
-// a slightly enlarged red silhouette (tintColor) peeking out from behind the edges —
-// reads as an aura, not a flat recolor of the character itself.
+// `powered` (2026-08-15) — raid bosses (and MAD-campaign bosses) need to read as an
+// "enraged/empowered" variant, not just their normal portrait. Two paths:
+// 1. Dedicated art exists (`poweredBossPng(id)`, e.g. MADBOSS_GOLEM.png, user-drawn) — use
+//    it directly, just with a soft red glow behind for atmosphere (no fake tint needed,
+//    it's already a proper "angry" drawing).
+// 2. No dedicated art — same halo-behind-shape sticker trick as StreakFlameGlow
+//    (counters/StreakFlame.tsx): soft red RadialGlow behind the normal art, plus a
+//    slightly enlarged red silhouette (tintColor) peeking out from behind the edges —
+//    reads as an aura, not a flat recolor of the character itself.
 export default function BossArt({ id, emoji, size = 74, powered = false }: {
   id: string; emoji: string; size?: number; powered?: boolean;
 }) {
   const png = bossPng(id);
+  const dedicatedPowered = powered ? poweredBossPng(id) : undefined;
   const aura = powered ? '#DC2626' : null;
+
+  if (dedicatedPowered) {
+    return (
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <RadialGlow size={size * 1.4} color={aura!} opacity={0.4} />
+        <Image source={dedicatedPowered} style={{ width: size, height: size }} resizeMode="contain" />
+      </View>
+    );
+  }
 
   if (!png) {
     return (
