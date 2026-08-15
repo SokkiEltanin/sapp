@@ -62,16 +62,35 @@ export function StreakFlameGlow({ days, size = 100 }: { days: number; size?: num
   const t = flameToneFor(days);
   const haloSize = size * 1.13;
   const coreSize = size * 0.62;
+  // 2026-08-15 (user): cały płomień +30% — CENTRALNE powiększenie, bez zmiany pozycji.
+  // `transform: scale` na wrapperze o tych samych wymiarach co outer box skaluje wokół
+  // jego środka (RN default transform-origin), więc kotwica kafelka (tileFlame:
+  // right/bottom w StreakWallCard) zostaje dokładnie tam gdzie była — rośnie tylko
+  // renderowany kształt, layout/pozycja nie drgają.
+  const GROUP_SCALE = 1.3;
+  // Zduplikowana OSTATNIA warstwa (core, najjaśniejsza, rysowana na wierzchu) jako
+  // osobna poświata MIĘDZY kafelkiem a całym (już przeskalowanym) płomieniem — większa
+  // (+45%, środek 40–50%) i dużo bardziej przezroczysta, żeby czytała się jako miękka
+  // otoczka światła ("smooth detail"), nie kolejny kontrastowy kształt. Poza grupą
+  // GROUP_SCALE — jej powiększenie jest OSOBNE, niezależne od skalowania całości.
+  const glowSize = coreSize * 1.45;
+  const glowLeft = (size - glowSize) / 2;
+  const glowTop = size * 0.315 - (glowSize - coreSize) / 2;
   return (
     <View style={{ width: size, height: size, opacity: days < 1 ? 0.6 : 1 }}>
-      <View style={{ position: 'absolute', left: -(haloSize - size) / 2, top: -(haloSize - size) / 2 }}>
-        <Flame size={haloSize} color={t.halo} fill={t.halo} strokeWidth={0} />
+      <View style={{ position: 'absolute', left: glowLeft, top: glowTop, opacity: 0.35 }}>
+        <Flame size={glowSize} color={t.core} fill={t.core} strokeWidth={0} />
       </View>
-      <View style={{ position: 'absolute', left: 0, top: 0 }}>
-        <Flame size={size} color={t.flame} fill={t.flame} strokeWidth={0} />
-      </View>
-      <View style={{ position: 'absolute', left: (size - coreSize) / 2, top: size * 0.315 }}>
-        <Flame size={coreSize} color={t.core} fill={t.core} strokeWidth={0} />
+      <View style={{ width: size, height: size, transform: [{ scale: GROUP_SCALE }] }}>
+        <View style={{ position: 'absolute', left: -(haloSize - size) / 2, top: -(haloSize - size) / 2 }}>
+          <Flame size={haloSize} color={t.halo} fill={t.halo} strokeWidth={0} />
+        </View>
+        <View style={{ position: 'absolute', left: 0, top: 0 }}>
+          <Flame size={size} color={t.flame} fill={t.flame} strokeWidth={0} />
+        </View>
+        <View style={{ position: 'absolute', left: (size - coreSize) / 2, top: size * 0.315 }}>
+          <Flame size={coreSize} color={t.core} fill={t.core} strokeWidth={0} />
+        </View>
       </View>
     </View>
   );
