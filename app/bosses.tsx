@@ -124,7 +124,7 @@ export default function Bosses() {
               </View>
             </View>
             <View style={s.miniBody}>
-              <BossArt id={raid.id} emoji={raid.emoji} size={40} />
+              <BossArt id={raid.id} emoji={raid.emoji} size={40} powered />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.miniName} numberOfLines={1}>{raid.name}</Text>
                 <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((raidDone ? 0 : raidRemaining) / raidMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[raid.weakness] ?? '#888' }]} /></View>

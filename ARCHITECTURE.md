@@ -254,6 +254,17 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
     (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
     tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
+  - **Art rajdowych bossów (2026-08-15)** — 6 bossów `raid.ts` nie ma własnych rysunków
+    (placeholder/emoji od startu, `RAID_POOL` id-ów nie ma w `BOSS_PNG`). Zamiast czekać na
+    nowy art, `bossIcons.ts` POŻYCZA PNG z kampanii pod tymi samymi id (wyrm→dragon,
+    siren→drought/mermaid, behemoth→sugar/pumpkin — te trzy dzielą motyw/`weakness` z
+    oryginałem; kraken→cerberus, golem→cyclops, phantom→reaper — czysto klimatyczne). Żeby
+    nie wyglądały identycznie jak kampanijny odpowiednik, `BossArt` (`components/bosses/
+    BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow` + powiększona czerwona
+    sylwetka (`tintColor`) za właściwym obrazkiem, ten sam sticker-halo trick co
+    `StreakFlameGlow`. Włączone tam gdzie renderuje się raid: karta w `app/bosses.tsx`,
+    portret walki i modal zwycięstwa w `boss-fight.tsx` (`kind==='raid'`/`victory.kind
+    ==='raid'`). Zero zmian w `raid.ts` — id/logika/nazwy bez zmian, to czysto wizualne.
   - **Questy-jako-walki** (2026-08-14 v2, `utils/minibosses.ts`) — CZWARTY tor, `?kind=quest`
     w `boss-fight.tsx` (pełna animacja, TA SAMA co kampania/wydarzenie — user chciał S&F-styl
     wszędzie). ⚠️ Pierwsza wersja (osobny ekran `app/minibosses.tsx`, tory woda/kroki, DODANA

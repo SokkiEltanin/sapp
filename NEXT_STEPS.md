@@ -177,7 +177,13 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   `TimePickerField`/`WheelPicker` już istnieją i są używane w zadaniach, tylko trzeba podmienić.
 - Tryb ręczny godzin pracy (Ustawienia→Praca→Ręcznie) nie ma odpowiednika na dashboardzie —
   kafelek "work-hours" działa tylko w trybie kalendarzowym.
-- 6 bossów rajdowych + 1 portret event-bossa wciąż bez prawdziwego artu (placeholder/emoji).
+- ~~6 bossów rajdowych bez artu~~ — 2026-08-15: pożyczają PNG z kampanii + czerwona aura
+  (`powered` prop w `BossArt`), patrz ARCHITECTURE §"Art rajdowych bossów". Kosmetyczny
+  stopgap, nie docelowy dedykowany art — jeśli kiedyś ktoś narysuje 6 unikalnych bossów,
+  wystarczy dopisać je do `BOSS_PNG` pod tymi samymi id i usunąć `powered` z 3 wywołań
+  `BossArt`. **NIEsprawdzone na urządzeniu** — priorytet: otwórz Bossy, sprawdź czy karta
+  RAID ma czerwoną poświatę i nie wygląda jak zwykły recolor bez sensu.
+- 1 portret event-bossa wciąż bez prawdziwego artu (placeholder/emoji).
 - Odznaki czekające w `assets/bagesv2/` bez wpięcia: `gnome.png` (brak pomysłu),
   `radar.png` (wykrywanie ominiętych przypomnień — złożone), `4th-of-july.png` (wymaga
   nowego pola daty urodzenia w Ustawieniach — większy prerequisite).

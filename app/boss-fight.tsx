@@ -501,7 +501,7 @@ export default function BossFight() {
                       TYLKO na osobnym attackFx burst-image niżej (to naturalnie coś co "wybucha"
                       i rośnie, nie postać która się trzęsie). */}
                   <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
-                    <BossArt id={target.id} emoji={target.emoji} size={104} />
+                    <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid'} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: bFlashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
                   {attackFx && lastHit && (
@@ -595,7 +595,7 @@ export default function BossFight() {
             <View style={s.vCenter} pointerEvents="none">
               <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : 'WYGRANA!'}</Text>
               <View style={{ opacity: 0.6 }}>
-                <BossArt id={victory.id} emoji={victory.emoji} size={78} />
+                <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid'} />
               </View>
               <Text style={s.vName}>{victory.kind === 'campaign' ? `${victory.name} pokonany` : victory.name}</Text>
               <View style={s.vLoot}>
