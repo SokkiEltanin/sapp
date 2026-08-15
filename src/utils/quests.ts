@@ -53,7 +53,11 @@ export interface ClaimState {
 }
 
 // ─── Daily quests ───────────────────────────────────────────────────────────
-interface DailyDef { id: string; label: string; coins: number; xp: number; done: (c: QuestCtx) => boolean; note?: (c: QuestCtx) => string }
+// `progress` = 0..1 dla questów z mierzalnym postępem (kroki/nawyki/woda/sen/rower) — do
+// paska postępu na niezrobionych questach (2026-08-15, user: zamiast liczby monet na
+// niezrobionym, chce pasek/wygaszony przycisk). Brak (undefined) dla questów binarnych
+// (mood/pet/self-report bez sensora) — tam nie ma czego pokazać jako ułamek.
+interface DailyDef { id: string; label: string; coins: number; xp: number; done: (c: QuestCtx) => boolean; note?: (c: QuestCtx) => string; progress?: (c: QuestCtx) => number }
 // Nagrody podwojone (2026-08-12, user: "zadania pupila powinny być lepiej oceniane... dają
 // bardzo mało względem tego jak dużo trzeba wydawać na upgrady"). Policzone, nie zgadywane:
 // upgrade HP/ATK w pet-stats.tsx kosztuje `40 + floor(bonus/krok)×15` — 10 zakupów pod rząd
@@ -65,13 +69,13 @@ interface DailyDef { id: string; label: string; coins: number; xp: number; done:
 // powtarzalny dochód konkurujący z upgradami na co dzień, tylko okazjonalny bonus za rekord.
 const DAILY: DailyDef[] = [
   { id: 'd_mood',    label: 'Wpisz humor dziś',      coins: 2, xp: 5, done: c => c.moodLoggedToday },
-  { id: 'd_steps10', label: '10 000 kroków',          coins: 2, xp: 5, done: c => c.stepsToday >= 10000, note: c => `${c.stepsToday}/10000` },
-  { id: 'd_steps20', label: '20 000 kroków',          coins: 2, xp: 6, done: c => c.stepsToday >= 20000, note: c => `${c.stepsToday}/20000` },
-  { id: 'd_habits',  label: 'Wszystkie nawyki',       coins: 2, xp: 5, done: c => c.habitsTotal > 0 && c.habitsDone >= c.habitsTotal, note: c => c.habitsTotal > 0 ? `${c.habitsDone}/${c.habitsTotal}` : 'brak nawyków' },
+  { id: 'd_steps10', label: '10 000 kroków',          coins: 2, xp: 5, done: c => c.stepsToday >= 10000, note: c => `${c.stepsToday}/10000`, progress: c => c.stepsToday / 10000 },
+  { id: 'd_steps20', label: '20 000 kroków',          coins: 2, xp: 6, done: c => c.stepsToday >= 20000, note: c => `${c.stepsToday}/20000`, progress: c => c.stepsToday / 20000 },
+  { id: 'd_habits',  label: 'Wszystkie nawyki',       coins: 2, xp: 5, done: c => c.habitsTotal > 0 && c.habitsDone >= c.habitsTotal, note: c => c.habitsTotal > 0 ? `${c.habitsDone}/${c.habitsTotal}` : 'brak nawyków', progress: c => c.habitsTotal > 0 ? c.habitsDone / c.habitsTotal : 0 },
   { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 2, xp: 5, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione ❤️' : 'stuknij kota' },
 ];
 
-export interface DailyQuestState { id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string }
+export interface DailyQuestState { id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string; progress?: number }
 
 // ─── Milestone quests ───────────────────────────────────────────────────────
 interface Tier { at: number; coins: number }
@@ -96,14 +100,17 @@ export interface MilestoneTierState { id: string; at: number; coins: number; xp:
 export interface MilestoneQuestState { id: string; label: string; unit: string; value: number; tiers: MilestoneTierState[]; nextAt: number | null }
 
 // ─── Dynamic bonus dailies (higher reward, adaptive to you) ─────────────────
-interface BonusDef { id: string; coins: number; xp: number; available: (c: QuestCtx) => boolean; label: (c: QuestCtx) => string; note?: (c: QuestCtx) => string; done: (c: QuestCtx) => boolean }
+interface BonusDef { id: string; coins: number; xp: number; available: (c: QuestCtx) => boolean; label: (c: QuestCtx) => string; note?: (c: QuestCtx) => string; done: (c: QuestCtx) => boolean; progress?: (c: QuestCtx) => number }
 const BONUS: BonusDef[] = [
   { id: 'b_stepbeat', coins: 4, xp: 10, available: c => (c.stepTarget ?? 0) > 0,
-    label: c => `Pobij formę: ${c.stepTarget!.toLocaleString('pl-PL')} kroków`, note: c => `${c.stepsToday}/${c.stepTarget}`, done: c => c.stepsToday >= (c.stepTarget ?? Infinity) },
+    label: c => `Pobij formę: ${c.stepTarget!.toLocaleString('pl-PL')} kroków`, note: c => `${c.stepsToday}/${c.stepTarget}`, done: c => c.stepsToday >= (c.stepTarget ?? Infinity),
+    progress: c => c.stepsToday / (c.stepTarget || 1) },
   { id: 'b_water', coins: 4, xp: 10, available: c => (c.waterGoal ?? 0) > 0,
-    label: c => `Wypij ${c.waterGoal} szklanek wody`, note: c => `${c.waterToday ?? 0}/${c.waterGoal}`, done: c => (c.waterToday ?? 0) >= (c.waterGoal ?? Infinity) },
+    label: c => `Wypij ${c.waterGoal} szklanek wody`, note: c => `${c.waterToday ?? 0}/${c.waterGoal}`, done: c => (c.waterToday ?? 0) >= (c.waterGoal ?? Infinity),
+    progress: c => (c.waterToday ?? 0) / (c.waterGoal || 1) },
   { id: 'b_sleep', coins: 4, xp: 10, available: c => (c.sleepMinutes ?? 0) > 0,
-    label: () => 'Prześpij 7 godzin', note: c => `${((c.sleepMinutes ?? 0) / 60).toFixed(1)}h / 7h`, done: c => (c.sleepMinutes ?? 0) >= 420 },
+    label: () => 'Prześpij 7 godzin', note: c => `${((c.sleepMinutes ?? 0) / 60).toFixed(1)}h / 7h`, done: c => (c.sleepMinutes ?? 0) >= 420,
+    progress: c => (c.sleepMinutes ?? 0) / 420 },
   // Personalized training quests — only show once Ustawienia → Personalizacja is filled
   // in (targets computed there). Pushups/squats are self-reported (tap when done, see
   // markPushupsDone/markSquatsDone in petStore — no sensor can count reps); the bike
@@ -121,7 +128,8 @@ const BONUS: BonusDef[] = [
     label: c => `Rozciąganie — ${c.stretchTarget} min`, note: c => c.stretchToday ? 'zrobione 🤸' : 'stuknij po zrobieniu', done: c => !!c.stretchToday },
   { id: 'b_bikeride', coins: 5, xp: 13, available: c => (c.bikeTarget ?? 0) > 0,
     label: c => `Przejażdżka rowerem (${c.bikeTarget} min)`, note: c => `${c.bikeMinutesToday ?? 0}/${c.bikeTarget} min`,
-    done: c => (c.bikeMinutesToday ?? 0) >= (c.bikeTarget ?? Infinity) },
+    done: c => (c.bikeMinutesToday ?? 0) >= (c.bikeTarget ?? Infinity),
+    progress: c => (c.bikeMinutesToday ?? 0) / (c.bikeTarget || 1) },
 ];
 // Wszystkie 6 questów treningowych — do rozpoznania "czy ten claim liczy się do streaka" w
 // pet.tsx (bumpTrainingDay) i do MILESTONES `m_training` niżej, bez duplikowania listy id.
@@ -186,14 +194,14 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState, level: number = 1)
     const done = d.done(ctx);
     const claimed = claim.dailyClaims[d.id] === claim.today;
     if (done && !claimed) claimable++;
-    return { id: d.id, label: d.label, coins: scaleCoins(d.coins), xp: scaleXp(d.xp), done, claimed, note: d.note?.(ctx) };
+    return { id: d.id, label: d.label, coins: scaleCoins(d.coins), xp: scaleXp(d.xp), done, claimed, note: d.note?.(ctx), progress: d.progress ? Math.max(0, Math.min(1, d.progress(ctx))) : undefined };
   });
 
   const bonusDaily: DailyQuestState[] = BONUS.filter(b => b.available(ctx)).map(b => {
     const done = b.done(ctx);
     const claimed = claim.dailyClaims[b.id] === claim.today;
     if (done && !claimed) claimable++;
-    return { id: b.id, label: b.label(ctx), coins: scaleCoins(b.coins), xp: scaleXp(b.xp), done, claimed, note: b.note?.(ctx) };
+    return { id: b.id, label: b.label(ctx), coins: scaleCoins(b.coins), xp: scaleXp(b.xp), done, claimed, note: b.note?.(ctx), progress: b.progress ? Math.max(0, Math.min(1, b.progress(ctx))) : undefined };
   });
 
   const milestones: MilestoneQuestState[] = MILESTONES.map(m => {

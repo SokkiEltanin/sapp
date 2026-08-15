@@ -430,11 +430,18 @@ export default function Pet() {
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
                       {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                      {/* Pasek postępu na NIEZROBIONYCH questach z mierzalną wartością
+                          (2026-08-15, user: zamiast liczby monet chce pasek/wygaszony
+                          przycisk) — dane już liczone dla `note` wyżej, więc to zero
+                          dodatkowego "ładowania", tylko inny render tej samej liczby. */}
+                      {!q.done && q.progress != null && (
+                        <View style={s.qProgTrack}><View style={[s.qProgFill, { width: `${Math.round(q.progress * 100)}%` }]} /></View>
+                      )}
                     </View>
-                    <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                    {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
                     {q.done
                       ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-                      : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
+                      : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
                   </View>
                 ))}
                 {claimedN > 0 && (
@@ -472,13 +479,16 @@ export default function Pet() {
                           <View style={{ flex: 1, minWidth: 0 }}>
                             <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
                             {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                            {!q.done && q.progress != null && (
+                              <View style={s.qProgTrack}><View style={[s.qProgFill, { width: `${Math.round(q.progress * 100)}%` }]} /></View>
+                            )}
                           </View>
-                          <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
+                          {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
                           {q.done
                             ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
                             : selfReport
                               ? <PressableScale onPress={() => { haptic.tap(); selfReport(); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Zrobione</Text></View></PressableScale>
-                              : <View style={s.qLocked}><Text style={s.qLockedTxt}>—</Text></View>}
+                              : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
                         </View>
                       );
                     })}
@@ -672,11 +682,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qClaimTxt: { fontSize: 14, fontWeight: '900', color: '#07160F', letterSpacing: 0.2 },
   qFight: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10, shadowColor: '#EF4444', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   qFightTxt: { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
+  // Wygaszony "Walcz" na niezrobionym queście (2026-08-15) — sam kształt przycisku,
+  // niższa opacity zamiast osobnego stylu/koloru, żeby jasno czytało się jako "to samo,
+  // ale jeszcze niedostępne", nie inna akcja.
+  qFightOff: { opacity: 0.35, shadowOpacity: 0 },
   qDone: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2AC68F1A' },
   qClaimedFoot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing[2] },
   qClaimedTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, letterSpacing: 0.2 },
-  qLocked: { width: 30, alignItems: 'center' },
-  qLockedTxt: { fontSize: 14, color: c.text.muted, fontWeight: '800' },
+  // Pasek postępu na niezrobionym queście z mierzalną wartością (steps/habits/water/sen/rower).
+  qProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4, maxWidth: 160 },
+  qProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
   qSelfReport: { backgroundColor: c.bg.elevated, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: c.border.default },
   qSelfReportTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
 
