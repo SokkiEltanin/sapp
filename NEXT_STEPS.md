@@ -18,6 +18,26 @@ było już gdzie zobaczyć co się ma po nazwie. Dodatkowo "Poduszka Leniwca" (�
 Leniwca) tego samego dnia dostała reflavor na "Iskra Poranka" ⚡ — id (`loot_pillow`) zostało,
 tylko nazwa się zmieniła (patrz komentarz w `src/utils/bosses.ts` przy definicji bossa `sloth`).
 
+## 🆕 MAD bossy — nowy, PIĄTY tor walki (2026-08-15, NIEsprawdzone na urządzeniu)
+
+User: "trzeba przemyśleć hp bossów dmg ich itp itd" → po doprecyzowaniu (2 pytania
+AskUserQuestion) skończyło się jako: druga, silniejsza fala tych samych 22 bossów kampanii,
+odblokowywana hurtem na **lvl 50**, ale TYLKO per-boss po pokonaniu jego zwykłej wersji.
+Zwykła kampania bez zmian. Pełny opis mechaniki w ARCHITECTURE §"Bossy" → "MAD bossy".
+
+**Priorytet testowania:**
+1. Pokonaj dowolnego bossa kampanii (albo sprawdź na koncie które już masz pokonane) →
+   otwórz Bossy → sekcja "MAD bossy" powinna pokazać tego bossa jako cel (jeśli lvl<50:
+   zablokowany z "Odblokujesz na poziomie 50"; jeśli lvl≥50: przycisk WALCZ).
+2. Stocz walkę MAD — sprawdź czy art ma czerwoną aurę (jak rajdowe bossy), czy nagroda
+   (coins/xp) jest wyraźnie wyższa niż standardowy boss tego samego id, czy po wygranej
+   znika z sekcji MAD i pojawia się KOLEJNY pokonany-ale-nie-MAD boss (jeśli jest).
+3. Balans sprawdzony throwaway-symulacją z UMIARKOWANYM profilem inwestycji (nie zero, nie
+   full-endgame) — jeśli w realnej grze okaże się za łatwe/trudne, kręcić `madHitsFor` w
+   `madBosses.ts` (obecnie 6→8 ciosów przez roster), NIE zgadywać — powtórzyć symulację
+   (metoda opisana w ARCHITECTURE, pułapka z `guard`/kwadratowym kontratakiem już
+   udokumentowana, nie trzeba jej odkrywać drugi raz).
+
 ## 🧪 Balans ekonomii vs bossy — audyt + naprawy (2026-08-14, NIEsprawdzone na urządzeniu)
 
 User poprosił o sprawdzenie czy tempo ekonomii questów nadąża za krzywą trudności bossów.
@@ -177,7 +197,13 @@ bossów widać w UI, i czy dashboard streak-tiles wyglądają dobrze (grubość 
   `TimePickerField`/`WheelPicker` już istnieją i są używane w zadaniach, tylko trzeba podmienić.
 - Tryb ręczny godzin pracy (Ustawienia→Praca→Ręcznie) nie ma odpowiednika na dashboardzie —
   kafelek "work-hours" działa tylko w trybie kalendarzowym.
-- 6 bossów rajdowych + 1 portret event-bossa wciąż bez prawdziwego artu (placeholder/emoji).
+- ~~6 bossów rajdowych bez artu~~ — 2026-08-15: pożyczają PNG z kampanii + czerwona aura
+  (`powered` prop w `BossArt`), patrz ARCHITECTURE §"Art rajdowych bossów". Kosmetyczny
+  stopgap, nie docelowy dedykowany art — jeśli kiedyś ktoś narysuje 6 unikalnych bossów,
+  wystarczy dopisać je do `BOSS_PNG` pod tymi samymi id i usunąć `powered` z 3 wywołań
+  `BossArt`. **NIEsprawdzone na urządzeniu** — priorytet: otwórz Bossy, sprawdź czy karta
+  RAID ma czerwoną poświatę i nie wygląda jak zwykły recolor bez sensu.
+- 1 portret event-bossa wciąż bez prawdziwego artu (placeholder/emoji).
 - Odznaki czekające w `assets/bagesv2/` bez wpięcia: `gnome.png` (brak pomysłu),
   `radar.png` (wykrywanie ominiętych przypomnień — złożone), `4th-of-july.png` (wymaga
   nowego pola daty urodzenia w Ustawieniach — większy prerequisite).

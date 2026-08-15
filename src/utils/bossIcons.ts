@@ -47,8 +47,25 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   mb_harpy:    require('../../assets/minibosses/MINIBOSS_harpy-eagle.png'),
   mb_macaws:   require('../../assets/minibosses/MINIBOSS_macaws.png'),
   mb_snake:    require('../../assets/minibosses/MINIBOSS_snake.png'),
+  // ── raid (2026-08-15) — 6 rajdowych bossów NIE mają własnego artu (placeholder/emoji od
+  // startu). User: "możesz użyć potężnych wersji tych co mamy z czerwoną aurą" → zamiast
+  // czekać na nowe rysunki, pożycz PNG z kampanii (BossArt niżej dokłada czerwoną aurę przez
+  // `powered` prop, patrz komentarz tam) i potraktuj to jako "wzmocniony/rozjuszony wariant".
+  // Dobór NIE jest przypadkowy tam gdzie się dało: wyrm/dragon to ten sam gatunek smoka,
+  // siren/drought dzielą motyw wody+pragnienia (i to samo `weakness`), behemoth/sugar dzielą
+  // TĘ SAMĄ słabość (sweetless) już w danych. Reszta (kraken/golem/phantom) to czysto
+  // klimatyczne dopasowanie (chaos↔wielogłowy cerberus, brutalna siła↔cyklop, żal↔kosiarz) —
+  // żaden nowy plik, żadna zmiana id/logiki rajdu, tylko dodatkowy wpis w tej mapie.
+  kraken:   require('../../assets/ikonybosów/BOSS_pazurattack_cerberus.png'),
+  golem:    require('../../assets/ikonybosów/BOSS_maczukaatack_cyclops.png'),
+  phantom:  require('../../assets/ikonybosów/BOSS_reaperatack_reaper.png'),
+  behemoth: require('../../assets/ikonybosów/BOSS_handattack_pumpkin.png'),
+  wyrm:     require('../../assets/ikonybosów/BOSS_fireattack_dragon.png'),
+  siren:    require('../../assets/ikonybosów/BOSS_ataksoundwave_mermaid.png'),
 };
 
+// `mad_<id>` (madBosses.ts, 2026-08-15) reuses the base boss's OWN art (same "powered" red
+// aura trick as raid above) — strip the prefix instead of duplicating all 22 require() lines.
 export function bossPng(id: string): ImageSourcePropType | undefined {
-  return BOSS_PNG[id];
+  return BOSS_PNG[id] ?? (id.startsWith('mad_') ? BOSS_PNG[id.slice(4)] : undefined);
 }

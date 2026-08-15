@@ -38,6 +38,8 @@ export const BOSS_ATTACK_FX: Record<string, ImageSourcePropType> = {
   wizard:        require('../../assets/ikonybosów/BOSSATTACK_magicspell.png'),                // magicattack
 };
 
+// `mad_<id>` (madBosses.ts, 2026-08-15) reuses the base boss's own attack VFX — strip the
+// prefix instead of duplicating all 22 entries (same pattern as bossPng in bossIcons.ts).
 export function bossAttackFx(id: string): ImageSourcePropType | undefined {
-  return BOSS_ATTACK_FX[id];
+  return BOSS_ATTACK_FX[id] ?? (id.startsWith('mad_') ? BOSS_ATTACK_FX[id.slice(4)] : undefined);
 }
