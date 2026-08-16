@@ -255,6 +255,15 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
     (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
     tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
+  - **Odliczanie do końca eventu** (2026-08-16, `eventEndsAt`/`eventDaysLeft` w
+    `seasonalEvents.ts`) — user: "żeby realnie móc go wygrać" — walka eventowa ma FLAT
+    1 próbę/dzień (`EVENT_DAILY_ATTEMPTS`), więc "ile dni zostało" to wprost "ile jeszcze
+    podejść dostanę" zanim boss zniknie. `eventEndsAt` to per-id lustro okien z `isActive`
+    (SEASONAL) — nie da się wyciągnąć granicy z samego predykatu true/false, więc każdy z
+    6 sezonowych ma jawny koniec (Wielkanoc liczona z `easterSunday`+1 dzień). `menace`
+    (nemesis miesiąca) nie ma stałego okna — jego koniec to koniec BIEŻĄCEGO miesiąca
+    kalendarzowego. Pokazywane w `app/bosses.tsx` (mini-karta) i `boss-fight.tsx` (ekran
+    walki), kolor eskaluje czerwono/żółto przy ≤1/≤3 dniach.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

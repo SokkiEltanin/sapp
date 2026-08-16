@@ -12,7 +12,7 @@ import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO } from '@/store/petStore';
 import { BOSSES, Boss, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
-import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss } from '@/utils/seasonalEvents';
+import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { minibossForMission, missionRewardFor } from '@/utils/missions';
@@ -145,6 +145,9 @@ export default function BossFight() {
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
   const eventMaxHp = eventBoss ? Math.round(eventHpFor(level) * weaknessHpFactor(weaknessStreaks[eventBoss.weakness])) : eventHpFor(level);
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
+  // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — 1 próba/dzień, więc "ile
+  // dni zostało" mówi wprost ile jeszcze podejść zanim boss zniknie.
+  const eventDaysLeftN = eventBoss ? eventDaysLeft(eventBoss, now) : 0;
 
   // ── quest-jako-walka (2026-08-14 v2) — zamiast zwykłego "Odbierz" na wykonanym queście,
   // pełna walka z minibossem przypisanym do TEGO questu na TEN dzień (patrz minibosses.ts).
@@ -595,6 +598,13 @@ export default function BossFight() {
                 pokazywanie pustej etykiety byłoby myląco puste, więc linijka schowana. */}
             {kind !== 'quest' && kind !== 'mission' && (
               <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
+            )}
+            {/* Odliczanie (2026-08-16) — event ma FLAT 1 próbę/dzień, więc "ile dni zostało"
+                mówi wprost ile jeszcze podejść zanim boss zniknie na dobre. */}
+            {kind === 'event' && !eventDone && (
+              <Text style={[s.motywTxt, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted, fontWeight: '800' }]}>
+                {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
+              </Text>
             )}
             {/* Osłabiona obrona z realnej serii (2026-08-13, patrz bossWeakness.ts) — im dłuższa
                 seria w kategorii słabości TEGO bossa, tym niższe jego effective HP (już wliczone

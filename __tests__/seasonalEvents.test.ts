@@ -1,6 +1,6 @@
 import {
   easterSunday, activeSeasonalEvent, pickMenace, currentEventBoss, eventPeriodKey, eventBossFromKey, MENACE_POOL,
-  eventHpFor, eventAsBoss,
+  eventHpFor, eventAsBoss, eventEndsAt, eventDaysLeft,
 } from '@/utils/seasonalEvents';
 import { atkPower, counterDamage } from '@/utils/bosses';
 
@@ -85,6 +85,36 @@ describe('seasonalEvents — eventPeriodKey', () => {
     const seasonal = activeSeasonalEvent(new Date(2026, 11, 10))!;
     expect(eventPeriodKey(seasonal, new Date(2026, 11, 10))).toBe('mikolaj-2026');
     expect(eventPeriodKey(MENACE_POOL.overtime, new Date(2026, 0, 15))).toBe('overtime-2026-01');
+  });
+});
+
+// 2026-08-16: user — "dodajmy terminy z odliczaniem za ile kończy się event boss, żeby
+// realnie móc go wygrać" — event ma FLAT 1 próbę/dzień, więc "dni zostało" = "podejść zostało".
+describe('seasonalEvents — eventEndsAt / eventDaysLeft', () => {
+  test('Mikołaj kończy się 26 grudnia (koniec dnia)', () => {
+    const boss = activeSeasonalEvent(new Date(2026, 11, 6))!;
+    expect(eventEndsAt(boss, new Date(2026, 11, 6))).toEqual(new Date(2026, 11, 26, 23, 59, 59, 999));
+  });
+
+  test('Wielkanoc kończy się w Poniedziałek Wielkanocny (Easter Sunday + 1)', () => {
+    const boss = activeSeasonalEvent(new Date(2026, 3, 5))!; // 2026: Wielkanoc = 5 kwietnia
+    expect(eventEndsAt(boss, new Date(2026, 3, 5))).toEqual(new Date(2026, 3, 6, 23, 59, 59, 999));
+  });
+
+  test('Wakacje kończą się 31 sierpnia', () => {
+    const boss = activeSeasonalEvent(new Date(2026, 6, 15))!;
+    expect(eventEndsAt(boss, new Date(2026, 6, 15))).toEqual(new Date(2026, 7, 31, 23, 59, 59, 999));
+  });
+
+  test('Nemesis miesiąca kończy się z ostatnim dniem BIEŻĄCEGO miesiąca (styczeń 2026 ma 31 dni)', () => {
+    expect(eventEndsAt(MENACE_POOL.overtime, new Date(2026, 0, 15))).toEqual(new Date(2026, 0, 31, 23, 59, 59, 999));
+  });
+
+  test('eventDaysLeft liczy pełne dni w górę, nigdy ujemne', () => {
+    const boss = activeSeasonalEvent(new Date(2026, 11, 6))!;
+    expect(eventDaysLeft(boss, new Date(2026, 11, 25, 10, 0, 0))).toBe(2); // 25 → koniec 26 = >1 dzień, <2 → ceil 2
+    expect(eventDaysLeft(boss, new Date(2026, 11, 26, 23, 59, 59, 999))).toBe(0); // dokładnie na granicy
+    expect(eventDaysLeft(boss, new Date(2026, 11, 27, 0, 0, 0))).toBe(0); // po granicy → nigdy ujemne
   });
 });
 
