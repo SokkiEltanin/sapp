@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppSta
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Check, Coins, Heart } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -398,44 +398,13 @@ export default function Pet() {
           <Text style={s.affTxt}>{affToday >= 100 ? 'głaskany!' : 'głaskanie'}</Text>
         </View>
 
-        {/* Skrzynka dnia — darmowa, TU przy kocie (w sklepie user o niej zapominał) */}
-        <PressableScale onPress={onDailyBox} style={[s.dailyBox, !dailyBoxReady && s.dailyBoxDone]}>
-          <Gift size={18} color={dailyBoxReady ? '#0B0E1A' : c.text.muted} />
-          <Text style={[s.dailyBoxTxt, !dailyBoxReady && { color: c.text.muted }]}>
-            {dailyBoxReady ? 'Odbierz skrzynkę dnia — za darmo' : 'Skrzynka odebrana — wróć jutro'}
-          </Text>
-          {dailyBoxReady && <View style={s.dailyBoxDot} />}
+        {/* Głaskanie — jawny przycisk zamiast sekcji "Potrzeby" (2026-08-16, user: "potrzeby
+            nic nie mówią, zrób głaskanie") — tapnięcie kota już głaskało, ale było niewidoczne;
+            ten przycisk robi dokładnie to samo (handlePet), tylko jawnie. */}
+        <PressableScale onPress={handlePet} style={s.petBtn}>
+          <Heart size={16} color="#F472B6" fill={affToday >= 100 ? '#F472B6' : 'transparent'} />
+          <Text style={s.petBtnTxt}>Pogłaskaj pupila</Text>
         </PressableScale>
-
-        {pendingCrates > 0 && (
-          <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
-            <Text style={{ fontSize: 18 }}>🐟</Text>
-            <Text style={s.crateBtnTxt}>Otwórz skrzynkę sardynek{pendingCrates > 1 ? ` · ${pendingCrates}` : ''}</Text>
-          </PressableScale>
-        )}
-
-        {/* level */}
-        <View style={s.levelCard}>
-          <View style={s.levelTop}>
-            <Text style={s.levelTxt}>Poziom {lvl.level}</Text>
-            <Text style={s.levelSub}>{lvl.inLevel}/{lvl.needed} XP · {stage}</Text>
-          </View>
-          <View style={s.xpTrack}><View style={[s.xpFill, { width: `${Math.round(lvl.progress * 100)}%` }]} /></View>
-        </View>
-
-        {/* needs */}
-        <Text style={s.section}>Potrzeby dziś</Text>
-        <View style={s.needs}>
-          {pet.needs.map(n => (
-            <View key={n.key} style={s.needRow}>
-              <Text style={s.needLabel}>{n.label}</Text>
-              <View style={s.needTrack}>
-                {!n.unknown && <View style={[s.needFill, { width: `${n.value}%`, backgroundColor: n.met ? '#2AC68F' : n.value >= 30 ? '#FBBF24' : '#F87171' }]} />}
-              </View>
-              <Text style={[s.needVal, n.unknown && { opacity: 0.5 }]}>{n.unknown ? '—' : `${n.value}%`}</Text>
-            </View>
-          ))}
-        </View>
 
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
             (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. Bez
@@ -592,6 +561,31 @@ export default function Pet() {
           </>
         )}
 
+        {/* Skrzynka dnia — darmowa, TU przy kocie (w sklepie user o niej zapominał) */}
+        <PressableScale onPress={onDailyBox} style={[s.dailyBox, !dailyBoxReady && s.dailyBoxDone]}>
+          <Gift size={18} color={dailyBoxReady ? '#0B0E1A' : c.text.muted} />
+          <Text style={[s.dailyBoxTxt, !dailyBoxReady && { color: c.text.muted }]}>
+            {dailyBoxReady ? 'Odbierz skrzynkę dnia — za darmo' : 'Skrzynka odebrana — wróć jutro'}
+          </Text>
+          {dailyBoxReady && <View style={s.dailyBoxDot} />}
+        </PressableScale>
+
+        {pendingCrates > 0 && (
+          <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
+            <Text style={{ fontSize: 18 }}>🐟</Text>
+            <Text style={s.crateBtnTxt}>Otwórz skrzynkę sardynek{pendingCrates > 1 ? ` · ${pendingCrates}` : ''}</Text>
+          </PressableScale>
+        )}
+
+        {/* level */}
+        <View style={s.levelCard}>
+          <View style={s.levelTop}>
+            <Text style={s.levelTxt}>Poziom {lvl.level}</Text>
+            <Text style={s.levelSub}>{lvl.inLevel}/{lvl.needed} XP · {stage}</Text>
+          </View>
+          <View style={s.xpTrack}><View style={[s.xpFill, { width: `${Math.round(lvl.progress * 100)}%` }]} /></View>
+        </View>
+
         {/* ── Weekly challenges ── */}
         {quests.weekly.length > 0 && (
           <>
@@ -711,14 +705,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: spacing[2] },
-  name: { fontSize: 24, fontWeight: '900', color: c.text.primary, letterSpacing: -0.5 },
-  nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[2] },
-  nameInput: { fontSize: 20, fontWeight: '800', color: c.text.primary, borderBottomWidth: 2, borderBottomColor: c.accent.blue, minWidth: 140, textAlign: 'center', paddingVertical: 2 },
-  nameSave: { width: 34, height: 34, borderRadius: 17, backgroundColor: c.accent.green, alignItems: 'center', justifyContent: 'center' },
-  moodChip: { marginTop: 6, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.full, borderWidth: 1 },
-  status: { fontSize: 14, fontWeight: '800' },
-  tip: { fontSize: 12.5, color: c.text.muted, marginTop: 6, textAlign: 'center' },
+  // Nazwa/status skurczone (2026-08-16, user: "nazwę zbić, nad pupilem zajmuje w pizdu
+  // miejsca") — mniejsza czcionka + ciaśniejsze marginesy nad kotem, żeby resztę (głaskanie,
+  // questy) było widać bez przewijania od razu po wejściu.
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  name: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
+  nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  nameInput: { fontSize: 16, fontWeight: '800', color: c.text.primary, borderBottomWidth: 2, borderBottomColor: c.accent.blue, minWidth: 140, textAlign: 'center', paddingVertical: 2 },
+  nameSave: { width: 30, height: 30, borderRadius: 15, backgroundColor: c.accent.green, alignItems: 'center', justifyContent: 'center' },
+  moodChip: { marginTop: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1 },
+  status: { fontSize: 12, fontWeight: '800' },
+  tip: { fontSize: 11.5, color: c.text.muted, marginTop: 3, textAlign: 'center' },
 
   affRow: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', marginTop: spacing[3] },
   affHeart: { fontSize: 16 },
@@ -751,12 +748,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   addonState: { fontSize: 9.5, fontWeight: '700' },
   addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
-  needs: { width: '100%', gap: spacing[2] },
-  needRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  needLabel: { width: 62, fontSize: 13, fontWeight: '700', color: c.text.secondary },
-  needTrack: { flex: 1, height: 9, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
-  needFill: { height: '100%', borderRadius: 5 },
-  needVal: { width: 38, textAlign: 'right', fontSize: 11, fontWeight: '700', color: c.text.muted },
+  petBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[3], paddingVertical: 12, borderRadius: radius.lg, backgroundColor: '#F472B618', borderWidth: 1, borderColor: '#F472B655' },
+  petBtnTxt: { fontSize: 13, fontWeight: '800', color: '#F472B6' },
 
   missionCard: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },

@@ -9,6 +9,23 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Przebudowa layoutu zakładki Pupila — NIEsprawdzone na urządzeniu (2026-08-16)
+
+User: "zadania i ta walka jest za nisko, może lepiej wywalić potrzeby jego bo to nic nie
+mówi i głaskanie zrobić, i nazwę zbić bo tam nad pupilem zajmuje w pizdu miejsca." Zmiany w
+`app/pet.tsx` (pełny opis w ARCHITECTURE §9):
+1. Sekcja "Potrzeby dziś" (paski needs) **usunięta całkowicie** z ekranu.
+2. W jej miejscu — jawny przycisk **"Pogłaskaj pupila"** (ikonka serca, wcześniej głaskanie
+   działało tylko przez ukryty tap na sprite'a kota).
+3. **Misja / Nieodebrane z wczoraj / Codzienne / Bonusowe dziś** (wszystkie z "Walcz")
+   przeniesione WYŻEJ — zaraz pod głaskaniem, przed skrzynką dnia/poziomem.
+4. Nazwa kotka nad postacią zmniejszona (24px→16px) + ciaśniejsze marginesy, żeby cała góra
+   ekranu zajmowała mniej miejsca.
+**Priorytet testu:** otwórz Pupila, sprawdź czy questy/misja/walka są widoczne bez (albo z
+minimalnym) przewijaniem, czy przycisk głaskania faktycznie napełnia pasek afekcji tak samo
+jak tap na kota, i czy nic się wizualnie nie rozjechało (skrzynka dnia/poziom/tygodniowe dalej
+działają, tylko niżej).
+
 ## 🆕 Odliczanie do końca eventu — NIEsprawdzone na urządzeniu (2026-08-16)
 
 User: "dodajmy terminy z odliczaniem za ile kończy się event boss, żeby realnie móc go

@@ -378,6 +378,18 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     brzuszków ekran z docelową liczbą powtórzeń + przycisk "UKOŃCZYŁEM" (bez czujnika liczyć
     się nie da). Po ukończeniu woła to samo `mark*Done` z `petStore` co wcześniej — quest
     staje się `done`, dalej idzie przez tor "Questy-jako-walki" wyżej (przycisk "Walcz").
+  - **Layout `app/pet.tsx` (2026-08-16)** — user: "zadania i ta walka jest za nisko, wywalić
+    potrzeby bo nic nie mówi, zrobić głaskanie, nazwę zbić bo nad pupilem zajmuje w pizdu
+    miejsca". Nowa kolejność sekcji w ScrollView: nazwa/nastrój (skurczone — `name` 24→16px,
+    ciaśniejsze marginesy nad kotem) → CatArt → pasek afekcji → **przycisk "Pogłaskaj pupila"**
+    (jawne CTA na `handlePet`, zamiast dotychczasowego wyłącznie ukrytego tap-on-sprite) →
+    **Misja / Nieodebrane z wczoraj / Codzienne / Bonusowe dziś** (wszystkie z przyciskiem
+    "Walcz" — PRZENIESIONE wyżej, od razu pod głaskaniem, żeby były widoczne bez przewijania)
+    → skrzynka dnia / skrzynka sardynek / karta poziomu (przesunięte NIŻEJ, mniej akcyjne niż
+    questy) → tygodniowe/miesięczne/cele. Sekcja "Potrzeby dziś" (paski `pet.needs` z
+    `computePetState`) USUNIĘTA CAŁKOWICIE z UI — user: nic nie mówiła, była martwym
+    wypełniaczem; `computePetState`/`PetInput` bez zmian (nadal karmi `pet.color`/`label`/
+    `expression`/`wellbeing` gdzie indziej na ekranie), tylko render `.needs` zniknął.
   - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 4
     torów wyżej), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
     czytelny tekstowy raport (poziom/staty/pokonani bossowie/log), Ustawienia →
