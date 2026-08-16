@@ -70,6 +70,13 @@ export default function Pet() {
   const missionRemainingMs = missionEndsAt ? new Date(missionEndsAt).getTime() - Date.now() : 0;
   void missionTick;
   const missionReady = !!missionEndsAt && missionRemainingMs <= 0;
+  // Pasek postępu (2026-08-15, user: "niech będzie pasek też ładowania przy timerze") —
+  // elapsed/total od missionStartedAt do missionEndsAt, capowany 0..1 (nie powinno przekroczyć,
+  // ale zegar urządzenia to nie gwarancja).
+  const missionTotalMs = missionStartedAt && missionEndsAt
+    ? new Date(missionEndsAt).getTime() - new Date(missionStartedAt).getTime() : 0;
+  const missionProgress = missionTotalMs > 0
+    ? Math.min(1, Math.max(0, 1 - missionRemainingMs / missionTotalMs)) : 0;
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
@@ -159,6 +166,23 @@ export default function Pet() {
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
     return () => sub.remove();
+  }, [reload]);
+  // DRUGA, ODDZIELNA dziura we wznawianiu (2026-08-15, user: "przejechałem wczoraj rowerem
+  // i dzisiaj rano się nie odświeżyło i odebrałem niechcący") — powyższe dwa triggery łapią
+  // powrót do ekranu i powrót z tła, ale NIE łapią północy mijającej podczas gdy telefon
+  // stał CAŁY CZAS aktywny na ekranie Pupila (np. leżał na ładowarce z appką otwartą przez
+  // noc) — wtedy nie ma ani nawigacji, ani zmiany AppState, więc `health`/quest-ctx zostają
+  // zamrożone na wczorajszych danych mimo że `todayISO()` (liczone na żywo) już wskazuje
+  // nowy dzień. Prosty poller: co minutę porównaj dzisiejszą datę z dniem ostatniego
+  // reload() — przy realnej zmianie odpal go ponownie. Koszt: jedno porównanie stringów co
+  // 60s, realny reload tylko raz na dobę (gdy data faktycznie się zmieni).
+  const lastReloadDay = useRef(todayISO());
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const t = todayISO();
+      if (t !== lastReloadDay.current) { lastReloadDay.current = t; reload(); }
+    }, 60000);
+    return () => clearInterval(iv);
   }, [reload]);
 
   const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
@@ -436,6 +460,7 @@ export default function Pet() {
               <>
                 <Text style={s.missionTitle}>Pupil w misji…</Text>
                 <Text style={s.missionSub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+                <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
               </>
             )}
           </View>
@@ -736,6 +761,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   missionCard: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
   missionSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
+  missionProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 6 },
+  missionProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
   missionBtn: { backgroundColor: '#38BDF8', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10 },
   missionBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 

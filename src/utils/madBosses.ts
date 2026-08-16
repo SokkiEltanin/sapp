@@ -1,4 +1,4 @@
-import { Boss, BOSSES, atkPower } from '@/utils/bosses';
+import { Boss, BOSSES, Bonuses, atkPower } from '@/utils/bosses';
 
 // MAD bossy (2026-08-15) — user: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną
 // krzywą HP w nieskończoność (dokładnie ten problem audyt 14.08 znalazł w raidzie: output
@@ -28,12 +28,21 @@ import { Boss, BOSSES, atkPower } from '@/utils/bosses';
 // zakupionym catMaxHpBonus) — więcej ciosów = kwadratowo więcej skumulowanych kontrataków,
 // nie liniowo. Bezpieczny, wciąż wyraźnie trudniejszy niż quest (4 ciosy) zakres: 6→8 ciosów
 // (order 1→22), stabilne 100% win-rate do lvl~150 przy umiarkowanej inwestycji w symulacji.
+//
+// Fix 2026-08-15 (drugi tego dnia — user zgłosił IDENTYCZNY problem dla questów, ta sama
+// przyczyna tutaj): `atkPower(0, level, ZERO_BONUSES)` ignorował realny atkStatBonus/bonuses
+// gracza, podczas gdy jego faktyczny cios (computeDamage w bosses.ts) już je liczy — gracz
+// z realną inwestycją zadawał więcej niż formuła zakładała, trywializując walkę mimo
+// "bezpiecznego" zakresu 6-8 ciosów zweryfikowanego wyżej TYLKO dla jednego stałego profilu
+// bonusów. Teraz bierze też prawdziwe atkStatBonus/bonuses — te same argumenty co
+// computeDamage, więc ciosy potrzebne do zabicia zostają w zwalidowanym zakresie NIEZALEŻNIE
+// od tego ile gracz faktycznie zainwestował.
 export const MAD_UNLOCK_LEVEL = 50;
 export const MAD_REWARD_MULT = 3;
 
 const madHitsFor = (order: number) => 6 + (order - 1) * (2 / 21);
-export const madBossHpFor = (level: number, order: number) =>
-  Math.round(atkPower(0, Math.max(0, level), { atk: 0, dodge: 0, crit: 0, energyMult: 0 }) * madHitsFor(order));
+export const madBossHpFor = (atkStatBonus: number, level: number, bonuses: Bonuses, order: number) =>
+  Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * madHitsFor(order));
 
 export function madBossId(baseId: string): string { return `mad_${baseId}`; }
 
@@ -51,12 +60,12 @@ export function madCandidate(defeatedBosses: string[], defeatedMadBosses: string
 // bezpieczny zakres (0% win-rate w symulacji od lvl 100 wzwyż). "Oszalały" to nowy, osobno
 // wyważony tryb — nie musi kopiować każdej mechaniki oryginału, żeby czuć się jak ten sam
 // boss (art+nazwa+weakness wystarczą).
-export function madBossFor(boss: Boss, level: number): Boss {
+export function madBossFor(boss: Boss, atkStatBonus: number, level: number, bonuses: Bonuses): Boss {
   return {
     ...boss,
     id: madBossId(boss.id),
     name: `${boss.name} (Oszalały)`,
-    hp: madBossHpFor(level, boss.order),
+    hp: madBossHpFor(atkStatBonus, level, bonuses, boss.order),
     coins: Math.round(boss.coins * MAD_REWARD_MULT),
     xp: Math.round(boss.xp * MAD_REWARD_MULT),
     unlockLevel: MAD_UNLOCK_LEVEL,

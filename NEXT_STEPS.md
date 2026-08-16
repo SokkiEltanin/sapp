@@ -9,6 +9,36 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 5 zgłoszeń usera w jednej wiadomości — naprawione, NIEsprawdzone na urządzeniu (2026-08-15)
+
+1. **Kolor/dodatki kotka nie zgadzały się w walce** — `boss-fight.tsx`'s `<CatArt>` w ogóle
+   nie dostawał `palette`/`stripes`/`eyeColor`/`noseColor`/`whiskers`/`legStripes` (jedyne
+   takie miejsce w kodzie — pet.tsx/pet-shop.tsx/PetTile/AnimatedSplash/StartupPreview
+   wszystkie już to robiły poprawnie). Naprawione — walka pokazuje TEGO SAMEGO kotka co
+   Pupil. **Priorytet testu:** otwórz walkę (dowolny tryb), sprawdź czy kolor/prążki/oczy/
+   nosek/wąsy się zgadzają z ekranem Pupil.
+2. **Questowe/MAD bossy trywialne mimo "poprawki" z wcześniej dziś** — user: "ja im ponad
+   100, oni mi ledwo 1%". Przyczyna: `questBossHpFor`/`madBossHpFor` liczyły się z ZEREM
+   zamiast realnego `atkStatBonus`/`bonuses` gracza — im więcej zainwestował w staty, tym
+   bardziej trywializował te walki, bo hp bossa nie rosło razem z jego prawdziwą mocą.
+   Naprawione (pełny opis w ARCHITECTURE §"Bossy"). **Priorytet testu:** stocz walkę
+   questową/MAD, sprawdź czy trwa realnie kilka ciosów i czy kontratak coś faktycznie ujmuje
+   (nie <2% jak wcześniej).
+3. **Pasek postępu przy misji** — dodany pod tekstem odliczania w `app/pet.tsx`
+   (`missionProgTrack`/`missionProgFill`), elapsed/total od `missionStartedAt`/`missionEndsAt`.
+4. **Bug z nieodświeżającymi się questami** (user: rower z wczoraj pokazał się jako zrobiony
+   dziś rano, przypadkowo odebrał) — zbadane: dwa istniejące triggery (`useFocusEffect` +
+   `AppState` resume) łapią powrót na ekran i powrót z tła, ale NIE łapią północy mijającej
+   gdy telefon stał CAŁY CZAS aktywny na ekranie Pupila (np. na ładowarce przez noc, appka
+   nigdy nie zeszła do tła). Dodany trzeci trigger: poller co 60s porównujący `todayISO()` z
+   dniem ostatniego odświeżenia, wymusza `reload()` przy realnej zmianie. **Priorytet testu:**
+   trudny do zweryfikować bez zostawienia telefonu na ekranie Pupila przez północ — jeśli
+   user ma sposób żeby to odtworzyć, warto potwierdzić.
+5. **Kodeks Bossów (artefakt) v2** — więcej/rozwinięte ciekawostki z konkretnymi liczbami/
+   datami, usunięte cytaty-z-książek jako lead faktu, dodane rozwijane "Czytaj więcej" z
+   drugim faktem + nazwą hasła do sprawdzenia (bez generowanych URL-i — zasada sesji: nie
+   zgadywać linków spoza kontekstu programistycznego). Ten sam link co poprzednio (republish).
+
 ## 🐛 "Zgubione" itemy z bossów — WYJAŚNIONE, nie bug (2026-08-14)
 
 User pytał czemu nie ma Kryształu Cukru / Poduszki Leniwca po pokonaniu pierwszych bossów.
