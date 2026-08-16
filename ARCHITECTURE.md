@@ -296,7 +296,15 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (stara stała `50+level×5` rosła wolniej niż moc ataku, więc walki stawały się trywialne
     od ok. level 10 — user: "dają 1hp dmg... wale ich na 2 hity"); bez ryzyka endgame'owego
     przesunięcia jak w `raid.ts` (`raidHpFor`), bo obie strony formuły rosną z tym samym
-    czynnikiem.
+    czynnikiem. **Fix #2 tego samego dnia** (user ponownie: "ja im ponad 100, oni mi ledwo
+    1%") — `atkPower(level)` powyżej użyty był z ZEREM zamiast realnego `atkStatBonus`/
+    `bonuses` gracza (te same argumenty, których używa jego faktyczny cios w
+    `computeDamage`). Gracz z realną inwestycją (kupiony atkStatBonus, bonusy z łupu) zadawał
+    znacznie więcej niż formuła zakładała, więc bossy padały w 1-2 ciosy niezależnie od
+    docelowych 4. `questBossHpFor`/`minibossAsBoss` biorą teraz `atkStatBonus`/`bonuses` jak
+    reszta walki — ten sam fix zastosowany od razu profilaktycznie do `madBossHpFor`/
+    `madBossFor` (madBosses.ts), bo to identyczna formuła z identyczną luką, tylko jeszcze
+    nie zgłoszona (MAD jest zbyt świeże, żeby user zdążył to zauważyć).
   - **MAD bossy** (2026-08-15, `utils/madBosses.ts`) — PIĄTY tor, `?kind=mad` w
     `boss-fight.tsx`. User: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną krzywą
     HP w nieskończoność (dokładnie problem raidu wyżej), druga fala TYCH SAMYCH 22 bossów
@@ -349,7 +357,9 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     NIE jest importowany statycznie w `petStore.ts` (ciągnie `expo-notifications`, którego
     Jest nie parsuje z poziomu plików czysto-logicznych importowanych przez testy — dokładnie
     ten sam problem co `lucide-react-native` w `raid.ts`/`minibosses.ts`, ten sam fix: `require()`
-    leniwie WEWNĄTRZ akcji `startMission`/`claimMission`, nie na górze pliku).
+    leniwie WEWNĄTRZ akcji `startMission`/`claimMission`, nie na górze pliku). Pasek postępu
+    (2026-08-15, drugi tego dnia) w `app/pet.tsx` — elapsed/total liczone z `missionStartedAt`/
+    `missionEndsAt`, capowane 0..1.
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

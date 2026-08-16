@@ -40,7 +40,7 @@ export default function Bosses() {
   const s = useMemo(() => makeS(c), [c]);
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
-    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses,
+    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -79,7 +79,7 @@ export default function Bosses() {
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
   // wzorzec co `current` wyżej.
   const madBase = madCandidate(defeatedBosses, defeatedMadBosses);
-  const madBoss = madBase ? madBossFor(madBase, level) : null;
+  const madBoss = madBase ? madBossFor(madBase, atkStatBonus, level, bonuses) : null;
   const madUnlocked = level >= MAD_UNLOCK_LEVEL && !!madBase;
 
   // ── raid tygodniowy ──

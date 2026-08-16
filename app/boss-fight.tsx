@@ -6,6 +6,7 @@ import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Ha
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
+import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO } from '@/store/petStore';
@@ -75,6 +76,7 @@ export default function BossFight() {
     eventWon, spendEventEnergy, eventClaim,
     dayClaims, claimQuestFight, markTrainingDay,
     missionStartedAt, missionEndsAt, claimMission,
+    catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -114,6 +116,11 @@ export default function BossFight() {
     [equippedCombatItems, ownedCombatItems],
   );
   const catMax = catMaxHp(catMaxHpBonus);
+  // Kotek na ekranie walki musi wyglądać tak samo jak u Pupila (2026-08-15, user: "kolor
+  // pupila musi się zgadzać z kolorem w walce") — CatArt tu w ogóle nie dostawał
+  // palette/stripes/eyeColor/noseColor/whiskers/legStripes, więc zawsze renderował domyślny
+  // wygląd niezależnie od customizacji. Ten sam wzorzec co pet.tsx (paletteById(catColor)).
+  const palette = useMemo(() => paletteById(catColor), [catColor]);
 
   // ── kampania: sekwencyjna, zawsze pierwszy niepokonany ──
   const campaignBossRaw = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
@@ -144,14 +151,14 @@ export default function BossFight() {
   // Bez energii/limitu prób — quest już wykonany realnie, retry po przegranej jest darmowy.
   const today = todayISO();
   const questMb = kind === 'quest' && questId ? minibossForQuest(today, questId) : null;
-  const questBoss = questMb ? minibossAsBoss(questMb, level) : null;
+  const questBoss = questMb ? minibossAsBoss(questMb, atkStatBonus, level, bonuses) : null;
   const questAlreadyClaimed = kind === 'quest' && questId ? !!dayClaims[`${questId}:${today}`] : false;
 
   // ── MAD (2026-08-15) — druga, silniejsza fala tych samych 22 bossów kampanii dla lvl 50+,
   // TYLKO po pokonaniu normalnej wersji (madBosses.ts). Jeden wspólny cel po kolejności
   // `order`, dokładnie jak campaignBoss wyżej — bez osobnego id w URL.
   const madBase = kind === 'mad' ? madCandidate(defeatedBosses, defeatedMadBosses) : null;
-  const madBoss = madBase ? weakenBoss(madBossFor(madBase, level), weaknessStreaks[madBase.weakness]) : null;
+  const madBoss = madBase ? weakenBoss(madBossFor(madBase, atkStatBonus, level, bonuses), weaknessStreaks[madBase.weakness]) : null;
 
   // ── Misja (utils/missions.ts, 2026-08-15) — jeden globalny slot w store (petStore.
   // missionStartedAt/missionEndsAt), bez id w URL: gotowość i tożsamość miniboss'a (seedowany
@@ -159,7 +166,7 @@ export default function BossFight() {
   // niegotową misją (np. cofnięcie ekranu) nie da się "oszukać" wcześniejszą walką.
   const missionReady = kind === 'mission' && !!missionStartedAt && !!missionEndsAt && Date.now() >= new Date(missionEndsAt).getTime();
   const missionMb = missionReady && missionStartedAt ? minibossForMission(missionStartedAt) : null;
-  const missionBoss = missionMb ? minibossAsBoss(missionMb, level) : null;
+  const missionBoss = missionMb ? minibossAsBoss(missionMb, atkStatBonus, level, bonuses) : null;
   const missionReward = missionRewardFor(level);
 
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
@@ -518,7 +525,8 @@ export default function BossFight() {
                 <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
                 <View style={s.tilePortrait}>
                   <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
-                    <CatArt size={104} expression="content" attack={attackPulse} />
+                    <CatArt size={104} expression="content" attack={attackPulse} palette={palette} stripes={catStripes}
+                      eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: kFlashOp, backgroundColor: '#F87171' }]} />
                   {catHit && !!catHit.dmg && (
