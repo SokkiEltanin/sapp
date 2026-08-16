@@ -9,6 +9,14 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Odliczanie do końca eventu — NIEsprawdzone na urządzeniu (2026-08-16)
+
+User: "dodajmy terminy z odliczaniem za ile kończy się event boss, żeby realnie móc go
+wygrać" — mini-karta w `app/bosses.tsx` i ekran walki (`boss-fight.tsx`, kind=event) pokazują
+teraz "Kończy się za X dni" (czerwony ≤1 dzień, żółty ≤3 dni). Pełny opis w ARCHITECTURE
+§"Bossy". **Priorytet testu:** otwórz Bossy podczas aktywnego eventu/nemesis, sprawdź czy
+liczba dni wygląda sensownie (np. w środku okna Mikołaja powinno pokazać kilkanaście dni).
+
 ## 🐛 5 zgłoszeń usera w jednej wiadomości — naprawione, NIEsprawdzone na urządzeniu (2026-08-15)
 
 1. **Kolor/dodatki kotka nie zgadzały się w walce** — `boss-fight.tsx`'s `<CatArt>` w ogóle

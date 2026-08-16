@@ -11,7 +11,7 @@ import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, EVENT_DAILY_ATTEMPTS } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
-import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey } from '@/utils/seasonalEvents';
+import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft } from '@/utils/seasonalEvents';
 import { raidIcon, eventIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf } from '@/utils/quests';
@@ -107,6 +107,9 @@ export default function Bosses() {
   const eventMaxHp = eventHpFor(level);
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
   const eventUnlocked = level >= 2;
+  // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — walka eventowa ma FLAT
+  // 1 próbę/dzień, więc "ile dni zostało" = "ile jeszcze podejść dostanę" zanim boss zniknie.
+  const eventDaysLeftN = eventBoss ? eventDaysLeft(eventBoss, now) : 0;
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -169,6 +172,11 @@ export default function Bosses() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.miniName} numberOfLines={1}>{eventBoss.name}</Text>
                   <Text style={s.miniSub} numberOfLines={1}>{eventMaxHp} HP · {eventBoss.weaknessLabel}</Text>
+                  {!eventDone && (
+                    <Text style={[s.miniCountdown, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted }]} numberOfLines={1}>
+                      {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
+                    </Text>
+                  )}
                 </View>
               </View>
               {eventDone ? (
@@ -358,6 +366,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   miniBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   miniName: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
   miniSub: { fontSize: 10, color: c.text.muted, marginTop: 2 },
+  miniCountdown: { fontSize: 10, fontWeight: '800', marginTop: 2 },
   miniHpTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4 },
   miniHpFill: { height: '100%', borderRadius: 3 },
   miniBtn: { alignItems: 'center', borderRadius: radius.md, paddingVertical: 8, backgroundColor: '#EF4444' },

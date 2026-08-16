@@ -125,6 +125,41 @@ export function currentEventBoss(d: Date, menaceCtx: MenaceCtx): EventBoss | nul
   return activeSeasonalEvent(d) ?? pickMenace(menaceCtx);
 }
 
+// Koniec BIEŻĄCEGO okna aktywności (2026-08-16, user: "dodajmy terminy z odliczaniem za ile
+// kończy się event boss, żeby realnie móc go wygrać") — walka eventowa ma FLAT 1 próbę/dzień
+// (EVENT_DAILY_ATTEMPTS w bosses.ts), więc "ile dni zostało" to wprost "ile jeszcze podejść
+// dostanę" zanim boss zniknie na dobre. `isActive` per-definicja wyżej sprawdza TYLKO
+// przynależność (true/false), nie ma gdzie wyciągnąć samej granicy — stąd osobna funkcja,
+// lustrzana per-id (te same okna co isActive, jawnie jako Date). Nemesis miesiąca (`menace`)
+// nie ma stałego okna dat — jego "koniec" to koniec BIEŻĄCEGO miesiąca kalendarzowego (wtedy
+// `pickMenace` przelicza się od nowa na nowych, zerowych statystykach miesiąca).
+export function eventEndsAt(boss: EventBoss, now: Date): Date {
+  const y = now.getFullYear();
+  const endOfDay = (year: number, month: number, day: number) => new Date(year, month, day, 23, 59, 59, 999);
+  if (boss.kind === 'menace') return endOfDay(y, now.getMonth() + 1, 0); // ostatni dzień TEGO miesiąca
+  switch (boss.id) {
+    case 'mikolaj': return endOfDay(y, 11, 26);       // 1–26 grudnia
+    case 'wielkanoc': {
+      const end = new Date(easterSunday(y));
+      end.setDate(end.getDate() + 1);                  // Poniedziałek Wielkanocny
+      end.setHours(23, 59, 59, 999);
+      return end;
+    }
+    case 'wakacje': return endOfDay(y, 7, 31);          // 15 czerwca – 31 sierpnia
+    case 'wiosna':  return endOfDay(y, 4, 14);          // 1–14 maja
+    case 'jesien':  return endOfDay(y, 9, 14);          // 1–14 października
+    case 'zima':    return endOfDay(y, 1, 14);          // 1–14 lutego
+    default:        return endOfDay(y, now.getMonth() + 1, 0); // bezpieczny fallback
+  }
+}
+
+// Pełne dni pozostałe (zaokrąglone W GÓRĘ — "kończy się za 1 dzień" oznacza że jeszcze DZIŚ
+// jest do wygrania, nie że już przepadło). Minimum 0 — nigdy ujemne w UI.
+export function eventDaysLeft(boss: EventBoss, now: Date): number {
+  const ms = eventEndsAt(boss, now).getTime() - now.getTime();
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
 // Klucz okresu dla claimu/HP — sezonowy wraca co ROK (klucz z rokiem), nemesis co MIESIĄC.
 export function eventPeriodKey(boss: EventBoss, d: Date): string {
   if (boss.kind === 'seasonal') return `${boss.id}-${d.getFullYear()}`;
