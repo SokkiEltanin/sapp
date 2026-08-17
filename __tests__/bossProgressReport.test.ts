@@ -73,4 +73,23 @@ describe('bossProgressReport', () => {
     const report = buildBossProgressReport({ ...base, atkStatBonus: 500 });
     expect(report).toMatch(/ciosów przy Twoich statach/);
   });
+
+  // 2026-08-17: user — "niech reset pupila tworzy nowy log danych żeby było wiadomo które od
+  // czego" — resetGeneration/lastResetAt (petStore.ts) rosną z każdym resetem zamiast wracać
+  // do zera, żeby kolejne eksporty dało się jednoznacznie odróżnić w rozmowie.
+  describe('runda testowa (resetGeneration/lastResetAt)', () => {
+    test('brak pól = brak linii (stare wywołania/testy bez zmian)', () => {
+      const report = buildBossProgressReport(base);
+      expect(report).not.toContain('Runda testowa');
+    });
+    test('resetGeneration bez lastResetAt (nigdy nie resetowano) — "jeszcze bez resetu"', () => {
+      const report = buildBossProgressReport({ ...base, resetGeneration: 1, lastResetAt: null });
+      expect(report).toContain('Runda testowa: #1 (jeszcze bez resetu)');
+    });
+    test('resetGeneration + lastResetAt po resecie — numer i data w nagłówku', () => {
+      const report = buildBossProgressReport({ ...base, resetGeneration: 3, lastResetAt: '2026-08-17T10:00:00.000Z' });
+      expect(report).toContain('Runda testowa: #3');
+      expect(report).toContain('ostatni reset:');
+    });
+  });
 });

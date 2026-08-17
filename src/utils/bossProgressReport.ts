@@ -17,6 +17,8 @@ export interface ProgressReportInput {
   raidWon: string[];
   eventWon: string[];
   bossLog: BossLogEntry[];
+  resetGeneration?: number;   // 2026-08-17 — patrz komentarz w petStore.ts. Opcjonalne, żeby
+  lastResetAt?: string | null; // istniejące wywołania/testy bez tych pól dalej działały.
 }
 
 const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
@@ -34,6 +36,13 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
 
   const lines: string[] = [];
   lines.push(`STAN PUPILA — ${new Date().toLocaleString('pl-PL')}`);
+  // Numer rundy testowej (2026-08-17, user: "niech reset pupila tworzy nowy log danych
+  // żeby było wiadomo które od czego") — bez tego dwa eksporty po dwóch różnych resetach
+  // wyglądają identycznie ("Poziom 1, log pusty"), nie dało się ich odróżnić w rozmowie.
+  if (s.resetGeneration != null) {
+    const resetInfo = s.lastResetAt ? ` (ostatni reset: ${new Date(s.lastResetAt).toLocaleString('pl-PL')})` : ' (jeszcze bez resetu)';
+    lines.push(`Runda testowa: #${s.resetGeneration}${resetInfo}`);
+  }
   lines.push('');
   lines.push(`Poziom: ${lvl.level} (${lvl.inLevel}/${lvl.needed} XP w poziomie, ${s.xp} XP total)`);
   lines.push(`Monety: ${s.coins}`);

@@ -322,6 +322,15 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       liczony wyżej w raporcie dla linii ATK), nie goły `b.hp`. To dokładnie liczba, którą do
       tej pory liczyłem ręcznie throwaway-symulacjami przy każdej zmianie balansu — teraz
       wychodzi wprost z eksportu, bez pytania o dodatkowe dane.
+    - **Numer rundy testowej** (ten sam dzień, user: "niech reset pupila tworzy nowy log
+      danych żeby było wiadomo które od czego") — `petStore.reset()` czyści `bossLog`/staty
+      do zera (dosłownie nowy, pusty log), ale nowe pola `resetGeneration`/`lastResetAt`
+      ROSNĄ z każdym resetem zamiast wracać do 1 — CELOWO POZA `reset()`-em i POZA
+      partialize-usuwaniem (to metadane O resetach, muszą przetrwać sam reset, żeby liczyć).
+      `bossProgressReport.ts` pokazuje je w nagłówku: `Runda testowa: #3 (ostatni reset:
+      ...)`. Efekt: dwa eksporty po dwóch różnych resetach, wcześniej nierozróżnialne
+      ("Poziom 1, log pusty" za każdym razem), teraz jednoznacznie oznaczone numerem — można
+      wkleić kilka kolejnych rund testowych do rozmowy i wiadomo która jest która.
   - **Unikatowe ataki bossów wg typu** (2026-08-17, user: "planuję żeby bossy miały unikatowe
     ataki — drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, ci
     którzy nie mają to pięść") — nowy opcjonalny `attackKind?: 'claw'|'magic'|'sword'` na

@@ -114,6 +114,15 @@ interface PetState {
                                    // celowo nie miesza się z defeatedBosses (zwykła kampania)
   bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
   bossLog: BossLogEntry[];        // historia pokonanych walk (kampania/raid/event) — patrz typ wyżej
+  // Numer "rundy testowej" (2026-08-17, user: "niech reset pupila tworzy nowy log danych
+  // żeby było wiadomo które od czego") — `reset()` czyści bossLog/staty do zera (nowy,
+  // pusty log), ale ROŚNIE z każdym resetem zamiast wracać do 1, więc kolejne eksporty po
+  // kolejnych resetach są jednoznacznie odróżnialne w rozmowie (numer + data resetu w
+  // nagłówku raportu, patrz bossProgressReport.ts) zamiast wszystkie wyglądać identycznie
+  // jako "Poziom 1, log pusty". CELOWO poza partialize-resetem (patrz reset() niżej) — to
+  // metadane O resetach, muszą PRZEŻYĆ sam reset, nie być przez niego zerowane.
+  resetGeneration: number;
+  lastResetAt: string | null;     // ISO timestamp ostatniego resetu; null = nigdy nie resetowano
   // ── Misja pupila (utils/missions.ts, 2026-08-15) — jeden aktywny slot, bez limitu
   // dziennego. null/null = brak aktywnej misji (można wysłać). Czas trwania (missionMinutesFor)
   // liczony RAZ przy wysyłce z ówczesnego poziomu i zapisany jako missionEndsAt — nie
@@ -276,6 +285,8 @@ export const usePetStore = create<PetState>()(
       missionEndsAt: null,
       bossHp: {},
       bossLog: [],
+      resetGeneration: 1,
+      lastResetAt: null,
       catHp: CAT_BASE_MAX_HP,
       catMaxHpBonus: 0,
       atkStatBonus: 0,
@@ -648,7 +659,10 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
-      reset: () => set({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, bossHp: {}, bossLog: [], raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] }),
+      // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
+      // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
+      // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
     }),
     {
       name: 'pet-v1',
@@ -668,6 +682,7 @@ export const usePetStore = create<PetState>()(
         defeatedBosses: s.defeatedBosses, defeatedMadBosses: s.defeatedMadBosses,
         missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt,
         bossHp: s.bossHp, bossLog: s.bossLog,
+        resetGeneration: s.resetGeneration, lastResetAt: s.lastResetAt,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
