@@ -382,6 +382,31 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     zemdleć w środku pojedynczej sesji przy pechu (wariancja) — to NIE bug, po prostu ta próba
     dobija mniej HP, spróbuj ponownie następnym razem (energia i tak już zużyta, jak przy
     każdym innym trybie).
+  - **Kampania: gate "1 nowy boss dziennie"** (2026-08-17, ten sam dzień — user przysłał pełny
+    eksport z czystego resetu: 3/3 pokonanych bossów w ~4 minuty, "zdecydowanie za szybko to
+    poszło") — pojedyncza walka per-boss była już zwalidowana (9-12 ciosów, patrz "Trudność
+    walk" wyżej), problem był w PACINGU: odblokowanie kampanii jest czysto sekwencyjne (bez
+    progu poziomu, patrz fix niżej) + 3 dzienne próby ataku = nic nie stało na przeszkodzie
+    zbiciu 3 różnych bossów w jednej sesji, gdy XP starczyło na kilka poziomów naraz. Fix NIE
+    dotyka hp/dmg (świadomie — świeżo przetestowana krzywa), tylko dodaje osobny wymiar
+    pacingu: `lastCampaignDefeatDate: string | null` w `petStore.ts`, ustawiane na `todayISO()`
+    w `defeatBoss()` PRZY KAŻDYM nowym zwycięstwie (persystowane w `partialize`; `reset()`
+    czyści je do `null` razem z resztą postępu, w przeciwieństwie do `resetGeneration`/
+    `lastResetAt` które CELOWO przeżywają reset). `boss-fight.tsx` liczy `campaignDailyCapped = kind==='campaign'
+    && lastCampaignDefeatDate === today` — blokuje `attackRoundBased()` (toast "Dzisiejszego
+    bossa kampanii już pokonałeś") i podmienia arenę na `lockBox` z wyjaśnieniem zamiast
+    zwykłego `!target.unlocked` (level-lock) komunikatu — to CELOWO OSOBNY flag (`dailyCapped`
+    na `Target`), nie nadpisanie `unlocked`, żeby nie pokazać mylącego "odblokujesz na
+    poziomie X" dla bossa który i tak jest już level-unlocked. `app/bosses.tsx` dostaje ten sam
+    `campaignDailyCapped` (liczone lokalnie z `lastCampaignDefeatDate`+`todayISO()`, ekran nie
+    ma dostępu do `target`) — wygasza przycisk WALCZ! + subtitle pod hero card, ale WCIĄŻ
+    nawiguje do `boss-fight.tsx` (tam wyświetla się pełny lockBox, spójnie z resztą wzorców
+    lock-UI w tym pliku). Retry na TYM SAMYM, jeszcze niepokonanym bossie po przegranej
+    zostaje darmowe — `lastCampaignDefeatDate` zmienia się TYLKO przy zwycięstwie, więc gate
+    ogranicza wyłącznie przejście do KOLEJNEGO bossa tego samego dnia, nie liczbę prób na
+    aktualnym. MAD (druga, endgame'owa fala tych samych 22 bossów) świadomie NIE objęty tym
+    gate'em — to osobna oś progresji z własną pulą przeciwników (`madCandidate`), nie ta sama
+    "zbyt szybki pierwszy dzień" sytuacja co user zgłosił.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

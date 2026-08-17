@@ -74,7 +74,7 @@ export default function BossFight() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
+    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, defeatBoss, lastCampaignDefeatDate,
     defeatedMadBosses, defeatMadBoss,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
     ownedCombatItems, equippedCombatItems,
@@ -159,6 +159,10 @@ export default function BossFight() {
   // pełna walka z minibossem przypisanym do TEGO questu na TEN dzień (patrz minibosses.ts).
   // Bez energii/limitu prób — quest już wykonany realnie, retry po przegranej jest darmowy.
   const today = todayISO();
+  // Gate "1 nowy boss kampanii dziennie" (2026-08-17, patrz komentarz przy
+  // lastCampaignDefeatDate w petStore.ts) — TYLKO campaign, nie MAD (osobna, endgame'owa
+  // druga fala, nie ta sama oś co user'owy raport z czystego resetu).
+  const campaignDailyCapped = kind === 'campaign' && lastCampaignDefeatDate === today;
   const questMb = kind === 'quest' && questId ? minibossForQuest(today, questId) : null;
   const questBoss = questMb ? minibossAsBoss(questMb, atkStatBonus, level, bonuses) : null;
   const questAlreadyClaimed = kind === 'quest' && questId ? !!dayClaims[`${questId}:${today}`] : false;
@@ -181,13 +185,15 @@ export default function BossFight() {
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   // maxHp już uwzględnia osłabienie z realnej serii (patrz weaknessStreaks/weakenBoss wyżej) —
   // ekran zawsze pokazuje FAKTYCZNY pasek HP, nie "surowy" numer z bosses.ts/raid.ts.
-  type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind };
+  type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind; dailyCapped?: boolean };
   let target: Target | null = null;
   if (kind === 'campaign' && campaignBoss) {
     // Odblokowanie kampanii = samo pokonanie poprzedniego bossa, NIE poziom (2026-08-17,
     // patrz identyczny komentarz przy `current`/`unlocked` w app/bosses.tsx) — campaignBoss
     // tutaj jest już z definicji "pierwszy niepokonany", więc zawsze dostępny do walki.
-    target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, unlocked: true, unlockLevel: campaignBoss.unlockLevel, done: false, attackKind: campaignBoss.attackKind };
+    // `dailyCapped` to OSOBNY gate od `unlocked` (level-lock) — 1 nowy boss/dzień, patrz
+    // campaignDailyCapped wyżej.
+    target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, unlocked: true, unlockLevel: campaignBoss.unlockLevel, done: false, attackKind: campaignBoss.attackKind, dailyCapped: campaignDailyCapped };
   } else if (kind === 'raid') {
     target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: raidEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
   } else if (kind === 'event' && eventBoss && eventKey) {
@@ -302,6 +308,7 @@ export default function BossFight() {
   // cel (roundBoss) i co się dzieje po wygranej.
   const attackRoundBased = () => {
     if (!target || !target.unlocked || fighting) return;
+    if (target.dailyCapped) { haptic.error(); toast.info('Dzisiejszego bossa kampanii już pokonałeś — wróć jutro po kolejnego.'); return; }
     // Raid (2026-08-17): sesja rundowa wobec MAŁEGO, bezpiecznie skalowanego celu
     // (raidSessionHpFor — ten sam wzorzec co questBossHpFor/madBossHpFor), NIE wobec surowej
     // trwałej puli tygodniowej — patrz pełny komentarz na górze pliku i w raid.ts.
@@ -491,6 +498,11 @@ export default function BossFight() {
           <View style={s.lockBox}>
             <Lock size={16} color={c.text.muted} />
             <Text style={s.lockTxt}>Odblokujesz na poziomie {target.unlockLevel} (masz {level}). Rozwijaj pupila questami.</Text>
+          </View>
+        ) : target.dailyCapped ? (
+          <View style={s.lockBox}>
+            <Lock size={16} color={c.text.muted} />
+            <Text style={s.lockTxt}>{target.name} czeka pokonany — kolejnego bossa kampanii odblokujesz jutro. Jeden nowy boss dziennie, żeby dać się nacieszyć postępem.</Text>
           </View>
         ) : (
           <View style={s.arena}>

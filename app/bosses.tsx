@@ -7,7 +7,7 @@ import { ChevronLeft, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-nati
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
-import { usePetStore, levelFromXp } from '@/store/petStore';
+import { usePetStore, levelFromXp, todayISO } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
@@ -40,7 +40,7 @@ export default function Bosses() {
   const s = useMemo(() => makeS(c), [c]);
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
-    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
+    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus, lastCampaignDefeatDate,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -80,6 +80,10 @@ export default function Bosses() {
   // jaki wyważono hp/atak tego bossa), tylko przestał być bramką — stąd WALCZ! niżej jest
   // teraz bezwarunkowe, gdy tylko `current` istnieje.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
+  // Gate "1 nowy boss kampanii dziennie" (2026-08-17) — patrz identyczny komentarz przy
+  // lastCampaignDefeatDate w petStore.ts i campaignDailyCapped w boss-fight.tsx. Tu tylko
+  // podgląd/CTA — sam gate egzekwuje attackRoundBased() na ekranie walki.
+  const campaignDailyCapped = lastCampaignDefeatDate === todayISO();
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
@@ -217,9 +221,12 @@ export default function Bosses() {
             {/* Tylko HP + motyw — BEZ nagrody/mechanik przed walką (2026-08-10, user:
                 "zbyt dużo opisu bossa"). Reszta szczegółów żyje na ekranie walki. */}
             <Text style={s.hpTxt}>{current.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text></Text>
+            {campaignDailyCapped && (
+              <Text style={[s.hpTxt, { color: c.text.muted }]}>Dzisiejszy boss kampanii już pokonany — wróć jutro po kolejnego.</Text>
+            )}
 
             <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight' as any); }} style={{ width: '100%' }}>
-              <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
+              <View style={[s.attackBtn, (energy <= 0 || campaignDailyCapped) && { opacity: 0.5 }]}>
                 <Swords size={18} color="#fff" />
                 <Text style={s.attackTxt}>WALCZ!</Text>
               </View>
