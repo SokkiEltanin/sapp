@@ -9,6 +9,40 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Raid: pełna rundowa walka + pazury nie latają + dane z rundy #2 (2026-08-17)
+
+Trzy rzeczy z jednej wiadomości usera (wysłał realny eksport z rundy testowej #2):
+
+1. **Pazury już nie latają jako pocisk** — user: "jak są pazury to nie mają lecieć tylko
+   pojawiać się na pupila". Naprawione — teraz błyskają bezpośrednio na portrecie kotka,
+   magia/miecz/pięść dalej lecą jak wcześniej. **Priorytet testu:** stocz walkę z bossem
+   claw (jaguar/dinozaur/sloth/cerberus w kampanii, kraken w raidzie, demon w nemesis) —
+   kontratak powinien błysnąć NA kotku, nie lecieć przez arenę.
+
+2. **Raid dostał pełną rundową walkę** — user: "miała być zwykła walka tylko taka która nie
+   restartuje jego HP jak z tym drugim [event]... ale tamta jest jakaś za łatwa". Raid był
+   jedynym trybem z jedną wymianą ciosów na próbę zamiast prawdziwej wieloroundowej walki.
+   Teraz: pełna animacja jak kampania, KAŻDA próba to bezpiecznie skalowana "sesja"
+   (`raidSessionHpFor`, ten sam wzorzec co quest/MAD), realny postęp dopisuje się do
+   PRAWDZIWEJ, trwałej puli tygodniowej (bez zmian w tym, że NIE restartuje się między
+   próbami). Pełny opis + throwaway-symulacja w ARCHITECTURE §"Bossy". **Priorytet testu:**
+   stocz próbę raidu, sprawdź czy widzisz kilka rund wymiany ciosów (nie jedno kliknięcie),
+   czy pasek HP w arenie faktycznie się rusza, i czy po zakończeniu próby PRAWDZIWY tygodniowy
+   pasek na liście bossów (`app/bosses.tsx`) zmniejszył się o tyle ile widziałeś w walce.
+   Uwaga: kotek może czasem "zemdleć" w środku sesji przy pechu (wariancja) — to nie bug,
+   próba i tak dopisuje częściowy postęp, spróbuj ponownie.
+
+3. **Dane z rundy testowej #2** (eksport usera, Lv6, atkStatBonus 10, 0 itemów bojowych): 3/3
+   wygrane walki kampanii (sloth ~7 ciosów, sugar guard ~14, snake ~8) — user: "zdecydowanie
+   za szybko to poszło, pokonałem 3 bossy od zera nie mając nic praktycznie". To PASUJE do
+   zwalidowanego projektu (9-12 ciosów, ~100% winrate przy lekkiej inwestycji dla bossów
+   #1-13) — nie jest to bug, ale user nadal odczuwa to jako za łatwe. NIE dotknięte w tym
+   przejściu (kolejny fix guard-bugu + podbicie HP dopiero co wylądowały, dawanie im chwili
+   przed kolejną rundą podbijania) — jeśli po zagraniu z pełną rundową walką raidu/nowymi
+   pazurami user nadal chce mocniej podbić wczesną kampanię, kolejny krok: zwiększyć
+   `earlyHits` docelowy zakres w `BOSSES` (obecnie 9→12) i przewalidować throwaway-symulacją
+   jak poprzednio (patrz komentarz nad `BOSSES` w bosses.ts).
+
 ## 🆕 Reset pupila = nowa numerowana runda testowa — NIEsprawdzone na urządzeniu (2026-08-17)
 
 User: "niech reset pupila tworzy nowy log danych jakby żeby było wiadomo które od czego" —
