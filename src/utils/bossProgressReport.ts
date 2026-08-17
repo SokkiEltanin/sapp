@@ -95,7 +95,20 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
   if (log.length === 0) lines.push('  (brak zapisanych walk)');
   for (const e of log) {
     const when = new Date(e.at).toLocaleString('pl-PL');
-    lines.push(`  ${when} · ${KIND_LABEL[e.kind]} · ${e.name} · Lv${e.level} · +${e.coins} monet, +${e.xp} XP`);
+    const head = `  ${when} · ${KIND_LABEL[e.kind]} · ${e.name} · Lv${e.level}`;
+    // Przebieg walki runda po rundzie (2026-08-17, user: "nie zapisujesz... dokładnie walk z
+    // ilością HP w czasie i dmg zadanego mi i którego zadał bossowi") — wpisy sprzed tego
+    // fixu nie mają `rounds` (opcjonalne pole), dostają starą, samą linię z nagrodą.
+    if (e.rounds && e.rounds.length > 0 && e.bossMaxHp != null && e.catMaxHpAtFight != null) {
+      const outcome = e.won ? 'WYGRANA' : e.catFainted ? 'PRZEGRANA (kotek zemdlał)' : 'PRZEGRANA (limit rund)';
+      lines.push(`${head} · ${outcome} (${e.rounds.length} rund) · +${e.coins} monet, +${e.xp} XP`);
+      lines.push(`      boss HP: ${e.bossMaxHp}→${e.rounds.map(r => r.bhp).join('→')}`);
+      lines.push(`      kotek HP: ${e.catMaxHpAtFight}→${e.rounds.map(r => r.chp).join('→')}`);
+      lines.push(`      Twój dmg/rundę: ${e.rounds.map(r => r.p).join(',')}`);
+      lines.push(`      kontratak/rundę: ${e.rounds.map(r => r.c).join(',')}`);
+    } else {
+      lines.push(`${head} · +${e.coins} monet, +${e.xp} XP`);
+    }
   }
 
   return lines.join('\n');

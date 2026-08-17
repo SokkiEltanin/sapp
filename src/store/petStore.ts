@@ -47,6 +47,31 @@ export function loginBonusCoins(streak: number): number {
 // krzywej bossów (2026-08-14, user chce eksportować to i wklejać do analizy). Osobno od
 // defeatedBosses/raidWon/eventWon (te trzymają tylko "czy pokonany raz", bez historii) —
 // bossLog rośnie bez limitu w czasie, więc UI eksportu tnie do ostatnich N wpisów.
+// Przebieg JEDNEJ rundy walki, do logowania (2026-08-17, patrz komentarz przy BossFightDetail
+// niżej) — celowo krótkie klucze (p/c/bhp/chp), bo tych obiektów jest po jednym na rundę i
+// bossLog rośnie bez limitu w AsyncStorage.
+export interface BossLogRound {
+  p: number;    // Twój dmg tej rundy (na bossa)
+  c: number;    // kontratak bossa tej rundy (na kotka)
+  bhp: number;  // hp bossa PO tej rundzie
+  chp: number;  // hp kotka PO tej rundzie
+}
+
+// 2026-08-17 (user: "nie zapisujesz do logowania z pupila dokładnie walk z ilością HP w
+// czasie i dmg zadanego mi i którego zadał bossowi przez to nie wiesz jak bardzo łatwo
+// pokonuje bossy i jakie muszą być") — dotąd bossLog trzymał TYLKO podsumowanie nagrody
+// (coins/xp) z WYGRANYCH walk; nie dało się z eksportu ocenić jak blisko/łatwo poszła
+// walka. `logFight`/`logFightAttempt` (akcje niżej) dopisują to KAŻDEJ próbie (wygranej I
+// przegranej), więc export (bossProgressReport.ts) może pokazać realny przebieg, nie tylko
+// wynik końcowy.
+export interface BossFightDetail {
+  won: boolean;           // dla raid: wynik TEJ sesji, nie stanu tygodniowej puli
+  catFainted: boolean;
+  bossMaxHp: number;      // hp bossa/sesji na start tej próby — kontekst dla rounds[].bhp
+  catMaxHpAtFight: number; // max hp kotka na start tej próby — kontekst dla rounds[].chp
+  rounds: BossLogRound[];
+}
+
 export interface BossLogEntry {
   kind: 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
   id: string;          // bossId / weekKey / eventKey
@@ -55,6 +80,13 @@ export interface BossLogEntry {
   level: number;         // poziom kotka w chwili pokonania
   coins: number;
   xp: number;
+  // Opcjonalne — wpisy sprzed 2026-08-17 (i próby z jakiegoś powodu bez danych walki) ich
+  // nie mają. Patrz BossFightDetail wyżej.
+  won?: boolean;
+  catFainted?: boolean;
+  bossMaxHp?: number;
+  catMaxHpAtFight?: number;
+  rounds?: BossLogRound[];
 }
 
 interface PetState {
@@ -210,23 +242,28 @@ interface PetState {
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // jak syncEnergy, ale osobna pula raidu
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
   spendEnergy: () => void;   // v5: -1 próba za attempt (energy to teraz flat dzienny licznik, nie bank)
-  defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number) => void;
-  defeatMadBoss: (baseBossId: string, coins: number, xp: number, name: string, level: number) => void;
+  defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
+  defeatMadBoss: (baseBossId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   startMission: (level: number) => void;
-  claimMission: (coins: number, xp: number, name: string, level: number) => void;
+  claimMission: (coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
   raidAttack: (damage: number) => { remaining: number; defeated: boolean };
-  raidClaim: (weekKey: string, coins: number, xp: number, name: string, level: number) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
+  raidClaim: (weekKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
   // wydarzenia
   syncEventEnergy: (todayEnergy: number, mult: number) => void;
   spendEventEnergy: () => void;         // -1 próba (round-based fight jak kampania, patrz spendEnergy)
-  eventClaim: (eventKey: string, coins: number, xp: number, name: string, level: number) => void;
+  eventClaim: (eventKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   // Questy jako walki (2026-08-14 v2, patrz src/utils/minibosses.ts) — wygrana walka z
   // minibossem PRZYPISANYM do danego questu zastępuje zwykły claim. Ten sam day-guard co
   // claimDaily (dailyClaims+dayClaims, żeby buildQuests widział quest jako odebrany
   // identycznie jak przy zwykłym claimie), plus wpis do bossLog (inne tory walki go mają).
-  claimQuestFight: (questId: string, coins: number, xp: number, name: string, level: number) => boolean;
+  claimQuestFight: (questId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => boolean;
+  // Log KAŻDEJ próby walki BEZ nagrody (przegrana, lub raid-sesja która nie domknęła
+  // tygodniowej puli) — patrz komentarz przy BossFightDetail. Nagrodowe akcje wyżej
+  // (defeatBoss itd.) logują wygrane sam; ta akcja pokrywa resztę, żeby bossLog miał
+  // KOMPLETNY obraz prób, nie tylko sukcesy.
+  logFightAttempt: (kind: BossLogEntry['kind'], id: string, name: string, level: number, fight: BossFightDetail) => void;
   // HP kotka — fundament v4 (patrz komentarz przy polach wyżej)
   buyMaxHp: (cost: number, amount: number) => boolean;         // trwałe ulepszenie za monety
   buyAtkStat: (cost: number, amount: number) => boolean;       // trwałe ulepszenie ATK za monety (v5)
@@ -546,21 +583,21 @@ export const usePetStore = create<PetState>()(
         return { remaining, defeated };
       },
       spendEnergy: () => set((s) => ({ energy: Math.max(0, s.energy - 1) })),
-      defeatBoss: (bossId, lootId, coins, xp, name, level) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
+      defeatBoss: (bossId, lootId, coins, xp, name, level, fight) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
         defeatedBosses: [...s.defeatedBosses, bossId],
         lastCampaignDefeatDate: todayISO(),
         ownedItems: s.ownedItems.includes(lootId) ? s.ownedItems : [...s.ownedItems, lootId],
         coins: s.coins + coins,
         xp: s.xp + xp,
-        bossLog: [...s.bossLog, { kind: 'campaign', id: bossId, name, at: new Date().toISOString(), level, coins, xp }],
+        bossLog: [...s.bossLog, { kind: 'campaign', id: bossId, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Osobna lista od defeatedBosses (madBosses.ts) — bez loot-regrantu, ten item już masz
       // z pokonania zwykłej wersji tego bossa (madBossFor go tylko powiela).
-      defeatMadBoss: (baseBossId, coins, xp, name, level) => set((s) => s.defeatedMadBosses.includes(baseBossId) ? s : ({
+      defeatMadBoss: (baseBossId, coins, xp, name, level, fight) => set((s) => s.defeatedMadBosses.includes(baseBossId) ? s : ({
         defeatedMadBosses: [...s.defeatedMadBosses, baseBossId],
         coins: s.coins + coins,
         xp: s.xp + xp,
-        bossLog: [...s.bossLog, { kind: 'mad', id: baseBossId, name, at: new Date().toISOString(), level, coins, xp }],
+        bossLog: [...s.bossLog, { kind: 'mad', id: baseBossId, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Misja (utils/missions.ts) — guard: no-op jeśli już jest aktywna misja (missionEndsAt
       // ustawione), żeby nie dało się nadpisać trwającej misji nowym, krótszym czasem.
@@ -574,12 +611,12 @@ export const usePetStore = create<PetState>()(
       // Zeruje slot (kolejną misję można wysłać od razu, user: "można po misji na kolejną") —
       // bez dedupu po id/dacie jak questy, bo misja to jeden aktywny stan, nie coś liczonego
       // per dzień.
-      claimMission: (coins, xp, name, level) => set((s) => {
+      claimMission: (coins, xp, name, level, fight) => set((s) => {
         require('@/services/notificationsService').notificationsService.cancelMissionReady().catch(() => {});
         return {
           missionStartedAt: null, missionEndsAt: null,
           coins: s.coins + coins, xp: s.xp + xp,
-          bossLog: [...s.bossLog, { kind: 'mission', id: 'mission', name, at: new Date().toISOString(), level, coins, xp }],
+          bossLog: [...s.bossLog, { kind: 'mission', id: 'mission', name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         };
       }),
       healBoss: (bossId, amount, maxHp) => set((s) => ({ bossHp: { ...s.bossHp, [bossId]: Math.min(maxHp, (s.bossHp[bossId] ?? maxHp) + Math.max(0, amount)) } })),
@@ -590,9 +627,9 @@ export const usePetStore = create<PetState>()(
         set({ raidEnergy: Math.max(0, s.raidEnergy - 1), raidHp: remaining });
         return { remaining, defeated: remaining <= 0 };
       },
-      raidClaim: (weekKey, coins, xp, name, level) => set((s) => (s.raidWon.includes(weekKey) ? s : {
+      raidClaim: (weekKey, coins, xp, name, level, fight) => set((s) => (s.raidWon.includes(weekKey) ? s : {
         raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp,
-        bossLog: [...s.bossLog, { kind: 'raid', id: weekKey, name, at: new Date().toISOString(), level, coins, xp }],
+        bossLog: [...s.bossLog, { kind: 'raid', id: weekKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Identical shape to syncEnergy/syncRaidEnergy, targeting the event's own bank.
       syncEventEnergy: (todayEnergy, mult) => {
@@ -609,11 +646,11 @@ export const usePetStore = create<PetState>()(
         });
       },
       spendEventEnergy: () => set((s) => ({ eventEnergy: Math.max(0, s.eventEnergy - 1) })),
-      eventClaim: (eventKey, coins, xp, name, level) => set((s) => (s.eventWon.includes(eventKey) ? s : {
+      eventClaim: (eventKey, coins, xp, name, level, fight) => set((s) => (s.eventWon.includes(eventKey) ? s : {
         eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp,
-        bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp }],
+        bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
-      claimQuestFight: (questId, coins, xp, name, level) => {
+      claimQuestFight: (questId, coins, xp, name, level, fight) => {
         const t = todayISO();
         const st = get();
         if (st.dailyClaims[questId] === t || st.dayClaims[`${questId}:${t}`]) return false;
@@ -621,10 +658,13 @@ export const usePetStore = create<PetState>()(
           dailyClaims: { ...s.dailyClaims, [questId]: t },
           dayClaims: { ...s.dayClaims, [`${questId}:${t}`]: true },
           coins: s.coins + coins, xp: s.xp + xp,
-          bossLog: [...s.bossLog, { kind: 'quest', id: questId, name, at: new Date().toISOString(), level, coins, xp }],
+          bossLog: [...s.bossLog, { kind: 'quest', id: questId, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         }));
         return true;
       },
+      logFightAttempt: (kind, id, name, level, fight) => set((s) => ({
+        bossLog: [...s.bossLog, { kind, id, name, at: new Date().toISOString(), level, coins: 0, xp: 0, ...fight }],
+      })),
       buyMaxHp: (cost, amount) => {
         const s = get();
         if (!s._hydrated) return false;

@@ -9,7 +9,7 @@ import CatArt from '@/components/pet/CatArt';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
-import { usePetStore, levelFromXp, catMaxHp, todayISO } from '@/store/petStore';
+import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidSessionHpFor } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft } from '@/utils/seasonalEvents';
@@ -75,7 +75,7 @@ export default function BossFight() {
   const s = useMemo(() => makeS(c), [c]);
   const {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, defeatBoss, lastCampaignDefeatDate,
-    defeatedMadBosses, defeatMadBoss,
+    defeatedMadBosses, defeatMadBoss, logFightAttempt,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
     ownedCombatItems, equippedCombatItems,
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
@@ -332,6 +332,18 @@ export default function BossFight() {
     }
     resetCatHp();
     const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
+    // Przebieg TEJ próby do bossLog (2026-08-17, user: "nie zapisujesz... dokładnie walk z
+    // ilością HP w czasie i dmg zadanego" — patrz BossFightDetail w petStore.ts). Budowane RAZ
+    // tutaj (z surowego result.rounds, PRZED odtworzeniem animacji), używane niżej w finish()
+    // niezależnie od wyniku — wygrana, przegrana, i (raid) sesja bez domknięcia tygodniowej puli
+    // wszystkie dostają wpis, żeby eksport pokazywał KOMPLETNY obraz prób, nie tylko sukcesy.
+    const fightDetail: BossFightDetail = {
+      won: result.won,
+      catFainted: result.catFainted,
+      bossMaxHp: roundBoss.hp,
+      catMaxHpAtFight: catMax,
+      rounds: result.rounds.map(r => ({ p: r.playerDmg, c: r.counterDmg, bhp: r.bossHpAfter, chp: r.catHpAfter })),
+    };
     // Raid: JEDNO wywołanie raidAttack (nie per rundę) — dopisuje realny postęp tej sesji
     // (sesyjne hp przed minus po) do prawdziwej, trwałej puli tygodniowej i zużywa DOKŁADNIE
     // 1 raidEnergy (1 próba = 1 atak, tak jak reszta trybów), niezależnie od liczby rund w
@@ -355,36 +367,49 @@ export default function BossFight() {
       if (kind === 'raid') {
         if (raidOutcome?.defeated) {
           haptic.success();
-          raidClaim(weekKey, raidCoins(level), raidXp(level), raid.name, level);
+          raidClaim(weekKey, raidCoins(level), raidXp(level), raid.name, level, fightDetail);
           setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
+        } else {
+          // Sesja nie domknęła tygodniowej puli — bez nagrody, ale próba i tak realnie się
+          // odbyła (patrz komentarz przy fightDetail), więc dostaje wpis do historii.
+          logFightAttempt('raid', raid.id, raid.name, level, fightDetail);
         }
         return;
       }
       if (result.won) {
         haptic.success();
         if (kind === 'campaign' && campaignBoss) {
-          defeatBoss(campaignBoss.id, campaignBoss.loot.id, campaignBoss.coins, campaignBoss.xp, campaignBoss.name, level);
+          defeatBoss(campaignBoss.id, campaignBoss.loot.id, campaignBoss.coins, campaignBoss.xp, campaignBoss.name, level, fightDetail);
           setVictory({ kind: 'campaign', id: campaignBoss.id, name: campaignBoss.name, emoji: campaignBoss.emoji, coins: campaignBoss.coins, xp: campaignBoss.xp, loot: campaignBoss.loot });
         } else if (kind === 'event' && eventBoss && eventKey) {
-          eventClaim(eventKey, eventCoins(level), eventXp(level), eventBoss.name, level);
+          eventClaim(eventKey, eventCoins(level), eventXp(level), eventBoss.name, level, fightDetail);
           setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: eventCoins(level), xp: eventXp(level) });
         } else if (kind === 'quest' && questBoss && questId) {
           const coinsWon = questFightCoins(Number(questCoins) || 0);
           const xpWon = questFightXp(Number(questXp) || 0);
-          if (claimQuestFight(questId, coinsWon, xpWon, questBoss.name, level)) {
+          if (claimQuestFight(questId, coinsWon, xpWon, questBoss.name, level, fightDetail)) {
             if (TRAINING_QUEST_IDS.includes(questId)) markTrainingDay();
           }
           setVictory({ kind: 'quest', id: questBoss.id, name: questBoss.name, emoji: questBoss.emoji, coins: coinsWon, xp: xpWon });
         } else if (kind === 'mad' && madBoss && madBase) {
-          defeatMadBoss(madBase.id, madBoss.coins, madBoss.xp, madBoss.name, level);
+          defeatMadBoss(madBase.id, madBoss.coins, madBoss.xp, madBoss.name, level, fightDetail);
           setVictory({ kind: 'mad', id: madBoss.id, name: madBoss.name, emoji: madBoss.emoji, coins: madBoss.coins, xp: madBoss.xp });
         } else if (kind === 'mission' && missionBoss) {
-          claimMission(missionReward.coins, missionReward.xp, missionBoss.name, level);
+          claimMission(missionReward.coins, missionReward.xp, missionBoss.name, level, fightDetail);
           setVictory({ kind: 'mission', id: missionBoss.id, name: missionBoss.name, emoji: missionBoss.emoji, coins: missionReward.coins, xp: missionReward.xp });
         }
       } else {
         haptic.error();
         setDefeat({ fainted: result.catFainted });
+        // id/name TU muszą się zgadzać z tym co wpisują odpowiednie akcje-nagrody wyżej przy
+        // wygranej (NIE zawsze target.id/target.name — event loguje pod eventKey, mission pod
+        // stałym 'mission', mad pod id BAZOWEGO bossa, nie wariantu), inaczej ta sama walka
+        // wyglądałaby w bossLog jak dwa różne przeciwniki zależnie od wyniku.
+        if (kind === 'campaign' && campaignBoss) logFightAttempt('campaign', campaignBoss.id, campaignBoss.name, level, fightDetail);
+        else if (kind === 'event' && eventBoss && eventKey) logFightAttempt('event', eventKey, eventBoss.name, level, fightDetail);
+        else if (kind === 'quest' && questBoss && questId) logFightAttempt('quest', questId, questBoss.name, level, fightDetail);
+        else if (kind === 'mad' && madBoss && madBase) logFightAttempt('mad', madBase.id, madBoss.name, level, fightDetail);
+        else if (kind === 'mission' && missionBoss) logFightAttempt('mission', 'mission', missionBoss.name, level, fightDetail);
       }
     };
 

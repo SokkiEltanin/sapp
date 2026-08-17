@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 bossLog: przebieg walki runda po rundzie (HP w czasie + dmg) — NIEsprawdzone (2026-08-17)
+
+User (po zobaczeniu gate'u "1 boss/dzień" wyżej): "ty nie zapisujesz do logowania z pupila
+dokładnie walk z ilością HP w czasie i dmg zadanego mi i którego zadał bossowi przez to nie
+wiesz jak bardzo łatwo pokonuje bossy i jakie muszą być, zrob to ja zrestartuje i spróbujemy
+ponownie". Trafna uwaga — dotąd `bossLog` (eksport "STAN PUPILA") trzymał TYLKO nagrodę z
+WYGRANYCH walk (coins/xp), bez śladu jak blisko poszła walka i bez przegranych w ogóle.
+
+**Zrobione:** każda próba walki (wygrana I przegrana, wszystkie 6 torów) loguje teraz pełny
+przebieg runda-po-rundzie — `BossFightDetail`/`BossLogRound` w `petStore.ts`, pełny opis w
+ARCHITECTURE §9 przy `petStore.bossLog`. Export pokazuje na próbę: wynik + liczbę rund,
+trajektorię HP bossa i kotka rundę-po-rundzie, oraz listy zadanego dmg/kontrataku per rundę.
+
+**Priorytet testu:** user zresetuje postęp (Diagnostyka → Zresetuj postęp pupila) i spróbuje
+ponownie z nowym gate'em "1 boss/dzień" (patrz sekcja niżej) — jak wyeksportuje "STAN PUPILA"
+tym razem, log powinien pokazać pełne dane per walkę (nie tylko podsumowanie), co pozwoli
+ocenić trudność precyzyjnie zamiast na wyczucie/szacunku "~N ciosów". Stare wpisy sprzed tego
+fixu (jeśli jakieś przetrwały do tego eksportu) dalej pokażą starą, krótką linię — to
+oczekiwane, nie brakujące dane.
+
 ## 🆕 Raid: pełna rundowa walka + pazury nie latają + dane z rundy #2 (2026-08-17)
 
 Trzy rzeczy z jednej wiadomości usera (wysłał realny eksport z rundy testowej #2):

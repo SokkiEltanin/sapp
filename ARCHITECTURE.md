@@ -561,11 +561,37 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       poprzednio, bez osobnych kart, więc reszta ekranu (Misja/Codzienne/...) zaczyna się
       wcześniej. `tip` (`petStatusLine`) zostaje jako osobna linia POD nagłówkiem, na całą
       szerokość.
-  - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 4
-    torów wyżej), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
+  - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 6
+    torów), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
     czytelny tekstowy raport (poziom/staty/pokonani bossowie/log), Ustawienia →
     Diagnostyka → „Eksportuj postęp pupila" (`Share.share`) / „Zresetuj postęp pupila"
     (`petStore.reset()`, wcześniej martwa funkcja, teraz podpięta).
+    - **Przebieg runda-po-rundzie w bossLog** (2026-08-17, user: "nie zapisujesz do
+      logowania z pupila dokładnie walk z ilością HP w czasie i dmg zadanego mi i którego
+      zadał bossowi przez to nie wiesz jak bardzo łatwo pokonuje bossy") — DOTĄD `bossLog`
+      trzymał TYLKO podsumowanie nagrody (`coins`/`xp`) z WYGRANYCH walk; nie dało się z
+      eksportu ocenić jak blisko/łatwo poszła walka, a przegrane w ogóle nie zostawiały
+      śladu. `BossFightDetail` (`petStore.ts`) — `{won, catFainted, bossMaxHp,
+      catMaxHpAtFight, rounds: BossLogRound[]}`, gdzie `BossLogRound = {p, c, bhp, chp}`
+      (Twój dmg / kontratak / hp bossa po rundzie / hp kotka po rundzie, celowo krótkie
+      klucze — te obiekty rosną bez limitu w AsyncStorage) — budowany RAZ w
+      `attackRoundBased()` (`boss-fight.tsx`) wprost z surowego `result.rounds`
+      (`simulateFight`), NIEZALEŻNIE od wyniku. Nagrodowe akcje (`defeatBoss`,
+      `defeatMadBoss`, `eventClaim`, `claimQuestFight`, `claimMission`, `raidClaim`)
+      dostały 7. parametr `fight: BossFightDetail`, spreadowany do wpisu `bossLog` przy
+      WYGRANEJ. Nowa akcja `logFightAttempt(kind, id, name, level, fight)` pokrywa resztę
+      (przegrana dowolnego trybu poza raid; sesja raidu która nie domknęła tygodniowej
+      puli) z `coins:0, xp:0` — dzięki temu `bossLog` ma teraz KOMPLETNY obraz prób, nie
+      tylko sukcesy. WAŻNE: `id`/`name` w gałęzi przegranej MUSZĄ się zgadzać z tym co
+      wpisuje odpowiednia akcja-nagroda przy wygranej tego samego trybu (event loguje pod
+      `eventKey`, nie `eventBoss.id`; mission pod stałym `'mission'`; mad pod id
+      BAZOWEGO bossa (`madBase.id`), nie wariantu (`madBoss.id` ma inny, prefiksowany
+      id) — inaczej ta sama walka wyglądałaby w logu jak dwóch różnych przeciwników
+      zależnie od wyniku. `bossProgressReport.ts`: wpis z `rounds` renderuje
+      `WYGRANA/PRZEGRANA (N rund)` + trajektorię `boss HP: max→...→...` /
+      `kotek HP: max→...→...` + listy `Twój dmg/rundę`/`kontratak/rundę`; wpisy sprzed
+      tego fixu (bez `rounds`, opcjonalne pole) renderują starą, samą linię z nagrodą —
+      pełna wsteczna kompatybilność, żadnej migracji AsyncStorage.
 
 ## 10. Inne subsystemy (entry files)
 
