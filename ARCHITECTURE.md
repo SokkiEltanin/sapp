@@ -407,6 +407,27 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     aktualnym. MAD (druga, endgame'owa fala tych samych 22 bossów) świadomie NIE objęty tym
     gate'em — to osobna oś progresji z własną pulą przeciwników (`madCandidate`), nie ta sama
     "zbyt szybki pierwszy dzień" sytuacja co user zgłosił.
+  - **Fix: podwójne stuknięcie WALCZ! odpalało dwie równoległe walki naraz** (2026-08-17,
+    znalezione dzięki świeżo dodanemu przebiegowi runda-po-rundzie wyżej — user opisał
+    "kotek nie schodzi do zera HP... czasami walka przerywa zanim jedna ze stron zejdzie do
+    zera... boss ma mało HP [i wygląda jakby] pomija rundę") — `attackRoundBased()`
+    (`boss-fight.tsx`) gate'ował się TYLKO stanem `fighting`, czytanym z domknięcia
+    POPRZEDNIEGO renderu. Przycisk WALCZ! wizualnie gasł (`opacity` przy `fighting`), ale
+    `PressableScale` NIE dostawał `disabled` — Pressable dalej realnie odpalał `onPress`.
+    Szybkie podwójne stuknięcie (zanim React zdąży przerenderować z `fighting=true`)
+    odpalało DWA niezależne łańcuchy `setTimeout` (`playerBeat`/`counterBeat`) naraz, każdy
+    ze swoim `result`/lokalnym `i`, oba manipulujące tym samym, współdzielonym
+    `catHp`/`liveBossHp` w `petStore` — stąd pozorne "pomijanie" rund (dwa `counterBeat`
+    przeplatające się), HP kotka nie lądujące dokładnie na 0 (dwa RÓŻNE `result` obiekty, nie
+    jeden spójny przebieg), i jedna z walk "kończąca się" wcześniej (drugi, niewidoczny
+    łańcuch dogrywał się w tle po tym jak pierwszy `finish()` już zresetował `fighting`/
+    `liveBossHp`). Fix, DWIE warstwy: `fightingRef` (`useRef`, sprawdzany/ustawiany
+    SYNCHRONICZNIE w tej samej funkcji, więc odporny na timing renderu — żadne dwa
+    wywołania `attackRoundBased()` nie mogą przejść guardu naraz niezależnie od tego kiedy
+    React skomituje `fighting`) jako właściwy fix race'u, plus `disabled={target.energy<=0
+    || fighting}` na `PressableScale` (Pressable przestaje w ogóle odpalać `onPress`) jako
+    druga warstwa UX. NIEsprawdzone na urządzeniu — czysto statyczna analiza kodu (nie dało
+    się namierzyć przez symulację jak balans, to timing/race, nie matematyka walki).
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

@@ -223,8 +223,8 @@ export default function BossFight() {
 
   useEffect(() => { resetCatHp(); }, [kind]);
 
-  // Walka rund odgrywa się przez łańcuch setTimeout (patrz playerBeat/counterBeat/attackSimple
-  // niżej). Jeśli user wyjdzie z ekranu W TRAKCIE animacji, te timeouty same się nie anulują —
+  // Walka rund odgrywa się przez łańcuch setTimeout (patrz playerBeat/counterBeat niżej).
+  // Jeśli user wyjdzie z ekranu W TRAKCIE animacji, te timeouty same się nie anulują —
   // bez tej straży walka dokończyłaby się PO CICHU w tle. `roundTimer` + `alive` dają czysty
   // stop: cofnięcie w trakcie walki po prostu PRZERYWA ją.
   const alive = useRef(true);
@@ -233,6 +233,22 @@ export default function BossFight() {
     alive.current = false;
     if (roundTimer.current) clearTimeout(roundTimer.current);
   }, []);
+  // Straż przed podwójnym wejściem (2026-08-17, user: "zdarza się że walka [dziwnie się
+  // zachowuje]... kotek nie schodzi do zera HP... czasami walka przerywa zanim jedna ze
+  // stron zejdzie do zera") — `attackRoundBased()` gate'ował się dotąd TYLKO stanem
+  // `fighting`, czytanym z domknięcia POPRZEDNIEGO renderu. Przycisk WALCZ! wizualnie gasł
+  // (`opacity` przy `fighting`), ale `PressableScale` nie dostawał `disabled` — szybkie
+  // podwójne stuknięcie (zanim React zdąży przerenderować z `fighting=true`) realnie
+  // odpalało DWA niezależne łańcuchy setTimeout naraz, każdy ze swoim `result`/`i`, oba
+  // manipulujące tym samym, współdzielonym `catHp`/`liveBossHp` — stąd pozorne "pomijanie"
+  // rund, HP kotka nie lądujące dokładnie na 0, i jedna z walk "kończąca się" (drugi,
+  // niewidoczny łańcuch dogrywał się w tle). `fightingRef` to synchroniczna, odporna na
+  // timing renderu straż — ustawiana/sprawdzana w TEJ SAMEJ, jednej funkcji, więc żadne
+  // dwa wywołania nie mogą przejść guardu naraz niezależnie od tego kiedy React
+  // przerenderuje `fighting`. `disabled` na przycisku (niżej) to druga warstwa (UX — sam
+  // Pressable przestaje w ogóle odpalać onPress), ale to `fightingRef` faktycznie
+  // uniemożliwia race.
+  const fightingRef = useRef(false);
 
   // ── boss-side hit fx (Twój cios na bossie) — wspólne dla WSZYSTKICH trybów ──
   const bShake = useRef(new Animated.Value(0)).current;
@@ -307,7 +323,7 @@ export default function BossFight() {
   // (2026-08-12, patrz komentarz na górze pliku) — jedyna różnica to SKĄD biorą Boss-kształtny
   // cel (roundBoss) i co się dzieje po wygranej.
   const attackRoundBased = () => {
-    if (!target || !target.unlocked || fighting) return;
+    if (!target || !target.unlocked || fighting || fightingRef.current) return;
     if (target.dailyCapped) { haptic.error(); toast.info('Dzisiejszego bossa kampanii już pokonałeś — wróć jutro po kolejnego.'); return; }
     // Raid (2026-08-17): sesja rundowa wobec MAŁEGO, bezpiecznie skalowanego celu
     // (raidSessionHpFor — ten sam wzorzec co questBossHpFor/madBossHpFor), NIE wobec surowej
@@ -352,12 +368,14 @@ export default function BossFight() {
     if (kind === 'campaign' || kind === 'mad') spendEnergy();
     else if (kind === 'event') spendEventEnergy();
     else if (kind === 'raid') raidOutcome = raidAttack(raidSessionHp - result.bossHpLeft);
+    fightingRef.current = true;
     setFighting(true);
     setLiveBossHp(kind === 'raid' ? raidRealStart : roundBoss.hp);
     setCatHit(null);
     let i = 0;
 
     const finish = () => {
+      fightingRef.current = false;
       if (!alive.current) return;
       setFighting(false);
       setLiveBossHp(null);
@@ -669,7 +687,7 @@ export default function BossFight() {
             {target.done ? (
               <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : 'wróć w kolejnym okresie'}</Text>
             ) : (
-              <PressableScale onPress={attack} style={{ width: '100%' }}>
+              <PressableScale onPress={attack} disabled={target.energy <= 0 || fighting} style={{ width: '100%' }}>
                 <View style={[s.attackBtn, (target.energy <= 0 || fighting) && { opacity: 0.5 }]}>
                   <Swords size={18} color="#fff" />
                   <Text style={s.attackTxt}>{fighting ? 'Walka trwa…' : 'WALCZ!'}</Text>

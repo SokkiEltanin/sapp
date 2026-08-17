@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Podwójne stuknięcie WALCZ! = dwie walki naraz (przez to "przerywa"/"kotek nie do zera") — NIEsprawdzone (2026-08-17)
+
+User (po pierwszym eksporcie z nowym przebiegiem runda-po-rundzie — patrz sekcja niżej):
+"zdarza się że walka jak boss ma mało HP jakiś to nie atakuje jakby pomija jego rundę i
+atakuje pupila i go zabija, a w tym eventowym gościu problem że kotek nie schodzi do zera
+HP, czasami walka przerywa zanim jedna ze stron zejdzie do zera". Znalezione statycznie
+(bez możliwości odtworzenia na urządzeniu): `attackRoundBased()` gate'ował się TYLKO stanem
+`fighting` z domknięcia poprzedniego renderu, a przycisk WALCZ! wyglądał na wygaszony ale
+NIE był realnie `disabled` w `PressableScale` — szybkie podwójne stuknięcie mogło odpalić
+DWA równoległe łańcuchy animacji walki naraz, każdy ze swoim wynikiem symulacji, oba
+nadpisujące ten sam, współdzielony `catHp`/`liveBossHp`. Dokładny opis fixu (dwie warstwy:
+`fightingRef` + prawdziwy `disabled`) w ARCHITECTURE §9 przy boss-fight.
+
+**Priorytet testu:** spróbuj świadomie zrobić szybkie podwójne stuknięcie WALCZ! (np. dwa
+szybkie tapy pod rząd) i sprawdź, czy walka wygląda spójnie (jedna sekwencja rund, HP obu
+stron kończy dokładnie na 0 lub na wartości zgodnej z logiem). Jeśli po tym fixie ZNÓW
+zobaczysz te same objawy mimo NIE podwójnego stukania — to znaczy że hipoteza była błędna i
+trzeba szukać dalej (nowy eksport z przebiegiem runda-po-rundzie z tamtej konkretnej walki
+bardzo pomoże zdiagnozować, dokładnie jak tym razem).
+
 ## 🆕 bossLog: przebieg walki runda po rundzie (HP w czasie + dmg) — NIEsprawdzone (2026-08-17)
 
 User (po zobaczeniu gate'u "1 boss/dzień" wyżej): "ty nie zapisujesz do logowania z pupila
