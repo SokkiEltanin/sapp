@@ -14,12 +14,12 @@ export type SelfReportExercise = Exclude<TrainingExercise, 'bike'>;
 
 const TIMED: SelfReportExercise[] = ['plank', 'stretch'];
 
-const META: Record<SelfReportExercise, { label: string; emoji: string; unit: 'reps' | 'seconds' | 'minutes' }> = {
-  pushups: { label: 'Pompki', emoji: '💪', unit: 'reps' },
-  squats:  { label: 'Przysiady', emoji: '🦵', unit: 'reps' },
-  situps:  { label: 'Brzuszki', emoji: '🔥', unit: 'reps' },
-  plank:   { label: 'Deska', emoji: '🧘', unit: 'seconds' },
-  stretch: { label: 'Rozciąganie', emoji: '🤸', unit: 'minutes' },
+const META: Record<SelfReportExercise, { label: string; unit: 'reps' | 'seconds' | 'minutes' }> = {
+  pushups: { label: 'Pompki', unit: 'reps' },
+  squats:  { label: 'Przysiady', unit: 'reps' },
+  situps:  { label: 'Brzuszki', unit: 'reps' },
+  plank:   { label: 'Deska', unit: 'seconds' },
+  stretch: { label: 'Rozciąganie', unit: 'minutes' },
 };
 
 function fmt(secs: number) {
@@ -92,8 +92,6 @@ export default function TrainingSessionModal({ visible, exercise, target, onClos
               <X size={18} color="#8A93A8" />
             </TouchableOpacity>
           )}
-          <Text style={st.emoji}>{meta.emoji}</Text>
-
           {phase === 'ready' && (
             <>
               <Text style={st.title}>{meta.label}</Text>
@@ -145,7 +143,6 @@ const st = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   card: { width: '100%', maxWidth: 340, backgroundColor: '#161A1A', borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 26, alignItems: 'center', gap: 6 },
   closeBtn: { position: 'absolute', top: 14, right: 14, padding: 4 },
-  emoji: { fontSize: 40, marginBottom: 4 },
   title: { fontSize: 19, fontWeight: '900', color: '#fff' },
   sub: { fontSize: 13, fontWeight: '600', color: '#9AA6B2', marginBottom: 10, textAlign: 'center' },
   startBtn: { marginTop: 6, paddingHorizontal: 34, paddingVertical: 14, borderRadius: 14, backgroundColor: '#2AC68F' },

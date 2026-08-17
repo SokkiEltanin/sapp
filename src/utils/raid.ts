@@ -1,4 +1,4 @@
-import { WeaknessKey } from '@/utils/bosses';
+import { WeaknessKey, AttackKind } from '@/utils/bosses';
 
 // RAID TYGODNIOWY — jeden gruby boss na cały tydzień, inny co tydzień (świeżość). Bijesz go
 // całotygodniową dbałością o siebie (energia banked jak w kampanii). Pokonanie = kolekcjonerski
@@ -19,12 +19,17 @@ export interface Raid {
   weaknessLabel: string;
   taunt: string;
   trophyEmoji: string;
+  attackKind?: AttackKind; // 2026-08-17 — patrz komentarz nad AttackKind w bosses.ts
 }
 
+// attackKind: kraken=claw (macki/szpony), phantom=magic (zjawa) — te dwa mają jednoznaczny
+// motyw z 3 kategorii. golem/behemoth/wyrm/siren zostają bez wpisu → fallback pięść, tak samo
+// jak sugar/drought/dragon w kampanii dzielące ten sam motyw (fizyczny cios, nie pazur/miecz/
+// magia).
 export const RAID_POOL: Raid[] = [
-  { id: 'kraken',   name: 'Kraken Chaosu',      emoji: '🦑', weakness: 'habits',    weaknessLabel: 'nawyki',          taunt: 'Ten tydzień i tak Ci ucieknie…', trophyEmoji: '🏆' },
+  { id: 'kraken',   name: 'Kraken Chaosu',      emoji: '🦑', weakness: 'habits',    weaknessLabel: 'nawyki',          taunt: 'Ten tydzień i tak Ci ucieknie…', trophyEmoji: '🏆', attackKind: 'claw' },
   { id: 'golem',    name: 'Golem Lenistwa',     emoji: '🗿', weakness: 'steps',     weaknessLabel: 'kroki',           taunt: 'Zostań w łóżku cały tydzień…',   trophyEmoji: '🥇' },
-  { id: 'phantom',  name: 'Fantom Smutku',      emoji: '👻', weakness: 'mood',      weaknessLabel: 'wpisy nastroju',  taunt: 'Nie zaglądaj w siebie…',         trophyEmoji: '🎖️' },
+  { id: 'phantom',  name: 'Fantom Smutku',      emoji: '👻', weakness: 'mood',      weaknessLabel: 'wpisy nastroju',  taunt: 'Nie zaglądaj w siebie…',         trophyEmoji: '🎖️', attackKind: 'magic' },
   { id: 'behemoth', name: 'Behemot Cukru',      emoji: '🍭', weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',taunt: 'Słodki tydzień, co?',            trophyEmoji: '🏅' },
   { id: 'wyrm',     name: 'Żmij Bezsenności',   emoji: '🐉', weakness: 'sleep',     weaknessLabel: 'sen (7h+)',       taunt: 'Po co spać w weekend…',          trophyEmoji: '💠' },
   { id: 'siren',    name: 'Syrena Pragnienia',  emoji: '🌊', weakness: 'water',     weaknessLabel: 'woda (cel dnia)', taunt: 'Woda jest nudna…',               trophyEmoji: '🔱' },

@@ -1,4 +1,4 @@
-import { Boss, BossLoot, Bonuses, atkPower } from '@/utils/bosses';
+import { Boss, BossLoot, Bonuses, atkPower, AttackKind } from '@/utils/bosses';
 
 // MINIBOSSY v2 (2026-08-14) — user sprecyzował że pierwsza wersja (osobny ekran, tory
 // woda/kroki, płaska łatwa walka DODANA nad questami) była źle zrozumiana. Poprawny
@@ -17,15 +17,18 @@ export interface MiniBoss {
   name: string;
   emoji: string;
   taunt: string;
+  attackKind?: AttackKind; // 2026-08-17 — patrz komentarz nad AttackKind w bosses.ts
 }
 
+// Tylko harpia dostaje jednoznaczny wpis (szpony/talony = claw) — reszta rosteru to zwierzęta
+// bez pazur/miecza/magii w charakterze, zostają na fallback pięści.
 export const MINIBOSSES: MiniBoss[] = [
   { id: 'mb_capybara', name: 'Kapibara Chillu', emoji: '🦫', taunt: 'Po co się wysilać, i tak jest się chill…' },
   { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…' },
   { id: 'mb_shark', name: 'Rekinek Fali', emoji: '🦈', taunt: 'Ledwo mokro, po co ten wysiłek…' },
   { id: 'mb_whale', name: 'Wieloryb Głębin', emoji: '🐳', taunt: 'Jedna rzecz nic nie zmieni…' },
   { id: 'mb_goat', name: 'Koza Uparta', emoji: '🐐', taunt: 'Po co iść dalej, tu jest wygodnie…' },
-  { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…' },
+  { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw' },
   { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…' },
   { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…' },
 ];
@@ -79,5 +82,6 @@ export function minibossAsBoss(mb: MiniBoss, atkStatBonus: number, level: number
     order: 0, unlockLevel: 0, hp: questBossHpFor(atkStatBonus, level, bonuses),
     weakness: 'habits', weaknessLabel: '',
     loot: MINIBOSS_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: mb.taunt,
+    attackKind: mb.attackKind,
   };
 }
