@@ -1,4 +1,4 @@
-import { WeaknessKey, AttackKind } from '@/utils/bosses';
+import { WeaknessKey, AttackKind, Boss, BossLoot, Bonuses, atkPower } from '@/utils/bosses';
 
 // RAID TYGODNIOWY — jeden gruby boss na cały tydzień, inny co tydzień (świeżość). Bijesz go
 // całotygodniową dbałością o siebie (energia banked jak w kampanii). Pokonanie = kolekcjonerski
@@ -71,3 +71,33 @@ export function raidHpFor(level: number, weekKey: string): number {
 
 export const raidCoins = (level: number) => 60 + Math.max(0, level) * 6;
 export const raidXp = (level: number) => 400 + Math.max(0, level) * 40;
+
+// Sesja rundowa PER PRÓBA (2026-08-17, user: "miała być zwykła [walka], tylko taka która nie
+// restartuje jego HP jak z tym drugim [event]") — raid dostaje TERAZ pełną, animowaną walkę
+// rundową (simulateFight, jak kampania), ale prawdziwa pula `raidHpFor` jest z założenia
+// OGROMNA (ma wystarczyć na cały tydzień wielu prób) — nie da się jej użyć bezpośrednio jako
+// `boss.hp` w simulateFight, bo `counterDamage()` liczy % od AKTUALNEGO hp bossa (bosses.ts):
+// przy hp rzędu tysięcy jeden kontratak zabijałby kotka natychmiast (dokładnie problem, który
+// stary model omijał liczeniem kontrataku od `catMax`, nie od `raidMaxHp` — patrz historyczny
+// komentarz w app/boss-fight.tsx). Rozwiązanie: każda próba to osobna, MAŁA "sesja" wg
+// DOKŁADNIE tego samego, już zwalidowanego wzorca co questBossHpFor/madBossHpFor (`atkPower ×
+// mała stała`) — realny postęp (sesyjne hp przed minus po) dopisuje się do PRAWDZIWEJ, trwałej
+// puli (`raidHp` w petStore) osobnym wywołaniem `raidAttack()` PO zakończeniu sesji. Bo sesja
+// jest już bezpiecznie skalowana (ten sam sprawdzony kształt formuły co kampania), NIE trzeba
+// osobnego capu rund — walka kończy się naturalnie po ~RAID_SESSION_HITS ciosach, tak jak
+// wczesne bossy kampanii kończą się dużo przed MAX_FIGHT_ROUNDS.
+export const RAID_SESSION_HITS = 6;
+export function raidSessionHpFor(atkStatBonus: number, level: number, bonuses: Bonuses): number {
+  return Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * RAID_SESSION_HITS);
+}
+
+const RAID_PLACEHOLDER_LOOT: BossLoot = { id: 'raid_placeholder', name: '', emoji: '', desc: '', bonus: {} };
+export function raidAsBoss(raid: Raid, sessionHp: number): Boss {
+  return {
+    id: raid.id, name: raid.name, emoji: raid.emoji,
+    order: 0, unlockLevel: 0, hp: sessionHp,
+    weakness: raid.weakness, weaknessLabel: raid.weaknessLabel,
+    loot: RAID_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: raid.taunt,
+    attackKind: raid.attackKind,
+  };
+}

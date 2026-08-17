@@ -10,8 +10,8 @@ import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO } from '@/store/petStore';
-import { BOSSES, Boss, AttackKind, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
-import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
+import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
+import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidSessionHpFor } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
@@ -42,24 +42,29 @@ type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot };
 
 // Ekran WALKI (S&F-style, 2026-08-09/10 — patrz memory boss_design.md), wydzielony z listy
-// (app/bosses.tsx). Trzy TRYBY przez ?kind= (campaign domyślnie/raid/event). Wszystkie trzy
-// dzielą TĘ SAMĄ arenę/kafelki/pociski/trafienia, ale mechanika różni się:
-// — KAMPANIA i WYDARZENIE (2026-08-12, user: "musimy zrobić żeby walki eventowe były
-//   identyczne że pupil też traci HP w nich i oni też zadają obrażenia") — obie to pełna
-//   round-based symulacja (simulateFight, realny kontratak, HP kotka faktycznie spada,
-//   MOŻNA PRZEGRAĆ), HP bossa resetuje się do pełna co próbę. Jedyna różnica: kampania ma
-//   3 próby/dzień (dailyAttempts), wydarzenie ma WŁASNĄ, słabiej skalującą pulę
-//   (`eventDailyAttempts` w bosses.ts, 2026-08-17 — było flat 1/dzień) — HP/DMG wydarzenia
-//   PRZEBALANSOWANE pod ten model, patrz eventHpFor w
-//   seasonalEvents.ts. attackRoundBased() obsługuje obie.
-// — RAID: HP bossa zostaje na starym modelu (trwały bank przez cały tydzień, NIE resetuje
-//   się co próbę — to celowe, żeby dało się odrabiać po trochu). Ale (2026-08-12, user:
-//   "nadal nie ma normalnej walki") każda próba dostaje teraz REALNY kontratak na kotka,
-//   jedna czysta wymiana na próbę (kotek resetuje HP do pełna PRZED każdą), skalowany od
-//   catMax a nie raidMaxHp (ta pula jest z założenia dużo większa, więc ta sama skala co w
-//   kampanii by prawie zabiła kotka jednym ciosem). Wciąż BEZ stanu porażki — user o to nie
-//   prosił, raid dalej nie da się "przegrać", kontratak jest czysto poglądowy. attackSimple()
-//   poniżej. Pierwsze podejście do wyważenia obrażeń, niesprawdzone na urządzeniu.
+// (app/bosses.tsx). Sześć TRYBÓW przez ?kind= (campaign domyślnie/raid/event/quest/mad/
+// mission). Wszystkie dzielą TĘ SAMĄ arenę/kafelki/pociski/trafienia i TĘ SAMĄ pełną
+// round-based symulację (simulateFight, realny kontratak, HP kotka faktycznie spada) przez
+// jedną wspólną `attackRoundBased()` — jedyna różnica to SKĄD biorą Boss-kształtny cel i co
+// się dzieje po walce (energia zużyta, nagroda, czy jest stan porażki).
+// — KAMPANIA i WYDARZENIE (2026-08-12): HP bossa resetuje się do pełna co próbę. Kampania ma
+//   3 próby/dzień (dailyAttempts), wydarzenie WŁASNĄ, słabiej skalującą pulę
+//   (`eventDailyAttempts` w bosses.ts) — HP/DMG wydarzenia PRZEBALANSOWANE pod ten model,
+//   patrz eventHpFor w seasonalEvents.ts.
+// — RAID (2026-08-17, user: "miała być zwykła walka tylko taka która nie restartuje jego HP
+//   jak z tym drugim [event]... ale tamta jest jakaś za łatwa" — poprzednio RAID był jedynym
+//   trybem BEZ pełnej animacji, jedna prosta wymiana na próbę, `attackSimple()`, USUNIĘTA):
+//   HP bossa zostaje TRWAŁE przez cały tydzień (NIE resetuje się co próbę — to CELOWO
+//   zachowane, żeby dało się odrabiać po trochu, w przeciwieństwie do eventu). Ale każda próba
+//   to teraz PEŁNA rundowa walka jak kampania — wobec MAŁEJ "sesji" (`raidSessionHpFor` w
+//   raid.ts, ten sam bezpieczny wzorzec co questBossHpFor/madBossHpFor: `atkPower × mała
+//   stała`), NIE wobec surowej `raidHpFor` (za duża, `counterDamage()` liczony od aktualnego
+//   hp bossa zabiłby kotka jednym kontratakiem). Realny postęp sesji (`raidAsBoss` hp przed
+//   minus po) dopisuje się do PRAWDZIWEJ, trwałej puli osobnym wywołaniem `raidAttack()` —
+//   `targetRemaining`/pasek HP w arenie ZAWSZE pokazuje PRAWDZIWĄ skalę tygodniową, `liveBossHp`
+//   podczas animacji jest przeliczany z sesyjnej skali na prawdziwą (patrz w attackRoundBased).
+//   Wciąż BEZ stanu porażki — user o to nie prosił, raid dalej nie da się "przegrać"
+//   (finish() dla raid ignoruje result.won/catFainted, liczy się tylko realny postęp puli).
 export default function BossFight() {
   const { kind: kindParam, questId, questCoins, questXp, questLabel } = useLocalSearchParams<{
     kind?: string; questId?: string; questCoins?: string; questXp?: string; questLabel?: string;
@@ -199,9 +204,12 @@ export default function BossFight() {
   // placeholderem, patrz minibosses.ts) — stąd 0 zamiast czytania prawdziwego streaku.
   const targetWeaknessStreak = target && kind !== 'quest' && kind !== 'mission' ? weaknessStreaks[target.weakness as keyof typeof weaknessStreaks] : 0;
   const targetWeakenFactor = weaknessHpFactor(targetWeaknessStreak);
-  // Kampania, wydarzenie i quest resetują HP do pełna co próbę (liveBossHp podczas walki,
-  // inaczej pełne maxHp) — tylko raid ma trwały bank (raidRemaining).
-  const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : raidRemaining) : (liveBossHp ?? target.maxHp)) : 0;
+  // Kampania/wydarzenie/quest/MAD/misja resetują HP do pełna co próbę (liveBossHp podczas
+  // walki, inaczej pełne maxHp). Raid ma trwały bank (raidRemaining) — ale (2026-08-17)
+  // PODCZAS animowanej sesji `liveBossHp` też go nadpisuje (przeliczony na prawdziwą skalę
+  // w attackRoundBased, patrz komentarz tam), żeby pasek realnie ruszał się w trakcie walki,
+  // nie tylko skokiem po jej końcu.
+  const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : (liveBossHp ?? raidRemaining)) : (liveBossHp ?? target.maxHp)) : 0;
   const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
   // Do modala przegranej — kampania/wydarzenie/quest/MAD/misja mogą przegrać (raid nie ma kontrataku).
   // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
@@ -294,8 +302,14 @@ export default function BossFight() {
   // cel (roundBoss) i co się dzieje po wygranej.
   const attackRoundBased = () => {
     if (!target || !target.unlocked || fighting) return;
+    // Raid (2026-08-17): sesja rundowa wobec MAŁEGO, bezpiecznie skalowanego celu
+    // (raidSessionHpFor — ten sam wzorzec co questBossHpFor/madBossHpFor), NIE wobec surowej
+    // trwałej puli tygodniowej — patrz pełny komentarz na górze pliku i w raid.ts.
+    const raidSessionHp = kind === 'raid' ? raidSessionHpFor(atkStatBonus, level, bonuses) : 0;
+    const raidRealStart = kind === 'raid' ? raidRemaining : 0;
     const roundBoss: Boss | null =
       kind === 'campaign' ? campaignBoss :
+      kind === 'raid' ? raidAsBoss(raid, raidSessionHp) :
       kind === 'event' && eventBoss ? weakenBoss(eventAsBoss(eventBoss, level), weaknessStreaks[eventBoss.weakness]) :
       kind === 'quest' ? questBoss :
       kind === 'mad' ? madBoss :
@@ -306,14 +320,21 @@ export default function BossFight() {
     // przegrana = darmowy retry. MAD dzieli pulę energii z kampanią (to jej rozszerzenie, nie
     // osobny tor jak raid/event).
     if (kind !== 'quest' && kind !== 'mission') {
-      const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
+      const pool = kind === 'campaign' || kind === 'mad' ? energy : kind === 'raid' ? raidEnergy : eventEnergy;
       if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     }
     resetCatHp();
     const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
-    if (kind === 'campaign' || kind === 'mad') spendEnergy(); else if (kind === 'event') spendEventEnergy();
+    // Raid: JEDNO wywołanie raidAttack (nie per rundę) — dopisuje realny postęp tej sesji
+    // (sesyjne hp przed minus po) do prawdziwej, trwałej puli tygodniowej i zużywa DOKŁADNIE
+    // 1 raidEnergy (1 próba = 1 atak, tak jak reszta trybów), niezależnie od liczby rund w
+    // środku sesji.
+    let raidOutcome: { remaining: number; defeated: boolean } | null = null;
+    if (kind === 'campaign' || kind === 'mad') spendEnergy();
+    else if (kind === 'event') spendEventEnergy();
+    else if (kind === 'raid') raidOutcome = raidAttack(raidSessionHp - result.bossHpLeft);
     setFighting(true);
-    setLiveBossHp(roundBoss.hp);
+    setLiveBossHp(kind === 'raid' ? raidRealStart : roundBoss.hp);
     setCatHit(null);
     let i = 0;
 
@@ -321,6 +342,17 @@ export default function BossFight() {
       if (!alive.current) return;
       setFighting(false);
       setLiveBossHp(null);
+      // Raid dalej BEZ stanu porażki (user o to nie prosił) — liczy się TYLKO czy prawdziwy,
+      // trwały bank spadł do zera (raidOutcome.defeated), NIE wynik tej jednej małej sesji
+      // (result.won dotyczy sesyjnej puli, nie prawdziwego tygodniowego bossa).
+      if (kind === 'raid') {
+        if (raidOutcome?.defeated) {
+          haptic.success();
+          raidClaim(weekKey, raidCoins(level), raidXp(level), raid.name, level);
+          setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
+        }
+        return;
+      }
       if (result.won) {
         haptic.success();
         if (kind === 'campaign' && campaignBoss) {
@@ -388,7 +420,9 @@ export default function BossFight() {
         setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed, thornDmg: round.thornDmg });
         playBossHitFx(round.playerCrit);
         setAttackPulse(n => n + 1);
-        setLiveBossHp(round.bossHpAfter);
+        // Raid: przelicz sesyjny postęp (mała, bezpiecznie skalowana pula) na PRAWDZIWĄ skalę
+        // tygodniową — arena zawsze pokazuje prawdziwy pasek, nie sesyjny (patrz targetRemaining).
+        setLiveBossHp(kind === 'raid' ? Math.max(0, raidRealStart - (raidSessionHp - round.bossHpAfter)) : round.bossHpAfter);
         roundTimer.current = setTimeout(counterBeat, 480);
       }, THROW_MS);
     };
@@ -396,75 +430,9 @@ export default function BossFight() {
     playerBeat();
   };
 
-  // Raid: HP bossa zostaje na starym modelu — trwały bank przez cały tydzień, nie resetuje się
-  // co próbę jak kampania/wydarzenie (ten sam tydzień = ta sama pula, celowo, żeby dało się
-  // odrabiać po trochu). ALE każda próba (2026-08-12, user: "nadal nie ma normalnej walki")
-  // dostaje teraz REALNY kontratak na kotka, jak kampania/wydarzenie — jedno uderzenie, jedna
-  // wymiana. Kotek resetuje się do pełna PRZED każdą próbą (jak w attackRoundBased), więc jeden
-  // kontratak nigdy nie kumuluje się między próbami — to zawsze "jedna czysta wymiana", bez
-  // nowego stanu porażki w raidzie (user o tym nie prosił, raid dalej nie da się "przegrać").
-  // Obrażenia kontrataku skalowane od `catMax`, NIE od `raidMaxHp` — pula raidu jest z założenia
-  // dużo większa (ma wytrzymać cały tydzień dobijania), więc ten sam × wskaźnik co w kampanii
-  // policzony na surowym raidMaxHp prawie zabijałby kotka jednym ciosem. Pierwsze podejście do
-  // wyważenia, nie grane na urządzeniu — może wymagać korekty po realnym teście.
-  const RAID_COUNTER_PCT = 0.04;
-  const attackSimple = () => {
-    if (kind !== 'raid' || !target || !target.unlocked || fighting || target.done) return;
-    if (target.energy <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
-    const { damage, crit } = computeDamage(atkStatBonus, level, bonuses);
-    resetCatHp();
-    setCatHit(null);
-    setFighting(true);
-    setPawFlying(true);
-    pawTravel.setValue(0);
-    Animated.timing(pawTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
-    roundTimer.current = setTimeout(() => {
-      if (!alive.current) return;
-      setPawFlying(false);
-      haptic.medium();
-      setLastHit({ dmg: damage, crit, guarded: false, healed: 0, thornDmg: 0 });
-      playBossHitFx(crit);
-      setAttackPulse(n => n + 1);
-
-      const res = raidAttack(damage);
-      setLiveBossHp(res.remaining);
-
-      const afterCounter = () => {
-        setFighting(false);
-        if (res.defeated) {
-          roundTimer.current = setTimeout(() => {
-            if (!alive.current) return;
-            raidClaim(weekKey, raidCoins(level), raidXp(level), raid.name, level);
-            haptic.success();
-            setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
-          }, 500);
-        }
-      };
-
-      // Boss padł tym ciosem → od razu do zwycięstwa, bez zbędnego kontrataku "z tamtego świata".
-      if (res.defeated) { afterCounter(); return; }
-
-      roundTimer.current = setTimeout(() => {
-        if (!alive.current) return;
-        const variance = 0.85 + Math.random() * 0.3;
-        const counterDmg = Math.round(catMax * RAID_COUNTER_PCT * variance * (1 - Math.min(0.9, Math.max(0, bonuses.dodge))));
-        setBoltFlying(true);
-        boltTravel.setValue(0);
-        Animated.timing(boltTravel, { toValue: 1, duration: THROW_MS, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
-        roundTimer.current = setTimeout(() => {
-          if (!alive.current) return;
-          setBoltFlying(false);
-          haptic.medium();
-          setCatHit({ dmg: counterDmg, healed: 0 });
-          playCatHitFx();
-          damageCat(counterDmg);
-          afterCounter();
-        }, THROW_MS);
-      }, 480);
-    }, THROW_MS);
-  };
-
-  const attack = kind === 'raid' ? attackSimple : attackRoundBased;
+  // Raid dołączył do attackRoundBased 2026-08-17 (patrz komentarz na górze pliku) — jedna
+  // wspólna funkcja obsługuje teraz wszystkie 6 trybów.
+  const attack = attackRoundBased;
 
   const bShakeX = bShake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] });
   const bFlashOp = bFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.8] });
@@ -542,6 +510,17 @@ export default function BossFight() {
                       eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: kFlashOp, backgroundColor: '#F87171' }]} />
+                  {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
+                      pojawiać się na pupila") — atak w zwarciu, nie rzut: zamiast
+                      podróżującego pocisku (boltFlying niżej, suppressed dla claw), burst
+                      ikony wprost NA portrecie kotka, ten sam trick co attackFx na bossie
+                      przy Twoim ciosie, tylko po drugiej stronie i inny trigger (boltTravel,
+                      nie bPop). */}
+                  {boltFlying && target?.attackKind === 'claw' && (
+                    <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
+                      <HandGrab size={90} color={counterColor} />
+                    </Animated.View>
+                  )}
                   {catHit && !!catHit.dmg && (
                     <Animated.Text style={[s.dmgFloat, { opacity: kFloatOp, transform: [{ translateY: kFloatY }], color: '#F87171' }]}>-{catHit.dmg}</Animated.Text>
                   )}
@@ -599,8 +578,11 @@ export default function BossFight() {
                 pazurami, magowie kulę magiczną, miecze slash mieczem, ci którzy nie mają to
                 pięść") — dalej PROSTY kształt (jedna ikona lecąca po prostej), tylko dobrana
                 po `target.attackKind` zamiast zawsze tej samej pięści; brak attackKind = ta
-                sama pięść co dawniej, więc zachowanie dla większości bossów bez zmian. */}
-            {boltFlying && (
+                sama pięść co dawniej, więc zachowanie dla większości bossów bez zmian.
+                Pazury WYJĄTKOWO nie lecą tędy wcale (2026-08-17) — patrz `s.clawFx` burst
+                na portrecie kotka wyżej, ten sam trigger (`boltFlying`/`boltOp`/`boltScale`),
+                inne miejsce renderu. */}
+            {boltFlying && target?.attackKind !== 'claw' && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
                 <CounterIcon size={28} color={counterColor} fill={counterColor} />
               </Animated.View>
@@ -764,5 +746,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
   attackFx: { position: 'absolute', width: 150, height: 150 },
+  clawFx: { position: 'absolute', width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
   projectile: { position: 'absolute', top: 96, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));

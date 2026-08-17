@@ -349,6 +349,39 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`HandGrab`/czerwony=claw, `Sparkles`/fioletowy=magic, `Sword`/szary=sword, `HandFist`/
     czerwony=fallback) zamiast zawsze tej samej pięści — sam mechanizm lotu/animacji BEZ
     zmian, tylko dobór ikony.
+    - **Fix pazurów** (ten sam dzień, user: "jak są pazury to nie mają lecieć tylko pojawiać
+      się na pupila") — pazury NIE dostają latającego pocisku wcale (jedyny wyjątek z 3
+      kategorii) — zamiast tego `s.clawFx` (`HandGrab`, ten sam trigger `boltFlying`/
+      `boltOp`/`boltScale`) błyska bezpośrednio NA portrecie kotka, mirror `attackFx` (burst
+      na bossie przy Twoim ciosie), tylko po drugiej stronie areny. Magia/miecz/pięść nadal
+      lecą jak wcześniej.
+  - **Raid dostał pełną rundową walkę** (2026-08-17, user: "ten eventowy [na pozycji raidu —
+    patrz niżej] jakby kafelek jest zbudowany a nie zwykła walka... miała być zwykła tylko
+    taka która nie restartuje jego HP jak z tym drugim [event]") — raid był JEDYNYM trybem bez
+    pełnej animacji: `attackSimple()` w `boss-fight.tsx` robił jedną wymianę ciosów na próbę
+    (kliknięcie → wynik), nie prawdziwą wielorundową walkę jak kampania/event. USUNIĘTA,
+    scalona w `attackRoundBased()` (teraz WSZYSTKIE 6 trybów przez jedną wspólną funkcję).
+    Kluczowy problem do rozwiązania: `raidHpFor` (prawdziwa, trwała pula na cały tydzień) jest
+    z założenia OGROMNA — podać ją bezpośrednio jako `boss.hp` do `simulateFight` zabiłoby
+    kotka jednym kontratakiem (`counterDamage()` liczy % od AKTUALNEGO hp bossa). Rozwiązanie:
+    `raidSessionHpFor(atkStatBonus, level, bonuses)` w `raid.ts` — DOKŁADNIE ten sam,
+    zwalidowany wzorzec co `questBossHpFor`/`madBossHpFor` (`atkPower × mała stała`,
+    `RAID_SESSION_HITS=6`) — każda próba to osobna, bezpiecznie skalowana "sesja" wobec
+    `raidAsBoss(raid, sessionHp)`, NIE wobec surowej tygodniowej puli. Realny postęp sesji
+    (`sessionHp - result.bossHpLeft`) dopisuje się do PRAWDZIWEJ, trwałej puli JEDNYM
+    wywołaniem `raidAttack()` po zakończeniu sesji (nie per rundę — dalej dokładnie 1
+    raidEnergy = 1 próba, jak reszta trybów). `targetRemaining`/pasek HP w arenie ZAWSZE
+    pokazuje prawdziwą skalę tygodniową (nie sesyjną) — `liveBossHp` podczas animacji jest
+    przeliczany z sesyjnej skali na prawdziwą (`raidRealStart - (raidSessionHp -
+    round.bossHpAfter)`). Raid dalej BEZ stanu porażki (user o to nie prosił) — `finish()`
+    dla `kind==='raid'` całkowicie ignoruje `result.won`/`result.catFainted`, liczy się TYLKO
+    czy `raidAttack()` zwróci `defeated:true` (prawdziwa pula = 0). Throwaway-symulacją
+    (`__tests__/raid.test.ts`) zweryfikowane: sesja bezpieczna (kontratak sesji nigdy nie
+    zabija w 1 rundzie, kontrastowo surowa pula na wyższych poziomach BY zabiła — to dowód że
+    fix jest potrzebny, nie kosmetyczny), zawsze robi realny postęp. UWAGA: kotek MOŻE
+    zemdleć w środku pojedynczej sesji przy pechu (wariancja) — to NIE bug, po prostu ta próba
+    dobija mniej HP, spróbuj ponownie następnym razem (energia i tak już zużyta, jak przy
+    każdym innym trybie).
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`
