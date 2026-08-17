@@ -57,4 +57,20 @@ describe('bossProgressReport', () => {
     const report = buildBossProgressReport(s);
     expect(report).toMatch(/Unik — poziom 2\/4 \[ZAŁOŻONY\]/);
   });
+
+  // 2026-08-17: po usunięciu progu poziomu z odblokowania kampanii (patrz NEXT_STEPS.md),
+  // status ikony w raporcie musiały przestać obiecywać 🔒 na podstawie levelu — jedyne stany
+  // to pokonany (✓) / aktualny cel (▶) / jeszcze nie w kolejce (·). Do tego każdy wiersz
+  // dostał szacunek ciosów PRZY REALNYCH statach gracza, nie gołe hp — dokładnie dane
+  // przydatne do throwaway-symulacji balansu bez ręcznego liczenia z surowych liczb.
+  test('pierwszy niepokonany boss oznaczony ▶ (aktualny cel), nie 🔒 — poziom już nie blokuje', () => {
+    const report = buildBossProgressReport(base); // xp=0 -> level 1, żaden boss nie pokonany
+    expect(report).toContain('▶');
+    expect(report).not.toContain('🔒');
+  });
+
+  test('każdy wiersz bossa pokazuje szacunek ciosów przy aktualnych statach gracza', () => {
+    const report = buildBossProgressReport({ ...base, atkStatBonus: 500 });
+    expect(report).toMatch(/ciosów przy Twoich statach/);
+  });
 });

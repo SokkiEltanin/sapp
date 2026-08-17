@@ -9,6 +9,23 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Eksport pupila: ciosy przy Twoich statach + fix ikon po zmianie odblokowania (2026-08-17)
+
+User: "ulepszyłeś te statystyki żebyśmy zebrali dane pod eksport pupila odnośnie levela walk
+upgradów itp opartych na poziomie ulepszenia?" — nie było zrobione, i przy okazji poprzednia
+zmiana (odblokowanie kampanii bez progu poziomu, wpis wyżej) zostawiła w eksporcie martwy
+🔒 liczony ze starego progu. Naprawione + ulepszone w `utils/bossProgressReport.ts`:
+- Status-ikony bossów: `✓` pokonany, `▶` aktualny cel, `·` reszta (bez 🔒/poziomu).
+- Każdy wiersz bossa dostał `~N ciosów przy Twoich statach` — liczone z REALNEGO
+  `atkStatBonus`/łupu gracza (nie gołe `b.hp`), z uwzględnieniem `guard` (×0.5 dmg). To
+  dokładnie ta liczba, którą do tej pory liczyłem ręcznie throwaway-symulacjami przy każdej
+  zmianie balansu — teraz wychodzi wprost z eksportu (Ustawienia → Diagnostyka → "Eksportuj
+  postęp pupila").
+
+**Priorytet testu:** zrób eksport, sprawdź czy `~N ciosów` przy wcześniej pokonanych bossach
+z grubsza zgadza się z tym jak faktycznie poszła walka (jeśli realnie było zauważalnie więcej
+rund niż `N` — sygnał że coś w formule nie łapie wariancji/krytów wystarczająco).
+
 ## 🆕 Odblokowanie kampanii bez progu poziomu — NIEsprawdzone na urządzeniu (2026-08-17)
 
 User (testując świeżo podbitą trudność wyżej): "odblokowanie jest po pokonaniu wcześniejszego
