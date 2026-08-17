@@ -294,6 +294,24 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     ekonomii gracza; dalsze podbijanie bez pełnego audytu ryzykowałoby powtórzenie DOKŁADNIE
     tego samego "6 z 22 bossów praktycznie nieosiągalnych" problemu, już raz naprawionego
     (wtedy stroną ekonomii). Odłożone do osobnego, pełnego audytu.
+  - **Odblokowanie kampanii = tylko pokonanie poprzedniego, NIE poziom** (2026-08-17, user
+    testował świeżo podbitą trudność wyżej: "musimy dać że odblokowanie jest po pokonaniu
+    wcześniejszego... ciężko jest za dużo muszę xp żeby sprawdzić nawet inne bossy") —
+    `unlockLevel` na każdym Boss był DODATKOWYM progiem ponad kolejność, mimo że kolejność
+    (`BOSSES.find(b => !defeatedBosses.includes(b.id))`) i tak już wymusza sekwencję —
+    poziom nic ekstra nie chronił poza spowolnieniem, nie dawał się realnie ominąć/oszukać
+    (żeby dojść do późnego bossa trzeba i tak pokonać wszystkich wcześniejszych, a atak gracza
+    i tak skaluje się z REALNYM poziomem via `atkMultiplier`, więc niski poziom przeciw
+    późnemu bossowi po prostu przegrywa, nie "cheesuje"). Usunięte w dwóch miejscach: `app/
+    bosses.tsx` (`unlocked = !!current`, hero card WALCZ! bezwarunkowe gdy jest `current`;
+    lista kampanii: `lock` = "nie pokonany i nie current", tekst "Pokonaj poprzednich" zamiast
+    numeru poziomu) i `app/boss-fight.tsx` (`target.unlocked: true` dla `kind==='campaign'`,
+    ten sam ekran liczy `campaignBoss` niezależnie od bosses.tsx, więc wymagał osobnego fixu).
+    `unlockLevel` ZOSTAJE w danych `Boss` (referencyjny poziom pod jaki historycznie wyważono
+    hp/atak tego bossa, `madBossFor` go też czyta) — przestał być tylko BRAMKĄ dostępu. Raid
+    (`level>=3`)/event (`level>=2`)/MAD (`level>=MAD_UNLOCK_LEVEL=50`) CELOWO nietknięte —
+    to osobne, deliberatne progi niezwiązane z sekwencją "pokonaj poprzedniego", user pytał
+    konkretnie o kampanię.
   - **Unikatowe ataki bossów wg typu** (2026-08-17, user: "planuję żeby bossy miały unikatowe
     ataki — drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, ci
     którzy nie mają to pięść") — nowy opcjonalny `attackKind?: 'claw'|'magic'|'sword'` na

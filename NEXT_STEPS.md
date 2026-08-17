@@ -9,6 +9,24 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Odblokowanie kampanii bez progu poziomu — NIEsprawdzone na urządzeniu (2026-08-17)
+
+User (testując świeżo podbitą trudność wyżej): "odblokowanie jest po pokonaniu wcześniejszego
+jednak nie odświeżyło lvl pupila... ciężko jest za dużo muszę xp żeby sprawdzić nawet inne
+bossy". Kampania wymagała DWÓCH warunków na kolejnego bossa: pokonać poprzedniego (i tak już
+wymuszone przez kolejność) ORAZ osiągnąć jego `unlockLevel` — drugi warunek tylko spowalniał,
+nie chronił przed niczym realnym (atak i tak skaluje się z prawdziwym poziomem, więc zbyt
+niski poziom przeciw dalekiemu bossowi po prostu przegrywa fight, nie omija progresji).
+Usunięty w `app/bosses.tsx` i `app/boss-fight.tsx` — WALCZ! na aktualnym bossie kampanii jest
+teraz zawsze aktywne, jedyny warunek to energia dzienna. Raid/event/MAD progi bez zmian
+(osobne, deliberatne). **Priorytet testu:** dokładnie to o co prosił user — spróbuj przejść
+przez kilku kolejnych bossów kampanii bez martwienia się o poziom, sprawdź czy faktycznie nic
+już nie blokuje poza energią dzienną.
+
+**Nie zbadane** (za mało informacji do samodzielnej diagnozy): "nie odświeżyło lvl pupila" —
+jeśli to nadal problem PO wgraniu tego builda, potrzebne dokładniejsze kroki odtworzenia
+(gdzie dokładnie poziom wyglądał na nieaktualny — ekran Bossy? Pupil? po jakiej akcji?).
+
 ## 🆕 Trudność walk + unikatowe ataki bossów + emoji z treningów — NIEsprawdzone (2026-08-17)
 
 User (jedna wiadomość, 2 punkty + zapowiedź trzeciego odłożonego na później):
