@@ -33,15 +33,22 @@ Trzy rzeczy z jednej wiadomości usera (wysłał realny eksport z rundy testowej
    próba i tak dopisuje częściowy postęp, spróbuj ponownie.
 
 3. **Dane z rundy testowej #2** (eksport usera, Lv6, atkStatBonus 10, 0 itemów bojowych): 3/3
-   wygrane walki kampanii (sloth ~7 ciosów, sugar guard ~14, snake ~8) — user: "zdecydowanie
-   za szybko to poszło, pokonałem 3 bossy od zera nie mając nic praktycznie". To PASUJE do
-   zwalidowanego projektu (9-12 ciosów, ~100% winrate przy lekkiej inwestycji dla bossów
-   #1-13) — nie jest to bug, ale user nadal odczuwa to jako za łatwe. NIE dotknięte w tym
-   przejściu (kolejny fix guard-bugu + podbicie HP dopiero co wylądowały, dawanie im chwili
-   przed kolejną rundą podbijania) — jeśli po zagraniu z pełną rundową walką raidu/nowymi
-   pazurami user nadal chce mocniej podbić wczesną kampanię, kolejny krok: zwiększyć
-   `earlyHits` docelowy zakres w `BOSSES` (obecnie 9→12) i przewalidować throwaway-symulacją
-   jak poprzednio (patrz komentarz nad `BOSSES` w bosses.ts).
+   wygrane walki kampanii (sloth ~7 ciosów, sugar guard ~14, snake ~8) w ~4 minuty od czystego
+   resetu — user: "zdecydowanie za szybko to poszło, pokonałem 3 bossy od zera nie mając nic
+   praktycznie". Per-walka trudność PASUJE do zwalidowanego projektu (9-12 ciosów, ~100%
+   winrate przy lekkiej inwestycji dla bossów #1-13) — root cause NIE był hp/dmg pojedynczej
+   walki, tylko PACING: odblokowanie czysto sekwencyjne (bez progu poziomu, fix z
+   2026-08-17 wcześniej tego dnia) + 3 dzienne próby ataku = nic nie stało na przeszkodzie
+   zbiciu 3 różnych bossów w jednej sesji, gdy XP akurat starczyło na Lv6 (realny gracz
+   który wypełni cały dzień questów/nawyków też może to osiągnąć pierwszego dnia).
+   **Naprawione** (ten sam dzień, kolejny fix): kampania dostała gate "1 NOWY boss dziennie"
+   — `lastCampaignDefeatDate` w petStore, ustawiane w `defeatBoss()`. Retry na TYM SAMYM,
+   jeszcze niepokonanym bossie po przegranej zostaje darmowe (nie zmienia tej daty) —
+   ograniczone jest tylko przejście do KOLEJNEGO bossa tego samego dnia. UI: `app/boss-fight.tsx`
+   pokazuje lockBox z komunikatem zamiast areny, `app/bosses.tsx` wygasza przycisk WALCZ! +
+   subtitle pod hero card. MAD (druga fala, endgame) świadomie NIE objęty tym gate'em — to
+   osobna oś progresji. **Priorytet testu:** pokonaj bossa kampanii, sprawdź że KOLEJNY boss
+   pokazuje lockBox "wróć jutro" zamiast dać się zaatakować, mimo zostałych prób ataku.
 
 ## 🆕 Reset pupila = nowa numerowana runda testowa — NIEsprawdzone na urządzeniu (2026-08-17)
 

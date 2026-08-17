@@ -110,6 +110,17 @@ interface PetState {
   energyDate: string | null;    // day the top-up counter belongs to
   energyToday: number;          // energy already granted today (for daily top-up)
   defeatedBosses: string[];
+  // Data (todayISO) ostatniego NOWEGO pokonania bossa kampanii — gate na "1 nowy boss
+  // kampanii dziennie" (2026-08-17, user: "zdecydowanie za szybko to poszło pokonałem 3
+  // bossy od zera nie mając nic praktycznie" — pełny eksport z czystego resetu pokazał
+  // że 3 dzienne próby ataku + odblokowanie czysto sekwencyjne, bez progu poziomu,
+  // NIC nie stało na przeszkodzie zbiciu 3 różnych bossów w jednej krótkiej sesji.
+  // Bossy same w sobie (hp/ciosy) zostały świadomo NIETKNIĘTE w tym fixie — to
+  // OSOBNA oś: nie "boss za łatwy", tylko "zbyt wiele różnych bossów naraz w jeden
+  // dzień". Ustawiane w defeatBoss() PO wygranej; blokuje attackRoundBased() dla
+  // kind==='campaign', dopóki data się nie zmieni — retry na TYM SAMYM (jeszcze
+  // niepokonanym) bossie po przegranej zostaje darmowe, bo nie zmienia tej daty.
+  lastCampaignDefeatDate: string | null;
   defeatedMadBosses: string[];    // 'MAD' warianty (madBosses.ts, 2026-08-15) — osobna lista,
                                    // celowo nie miesza się z defeatedBosses (zwykła kampania)
   bossHp: Record<string, number>; // bossId → remaining hp (absent = full)
@@ -280,6 +291,7 @@ export const usePetStore = create<PetState>()(
       eventEnergyToday: 0,
       eventWon: [],
       defeatedBosses: [],
+      lastCampaignDefeatDate: null,
       defeatedMadBosses: [],
       missionStartedAt: null,
       missionEndsAt: null,
@@ -536,6 +548,7 @@ export const usePetStore = create<PetState>()(
       spendEnergy: () => set((s) => ({ energy: Math.max(0, s.energy - 1) })),
       defeatBoss: (bossId, lootId, coins, xp, name, level) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
         defeatedBosses: [...s.defeatedBosses, bossId],
+        lastCampaignDefeatDate: todayISO(),
         ownedItems: s.ownedItems.includes(lootId) ? s.ownedItems : [...s.ownedItems, lootId],
         coins: s.coins + coins,
         xp: s.xp + xp,
@@ -662,7 +675,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], lastCampaignDefeatDate: null, defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
     }),
     {
       name: 'pet-v1',
@@ -679,7 +692,7 @@ export const usePetStore = create<PetState>()(
         pushupsDay: s.pushupsDay, squatsDay: s.squatsDay,
         situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, trainingDays: s.trainingDays,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
-        defeatedBosses: s.defeatedBosses, defeatedMadBosses: s.defeatedMadBosses,
+        defeatedBosses: s.defeatedBosses, lastCampaignDefeatDate: s.lastCampaignDefeatDate, defeatedMadBosses: s.defeatedMadBosses,
         missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt,
         bossHp: s.bossHp, bossLog: s.bossLog,
         resetGeneration: s.resetGeneration, lastResetAt: s.lastResetAt,
@@ -698,6 +711,7 @@ export const usePetStore = create<PetState>()(
         state.lastLoginDay = state.lastLoginDay ?? null;
         state.loginBonusDay = state.loginBonusDay ?? null;
         state.bossLog = state.bossLog ?? [];   // stary stan sprzed 2026-08-14 nie miał logu walk
+        state.lastCampaignDefeatDate = state.lastCampaignDefeatDate ?? null;   // stary stan sprzed 2026-08-17 nie miał gate'u 1 boss/dzień
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};
