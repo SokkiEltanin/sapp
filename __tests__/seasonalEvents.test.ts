@@ -89,7 +89,8 @@ describe('seasonalEvents — eventPeriodKey', () => {
 });
 
 // 2026-08-16: user — "dodajmy terminy z odliczaniem za ile kończy się event boss, żeby
-// realnie móc go wygrać" — event ma FLAT 1 próbę/dzień, więc "dni zostało" = "podejść zostało".
+// realnie móc go wygrać" — event ma co najmniej 1 próbę/dzień (do 3 przy wysokim energyMult,
+// patrz eventDailyAttempts w bosses.ts), więc "dni zostało" to DOLNA GRANICA "podejść zostało".
 describe('seasonalEvents — eventEndsAt / eventDaysLeft', () => {
   test('Mikołaj kończy się 26 grudnia (koniec dnia)', () => {
     const boss = activeSeasonalEvent(new Date(2026, 11, 6))!;

@@ -9,6 +9,19 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Druga pula energii na bossy eventowe — NIEsprawdzone na urządzeniu (2026-08-17)
+
+User: "mam tam 7 energii a nie mogę walczyć dodatkowo, może zróbmy że jak mam energię na
+bossy to energia na bossy, a mam drugą inną energię łącznie na bossy eventowe" — event miał
+FLAT 1 próbę/dzień niezależnie od `energyMult` z łupu kampanii, czyli inwestycja w energyMult
+nic nie dawała TAM gdzie ma teraz twardy termin (odliczanie z wczoraj). Nowa funkcja
+`eventDailyAttempts` w `bosses.ts` — skaluje się z energyMult jak kampania, ale wyraźnie
+słabiej i z twardym capem na 3 (kampania przy pełnej inwestycji daje 5). Pełny opis w
+ARCHITECTURE §"Bossy". **Priorytet testu:** zbierz trochę energyMult z łupu (pokonaj kilku
+bossów kampanii dających `bonus.energyMult`), sprawdź czy licznik energii eventowej w
+mini-karcie (`app/bosses.tsx`) pokazuje więcej niż 1, i czy realnie idzie stoczyć więcej niż
+jedną walkę eventową danego dnia.
+
 ## 🆕 Nagłówek Pupila v2 + łapka koloru kotka + fix aury raidu — NIEsprawdzone (2026-08-16)
 
 Trzy rzeczy z jednej wiadomości usera:

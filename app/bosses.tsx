@@ -8,7 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts, EVENT_DAILY_ATTEMPTS } from '@/utils/bosses';
+import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft } from '@/utils/seasonalEvents';
@@ -51,14 +51,15 @@ export default function Bosses() {
 
   // v5 pivot: energia to płaski dzienny limit prób (dailyAttempts), NIE liczony już z
   // danych samo-opieki — patrz memory boss_design.md. Boss/raid dzielą ten sam limit
-  // (dailyAttempts, bazowo 3). Wydarzenie ma WŁASNY, flat sufit (2026-08-12, user: "mamy
-  // jedno podejście eventowe dziennie") — walka eventowa jest teraz pełną symulacją jak
-  // kampania (realny kontratak, można przegrać), więc dostaje mniej prób, nie tyle co reszta.
+  // (dailyAttempts, bazowo 3). Wydarzenie ma WŁASNĄ, osobną pulę (`eventDailyAttempts`,
+  // 2026-08-17 — wcześniej flat 1/dzień, patrz komentarz nad `eventDailyAttempts` w
+  // bosses.ts) — skaluje się z energyMult jak kampania, ale WYRAŹNIE słabiej i z twardym
+  // capem, żeby event pozostał rzadszy niż kampania nawet przy pełnej inwestycji.
   const reload = useCallback(() => {
     const attempts = dailyAttempts(bonuses.energyMult);
     syncEnergy(attempts, 0);
     syncRaidEnergy(attempts, 0);
-    syncEventEnergy(EVENT_DAILY_ATTEMPTS, 0);
+    syncEventEnergy(eventDailyAttempts(bonuses.energyMult), 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
   }, [bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
   useFocusEffect(reload);
