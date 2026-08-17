@@ -92,4 +92,60 @@ describe('bossProgressReport', () => {
       expect(report).toContain('ostatni reset:');
     });
   });
+
+  // 2026-08-17: user — "nie zapisujesz do logowania z pupila dokładnie walk z ilością HP w
+  // czasie i dmg zadanego mi i którego zadał bossowi... nie wiesz jak bardzo łatwo pokonuje
+  // bossy". bossLog dostał opcjonalny przebieg runda-po-rundzie (BossFightDetail) — te testy
+  // pilnują że report faktycznie go pokazuje, i że wpisy sprzed tego fixu (bez `rounds`) dalej
+  // renderują się jak wcześniej (nie wybuchają, nie zmieniają formatu).
+  describe('przebieg walki runda po rundzie (BossFightDetail w bossLog)', () => {
+    test('wygrana z pełnym przebiegiem — pokazuje HP bossa/kotka w czasie i dmg/rundę', () => {
+      const s: ProgressReportInput = {
+        ...base,
+        bossLog: [{
+          kind: 'campaign', id: 'sloth', name: 'Kanapowy Leniwiec', at: '2026-08-17T10:00:00.000Z',
+          level: 4, coins: 8, xp: 60,
+          won: true, catFainted: false, bossMaxHp: 382, catMaxHpAtFight: 120,
+          rounds: [
+            { p: 61, c: 12, bhp: 321, chp: 108 },
+            { p: 58, c: 0, bhp: 263, chp: 108 },
+          ],
+        }],
+      };
+      const report = buildBossProgressReport(s);
+      expect(report).toContain('WYGRANA (2 rund)');
+      expect(report).toContain('boss HP: 382→321→263');
+      expect(report).toContain('kotek HP: 120→108→108');
+      expect(report).toContain('Twój dmg/rundę: 61,58');
+      expect(report).toContain('kontratak/rundę: 12,0');
+    });
+
+    test('przegrana bo kotek zemdlał — oznaczona osobno od przegranej limitem rund', () => {
+      const s: ProgressReportInput = {
+        ...base,
+        bossLog: [{
+          kind: 'campaign', id: 'sugar', name: 'Cukrowy Potwór', at: '2026-08-17T10:05:00.000Z',
+          level: 4, coins: 0, xp: 0,
+          won: false, catFainted: true, bossMaxHp: 414, catMaxHpAtFight: 120,
+          rounds: [{ p: 30, c: 120, bhp: 384, chp: 0 }],
+        }],
+      };
+      const report = buildBossProgressReport(s);
+      expect(report).toContain('PRZEGRANA (kotek zemdlał)');
+      expect(report).toContain('+0 monet, +0 XP');
+    });
+
+    test('stary wpis bez `rounds` (sprzed fixu) dalej renderuje samą linię z nagrodą, bez wybuchu', () => {
+      const s: ProgressReportInput = {
+        ...base,
+        bossLog: [
+          { kind: 'campaign', id: 'sloth', name: 'Kanapowy Leniwiec', at: '2026-08-14T10:00:00.000Z', level: 2, coins: 8, xp: 60 },
+        ],
+      };
+      const report = buildBossProgressReport(s);
+      expect(report).toMatch(/kampania · Kanapowy Leniwiec · Lv2 · \+8 monet, \+60 XP/);
+      expect(report).not.toContain('WYGRANA');
+      expect(report).not.toContain('boss HP:');
+    });
+  });
 });
