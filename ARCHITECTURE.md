@@ -312,6 +312,16 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`level>=3`)/event (`level>=2`)/MAD (`level>=MAD_UNLOCK_LEVEL=50`) CELOWO nietknięte —
     to osobne, deliberatne progi niezwiązane z sekwencją "pokonaj poprzedniego", user pytał
     konkretnie o kampanię.
+    - **Fix eksportu** (`utils/bossProgressReport.ts`, ten sam dzień, user: "zebrać dane pod
+      eksport... oparte na poziomie ulepszenia") — status-ikona listy bossów w raporcie
+      ("Eksportuj postęp pupila", Ustawienia → Diagnostyka) ciągle liczyła 🔒 z `lvl.level >=
+      b.unlockLevel`, czyli obiecywała próg, który właśnie zniknął z UI. Nowe stany: `✓`
+      pokonany, `▶` aktualny cel (`BOSSES.find(b => !defeatedSet.has(b.id))`), `·` reszta.
+      PRZY OKAZJI każdy wiersz dostał `~N ciosów przy Twoich statach` — `Math.ceil(b.hp /
+      (power × (guard?0.5:1)))` z REALNYM `atkStatBonus`/`bonuses` gracza (ten sam `power` już
+      liczony wyżej w raporcie dla linii ATK), nie goły `b.hp`. To dokładnie liczba, którą do
+      tej pory liczyłem ręcznie throwaway-symulacjami przy każdej zmianie balansu — teraz
+      wychodzi wprost z eksportu, bez pytania o dodatkowe dane.
   - **Unikatowe ataki bossów wg typu** (2026-08-17, user: "planuję żeby bossy miały unikatowe
     ataki — drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, ci
     którzy nie mają to pięść") — nowy opcjonalny `attackKind?: 'claw'|'magic'|'sword'` na

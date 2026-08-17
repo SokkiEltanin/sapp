@@ -47,10 +47,22 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
   lines.push('');
 
   const defeatedSet = new Set(s.defeatedBosses);
+  const current = BOSSES.find(b => !defeatedSet.has(b.id));
   lines.push(`BOSSOWIE KAMPANII: ${s.defeatedBosses.length}/${BOSSES.length} pokonanych`);
   for (const b of BOSSES) {
-    const status = defeatedSet.has(b.id) ? '✓' : (lvl.level >= b.unlockLevel ? '·' : '🔒');
-    lines.push(`  ${status} ${b.emoji} ${b.name} — Lv${b.unlockLevel}, ${b.hp} HP${b.guard ? ', guard' : ''}${b.regenPct ? `, regen ${Math.round(b.regenPct * 100)}%` : ''}`);
+    // Status ikony (2026-08-17, po usunięciu progu poziomu z odblokowania kampanii —
+    // patrz NEXT_STEPS.md "Odblokowanie kampanii bez progu poziomu") — odblokowanie jest
+    // TERAZ czysto sekwencyjne (pokonaj poprzedniego), więc 🔒/Lv-próg nie ma już sensu;
+    // jedyne stany to pokonany / aktualny cel / jeszcze nie w kolejce.
+    const status = defeatedSet.has(b.id) ? '✓' : current?.id === b.id ? '▶' : '·';
+    // Szacunek ciosów potrzebnych PRZY AKTUALNYCH statach gracza (nie zerowej mocy jak
+    // sam `b.hp` zakłada w danych) — dokładnie ta liczba, którą ręcznie liczyłem throwaway-
+    // symulacjami przy balansowaniu; user (2026-08-17): "zebrać dane pod eksport... oparte
+    // na poziomie ulepszenia" — to bezpośrednio to. `guard` (×0.5 dmg gracza) wliczone,
+    // wariancja/kryt/dodge pominięte (środek zakresu, nie dokładna symulacja rundy po rundzie).
+    const effPower = power * (b.guard ? 0.5 : 1);
+    const hitsAtCurrentStats = effPower > 0 ? Math.ceil(b.hp / effPower) : Infinity;
+    lines.push(`  ${status} ${b.emoji} ${b.name} — Lv${b.unlockLevel}, ${b.hp} HP${b.guard ? ', guard' : ''}${b.regenPct ? `, regen ${Math.round(b.regenPct * 100)}%` : ''} · ~${hitsAtCurrentStats} ciosów przy Twoich statach`);
   }
   lines.push('');
 
