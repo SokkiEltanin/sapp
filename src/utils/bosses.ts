@@ -40,6 +40,16 @@ export interface BossLoot {
   bonus: Partial<{ atk: number; dodge: number; crit: number; energyMult: number }>;
 }
 
+// Unikatowy atak kontrataku bossa (2026-08-17, user: "planuję żeby bossy miały unikatowe
+// ataki — drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, a ci
+// którzy nie mają to pięść"). Derywowane wprost z istniejącej konwencji nazewnictwa plików w
+// bossIcons.ts (BOSS_<atak>_<nazwa>.png — sam user tak je nazwał, patrz komentarz tam) —
+// TYLKO bossy z jednoznacznym pazur/magia/miecz atakiem w nazwie pliku dostają wpis, reszta
+// (hand/bite/fire/axe/club/bone/scythe/soundwave — nie pasują jednoznacznie do żadnej z 3
+// kategorii) zostaje `undefined` → fallback pięść w BossArt/boss-fight.tsx, zgodnie z
+// dokładnym życzeniem "ci którzy nie mają to mamy pięść".
+export type AttackKind = 'claw' | 'magic' | 'sword';
+
 export interface Boss {
   id: string;
   name: string;
@@ -57,6 +67,7 @@ export interface Boss {
   // dzisiejszych danych samo-opieki ──
   guard?: boolean;    // OSŁONA: ten boss zawsze redukuje Twój cios ×0.5 (tankowy typ)
   regenPct?: number;  // REGENERACJA: ten boss zawsze leczy ten % max HP co przeżytą rundę (enrage)
+  attackKind?: AttackKind; // wizualny typ kontrataku — patrz komentarz nad AttackKind
 }
 
 // BALANCE REVIEW (2026-08-13, patrz memory boss_design.md „balance review") — `hp` wartości
@@ -73,9 +84,30 @@ export interface Boss {
 // (insomnia/devourer/wizard miały oba) — ta kombinacja potrafiła zrobić z bossa dosłownie
 // niezabijalnego, gdy `0.5×atkPower < regenPct×hp` (kotek zadaje mniej niż boss leczy,
 // każda runda). Nadal PIERWSZA WERSJA tej krzywej — niesprawdzona na urządzeniu.
+//
+// FIX 2026-08-17 (user: "walki są zbyt łatwe") — throwaway-symulacją (profil "lekkiej"
+// stopniowej inwestycji rosnącej z `order`, ta sama dyscyplina co przy MAD/quest wcześniej)
+// znaleziono DWA osobne problemy:
+// 1) **realny bug, nie kwestia trudności**: `guard` (Twój cios ×0.5) w połączeniu z
+//    `counterDamage()` liczonym od AKTUALNEGO hp bossa podwaja SKUMULOWANY kontratak wobec
+//    bossa bez guard o tym samym hp (2× rund ekspozycji × ten sam % za rundę) — bossy #22
+//    (Iluzja Kontroli, FINAŁ KAMPANII) i #14/#15 były w praktyce nie do wygrania nawet przy
+//    realistycznej inwestycji. Fix: `counterDamage` bierze teraz `guard`, ucina kontratak
+//    o połowę gdy aktywny — przywraca parytet z bossami bez guard przy tym samym hp/hits.
+// 2) **za łatwe wczesne/środkowe bossy** (order 1-13, Lv2-46) — docelowe 6→10.6 ciosów w tym
+//    zakresie dawało 100% winrate nawet przy zerowej inwestycji. Podbite do 9→12 ciosów (patrz
+//    hp niżej) — nadal 100% winrate w symulacji przy LEKKIEJ inwestycji, ale wyraźnie dłuższe/
+//    trudniejsze walki. Bossy #14-22 (Lv52-116, "elite" tier) ŚWIADOMIE NIETKNIĘTE — audyt
+//    14.08 ("Balans ekonomii vs bossy" w NEXT_STEPS.md) już wcześniej znalazł że ten sam
+//    zakres jest szczególnie wrażliwy na rozjazd między prostym modelem a REALNYM tempem
+//    ekonomii gracza; podbijanie go dalej bez tej samej rygorystycznej, pełnej symulacji
+//    ryzykowałoby powtórzenie DOKŁADNIE tego samego "6 z 22 bossów praktycznie nieosiągalnych"
+//    problemu, który już raz naprawiono (wtedy stroną ekonomii, nie hp bossów). Odłożone do
+//    osobnego, pełnego audytu — patrz NEXT_STEPS.md.
 export const BOSSES: Boss[] = [
   {
-    id: 'sloth', name: 'Kanapowy Leniwiec', emoji: '🦥', order: 1, unlockLevel: 2, hp: 250,
+    id: 'sloth', name: 'Kanapowy Leniwiec', emoji: '🦥', order: 1, unlockLevel: 2, hp: 382,
+    attackKind: 'claw', // atakpazury_frog.png
     weakness: 'steps', weaknessLabel: 'kroki',
     // id zostaje 'loot_pillow' mimo zmiany nazwy/emoji (2026-08-12, gablota trofeów
     // wywalona z pupila) — to trwały klucz w ownedItems, zmiana złamałaby już zdobyty
@@ -85,74 +117,77 @@ export const BOSSES: Boss[] = [
     coins: 8, xp: 60, taunt: 'Po co dziś wstawać…',
   },
   {
-    id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 310,
+    id: 'sugar', name: 'Cukrowy Potwór', emoji: '🍬', order: 2, unlockLevel: 4, hp: 414,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_sugarcrystal', name: 'Kryształ Cukru', emoji: '💎', desc: '+3% siły ataku', bonus: { atk: 0.03 } },
     coins: 12, xp: 100, taunt: 'Zjedz jeszcze jednego batonika…', guard: true,
   },
   {
-    id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 330,
+    id: 'snake', name: 'Wąż Kusiciel', emoji: '🐍', order: 3, unlockLevel: 6, hp: 448,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_snakefig', name: 'Figurka Węża', emoji: '🐍', desc: '+5% szansy na cios krytyczny', bonus: { crit: 0.05 } },
     coins: 18, xp: 160, taunt: 'Odpuść dziś nawyki…',
   },
   {
-    id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 410,
+    id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 495,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_dragon', name: 'Trofeum Smoka', emoji: '🐲', desc: '+5% uniku, +3% siły ataku', bonus: { dodge: 0.05, atk: 0.03 } },
     coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
   },
   {
-    id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 440,
+    id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 544,
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_hourglass', name: 'Klepsydra Skupienia', emoji: '⏳', desc: '+7% energii z dbania o siebie', bonus: { energyMult: 0.07 } },
     coins: 45, xp: 450, taunt: 'Jeszcze tylko jeden filmik…',
   },
   {
-    id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 460,
+    id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 595,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+6% uniku', bonus: { dodge: 0.06 } },
     coins: 60, xp: 600, taunt: 'Martw się wszystkim naraz…',
   },
   {
-    id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 550,
+    id: 'junk', name: 'Król Fast Foodu', emoji: '🍔', order: 7, unlockLevel: 18, hp: 647,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_veg', name: 'Korona Warzyw', emoji: '🥦', desc: '+5% siły ataku, +2% kryt', bonus: { atk: 0.05, crit: 0.02 } },
     coins: 80, xp: 800, taunt: 'Dorzuć duże frytki…', guard: true,
   },
   {
-    id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 600,
+    id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 714,
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +5% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.05, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
   },
   // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
   {
-    id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 710,
+    id: 'insomnia', name: 'Zmora Bezsenności', emoji: '🌙', order: 9, unlockLevel: 26, hp: 783,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
     loot: { id: 'loot_moon', name: 'Amulet Księżyca', emoji: '🌙', desc: '+8% energii z dbania o siebie', bonus: { energyMult: 0.08 } },
     coins: 150, xp: 1500, taunt: 'Jeszcze tylko jeden odcinek o 2 w nocy…', guard: true,
   },
   {
-    id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 760,
+    id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 855,
+    attackKind: 'magic', // atakmagicrod_magician.png
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+7% uniku, +3% atak', bonus: { dodge: 0.07, atk: 0.03 } },
     coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
   },
   {
-    id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 820,
+    id: 'drought', name: 'Hydra Odwodnienia', emoji: '🐙', order: 11, unlockLevel: 35, hp: 943,
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_spring', name: 'Fiolka Źródła', emoji: '💧', desc: '+6% atak, +4% kryt', bonus: { atk: 0.06, crit: 0.04 } },
     coins: 280, xp: 2800, taunt: 'Kawa liczy się jako woda, nie?', regenPct: 0.03,
   },
   {
-    id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 970,
+    id: 'procrast', name: 'Tytan Prokrastynacji', emoji: '⏳', order: 12, unlockLevel: 40, hp: 1034,
+    attackKind: 'magic', // BOLTATTACK_zeus.png (piorun — elementarny/magiczny, nie fizyczny cios)
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_gear', name: 'Mechanizm Czasu', emoji: '⚙️', desc: '+9% energii, +3% atak', bonus: { energyMult: 0.09, atk: 0.03 } },
     coins: 380, xp: 3800, taunt: 'Zrobisz to jutro… na pewno…',
   },
   {
-    id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 1050,
+    id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 1142,
+    attackKind: 'claw', // pazurattack_cerberus.png
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +6% uniku', bonus: { atk: 0.08, dodge: 0.06 } },
     coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
@@ -168,24 +203,28 @@ export const BOSSES: Boss[] = [
   // komentarz nad BOSSES.
   {
     id: 'samurai', name: 'Duch Perfekcjonizmu', emoji: '🥷', order: 15, unlockLevel: 58, hp: 1320,
+    attackKind: 'sword', // atakkatana_samurai.png
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_katana', name: 'Katana Honoru', emoji: '🗡️', desc: '+9% siły ataku', bonus: { atk: 0.09 } },
     coins: 1300, xp: 13500, taunt: 'Musisz zrobić to idealnie, inaczej się nie liczy…', guard: true,
   },
   {
     id: 'jaguar', name: 'Cień Impulsu', emoji: '🐆', order: 16, unlockLevel: 65, hp: 1420,
+    attackKind: 'claw', // atakpazurty_jaguar.png
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+9% uniku', bonus: { dodge: 0.09 } },
     coins: 2000, xp: 20000, taunt: 'Kup to teraz, pomyślisz później…',
   },
   {
     id: 'dinosaur', name: 'Skamieniały Nawyk', emoji: '🦖', order: 17, unlockLevel: 72, hp: 1640,
+    attackKind: 'claw', // atakpazury_dinosaur.png
     weakness: 'steps', weaknessLabel: 'kroki',
     loot: { id: 'loot_fossil', name: 'Skamielina Mocy', emoji: '🦴', desc: '+10% atak, +3% kryt', bonus: { atk: 0.10, crit: 0.03 } },
     coins: 3000, xp: 30000, taunt: 'Zawsze tak robiłeś, po co coś zmieniać…',
   },
   {
     id: 'piratecapitan', name: 'Kapitan Zachłanności', emoji: '🏴‍☠️', order: 18, unlockLevel: 80, hp: 1770,
+    attackKind: 'sword', // attaksword_piratecapitan.png
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
     loot: { id: 'loot_treasuremap', name: 'Mapa Skarbów', emoji: '🗺️', desc: '+10% energii, +4% atak', bonus: { energyMult: 0.10, atk: 0.04 } },
     coins: 4500, xp: 45000, taunt: 'Jeszcze jedno, jeszcze trochę więcej…',
@@ -210,6 +249,7 @@ export const BOSSES: Boss[] = [
   },
   {
     id: 'wizard', name: 'Iluzja Kontroli', emoji: '🧙', order: 22, unlockLevel: 116, hp: 2690,
+    attackKind: 'magic', // magicattack_wizard.png
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
     loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +10% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.10, energyMult: 0.10, crit: 0.08 } },
     coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true,
@@ -309,8 +349,20 @@ export function eventDailyAttempts(energyMult: number): number {
 // przypadki i sprawia że kontratak faktycznie reaguje na przebieg walki, nie tylko na to
 // KTÓRY to boss.
 const COUNTER_PCT = 0.04; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kontratak
-export function counterDamage(currentBossHp: number, dodge: number): number {
-  const base = Math.max(0, currentBossHp) * COUNTER_PCT;
+//
+// FIX 2026-08-17 (throwaway-symulacją, znalezione przy audycie "za łatwe walki" — patrz
+// komentarz nad BOSSES): `guard` (Twój cios ×0.5) BEZ zmiany tutaj podwaja skumulowany
+// kontratak w całej walce względem bossa bez guard o tym samym hp — potrzeba ~2× rund
+// (bo każdy Twój cios słabszy), a każda z tych rund nadal liczy kontratak jako 4% AKTUALNEGO
+// hp bossa, które przy guard maleje WOLNIEJ (mniej dmg/rundę), więc suma kontrataków rośnie,
+// nie tylko liczba rund. Symulacja: bez tego fixu boss #22 (finał kampanii, Iluzja Kontroli)
+// był praktycznie niewygrywalny (0% winrate) nawet przy realistycznej inwestycji. `guard`
+// tnie kontratak o połowę tutaj — przywraca parytet: guard boss z tym samym hp/docelową
+// liczbą ciosów daje w sumie TYLE SAMO skumulowanych obrażeń na kotka co odpowiednik bez
+// guard, zamiast dwa razy tyle. Guard nadal robi swoje (2× dłuższa walka, tankowy typ), tylko
+// przestaje BEZ ZAMIERZENIA mnożyć całkowite ryzyko.
+export function counterDamage(currentBossHp: number, dodge: number, guard = false): number {
+  const base = Math.max(0, currentBossHp) * COUNTER_PCT * (guard ? 0.5 : 1);
   return Math.round(base * (1 - Math.min(0.9, Math.max(0, dodge))));
 }
 
@@ -410,7 +462,7 @@ export function simulateFight(
         // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
         const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
         if (!controlled) {
-          counterDmg = counterDamage(bossHp, bonuses.dodge);
+          counterDmg = counterDamage(bossHp, bonuses.dodge, guarded);
           // 'dodge' — całkowity unik kontrataku
           if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
           // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka

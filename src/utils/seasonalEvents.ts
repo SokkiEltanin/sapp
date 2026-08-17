@@ -1,4 +1,4 @@
-import { WeaknessKey, Boss, BossLoot } from '@/utils/bosses';
+import { WeaknessKey, Boss, BossLoot, AttackKind } from '@/utils/bosses';
 
 // TRZECI tor walki (obok kampanii bossów i cotygodniowego raidu) — WYDARZENIA:
 // świąteczne/sezonowe bossy (data w kalendarzu decyduje) i „nemesis miesiąca" (Twoje
@@ -19,6 +19,7 @@ export interface EventBoss {
   taunt: string;
   trophyEmoji: string;
   kind: 'seasonal' | 'menace';
+  attackKind?: AttackKind; // 2026-08-17 — patrz komentarz nad AttackKind w bosses.ts
 }
 
 interface SeasonalDef extends EventBoss {
@@ -71,17 +72,17 @@ const SEASONAL: SeasonalDef[] = [
   // ani dat z __tests__/seasonalEvents.test.ts), więc menace ma nadal ~10 miesięcy okazji. ──
   {
     id: 'wiosna', name: 'Wiosenna Nike', emoji: '🏆', weakness: 'steps', weaknessLabel: 'kroki',
-    taunt: 'Jeszcze jeden dzień na kanapie nikomu nie zaszkodzi…', trophyEmoji: '🌸', kind: 'seasonal',
+    taunt: 'Jeszcze jeden dzień na kanapie nikomu nie zaszkodzi…', trophyEmoji: '🌸', kind: 'seasonal', attackKind: 'magic',
     isActive: d => d.getMonth() === 4 && d.getDate() <= 14, // 1–14 maja
   },
   {
     id: 'jesien', name: 'Jesienna Demeter', emoji: '🌾', weakness: 'water', weaknessLabel: 'woda (cel dnia)',
-    taunt: 'Jedna kawa zamiast wody nikomu nie zaszkodzi…', trophyEmoji: '🌾', kind: 'seasonal',
+    taunt: 'Jedna kawa zamiast wody nikomu nie zaszkodzi…', trophyEmoji: '🌾', kind: 'seasonal', attackKind: 'magic',
     isActive: d => d.getMonth() === 9 && d.getDate() <= 14, // 1–14 października
   },
   {
     id: 'zima', name: 'Zimowa Hera', emoji: '👑', weakness: 'sleep', weaknessLabel: 'sen (7h+)',
-    taunt: 'Jeszcze jeden odcinek zamiast spać nikomu nie zaszkodzi…', trophyEmoji: '❄️', kind: 'seasonal',
+    taunt: 'Jeszcze jeden odcinek zamiast spać nikomu nie zaszkodzi…', trophyEmoji: '❄️', kind: 'seasonal', attackKind: 'magic',
     isActive: d => d.getMonth() === 1 && d.getDate() <= 14, // 1–14 lutego
   },
 ];
@@ -94,11 +95,11 @@ export function activeSeasonalEvent(d: Date): EventBoss | null {
 export const MENACE_POOL = {
   overtime: {
     id: 'overtime', name: 'Widmo Nadgodzin', emoji: '💼', weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    taunt: 'Jeszcze jedna zmiana nikogo nie zabiła…', trophyEmoji: '⏱️', kind: 'menace',
+    taunt: 'Jeszcze jedna zmiana nikogo nie zabiła…', trophyEmoji: '⏱️', kind: 'menace', attackKind: 'magic',
   } as EventBoss,
   sweettooth: {
     id: 'sweettooth', name: 'Demon Słodyczy', emoji: '🍩', weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
-    taunt: 'Ten miesiąc i tak już przepadł…', trophyEmoji: '🍬', kind: 'menace',
+    taunt: 'Ten miesiąc i tak już przepadł…', trophyEmoji: '🍬', kind: 'menace', attackKind: 'claw',
   } as EventBoss,
 };
 
@@ -204,5 +205,6 @@ export function eventAsBoss(eventBoss: EventBoss, level: number): Boss {
     order: 0, unlockLevel: 0, hp: eventHpFor(level),
     weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel,
     loot: EVENT_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: eventBoss.taunt,
+    attackKind: eventBoss.attackKind,
   };
 }

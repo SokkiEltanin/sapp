@@ -278,6 +278,40 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     inwestycja się liczy, ale event się nie trywializuje. Pule dalej NIEZALEŻNE (`eventEnergy`
     w `petStore.ts`, osobny od `energy`/`raidEnergy`) — zmieniła się tylko formuła dziennego
     top-upu w `reload()` (`app/bosses.tsx`), zero zmian w mechanice samej walki/HP.
+  - **Trudność kampanii podbita + fix realnego bugu z `guard`** (2026-08-17, user: "walki są
+    zbyt łatwe") — throwaway-symulacją (ta sama dyscyplina co przy MAD/quest wcześniej, profil
+    "lekkiej" stopniowej inwestycji rosnącej z `order`) znaleziono, że `guard` (Twój cios ×0.5)
+    w połączeniu z `counterDamage()` liczonym od AKTUALNEGO hp bossa **podwaja** skumulowany
+    kontratak wobec bossa bez guard o tym samym hp — boss #22 (FINAŁ KAMPANII, Iluzja
+    Kontroli) był w praktyce niewygrywalny nawet przy realistycznej inwestycji, nie tylko
+    "za łatwy". `counterDamage(hp, dodge, guard?)` tnie teraz kontratak o połowę gdy `guard`
+    aktywny — przywraca parytet z bossami bez guard przy tym samym hp/docelowej liczbie
+    ciosów. NIEZALEŻNIE: docelowa liczba ciosów dla bossów #1-13 (Lv2-46) podbita z 6→10.6 do
+    9→12 (nowe `hp` w `BOSSES`) — w symulacji nadal 100% winrate przy lekkiej inwestycji, ale
+    wyraźnie dłuższe walki. Bossy #14-22 (Lv52-116, "elite") ŚWIADOMIE NIETKNIĘTE — audyt
+    14.08 ("Balans ekonomii vs bossy" w NEXT_STEPS.md) już wcześniej znalazł że ten zakres jest
+    szczególnie wrażliwy na rozjazd między prostym modelem inwestycji a REALNYM tempem
+    ekonomii gracza; dalsze podbijanie bez pełnego audytu ryzykowałoby powtórzenie DOKŁADNIE
+    tego samego "6 z 22 bossów praktycznie nieosiągalnych" problemu, już raz naprawionego
+    (wtedy stroną ekonomii). Odłożone do osobnego, pełnego audytu.
+  - **Unikatowe ataki bossów wg typu** (2026-08-17, user: "planuję żeby bossy miały unikatowe
+    ataki — drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, ci
+    którzy nie mają to pięść") — nowy opcjonalny `attackKind?: 'claw'|'magic'|'sword'` na
+    `Boss` (`bosses.ts`) + lustrzane pole na `Raid` (`raid.ts`), `EventBoss`
+    (`seasonalEvents.ts`) i `MiniBoss` (`minibosses.ts`) — `undefined` = fallback pięść
+    (`HandFist`, bez zmian dla większości rosteru). Przypisania DERYWOWANE wprost z istniejącej
+    konwencji nazw plików w `bossIcons.ts` (`BOSS_<atak>_<nazwa>.png` — sam user tak je
+    nazwał) — tylko bossy z jednoznacznym pazur/magia/miecz atakiem w nazwie pliku dostają
+    wpis (kampania: sloth/doubt/jaguar/dinosaur=claw, compare/procrast/wizard=magic,
+    samurai/piratecapitan=sword; raid: kraken=claw, phantom=magic; event: wiosna/jesień/
+    zima/overtime=magic (mitologiczne boginie/widmo), sweettooth=claw (demon); minibossy:
+    tylko harpia=claw). `minibossAsBoss`/`eventAsBoss` (budują `Boss` z `MiniBoss`/`EventBoss`
+    ręcznie, nie przez spread) dostały jawne przekazanie `attackKind` — `madBossFor` dostaje
+    je AUTOMATYCZNIE (spreaduje `...boss` z kampanii). W `boss-fight.tsx`: `Target` niesie
+    `attackKind`, kontratak (`boltFlying` pocisk) wybiera ikonę/kolor z małej mapy
+    (`HandGrab`/czerwony=claw, `Sparkles`/fioletowy=magic, `Sword`/szary=sword, `HandFist`/
+    czerwony=fallback) zamiast zawsze tej samej pięści — sam mechanizm lotu/animacji BEZ
+    zmian, tylko dobór ikony.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`
@@ -404,6 +438,11 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     brzuszków ekran z docelową liczbą powtórzeń + przycisk "UKOŃCZYŁEM" (bez czujnika liczyć
     się nie da). Po ukończeniu woła to samo `mark*Done` z `petStore` co wcześniej — quest
     staje się `done`, dalej idzie przez tor "Questy-jako-walki" wyżej (przycisk "Walcz").
+    **Fix 2026-08-17** (user: "wywal emotki z tych treningów, zostaw tylko nazwy ćwiczeń") —
+    duży emoji na górze `TrainingSessionModal` usunięty (samo `META` bez pola `emoji`), plus
+    emoji-sufiksy w `quests.ts` (`note: 'zrobione 💪'` itd. dla `b_pushups/squats/situps/
+    plank/stretch`) ścięte do gołego `'zrobione'` — sama nazwa ćwiczenia (label questu)
+    bez zmian.
   - **Layout `app/pet.tsx` (2026-08-16)** — user: "zadania i ta walka jest za nisko, wywalić
     potrzeby bo nic nie mówi, zrobić głaskanie, nazwę zbić bo nad pupilem zajmuje w pizdu
     miejsca". Nowa kolejność sekcji w ScrollView: nazwa/nastrój (skurczone — `name` 24→16px,

@@ -95,6 +95,13 @@ describe('bosses — counterDamage (2026-08-13: liczy od AKTUALNEGO, nie max HP 
     expect(counterDamage(1000, 0)).toBeGreaterThan(counterDamage(200, 0));
     expect(counterDamage(0, 0)).toBe(0); // wybity boss nie kontratakuje
   });
+  // 2026-08-17: guard (Twój cios ×0.5) BEZ tego fixu podwaja skumulowany kontratak wobec
+  // bossa bez guard o tym samym hp (2× rund ekspozycji na TĘ SAMĄ % stawkę) — symulacja
+  // znalazła że to robiło finałowego bossa kampanii praktycznie niewygrywalnym.
+  test('guard tnie kontratak o połowę — kompensuje 2× rund ekspozycji z ciosem ×0.5', () => {
+    expect(counterDamage(1000, 0, true)).toBe(counterDamage(1000, 0, false) / 2);
+    expect(counterDamage(1000, 0)).toBe(counterDamage(1000, 0, false)); // domyślnie bez guard
+  });
 });
 
 describe('bosses — BOSSES roster balance (2026-08-13, patrz memory boss_design.md „balance review")', () => {

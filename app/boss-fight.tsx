@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, HandFist, Trophy } from 'lucide-react-native';
+import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, HandFist, HandGrab, Sparkles, Sword, Trophy } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -10,7 +10,7 @@ import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO } from '@/store/petStore';
-import { BOSSES, Boss, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
+import { BOSSES, Boss, AttackKind, bossBonuses, computeDamage, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
@@ -176,20 +176,20 @@ export default function BossFight() {
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   // maxHp już uwzględnia osłabienie z realnej serii (patrz weaknessStreaks/weakenBoss wyżej) —
   // ekran zawsze pokazuje FAKTYCZNY pasek HP, nie "surowy" numer z bosses.ts/raid.ts.
-  type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean };
+  type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind };
   let target: Target | null = null;
   if (kind === 'campaign' && campaignBoss) {
-    target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, unlocked: level >= campaignBoss.unlockLevel, unlockLevel: campaignBoss.unlockLevel, done: false };
+    target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, unlocked: level >= campaignBoss.unlockLevel, unlockLevel: campaignBoss.unlockLevel, done: false, attackKind: campaignBoss.attackKind };
   } else if (kind === 'raid') {
-    target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: raidEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone };
+    target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: raidEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
   } else if (kind === 'event' && eventBoss && eventKey) {
-    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: eventMaxHp, energy: eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone };
+    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: eventMaxHp, energy: eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
   } else if (kind === 'quest' && questBoss) {
-    target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed };
+    target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed, attackKind: questBoss.attackKind };
   } else if (kind === 'mad' && madBoss && madBase) {
-    target = { id: madBoss.id, name: madBoss.name, taunt: madBoss.taunt, weakness: madBoss.weakness, weaknessLabel: madBoss.weaknessLabel, emoji: madBoss.emoji, maxHp: madBoss.hp, energy, unlocked: level >= MAD_UNLOCK_LEVEL, unlockLevel: MAD_UNLOCK_LEVEL, done: false };
+    target = { id: madBoss.id, name: madBoss.name, taunt: madBoss.taunt, weakness: madBoss.weakness, weaknessLabel: madBoss.weaknessLabel, emoji: madBoss.emoji, maxHp: madBoss.hp, energy, unlocked: level >= MAD_UNLOCK_LEVEL, unlockLevel: MAD_UNLOCK_LEVEL, done: false, attackKind: madBoss.attackKind };
   } else if (kind === 'mission' && missionBoss) {
-    target = { id: missionBoss.id, name: missionBoss.name, taunt: missionBoss.taunt, weakness: missionBoss.weakness, weaknessLabel: '', emoji: missionBoss.emoji, maxHp: missionBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: false };
+    target = { id: missionBoss.id, name: missionBoss.name, taunt: missionBoss.taunt, weakness: missionBoss.weakness, weaknessLabel: '', emoji: missionBoss.emoji, maxHp: missionBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: false, attackKind: missionBoss.attackKind };
   }
   // Streak realny za kategorię AKTUALNEGO celu — do UI-notki "osłabiona obrona" niżej.
   // Quest-minibossy NIE mają mechaniki osłabiania (weakness na nich jest nieużywanym
@@ -481,6 +481,12 @@ export default function BossFight() {
   const boltX = boltTravel.interpolate({ inputRange: [0, 1], outputRange: ['84%', '16%'] });
   const boltOp = boltTravel.interpolate({ inputRange: [0, 0.08, 0.85, 1], outputRange: [0, 1, 1, 0] });
   const boltScale = boltTravel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] });
+  // Unikatowy kontratak per typ bossa (2026-08-17) — patrz komentarz przy render'ze pocisku
+  // niżej. Brak attackKind (większość rosteru) = ta sama czerwona pięść co dotąd.
+  const COUNTER_ICON: Record<AttackKind, typeof HandFist> = { claw: HandGrab, magic: Sparkles, sword: Sword };
+  const COUNTER_COLOR: Record<AttackKind, string> = { claw: '#F87171', magic: '#A78BFA', sword: '#94A3B8' };
+  const CounterIcon = target?.attackKind ? COUNTER_ICON[target.attackKind] : HandFist;
+  const counterColor = target?.attackKind ? COUNTER_COLOR[target.attackKind] : '#F87171';
 
   const closeVictory = () => { setVictory(null); router.back(); };
   const closeDefeat = () => { setDefeat(null); router.back(); };
@@ -581,14 +587,19 @@ export default function BossFight() {
                 <PawPrint size={30} color={palette.coat} fill={palette.coat} />
               </Animated.View>
             )}
-            {/* Kontratak bossa = zwykła pięść, ZAWSZE — user (2026-08-12): poprzednio leciał
-                tu ten sam per-bossowy burst (fire/bomb/magicspell/…) co przy Twoim trafieniu
-                niżej, i wyglądało to jak rakieta/bomba lecąca w kotka, nie jak cios. Ten sam
-                obrazek bossa zostaje TYLKO jako flash na jego kaflu przy Twoim ciosie (s.attackFx
-                niżej) — tam nikt się nie skarżył, to inny moment (Twój cios ląduje na NIM). */}
+            {/* Kontratak bossa — user (2026-08-12): poprzednio leciał tu ten sam per-bossowy
+                burst (fire/bomb/magicspell/…) co przy Twoim trafieniu niżej, i wyglądało to
+                jak rakieta/bomba lecąca w kotka, nie jak cios — dlatego uniwersalna pięść. Ten
+                sam obrazek bossa zostaje TYLKO jako flash na jego kaflu przy Twoim ciosie
+                (s.attackFx niżej) — tam nikt się nie skarżył, to inny moment (Twój cios ląduje
+                na NIM). 2026-08-17 (user: "bossy miały unikatowe ataki — drapieżniki drapnięcie
+                pazurami, magowie kulę magiczną, miecze slash mieczem, ci którzy nie mają to
+                pięść") — dalej PROSTY kształt (jedna ikona lecąca po prostej), tylko dobrana
+                po `target.attackKind` zamiast zawsze tej samej pięści; brak attackKind = ta
+                sama pięść co dawniej, więc zachowanie dla większości bossów bez zmian. */}
             {boltFlying && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
-                <HandFist size={28} color="#F87171" fill="#F87171" />
+                <CounterIcon size={28} color={counterColor} fill={counterColor} />
               </Animated.View>
             )}
             </View>
