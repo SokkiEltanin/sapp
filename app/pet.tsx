@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppSta
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins, Heart } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Check, Coins } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -364,21 +364,38 @@ export default function Pet() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* name + mood — at the very top */}
-        {editing ? (
-          <View style={s.nameEdit}>
-            <TextInput value={draft} onChangeText={setDraft} style={s.nameInput} autoFocus maxLength={16}
-              placeholder="Imię" placeholderTextColor={c.text.muted} onSubmitEditing={saveName} />
-            <TouchableOpacity onPress={saveName} style={s.nameSave}><Check size={18} color="#fff" /></TouchableOpacity>
+        {/* Nagłówek: nazwa+samopoczucie (lewo) / lvl+głaskanie (prawo) — (2026-08-16 v2, user:
+            "nazwa po lewej, samopoczucie pod nim, po prawej ta sama linijka pasek lvl oraz
+            pasek pogłaskania, wywal przycisk pogłaskaj po co on" — przycisk zniknął, tap na
+            kota (handlePet, niżej) zostaje jedynym sposobem głaskania, tak jak przed 2026-08-16). */}
+        <View style={s.topHeader}>
+          <View style={s.topLeft}>
+            {editing ? (
+              <View style={s.nameEdit}>
+                <TextInput value={draft} onChangeText={setDraft} style={s.nameInput} autoFocus maxLength={16}
+                  placeholder="Imię" placeholderTextColor={c.text.muted} onSubmitEditing={saveName} />
+                <TouchableOpacity onPress={saveName} style={s.nameSave}><Check size={18} color="#fff" /></TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={s.nameRow} onPress={() => { setDraft(name); setEditing(true); }} activeOpacity={0.7}>
+                <Text style={s.name}>{name}</Text>
+                <Pencil size={14} color={c.text.muted} />
+              </TouchableOpacity>
+            )}
+            <View style={[s.moodChip, { backgroundColor: pet.color + '1E', borderColor: pet.color + '55' }]}>
+              <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
+            </View>
           </View>
-        ) : (
-          <TouchableOpacity style={s.nameRow} onPress={() => { setDraft(name); setEditing(true); }} activeOpacity={0.7}>
-            <Text style={s.name}>{name}</Text>
-            <Pencil size={14} color={c.text.muted} />
-          </TouchableOpacity>
-        )}
-        <View style={[s.moodChip, { backgroundColor: pet.color + '1E', borderColor: pet.color + '55' }]}>
-          <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
+          <View style={s.topRight}>
+            <View style={s.miniBarRow}>
+              <Text style={s.miniBarLabel}>Lv {lvl.level}</Text>
+              <View style={s.miniBarTrack}><View style={[s.miniBarFill, { width: `${Math.round(lvl.progress * 100)}%`, backgroundColor: '#A78BFA' }]} /></View>
+            </View>
+            <View style={s.miniBarRow}>
+              <Text style={s.affHeart}>{affToday >= 100 ? '❤️' : affToday > 0 ? '🩵' : '🤍'}</Text>
+              <View style={s.miniBarTrack}><View style={[s.miniBarFill, { width: `${affToday}%`, backgroundColor: '#F472B6' }]} /></View>
+            </View>
+          </View>
         </View>
         <Text style={s.tip}>{petStatusLine(pet)}</Text>
 
@@ -388,23 +405,6 @@ export default function Pet() {
             eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
             onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
         </View>
-
-        {/* Affection — fills as you pet (tap) the cat; full = daily bonus. */}
-        <View style={s.affRow}>
-          <Text style={s.affHeart}>{affToday >= 100 ? '❤️' : affToday > 0 ? '🩵' : '🤍'}</Text>
-          <View style={s.affTrack}>
-            <View style={[s.affFill, { width: `${affToday}%` }]} />
-          </View>
-          <Text style={s.affTxt}>{affToday >= 100 ? 'głaskany!' : 'głaskanie'}</Text>
-        </View>
-
-        {/* Głaskanie — jawny przycisk zamiast sekcji "Potrzeby" (2026-08-16, user: "potrzeby
-            nic nie mówią, zrób głaskanie") — tapnięcie kota już głaskało, ale było niewidoczne;
-            ten przycisk robi dokładnie to samo (handlePet), tylko jawnie. */}
-        <PressableScale onPress={handlePet} style={s.petBtn}>
-          <Heart size={16} color="#F472B6" fill={affToday >= 100 ? '#F472B6' : 'transparent'} />
-          <Text style={s.petBtnTxt}>Pogłaskaj pupila</Text>
-        </PressableScale>
 
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
             (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. Bez
@@ -577,15 +577,6 @@ export default function Pet() {
           </PressableScale>
         )}
 
-        {/* level */}
-        <View style={s.levelCard}>
-          <View style={s.levelTop}>
-            <Text style={s.levelTxt}>Poziom {lvl.level}</Text>
-            <Text style={s.levelSub}>{lvl.inLevel}/{lvl.needed} XP · {stage}</Text>
-          </View>
-          <View style={s.xpTrack}><View style={[s.xpFill, { width: `${Math.round(lvl.progress * 100)}%` }]} /></View>
-        </View>
-
         {/* ── Weekly challenges ── */}
         {quests.weekly.length > 0 && (
           <>
@@ -708,6 +699,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // Nazwa/status skurczone (2026-08-16, user: "nazwę zbić, nad pupilem zajmuje w pizdu
   // miejsca") — mniejsza czcionka + ciaśniejsze marginesy nad kotem, żeby resztę (głaskanie,
   // questy) było widać bez przewijania od razu po wejściu.
+  // Nagłówek dwukolumnowy (2026-08-16 v2, user: "nazwa po lewej, samopoczucie pod nim,
+  // po prawej pasek lvl i pasek pogłaskania") — zastępuje osobne karty level/affection
+  // z poprzedniej wersji, które schodziły niżej na ekranie.
+  topHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: spacing[1] },
+  topLeft: { alignItems: 'flex-start', gap: 4, flexShrink: 1 },
+  topRight: { alignItems: 'flex-end', gap: 6, minWidth: 108 },
+  miniBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 108 },
+  miniBarLabel: { fontSize: 10.5, fontWeight: '800', color: c.text.muted, width: 30 },
+  miniBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden' },
+  miniBarFill: { height: '100%', borderRadius: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   name: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
   nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
@@ -717,24 +718,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   status: { fontSize: 12, fontWeight: '800' },
   tip: { fontSize: 11.5, color: c.text.muted, marginTop: 3, textAlign: 'center' },
 
-  affRow: { flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', marginTop: spacing[3] },
-  affHeart: { fontSize: 16 },
-  affTrack: { flex: 1, height: 10, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
-  affFill: { height: '100%', borderRadius: 5, backgroundColor: '#F472B6' },
-  affTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted, width: 68, textAlign: 'right' },
+  affHeart: { fontSize: 14 },
   crateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 11, borderRadius: radius.lg, backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
   crateBtnTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
   dailyBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 12, borderRadius: radius.lg, backgroundColor: '#FBBF24', borderWidth: 1, borderColor: '#FBBF24' },
   dailyBoxDone: { backgroundColor: c.bg.card, borderColor: c.border.default },
   dailyBoxTxt: { fontSize: 13, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.2 },
   dailyBoxDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E4342E' },
-
-  levelCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[4] },
-  levelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  levelTxt: { fontSize: 15, fontWeight: '800', color: c.text.primary },
-  levelSub: { fontSize: 11, fontWeight: '600', color: c.text.muted },
-  xpTrack: { height: 10, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
-  xpFill: { height: '100%', borderRadius: 5, backgroundColor: '#A78BFA' },
 
   section: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[4], marginBottom: spacing[2] },
 
@@ -748,8 +738,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   addonState: { fontSize: 9.5, fontWeight: '700' },
   addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
-  petBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[3], paddingVertical: 12, borderRadius: radius.lg, backgroundColor: '#F472B618', borderWidth: 1, borderColor: '#F472B655' },
-  petBtnTxt: { fontSize: 13, fontWeight: '800', color: '#F472B6' },
 
   missionCard: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },

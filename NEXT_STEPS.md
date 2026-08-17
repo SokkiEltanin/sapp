@@ -9,6 +9,28 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Nagłówek Pupila v2 + łapka koloru kotka + fix aury raidu — NIEsprawdzone (2026-08-16)
+
+Trzy rzeczy z jednej wiadomości usera:
+1. **Nagłówek Pupila przebudowany drugi raz tego dnia** — teraz dwukolumnowy: nazwa+edycja
+   i "samopoczucie" (moodChip) po lewej, cienki pasek poziomu i pasek głaskania po prawej
+   (ta sama linijka co nazwa). Przycisk "Pogłaskaj pupila" z poprzedniej wersji USUNIĘTY —
+   user: "po co on xd" — tap na kota zostaje jedynym sposobem głaskania. **Priorytet testu:**
+   otwórz Pupila, sprawdź czy nagłówek czyta się dobrze (nazwa nie ucieka pod długi pasek
+   przy wąskim ekranie), czy tap na kota dalej napełnia pasek w prawej kolumnie.
+2. **Łapka-pocisk w walce koloru kotka** — była na sztywno różowa, teraz `palette.coat` (ten
+   sam kolor co portret). **Priorytet testu:** stocz dowolną walkę z kotkiem NIE-niebieskim
+   (domyślny kolor), sprawdź czy lecąca łapka ma jego prawdziwy kolor sierści.
+3. **Fix: rajdowy boss tracił czerwoną aurę na ekranie przegranej** — `powered` prop nie był
+   przekazywany w modalu przegranej dla `kind==='raid'` (tylko dla `mad`). Naprawione.
+   **Priorytet testu:** przegraj walkę rajdową (celowo, np. bez leczenia kotka), sprawdź czy
+   modal przegranej pokazuje bossa z czerwoną poświatą tak jak modal zwycięstwa.
+
+**Nadal blokowane na nowym arcie od usera** (nie coś do naprawienia kodem): `behemoth`/
+`wyrm`/`siren` (raid) i Zły Mikołaj/Czekoladowy Zajączek/Widmo Nadgodzin/Demon Słodyczy
+(event) wciąż bez dedykowanego PNG — patrz sekcja niżej "Rajdowe bossy" / "4 portrety
+event-bossów".
+
 ## 🆕 Przebudowa layoutu zakładki Pupila — NIEsprawdzone na urządzeniu (2026-08-16)
 
 User: "zadania i ta walka jest za nisko, może lepiej wywalić potrzeby jego bo to nic nie
