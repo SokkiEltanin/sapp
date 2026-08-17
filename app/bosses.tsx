@@ -72,9 +72,14 @@ export default function Bosses() {
   }, [reload]);
 
   // sequential campaign: current = pierwszy niepokonany. HP resetuje się co próbę
-  // (karczma S&F) — pasek nie ma sensu tutaj, tylko na ekranie walki.
+  // (karczma S&F) — pasek nie ma sensu tutaj, tylko na ekranie walki. Odblokowanie = samo
+  // pokonanie poprzedniego, NIE poziom (2026-08-17, user: "odblokowanie jest po pokonaniu
+  // wcześniejszego" — dodatkowy próg poziomu blokował testowanie kolejnych bossów mimo że
+  // kolejność i tak jest już wymuszona przez `current`, poziom nic ekstra nie chronił poza
+  // spowolnieniem testów). `unlockLevel` na Boss zostaje w danych (referencyjny poziom pod
+  // jaki wyważono hp/atak tego bossa), tylko przestał być bramką — stąd WALCZ! niżej jest
+  // teraz bezwarunkowe, gdy tylko `current` istnieje.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
-  const unlocked = current ? level >= current.unlockLevel : false;
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
@@ -213,19 +218,12 @@ export default function Bosses() {
                 "zbyt dużo opisu bossa"). Reszta szczegółów żyje na ekranie walki. */}
             <Text style={s.hpTxt}>{current.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text></Text>
 
-            {unlocked ? (
-              <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight' as any); }} style={{ width: '100%' }}>
-                <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
-                  <Swords size={18} color="#fff" />
-                  <Text style={s.attackTxt}>WALCZ!</Text>
-                </View>
-              </PressableScale>
-            ) : (
-              <View style={s.lockBox}>
-                <Lock size={16} color={c.text.muted} />
-                <Text style={s.lockTxt}>Odblokujesz na poziomie {current.unlockLevel} (masz {level}). Rozwijaj pupila questami.</Text>
+            <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight' as any); }} style={{ width: '100%' }}>
+              <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
+                <Swords size={18} color="#fff" />
+                <Text style={s.attackTxt}>WALCZ!</Text>
               </View>
-            )}
+            </PressableScale>
           </View>
         )}
 
@@ -235,7 +233,11 @@ export default function Bosses() {
           {BOSSES.map(b => {
             const def = defeatedBosses.includes(b.id);
             const isCur = current?.id === b.id;
-            const lock = !def && level < b.unlockLevel;
+            // 2026-08-17 — lock w liście to teraz czysto "jeszcze nie doszedłeś tu w
+            // kolejności" (nie def, nie current), NIE poziom — patrz komentarz przy `current`
+            // wyżej. Wciąż informacyjne (lista nie ma własnego przycisku walki, tylko hero
+            // card current-bossa wyżej), ale już nie sugeruje nieistniejącego wymogu poziomu.
+            const lock = !def && !isCur;
             return (
               <View key={b.id} style={[s.row, isCur && { borderColor: '#38BDF8' }]}>
                 <View style={(def || lock) && { opacity: 0.5 }}>
@@ -243,7 +245,7 @@ export default function Bosses() {
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
-                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.name}` : lock ? `Poziom ${b.unlockLevel}` : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
+                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.name}` : lock ? 'Pokonaj poprzednich' : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
                 </View>
                 {def ? <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
                   : lock ? <Lock size={15} color={c.text.muted} />
