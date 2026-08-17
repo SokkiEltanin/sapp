@@ -126,9 +126,11 @@ export function currentEventBoss(d: Date, menaceCtx: MenaceCtx): EventBoss | nul
 }
 
 // Koniec BIEŻĄCEGO okna aktywności (2026-08-16, user: "dodajmy terminy z odliczaniem za ile
-// kończy się event boss, żeby realnie móc go wygrać") — walka eventowa ma FLAT 1 próbę/dzień
-// (EVENT_DAILY_ATTEMPTS w bosses.ts), więc "ile dni zostało" to wprost "ile jeszcze podejść
-// dostanę" zanim boss zniknie na dobre. `isActive` per-definicja wyżej sprawdza TYLKO
+// kończy się event boss, żeby realnie móc go wygrać") — walka eventowa ma co najmniej
+// 1 próbę/dzień (`eventDailyAttempts` w bosses.ts, do 3 przy wysokim energyMult z łupu —
+// patrz komentarz przy tej funkcji, 2026-08-17), więc "ile dni zostało" to DOLNA GRANICA
+// "ile jeszcze podejść dostanę" zanim boss zniknie na dobre (realnie może być więcej).
+// `isActive` per-definicja wyżej sprawdza TYLKO
 // przynależność (true/false), nie ma gdzie wyciągnąć samej granicy — stąd osobna funkcja,
 // lustrzana per-id (te same okna co isActive, jawnie jako Date). Nemesis miesiąca (`menace`)
 // nie ma stałego okna dat — jego "koniec" to koniec BIEŻĄCEGO miesiąca kalendarzowego (wtedy

@@ -256,14 +256,28 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
     tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
   - **Odliczanie do końca eventu** (2026-08-16, `eventEndsAt`/`eventDaysLeft` w
-    `seasonalEvents.ts`) — user: "żeby realnie móc go wygrać" — walka eventowa ma FLAT
-    1 próbę/dzień (`EVENT_DAILY_ATTEMPTS`), więc "ile dni zostało" to wprost "ile jeszcze
-    podejść dostanę" zanim boss zniknie. `eventEndsAt` to per-id lustro okien z `isActive`
+    `seasonalEvents.ts`) — user: "żeby realnie móc go wygrać" — walka eventowa ma co
+    najmniej 1 próbę/dzień (patrz `eventDailyAttempts` niżej), więc "ile dni zostało" to
+    DOLNA GRANICA "ile jeszcze podejść dostanę" zanim boss zniknie (realnie może być więcej,
+    patrz osobna pula energii poniżej). `eventEndsAt` to per-id lustro okien z `isActive`
     (SEASONAL) — nie da się wyciągnąć granicy z samego predykatu true/false, więc każdy z
     6 sezonowych ma jawny koniec (Wielkanoc liczona z `easterSunday`+1 dzień). `menace`
     (nemesis miesiąca) nie ma stałego okna — jego koniec to koniec BIEŻĄCEGO miesiąca
     kalendarzowego. Pokazywane w `app/bosses.tsx` (mini-karta) i `boss-fight.tsx` (ekran
     walki), kolor eskaluje czerwono/żółto przy ≤1/≤3 dniach.
+  - **Druga, osobna pula energii na bossy eventowe** (2026-08-17, `eventDailyAttempts` w
+    `bosses.ts`) — user: "jak mam energię na bossy to energia na bossy, a mam drugą inną
+    energię łącznie na bossy eventowe" — wcześniej event miał FLAT `EVENT_DAILY_ATTEMPTS=1`
+    niezależnie od `energyMult` z łupu kampanii, co znaczyło że leftover inwestycja w energię
+    (kampania/raid już skalują się z `dailyAttempts`) była bezużyteczna DOKŁADNIE tam, gdzie
+    twardy termin eventu (patrz wyżej) najbardziej by się przydał. `eventDailyAttempts(mult)
+    = min(EVENT_MAX_DAILY_ATTEMPTS=3, 1 + round(mult×2))` — skaluje się WYRAŹNIE słabiej niż
+    `dailyAttempts` (kampania, `round(3×(1+mult))`) i ma twardy cap na 3, żeby event zostawał
+    rzadszy niż kampania nawet przy maksymalnej inwestycji (przy obecnym maksymalnym sumie
+    `energyMult` z całego łupu kampanii ~0.75, kampania daje 5 prób, event capuje na 3) —
+    inwestycja się liczy, ale event się nie trywializuje. Pule dalej NIEZALEŻNE (`eventEnergy`
+    w `petStore.ts`, osobny od `energy`/`raidEnergy`) — zmieniła się tylko formuła dziennego
+    top-upu w `reload()` (`app/bosses.tsx`), zero zmian w mechanice samej walki/HP.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

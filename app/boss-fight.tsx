@@ -48,8 +48,9 @@ type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins:
 //   identyczne że pupil też traci HP w nich i oni też zadają obrażenia") — obie to pełna
 //   round-based symulacja (simulateFight, realny kontratak, HP kotka faktycznie spada,
 //   MOŻNA PRZEGRAĆ), HP bossa resetuje się do pełna co próbę. Jedyna różnica: kampania ma
-//   3 próby/dzień (dailyAttempts), wydarzenie ma FLAT 1 próbę/dzień (EVENT_DAILY_ATTEMPTS w
-//   bosses.ts) — HP/DMG wydarzenia PRZEBALANSOWANE pod ten model, patrz eventHpFor w
+//   3 próby/dzień (dailyAttempts), wydarzenie ma WŁASNĄ, słabiej skalującą pulę
+//   (`eventDailyAttempts` w bosses.ts, 2026-08-17 — było flat 1/dzień) — HP/DMG wydarzenia
+//   PRZEBALANSOWANE pod ten model, patrz eventHpFor w
 //   seasonalEvents.ts. attackRoundBased() obsługuje obie.
 // — RAID: HP bossa zostaje na starym modelu (trwały bank przez cały tydzień, NIE resetuje
 //   się co próbę — to celowe, żeby dało się odrabiać po trochu). Ale (2026-08-12, user:

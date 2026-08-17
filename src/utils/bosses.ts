@@ -272,9 +272,25 @@ export function dailyAttempts(energyMult: number): number {
 
 // Wydarzenia (2026-08-12): user — "musimy zrobić żeby walki eventowe były identyczne [do
 // kampanii]... wtedy mamy jedno podejście eventowe dziennie [UWAGA: zwykłe bossy zostają
-// przy 3/dzień]". Osobna, FLAT stała (nie dailyAttempts()) — celowo NIE rośnie z energyMult
-// z łupu, żeby "jedna próba" zostawało jedną próbą niezależnie od inwestycji.
-export const EVENT_DAILY_ATTEMPTS = 1;
+// przy 3/dzień]". Była FLAT stała, celowo NIE rosnąca z energyMult z łupu, żeby "jedna
+// próba" zostawało jedną próbą niezależnie od inwestycji.
+//
+// Fix 2026-08-17 (user: "mam tam 7 energii a nie mogę walczyć dodatkowo... jak mam energię
+// na bossy to energia na bossy, a mam drugą inną energię łącznie na bossy eventowe") —
+// event ma FLAT 1 próbę/dzień niezależnie od tego, ile energyMult gracz uzbierał, a event ma
+// twardy termin (patrz eventEndsAt/eventDaysLeft w seasonalEvents.ts) — leftover inwestycja
+// w energyMult była bezużyteczna tam, gdzie najbardziej mogłaby pomóc zdążyć przed terminem.
+// `eventDailyAttempts` skaluje SŁABIEJ niż kampania (dailyAttempts wyżej) i ma twardy cap —
+// event ma zostać wyraźnie rzadszy niż kampania nawet przy maksymalnej inwestycji (przy
+// obecnym maksymalnym sumarycznym energyMult z całego łupu kampanii, ~0.75, kampania daje
+// round(3×1.75)=5 prób, event capuje na 3) — inwestycja się liczy, ale event nie trywializuje
+// się tak jak kampania.
+export const EVENT_BASE_DAILY_ATTEMPTS = 1;
+export const EVENT_MAX_DAILY_ATTEMPTS = 3;
+export function eventDailyAttempts(energyMult: number): number {
+  const bonus = Math.round(Math.max(0, energyMult) * 2);
+  return Math.min(EVENT_MAX_DAILY_ATTEMPTS, EVENT_BASE_DAILY_ATTEMPTS + bonus);
+}
 
 // ── Kontratak bossa (v4 redesign, fundament — patrz memory boss_design.md) ────────
 // Skaluje z HP bossa, nie z poziomem gracza — tak jak walka z bossem samym w sobie już

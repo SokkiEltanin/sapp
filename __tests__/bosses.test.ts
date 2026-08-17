@@ -1,5 +1,6 @@
 import {
-  bossTier, counterDamage, atkPower, atkMultiplier, dailyAttempts, simulateFight,
+  bossTier, counterDamage, atkPower, atkMultiplier, dailyAttempts, eventDailyAttempts,
+  EVENT_MAX_DAILY_ATTEMPTS, simulateFight,
   EquippedItem, Bonuses, BOSSES, Boss, combatItemSlotsFor, COMBAT_ITEM_SLOTS,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
@@ -25,6 +26,25 @@ describe('bosses — atkPower / dailyAttempts (v5 pivot: staty zamiast danych zd
     expect(dailyAttempts(0)).toBe(3);
     expect(dailyAttempts(0.5)).toBeGreaterThan(3);
     expect(dailyAttempts(-5)).toBeGreaterThanOrEqual(1); // nigdy 0
+  });
+});
+
+// 2026-08-17: user — "jak mam energię na bossy to energia na bossy, a mam drugą inną
+// energię łącznie na bossy eventowe" — event miał FLAT 1/dzień niezależnie od energyMult
+// (leftover inwestycja bezużyteczna akurat tam, gdzie licznik dni do końca eventu najbardziej
+// by się przydał). eventDailyAttempts skaluje WYRAŹNIE słabiej niż kampania i ma twardy cap.
+describe('bosses — eventDailyAttempts (druga, słabiej skalująca pula na bossy eventowe)', () => {
+  test('bez energyMult: baza 1, tak jak dawny flat model', () => {
+    expect(eventDailyAttempts(0)).toBe(1);
+    expect(eventDailyAttempts(-5)).toBe(1); // nigdy poniżej bazy
+  });
+  test('rośnie z energyMult, ale wolniej niż dailyAttempts (kampania) na tym samym wejściu', () => {
+    expect(eventDailyAttempts(0.5)).toBeGreaterThan(1);
+    expect(eventDailyAttempts(0.5)).toBeLessThan(dailyAttempts(0.5));
+  });
+  test('twardy cap — nigdy nie dogania kampanii nawet przy skrajnej inwestycji', () => {
+    expect(eventDailyAttempts(10)).toBe(EVENT_MAX_DAILY_ATTEMPTS);
+    expect(eventDailyAttempts(0.75)).toBeLessThanOrEqual(EVENT_MAX_DAILY_ATTEMPTS);
   });
 });
 
