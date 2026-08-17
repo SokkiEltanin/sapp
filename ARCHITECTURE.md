@@ -282,6 +282,18 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     Włączone tam gdzie renderuje się raid: karta w `app/bosses.tsx`, portret walki i modal
     zwycięstwa w `boss-fight.tsx` (`kind==='raid'`/`victory.kind==='raid'`). Zero zmian w
     `raid.ts` — id/logika/nazwy bez zmian, to czysto wizualne.
+    - **Fix 2026-08-16** (audyt "ogarnij bossy do końca"): modal PRZEGRANEJ w `boss-fight.tsx`
+      przekazywał `powered={kind==='mad'}` — bez `kind==='raid'`, jedyne miejsce z tą luką
+      (tile walki i modal zwycięstwa już miały oba). Rajdowy boss tracił czerwoną aurę
+      dokładnie na ekranie przegranej. Naprawione (`powered={kind==='raid'||kind==='mad'}`).
+      Sprawdzone WSZYSTKIE call site'y `BossArt` w repo (tylko `bosses.tsx`/`boss-fight.tsx`,
+      6 wystąpień) — reszta poprawna. `behemoth`/`wyrm`/`siren` (raid) i Zły Mikołaj/
+      Czekoladowy Zajączek/Widmo Nadgodzin/Demon Słodyczy (event) DALEJ czekają na własny
+      art — to nie coś do naprawienia kodem, blokuje na nowych plikach PNG od usera.
+    - **Łapka koloru kotka** (2026-08-16, user: "kotek w walkach niech rzuca swoją łapką
+      zależną od koloru") — pocisk `PawPrint` w `boss-fight.tsx` miał na sztywno wpisany
+      różowy `#F4A6A6` niezależnie od `catColor`. Teraz `color/fill={palette.coat}` (ta sama
+      `palette = paletteById(catColor)` co portret kota na tym samym ekranie).
   - **Questy-jako-walki** (2026-08-14 v2, `utils/minibosses.ts`) — CZWARTY tor, `?kind=quest`
     w `boss-fight.tsx` (pełna animacja, TA SAMA co kampania/wydarzenie — user chciał S&F-styl
     wszędzie). ⚠️ Pierwsza wersja (osobny ekran `app/minibosses.tsx`, tory woda/kroki, DODANA
@@ -390,6 +402,17 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     `computePetState`) USUNIĘTA CAŁKOWICIE z UI — user: nic nie mówiła, była martwym
     wypełniaczem; `computePetState`/`PetInput` bez zmian (nadal karmi `pet.color`/`label`/
     `expression`/`wellbeing` gdzie indziej na ekranie), tylko render `.needs` zniknął.
+    - **Nagłówek v2 (2026-08-16, tego samego dnia)** — user doprecyzował dalej: "nazwa po
+      lewej, samopoczucie pod nim, po prawej ta sama linijka pasek lvl oraz pasek pogłaskania,
+      wywal przycisk pogłaskaj". Przycisk "Pogłaskaj pupila" z wersji wyżej ZNIKNĄŁ (tap na
+      kota, `handlePet`/`handleCuddle` na `<CatArt onPress/onLongPress>`, zostaje jedynym
+      sposobem głaskania — jak przed 2026-08-16). Osobne karty `levelCard` i `affRow` też
+      zniknęły — zastąpione dwukolumnowym `topHeader` (`topLeft`: nazwa+edycja+`moodChip`;
+      `topRight`: dwa cienkie `miniBarRow` — poziom (fiolet `#A78BFA`, `Lv {level}` +
+      `lvl.progress`) i głaskanie (róż `#F472B6`, serce-emoji + `affToday`%)) — te same dane co
+      poprzednio, bez osobnych kart, więc reszta ekranu (Misja/Codzienne/...) zaczyna się
+      wcześniej. `tip` (`petStatusLine`) zostaje jako osobna linia POD nagłówkiem, na całą
+      szerokość.
   - **`petStore.bossLog`** (2026-08-14) — historia KAŻDEJ pokonanej walki (wszystkich 4
     torów wyżej), do eksportu/balance-testowania: `utils/bossProgressReport.ts` buduje
     czytelny tekstowy raport (poziom/staty/pokonani bossowie/log), Ustawienia →

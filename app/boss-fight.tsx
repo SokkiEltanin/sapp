@@ -573,9 +573,11 @@ export default function BossFight() {
               <Animated.View pointerEvents="none" style={[s.projectile, { left: pawX, opacity: pawOp, transform: [{ scale: pawScale }, { translateX: -14 }] }]}>
                 {/* Był stroke-only bursztynowy #FBBF24 — nierozpoznawalne jako "łapka" w ruchu,
                     user: "nie używa swojej łapki tylko czegoś żółtego nie wiem co to" (2026-08-12).
-                    Solidne wypełnienie (fill) + różowo-koralowy odcień poduszki łapki, żeby czytało
-                    się jednoznacznie jako łapka nawet przy 28px i szybkim locie. */}
-                <PawPrint size={30} color="#F4A6A6" fill="#F4A6A6" />
+                    Solidne wypełnienie (fill), żeby czytało się jednoznacznie jako łapka nawet przy
+                    28px i szybkim locie. Kolor = `palette.coat` (2026-08-16, user: "kotek w walkach
+                    niech rzuca swoją łapką zależną od koloru") — ta sama paleta co portret kota na
+                    tym samym ekranie (patrz `palette` wyżej), więc łapka wygląda jak NAPRAWDĘ jego. */}
+                <PawPrint size={30} color={palette.coat} fill={palette.coat} />
               </Animated.View>
             )}
             {/* Kontratak bossa = zwykła pięść, ZAWSZE — user (2026-08-12): poprzednio leciał
@@ -680,7 +682,7 @@ export default function BossFight() {
             <View style={s.vCenter} pointerEvents="none">
               <Text style={[s.vKicker, { color: defeat.fainted ? '#F87171' : '#F4B740' }]}>{defeat.fainted ? 'PRZEGRANA' : 'BOSS PRZETRWAŁ'}</Text>
               <View style={{ opacity: 0.5 }}>
-                <BossArt id={defeatTarget.id} emoji={defeatTarget.emoji} size={78} powered={kind === 'mad'} />
+                <BossArt id={defeatTarget.id} emoji={defeatTarget.emoji} size={78} powered={kind === 'raid' || kind === 'mad'} />
               </View>
               <Text style={s.vName}>{defeatTarget.name} przetrwał</Text>
               <Text style={s.vDefeatSub}>
