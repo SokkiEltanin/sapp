@@ -12,11 +12,11 @@ import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidSessionHpFor } from '@/utils/raid';
-import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft } from '@/utils/seasonalEvents';
+import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft, menaceHpFor, menaceSessionHpFor, menaceAsBoss, menaceCoins, menaceXp } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { minibossForMission, missionRewardFor } from '@/utils/missions';
-import { COMBAT_ITEMS } from '@/utils/combatItems';
+import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
@@ -34,7 +34,7 @@ const WEAK_COLOR: Record<string, string> = {
 };
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
-type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot };
+type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; isMenace?: boolean };
 
 // Ekran WALKI (S&F-style, 2026-08-09/10 — patrz memory boss_design.md), wydzielony z listy
 // (app/bosses.tsx). Sześć TRYBÓW przez ?kind= (campaign domyślnie/raid/event/quest/mad/
@@ -75,6 +75,7 @@ export default function BossFight() {
     ownedCombatItems, equippedCombatItems,
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
+    menaceId, menaceHp, menaceEnsure, menaceAttack, menaceClaim,
     dayClaims, claimQuestFight, markTrainingDay,
     missionStartedAt, missionEndsAt, missionProfile, claimMission,
     catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
@@ -125,11 +126,21 @@ export default function BossFight() {
   const menaceCtx = { workHoursThisMonth: workVsAvg.thisMonth, workHoursAvg: workVsAvg.avg, sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg };
   const eventBoss = currentEventBoss(now, menaceCtx);
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
+  const isMenace = eventBoss?.kind === 'menace';
   const eventMaxHp = eventHpFor(level);
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
-  // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — 1 próba/dzień, więc "ile
-  // dni zostało" mówi wprost ile jeszcze podejść zanim boss zniknie.
-  const eventDaysLeftN = eventBoss ? eventDaysLeft(eventBoss, now) : 0;
+  // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — TYLKO sezonowe mają jeszcze
+  // timer/FLAT próbę dzienną. Nemesis (2026-08-18, user: "niech nie ma timera... nielimitowany
+  // czas i próby podejścia") nie ma już końca ani limitu prób — patrz menaceMaxHp/menaceEnsure
+  // niżej, ten sam trwały-bank wzorzec co raid.
+  const eventDaysLeftN = eventBoss && !isMenace ? eventDaysLeft(eventBoss, now) : 0;
+
+  // ── nemesis: TRWAŁY bank HP, lustrzane raidMaxHp/raidRemaining wyżej ──
+  const menaceMaxHp = isMenace ? menaceHpFor(level) : 0;
+  const menaceRemaining = isMenace ? (menaceId === eventBoss!.id ? menaceHp : menaceMaxHp) : 0;
+  useEffect(() => {
+    if (kind === 'event' && isMenace && eventBoss) menaceEnsure(eventBoss.id, menaceMaxHp);
+  }, [kind, isMenace, eventBoss?.id, menaceMaxHp]);
 
   // ── quest-jako-walka (2026-08-14 v2) — zamiast zwykłego "Odbierz" na wykonanym queście,
   // pełna walka z minibossem przypisanym do TEGO questu na TEN dzień (patrz minibosses.ts).
@@ -170,7 +181,9 @@ export default function BossFight() {
   } else if (kind === 'raid') {
     target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: raidEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
   } else if (kind === 'event' && eventBoss && eventKey) {
-    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: eventMaxHp, energy: eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
+    // Nemesis (2026-08-18): maxHp = TRWAŁA pula (menaceMaxHp, jak raid), energy = stała 1
+    // (zawsze "ma próbę" — nielimitowane ataki, patrz komentarz przy `pool` w attackRoundBased).
+    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: isMenace ? menaceMaxHp : eventMaxHp, energy: isMenace ? 1 : eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
   } else if (kind === 'quest' && questBoss) {
     target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed, attackKind: questBoss.attackKind };
   } else if (kind === 'mad' && madBoss && madBase) {
@@ -183,8 +196,12 @@ export default function BossFight() {
   // PODCZAS animowanej sesji `liveBossHp` też go nadpisuje (przeliczony na prawdziwą skalę
   // w attackRoundBased, patrz komentarz tam), żeby pasek realnie ruszał się w trakcie walki,
   // nie tylko skokiem po jej końcu.
-  const targetRemaining = target ? (kind === 'raid' ? (raidDone ? 0 : (liveBossHp ?? raidRemaining)) : (liveBossHp ?? target.maxHp)) : 0;
-  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? 'Wydarzenie' : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
+  const targetRemaining = target ? (
+    kind === 'raid' ? (raidDone ? 0 : (liveBossHp ?? raidRemaining)) :
+    kind === 'event' && isMenace ? (eventDone ? 0 : (liveBossHp ?? menaceRemaining)) :
+    (liveBossHp ?? target.maxHp)
+  ) : 0;
+  const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? (isMenace ? 'Nemesis' : 'Wydarzenie') : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
   // Do modala przegranej — kampania/wydarzenie/quest/MAD/misja mogą przegrać (raid nie ma kontrataku).
   // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
   const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : kind === 'mad' ? madBoss : kind === 'mission' ? missionBoss : null;
@@ -293,9 +310,14 @@ export default function BossFight() {
     // trwałej puli tygodniowej — patrz pełny komentarz na górze pliku i w raid.ts.
     const raidSessionHp = kind === 'raid' ? raidSessionHpFor(atkStatBonus, level, bonuses) : 0;
     const raidRealStart = kind === 'raid' ? raidRemaining : 0;
+    // Nemesis (2026-08-18): TA SAMA sesja-wobec-trwałej-puli sztuczka co raid — patrz komentarz
+    // przy menaceHpFor w seasonalEvents.ts (surowa menaceHpFor jest za duża dla counterDamage%).
+    const menaceSessionHp = kind === 'event' && isMenace ? menaceSessionHpFor(atkStatBonus, level, bonuses) : 0;
+    const menaceRealStart = kind === 'event' && isMenace ? menaceRemaining : 0;
     const roundBoss: Boss | null =
       kind === 'campaign' ? campaignBoss :
       kind === 'raid' ? raidAsBoss(raid, raidSessionHp) :
+      kind === 'event' && eventBoss && isMenace ? menaceAsBoss(eventBoss, menaceSessionHp) :
       kind === 'event' && eventBoss ? eventAsBoss(eventBoss, level) :
       kind === 'quest' ? questBoss :
       kind === 'mad' ? madBoss :
@@ -304,8 +326,9 @@ export default function BossFight() {
     if (!roundBoss) return;
     // Quest/misja: bez puli prób — quest już wykonany realnie / misja już odczekana realnie,
     // przegrana = darmowy retry. MAD dzieli pulę energii z kampanią (to jej rozszerzenie, nie
-    // osobny tor jak raid/event).
-    if (kind !== 'quest' && kind !== 'mission') {
+    // osobny tor jak raid/event). Nemesis (2026-08-18): NIELIMITOWANE próby (user: "nielimitowany
+    // czas i próby podejścia") — bez sprawdzania puli, tak jak quest/misja.
+    if (kind !== 'quest' && kind !== 'mission' && !(kind === 'event' && isMenace)) {
       const pool = kind === 'campaign' || kind === 'mad' ? energy : kind === 'raid' ? raidEnergy : eventEnergy;
       if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     }
@@ -328,12 +351,14 @@ export default function BossFight() {
     // 1 raidEnergy (1 próba = 1 atak, tak jak reszta trybów), niezależnie od liczby rund w
     // środku sesji.
     let raidOutcome: { remaining: number; defeated: boolean } | null = null;
+    let menaceOutcome: { remaining: number; defeated: boolean } | null = null;
     if (kind === 'campaign' || kind === 'mad') spendEnergy();
+    else if (kind === 'event' && isMenace) menaceOutcome = menaceAttack(menaceSessionHp - result.bossHpLeft);
     else if (kind === 'event') spendEventEnergy();
     else if (kind === 'raid') raidOutcome = raidAttack(raidSessionHp - result.bossHpLeft);
     fightingRef.current = true;
     setFighting(true);
-    setLiveBossHp(kind === 'raid' ? raidRealStart : roundBoss.hp);
+    setLiveBossHp(kind === 'raid' ? raidRealStart : kind === 'event' && isMenace ? menaceRealStart : roundBoss.hp);
     setCatHit(null);
     let i = 0;
 
@@ -354,6 +379,18 @@ export default function BossFight() {
           // Sesja nie domknęła tygodniowej puli — bez nagrody, ale próba i tak realnie się
           // odbyła (patrz komentarz przy fightDetail), więc dostaje wpis do historii.
           logFightAttempt('raid', raid.id, raid.name, level, fightDetail);
+        }
+        return;
+      }
+      // Nemesis: LUSTRZANE raid wyżej — bez stanu porażki, liczy się TYLKO czy prawdziwa,
+      // trwała pula spadła do zera (menaceOutcome.defeated), nie wynik tej jednej sesji.
+      if (kind === 'event' && isMenace) {
+        if (menaceOutcome?.defeated && eventBoss && eventKey) {
+          haptic.success();
+          const itemDropped = menaceClaim(eventKey, menaceCoins(level), menaceXp(level), eventBoss.name, level, fightDetail);
+          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: menaceCoins(level), xp: menaceXp(level), itemDropped: itemDropped ?? undefined, isMenace: true });
+        } else if (eventBoss && eventKey) {
+          logFightAttempt('event', eventKey, eventBoss.name, level, fightDetail);
         }
         return;
       }
@@ -435,7 +472,11 @@ export default function BossFight() {
         setAttackPulse(n => n + 1);
         // Raid: przelicz sesyjny postęp (mała, bezpiecznie skalowana pula) na PRAWDZIWĄ skalę
         // tygodniową — arena zawsze pokazuje prawdziwy pasek, nie sesyjny (patrz targetRemaining).
-        setLiveBossHp(kind === 'raid' ? Math.max(0, raidRealStart - (raidSessionHp - round.bossHpAfter)) : round.bossHpAfter);
+        setLiveBossHp(
+          kind === 'raid' ? Math.max(0, raidRealStart - (raidSessionHp - round.bossHpAfter)) :
+          kind === 'event' && isMenace ? Math.max(0, menaceRealStart - (menaceSessionHp - round.bossHpAfter)) :
+          round.bossHpAfter
+        );
         roundTimer.current = setTimeout(counterBeat, 480);
       }, THROW_MS);
     };
@@ -557,7 +598,7 @@ export default function BossFight() {
                       raid/event/quest/mad/misja miały od zawsze (one nigdy nie dostały
                       attackFx). */}
                   <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
-                    <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid' || kind === 'mad'} />
+                    <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: bFlashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
                   {lastHit && (
@@ -610,9 +651,10 @@ export default function BossFight() {
             {kind !== 'quest' && kind !== 'mission' && (
               <Text style={s.motywTxt}>Motyw: <Text style={{ color: WEAK_COLOR[target.weakness] ?? c.text.primary, fontWeight: '800' }}>{target.weaknessLabel}</Text></Text>
             )}
-            {/* Odliczanie (2026-08-16) — event ma FLAT 1 próbę/dzień, więc "ile dni zostało"
-                mówi wprost ile jeszcze podejść zanim boss zniknie na dobre. */}
-            {kind === 'event' && !eventDone && (
+            {/* Odliczanie (2026-08-16) — TYLKO sezonowe mają jeszcze FLAT próbę dzienną i termin.
+                Nemesis (2026-08-18) nie ma już końca ani limitu prób — pasek HP wyżej (trwały
+                bank) mówi wprost ile jeszcze zostało do zrobienia, bez sztucznego dedline'u. */}
+            {kind === 'event' && !isMenace && !eventDone && (
               <Text style={[s.motywTxt, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted, fontWeight: '800' }]}>
                 {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
               </Text>
@@ -631,7 +673,7 @@ export default function BossFight() {
             )}
 
             {target.done ? (
-              <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : 'wróć w kolejnym okresie'}</Text>
+              <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : kind === 'event' && isMenace ? 'nemesis rozwiązany' : 'wróć w kolejnym okresie'}</Text>
             ) : (
               <PressableScale onPress={attack} disabled={target.energy <= 0 || fighting} style={{ width: '100%' }}>
                 <View style={[s.attackBtn, (target.energy <= 0 || fighting) && { opacity: 0.5 }]}>
@@ -649,9 +691,9 @@ export default function BossFight() {
           <Confetti colors={['#FDE047', '#2AC68F', '#38BDF8', '#F472B6']} />
           {victory && (
             <View style={s.vCenter} pointerEvents="none">
-              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? 'WYDARZENIE POKONANE!' : victory.kind === 'quest' ? 'QUEST WYGRANY!' : victory.kind === 'mad' ? 'MAD BOSS POKONANY!' : victory.kind === 'mission' ? 'MISJA UKOŃCZONA!' : 'WYGRANA!'}</Text>
+              <Text style={s.vKicker}>{victory.kind === 'raid' ? 'RAID POKONANY!' : victory.kind === 'event' ? (victory.isMenace ? 'NEMESIS POKONANY!' : 'WYDARZENIE POKONANE!') : victory.kind === 'quest' ? 'QUEST WYGRANY!' : victory.kind === 'mad' ? 'MAD BOSS POKONANY!' : victory.kind === 'mission' ? 'MISJA UKOŃCZONA!' : 'WYGRANA!'}</Text>
               <View style={{ opacity: 0.6 }}>
-                <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid' || victory.kind === 'mad'} />
+                <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid' || victory.kind === 'mad' || victory.isMenace} />
               </View>
               <Text style={s.vName}>{victory.kind === 'campaign' ? `${victory.name} pokonany` : victory.name}</Text>
               <View style={s.vLoot}>
@@ -662,12 +704,15 @@ export default function BossFight() {
                     <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
                   </>
                 ) : (
-                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : victory.kind === 'mad' ? 'Nagroda MAD' : victory.kind === 'mission' ? 'Nagroda z misji' : 'Medal wydarzenia'}</Text>
+                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : victory.kind === 'mad' ? 'Nagroda MAD' : victory.kind === 'mission' ? 'Nagroda z misji' : victory.isMenace ? 'Nagroda nemesis' : 'Medal wydarzenia'}</Text>
                 )}
               </View>
               <View style={s.vRewardRow}>
                 <Coins size={16} color="#FDE047" /><Text style={s.vReward}>{victory.coins} · +{victory.xp} XP</Text>
               </View>
+              {victory.itemDropped && (
+                <Text style={s.vItemDrop}>🎁 Nowy item bojowy: {COMBAT_ITEMS[victory.itemDropped].name}!</Text>
+              )}
             </View>
           )}
           <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
@@ -680,7 +725,7 @@ export default function BossFight() {
             <View style={s.vCenter} pointerEvents="none">
               <Text style={[s.vKicker, { color: defeat.fainted ? '#F87171' : '#F4B740' }]}>{defeat.fainted ? 'PRZEGRANA' : 'BOSS PRZETRWAŁ'}</Text>
               <View style={{ opacity: 0.5 }}>
-                <BossArt id={defeatTarget.id} emoji={defeatTarget.emoji} size={78} powered={kind === 'raid' || kind === 'mad'} />
+                <BossArt id={defeatTarget.id} emoji={defeatTarget.emoji} size={78} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
               </View>
               <Text style={s.vName}>{defeatTarget.name} przetrwał</Text>
               <Text style={s.vDefeatSub}>
@@ -742,6 +787,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vLoot: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: radius.lg, paddingVertical: spacing[3], paddingHorizontal: spacing[5], marginTop: spacing[4] },
   vLootName: { fontSize: 15, fontWeight: '800', color: '#fff', marginTop: 4 },
   vLootDesc: { fontSize: 12, color: '#2AC68F', fontWeight: '700', marginTop: 1 },
+  vItemDrop: { fontSize: 13, fontWeight: '800', color: '#FDE047', marginTop: spacing[2] },
   vRewardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[4] },
   vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047' },
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },

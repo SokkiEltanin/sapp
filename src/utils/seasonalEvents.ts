@@ -1,4 +1,4 @@
-import { WeaknessKey, Boss, BossLoot, AttackKind } from '@/utils/bosses';
+import { WeaknessKey, Boss, BossLoot, AttackKind, Bonuses, atkPower } from '@/utils/bosses';
 
 // TRZECI tor walki (obok kampanii bossów i cotygodniowego raidu) — WYDARZENIA:
 // świąteczne/sezonowe bossy (data w kalendarzu decyduje) i „nemesis miesiąca" (Twoje
@@ -163,17 +163,23 @@ export function eventDaysLeft(boss: EventBoss, now: Date): number {
   return Math.max(0, Math.ceil(ms / 86400000));
 }
 
-// Klucz okresu dla claimu/HP — sezonowy wraca co ROK (klucz z rokiem), nemesis co MIESIĄC.
+// Klucz okresu dla claimu/HP — sezonowy wraca co ROK (klucz z rokiem). Nemesis (2026-08-18,
+// usunięty miesięczny reset — patrz komentarz przy menaceHpFor niżej) dostaje TERAZ goły
+// `boss.id`, bez żadnego sufiksu daty — trwały bank/medal, nie odnawia się co miesiąc. Stare
+// zapisane klucze sprzed tej zmiany (np. "overtime-2026-08") zostają w `eventWon` jako
+// nieszkodliwe, martwe wpisy (nigdy więcej nie wygenerowane), `eventBossFromKey` niżej wciąż
+// je rozpoznaje.
 export function eventPeriodKey(boss: EventBoss, d: Date): string {
   if (boss.kind === 'seasonal') return `${boss.id}-${d.getFullYear()}`;
-  return `${boss.id}-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return boss.id;
 }
 
 // Wszystkie EventBoss (sezonowe + nemesis) — do wyszukania po id, np. przy renderowaniu
-// ściany medali z zapisanych eventKeys ("<id>-<rok>[-<miesiąc>]").
+// ściany medali z zapisanych eventKeys ("<id>-<rok>" sezonowy / gołe "<id>" nemesis / stare
+// "<id>-<rok>-<miesiąc>" nemesis sprzed 2026-08-18).
 export const ALL_EVENT_BOSSES: EventBoss[] = [...SEASONAL, ...Object.values(MENACE_POOL)];
 export function eventBossFromKey(eventKey: string): EventBoss | undefined {
-  return ALL_EVENT_BOSSES.find(b => eventKey.startsWith(`${b.id}-`));
+  return ALL_EVENT_BOSSES.find(b => eventKey === b.id || eventKey.startsWith(`${b.id}-`));
 }
 
 // HP/nagrody skalują z poziomem — lżej niż raid (to bonusowa, sezonowa walka, nie główny grind).
@@ -188,9 +194,38 @@ export function eventBossFromKey(eventKey: string): EventBoss | undefined {
 // statach (atkStatBonus=0) to ~5-6 ciosów do zabicia na każdym poziomie (dopasowane do
 // atkPower(0,level) rosnącego liniowo z poziomem), tak żeby kontratak (COUNTER_PCT × ta HP)
 // nie zabijał kotka w 1-2 rundy przy bazowym max HP=100 — patrz counterDamage w bosses.ts.
-export const eventHpFor = (level: number) => 200 + Math.max(0, level) * 6;
+//
+// UWAGA (2026-08-18) — te trzy formuły są teraz SEZONOWE (kind='seasonal') WYŁĄCZNIE. Nemesis
+// (kind='menace') dostał osobny, trwały model — patrz menaceHpFor/menaceAsBoss niżej, ten sam
+// powód co przy raidHpFor/raidSessionHpFor w raid.ts. HP podbite +50% (user: "sezonowe... mają
+// dużo HP") — wciąż bezpiecznie w skali pojedynczego starcia (patrz uwaga wyżej), tylko wyższa
+// stała bazowa/mnożnik.
+export const eventHpFor = (level: number) => 300 + Math.max(0, level) * 9;
 export const eventCoins = (level: number) => 40 + Math.max(0, level) * 4;
 export const eventXp   = (level: number) => 250 + Math.max(0, level) * 25;
+
+// ── Nemesis (kind='menace') — TRWAŁY bank HP, bez timera, bez limitu prób (2026-08-18, user:
+// "ten drugi niech nie ma timera tylko pasek zdrowia większy, ma nielimitowany czas i próby
+// podejścia ale ma wpizdu HP żeby go długo klepać... dobre nagrody, szansa na item kilka prc,
+// XP sporo i golda"). Dokładnie ten sam wzorzec co raid.ts: prawdziwa pula jest ZA DUŻA żeby
+// wrzucić bezpośrednio do simulateFight (counterDamage liczy % od AKTUALNEGO hp bossa — przy
+// tysiącach HP jeden kontratak zabiłby kotka), więc każda próba to mała, bezpiecznie skalowana
+// SESJA (menaceSessionHpFor, ten sam `atkPower × stała` kształt), a realny postęp (sesyjne hp
+// przed minus po) dopisuje się do prawdziwej puli osobnym wywołaniem store'u (menaceAttack).
+// Baza WYŻSZA niż raid (raid ma limit energii/tydzień; nemesis ma NIEOGRANICZONE próby, więc
+// jedynym hamulcem jest sama skala HP — musi starczyć na wiele sesji rozłożonych na dni/tygodnie,
+// nie na jedno posiedzenie ze spamowaniem przycisku).
+export const menaceHpFor = (level: number) => 5000 + Math.max(0, level) * 700;
+export const MENACE_SESSION_HITS = 6;
+export function menaceSessionHpFor(atkStatBonus: number, level: number, bonuses: Bonuses): number {
+  return Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * MENACE_SESSION_HITS);
+}
+export const menaceCoins = (level: number) => 120 + Math.max(0, level) * 12;
+export const menaceXp    = (level: number) => 700 + Math.max(0, level) * 60;
+// Szansa na przedmiot bojowy przy pokonaniu — "kilka prc" (2026-08-18). Osobna, WYŻSZA stała
+// niż COMBAT_ITEM_DROP_CHANCE ze skrzynek (bosses.ts) — to jednorazowa nagroda za wielosesyjny
+// grind, nie powtarzalny codzienny roll.
+export const MENACE_ITEM_DROP_CHANCE = 0.08;
 
 // Placeholder loot — wygrana wydarzenia daje MEDAL (kolekcjonerski), nie przedmiot z bonusem
 // jak kampania; simulateFight()/Boss wymaga pola `loot`, ale boss-fight.tsx dla kind='event'
@@ -206,5 +241,17 @@ export function eventAsBoss(eventBoss: EventBoss, level: number): Boss {
     weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel,
     loot: EVENT_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: eventBoss.taunt,
     attackKind: eventBoss.attackKind,
+  };
+}
+
+// Nemesis + MAŁA sesyjna HP (menaceSessionHpFor, nie surowa menaceHpFor — patrz komentarz
+// tam) → Boss-kształtny obiekt do simulateFight(). Lustrzane raidAsBoss w raid.ts.
+export function menaceAsBoss(menaceBoss: EventBoss, sessionHp: number): Boss {
+  return {
+    id: menaceBoss.id, name: menaceBoss.name, emoji: menaceBoss.emoji,
+    order: 0, unlockLevel: 0, hp: sessionHp,
+    weakness: menaceBoss.weakness, weaknessLabel: menaceBoss.weaknessLabel,
+    loot: EVENT_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: menaceBoss.taunt,
+    attackKind: menaceBoss.attackKind,
   };
 }

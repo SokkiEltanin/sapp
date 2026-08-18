@@ -9,6 +9,29 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Nemesis: trwały bank HP bez timera/limitu prób, sezonowe z podbitym HP — NIEsprawdzone (2026-08-18)
+
+User (po ustaleniu podziału na sezonowe vs nemesis w rozmowie o balansie ekonomii): "wyłączyć
+czas tym eventowym i zostawić tylko sezonowe bossy że mają dużo HP, wspólną energię... a ten
+drugi [nemesis] niech nie ma timera tylko pasek zdrowia większy, ma nielimitowany czas i próby
+podejścia ale ma wpizdu HP żeby go długo klepać... dobre nagrody, szansa na item kilka prc, XP
+sporo i golda". Sezonowe (Mikołaj/Wielkanoc/Wakacje/4×mitologiczne) BEZ zmian w mechanice —
+tylko HP podbite +50%. Nemesis (`kind='menace'`, Widmo Nadgodzin / Demon Słodyczy) przebudowany
+na TRWAŁY bank HP dokładnie jak raid: sesyjne ataki (bez zużywania energii — nielimitowane
+próby), pasek zdrowia zamiast statycznego "X HP", bez timera/odliczania, nagroda przy pokonaniu
+= coins/xp (wyższe niż raid) + `MENACE_ITEM_DROP_CHANCE=8%` szansa na przedmiot bojowy. Klucz
+identyfikacji zmieniony z `<id>-<rok>-<miesiąc>` (reset co miesiąc) na goły `boss.id` (trwały,
+przetrwa zmianę miesiąca). Pełny opis w ARCHITECTURE §9 (szukaj "Nemesis... przebudowany na
+TRWAŁY bank HP"). **Priorytet testu:** (a) wejdź w nemesis (musisz mieć realną przewagę
+work-hours/sweets-spend nad swoją średnią żeby się pojawił — jeśli nie widzisz karty, to
+normalne, `pickMenace` zwraca `null` przy braku danych/w normie), sprawdź czy karta pokazuje
+PASEK HP (nie liczbę + energię) i BRAK odliczania dni; (b) zaatakuj kilka razy pod rząd —
+sprawdź że NIE ma komunikatu "brak prób" (nielimitowane), pasek realnie spada między próbami i
+PRZETRWA zamknięcie/otwarcie ekranu; (c) jeśli masz cierpliwość dobić bank do zera — sprawdź
+ekran "NEMESIS POKONANY!" i czy czasem pokazuje się "🎁 Nowy item bojowy"; (d) osobno sprawdź że
+sezonowy event (jeśli akurat trwa jakiś sezon w kalendarzu) dalej ma odliczanie dni i pigułkę
+energii, niezmieniony poza wyższym HP.
+
 ## 🆕 Kotek na pasku misji podskakuje + znika ze sceny gdy w misji — NIEsprawdzone (2026-08-18)
 
 User ze screenshotem: "tylko on miał tam podskakiwać jak w tych paskach na dashboardzie xd, i

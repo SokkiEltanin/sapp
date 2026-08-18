@@ -255,16 +255,18 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (`seasonalEvents.ts`, sezonowe/nemesis miesiąca) walczą na `app/boss-fight.tsx`
     (`?kind=campaign|event`), pełna animacja pocisk/łapa. **Raid** (`raid.ts`, tygodniowy)
     tam samo, ale HP to trwały bank na tydzień, nie resetuje się co próbę.
-  - **Odliczanie do końca eventu** (2026-08-16, `eventEndsAt`/`eventDaysLeft` w
-    `seasonalEvents.ts`) — user: "żeby realnie móc go wygrać" — walka eventowa ma co
-    najmniej 1 próbę/dzień (patrz `eventDailyAttempts` niżej), więc "ile dni zostało" to
-    DOLNA GRANICA "ile jeszcze podejść dostanę" zanim boss zniknie (realnie może być więcej,
-    patrz osobna pula energii poniżej). `eventEndsAt` to per-id lustro okien z `isActive`
-    (SEASONAL) — nie da się wyciągnąć granicy z samego predykatu true/false, więc każdy z
-    6 sezonowych ma jawny koniec (Wielkanoc liczona z `easterSunday`+1 dzień). `menace`
-    (nemesis miesiąca) nie ma stałego okna — jego koniec to koniec BIEŻĄCEGO miesiąca
-    kalendarzowego. Pokazywane w `app/bosses.tsx` (mini-karta) i `boss-fight.tsx` (ekran
-    walki), kolor eskaluje czerwono/żółto przy ≤1/≤3 dniach.
+  - **Odliczanie do końca eventu — TYLKO sezonowe od 2026-08-18** (2026-08-16, `eventEndsAt`/
+    `eventDaysLeft` w `seasonalEvents.ts`) — user: "żeby realnie móc go wygrać" — walka
+    eventowa ma co najmniej 1 próbę/dzień (patrz `eventDailyAttempts` niżej), więc "ile dni
+    zostało" to DOLNA GRANICA "ile jeszcze podejść dostanę" zanim boss zniknie (realnie może
+    być więcej, patrz osobna pula energii poniżej). `eventEndsAt` to per-id lustro okien z
+    `isActive` (SEASONAL) — nie da się wyciągnąć granicy z samego predykatu true/false, więc
+    każdy z 6 sezonowych ma jawny koniec (Wielkanoc liczona z `easterSunday`+1 dzień). UWAGA
+    (2026-08-18) — `menace` (nemesis) stracił timer CAŁKOWICIE (patrz osobny, duży wpis niżej
+    przy "Nemesis... przebudowany na TRWAŁY bank HP") — `eventEndsAt`/`eventDaysLeft` dla
+    `kind='menace'` WCIĄŻ liczy koniec-miesiąca (funkcja nietknięta, testy ją pilnują), ale UI
+    (`bosses.tsx`/`boss-fight.tsx`) już jej nie woła dla menace, tylko dla sezonowych — martwy
+    kod z punktu widzenia nemesis, zachowany bo nieszkodliwy i test go dokumentuje.
   - **Druga, osobna pula energii na bossy eventowe** (2026-08-17, `eventDailyAttempts` w
     `bosses.ts`) — user: "jak mam energię na bossy to energia na bossy, a mam drugą inną
     energię łącznie na bossy eventowe" — wcześniej event miał FLAT `EVENT_DAILY_ATTEMPTS=1`
@@ -690,6 +692,56 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       energia za Xh Ymin" (`fmtEnergyCountdown`, statyczny w chwili renderu jak
       `fmtMissionDuration` w `pet.tsx`, nie żywy tiker) gdy bank niepełny — user widzi KIEDY
       wróci, nie tylko suchą liczbę "0 energii".
+  - **Nemesis (`kind='menace'` w `seasonalEvents.ts`) przebudowany na TRWAŁY bank HP, bez
+    timera/limitu prób** (2026-08-18, user: "wyłączyć czas tym eventowym i zostawić tylko
+    sezonowe bossy że mają dużo HP, wspólną energię... a ten drugi [nemesis] niech nie ma
+    timera tylko pasek zdrowia większy, ma nielimitowany czas i próby podejścia ale ma wpizdu
+    HP żeby go długo klepać... dobre nagrody, szansa na item kilka prc, XP sporo i golda") —
+    SEZONOWE (Mikołaj/Wielkanoc/Wakacje/4×mitologiczne) BEZ ZMIAN w mechanice: dalej pełny
+    reset HP co próbę (`eventAsBoss`/`eventHpFor`), dalej mają timer (`eventEndsAt`/
+    `eventDaysLeft`) i współdzieloną `eventEnergy` — tylko HP podbite +50% (`eventHpFor` = `300
+    + level×9`, było `200 + level×6`). NEMESIS dostał ODWROTNY model, DOKŁADNIE lustrzany
+    względem raidu (`raid.ts`/`raidHpFor`/`raidSessionHpFor`), bo z tych samych powodów:
+    - **Store** (`petStore.ts`) — nowe `menaceId: string | null`, `menaceHp: number` (trwały
+      bank, jak `raidWeek`/`raidHp`), akcje `menaceEnsure(id, hp)` (no-op jeśli `id` się nie
+      zmienił), `menaceAttack(damage)` (odejmuje od banku, BEZ zużywania `eventEnergy` —
+      nemesis ma nielimitowane próby), `menaceClaim(key, coins, xp, name, level, fight)`
+      (dopisuje nagrodę + rzuca `MENACE_ITEM_DROP_CHANCE=0.08` szansą na przedmiot bojowy
+      spośród jeszcze nieposiadanych, ten sam wzorzec co `openCrate`, zwraca `itemDropped`
+      do UI). `eventWon` (bez zmian jako tablica) dalej znaczy "który klucz pokonany" —
+      wspólna z sezonowymi.
+    - **Klucz identyfikacji BEZ daty** (`eventPeriodKey` w `seasonalEvents.ts`) — sezonowy
+      dalej `<id>-<rok>` (wraca co rok). Nemesis DOTĄD miał `<id>-<rok>-<miesiąc>` (reset co
+      miesiąc, bo `pickMenace` przelicza się od zerowych statystyk miesiąca) — TERAZ goły
+      `boss.id`, bez sufiksu: skoro nie ma już timera/resetu, tożsamość i trwały bank/medal
+      muszą przetrwać zmianę miesiąca kalendarzowego. `pickMenace` dalej przelicza się co
+      render/reload na bieżących statystykach MIESIĄCA (który axis "overtime" vs "sweettooth"
+      najbardziej odstaje TERAZ) — jeśli axis się zmieni w trakcie niedobitego grindu, stary
+      bank (`menaceId`/`menaceHp`) po prostu czeka nietknięty, aż `pickMenace` znowu na niego
+      wskaże (bank per-id, nie per-"aktualnie wybrany"). Stare zapisane klucze sprzed tej
+      zmiany (np. `overtime-2026-08`) zostają w `eventWon` jako nieszkodliwe martwe wpisy,
+      `eventBossFromKey` rozpoznaje OBA formaty (`eventKey === b.id || eventKey.startsWith(...)`).
+    - **Sesja-wobec-trwałej-puli** (`menaceSessionHpFor`/`menaceAsBoss`, `seasonalEvents.ts`)
+      — TA SAMA sztuczka co raid: surowa `menaceHpFor` (baza `5000 + level×700`, WYŻSZA niż
+      raidowa `1000 + level×210` — skoro próby są nielimitowane, jedynym hamulcem jest sama
+      skala HP, musi starczyć na wiele sesji rozłożonych na dni/tygodnie) jest za duża, żeby
+      wrzucić bezpośrednio do `simulateFight` (`counterDamage()` liczy % od AKTUALNEGO hp
+      bossa — przy tysiącach HP jeden kontratak zabiłby kotka). Każda próba to mała sesja
+      (`menaceSessionHpFor`, `atkPower × MENACE_SESSION_HITS(=6)`, identyczny kształt co
+      `raidSessionHpFor`/`questBossHpFor`/`madBossHpFor`), realny postęp (sesyjne hp przed
+      minus po) dopisuje się do prawdziwego banku przez `menaceAttack()`.
+    - **`boss-fight.tsx`** — `attackRoundBased()` rozgałęziony na `kind==='event' && isMenace`
+      DOKŁADNIE tam gdzie wcześniej `kind==='raid'`: bez sprawdzania puli energii przed atakiem
+      (nielimitowane próby), `roundBoss` z `menaceAsBoss`, `menaceAttack` zamiast
+      `spendEventEnergy`, `finish()` liczy TYLKO czy `menaceOutcome.defeated` (bank spadł do
+      zera) — BEZ stanu porażki, jak raid, sesja która nie domknęła banku i tak dostaje wpis
+      `logFightAttempt`. `target.energy` dla menace = stała `1` (zawsze "ma próbę"). Pasek HP
+      areny pokazuje PRAWDZIWĄ skalę (`menaceRemaining`/`menaceMaxHp`), nie sesyjną — ten sam
+      przelicznik co raid w `playerBeat`. Victory modal: "NEMESIS POKONANY!" + osobny napis
+      "🎁 Nowy item bojowy: ..." gdy `itemDropped` (ten sam string co `CrateModal.tsx`).
+    - **`app/bosses.tsx`/mini-karta** — dla `isMenace`: bez pigułki energii (nielimitowane),
+      pasek HP zamiast statycznego "X HP" (jak raid — `menaceRemaining/menaceMaxHp`), bez
+      odliczania dni. Sezonowe bez zmian (energia + statyczne HP + odliczanie).
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

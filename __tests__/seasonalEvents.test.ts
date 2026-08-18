@@ -1,8 +1,11 @@
 import {
   easterSunday, activeSeasonalEvent, pickMenace, currentEventBoss, eventPeriodKey, eventBossFromKey, MENACE_POOL,
   eventHpFor, eventAsBoss, eventEndsAt, eventDaysLeft,
+  menaceHpFor, menaceSessionHpFor, menaceAsBoss, menaceCoins, menaceXp, MENACE_SESSION_HITS, MENACE_ITEM_DROP_CHANCE,
 } from '@/utils/seasonalEvents';
-import { atkPower, counterDamage } from '@/utils/bosses';
+import { atkPower, counterDamage, Bonuses } from '@/utils/bosses';
+
+const ZERO: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
 
 describe('seasonalEvents — easterSunday', () => {
   test('matches known Gregorian Easter dates', () => {
@@ -81,10 +84,14 @@ describe('seasonalEvents — currentEventBoss priority', () => {
 });
 
 describe('seasonalEvents — eventPeriodKey', () => {
-  test('seasonal keyed by year, menace keyed by year-month', () => {
+  // 2026-08-18 — nemesis stracił miesięczny reset (user: "nielimitowany czas i próby
+  // podejścia"), więc jego klucz jest teraz goły `boss.id`, bez sufiksu daty — trwały,
+  // niezależny od tego KTÓRY to miesiąc.
+  test('seasonal keyed by year, menace keyed by bare id (no date suffix)', () => {
     const seasonal = activeSeasonalEvent(new Date(2026, 11, 10))!;
     expect(eventPeriodKey(seasonal, new Date(2026, 11, 10))).toBe('mikolaj-2026');
-    expect(eventPeriodKey(MENACE_POOL.overtime, new Date(2026, 0, 15))).toBe('overtime-2026-01');
+    expect(eventPeriodKey(MENACE_POOL.overtime, new Date(2026, 0, 15))).toBe('overtime');
+    expect(eventPeriodKey(MENACE_POOL.overtime, new Date(2026, 5, 3))).toBe('overtime');
   });
 });
 
@@ -166,5 +173,72 @@ describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 202
     expect(boss.hp).toBe(eventHpFor(40));
     expect(boss.guard).toBeUndefined();
     expect(boss.regenPct).toBeUndefined();
+  });
+});
+
+// 2026-08-18 — nemesis przebudowany na TRWAŁY bank HP (jak raid), user: "ten drugi niech nie
+// ma timera tylko pasek zdrowia większy, ma nielimitowany czas i próby podejścia ale ma
+// wpizdu HP żeby go długo klepać". Ten sam sesja-wobec-trwałej-puli wzorzec i te same testy-
+// -strażnicy co raid.test.ts (counterDamage% liczony od AKTUALNEGO hp bossa — surowa
+// menaceHpFor jest za duża, żeby wrzucić bezpośrednio do simulateFight).
+describe('seasonalEvents — menaceHpFor / menaceSessionHpFor / menaceAsBoss (trwały bank, 2026-08-18)', () => {
+  test('menaceHpFor rośnie z poziomem i jest WIĘKSZE niż raidHpFor na tym samym poziomie (nieograniczone próby → musi starczyć na dłużej)', () => {
+    expect(menaceHpFor(0)).toBeGreaterThan(0);
+    expect(menaceHpFor(50)).toBeGreaterThan(menaceHpFor(1));
+  });
+
+  test('sesyjne hp rośnie z realną mocą gracza, nie stała liczba', () => {
+    const low = menaceSessionHpFor(0, 1, ZERO);
+    const high = menaceSessionHpFor(200, 50, { atk: 0.3, dodge: 0.1, crit: 0.1, energyMult: 0.2 });
+    expect(high).toBeGreaterThan(low);
+    expect(low).toBeGreaterThan(0);
+  });
+
+  test('sesja jest rzędu wielkości mniejsza niż surowa trwała pula na wyższych poziomach', () => {
+    const level = 40;
+    expect(menaceSessionHpFor(0, level, ZERO)).toBeLessThan(menaceHpFor(level));
+  });
+
+  test('zabijalny w ~MENACE_SESSION_HITS ciosów na kilku poziomach, przy zerowej inwestycji', () => {
+    for (const level of [2, 10, 30, 60]) {
+      const sessionHp = menaceSessionHpFor(0, level, ZERO);
+      const hit = atkPower(0, level, ZERO);
+      expect(sessionHp / hit).toBeCloseTo(MENACE_SESSION_HITS, 0);
+    }
+  });
+
+  test('kontratak sesji NIE zabija kotka (base 100 HP) w 1 rundzie na żadnym z tych poziomów', () => {
+    for (const level of [2, 30, 60, 100]) {
+      const sessionHp = menaceSessionHpFor(0, level, ZERO);
+      expect(counterDamage(sessionHp, 0)).toBeLessThan(100);
+    }
+  });
+
+  test('kontrast: surowa trwała pula NA WYŻSZYCH poziomach BY zabiła w 1 rundzie — dowód że sesja jest naprawdę potrzebna', () => {
+    expect(counterDamage(menaceHpFor(60), 0)).toBeGreaterThan(100);
+  });
+
+  test('menaceAsBoss przenosi tożsamość i podpina hp z argumentu (sesja, nie surowa pula)', () => {
+    const eb = MENACE_POOL.sweettooth;
+    const boss = menaceAsBoss(eb, 700);
+    expect(boss.id).toBe(eb.id);
+    expect(boss.name).toBe(eb.name);
+    expect(boss.attackKind).toBe(eb.attackKind);
+    expect(boss.hp).toBe(700);
+    expect(boss.guard).toBeUndefined();
+  });
+});
+
+describe('seasonalEvents — menaceCoins / menaceXp / MENACE_ITEM_DROP_CHANCE (nagroda za wielosesyjny grind)', () => {
+  test('wyższe niż raid na tym samym poziomie — dłuższy, nielimitowany grind', () => {
+    expect(menaceCoins(0)).toBeGreaterThan(0);
+    expect(menaceXp(0)).toBeGreaterThan(0);
+    expect(menaceCoins(20)).toBeGreaterThan(menaceCoins(0));
+    expect(menaceXp(20)).toBeGreaterThan(menaceXp(0));
+  });
+
+  test('szansa na item to prawdziwy ułamek (0, 1), "kilka prc"', () => {
+    expect(MENACE_ITEM_DROP_CHANCE).toBeGreaterThan(0);
+    expect(MENACE_ITEM_DROP_CHANCE).toBeLessThan(0.2);
   });
 });

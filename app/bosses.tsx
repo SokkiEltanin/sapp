@@ -11,7 +11,7 @@ import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName, ENERGY_MAX } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
-import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft } from '@/utils/seasonalEvents';
+import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft, menaceHpFor } from '@/utils/seasonalEvents';
 import { raidIcon, eventIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf } from '@/utils/quests';
@@ -52,6 +52,7 @@ export default function Bosses() {
   const {
     xp, energy, energyRegenAt, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncRaidEnergy, syncEventEnergy,
     raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
+    menaceId, menaceHp, menaceEnsure,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -71,7 +72,21 @@ export default function Bosses() {
     syncRaidEnergy(dailyAttempts(bonuses.energyMult), 0);
     syncEventEnergy(eventDailyAttempts(bonuses.energyMult), 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
-  }, [bonuses.energyMult, syncEnergyRegen, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
+    // Nemesis (2026-08-18): trwały bank jak raid — ensure na KAŻDY reload (no-op jeśli id się
+    // nie zmienił, patrz menaceEnsure w petStore.ts). Liczone TU niezależnie od `eventBoss`
+    // render-owego niżej (ten sam duplikat co raid — czyste funkcje z bosses.ts, nie ma
+    // problemu z nieaktualnym closure przy useCallback, patrz komentarz historyczny).
+    const now = new Date();
+    const workByMonth = monthlyWorkHours([...events, ...gcalEvents], workSettings, now);
+    const sweetsByMonth = monthlySweetsSpend(expenses, now);
+    const workVsAvg = thisMonthVsAvg(workByMonth, now);
+    const sweetsVsAvg = thisMonthVsAvg(sweetsByMonth, now);
+    const eb = currentEventBoss(now, {
+      workHoursThisMonth: workVsAvg.thisMonth, workHoursAvg: workVsAvg.avg,
+      sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg,
+    });
+    if (eb && eb.kind === 'menace') menaceEnsure(eb.id, menaceHpFor(level));
+  }, [bonuses.energyMult, syncEnergyRegen, syncRaidEnergy, syncEventEnergy, level, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
   useFocusEffect(reload);
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md). Tu
@@ -118,14 +133,18 @@ export default function Bosses() {
   };
   const eventBoss = currentEventBoss(now, menaceCtx);
   const eventKey = eventBoss ? eventPeriodKey(eventBoss, now) : null;
-  // HP resetuje się co próbę (jak kampania) — nie ma już trwałego banku do pokazania jako
-  // pasek postępu tutaj, patrz eventAsBoss w seasonalEvents.ts.
+  const isMenace = eventBoss?.kind === 'menace';
+  // Sezonowe: HP resetuje się co próbę (jak kampania) — nie ma trwałego banku, patrz
+  // eventAsBoss w seasonalEvents.ts. Nemesis (2026-08-18): TRWAŁY bank, lustrzane raidMaxHp/
+  // raidRemaining wyżej — patrz menaceHpFor/menaceAsBoss tam.
   const eventMaxHp = eventHpFor(level);
+  const menaceMaxHp = isMenace ? menaceHpFor(level) : 0;
+  const menaceRemaining = isMenace ? (menaceId === eventBoss!.id ? menaceHp : menaceMaxHp) : 0;
   const eventDone = eventKey ? eventWon.includes(eventKey) : false;
   const eventUnlocked = level >= 2;
-  // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — walka eventowa ma FLAT
-  // 1 próbę/dzień, więc "ile dni zostało" = "ile jeszcze podejść dostanę" zanim boss zniknie.
-  const eventDaysLeftN = eventBoss ? eventDaysLeft(eventBoss, now) : 0;
+  // Odliczanie (2026-08-16, user: "żeby realnie móc go wygrać") — TYLKO sezonowe mają jeszcze
+  // FLAT próbę dzienną/termin. Nemesis (2026-08-18) nie ma już końca ani limitu prób.
+  const eventDaysLeftN = eventBoss && !isMenace ? eventDaysLeft(eventBoss, now) : 0;
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -174,24 +193,36 @@ export default function Bosses() {
             <View style={s.miniCard}>
               <View style={s.miniHead}>
                 <View style={s.miniKickerRow}>
-                  <Text style={s.miniKicker} numberOfLines={1}>{eventBoss.kind === 'seasonal' ? 'WYDARZENIE' : 'NEMESIS'}</Text>
+                  <Text style={s.miniKicker} numberOfLines={1}>{isMenace ? 'NEMESIS' : 'WYDARZENIE'}</Text>
                   <Trophy size={9} color={c.text.muted} />
                   <Text style={s.miniKicker}>{eventWon.length}</Text>
                 </View>
-                <View style={s.miniEnergyRow}>
-                  <Zap size={10} color="#38BDF8" />
-                  <Text style={s.miniEnergy}>{eventEnergy}</Text>
-                </View>
+                {/* Nemesis (2026-08-18): nielimitowane próby — bez pigułki energii, to już nie
+                    ma sensu jako "ile mi zostało dziś". Sezonowe zostają przy energii. */}
+                {!isMenace && (
+                  <View style={s.miniEnergyRow}>
+                    <Zap size={10} color="#38BDF8" />
+                    <Text style={s.miniEnergy}>{eventEnergy}</Text>
+                  </View>
+                )}
               </View>
               <View style={s.miniBody}>
-                <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={40} />
+                <BossArt id={eventBoss.id} emoji={eventBoss.emoji} size={40} powered={isMenace} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.miniName} numberOfLines={1}>{eventBoss.name}</Text>
-                  <Text style={s.miniSub} numberOfLines={1}>{eventMaxHp} HP · {eventBoss.weaknessLabel}</Text>
-                  {!eventDone && (
-                    <Text style={[s.miniCountdown, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted }]} numberOfLines={1}>
-                      {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
-                    </Text>
+                  {isMenace ? (
+                    // Trwały bank → pasek postępu (jak raid), nie statyczne "X HP" — user:
+                    // "pasek zdrowia większy... żeby go długo klepać".
+                    <View style={s.miniHpTrack}><View style={[s.miniHpFill, { width: `${Math.round((eventDone ? 0 : menaceRemaining) / menaceMaxHp * 100)}%`, backgroundColor: WEAK_COLOR[eventBoss.weakness] ?? '#888' }]} /></View>
+                  ) : (
+                    <>
+                      <Text style={s.miniSub} numberOfLines={1}>{eventMaxHp} HP · {eventBoss.weaknessLabel}</Text>
+                      {!eventDone && (
+                        <Text style={[s.miniCountdown, { color: eventDaysLeftN <= 1 ? '#F87171' : eventDaysLeftN <= 3 ? '#FBBF24' : c.text.muted }]} numberOfLines={1}>
+                          {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
+                        </Text>
+                      )}
+                    </>
                   )}
                 </View>
               </View>
@@ -199,7 +230,7 @@ export default function Bosses() {
                 <Text style={s.miniDoneTxt}>Pokonany ✓</Text>
               ) : eventUnlocked ? (
                 <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=event' as any); }}>
-                  <View style={[s.miniBtn, eventEnergy <= 0 && { opacity: 0.5 }]}>
+                  <View style={[s.miniBtn, !isMenace && eventEnergy <= 0 && { opacity: 0.5 }]}>
                     <Text style={s.miniBtnTxt}>WALCZ</Text>
                   </View>
                 </PressableScale>
