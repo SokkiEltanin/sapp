@@ -1,6 +1,6 @@
 import {
   bossTier, counterDamage, atkPower, atkMultiplier, dailyAttempts, eventDailyAttempts,
-  EVENT_MAX_DAILY_ATTEMPTS, simulateFight,
+  EVENT_MAX_DAILY_ATTEMPTS, simulateFight, mysteryBossName,
   EquippedItem, Bonuses, BOSSES, Boss, combatItemSlotsFor, COMBAT_ITEM_SLOTS,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
@@ -60,6 +60,26 @@ describe('bosses — combatItemSlotsFor (2026-08-13: sloty rosną z poziomem)', 
   test('cap na 6 slotach nawet przy bardzo wysokim poziomie', () => {
     expect(combatItemSlotsFor(18)).toBe(6);
     expect(combatItemSlotsFor(100)).toBe(6);
+  });
+});
+
+// 2026-08-18, user: "musimy zrobić że [niepokonani bossowie] mają... mityczne znaki, że nie
+// wiadomo o co chodzi, dopóki nie pokonasz wcześniejszego" — placeholder "nazwa" dla bossów
+// dalej w kolejności kampanii, patrz komentarz nad `mysteryBossName` w bosses.ts.
+describe('bosses — mysteryBossName (placeholder dla jeszcze nieodblokowanych)', () => {
+  test('deterministyczna — ten sam id zawsze daje ten sam wynik', () => {
+    expect(mysteryBossName('sloth')).toBe(mysteryBossName('sloth'));
+  });
+  test('różne id dają (zazwyczaj) różne placeholdery — nie jeden stały string dla wszystkich', () => {
+    const names = new Set(BOSSES.map(b => mysteryBossName(b.id)));
+    expect(names.size).toBeGreaterThan(1);
+  });
+  test('nigdy nie zawiera prawdziwej nazwy/id bossa — czysto symboliczne', () => {
+    for (const b of BOSSES) {
+      const placeholder = mysteryBossName(b.id);
+      expect(placeholder).not.toContain(b.id);
+      expect(placeholder.toLowerCase()).not.toContain(b.name.toLowerCase());
+    }
   });
 });
 

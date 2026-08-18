@@ -9,6 +9,19 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Bossy dalej w kolejności = mystery (czarna sylwetka + symbole zamiast nazwy) — NIEsprawdzone (2026-08-18)
+
+User: "musimy zrobić że mają znaki zapytania i ciemne kształty... a ich nazwy to jakieś
+mityczne znaki, że nie wiadomo o co chodzi i co to dopóki nie pokonasz wcześniejszego".
+Lista bossów kampanii dotąd zdradzała prawdziwy portret+nazwę KAŻDEGO bossa, nawet tych
+daleko w kolejności (tylko HP/temat były ukryte). Teraz zablokowane pozycje (`lock`) pokazują
+czarną sylwetkę (prawdziwy kształt bossa, ale bez koloru/detalu — `BossArt mystery` prop) i
+placeholder-nazwę z 3 mistycznych symboli (`mysteryBossName(id)`, deterministyczne — ten sam
+boss zawsze ten sam placeholder). Bez custom fontu — gotowy Unicode wystarczył. Pełny opis w
+ARCHITECTURE §9. **Priorytet testu:** otwórz listę bossów kampanii, sprawdź że pokonany ✓ i
+aktualny ▶ boss wyglądają normalnie (pełny portret+nazwa), a WSZYSTKIE dalsze pozycje mają
+czarną sylwetkę + dziwne symbole zamiast nazwy, nie prawdziwy portret/imię.
+
 ## 🆕 Skrzynka dnia = kwadratowy przycisk w headerze — NIEsprawdzone (2026-08-18)
 
 User: "skrzynka daily powinna być jako square button chyba przy overlayu bo ona ginie w

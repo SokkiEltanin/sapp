@@ -259,6 +259,25 @@ export const BOSSES: Boss[] = [
 
 export function bossById(id: string): Boss | undefined { return BOSSES.find(b => b.id === id); }
 
+// Placeholder "nazwa" dla bossa kampanii dalej w kolejności, jeszcze nie odblokowanego
+// (2026-08-18, user: "musimy zrobić że mają znaki zapytania i ciemne kształty... a ich nazwy
+// to jakieś mityczne znaki, że nie wiadomo o co chodzi... dopóki nie pokonasz wcześniejszego").
+// Świadomie NIE custom font (user zaproponował "pobrać czcionkę ze specjalnymi znakami", ale
+// to nowy asset do dociągnięcia + licencja + expo-font setup dla czegoś czysto kosmetycznego)
+// — gotowy, uniwersalnie renderowalny Unicode (bloki Misc Symbols/Dingbats/Alchemical, szeroko
+// wspierane na Androidzie) daje TEN SAM efekt "mistycznych znaków" bez nowego assetu.
+// Deterministyczne po `id` (ten sam hash-wzorzec co `raidForWeek` w raid.ts) — TEN SAM boss
+// zawsze pokazuje TEN SAM placeholder, nie migocze losowo między odświeżeniami ekranu.
+const MYSTERY_GLYPHS = ['✦', '✧', '☽', '☾', '⚝', '✵', '⟁', '⌬', '⚚', '✴', '⛧', '❖', '◈', '⚶'];
+export function mysteryBossName(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const a = MYSTERY_GLYPHS[h % MYSTERY_GLYPHS.length];
+  const b = MYSTERY_GLYPHS[(h >> 4) % MYSTERY_GLYPHS.length];
+  const c = MYSTERY_GLYPHS[(h >> 8) % MYSTERY_GLYPHS.length];
+  return `${a}${b}${c}`;
+}
+
 // Ranga bossa kampanii — DERYWOWANA z unlockLevel, nie osobne pole do ręcznego tagowania
 // (mniej okazji do pomyłki, nowe bossy klasyfikują się same). Granica 26 = już istniejący
 // komentarz „endgame" przy insomnia niżej. Podstawa pod przyszłą pasywkę „blokuj % ataków
