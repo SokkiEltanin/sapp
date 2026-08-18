@@ -361,6 +361,19 @@ export default function Pet() {
           <Coins size={13} color="#FBBF24" />
           <Text style={s.coinTxt}>{coins}</Text>
         </View>
+        {/* Skrzynka dnia — kwadratowy przycisk w headerze, nie wiersz w liście questów
+            (2026-08-18, user: "skrzynka daily powinna być jako square button przy
+            overlayu bo ona ginie w tych taskach" — jako pełnoszerokościowy wiersz między
+            questami faktycznie wyglądała jak kolejny task, łatwo przewinąć obok). Header
+            jest NAD ScrollView (zawsze widoczny, nie trzeba scrollować) — widoczna TYLKO
+            gdy jest coś do odebrania (dailyBoxReady); po odebraniu znika, żaden szary
+            "nieaktywny" przycisk nie zaśmieca headera resztę dnia. */}
+        {dailyBoxReady && (
+          <PressableScale onPress={onDailyBox} style={s.dailyBoxIconBtn}>
+            <Gift size={18} color="#0B0E1A" />
+            <View style={s.dailyBoxDot} />
+          </PressableScale>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -561,15 +574,6 @@ export default function Pet() {
           </>
         )}
 
-        {/* Skrzynka dnia — darmowa, TU przy kocie (w sklepie user o niej zapominał) */}
-        <PressableScale onPress={onDailyBox} style={[s.dailyBox, !dailyBoxReady && s.dailyBoxDone]}>
-          <Gift size={18} color={dailyBoxReady ? '#0B0E1A' : c.text.muted} />
-          <Text style={[s.dailyBoxTxt, !dailyBoxReady && { color: c.text.muted }]}>
-            {dailyBoxReady ? 'Odbierz skrzynkę dnia — za darmo' : 'Skrzynka odebrana — wróć jutro'}
-          </Text>
-          {dailyBoxReady && <View style={s.dailyBoxDot} />}
-        </PressableScale>
-
         {pendingCrates > 0 && (
           <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
             <Text style={{ fontSize: 18 }}>🐟</Text>
@@ -721,10 +725,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   affHeart: { fontSize: 14 },
   crateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 11, borderRadius: radius.lg, backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
   crateBtnTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
-  dailyBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 12, borderRadius: radius.lg, backgroundColor: '#FBBF24', borderWidth: 1, borderColor: '#FBBF24' },
-  dailyBoxDone: { backgroundColor: c.bg.card, borderColor: c.border.default },
-  dailyBoxTxt: { fontSize: 13, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.2 },
-  dailyBoxDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#E4342E' },
+  dailyBoxIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: '#FBBF24', marginLeft: 6 },
+  dailyBoxDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#E4342E' },
 
   section: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', color: c.text.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginTop: spacing[4], marginBottom: spacing[2] },
 

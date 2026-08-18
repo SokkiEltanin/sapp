@@ -428,6 +428,18 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     || fighting}` na `PressableScale` (Pressable przestaje w ogóle odpalać `onPress`) jako
     druga warstwa UX. NIEsprawdzone na urządzeniu — czysto statyczna analiza kodu (nie dało
     się namierzyć przez symulację jak balans, to timing/race, nie matematyka walki).
+  - **Skrzynka dnia przeniesiona do headera jako kwadratowy przycisk** (2026-08-18, user:
+    "skrzynka daily powinna być jako square button przy overlayu bo ona ginie w tych
+    taskach") — była pełnoszerokościowym wierszem w `app/pet.tsx` MIĘDZY questami
+    (treningi/samoraport), więc wyglądała jak kolejny task do przewinięcia, nie osobna
+    rzecz. Przeniesiona do `s.header` (pasek NAD `ScrollView`, zawsze widoczny, nie trzeba
+    scrollować) jako 40×40 kwadratowy `dailyBoxIconBtn` obok `coinPill`, renderowany TYLKO
+    gdy `dailyBoxReady` (po odebraniu znika całkiem — żaden wygaszony przycisk nie zaśmieca
+    headera resztę dnia, inaczej niż poprzedni wariant który zostawał widoczny jako "Skrzynka
+    odebrana — wróć jutro"). Mała czerwona kropka-`dailyBoxDot` w rogu (dawniej inline obok
+    tekstu, teraz `position:'absolute'` badge) sygnalizuje że jest coś do odebrania. Logika
+    (`onDailyBox`/`claimDailyBox`/dedup po `dayClaims['dailybox:'+dzień]`) bez zmian — to
+    czysto przeniesienie UI.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`
