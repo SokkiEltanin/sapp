@@ -7,11 +7,14 @@
 // mood/sweets like before. `guard`/`regenPct` on a Boss are now INNATE traits (some
 // bosses are just tankier/regenerate), not conditional on "did you do X today".
 //
-// EXCEPTION (2026-08-13, patrz bossWeakness.ts): a boss's `weakness` category CAN weaken
-// it again, but through a wielodniowa SERIA (habits/water/steps/sweetless/mood/sleep
-// streak), not a same-day number — so it can't flip a fight from "did X today" alone. The
-// weakening happens OUTSIDE this file (weakenBoss() clones a Boss with reduced `hp` before
-// simulateFight/raid see it) — this file's own functions stay pure and unaware of streaks.
+// 2026-08-13→2026-08-18: for a while a boss's `weakness` category ALSO weakened its
+// effective HP based on a real multi-day self-care streak (bossWeakness.ts). REMOVED
+// (2026-08-18, user: "wywalić chyba musimy osłabienia bossów na nawyki itp, bo problemem
+// jest to że wtedy bardzo ciężko balansować je będzie za dużo zmiennych") — hp already
+// depends on level/order/loot/items; adding a THIRD, real-world-streak-driven axis made the
+// difficulty curve impossible to reason about (every balance pass would need to account for
+// "what if the player also has a 30-day streak"). `weakness`/`weaknessLabel` stay on Boss
+// PURELY as flavor/theme (art aura color, "Motyw: X" label) — no mechanical effect any more.
 
 import {
   CombatItemId, HEADSHOT_CHANCE, HEAL_ONCE_PCT, dodgeChanceAt, reflectPctAt,
@@ -23,13 +26,11 @@ import {
 // bezpośrednio przez testy (bosses.test.ts importuje bosses.ts). Ikony (loot/raid/
 // wydarzenia) żyją osobno w src/utils/bossUiIcons.ts, importowane tylko przez ekrany.
 
-// Temat/flavor bossa (art/aura, kolor aury w bosses.tsx) — v5 pivot (2026-08-07) odłączył
-// to od DZISIEJSZYCH danych samoopieki. Od 2026-08-13 (patrz bossWeakness.ts) ta sama etykieta
-// znów coś robi, ale inaczej niż przed pivotem: wielodniowa SERIA (nie dzisiejsza liczba)
-// osłabia effective HP bossa tego typu — "osłabiona obrona", stabilna, nie znika po jednym
-// potknięciu. computeDamage/atkPower/simulateFight w tym pliku nadal o tym nic nie wiedzą —
-// osłabianie dzieje się PRZED wywołaniem (weakenBoss() na sklonowanym Boss/raidMaxHp), więc
-// silnik walki zostaje czystą funkcją bez nowej zależności.
+// Temat/flavor bossa (art/aura, kolor aury w bosses.tsx, "Motyw: X" na hero card/ekranie
+// walki) — v5 pivot (2026-08-07) odłączył to od DZISIEJSZYCH danych samoopieki. Między
+// 2026-08-13 a 2026-08-18 ta sama etykieta NA CHWILĘ dostała mechaniczny efekt (osłabiała
+// effective HP przez wielodniową serię), usunięte — patrz komentarz na górze pliku. Zostaje
+// czystym flavorem: computeDamage/atkPower/simulateFight nigdy o tym nic nie wiedziały.
 export type WeaknessKey = 'steps' | 'sweetless' | 'habits' | 'mood' | 'sleep' | 'water';
 
 export interface BossLoot {

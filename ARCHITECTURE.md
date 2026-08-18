@@ -461,6 +461,25 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     user prosił o usunięcie PLIKU KODU (`ten plik`, liczba pojedyncza), nie assetów;
     zostają osierocone na dysku, do ewentualnego sprzątnięcia osobno jeśli kiedyś okaże się
     że nic ich więcej nie używa. NIEsprawdzone na urządzeniu.
+  - **Osłabianie bossów realnymi seriami USUNIĘTE** (2026-08-18, user: "wywalić chyba musimy
+    osłabienia bossów na nawyki itp, bo problemem jest to że wtedy bardzo ciężko balansować
+    je będzie za dużo zmiennych") — mechanika z 2026-08-13 (`src/utils/bossWeakness.ts`,
+    `computeWeaknessStreaks`/`weaknessHpFactor`/`weakenBoss`, -1%/dzień realnej serii samo-
+    opieki w kategorii słabości bossa, max -35%) dodawała TRZECI wymiar do balansu (obok
+    poziomu i łupu) — throwaway-symulacje przez całą tę sesję już i tak z trudem ogarniały
+    dwa wymiary (patrz "Balans ekonomii vs bossy" niżej), trzeci realno-życiowy (nieznany z
+    góry, różny per gracz) czynił pełną symulację praktycznie niemożliwą. `bossWeakness.ts` +
+    `__tests__/bossWeakness.test.ts` USUNIĘTE plikami. `boss-fight.tsx`: `campaignBoss`/
+    `raidMaxHp`/`eventMaxHp`/`madBoss`/`roundBoss` (event branch w `attackRoundBased`) nie
+    przechodzą już przez `weakenBoss()` — surowe hp z `bosses.ts`/`raid.ts`/`seasonalEvents.ts`/
+    `madBosses.ts` bez modyfikacji. Usunięte też: `weaknessStreaks` `useMemo` i WSZYSTKIE hooki
+    które istniały WYŁĄCZNIE po to by je zasilić (`useMoodStore`, `useHabits`, lokalny
+    `sleepHealthDays`/`getHealthHistory` efekt) — `useExpensesStore` ZOSTAJE (nadal potrzebny
+    dla `sweetsByMonth` w wyzwalaniu wydarzeń, osobny system). UI-notka "Osłabiony: X dni serii
+    → -Y% HP bossa" (`targetWeaknessStreak`/`targetWeakenFactor`) zniknęła całkiem. `weakness`/
+    `weaknessLabel` na `Boss`/`Raid`/`EventBoss` ZOSTAJĄ jako pole — teraz PURE flavor (kolor
+    aury, etykieta "Motyw: X"), zero efektu mechanicznego; `WeaknessKey` w `bosses.ts` też
+    zostaje, tylko komentarz nad nim zaktualizowany. NIEsprawdzone na urządzeniu.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`
