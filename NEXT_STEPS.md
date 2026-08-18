@@ -18,6 +18,27 @@ TYLKO gdy jest coś do odebrania. Pełny opis w ARCHITECTURE §9. **Priorytet te
 Pupila, sprawdź czy widać kwadratowy przycisk z prezentem w headerze (gdy skrzynka nieodebrana
 dziś) i czy znika po odebraniu.
 
+## 🆕 Osłabianie bossów realnymi seriami USUNIĘTE — NIEsprawdzone (2026-08-18)
+
+User: "wywalić chyba musimy osłabienia bossów na nawyki itp, bo problemem jest to że wtedy
+bardzo ciężko balansować je będzie za dużo zmiennych". Mechanika z `src/utils/bossWeakness.ts`
+(2026-08-13, patrz historia niżej) obniżała effective HP bossa o -1%/dzień realnej serii w
+jego kategorii słabości (max -35% przy 35+ dniach) — dodawała TRZECI, poza-kontrolny wymiar
+do balansu (obok poziomu i łupu), przez co żaden balance-pass throwaway-symulacją (patrz cała
+historia tej sesji z bossami) nie mógł uwzględnić "a co jeśli gracz ma jeszcze 30-dniową
+serię" bez eksplozji liczby scenariuszy do sprawdzenia.
+
+**Usunięte:** `src/utils/bossWeakness.ts` + `__tests__/bossWeakness.test.ts` skasowane,
+`boss-fight.tsx` nie liczy już `weaknessStreaks`/nie wywołuje `weakenBoss()` na żadnym
+celu (campaign/raid/event/mad), UI-notka "Osłabiony: X dni serii → -Y% HP" zniknęła, razem
+z martwymi po tym hookami (`useMoodStore`/`useHabits`/`getHealthHistory` w tym pliku były
+używane WYŁĄCZNIE pod tę mechanikę). `weakness`/`weaknessLabel` na `Boss` ZOSTAJĄ — to teraz
+CZYSTY flavor/temat (kolor aury, "Motyw: X" na hero card), bez żadnego efektu na hp. **Boss
+hp wraca do CZYSTEGO wzoru** level+order+loot+items, bez trzeciego, realno-życiowego wymiaru
+— dokładnie to o co prosił user, powinno realnie ułatwić kolejne balance-passy.
+**Priorytet testu:** walka z dowolnym bossem NIE powinna już pokazywać notki "Osłabiony: X
+dni serii" niezależnie od realnych serii w grze.
+
 ## 🆕 bossAttackFx USUNIĘTE permanentnie (bomby/ogień/etc. na kaflu bossa) — NIEsprawdzone (2026-08-18)
 
 User po doprecyzowaniu (patrz sekcja niżej, punkty 3-4): "z nie działających to właśnie te
