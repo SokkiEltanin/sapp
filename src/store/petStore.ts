@@ -6,6 +6,7 @@ import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, ENERGY_MAX, energyRegenTick, energySpendTick } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
+import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -204,7 +205,14 @@ interface PetState {
   // eventHp (bank trwałego HP per eventKey) USUNIĘTY 2026-08-12 — wydarzenia walczą teraz
   // IDENTYCZNIE jak kampania (simulateFight, HP resetuje się do pełna co próbę), nie ma już
   // czego trzymać między próbami. eventWon zostaje — to wciąż "czy TEN okres pokonany".
+  // UWAGA (2026-08-18) — to dotyczy TYLKO sezonowych (kind='seasonal'). Nemesis (kind='menace')
+  // dostał WŁASNY, trwały bank z powrotem — patrz menaceId/menaceHp niżej, ten sam wzorzec co
+  // raidWeek/raidHp wyżej, bo user chciał "pasek zdrowia większy... żeby go długo klepać"
+  // zamiast resetu co próbę.
   eventWon: string[];               // eventKeys pokonane (kolekcjonerskie medale)
+  // ── nemesis (menace) — TRWAŁY bank HP, bez timera/limitu prób, lustrzane raidWeek/raidHp ──
+  menaceId: string | null;   // id nemesis (overtime/sweettooth) dla którego menaceHp jest aktualne
+  menaceHp: number;          // pozostałe HP bieżącego nemesis
   _hydrated: boolean;
 
   setName: (name: string) => void;
@@ -254,6 +262,10 @@ interface PetState {
   syncEventEnergy: (todayEnergy: number, mult: number) => void;
   spendEventEnergy: () => void;         // -1 próba (round-based fight jak kampania, patrz spendEnergy)
   eventClaim: (eventKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
+  // nemesis — bez energii (nielimitowane próby), trwały bank jak raid
+  menaceEnsure: (menaceId: string, hp: number) => void;
+  menaceAttack: (damage: number) => { remaining: number; defeated: boolean };
+  menaceClaim: (menaceKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => CombatItemId | null; // zwraca dropnięty item (albo null)
   // Questy jako walki (2026-08-14 v2, patrz src/utils/minibosses.ts) — wygrana walka z
   // minibossem PRZYPISANYM do danego questu zastępuje zwykły claim. Ten sam day-guard co
   // claimDaily (dailyClaims+dayClaims, żeby buildQuests widział quest jako odebrany
@@ -326,6 +338,8 @@ export const usePetStore = create<PetState>()(
       eventEnergyDate: null,
       eventEnergyToday: 0,
       eventWon: [],
+      menaceId: null,
+      menaceHp: 0,
       defeatedBosses: [],
       defeatedMadBosses: [],
       missionStartedAt: null,
@@ -645,6 +659,34 @@ export const usePetStore = create<PetState>()(
         eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp,
         bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
+      // Nemesis (2026-08-18) — lustrzane raidEnsure/raidAttack, bez energii (spendEventEnergy
+      // NIE jest wołane dla menace, patrz boss-fight.tsx): nielimitowane próby, jedynym
+      // hamulcem jest sama skala HP.
+      menaceEnsure: (menaceId, hp) => set((s) => (s.menaceId === menaceId ? s : { menaceId, menaceHp: hp })),
+      menaceAttack: (damage) => {
+        const s = get();
+        const remaining = Math.max(0, s.menaceHp - damage);
+        set({ menaceHp: remaining });
+        return { remaining, defeated: remaining <= 0 };
+      },
+      // Nagroda za pokonanie nemesis: coins/xp jak zwykle + szansa na przedmiot bojowy
+      // (user: "szansa na item kilka prc") — ten sam losowy-spośród-nieposiadanych wzorzec co
+      // openCrate wyżej, tylko osobna, wyższa stała (MENACE_ITEM_DROP_CHANCE).
+      menaceClaim: (menaceKey, coins, xp, name, level, fight) => {
+        const s = get();
+        if (s.eventWon.includes(menaceKey)) return null;
+        let itemDropped: CombatItemId | null = null;
+        if (Math.random() < MENACE_ITEM_DROP_CHANCE) {
+          const candidates = (Object.keys(COMBAT_ITEMS) as CombatItemId[]).filter(id => !s.ownedCombatItems[id]);
+          if (candidates.length > 0) itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+        set({
+          eventWon: [...s.eventWon, menaceKey], coins: s.coins + coins, xp: s.xp + xp,
+          ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
+          bossLog: [...s.bossLog, { kind: 'event', id: menaceKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
+        });
+        return itemDropped;
+      },
       claimQuestFight: (questId, coins, xp, name, level, fight) => {
         const t = todayISO();
         const st = get();
@@ -710,7 +752,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
     }),
     {
       name: 'pet-v1',
@@ -735,6 +777,7 @@ export const usePetStore = create<PetState>()(
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
         eventWon: s.eventWon,
+        menaceId: s.menaceId, menaceHp: s.menaceHp,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
       }),
@@ -759,6 +802,11 @@ export const usePetStore = create<PetState>()(
         // niepełny (patrz gałąź `!s.energyRegenAt` tam).
         state.energy = Math.min(state.energy ?? ENERGY_MAX, ENERGY_MAX);
         state.energyRegenAt = null;
+        // Stary stan sprzed 2026-08-18 nie miał trwałego banku nemesis (patrz menaceId/menaceHp
+        // w interfejsie) — brak pola = brak aktywnego bossa jeszcze, pierwsze `menaceEnsure()`
+        // po starcie samo go ustawi.
+        state.menaceId = state.menaceId ?? null;
+        state.menaceHp = state.menaceHp ?? 0;
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};
