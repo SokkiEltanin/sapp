@@ -40,6 +40,23 @@ describe('madBosses — balans (rośnie z AKTUALNYM poziomem, nie zamrożone jak
   test('id ma prefiks mad_, nie koliduje z bossem bazowym w defeatedBosses/bossLog', () => {
     expect(madBossId('sloth')).toBe('mad_sloth');
   });
+
+  // 2026-08-18 — user: "daj im o +30% HP więcej niż teraz jest". Throwaway-symulacją
+  // sprawdzono że dosłowne +30% łamie winnability dla świeżo Lv15 gracza (MAD_UNLOCK_LEVEL)
+  // na order6 (~45% winrate/55% faintRate) — +15% to sprawdzony bezpieczny sufit (order1-6 @
+  // Lv15-20 zostaje 100% winrate). Ten test pilnuje że ktoś przypadkiem nie wróci do +30%
+  // (albo 0%) bez ponownej walidacji.
+  test('HP podbite ~1.15× względem gołej formuły 6→8 ciosów (2026-08-18, nie 1.3× — patrz komentarz w madBosses.ts)', () => {
+    const bare1 = 6, bare22 = 8; // stara formuła: 6 + (order-1)*(2/21), order=1→6, order=22→8
+    const hp1 = madBossHpFor(0, 50, ZERO, 1);
+    const hp22 = madBossHpFor(0, 50, ZERO, 22);
+    const bareHp1 = Math.round((40 * (1 + 50 * 0.03)) * bare1);
+    const bareHp22 = Math.round((40 * (1 + 50 * 0.03)) * bare22);
+    expect(hp1 / bareHp1).toBeGreaterThan(1.1);
+    expect(hp1 / bareHp1).toBeLessThan(1.2);
+    expect(hp22 / bareHp22).toBeGreaterThan(1.1);
+    expect(hp22 / bareHp22).toBeLessThan(1.2);
+  });
 });
 
 describe('madBosses — madBossFor (kształt gotowy do simulateFight)', () => {
