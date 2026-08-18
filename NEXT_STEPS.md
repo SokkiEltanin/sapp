@@ -18,6 +18,20 @@ TYLKO gdy jest coś do odebrania. Pełny opis w ARCHITECTURE §9. **Priorytet te
 Pupila, sprawdź czy widać kwadratowy przycisk z prezentem w headerze (gdy skrzynka nieodebrana
 dziś) i czy znika po odebraniu.
 
+## 🆕 bossAttackFx USUNIĘTE permanentnie (bomby/ogień/etc. na kaflu bossa) — NIEsprawdzone (2026-08-18)
+
+User po doprecyzowaniu (patrz sekcja niżej, punkty 3-4): "z nie działających to właśnie te
+bomby/pociski one hujowe pojawiały się tylko na sobie samym robiły skaling up i znikały
+zadając dmg na odległość dziwnie xd wywalmy je wgle zamieńmy ten atak wgle (i usuń plik ten
+permanentnie)". Zestawił to z DZIAŁAJĄCYMI wzorcami: pocisk lecący (łapka kota, magia) i
+burst-na-celu (pazury) — oba zostają bez zmian. `src/utils/bossAttackFx.ts` usunięty
+plikiem, cały jego import/użycie wyczyszczone z `boss-fight.tsx` (włącznie z martwym
+`bPop` — był używany wyłącznie pod ten efekt). Pełny opis w ARCHITECTURE §9. Efekt: "Twój
+cios ląduje na bossie" wygląda teraz identycznie we wszystkich 6 trybach (flash+shake+dmg),
+tak jak raid/event/quest/mad/misja miały od zawsze. **Priorytet testu:** stocz kilka walk
+kampanii (w tym z Cukrowym Potworem) i potwierdź że nie ma już żadnego "bombowego"
+błysku/skanowania na bossie — tylko czerwony/żółty flash + trzęsienie + liczba obrażeń.
+
 ## 🐛 Zgłoszenia z eksportu #3 (2026-08-18) — częściowo wyjaśnione, jedno wymaga doprecyzowania
 
 User przysłał kolejny eksport + opis trzech obserwacji w jednej wiadomości:
@@ -33,19 +47,14 @@ User przysłał kolejny eksport + opis trzech obserwacji w jednej wiadomości:
 2. **"nie wiem czy resetuje go reset"** — TAK, potwierdzone w kodzie: `petStore.reset()`
    czyści `eventWon`/`eventEnergy*` razem z resztą postępu (patrz linia z `reset:` w
    `petStore.ts`). Nie wymaga fixu, tylko odpowiedzi.
-3. **"cukrowypotwór te bomby jego uderzają jakby tylko w niego a to chodziło o dmg kotka
-   nie?"** — TO ZAMIERZONE, nie bug: `bossAttackFx`/`BOSS_ATTACK_FX` (bomb.png dla sugar)
-   to burst dekorujący WŁASNY kafel bossa w momencie gdy TY go trafiasz (`attackFx` w
-   `boss-fight.tsx`, `lastHit`-triggered), NIE jego kontratak na kotka. Kontratak (dmg na
-   kotka) leci jako osobny, uniwersalny pocisk (pięść/pazur/magia/miecz wg `attackKind`) —
-   patrz historyczny komentarz w `boss-fight.tsx` przy `pawFlying`/`boltFlying`: dawniej
-   per-bossowy burst (fire/bomb/magicspell) leciał JAKO kontratak i user się skarżył że
-   "wygląda jak rakieta lecąca w kotka, nie jak cios" — stąd świadoma zmiana na uniwersalną
-   ikonę dla kontrataku. Sugar akurat nie ma przypisanego `attackKind` (fallback pięść).
-4. **"nadal nie naprawiłeś tej animacji wtedy wychodzi"** — NIEJASNE, wymaga doprecyzowania
-   od usera zanim da się cokolwiek naprawić: czy "wychodzi" = ekran/aplikacja się zamyka
-   (crash)? Czy coś innego "wychodzi" (dosłownie wylatuje/pojawia się)? Przy której
-   dokładnie sytuacji? Zapytane wprost w rozmowie — czeka na odpowiedź.
+3.–4. **"cukrowypotwór te bomby... animacja skanowania i znikania i tyle" / "nadal nie
+   naprawiłeś tej animacji wtedy wychodzi"** — DOPRECYZOWANE i NAPRAWIONE (patrz sekcja
+   "bossAttackFx USUNIĘTE" niżej): user nie mylił która strona dostaje dmg (to zrozumiał) —
+   chodziło o samą JAKOŚĆ animacji, statyczny scale+fade w miejscu czytał się jako płaskie
+   "skanowanie", nie realny cios ("wychodzi" = obrazek bomby "wychodzi"/pojawia się i znika,
+   nie crash aplikacji jak wcześniej podejrzewałem). User porównał to do DZIAŁAJĄCYCH
+   wzorców (łapka/magia lecące, pazury pojawiające się na celu) i kazał usunąć per-bossowy
+   burst CAŁKOWICIE — zrobione, `bossAttackFx.ts` usunięty permanentnie.
 
 ## 🐛 Podwójne stuknięcie WALCZ! = dwie walki naraz (przez to "przerywa"/"kotek nie do zera") — NIEsprawdzone (2026-08-17)
 

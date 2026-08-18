@@ -16,7 +16,6 @@ import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, even
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { minibossForMission, missionRewardFor } from '@/utils/missions';
-import { bossAttackFx } from '@/utils/bossAttackFx';
 import { COMBAT_ITEMS } from '@/utils/combatItems';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
@@ -253,21 +252,16 @@ export default function BossFight() {
   // ── boss-side hit fx (Twój cios na bossie) — wspólne dla WSZYSTKICH trybów ──
   const bShake = useRef(new Animated.Value(0)).current;
   const bDmgY = useRef(new Animated.Value(0)).current;
-  const bPop = useRef(new Animated.Value(0)).current;
   const bFlash = useRef(new Animated.Value(0)).current;
   const [lastHit, setLastHit] = useState<{ dmg: number; crit: boolean; guarded: boolean; healed: number; thornDmg: number } | null>(null);
   const playBossHitFx = (crit: boolean) => {
-    bShake.setValue(0); bDmgY.setValue(0); bPop.setValue(0); bFlash.setValue(0);
+    bShake.setValue(0); bDmgY.setValue(0); bFlash.setValue(0);
     Animated.parallel([
       Animated.sequence([
         Animated.timing(bShake, { toValue: 1, duration: 50, useNativeDriver: true }),
         Animated.timing(bShake, { toValue: -1, duration: 50, useNativeDriver: true }),
         Animated.timing(bShake, { toValue: crit ? 1 : 0.5, duration: 50, useNativeDriver: true }),
         Animated.timing(bShake, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(bPop, { toValue: 1, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.spring(bPop, { toValue: 0, friction: 4, useNativeDriver: true }),
       ]),
       Animated.sequence([
         Animated.timing(bFlash, { toValue: 1, duration: 60, useNativeDriver: true }),
@@ -492,10 +486,6 @@ export default function BossFight() {
   const kFlashOp = kFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] });
   const kFloatY = kDmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -46] });
   const kFloatOp = kDmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
-  // Custom attack burst per boss (assets/ikonybosów/BOSSATTACK_*) na Twoim ciosie — tylko
-  // kampania ma ustawione fx (bossAttackFx zwraca undefined dla raid/event id, wtedy fallback niżej).
-  const attackFx = target ? bossAttackFx(target.id) : undefined;
-  const fxScale = bPop.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.35] });
   const pawX = pawTravel.interpolate({ inputRange: [0, 1], outputRange: ['16%', '84%'] });
   const pawOp = pawTravel.interpolate({ inputRange: [0, 0.08, 0.85, 1], outputRange: [0, 1, 1, 0] });
   const pawScale = pawTravel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] });
@@ -568,9 +558,8 @@ export default function BossFight() {
                   {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
                       pojawiać się na pupila") — atak w zwarciu, nie rzut: zamiast
                       podróżującego pocisku (boltFlying niżej, suppressed dla claw), burst
-                      ikony wprost NA portrecie kotka, ten sam trick co attackFx na bossie
-                      przy Twoim ciosie, tylko po drugiej stronie i inny trigger (boltTravel,
-                      nie bPop). */}
+                      ikony wprost NA portrecie kotka, wyzwalany tym samym `boltTravel` co
+                      lot pocisku dla pozostałych typów. */}
                   {boltFlying && target?.attackKind === 'claw' && (
                     <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
                       <HandGrab size={90} color={counterColor} />
@@ -589,19 +578,19 @@ export default function BossFight() {
                 <View style={s.tilePortrait}>
                   {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
                       chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
-                      się pokazuje, nic więcej). Shake+scale-pulse NARAZ na tym samym sprite
-                      czytało się jako rozchwiane "wobble", nie czysty cios — scale-pop zostaje
-                      TYLKO na osobnym attackFx burst-image niżej (to naturalnie coś co "wybucha"
-                      i rośnie, nie postać która się trzęsie). */}
+                      się pokazuje, nic więcej). Per-bossowy burst-image (bomby/ogień/…) USUNIĘTY
+                      permanentnie (2026-08-18, user: "te bomby... pojawiały się tylko na sobie
+                      samym, robiły scaling up i znikały, zadając dmg na odległość dziwnie xd,
+                      wywalmy je wgle" — statyczny obrazek scale+fade czytał się jako płaski
+                      "scan i zniknięcie", nie realny cios; działające wzorce to WYŁĄCZNIE
+                      podróżujący pocisk (łapka/magia) i burst-na-celu (pazury), oba już tu są).
+                      Zostaje tylko flash+shake+liczba obrażeń — ten sam, spójny język co
+                      raid/event/quest/mad/misja miały od zawsze (one nigdy nie dostały
+                      attackFx). */}
                   <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
                     <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid' || kind === 'mad'} />
                   </Animated.View>
                   <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: bFlashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
-                  {attackFx && lastHit && (
-                    <Animated.View pointerEvents="none" style={[s.attackFx, { opacity: bFlashOp, transform: [{ scale: fxScale }, { rotate: '-10deg' }] }]}>
-                      <Image source={attackFx} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
-                    </Animated.View>
-                  )}
                   {lastHit && (
                     <Animated.Text style={[s.dmgFloat, { opacity: bFloatOp, transform: [{ translateY: bFloatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
                       -{lastHit.dmg}{lastHit.crit ? ' KRYT!' : ''}
@@ -625,16 +614,15 @@ export default function BossFight() {
               </Animated.View>
             )}
             {/* Kontratak bossa — user (2026-08-12): poprzednio leciał tu ten sam per-bossowy
-                burst (fire/bomb/magicspell/…) co przy Twoim trafieniu niżej, i wyglądało to
-                jak rakieta/bomba lecąca w kotka, nie jak cios — dlatego uniwersalna pięść. Ten
-                sam obrazek bossa zostaje TYLKO jako flash na jego kaflu przy Twoim ciosie
-                (s.attackFx niżej) — tam nikt się nie skarżył, to inny moment (Twój cios ląduje
-                na NIM). 2026-08-17 (user: "bossy miały unikatowe ataki — drapieżniki drapnięcie
-                pazurami, magowie kulę magiczną, miecze slash mieczem, ci którzy nie mają to
-                pięść") — dalej PROSTY kształt (jedna ikona lecąca po prostej), tylko dobrana
-                po `target.attackKind` zamiast zawsze tej samej pięści; brak attackKind = ta
-                sama pięść co dawniej, więc zachowanie dla większości bossów bez zmian.
-                Pazury WYJĄTKOWO nie lecą tędy wcale (2026-08-17) — patrz `s.clawFx` burst
+                burst (fire/bomb/magicspell/…) co przy Twoim trafieniu, i wyglądało to jak
+                rakieta/bomba lecąca w kotka, nie jak cios — dlatego uniwersalna pięść (per-bossowy
+                burst przy Twoim ciosie USUNIĘTY permanentnie 2026-08-18, patrz komentarz przy
+                `tileFlash` bossa wyżej). 2026-08-17 (user: "bossy miały unikatowe ataki —
+                drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, ci
+                którzy nie mają to pięść") — dalej PROSTY kształt (jedna ikona lecąca po prostej),
+                tylko dobrana po `target.attackKind` zamiast zawsze tej samej pięści; brak
+                attackKind = ta sama pięść co dawniej, więc zachowanie dla większości bossów bez
+                zmian. Pazury WYJĄTKOWO nie lecą tędy wcale (2026-08-17) — patrz `s.clawFx` burst
                 na portrecie kotka wyżej, ten sam trigger (`boltFlying`/`boltOp`/`boltScale`),
                 inne miejsce renderu. */}
             {boltFlying && target?.attackKind !== 'claw' && (
@@ -800,7 +788,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vReward: { fontSize: 14, fontWeight: '800', color: '#FDE047' },
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
-  attackFx: { position: 'absolute', width: 150, height: 150 },
   clawFx: { position: 'absolute', width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
   projectile: { position: 'absolute', top: 96, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));
