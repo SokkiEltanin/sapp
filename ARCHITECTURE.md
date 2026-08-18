@@ -440,6 +440,27 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     tekstu, teraz `position:'absolute'` badge) sygnalizuje że jest coś do odebrania. Logika
     (`onDailyBox`/`claimDailyBox`/dedup po `dayClaims['dailybox:'+dzień]`) bez zmian — to
     czysto przeniesienie UI.
+  - **`bossAttackFx`/`BOSS_ATTACK_FX` USUNIĘTE permanentnie** (2026-08-18, user: "te
+    bomby/pociski hujowe pojawiały się tylko na sobie samym, robiły scaling up i znikały,
+    zadając dmg na odległość dziwnie xd, wywalmy je wgle zamieńmy ten atak wgle i usuń plik
+    ten permanentnie") — `src/utils/bossAttackFx.ts` (mapa `Boss.id → burst PNG z
+    assets/ikonybosów/BOSSATTACK_*`, 22 wpisy, po jednym na każdego bossa kampanii)
+    USUNIĘTY plikiem, razem z całym jego użyciem w `boss-fight.tsx`: import, `attackFx`/
+    `fxScale` (interpolacja z `bPop`), sam `bPop` `Animated.Value` (był używany WYŁĄCZNIE
+    pod `fxScale`, nic innego go nie czytało — usunięty też z `playBossHitFx`), JSX-block
+    renderujący `<Image source={attackFx}>` na kaflu bossa, i style `attackFx`. User
+    dokładnie zdiagnozował problem porównując dwa DZIAŁAJĄCE wzorce animacji z tym
+    zepsutym: podróżujący pocisk (łapka kota / kontratak magia — "wygląda i działa
+    dobrze") i burst-na-celu (pazury — "wyglądały i działały dobrze"), kontra statyczny
+    scale+fade w miejscu (bomby sugar) — "jakby animacja skanowania i znikania i tyle".
+    Efekt usunięcia: "Twój cios ląduje na bossie" wygląda teraz TAK SAMO we WSZYSTKICH 6
+    trybach (flash + shake + liczba obrażeń) — kampania traci per-bossowy akcent, ale
+    zyskuje spójność z raid/event/quest/mad/misją, które nigdy nie miały `attackFx` (ich
+    `bossAttackFx(id)` zawsze zwracał `undefined` — mapa miała wpisy tylko dla 22 id
+    kampanii). `assets/ikonybosów/BOSSATTACK_*.png` (same pliki graficzne) NIE usunięte —
+    user prosił o usunięcie PLIKU KODU (`ten plik`, liczba pojedyncza), nie assetów;
+    zostają osierocone na dysku, do ewentualnego sprzątnięcia osobno jeśli kiedyś okaże się
+    że nic ich więcej nie używa. NIEsprawdzone na urządzeniu.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`
@@ -513,8 +534,8 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     !defeated.includes(b.id))`) — jeden wspólny cel po `order`, osobna lista
     `defeatedMadBosses`/`defeatMadBoss` w `petStore.ts` (bez loot-regrantu — ten item już
     masz z pokonania zwykłej wersji). Art: POŻYCZONY z kampanii pod `mad_<id>` (prefiks
-    ściągany w `bossPng`/`bossAttackFx`, nie duplikowane require()) + ta sama czerwona
-    `powered` aura co raid.
+    ściągany w `bossPng`, nie duplikowane require()) + ta sama czerwona `powered` aura co
+    raid.
     - **HP dynamiczne** (`madBossHpFor(level, order)` = `atkPower(level) × hits(order)`,
       hits 6→8 przez roster) — liczone z AKTUALNEGO poziomu gracza (jak `questBossHpFor`),
       nie zamrożone przy `unlockLevel` jak zwykła kampania — MAD nigdy nie robi się
