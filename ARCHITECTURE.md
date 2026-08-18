@@ -780,6 +780,36 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       więc pokazywanie pustego "zdobyłeś trofeum" placeholdera przy KAŻDEJ z nich czytało się
       jak spam — coins/XP rewardRow niżej i tak pokazuje realną nagrodę. `itemDropped`
       (nemesis) ma własny, osobny napis, zostaje bez zmian.
+    - **MAD HP dodatkowo +15%** (osobny PR tego samego dnia, user: "mad wtedy niech będą 2x
+      trudniejsze od podstaw albo 4razy trudniejsze nie wiem jeszcze na pewno daj im o +30% HP
+      więcej niż teraz jest") — user poprosił o +30%, throwaway-symulacją sprawdzono że
+      DOSŁOWNE +30% łamie winnability dokładnie tam gdzie boli najbardziej: świeżo Lv15 gracz
+      (MAD_UNLOCK_LEVEL) próbujący order6 kończy na ~45% winrate/55% faintRate. `MAD_HITS_MULT
+      = 1.15` w `madBosses.ts` (mnożnik na całą `madHitsFor(order)`) to sprawdzony bezpieczny
+      sufit — order1-6 przy Lv15-20 zostaje 100% winrate, wyraźnie trudniejsze (avgLoss
+      54-86% zamiast 48-64%). Świadomie NIE dano usera dokładnie tego o co prosił — jawnie
+      wyjaśnione w PR-ie, nie po cichu ucięte.
+  - **Itemy bojowe — droprate tierowany wg skrzynki + darmowy level-up z epic/legendary**
+    (2026-08-18, user: "zrob zeby itemy z bossów miały większy droprate... że te itemy mają
+    poziomy, najsłabsze niech lecą na niższych gorszych boksach a lepsze poziomy czyli
+    ulepszanie itemów na trudniejszych") — "itemy z bossów" = itemy bojowe (9 typów, część z
+    `maxLevel`>1: dodge/fire/execute/reflect), NIE loot kampanii (gwarantowany, bez poziomów,
+    bez zmian). "Boksy" = tiery skrzynki sardynek (`CrateTier` w `crates.ts` — `basic`/`rare`/
+    `epic`/`legendary`, TA SAMA skrzynka co codzienne głaskanie do pełnej afekcji, więc
+    osiągalne bez realnego grindu, zgodnie z życzeniem):
+    - **`COMBAT_ITEM_DROP_CHANCE_BY_TIER`** (zastąpił flat `COMBAT_ITEM_DROP_CHANCE=0.01`) —
+      `basic: 0` (zbyt częsta, zabiłaby rzadkość), `rare: 0.03`, `epic: 0.08`,
+      `legendary: 0.18` — WYRAŹNIE wyższe niż stare 1% na wyższych tierach ("większy
+      droprate"), zero na najsłabszym ("niższe gorsze boksy" dalej dają MNIEJ, nie więcej).
+    - **`openCrate()` w `petStore.ts`** — gałąź decyzji: `basic`/`rare` dają TYLKO nowy
+      nieposiadany item na poziomie 1 ("najsłabszy poziom" — pierwsze zdobycie). `epic`/
+      `legendary` PREFERUJĄ ulepszenie już posiadanego, jeszcze nie na `maxLevel` itemu o +1
+      (`itemLeveledUp`, NOWA gałąź) — nowy item to tam fallback TYLKO gdy nie ma czego
+      ulepszyć (nic jeszcze nie posiadasz na < max). Level-up jest DARMOWY (bez kosztu monet)
+      — DRUGI, RÓWNOLEGŁY tor obok istniejącego `upgradeCombatItem` (koszt monet,
+      `combatItemUpgradeCost`), nie zastępuje go, oba prowadzą do tego samego capu.
+    - **`CrateModal.tsx`** — nowy napis "⬆️ {nazwa} +1 poziom (LvN)!" obok istniejącego "🎁
+      Nowy item bojowy", zależnie od tego która gałąź trafiła.
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

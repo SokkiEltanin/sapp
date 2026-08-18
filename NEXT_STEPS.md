@@ -9,6 +9,27 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 MAD +15% HP (nie +30%) + itemy bojowe: droprate tierowany wg skrzynki — NIEsprawdzone (2026-08-18)
+
+Dwie osobne, ale tego samego dnia zmiany:
+
+1. **MAD +15% HP** — user chciał +30% ("2x-4x trudniejsze, nie wiem jeszcze na pewno"), ale
+   throwaway-symulacja pokazała że dosłowne +30% łamie winnability świeżo po odblokowaniu (Lv15,
+   ~45% winrate/55% faintRate na order6). +15% (`MAD_HITS_MULT` w `madBosses.ts`) to sprawdzony
+   bezpieczny sufit — jawnie NIE dano usera dokładnie tego o co prosił, wyjaśnione w PR-ie.
+2. **Itemy bojowe — większy droprate, tierowany wg skrzynki** (user: "najsłabsze [zdobycie]
+   niech lecą na niższych gorszych boksach, lepsze poziomy [ulepszenia] na trudniejszych") —
+   `COMBAT_ITEM_DROP_CHANCE_BY_TIER` w `crates.ts` zastąpił flat 1%: `basic=0`, `rare=3%`,
+   `epic=8%`, `legendary=18%`. `basic`/`rare` dają tylko NOWY nieposiadany item (poziom 1).
+   `epic`/`legendary` PREFERUJĄ darmowy +1 poziom już posiadanemu itemowi (nowa gałąź w
+   `openCrate()`, `petStore.ts`) — nowy item to tam fallback. To DRUGI, równoległy tor obok
+   istniejącego płatnego (monety) `upgradeCombatItem`, nie zastępuje go.
+
+Pełny opis w ARCHITECTURE §9. **Priorytet testu:** (a) pokonaj kilka MAD bossów tuż po Lv15,
+sprawdź czy realnie trudniejsze ale wygrywalne; (b) otwórz kilka skrzynek sardynek różnych
+tierów (głaskanie do pełnej afekcji), sprawdź czy epic/legendary faktycznie czasem dają "⬆️
+poziom" zamiast/obok "🎁 nowy item", a basic/rare nigdy nic nie dają z itemów.
+
 ## 🆕 Bossy trudniejsze (COUNTER_PCT 0.05) + bez "trofeów" + MAD od Lv15 — NIEsprawdzone (2026-08-18)
 
 User przesłał świeży log walk (kotek kończył KAŻDĄ walkę na 45-70% pełnego HP, nigdy realnie

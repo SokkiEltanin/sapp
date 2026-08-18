@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weekKeyOf } from '@/utils/quests';
-import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE } from '@/utils/crates';
+import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, ENERGY_MAX, energyRegenTick, energySpendTick } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
@@ -244,7 +244,10 @@ interface PetState {
   markPlankDone: () => void;
   markStretchDone: () => void;
   markTrainingDay: () => void;   // called once per claimed training quest — feeds m_training streak
-  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null } | null; // open one pending crate
+  // itemDropped = nowy, jeszcze nieposiadany item (poziom 1). itemLeveledUp = ulepszenie JUŻ
+  // posiadanego itemu o +1 poziom (2026-08-18, tylko epic/legendary — patrz COMBAT_ITEM_DROP_
+  // CHANCE_BY_TIER w crates.ts). Zawsze co najwyżej JEDNO z dwóch, nigdy oba naraz.
+  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null } | null; // open one pending crate
   // boss battles
   syncEnergyRegen: () => void;  // dogania tyknięcia regeneracji energii kampanii/MAD które minęły offline
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // FLAT dzienny grant, bez zmian — osobna pula raidu
@@ -537,19 +540,32 @@ export const usePetStore = create<PetState>()(
         const s = get();
         if ((s.pendingCrates ?? 0) <= 0) return null;
         const roll = rollCrate();
-        // Rzadka, niezależna szansa na item bojowy (v4.1) — tylko spośród jeszcze
-        // nieposiadanych, żeby nie "marnować" dropu na duplikat (merge nie istnieje jeszcze).
+        // Szansa na item bojowy TIEROWANA wg tieru skrzynki (2026-08-18, patrz komentarz przy
+        // COMBAT_ITEM_DROP_CHANCE_BY_TIER w crates.ts) — niższe/gorsze tiery dają TYLKO nowy
+        // nieposiadany item (poziom 1); epic/legendary PREFERUJĄ ulepszenie już posiadanego
+        // (jeśli masz cokolwiek jeszcze nie na maksie), nowy item to tam fallback gdy nie ma
+        // czego ulepszyć (albo nic jeszcze nie posiadasz).
         let itemDropped: CombatItemId | null = null;
-        if (Math.random() < COMBAT_ITEM_DROP_CHANCE) {
-          const candidates = (Object.keys(COMBAT_ITEMS) as CombatItemId[]).filter(id => !s.ownedCombatItems[id]);
-          if (candidates.length > 0) itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
+        let itemLeveledUp: { id: CombatItemId; level: number } | null = null;
+        if (Math.random() < COMBAT_ITEM_DROP_CHANCE_BY_TIER[roll.tier]) {
+          const preferUpgrade = roll.tier === 'epic' || roll.tier === 'legendary';
+          const upgradeable = (Object.keys(s.ownedCombatItems) as CombatItemId[])
+            .filter(id => (s.ownedCombatItems[id] ?? 0) < COMBAT_ITEMS[id].maxLevel);
+          if (preferUpgrade && upgradeable.length > 0) {
+            const id = upgradeable[Math.floor(Math.random() * upgradeable.length)];
+            itemLeveledUp = { id, level: (s.ownedCombatItems[id] ?? 0) + 1 };
+          } else {
+            const candidates = (Object.keys(COMBAT_ITEMS) as CombatItemId[]).filter(id => !s.ownedCombatItems[id]);
+            if (candidates.length > 0) itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
+          }
         }
         set({
           pendingCrates: s.pendingCrates - 1,
           coins: s.coins + roll.coins,
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
+          ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
         });
-        return { ...roll, itemDropped };
+        return { ...roll, itemDropped, itemLeveledUp };
       },
       // Dogania regenerację energii kampanii/MAD która minęła podczas gdy aplikacja była
       // zamknięta — wołane przy każdym otwarciu/powrocie na ekran bossów (patrz reload() w

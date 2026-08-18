@@ -111,7 +111,11 @@ export const THORN_PCT = 0.02;             // gwarantowane -2% hp bossa co rund�
 
 export function itemById(id: CombatItemId): CombatItemDef { return COMBAT_ITEMS[id]; }
 
-// Ulepszanie itemów bojowych (UI w app/pet-stats.tsx) — taniej niż HP/ATK w sklepie, bo
-// te itemy trzeba NAJPIERW wylosować ze skrzynki (COMBAT_ITEM_DROP_CHANCE=0.01 w
-// crates.ts), więc samo posiadanie już jest rzadkie. TODO-balance: brak danych z playtestów.
+// Ulepszanie itemów bojowych za monety (UI w app/pet-stats.tsx) — taniej niż HP/ATK w
+// sklepie, bo te itemy trzeba NAJPIERW wylosować ze skrzynki (COMBAT_ITEM_DROP_CHANCE_BY_TIER
+// w crates.ts), więc samo posiadanie już jest rzadkie. DRUGI, RÓWNOLEGŁY tor ulepszania
+// (2026-08-18) — epic/legendary skrzynki mogą ZAMIAST nowego itemu dać darmowy +1 poziom
+// już posiadanemu (patrz openCrate() w petStore.ts) — coiny i drop to dwie NIEZALEŻNE ścieżki
+// do tego samego capu (maxLevel), nie trzeba wybierać jednej. TODO-balance: brak danych z
+// playtestów.
 export const combatItemUpgradeCost = (currentLevel: number) => 25 + (currentLevel - 1) * 20;
