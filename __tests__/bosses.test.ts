@@ -171,13 +171,13 @@ describe('bosses — bossTier (derywowana z unlockLevel)', () => {
 
 describe('bosses — counterDamage (2026-08-13: liczy od AKTUALNEGO, nie max HP bossa)', () => {
   test('skaluje z aktualnym HP bossa, bez uniku', () => {
-    expect(counterDamage(300, 0)).toBe(12);   // 300 * 0.04
-    expect(counterDamage(1000, 0)).toBe(40);  // 1000 * 0.04
+    expect(counterDamage(300, 0)).toBe(15);   // 300 * 0.05
+    expect(counterDamage(1000, 0)).toBe(50);  // 1000 * 0.05
   });
   test('unik redukuje obrażenia, cap 90%', () => {
-    expect(counterDamage(1000, 0.5)).toBe(20);   // połowa
-    expect(counterDamage(1000, 0.9)).toBe(4);    // 10% zostaje
-    expect(counterDamage(1000, 1.5)).toBe(4);    // cap na 0.9, nie ujemne
+    expect(counterDamage(1000, 0.5)).toBe(25);   // połowa
+    expect(counterDamage(1000, 0.9)).toBe(5);    // 10% zostaje
+    expect(counterDamage(1000, 1.5)).toBe(5);    // cap na 0.9, nie ujemne
   });
   test('słabnie w miarę jak boss traci HP — nie stały numer całej walki', () => {
     expect(counterDamage(1000, 0)).toBeGreaterThan(counterDamage(200, 0));

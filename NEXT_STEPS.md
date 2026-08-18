@@ -9,6 +9,38 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Bossy trudniejsze (COUNTER_PCT 0.05) + bez "trofeów" + MAD od Lv15 — NIEsprawdzone (2026-08-18)
+
+User przesłał świeży log walk (kotek kończył KAŻDĄ walkę na 45-70% pełnego HP, nigdy realnie
+blisko zemdlenia) z komentarzem: "1. z bossów nagrody wypierdzielaj trofea cały czas pisze że
+coś dostałem xd wywalmy te trofea, 2. bossy muszą być trudniejsze zobacz na log i pomyśl, 3. tak
+samo bosy mad wersje muszą być bardzo trudne i dajmy je od 15 lvl jednak". Trzy zmiany:
+
+1. **Trudniejsze bossy** — `COUNTER_PCT` (kontratak jako % AKTUALNEGO hp bossa, `bosses.ts`)
+   podbite 0.04→0.05, WSPÓLNE dla wszystkich 6 trybów walki (kampania/raid/event/quest/mad/
+   misja — jeden silnik). Zwalidowane throwaway-symulacją PEŁNEGO rosteru 22 bossów kampanii z
+   profilem inwestycji skalibrowanym wprost na realnych danych z logu (Lv9, atkStatBonus=20,
+   catMaxHpBonus=40) — 100% winrate przy takiej inwestycji na CAŁYM rosterze, ale realnie
+   odczuwalna trudność (avgLoss ~45-75% zamiast ~35-60%, worstLoss do 90%+). 0.06 już WALI
+   kilku bossów do 0% winrate przy lżejszej inwestycji, więc 0.05 to sprawdzony bezpieczny sufit.
+2. **MAD bossy od Lv15 zamiast Lv50** (`MAD_UNLOCK_LEVEL` w `madBosses.ts`) — dostępne dużo
+   wcześniej, gdy gracz ma naturalnie mniej inwestycji, co samo w sobie robi je "bardzo trudne"
+   względem punktu w grze. `madHitsFor` (liczba ciosów do zabicia) ŚWIADOMIE nietknięte —
+   symulacją sprawdzono że MAD hp liczy się z ŻYWEJ, aktualnej mocy gracza (nie zamrożonej jak
+   kampania), więc podbijanie hits tam jest dużo bardziej ryzykowne (kwadratowy wzrost
+   skumulowanego kontrataku) niż w kampanii.
+3. **Victory modal bez "trofeów"** (`app/boss-fight.tsx`) — box z ikoną+"Medal tygodnia"/
+   "Nagroda questu"/itd. (bez prawdziwego itemu) renderuje się TERAZ tylko dla kampanii
+   (prawdziwy przedmiot ze statem). Raid/event/quest/mad/misja pokazują tylko monety+XP,
+   bez fałszywego "zdobyłeś trofeum" przy każdej (bardzo częstej) walce.
+
+Pełny opis w ARCHITECTURE §9 ("Trudność bossów podbita"). **Priorytet testu:** (a) stocz kilka
+walk kampanii/raid/questa/misji, sprawdź czy kotek realnie kończy bliżej zera HP niż wcześniej
+(nie musi ginąć, ale powinno czuć się bardziej "na styk"); (b) sprawdź że victory modal dla
+questa/misji/raidu NIE pokazuje już żadnego boxa z ikoną/nazwą "medalu", tylko monety+XP; (c)
+jeśli masz Lv15+, sprawdź czy MAD jest już dostępny (wcześniej wymagał Lv50) i czy faktycznie
+czuje się zauważalnie trudniejszy niż zwykła kampania na tym samym poziomie.
+
 ## 🆕 Nemesis: trwały bank HP bez timera/limitu prób, sezonowe z podbitym HP — NIEsprawdzone (2026-08-18)
 
 User (po ustaleniu podziału na sezonowe vs nemesis w rozmowie o balansie ekonomii): "wyłączyć
