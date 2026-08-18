@@ -511,7 +511,7 @@ export default function BossFight() {
 
   const closeVictory = () => { setVictory(null); router.back(); };
   const closeDefeat = () => { setDefeat(null); router.back(); };
-  const VictoryLootIcon = victory?.loot ? lootIcon(victory.loot) : Trophy;
+  const VictoryLootIcon = victory?.loot ? lootIcon(victory.loot) : Trophy; // fallback nieużywany w JSX (renderowane tylko gdy loot istnieje), zostaje żeby zadowolić typy LucideIcon
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -696,17 +696,21 @@ export default function BossFight() {
                 <BossArt id={victory.id} emoji={victory.emoji} size={78} powered={victory.kind === 'raid' || victory.kind === 'mad' || victory.isMenace} />
               </View>
               <Text style={s.vName}>{victory.kind === 'campaign' ? `${victory.name} pokonany` : victory.name}</Text>
-              <View style={s.vLoot}>
-                <VictoryLootIcon size={30} color="#2AC68F" />
-                {victory.loot ? (
-                  <>
-                    <Text style={s.vLootName}>{victory.loot.name}</Text>
-                    <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
-                  </>
-                ) : (
-                  <Text style={s.vLootName}>{victory.kind === 'raid' ? 'Medal tygodnia' : victory.kind === 'quest' ? 'Nagroda questu' : victory.kind === 'mad' ? 'Nagroda MAD' : victory.kind === 'mission' ? 'Nagroda z misji' : victory.isMenace ? 'Nagroda nemesis' : 'Medal wydarzenia'}</Text>
-                )}
-              </View>
+              {/* Box z ikoną+nazwą TYLKO dla prawdziwego itemu ze statem (kampania) — 2026-08-18,
+                  user: "z bossów nagrody wypierdzielaj trofea, cały czas pisze że coś dostałem
+                  xd". Raid/event/quest/mad/misja nie dają realnego przedmiotu, tylko flavor
+                  placeholder ("Medal tygodnia" itd.) — pokazywanie GO w tym samym pudełku co
+                  prawdziwy item, przy KAŻDEJ z tych bardzo częstych walk (misje/questy lecą
+                  wielokrotnie dziennie, patrz log), czytało się jak pusty "zdobyłeś trofeum"
+                  spam. Coins/XP niżej i tak pokazują realną nagrodę — box zbędny bez lootu.
+                  itemDropped (nemesis) ma WŁASNY, osobny napis niżej, zostaje. */}
+              {victory.loot && (
+                <View style={s.vLoot}>
+                  <VictoryLootIcon size={30} color="#2AC68F" />
+                  <Text style={s.vLootName}>{victory.loot.name}</Text>
+                  <Text style={s.vLootDesc}>{victory.loot.desc}</Text>
+                </View>
+              )}
               <View style={s.vRewardRow}>
                 <Coins size={16} color="#FDE047" /><Text style={s.vReward}>{victory.coins} · +{victory.xp} XP</Text>
               </View>

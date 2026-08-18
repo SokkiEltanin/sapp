@@ -37,7 +37,16 @@ import { Boss, BOSSES, Bonuses, atkPower } from '@/utils/bosses';
 // bonusów. Teraz bierze też prawdziwe atkStatBonus/bonuses — te same argumenty co
 // computeDamage, więc ciosy potrzebne do zabicia zostają w zwalidowanym zakresie NIEZALEŻNIE
 // od tego ile gracz faktycznie zainwestował.
-export const MAD_UNLOCK_LEVEL = 50;
+// PRZESUNIĘTE 50→15 (2026-08-18, user: "bosy mad wersje muszą byc bardzo trudne i dajmy je od
+// 15 lvl jednak") — MAD dostaje się dużo wcześniej, gdy gracz ma naturalnie mniej inwestycji
+// (mniej czasu na uzbieranie atkStatBonus/catMaxHpBonus), co samo w sobie robi go "bardzo
+// trudnym" względem punktu w grze w którym się pojawia. `madHitsFor` NIETKNIĘTE — throwaway-
+// symulacją (patrz komentarz tam) sprawdzono że podbijanie liczby ciosów jest DUŻO bardziej
+// wrażliwe niż w kampanii (kwadratowy, nie liniowy wzrost skumulowanego kontrataku, bo MAD hp
+// liczy się z AKTUALNEJ, żywej mocy gracza, nie zamrożonej przy unlockLevel) — realną,
+// odczuwalną trudność MAD dostaje ZA DARMO ze wspólnego COUNTER_PCT (bosses.ts, ten sam silnik
+// walki co kampania) bez ryzyka powtórki "MAD niewygrywalny od lvl~90" z pierwszej wersji.
+export const MAD_UNLOCK_LEVEL = 15;
 export const MAD_REWARD_MULT = 3;
 
 const madHitsFor = (order: number) => 6 + (order - 1) * (2 / 21);

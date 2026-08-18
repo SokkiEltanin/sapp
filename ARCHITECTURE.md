@@ -311,7 +311,7 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     ten sam ekran liczy `campaignBoss` niezależnie od bosses.tsx, więc wymagał osobnego fixu).
     `unlockLevel` ZOSTAJE w danych `Boss` (referencyjny poziom pod jaki historycznie wyważono
     hp/atak tego bossa, `madBossFor` go też czyta) — przestał być tylko BRAMKĄ dostępu. Raid
-    (`level>=3`)/event (`level>=2`)/MAD (`level>=MAD_UNLOCK_LEVEL=50`) CELOWO nietknięte —
+    (`level>=3`)/event (`level>=2`)/MAD (`level>=MAD_UNLOCK_LEVEL`, 50→15 od 2026-08-18) CELOWO nietknięte —
     to osobne, deliberatne progi niezwiązane z sekwencją "pokonaj poprzedniego", user pytał
     konkretnie o kampanię.
     - **Fix eksportu** (`utils/bossProgressReport.ts`, ten sam dzień, user: "zebrać dane pod
@@ -556,7 +556,8 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     HP w nieskończoność (dokładnie problem raidu wyżej), druga fala TYCH SAMYCH 22 bossów
     kampanii jako trwały endgame cel. User explicite wybrał: zwykła kampania BEZ zmian
     (`unlockLevel` 2→116 zostaje), MAD to dodatkowa warstwa odblokowywana hurtem na
-    **lvl 50** (`MAD_UNLOCK_LEVEL`) i TYLKO per-boss PO pokonaniu jego zwykłej wersji
+    **lvl 15** (`MAD_UNLOCK_LEVEL`, przesunięte z pierwotnego 50 — patrz wpis 2026-08-18
+    "Trudność bossów podbita" niżej) i TYLKO per-boss PO pokonaniu jego zwykłej wersji
     (`defeatedBosses.includes`) — nie da się przeskoczyć kampanii. Wybór "aktualnego" MAD
     celu (`madCandidate`) lustrzanie kopiuje `campaignBoss` (`BOSSES.find(b =>
     !defeated.includes(b.id))`) — jeden wspólny cel po `order`, osobna lista
@@ -742,6 +743,43 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     - **`app/bosses.tsx`/mini-karta** — dla `isMenace`: bez pigułki energii (nielimitowane),
       pasek HP zamiast statycznego "X HP" (jak raid — `menaceRemaining/menaceMaxHp`), bez
       odliczania dni. Sezonowe bez zmian (energia + statyczne HP + odliczanie).
+  - **Trudność bossów podbita: `COUNTER_PCT` 0.04→0.05 + victory modal bez "trofeów" + MAD od
+    Lv15** (2026-08-18, user przesłał świeży log walk: kotek kończył KAŻDĄ walkę na 45-70%
+    pełnego HP, nigdy realnie blisko zemdlenia — "bossy muszą być trudniejsze, zobacz na log i
+    pomyśl"):
+    - **`COUNTER_PCT` w `bosses.ts`** (stała współdzielona przez WSZYSTKIE 6 trybów walki, bo
+      `counterDamage()` jest jednym, wspólnym silnikiem) podbita 0.04→0.05. Throwaway-
+      symulacją (nie zgadywane — ten sam rygor co poprzednie audyty) PEŁNEGO rosteru 22 bossów
+      kampanii, profil inwestycji kalibrowany WPROST na realnych danych z przesłanego logu
+      (Lv9/order4: atkStatBonus=20, catMaxHpBonus=40, ekstrapolowane liniowo przez `order`)
+      sprawdzono: 0.05 daje 100% winrate na CAŁYM rosterze przy tej realnej inwestycji, ale
+      podnosi avgLoss z ~35-60% do ~45-75% (worstLoss 70-92%) — realna, odczuwalna trudność i
+      szansa na zemdlenie przy niedoinwestowaniu. 0.06 już WALI boss #19 (regen 0.04) do 0%
+      winrate nawet przy lżejszej inwestycji (regen bossy są nieproporcjonalnie wrażliwe — więcej
+      rund ekspozycji = kwadratowo więcej skumulowanego kontrataku) — 0.05 to sprawdzony,
+      bezpieczny sufit, NIE powtarza historycznego "6 z 22 bossów niewygrywalnych" (patrz
+      komentarz nad `BOSSES` w bosses.ts). Per-boss `hp` (22 wartości) świadomie NIETKNIĘTE —
+      jeden global knob jest łatwiejszy do zweryfikowania niż ręczne przestrajanie każdego bossa
+      z osobna, ten sam ostrożny wzorzec co przy poprzednich audytach.
+    - **MAD bossy** dziedziczą TEN SAM `counterDamage()`, więc automatycznie też stają się
+      trudniejsze — ŚWIADOMIE bez ręcznego podbijania `madHitsFor` (6→8 ciosów, `madBosses.ts`)
+      mimo że user chciał "bardzo trudne": throwaway-symulacją sprawdzono że MAD hp liczy się z
+      AKTUALNEJ, żywej mocy gracza (nie zamrożonej jak kampania), więc podbijanie hits tam jest
+      DUŻO bardziej wrażliwe — kwadratowy, nie liniowy wzrost skumulowanego kontrataku
+      (dokładnie problem z historycznego komentarza w `madBosses.ts`: "8-10 ciosów już
+      matematycznie niewygrywalne"). Zamiast tego: `MAD_UNLOCK_LEVEL` 50→15 (user: "dajmy je od
+      15 lvl jednak") — gracz spotyka MAD dużo wcześniej, z naturalnie mniejszą inwestycją, co
+      samo w sobie robi go subiektywnie "bardzo trudnym" względem punktu w grze w którym się
+      pojawia, bez ryzyka matematycznego niewygrywalnego stanu na wyższych poziomach.
+    - **Victory modal bez "trofeów" dla nie-kampanijnych wygranych** (`app/boss-fight.tsx`) —
+      user: "z bossów nagrody wypierdzielaj trofea, cały czas pisze że coś dostałem xd". Box z
+      ikoną+nazwą (`s.vLoot`, wcześniej `Trophy` fallback + "Medal tygodnia"/"Nagroda questu"/
+      itd. gdy `victory.loot` nieustawione) renderuje się TERAZ tylko gdy `victory.loot`
+      istnieje (kampania — prawdziwy item ze statem). Raid/event/quest/mad/misja (bardzo częste
+      walki, patrz log — misje/questy lecą wielokrotnie dziennie) nie dają realnego przedmiotu,
+      więc pokazywanie pustego "zdobyłeś trofeum" placeholdera przy KAŻDEJ z nich czytało się
+      jak spam — coins/XP rewardRow niżej i tak pokazuje realną nagrodę. `itemDropped`
+      (nemesis) ma własny, osobny napis, zostaje bez zmian.
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

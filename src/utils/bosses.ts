@@ -412,7 +412,19 @@ export function eventDailyAttempts(energyMult: number): number {
 // krzywej HP bossów / mocy ataku — patrz memory), ale usuwa patologiczne, niewygrywalne
 // przypadki i sprawia że kontratak faktycznie reaguje na przebieg walki, nie tylko na to
 // KTÓRY to boss.
-const COUNTER_PCT = 0.04; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kontratak
+//
+// PODBITE 0.04→0.05 (2026-08-18, user przesłał świeży log walk: kotek kończył każdą walkę
+// 45-70% pełnego HP, nigdy realnie blisko zemdlenia — "bossy muszą być trudniejsze, zobacz
+// na log i pomyśl"). Throwaway-symulacją PEŁNEGO rosteru 22 bossów (profil inwestycji
+// kalibrowany wprost na realnych danych z logu usera: Lv9/order4, atkStatBonus=20,
+// catMaxHpBonus=40, ekstrapolowane liniowo przez order) sprawdzono że 0.05 daje dalej 100%
+// winrate na CAŁYM rosterze przy tej realnej inwestycji, ale podnosi avgLoss z ~35-60% do
+// ~45-75% (worstLoss 70-92%) — realna, odczuwalna trudność i szansa na zemdlenie przy
+// niedoinwestowaniu, bez powtórki historycznego "6 z 22 bossów niewygrywalnych" (sprawdzone:
+// 0.06 już łamie boss #19 dla lżejszej inwestycji — 0.05 to bezpieczny górny sufit). Ten sam
+// stały COUNTER_PCT jest współdzielony przez WSZYSTKIE 6 trybów walki (kampania/raid/event/
+// quest/mad/misja) — jedna zmiana podnosi trudność wszędzie naraz, spójnie.
+const COUNTER_PCT = 0.05; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kontratak
 //
 // FIX 2026-08-17 (throwaway-symulacją, znalezione przy audycie "za łatwe walki" — patrz
 // komentarz nad BOSSES): `guard` (Twój cios ×0.5) BEZ zmiany tutaj podwaja skumulowany
