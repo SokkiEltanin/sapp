@@ -9,6 +9,17 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Kotek na pasku misji podskakuje + znika ze sceny gdy w misji — NIEsprawdzone (2026-08-18)
+
+User ze screenshotem: "tylko on miał tam podskakiwać jak w tych paskach na dashboardzie xd, i
+miał znikać z ekranu że niby jest w misji czaisz???". Dwa fixy do wcześniejszego "kotka na
+pasku": (1) mini-kotek na pasku misji teraz PODSKAKUJE (prosta pętla bounce, nie próbowaliśmy
+włączać wewnętrznego systemu animacji CatArt — zbudowany pod co innego); (2) GŁÓWNY portret
+kotka na scenie Pupila ZNIKA i zastępuje go placeholder "Pupil poszedł na misję…" dopóki
+misja trwa (wraca gdy `missionReady`). Pełny opis w ARCHITECTURE §9. **Priorytet testu:**
+wyślij misję, sprawdź czy główny kotek na scenie znika (placeholder z kompasem zamiast
+niego), i czy mini-kotek na pasku misji realnie podskakuje w miejscu.
+
 ## 🆕 Energia kampanii: regeneracja w czasie (2/bank, +1 co 3h) zamiast "1 boss dziennie" — NIEsprawdzone (2026-08-18)
 
 User, po pytaniu o gate "1 boss dziennie" (wprowadzony 2026-08-17): "uznałem wtedy że szybko
