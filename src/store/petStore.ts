@@ -5,7 +5,7 @@ import { weekKeyOf } from '@/utils/quests';
 import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor } from '@/utils/bosses';
-import { missionMinutesFor } from '@/utils/missions';
+import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -172,6 +172,11 @@ interface PetState {
   // przeliczamy go ponownie, żeby awans levelu W TRAKCIE misji nie zmieniał już obiecanego czasu.
   missionStartedAt: string | null;
   missionEndsAt: string | null;
+  // Profil wybrany PRZY WYSYŁCE (2026-08-18, user: "trzeba zrobić że mam jak w sfgame że mogę
+  // wybrać misję czy pod złoto czy pod XP" — patrz MissionProfile w missions.ts). Zapamiętany
+  // (nie tylko wybór "na moment"), żeby claimMission po powrocie liczyło nagrodę z TYM SAMYM
+  // profilem co user wybrał wysyłając, niezależnie kiedy realnie odbierze.
+  missionProfile: MissionProfile | null;
   // ── HP kotka (fundament pod v4 walk — S&F-owy redesign, patrz memory boss_design.md) ──
   // NIC jeszcze tego nie czyta/zapisuje poza akcjami niżej — czysto dodatkowy stan, żeby
   // dodanie go było zero-ryzykowne dla działających walk. catMaxHpBonus = TRWAŁE ulepszenia
@@ -244,7 +249,7 @@ interface PetState {
   spendEnergy: () => void;   // v5: -1 próba za attempt (energy to teraz flat dzienny licznik, nie bank)
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   defeatMadBoss: (baseBossId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
-  startMission: (level: number) => void;
+  startMission: (level: number, profile: MissionProfile) => void;
   claimMission: (coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
@@ -332,6 +337,7 @@ export const usePetStore = create<PetState>()(
       defeatedMadBosses: [],
       missionStartedAt: null,
       missionEndsAt: null,
+      missionProfile: null,
       bossHp: {},
       bossLog: [],
       resetGeneration: 1,
@@ -601,12 +607,12 @@ export const usePetStore = create<PetState>()(
       })),
       // Misja (utils/missions.ts) — guard: no-op jeśli już jest aktywna misja (missionEndsAt
       // ustawione), żeby nie dało się nadpisać trwającej misji nowym, krótszym czasem.
-      startMission: (level) => set((s) => {
+      startMission: (level, profile) => set((s) => {
         if (s.missionEndsAt) return s;
         const startedAt = new Date();
         const endsAt = new Date(startedAt.getTime() + missionMinutesFor(level) * 60000);
         require('@/services/notificationsService').notificationsService.scheduleMissionReady(endsAt.toISOString()).catch(() => {});
-        return { missionStartedAt: startedAt.toISOString(), missionEndsAt: endsAt.toISOString() };
+        return { missionStartedAt: startedAt.toISOString(), missionEndsAt: endsAt.toISOString(), missionProfile: profile };
       }),
       // Zeruje slot (kolejną misję można wysłać od razu, user: "można po misji na kolejną") —
       // bez dedupu po id/dacie jak questy, bo misja to jeden aktywny stan, nie coś liczonego
@@ -614,7 +620,7 @@ export const usePetStore = create<PetState>()(
       claimMission: (coins, xp, name, level, fight) => set((s) => {
         require('@/services/notificationsService').notificationsService.cancelMissionReady().catch(() => {});
         return {
-          missionStartedAt: null, missionEndsAt: null,
+          missionStartedAt: null, missionEndsAt: null, missionProfile: null,
           coins: s.coins + coins, xp: s.xp + xp,
           bossLog: [...s.bossLog, { kind: 'mission', id: 'mission', name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         };
@@ -715,7 +721,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], lastCampaignDefeatDate: null, defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: 0, energyDate: null, energyToday: 0, defeatedBosses: [], lastCampaignDefeatDate: null, defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
     }),
     {
       name: 'pet-v1',
@@ -733,7 +739,7 @@ export const usePetStore = create<PetState>()(
         situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, trainingDays: s.trainingDays,
         energy: s.energy, energyDate: s.energyDate, energyToday: s.energyToday,
         defeatedBosses: s.defeatedBosses, lastCampaignDefeatDate: s.lastCampaignDefeatDate, defeatedMadBosses: s.defeatedMadBosses,
-        missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt,
+        missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt, missionProfile: s.missionProfile,
         bossHp: s.bossHp, bossLog: s.bossLog,
         resetGeneration: s.resetGeneration, lastResetAt: s.lastResetAt,
         raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
@@ -752,6 +758,10 @@ export const usePetStore = create<PetState>()(
         state.loginBonusDay = state.loginBonusDay ?? null;
         state.bossLog = state.bossLog ?? [];   // stary stan sprzed 2026-08-14 nie miał logu walk
         state.lastCampaignDefeatDate = state.lastCampaignDefeatDate ?? null;   // stary stan sprzed 2026-08-17 nie miał gate'u 1 boss/dzień
+        // Stary stan sprzed 2026-08-18 nie miał wyboru profilu misji — jeśli akurat trwała
+        // aktywna misja (missionEndsAt ustawione), traktuj ją jako 'balanced' (stare wartości
+        // nagrody, dokładnie to co wtedy dostałaby), inaczej null (brak aktywnej misji).
+        state.missionProfile = state.missionProfile ?? (state.missionEndsAt ? 'balanced' : null);
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};

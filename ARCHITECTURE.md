@@ -617,6 +617,48 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     leniwie WEWNĄTRZ akcji `startMission`/`claimMission`, nie na górze pliku). Pasek postępu
     (2026-08-15, drugi tego dnia) w `app/pet.tsx` — elapsed/total liczone z `missionStartedAt`/
     `missionEndsAt`, capowane 0..1.
+    - **Kotek "w podróży" na pasku** (2026-08-18, user: "musi przeskalowywać się na pasek
+      podróży... pasek kotek wskakuje i tak jakby porusza się z progressem misji") —
+      zaproponował export osobnych ikon kotków per kolor, ale `CatArt` to już komponent SVG
+      parametryzowany paletą/dodatkami (nie bitmapa), więc renderujemy TEGO SAMEGO kotka co
+      reszta ekranu, po prostu `size={22}` i `animate={false}` — zero nowych assetów. Pozycja
+      `left: {progress}%` wewnątrz `missionProgWrap` (NOWY wrapper, BEZ `overflow:'hidden'` w
+      przeciwieństwie do `missionProgTrack` pod spodem — inaczej kotek wystający nad cienki
+      pasek zostałby przycięty), offset `missionCatWrap` (`top:-9, marginLeft:-11`) centruje
+      22px ikonę dokładnie na punkcie postępu — ta sama technika co `pawX`/`boltX` w
+      `boss-fight.tsx`.
+    - **Misja blokuje pozostałe tory walki** (2026-08-18, user: "wtedy nie może walczyć w
+      innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dotąd
+      misja była całkiem niezależna od kampanii/raidu/eventu/questów/MAD (osobna pula, osobny
+      stan) — można było grindować normalnie mimo aktywnej misji. Teraz `missionAway` (`!!
+      missionEndsAt && Date.now() < missionEndsAt`) w `boss-fight.tsx` blokuje `attackRoundBased()`
+      (toast) i podmienia arenę na `lockBox` ("Pupil jest w trakcie misji — wróć jak dotrze")
+      dla KAŻDEGO `kind !== 'mission'` — `kind==='mission'` to jedyny wyjątek (to właśnie
+      ekran na powrót). Świadomie NIE zmieniane w `app/bosses.tsx` (lista/hero card/mini-karty
+      raid+event) — nawigacja do `boss-fight.tsx` i tak poprawnie pokaże blokadę, więc to nie
+      dead-end, tylko brakuje wizualnego podglądu PRZED nawigacją (drobny polish do rozważenia
+      osobno, nie zrobiony w tym przejściu ze względu na 4 osobne przyciski do ogarnięcia).
+    - **Wybór profilu misji (balanced/gold/xp)** (2026-08-18, user: "trzeba zrobić że mam jak
+      w sfgame że mogę wybrać misję czy pod złoto czy pod XP że jedna ma trochę więcej gold a
+      druga XP i mogą być 3 do wyboru") — `MissionProfile = 'balanced'|'gold'|'xp'`
+      (`missions.ts`). TA SAMA długość dla wszystkich trzech (user nie prosił o różny czas) —
+      `MISSION_PROFILE_MULT` przesuwa TYLKO coins↔xp: `balanced` = dokładnie stare wartości
+      (×1/×1, nikt kto już wysyłał misje nie dostaje nagle gorszej nagrody przy domyślnym
+      wyborze), `gold` = ×1.5 coins/×0.6 xp, `xp` = ×0.6 coins/×1.5 xp — świadomie NIE ±50/±50
+      (suma identyczna zrobiłaby z wyboru czysty kosmetyk, +50%/-40% daje realny trade-off bez
+      jednego profilu strictly dominującego). `missionRewardFor(level, profile='balanced')` —
+      domyślny param, więc STARE wywołania (1 argument) działają bez zmian. Zapamiętane PRZY
+      WYSYŁCE w nowym `missionProfile: MissionProfile | null` w `petStore` (obok
+      `missionStartedAt`/`missionEndsAt`, ten sam cykl życia — `claimMission` czyści wszystkie
+      trzy naraz) — `boss-fight.tsx` liczy nagrodę CLAIM-em z zapamiętanego profilu, nie z
+      domyślnego, żeby wybór z wysyłki realnie się liczył niezależnie kiedy user wróci
+      odebrać. `app/pet.tsx`: `!missionEndsAt` (nic nie wysłano) renderuje NOWĄ
+      `missionChooseCard` (kolumna: head + `MISSION_PROFILE_ORDER.map` — 3 wiersze, każdy z
+      podglądem `+X🪙 +Y XP` i własnym przyciskiem Wyślij) zamiast starej `missionCard`
+      (`flexDirection:'row'`, źle pasująca do 3 przycisków) — stan w-trakcie/gotowa dalej
+      używa starej `missionCard`, bez zmian. Migracja: stary zapisany stan bez `missionProfile`
+      dostaje `'balanced'` JEŚLI akurat trwała aktywna misja (dokładnie to co wtedy dostałaby),
+      inaczej `null`.
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

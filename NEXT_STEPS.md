@@ -9,6 +9,28 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Misja: kotek na pasku + blokuje inne walki + wybór profilu (balanced/gold/xp) — NIEsprawdzone (2026-08-18)
+
+User (z opisem screenshota): "jak kto jest w podróży to musi przeskalowywać się na pasek
+podróży... pasek kotek wskakuje i tak jakby porusza się z progresem misji i wtedy nie może
+walczyć w innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji... i
+trzeba zrobić że mam jak w sfgame że mogę wybrać misję czy pod złoto czy pod XP że jedna ma
+trochę więcej gold a druga XP i mogą być 3 do wyboru". Trzy części, wszystkie zrobione:
+
+1. **Kotek "w podróży" na pasku misji** — mały `CatArt` (dokładnie Twoja kolorystyka/dodatki,
+   bez nowych assetów) jeździ po pasku postępu zgodnie z % ukończenia misji.
+2. **Misja blokuje pozostałe tory walki** — dopóki pupil jest w misji, kampania/raid/event/
+   quest/MAD pokazują "Pupil jest w trakcie misji — wróć jak dotrze" zamiast pozwolić walczyć.
+3. **Wybór profilu misji** — ekran Pupila pokazuje TERAZ 3 opcje wysyłki (Zbalansowana/Więcej
+   złota/Więcej XP), każda z własnym podglądem nagrody i przyciskiem Wyślij. Ten sam czas
+   trwania dla wszystkich, tylko coins↔xp się przesuwa.
+
+Pełny opis w ARCHITECTURE §9. **Priorytet testu:** (a) wyślij misję, sprawdź czy kotek na
+pasku wygląda jak Twój prawdziwy kotek i realnie się porusza z upływem czasu; (b) w trakcie
+misji spróbuj wejść w kampanię/raid/event — powinno pokazać blokadę, nie pozwolić walczyć;
+(c) na ekranie wysyłki sprawdź czy widać 3 opcje z różnymi nagrodami, i czy po powrocie
+dostajesz nagrodę zgodną z tym co WYBRAŁEŚ przy wysyłce (nie zawsze balanced).
+
 ## 🆕 Bossy dalej w kolejności = mystery (czarna sylwetka + symbole zamiast nazwy) — NIEsprawdzone (2026-08-18)
 
 User: "musimy zrobić że mają znaki zapytania i ciemne kształty... a ich nazwy to jakieś

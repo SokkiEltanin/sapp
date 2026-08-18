@@ -21,10 +21,35 @@ export function missionMinutesFor(level: number): number {
 // nie osobno zgadywana krzywa.
 const MISSION_BASE_COINS = 4;
 const MISSION_BASE_XP = 10;
-export function missionRewardFor(level: number): { coins: number; xp: number } {
+
+// Wybór profilu misji (2026-08-18, user: "trzeba zrobić że mam jak w sfgame że mogę wybrać
+// misję czy pod złoto czy pod XP że jedna ma trochę więcej gold a druga XP i mogą być 3 do
+// wyboru") — S&F-style trade-off: TA SAMA długość (`missionMinutesFor` bez zmian, user nie
+// prosił o różny czas), tylko przesunięcie coins↔xp. Świadomie NIE jeden profil strictly
+// lepszy od innych — `balanced` to dokładnie stare wartości (nikt kto już wysyłał misje nie
+// dostaje nagle gorszej nagrody przy domyślnym wyborze), `gold`/`xp` to ten sam SUMARYCZNY
+// "budżet" przesunięty w jedną stronę (+50% jednego, -40% drugiego — nie ±50/±50, żeby suma
+// nie była identyczna co ułatwiłoby uznanie wyboru za czysto kosmetyczny).
+export type MissionProfile = 'balanced' | 'gold' | 'xp';
+const MISSION_PROFILE_MULT: Record<MissionProfile, { coins: number; xp: number }> = {
+  balanced: { coins: 1, xp: 1 },
+  gold: { coins: 1.5, xp: 0.6 },
+  xp: { coins: 0.6, xp: 1.5 },
+};
+export function missionRewardFor(level: number, profile: MissionProfile = 'balanced'): { coins: number; xp: number } {
   const mult = questRewardMult(level);
-  return { coins: Math.round(MISSION_BASE_COINS * mult), xp: Math.round(MISSION_BASE_XP * mult) };
+  const pm = MISSION_PROFILE_MULT[profile];
+  return { coins: Math.round(MISSION_BASE_COINS * mult * pm.coins), xp: Math.round(MISSION_BASE_XP * mult * pm.xp) };
 }
+
+// Etykieta + kolejność wyświetlania (ekran Pupila renderuje 3 wybieralne wiersze w tej
+// kolejności) — jedno źródło prawdy, żeby ekran nie zgadywał kolejności/nazw osobno.
+export const MISSION_PROFILE_ORDER: MissionProfile[] = ['balanced', 'gold', 'xp'];
+export const MISSION_PROFILE_LABEL: Record<MissionProfile, string> = {
+  balanced: 'Zbalansowana',
+  gold: 'Więcej złota',
+  xp: 'Więcej XP',
+};
 
 function hashOf(s: string, mul: number): number {
   let h = 0;

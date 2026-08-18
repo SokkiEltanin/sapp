@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, HandFist, HandGrab, Sparkles, Sword, Trophy } from 'lucide-react-native';
+import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, HandFist, HandGrab, Sparkles, Sword, Trophy, Compass } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import CatArt from '@/components/pet/CatArt';
@@ -76,7 +76,7 @@ export default function BossFight() {
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
     dayClaims, claimQuestFight, markTrainingDay,
-    missionStartedAt, missionEndsAt, claimMission,
+    missionStartedAt, missionEndsAt, missionProfile, claimMission,
     catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
   } = usePetStore();
   const { expenses } = useExpensesStore();
@@ -154,9 +154,14 @@ export default function BossFight() {
   // dokładnym czasem wysłania) czytane wprost ze store'u, nie z parametrów — nawigacja tu z
   // niegotową misją (np. cofnięcie ekranu) nie da się "oszukać" wcześniejszą walką.
   const missionReady = kind === 'mission' && !!missionStartedAt && !!missionEndsAt && Date.now() >= new Date(missionEndsAt).getTime();
+  // Pupil fizycznie gdzieś poszedł (2026-08-18, user: "wtedy nie może walczyć w innych z
+  // bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dopóki misja trwa,
+  // BLOKUJE wszystkie POZOSTAŁE tory walki (kampania/raid/event/quest/mad), nie tylko samą
+  // misję. `kind==='mission'` to jedyny wyjątek — to WŁAŚNIE ekran na powrót z misji.
+  const missionAway = !!missionEndsAt && Date.now() < new Date(missionEndsAt).getTime();
   const missionMb = missionReady && missionStartedAt ? minibossForMission(missionStartedAt) : null;
   const missionBoss = missionMb ? minibossAsBoss(missionMb, atkStatBonus, level, bonuses) : null;
-  const missionReward = missionRewardFor(level);
+  const missionReward = missionRewardFor(level, missionProfile ?? 'balanced');
 
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind; dailyCapped?: boolean };
@@ -288,6 +293,7 @@ export default function BossFight() {
   // cel (roundBoss) i co się dzieje po wygranej.
   const attackRoundBased = () => {
     if (!target || !target.unlocked || fighting || fightingRef.current) return;
+    if (kind !== 'mission' && missionAway) { haptic.error(); toast.info('Pupil jest w trakcie misji — wróć jak dotrze.'); return; }
     if (target.dailyCapped) { haptic.error(); toast.info('Dzisiejszego bossa kampanii już pokonałeś — wróć jutro po kolejnego.'); return; }
     // Raid (2026-08-17): sesja rundowa wobec MAŁEGO, bezpiecznie skalowanego celu
     // (raidSessionHpFor — ten sam wzorzec co questBossHpFor/madBossHpFor), NIE wobec surowej
@@ -496,6 +502,11 @@ export default function BossFight() {
                 : kind === 'mission' ? (missionStartedAt ? 'Misja jeszcze trwa — wróć jak pupil wróci.' : 'Brak aktywnej misji — wyślij pupila z ekranu Pupil.')
                 : 'Brak aktywnego wydarzenia teraz — wróć innym razem.'}
             </Text>
+          </View>
+        ) : kind !== 'mission' && missionAway ? (
+          <View style={s.lockBox}>
+            <Compass size={16} color={c.text.muted} />
+            <Text style={s.lockTxt}>Pupil jest w trakcie misji — wróć jak dotrze, wtedy znowu będzie mógł walczyć.</Text>
           </View>
         ) : !target.unlocked ? (
           <View style={s.lockBox}>
