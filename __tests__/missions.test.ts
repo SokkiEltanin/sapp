@@ -1,6 +1,7 @@
 import {
   missionMinutesFor, missionRewardFor, minibossForMission,
   MISSION_BASE_MIN, MISSION_MIN_PER_LEVEL, MISSION_MAX_MIN,
+  MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL,
 } from '@/utils/missions';
 import { MINIBOSSES } from '@/utils/minibosses';
 
@@ -37,6 +38,31 @@ describe('missions — missionRewardFor (więcej niż daily quest, skaluje z lev
     const r = missionRewardFor(1);
     expect(r.coins).toBeGreaterThan(2);
     expect(r.xp).toBeGreaterThan(5);
+  });
+});
+
+// 2026-08-18, user: "trzeba zrobić że mam jak w sfgame że mogę wybrać misję czy pod złoto
+// czy pod XP że jedna ma trochę więcej gold a druga XP i mogą być 3 do wyboru".
+describe('missions — profile misji (balanced/gold/xp, S&F-style trade-off)', () => {
+  test('brak argumentu = balanced (wsteczna kompatybilność, stare wywołania bez zmian)', () => {
+    expect(missionRewardFor(20)).toEqual(missionRewardFor(20, 'balanced'));
+  });
+  test('gold daje więcej monet ale mniej XP niż balanced, przy tym samym poziomie', () => {
+    const balanced = missionRewardFor(20, 'balanced');
+    const gold = missionRewardFor(20, 'gold');
+    expect(gold.coins).toBeGreaterThan(balanced.coins);
+    expect(gold.xp).toBeLessThan(balanced.xp);
+  });
+  test('xp daje więcej XP ale mniej monet niż balanced, przy tym samym poziomie', () => {
+    const balanced = missionRewardFor(20, 'balanced');
+    const xpProfile = missionRewardFor(20, 'xp');
+    expect(xpProfile.xp).toBeGreaterThan(balanced.xp);
+    expect(xpProfile.coins).toBeLessThan(balanced.coins);
+  });
+  test('MISSION_PROFILE_ORDER/LABEL mają wpis dla każdego z 3 profili, bez duplikatów etykiet', () => {
+    expect(MISSION_PROFILE_ORDER.length).toBe(3);
+    const labels = MISSION_PROFILE_ORDER.map(p => MISSION_PROFILE_LABEL[p]);
+    expect(new Set(labels).size).toBe(3);
   });
 });
 

@@ -34,7 +34,7 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Coins as CoinsIcon, Check as CheckIcon, Gift, Swords, Compass } from 'lucide-react-native';
-import { missionMinutesFor, missionRewardFor } from '@/utils/missions';
+import { missionMinutesFor, missionRewardFor, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
@@ -302,7 +302,7 @@ export default function Pet() {
     router.push(`/boss-fight?kind=quest&questId=${id}&questLabel=${encodeURIComponent(label)}&questCoins=${coins}&questXp=${xp}` as any);
   };
   const [training, setTraining] = useState<{ exercise: SelfReportExercise; target: number; action: () => void } | null>(null);
-  const onSendMission = () => { haptic.tap(); startMission(lvl.level); };
+  const onSendMission = (profile: MissionProfile) => { haptic.tap(); startMission(lvl.level, profile); };
   const onFightMission = () => { haptic.tap(); router.push('/boss-fight?kind=mission' as any); };
   const onClaimTier = (id: string, c2: number, x: number) => {
     claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
@@ -423,35 +423,73 @@ export default function Pet() {
             (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. Bez
             dziennego limitu — od razu po odebraniu nagrody można wysłać kolejną. ── */}
         <Text style={s.section}>Misja</Text>
-        <View style={s.missionCard}>
-          <Compass size={26} color={missionReady ? '#2AC68F' : '#38BDF8'} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            {!missionEndsAt ? (
-              <>
-                <Text style={s.missionTitle}>Wyślij pupila na misję</Text>
-                <Text style={s.missionSub} numberOfLines={1}>
-                  ~{fmtMissionDuration(missionMinutesFor(lvl.level))} · +{missionRewardFor(lvl.level).coins} 🪙 +{missionRewardFor(lvl.level).xp} XP po powrocie
-                </Text>
-              </>
-            ) : missionReady ? (
-              <>
-                <Text style={s.missionTitle}>Pupil wrócił z misji!</Text>
-                <Text style={s.missionSub}>Czeka walka i nagroda</Text>
-              </>
-            ) : (
-              <>
-                <Text style={s.missionTitle}>Pupil w misji…</Text>
-                <Text style={s.missionSub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
-                <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
-              </>
+        {!missionEndsAt ? (
+          // Wybór profilu (2026-08-18, user: "trzeba zrobić że mam jak w sfgame że mogę
+          // wybrać misję czy pod złoto czy pod XP... mogą być 3 do wyboru") — 3 wiersze,
+          // każdy z własną nagrodą-podglądem i przyciskiem Wyślij (jeden card na trzy
+          // przyciski zamiast jednego uniwersalnego, bo user wybiera CZYM wysłać, nie tylko
+          // KIEDY). Czas trwania (`missionMinutesFor`) TEN SAM dla wszystkich profili — user
+          // nie prosił o różny czas, tylko o inny balans coins/XP.
+          <View style={s.missionChooseCard}>
+            <View style={s.missionChooseHead}>
+              <Compass size={22} color="#38BDF8" />
+              <Text style={s.missionTitle}>Wyślij pupila na misję</Text>
+            </View>
+            <View style={{ gap: spacing[2] }}>
+              {MISSION_PROFILE_ORDER.map(profile => {
+                const reward = missionRewardFor(lvl.level, profile);
+                return (
+                  <View key={profile} style={s.missionChoiceRow}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={s.missionChoiceLabel}>{MISSION_PROFILE_LABEL[profile]}</Text>
+                      <Text style={s.missionSub} numberOfLines={1}>
+                        ~{fmtMissionDuration(missionMinutesFor(lvl.level))} · +{reward.coins} 🪙 +{reward.xp} XP
+                      </Text>
+                    </View>
+                    <PressableScale onPress={() => onSendMission(profile)}>
+                      <View style={s.missionBtn}><Text style={s.missionBtnTxt}>Wyślij</Text></View>
+                    </PressableScale>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : (
+          <View style={s.missionCard}>
+            <Compass size={26} color={missionReady ? '#2AC68F' : '#38BDF8'} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {missionReady ? (
+                <>
+                  <Text style={s.missionTitle}>Pupil wrócił z misji!</Text>
+                  <Text style={s.missionSub}>Czeka walka i nagroda</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={s.missionTitle}>Pupil w misji…</Text>
+                  <Text style={s.missionSub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+                  {/* Kotek "w podróży" na pasku (2026-08-18, user: "musi przeskalowywać się na
+                      pasek podróży... pasek kotek wskakuje i tak jakby porusza się z
+                      progressem misji") — user zaproponował export osobnych ikon kotków per
+                      kolor, ale CatArt to już komponent SVG parametryzowany paletą/dodatkami
+                      (nie bitmapa) — więc renderujemy TEGO SAMEGO kotka co reszta ekranu, po
+                      prostu mały i wyłączony `animate`, bez potrzeby nowych assetów. Pozycja
+                      `left` = % postępu, offset przez `missionCatWrap` centruje go dokładnie
+                      NAD kropką na pasku (ta sama technika co `pawX`/`boltX` w boss-fight.tsx). */}
+                  <View style={s.missionProgWrap}>
+                    <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
+                    <View style={[s.missionCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
+                      <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
+                        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                    </View>
+                  </View>
+                </>
+              )}
+            </View>
+            {missionReady && (
+              <PressableScale onPress={onFightMission}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
             )}
           </View>
-          {!missionEndsAt
-            ? <PressableScale onPress={onSendMission}><View style={s.missionBtn}><Text style={s.missionBtnTxt}>Wyślij</Text></View></PressableScale>
-            : missionReady
-              ? <PressableScale onPress={onFightMission}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-              : null}
-        </View>
+        )}
 
         {/* ── Missed yesterday: rewards earned but never collected ── */}
         {missed.length > 0 && (
@@ -742,10 +780,20 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
 
   missionCard: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
+  // Karta wyboru profilu (2026-08-18) — kolumna (head + lista wierszy), stąd OSOBNY styl od
+  // `missionCard` (ten jest `flexDirection:'row'`, pasuje do stanu w-trakcie/gotowa).
+  missionChooseCard: { width: '100%', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
+  missionChooseHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  missionChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  missionChoiceLabel: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
   missionSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
-  missionProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 6 },
+  // `missionProgWrap` NIE ma `overflow:'hidden'` (w przeciwieństwie do `missionProgTrack`
+  // pod spodem) — kotek musi móc wystawać NAD cienki pasek, przycięcie by go obcięło.
+  missionProgWrap: { position: 'relative', marginTop: 16 },
+  missionProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden' },
   missionProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
+  missionCatWrap: { position: 'absolute', top: -9, marginLeft: -11 },
   missionBtn: { backgroundColor: '#38BDF8', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10 },
   missionBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 
