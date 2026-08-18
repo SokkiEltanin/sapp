@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
@@ -77,6 +77,22 @@ export default function Pet() {
     ? new Date(missionEndsAt).getTime() - new Date(missionStartedAt).getTime() : 0;
   const missionProgress = missionTotalMs > 0
     ? Math.min(1, Math.max(0, 1 - missionRemainingMs / missionTotalMs)) : 0;
+  // Kotek na pasku misji ma podskakiwać (2026-08-18, user: "miał tam podskakiwać jak w tych
+  // paskach na dashboardzie") — zewnętrzna, prosta pętla bounce na WRAPPERZE (nie
+  // wewnętrzny `animate` CatArt, ten jest budowany pod interakcje/idle na głównym portrecie,
+  // nie pod ciągłe "chodzenie w miejscu" małej ikony) — start/stop przy wejściu/wyjściu z
+  // trybu "w misji", żeby nie animować w tle gdy karta tego nie pokazuje.
+  const missionBounce = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!missionEndsAt || missionReady) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(missionBounce, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(missionBounce, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [missionEndsAt, missionReady]);
+  const missionBounceY = missionBounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
@@ -414,9 +430,21 @@ export default function Pet() {
 
         {/* stage — no room backdrop any more; the cat IS the stage */}
         <View style={s.stage}>
-          <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
-            eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
-            onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
+          {/* Kotek znika ze sceny gdy jest w misji (2026-08-18, user: "miał znikać z ekranu
+              że niby jest w misji czaisz???") — dziwnie wyglądało, żeby główny portret
+              siedział normalnie na scenie, podczas gdy karta Misja niżej mówi że go nie ma.
+              `missionReady` (wrócił, czeka walka) NIE liczy się jako "away" — jest już z
+              powrotem, tylko jeszcze nieodebrana walka/nagroda. */}
+          {missionEndsAt && !missionReady ? (
+            <View style={s.stageAway}>
+              <Compass size={48} color={c.text.muted} />
+              <Text style={s.stageAwayTxt}>Pupil poszedł na misję…</Text>
+            </View>
+          ) : (
+            <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
+              eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
+              onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
+          )}
         </View>
 
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
@@ -474,12 +502,16 @@ export default function Pet() {
                       (nie bitmapa) — więc renderujemy TEGO SAMEGO kotka co reszta ekranu, po
                       prostu mały i wyłączony `animate`, bez potrzeby nowych assetów. Pozycja
                       `left` = % postępu, offset przez `missionCatWrap` centruje go dokładnie
-                      NAD kropką na pasku (ta sama technika co `pawX`/`boltX` w boss-fight.tsx). */}
+                      NAD kropką na pasku (ta sama technika co `pawX`/`boltX` w boss-fight.tsx).
+                      Bounce (`missionBounceY`) w osobnym Animated.View wokół — patrz komentarz
+                      przy `missionBounce` wyżej. */}
                   <View style={s.missionProgWrap}>
                     <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
                     <View style={[s.missionCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
-                      <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
-                        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                      <Animated.View style={{ transform: [{ translateY: missionBounceY }] }}>
+                        <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
+                          eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                      </Animated.View>
                     </View>
                   </View>
                 </>
@@ -736,6 +768,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110, alignItems: 'center' },
 
   stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
+  stageAway: { alignItems: 'center', gap: spacing[2] },
+  stageAwayTxt: { fontSize: 13, fontWeight: '700', color: c.text.muted },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
   // Nazwa/status skurczone (2026-08-16, user: "nazwę zbić, nad pupilem zajmuje w pizdu

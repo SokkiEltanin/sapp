@@ -614,6 +614,20 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       pasek zostałby przycięty), offset `missionCatWrap` (`top:-9, marginLeft:-11`) centruje
       22px ikonę dokładnie na punkcie postępu — ta sama technika co `pawX`/`boltX` w
       `boss-fight.tsx`.
+      - **Fix (ten sam dzień, screenshot + "tylko on miał tam podskakiwać jak w tych paskach
+        na dashboardzie xd, i miał znikać z ekranu że niby jest w misji czaisz???")** — dwa
+        braki z pierwszej wersji: (1) kotek na pasku stał nieruchomo (`animate={false}`
+        wyłączał WSZYSTKIE efekty CatArt, łącznie z ewentualnym bounce) — dodany NOWY, prosty
+        `Animated.loop` na WRAPPERZE wokół mini-CatArt (`missionBounce`, translateY 0→-6→0,
+        320ms w każdą stronę), start/stop w `useEffect` bramkowanym `missionEndsAt &&
+        !missionReady` — CELOWO nie próbowano włączyć wewnętrznego `animate` CatArt (ten
+        system jest zbudowany pod interakcje/idle GŁÓWNEGO portretu — mrugnięcia, spojrzenia,
+        pogłaskanie — nie pod proste ciągłe "chodzenie w miejscu" 22px ikony, dużo cięższe niż
+        potrzeba). (2) GŁÓWNY portret kotka na scenie (`s.stage`) siedział normalnie nawet
+        gdy karta Misja mówiła że go nie ma — teraz `missionEndsAt && !missionReady` podmienia
+        całą scenę na placeholder (`Compass` + "Pupil poszedł na misję…"), zamiast renderować
+        `<CatArt>`. `missionReady` (wrócił, czeka walka) CELOWO nie liczy się jako "away" —
+        jest już z powrotem.
     - **Misja blokuje pozostałe tory walki** (2026-08-18, user: "wtedy nie może walczyć w
       innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dotąd
       misja była całkiem niezależna od kampanii/raidu/eventu/questów/MAD (osobna pula, osobny
