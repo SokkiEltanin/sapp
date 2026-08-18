@@ -1,4 +1,4 @@
-import { rollCrate, CRATE_META, COMBAT_ITEM_DROP_CHANCE } from '@/utils/crates';
+import { rollCrate, CRATE_META, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/crates';
 
 // rollCrate używa Math.random() bezpośrednio (brak wstrzykiwalnego generatora) — zamiast
 // próbkowania statystycznego, kontrolujemy go deterministycznie przez mock, sekwencyjnie
@@ -52,8 +52,14 @@ describe('crates — stałe', () => {
       expect(CRATE_META[tier].color).toMatch(/^#/);
     }
   });
-  test('szansa dropu itemu bojowego jest niewielka (celowo rzadka)', () => {
-    expect(COMBAT_ITEM_DROP_CHANCE).toBeGreaterThan(0);
-    expect(COMBAT_ITEM_DROP_CHANCE).toBeLessThan(0.05);
+  // 2026-08-18 — user: "itemy z bossów [mają] większy droprate... najsłabsze [zdobycie] na
+  // niższych gorszych boksach, lepsze poziomy [ulepszenia] na trudniejszych" — tierowane,
+  // rosnące z tierem skrzynki, `basic` celowo 0 (zbyt częsta, zabiłaby rzadkość itemów).
+  test('szansa dropu itemu bojowego rośnie z tierem skrzynki (basic=0, rosnąco do legendary)', () => {
+    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.basic).toBe(0);
+    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.rare).toBeGreaterThan(COMBAT_ITEM_DROP_CHANCE_BY_TIER.basic);
+    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.epic).toBeGreaterThan(COMBAT_ITEM_DROP_CHANCE_BY_TIER.rare);
+    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.legendary).toBeGreaterThan(COMBAT_ITEM_DROP_CHANCE_BY_TIER.epic);
+    expect(COMBAT_ITEM_DROP_CHANCE_BY_TIER.legendary).toBeLessThan(0.5); // wciąż rzadkie, nie gwarantowane
   });
 });

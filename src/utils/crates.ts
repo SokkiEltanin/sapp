@@ -8,11 +8,27 @@
 // `r < 0.02` bucket.
 export type CrateTier = 'basic' | 'rare' | 'epic' | 'legendary';
 
-// Niezależna szansa (osobna od tieru monet powyżej), że otwarcie skrzynki DODATKOWO
-// przyzna item bojowy (v4.1 — patrz memory boss_design.md). User 2026-08-06: "bardzo
-// rzadko". Osobna od kolorowego tieru = prościej — monety zostają jak były, item to
-// bonus na wierzchu, nie zależny od tego czy akurat wylosowało 'legendary'.
-export const COMBAT_ITEM_DROP_CHANCE = 0.01;
+// Szansa (NIEZALEŻNA od tieru monet powyżej — ten sam `rollCrate()` roll decyduje o OBU,
+// ale to dwa osobne progi) że otwarcie skrzynki DODATKOWO przyzna coś z itemów bojowych.
+//
+// PRZEBALANSOWANE (2026-08-18, user: "zrob zeby itemy z bossów miały większy droprate...
+// że te itemy mają poziomy, najsłabsze niech lecą na niższych gorszych boksach a lepsze
+// poziomy czyli ulepszanie itemów na trudniejszych") — dotąd FLAT 1% niezależnie od tieru
+// skrzynki, zawsze nowy nieposiadany item na poziomie 1 (nigdy level-up). Teraz TIEROWANE:
+// niższe/gorsze skrzynki (`basic`/`rare`) dalej dają TYLKO pierwsze zdobycie (nowy item,
+// poziom 1, "najsłabszy poziom") — `basic` bez zmian nie daje nic (zbyt częsta, zabiłoby
+// rzadkość), `rare` dostaje niewielką, ale WYRAŹNIE wyższą niż stare 1% szansę. Wyższe/
+// trudniejsze skrzynki (`epic`/`legendary`, same z definicji rzadsze — `rollCrate()` daje
+// je w 10%/2% przypadków) dostają WYŻSZĄ szansę I mogą zamiast nowego itemu ULEPSZYĆ już
+// posiadany (patrz gałąź w `openCrate()` w petStore.ts — `legendary` PREFERUJE level-up
+// nad nowym itemem, gdy masz cokolwiek jeszcze nie na max poziomie). Osiągalne przez zwykłe
+// codzienne skrzynki (głaskanie do pełnego paska afekcji) — bez potrzeby realnego grindu.
+export const COMBAT_ITEM_DROP_CHANCE_BY_TIER: Record<CrateTier, number> = {
+  basic: 0,
+  rare: 0.03,
+  epic: 0.08,
+  legendary: 0.18,
+};
 
 export const CRATE_META: Record<CrateTier, { label: string; color: string }> = {
   basic:     { label: 'Zwykła',      color: '#9AA6B2' },

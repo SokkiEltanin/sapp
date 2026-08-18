@@ -25,7 +25,7 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
   const pending = usePetStore(s => s.pendingCrates);
 
   const [phase, setPhase] = useState<'closed' | 'opening' | 'revealed'>('closed');
-  const [result, setResult] = useState<{ tier: CrateTier; coins: number; itemDropped: CombatItemId | null } | null>(null);
+  const [result, setResult] = useState<{ tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null } | null>(null);
   const [shown, setShown] = useState(0);
   const [flies, setFlies] = useState<{ id: number; dx: number; dy: number; emoji: string }[]>([]);
 
@@ -113,6 +113,9 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
                   <Text style={st.fish2}>🐟</Text>
                   {result?.itemDropped && (
                     <Text style={st.itemDrop}>🎁 Nowy item bojowy: {COMBAT_ITEMS[result.itemDropped].name}!</Text>
+                  )}
+                  {result?.itemLeveledUp && (
+                    <Text style={st.itemDrop}>⬆️ {COMBAT_ITEMS[result.itemLeveledUp.id].name} +1 poziom (Lv{result.itemLeveledUp.level})!</Text>
                   )}
                 </Animated.View>
               </View>
