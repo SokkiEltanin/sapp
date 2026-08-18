@@ -17,12 +17,32 @@ import RadialGlow from '@/components/ui/RadialGlow';
 //    (counters/StreakFlame.tsx): soft red RadialGlow behind the normal art, plus a
 //    slightly enlarged red silhouette (tintColor) peeking out from behind the edges —
 //    reads as an aura, not a flat recolor of the character itself.
-export default function BossArt({ id, emoji, size = 74, powered = false }: {
-  id: string; emoji: string; size?: number; powered?: boolean;
+// `mystery` (2026-08-18, user: "musimy zrobić że [niepokonani, jeszcze nieodblokowani
+// bossowie] mają znaki zapytania i ciemne kształty... że niewiadoma o co chodzi, dopóki nie
+// pokonasz wcześniejszego") — bossy dalej w kolejności kampanii (jeszcze nie `current`) nie
+// pokazują swojego prawdziwego portretu. Reużywa TĘ SAMĄ sztuczkę co `powered`-tint niżej
+// (Image `tintColor`, ta sama technika co StreakFlameGlow) — realny kształt sylwetki bossa
+// (nie generyczny placeholder), ale całkiem czarny i bez detali, więc rozpoznawalny "coś tu
+// jest" bez zdradzania KTO to. Emoji-fallback dostaje analogiczne czarne kółko (emoji nie da
+// się przekolorować jak Image).
+export default function BossArt({ id, emoji, size = 74, powered = false, mystery = false }: {
+  id: string; emoji: string; size?: number; powered?: boolean; mystery?: boolean;
 }) {
   const png = bossPng(id);
   const dedicatedPowered = powered ? poweredBossPng(id) : undefined;
   const aura = powered ? '#DC2626' : null;
+
+  if (mystery) {
+    return (
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        {png ? (
+          <Image source={png} style={{ width: size, height: size, tintColor: '#000000' }} resizeMode="contain" />
+        ) : (
+          <View style={{ width: size * 0.9, height: size * 0.9, borderRadius: size, backgroundColor: '#000000' }} />
+        )}
+      </View>
+    );
+  }
 
   if (dedicatedPowered) {
     return (

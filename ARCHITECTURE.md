@@ -480,6 +480,26 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     `weaknessLabel` na `Boss`/`Raid`/`EventBoss` ZOSTAJĄ jako pole — teraz PURE flavor (kolor
     aury, etykieta "Motyw: X"), zero efektu mechanicznego; `WeaknessKey` w `bosses.ts` też
     zostaje, tylko komentarz nad nim zaktualizowany. NIEsprawdzone na urządzeniu.
+  - **Bossy dalej w kolejności = mystery (portret-sylwetka + placeholder nazwa)** (2026-08-18,
+    user: "musimy zrobić że mają znaki zapytania i ciemne kształty... a ich nazwy to jakieś
+    mityczne znaki, że nie wiadomo o co chodzi... dopóki nie pokonasz wcześniejszego") — lista
+    kampanii (`app/bosses.tsx`) dotąd pokazywała PRAWDZIWY portret+nazwę+emoji dla KAŻDEGO
+    bossa niezależnie od `lock` (tylko HP/temat/próg były ukryte pod "Pokonaj poprzednich").
+    Teraz `lock` (jeszcze nie `current`, nie pokonany) dostaje pełny mystery-treatment:
+    `BossArt` (`components/bosses/BossArt.tsx`) — nowy prop `mystery?: boolean` — renderuje
+    PRAWDZIWY png bossa z `tintColor: '#000000'` (ta sama technika `Image` tint co istniejący
+    `powered`-aura silhouette-trick, więc kod się nie duplikuje) zamiast normalnego obrazka:
+    rozpoznawalny KSZTAŁT sylwetki (każdy boss ma inny), ale bez koloru/detalu — "coś tu jest",
+    nie "kto to". Emoji-fallback (gdyby jakiś boss go nie miał) dostaje analogiczne czarne
+    kółko. Nazwa: `mysteryBossName(id)` (`bosses.ts`) — deterministyczny (hash po `id`, SAM
+    wzorzec co `raidForWeek` w `raid.ts`) 3-znakowy placeholder z puli gotowych Unicode symboli
+    (`✦✧☽☾⚝✵⟁⌬⚚✴⛧❖◈⚶` — bloki Misc Symbols/Dingbats/Alchemical, szeroko wspierane na
+    Androidzie BEZ ładowania własnej czcionki) — user zaproponował "pobrać czcionkę ze
+    specjalnymi znakami", ale to nowy asset+licencja+expo-font setup dla czysto kosmetycznego
+    efektu, który gotowy Unicode już daje. Ten sam boss zawsze pokazuje TEN SAM placeholder
+    (nie miga losowo między odświeżeniami). Hero card ("current" boss, gotowy do walki) i
+    ekran walki (`boss-fight.tsx`, zawsze pokazuje TYLKO `current`) bez zmian — user
+    potwierdził że tam już działało dobrze.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

@@ -8,7 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp, todayISO } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts } from '@/utils/bosses';
+import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft } from '@/utils/seasonalEvents';
@@ -247,11 +247,11 @@ export default function Bosses() {
             const lock = !def && !isCur;
             return (
               <View key={b.id} style={[s.row, isCur && { borderColor: '#38BDF8' }]}>
-                <View style={(def || lock) && { opacity: 0.5 }}>
-                  <BossArt id={b.id} emoji={b.emoji} size={32} />
+                <View style={def && { opacity: 0.5 }}>
+                  <BossArt id={b.id} emoji={b.emoji} size={32} mystery={lock} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
+                  <Text style={s.rowName} numberOfLines={1}>{lock ? mysteryBossName(b.id) : b.name}</Text>
                   <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.name}` : lock ? 'Pokonaj poprzednich' : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
                 </View>
                 {def ? <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
