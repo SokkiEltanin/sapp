@@ -49,7 +49,21 @@ import { Boss, BOSSES, Bonuses, atkPower } from '@/utils/bosses';
 export const MAD_UNLOCK_LEVEL = 15;
 export const MAD_REWARD_MULT = 3;
 
-const madHitsFor = (order: number) => 6 + (order - 1) * (2 / 21);
+// PODBITE ×1.15 (2026-08-18, user: "mad wtedy niech będą 2x trudniejsze od podstaw albo
+// 4razy trudniejsze nie wiem jeszcze na pewno, daj im o +30% HP więcej niż teraz jest") — user
+// poprosił o +30%, throwaway-symulacją (dokładnie ten sam rygor co przy COUNTER_PCT wyżej,
+// profil inwestycji kalibrowany na realnych danych z logu) sprawdzono że +30% ŁAMIE
+// winnability dokładnie tam gdzie boli najbardziej: świeżo Lv15 gracz (MAD odblokowany od
+// niedawna, patrz MAD_UNLOCK_LEVEL) próbujący order6 kończy na ~45% winrate/55% faintRate —
+// NIE "bardzo trudne", tylko matematycznie w większości przegrane. +15% to sprawdzony sufit:
+// order1-6 przy Lv15-20 (realistyczny pierwszy kontakt z MAD) zostaje 100% winrate, wyraźnie
+// trudniejsze (avgLoss 54-86% zamiast 48-64%) bez przekraczania progu niewygrywalności z
+// historycznego komentarza wyżej ("już od ok. 8-10 ciosów" 0% win-rate). Część "2-4× trudniej"
+// user'a już i tak przychodzi ZA DARMO z COUNTER_PCT=0.05 (współdzielony z kampanią) +
+// wcześniejszym odblokowaniem (Lv15 zamiast 50, mniej czasu na inwestycję) — ten +15% HP to
+// TRZECI, dodatkowy mnożnik na wierzchu tamtych dwóch, nie jedyny.
+const MAD_HITS_MULT = 1.15;
+const madHitsFor = (order: number) => (6 + (order - 1) * (2 / 21)) * MAD_HITS_MULT;
 export const madBossHpFor = (atkStatBonus: number, level: number, bonuses: Bonuses, order: number) =>
   Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * madHitsFor(order));
 
