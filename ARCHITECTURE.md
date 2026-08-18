@@ -382,31 +382,18 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     zemdleć w środku pojedynczej sesji przy pechu (wariancja) — to NIE bug, po prostu ta próba
     dobija mniej HP, spróbuj ponownie następnym razem (energia i tak już zużyta, jak przy
     każdym innym trybie).
-  - **Kampania: gate "1 nowy boss dziennie"** (2026-08-17, ten sam dzień — user przysłał pełny
-    eksport z czystego resetu: 3/3 pokonanych bossów w ~4 minuty, "zdecydowanie za szybko to
-    poszło") — pojedyncza walka per-boss była już zwalidowana (9-12 ciosów, patrz "Trudność
-    walk" wyżej), problem był w PACINGU: odblokowanie kampanii jest czysto sekwencyjne (bez
-    progu poziomu, patrz fix niżej) + 3 dzienne próby ataku = nic nie stało na przeszkodzie
-    zbiciu 3 różnych bossów w jednej sesji, gdy XP starczyło na kilka poziomów naraz. Fix NIE
-    dotyka hp/dmg (świadomie — świeżo przetestowana krzywa), tylko dodaje osobny wymiar
-    pacingu: `lastCampaignDefeatDate: string | null` w `petStore.ts`, ustawiane na `todayISO()`
-    w `defeatBoss()` PRZY KAŻDYM nowym zwycięstwie (persystowane w `partialize`; `reset()`
-    czyści je do `null` razem z resztą postępu, w przeciwieństwie do `resetGeneration`/
-    `lastResetAt` które CELOWO przeżywają reset). `boss-fight.tsx` liczy `campaignDailyCapped = kind==='campaign'
-    && lastCampaignDefeatDate === today` — blokuje `attackRoundBased()` (toast "Dzisiejszego
-    bossa kampanii już pokonałeś") i podmienia arenę na `lockBox` z wyjaśnieniem zamiast
-    zwykłego `!target.unlocked` (level-lock) komunikatu — to CELOWO OSOBNY flag (`dailyCapped`
-    na `Target`), nie nadpisanie `unlocked`, żeby nie pokazać mylącego "odblokujesz na
-    poziomie X" dla bossa który i tak jest już level-unlocked. `app/bosses.tsx` dostaje ten sam
-    `campaignDailyCapped` (liczone lokalnie z `lastCampaignDefeatDate`+`todayISO()`, ekran nie
-    ma dostępu do `target`) — wygasza przycisk WALCZ! + subtitle pod hero card, ale WCIĄŻ
-    nawiguje do `boss-fight.tsx` (tam wyświetla się pełny lockBox, spójnie z resztą wzorców
-    lock-UI w tym pliku). Retry na TYM SAMYM, jeszcze niepokonanym bossie po przegranej
-    zostaje darmowe — `lastCampaignDefeatDate` zmienia się TYLKO przy zwycięstwie, więc gate
-    ogranicza wyłącznie przejście do KOLEJNEGO bossa tego samego dnia, nie liczbę prób na
-    aktualnym. MAD (druga, endgame'owa fala tych samych 22 bossów) świadomie NIE objęty tym
-    gate'em — to osobna oś progresji z własną pulą przeciwników (`madCandidate`), nie ta sama
-    "zbyt szybki pierwszy dzień" sytuacja co user zgłosił.
+  - **Kampania: gate "1 nowy boss dziennie" — WPROWADZONY 2026-08-17, ZASTĄPIONY 2026-08-18**
+    (patrz "Energia kampanii/MAD — regeneracja w czasie" niżej dla aktualnego mechanizmu) —
+    user przysłał pełny eksport z czystego resetu (3/3 bossów w ~4 minuty, "zdecydowanie za
+    szybko to poszło") i pierwotny fix był sztywną ścianą: `lastCampaignDefeatDate` w
+    `petStore.ts`, blokująca przejście do KOLEJNEGO bossa do następnego dnia po każdym
+    zwycięstwie. Dzień później user doprecyzował root cause ("uznałem wtedy że szybko poszło
+    bo bossy zaczynałem od resetu i od razu pokonałem wszystkie z samych nagród bez
+    jakichkolwiek wymagań") i wolał inny mechanizm: "wolałem zamiast jeden dziennie raz na 3h
+    atak może? i maksymalnie regeneruje się do 2 energii" — sztywna ściana "wróć jutro"
+    zastąpiona organiczną regeneracją energii w czasie (ten sam efekt: nie da się zblitzować
+    kampanii w jednej sesji, ale bez arbitralnego dziennego resetu). `lastCampaignDefeatDate`/
+    `campaignDailyCapped`/`dailyCapped` na `Target` CAŁKOWICIE usunięte z kodu.
   - **Fix: podwójne stuknięcie WALCZ! odpalało dwie równoległe walki naraz** (2026-08-17,
     znalezione dzięki świeżo dodanemu przebiegowi runda-po-rundzie wyżej — user opisał
     "kotek nie schodzi do zera HP... czasami walka przerywa zanim jedna ze stron zejdzie do
@@ -659,6 +646,36 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       używa starej `missionCard`, bez zmian. Migracja: stary zapisany stan bez `missionProfile`
       dostaje `'balanced'` JEŚLI akurat trwała aktywna misja (dokładnie to co wtedy dostałaby),
       inaczej `null`.
+  - **Energia kampanii/MAD — regeneracja w czasie rzeczywistym** (2026-08-18, ZASTĘPUJE gate
+    "1 nowy boss dziennie" z 2026-08-17, patrz wpis wyżej — user: "wolałem zamiast jeden
+    dziennie raz na 3h atak może? i maksymalnie regeneruje się do 2 energii") — dotąd `energy`
+    był FLAT dziennym grantem (`dailyAttempts(energyMult)`, ~3 bazowo, skalujący z łupem,
+    resetowany raz/dzień przez `syncEnergy`). Teraz bank 0..`ENERGY_MAX` (=2, `bosses.ts`),
+    +1 co `ENERGY_REGEN_HOURS` (=3) w czasie RZECZYWISTYM, nie o północy. Świadomie FLAT, BEZ
+    skalowania energyMult z łupu (user podał konkretne liczby bez wspominania o skalowaniu —
+    energyMult dalej ma sens dla raidu/eventu, tylko przestał wpływać na energię kampanii).
+    - **Jądro** — dwie CZYSTE, testowane funkcje w `bosses.ts` (nie w store, żeby dało się
+      testować bez Zustand/AsyncStorage — `__tests__/bosses.test.ts`, 10 nowych testów):
+      `energyRegenTick(energy, regenAt, now)` dogania tyknięcia PĘTLĄ (nie jednym odejmowaniem
+      różnicy czasu — inaczej `regenAt` mógłby wskazywać moment w PRZESZŁOŚCI po długim
+      offline, UI pokazywałoby ujemny odliczany czas), capuje na `ENERGY_MAX`, zwraca
+      `regenAt: null` gdy bank pełny (nic nie tyka). `energySpendTick(energy, regenAt, now)`
+      startuje zegar TYLKO przy przejściu pełny→niepełny — jeśli już tykał (bank był już
+      niepełny), zostaje bez zmian, żeby wydanie DRUGIEGO punktu energii nie zresetowało
+      postępu w stronę PIERWSZEGO (user nie traci częściowo odliczonego czasu).
+    - **Store** (`petStore.ts`) — `energyDate`/`energyToday` (stary model) zastąpione jednym
+      `energyRegenAt: string | null`. `syncEnergyRegen()` (nowa akcja, zero argumentów, w
+      przeciwieństwie do starego `syncEnergy(todayEnergy, mult)`) woła `energyRegenTick` z
+      realnym `Date.now()`; `spendEnergy()` woła `energySpendTick`. Migracja starego stanu:
+      `energy` przycięte do `ENERGY_MAX` (stary flat model mógł dawać więcej przy dużym
+      energyMult z łupu), `energyRegenAt` zawsze `null` po migracji (pierwsze
+      `syncEnergyRegen()` po starcie samo wystartuje zegar jeśli bank niepełny).
+    - **UI** — `app/bosses.tsx`'s `reload()` woła `syncEnergyRegen()` zamiast starego
+      `syncEnergy(attempts, 0)` (raid ZOSTAJE przy `syncRaidEnergy`+`dailyAttempts`, bez
+      zmian — to TYLKO energia kampanii). Hero card dostał nowy odliczany napis "Kolejna
+      energia za Xh Ymin" (`fmtEnergyCountdown`, statyczny w chwili renderu jak
+      `fmtMissionDuration` w `pet.tsx`, nie żywy tiker) gdy bank niepełny — user widzi KIEDY
+      wróci, nie tylko suchą liczbę "0 energii".
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

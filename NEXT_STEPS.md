@@ -9,6 +9,19 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Energia kampanii: regeneracja w czasie (2/bank, +1 co 3h) zamiast "1 boss dziennie" — NIEsprawdzone (2026-08-18)
+
+User, po pytaniu o gate "1 boss dziennie" (wprowadzony 2026-08-17): "uznałem wtedy że szybko
+poszło bo bossy zaczynałem od resetu i od razu pokonałem wszystkie z samych nagród bez
+jakichkolwiek wymagań... wolałem zamiast jeden dziennie raz na 3h atak może? i maksymalnie
+regeneruje się do 2 energii". Sztywny dzienny gate (`lastCampaignDefeatDate`) CAŁKOWICIE
+usunięty, zastąpiony organiczną regeneracją: bank energii kampanii/MAD 0..2, +1 co 3h w
+czasie rzeczywistym (nie o północy). Pełny opis w ARCHITECTURE §9. Raid/wydarzenie BEZ zmian
+— to tylko energia kampanii. **Priorytet testu:** wydaj oba punkty energii, sprawdź czy hero
+card na liście bossów pokazuje "Kolejna energia za Xh Ymin", poczekaj/zmień czas systemowy
+telefonu żeby sprawdzić czy realnie dochodzi punkt po ~3h (albo zrób export/import stanu z
+przesuniętym `energyRegenAt` jeśli wolisz nie czekać naprawdę).
+
 ## 🆕 Misja: kotek na pasku + blokuje inne walki + wybór profilu (balanced/gold/xp) — NIEsprawdzone (2026-08-18)
 
 User (z opisem screenshota): "jak kto jest w podróży to musi przeskalowywać się na pasek

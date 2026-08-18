@@ -324,10 +324,54 @@ export function atkPower(atkStatBonus: number, level: number, bonuses: Bonuses):
 }
 
 // Ile prób walki dziennie — FLAT, nie liczone z danych zdrowia (v5 pivot). Loot z
-// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower).
+// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower). Od 2026-08-18
+// używane TYLKO przez raid (`raidEnergy`/`syncRaidEnergy`) — kampania/MAD dostały OSOBNY,
+// regenerujący się w czasie model, patrz ENERGY_MAX/ENERGY_REGEN_HOURS niżej.
 export const BASE_DAILY_ATTEMPTS = 3;
 export function dailyAttempts(energyMult: number): number {
   return Math.max(1, Math.round(BASE_DAILY_ATTEMPTS * (1 + Math.max(0, energyMult))));
+}
+
+// Energia kampanii/MAD — regeneruje się w CZASIE RZECZYWISTYM, nie flat raz dziennie
+// (2026-08-18, user po odrzuceniu wcześniejszego gate'u "1 nowy boss dziennie": "wolałem
+// zamiast jeden dziennie raz na 3h atak może? i maksymalnie regeneruje się do 2 energii").
+// Zamierzony efekt TEN SAM co odrzucony gate (nie da się zblitzować kampanii w jednej
+// sesji), ale przez organiczny mechanizm regeneracji zamiast sztywnej ściany "wróć jutro" —
+// można wydać oba punkty naraz, ale trzeba poczekać (realnie, nie do północy) na kolejne.
+// Świadomie FLAT, bez skalowania energyMult z łupu (user podał konkretne liczby bez
+// wspominania o skalowaniu) — energyMult dalej ma sens dla raidu/eventu, po prostu przestał
+// wpływać na energię kampanii.
+export const ENERGY_MAX = 2;
+export const ENERGY_REGEN_HOURS = 3;
+
+// Czyste, testowalne jądro regeneracji — petStore.ts woła je z realnym `Date.now()`, testy
+// wołają z ustalonym `now`. `regenAt` = ISO czas kiedy dotrze NASTĘPNY punkt (null = bank
+// pełny, nic nie tyka).
+export interface EnergyState { energy: number; regenAt: string | null }
+
+// Doganianie tyknięć które minęły (np. offline) — PĘTLA, nie jedno odejmowanie różnicy
+// czasu, żeby zwrócony `regenAt` zawsze wskazywał REALNY, przyszły moment, nigdy przeszły.
+export function energyRegenTick(energy: number, regenAt: string | null, now: number = Date.now()): EnergyState {
+  if (energy >= ENERGY_MAX) return { energy: ENERGY_MAX, regenAt: null };
+  if (!regenAt) return { energy, regenAt: new Date(now + ENERGY_REGEN_HOURS * 3600000).toISOString() };
+  let e = energy;
+  let nextAt = new Date(regenAt).getTime();
+  while (nextAt <= now && e < ENERGY_MAX) {
+    e++;
+    nextAt += ENERGY_REGEN_HOURS * 3600000;
+  }
+  if (e >= ENERGY_MAX) return { energy: ENERGY_MAX, regenAt: null };
+  return { energy: e, regenAt: new Date(nextAt).toISOString() };
+}
+
+// -1 z banku. Zegar startuje TYLKO przy przejściu pełny→niepełny — jeśli już tykał (bank był
+// już niepełny), zostaje bez zmian, żeby wydanie drugiego punktu nie zresetowało postępu w
+// stronę pierwszego.
+export function energySpendTick(energy: number, regenAt: string | null, now: number = Date.now()): EnergyState {
+  const wasFull = energy >= ENERGY_MAX;
+  const next = Math.max(0, energy - 1);
+  const nextRegenAt = wasFull ? new Date(now + ENERGY_REGEN_HOURS * 3600000).toISOString() : regenAt;
+  return { energy: next, regenAt: nextRegenAt };
 }
 
 // Wydarzenia (2026-08-12): user — "musimy zrobić żeby walki eventowe były identyczne [do

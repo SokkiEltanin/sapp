@@ -7,8 +7,8 @@ import { ChevronLeft, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-nati
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
-import { usePetStore, levelFromXp, todayISO } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName } from '@/utils/bosses';
+import { usePetStore, levelFromXp } from '@/store/petStore';
+import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName, ENERGY_MAX } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft } from '@/utils/seasonalEvents';
@@ -28,6 +28,17 @@ const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
 
+// Odliczanie do kolejnego punktu energii kampanii (2026-08-18, patrz ENERGY_MAX/
+// ENERGY_REGEN_HOURS w bosses.ts) — statyczne w chwili renderu (jak fmtMissionDuration w
+// pet.tsx), nie żywy tiker; wystarczy bo user i tak wraca na ten ekran co jakiś czas
+// (useFocusEffect już odświeża `reload()` przy każdym powrocie).
+function fmtEnergyCountdown(regenAtIso: string): string {
+  const ms = Math.max(0, new Date(regenAtIso).getTime() - Date.now());
+  const totalMin = Math.ceil(ms / 60000);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
+
 // Ekran-LISTA (S&F-style): kampania + raid + wydarzenie, WYŁĄCZNIE przegląd. Klik "WALCZ"
 // na KAŻDYM z trzech nawiguje do app/boss-fight.tsx (kampania bez parametru, raid/wydarzenie
 // przez ?kind=raid|event) — 2026-08-10, user: "przyjrzyj się teraz eventowym bossom żeby
@@ -39,8 +50,8 @@ export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergy, syncRaidEnergy, syncEventEnergy,
-    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus, lastCampaignDefeatDate,
+    xp, energy, energyRegenAt, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncRaidEnergy, syncEventEnergy,
+    raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
@@ -49,19 +60,18 @@ export default function Bosses() {
   const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
-  // v5 pivot: energia to płaski dzienny limit prób (dailyAttempts), NIE liczony już z
-  // danych samo-opieki — patrz memory boss_design.md. Boss/raid dzielą ten sam limit
-  // (dailyAttempts, bazowo 3). Wydarzenie ma WŁASNĄ, osobną pulę (`eventDailyAttempts`,
-  // 2026-08-17 — wcześniej flat 1/dzień, patrz komentarz nad `eventDailyAttempts` w
-  // bosses.ts) — skaluje się z energyMult jak kampania, ale WYRAŹNIE słabiej i z twardym
-  // capem, żeby event pozostał rzadszy niż kampania nawet przy pełnej inwestycji.
+  // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
+  // ENERGY_MAX/ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
+  // które minęły offline, wołane tak samo jak stary flat sync przy każdym powrocie na ekran.
+  // Raid/wydarzenie ZOSTAJĄ przy starym flat dziennym modelu (`dailyAttempts`/
+  // `eventDailyAttempts`, skalowane energyMult z łupu) — ta zmiana dotyczy TYLKO energii
+  // kampanii, nie ich.
   const reload = useCallback(() => {
-    const attempts = dailyAttempts(bonuses.energyMult);
-    syncEnergy(attempts, 0);
-    syncRaidEnergy(attempts, 0);
+    syncEnergyRegen();
+    syncRaidEnergy(dailyAttempts(bonuses.energyMult), 0);
     syncEventEnergy(eventDailyAttempts(bonuses.energyMult), 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
-  }, [bonuses.energyMult, syncEnergy, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
+  }, [bonuses.energyMult, syncEnergyRegen, syncRaidEnergy, syncEventEnergy, level, raidEnsure]);
   useFocusEffect(reload);
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md). Tu
@@ -80,10 +90,6 @@ export default function Bosses() {
   // jaki wyważono hp/atak tego bossa), tylko przestał być bramką — stąd WALCZ! niżej jest
   // teraz bezwarunkowe, gdy tylko `current` istnieje.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
-  // Gate "1 nowy boss kampanii dziennie" (2026-08-17) — patrz identyczny komentarz przy
-  // lastCampaignDefeatDate w petStore.ts i campaignDailyCapped w boss-fight.tsx. Tu tylko
-  // podgląd/CTA — sam gate egzekwuje attackRoundBased() na ekranie walki.
-  const campaignDailyCapped = lastCampaignDefeatDate === todayISO();
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
@@ -221,12 +227,15 @@ export default function Bosses() {
             {/* Tylko HP + motyw — BEZ nagrody/mechanik przed walką (2026-08-10, user:
                 "zbyt dużo opisu bossa"). Reszta szczegółów żyje na ekranie walki. */}
             <Text style={s.hpTxt}>{current.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text></Text>
-            {campaignDailyCapped && (
-              <Text style={[s.hpTxt, { color: c.text.muted }]}>Dzisiejszy boss kampanii już pokonany — wróć jutro po kolejnego.</Text>
+            {/* Regeneracja w czasie (2026-08-18, patrz ENERGY_MAX/ENERGY_REGEN_HOURS w
+                bosses.ts) — gdy bank niepełny, pokazuje ZA ILE realnie dotrze kolejny punkt,
+                nie tylko "0 energii" bez kontekstu kiedy wróci. */}
+            {energy < ENERGY_MAX && energyRegenAt && (
+              <Text style={[s.hpTxt, { color: c.text.muted }]}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
             )}
 
             <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight' as any); }} style={{ width: '100%' }}>
-              <View style={[s.attackBtn, (energy <= 0 || campaignDailyCapped) && { opacity: 0.5 }]}>
+              <View style={[s.attackBtn, energy <= 0 && { opacity: 0.5 }]}>
                 <Swords size={18} color="#fff" />
                 <Text style={s.attackTxt}>WALCZ!</Text>
               </View>
