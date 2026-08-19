@@ -190,6 +190,15 @@ describe('bosses — counterDamage (2026-08-13: liczy od AKTUALNEGO, nie max HP 
     expect(counterDamage(1000, 0, true)).toBe(counterDamage(1000, 0, false) / 2);
     expect(counterDamage(1000, 0)).toBe(counterDamage(1000, 0, false)); // domyślnie bez guard
   });
+  // 2026-08-19 — user przejrzał log walk questowych: boss przy 1 HP (żywy!) miał kontratak
+  // zaokrąglony w dół do 0 (5% z 1 = 0.05 → round → 0), co wyglądało jak "martwy boss nadal
+  // dostaje ciosy" (dobijający cios w kolejnej rundzie renderował się bez poprzedzającego go
+  // kontrataku). Żywy boss ma teraz ZAWSZE co najmniej 1 obrażenie na kontratak.
+  test('żywy boss (hp>0) zadaje ZAWSZE co najmniej 1 obrażenie, nawet przy mikroskopijnym hp', () => {
+    expect(counterDamage(1, 0)).toBe(1);   // 1*0.05=0.05 → bez fixu zaokrągliłoby do 0
+    expect(counterDamage(5, 0)).toBe(1);   // 5*0.05=0.25 → też by się zaokrągliło do 0
+    expect(counterDamage(1, 0.9)).toBe(1); // nawet z maks. unikiem, żywy boss wciąż >=1
+  });
 });
 
 describe('bosses — BOSSES roster balance (2026-08-13, patrz memory boss_design.md „balance review")', () => {

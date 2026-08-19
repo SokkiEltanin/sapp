@@ -835,6 +835,29 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     `playerBeat()`, czy przeliczona realna skala właśnie spadła do 0 (`realDead`), i jeśli tak,
     skacze prosto do `finish()` zamiast kontynuować fikcyjne rundy — pomija też kontratak TEJ
     rundy (martwy boss nie kontratakuje, tak samo jak `simulateFight` już robi wewnętrznie).
+    - **Kampania/questy NIE miały tego buga** (dochodzenie 2026-08-19, user pytał "a w
+      kampanii i w daily/questach?") — przejrzany świeży log walk questowych nie pokazał ANI
+      JEDNEJ fikcyjnej rundy; to co wyglądało jak "atak na martwego bossa" to boss przy 1-20
+      HP (żywy, ale wizualnie prawie pusty pasek) + kontratak zaokrąglony do 0 (patrz bug
+      niżej) — myląca kombinacja, nie realny duplikat. Diagnoza PRZEZ dane (nie zgadywanie)
+      potwierdziła że rescaling z powyższego buga jest UNIKALNY dla raid/nemesis.
+  - **BUG: kontratak zaokrąglał się do 0 przy niskim HP bossa, mimo że boss żył** (2026-08-19,
+    user po przejrzeniu logu: boss przy 1 HP miał kontratak "0", co wyglądało jak dodatkowy,
+    niewywołany cios w kolejnej rundzie) — `counterDamage()` (`bosses.ts`) liczyła
+    `Math.round(currentBossHp × COUNTER_PCT × ...)`, a przy bardzo niskim HP (np. 1 HP ×
+    0.05 = 0.05) to się zaokrąglało w dół do gołego zera — boss TECHNICZNIE żywy, ale
+    wizualnie "nie kontratakuje", myląco sugerując że już padł. Żywy boss (`hp > 0`) zadaje
+    TERAZ zawsze `Math.max(1, ...)` — co najmniej 1 obrażenie na kontratak, niezależnie jak
+    mało HP mu zostało. Martwy boss (`hp <= 0`) dalej zwraca 0 bez zmian. Osobny mechanizm
+    CAŁKOWITEGO uniku (item `dodge`) nadal potrafi wyzerować to PO FAKCIE w `simulateFight` —
+    ta zmiana dotyczy tylko bazowego wyliczenia, nie efektów itemów. Drobny, ograniczony wpływ
+    na całkowity dmg w walce (+1 max w ostatnich 1-2 rundach każdej walki) — nie wymagało
+    ponownej pełnej symulacji balansu z audytu `COUNTER_PCT` wyżej.
+  - **Energia: pigułki w prawym górnym rogu W KOLUMNIE, nie w rzędzie** (2026-08-19, user:
+    "energia eventowych ma być czerwona i wspólna dla obu w prawym górnym, i pod nią energia
+    zwykła niebieska pod kampanię") — `app/bosses.tsx` header: czerwona pigułka (`eventEnergy`)
+    NA GÓRZE, niebieska (`energy`, kampania/MAD) POD NIĄ (`s.energyPillCol`,
+    `flexDirection:'column'`, było `energyPillRow`/`row`).
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

@@ -437,9 +437,22 @@ const COUNTER_PCT = 0.05; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kon
 // liczbą ciosów daje w sumie TYLE SAMO skumulowanych obrażeń na kotka co odpowiednik bez
 // guard, zamiast dwa razy tyle. Guard nadal robi swoje (2× dłuższa walka, tankowy typ), tylko
 // przestaje BEZ ZAMIERZENIA mnożyć całkowite ryzyko.
+// PODBITE (2026-08-19, user przejrzał log walk questowych: "boss HP: ...78→1→0, kontratak:
+// ...0,0" — boss przy 1 HP wciąż ŻYJE, ale 5% z 1 zaokrągla się w dół do 0, więc kontratak
+// znikał, mimo że boss jeszcze nie padł. User: "napraw żeby nie zaokrąglało tego") — `Math.
+// round` mogło ściąć każdą małą, ale NIEZEROWĄ wartość do 0, co wyglądało jak "martwy boss
+// nadal dostaje ciosy" (dobijający cios w rundzie N+1 renderował się bez POPRZEDZAJĄCEGO go
+// kontrataku, choć boss żył). Żywy boss (hp>0) zadaje TERAZ zawsze co najmniej 1 obrażenie —
+// `Math.max(1, ...)` zamiast gołego zaokrąglenia. Martwy boss (hp<=0) dalej zwraca 0 (guard na
+// górze, nie dotyczy tej zmiany). Osobny mechanizm CAŁKOWITEGO uniku (item 'dodge' w
+// combatItems.ts) i tak potrafi wyzerować to PO fakcie w simulateFight — ta zmiana nie koliduje,
+// dotyczy tylko bazowego wyliczenia, nie efektów itemów.
 export function counterDamage(currentBossHp: number, dodge: number, guard = false): number {
-  const base = Math.max(0, currentBossHp) * COUNTER_PCT * (guard ? 0.5 : 1);
-  return Math.round(base * (1 - Math.min(0.9, Math.max(0, dodge))));
+  const hp = Math.max(0, currentBossHp);
+  if (hp <= 0) return 0;
+  const base = hp * COUNTER_PCT * (guard ? 0.5 : 1);
+  const reduced = base * (1 - Math.min(0.9, Math.max(0, dodge)));
+  return Math.max(1, Math.round(reduced));
 }
 
 // One hit: pełna moc ataku (staty+poziom+łup), lekka losowa wariancja (0.85–1.15) żeby

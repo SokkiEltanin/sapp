@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Kontratak zaokrąglał się do 0 przy niskim HP + pigułki energii w kolumnie — NIEsprawdzone (2026-08-19)
+
+Follow-up po poprzednim fixie ("kotek atakuje 2 raz"). User zapytał czy to samo dotyczy
+kampanii/questów — przejrzałem świeży log walk questowych na jego prośbę i NIE znalazłem tam
+żadnej fikcyjnej rundy (potwierdzone przez dane, nie zgadywanie: rescaling z buga raid/nemesis
+jest unikalny dla tamtych trybów). Ale znalazłem PRAWDZIWY, mniejszy bug w tych samych danych:
+boss przy 1-20 HP (żywy!) miał kontratak zaokrąglony w dół do "0" (`Math.round(1×0.05)=0`), co
+wyglądało jak "boss już martwy, ale dostaje kolejny cios" — myląca kombinacja, nie duplikat.
+
+1. **Kontratak nie zaokrągla już do zera** — żywy boss (`hp>0`) zadaje teraz zawsze co najmniej
+   1 obrażenie na kontratak (`Math.max(1, ...)` w `counterDamage()`, `bosses.ts`), niezależnie
+   jak mało HP mu zostało. Martwy boss dalej nie kontratakuje.
+2. **Pigułki energii w kolumnie, nie w rzędzie** — user doprecyzował layout: czerwona
+   (wydarzenia) NA GÓRZE, niebieska (kampania) POD NIĄ, obie w prawym górnym rogu.
+
+Pełny opis w ARCHITECTURE §9. **Priorytet testu:** stocz walkę do samego końca przy niskim HP
+bossa (kampania/quest/misja), sprawdź czy kontratak w przedostatniej rundzie NIE pokazuje "0"
+mimo że boss jeszcze żyje — oraz czy prawy górny róg ekranu Bossy pokazuje czerwoną pigułkę NAD
+niebieską (kolumna), nie obok siebie.
+
 ## 🐛 Energia kampanii nigdy się nie ładowała + kotek atakował martwego bossa w raid/nemesis — NIEsprawdzone (2026-08-19)
 
 User: "energia nie ładuje się wgle pisze ciągle ze za 3h odnowienie xdd ale czekam od wczoraj i
