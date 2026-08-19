@@ -842,6 +842,30 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       `combatItemUpgradeCost`), nie zastępuje go, oba prowadzą do tego samego capu.
     - **`CrateModal.tsx`** — nowy napis "⬆️ {nazwa} +1 poziom (LvN)!" obok istniejącego "🎁
       Nowy item bojowy", zależnie od tego która gałąź trafiła.
+  - **SYSTEM EKWIPUNKU — `src/utils/gear.ts` (2026-08-19, W TRAKCIE, pełny plan +
+    checklista kroków w `NEXT_STEPS.md` "SYSTEM EKWIPUNKU")** — TRZECI, osobny system
+    itemów obok loot kampanii (`ownedItems`) i itemów bojowych (`combatItems.ts` powyżej):
+    6 slotów PASYWNYCH statów wokół kotka (hełm→crit%, zbroja→flat HP, buty→dodge%,
+    obroża→atk%, talizman→energyMult%, kolczyki→coins%), 30 itemów (5/slot, progresja
+    odblokowania wg poziomu pupila T1=Lv1..T5=Lv90, NIEZALEŻNA od rzadkości), 5 rarity
+    (common/rare/epic/legendary/mythic, mnożnik ×1/×5/×8/×11/×15 na `baseValue` —
+    ×1/×5/×15 zakotwiczone na przykładzie usera, ×8/×11 dointerpolowane TODO-balance).
+    Grafiki w `assets/ekwipunek/<slot>/` (README tam ma pełną listę nazw plików) — obecnie
+    PLACEHOLDERY (kolorowy prostokąt + "T{n}"), user podmieni pod te same nazwy, zero
+    zmian w kodzie potrzebnych. **Krok 1/2 świadomie ograniczony do stanu, jak
+    `combatItems.ts` na start**: `petStore.ownedGear` (item id → najlepsza zdobyta
+    rzadkość, dubel w gorszej rzadkości nic nie zmienia) + `equippedGear` (slot → id) +
+    `grantGear`/`equipGear`/`unequipGear` — **staty JESZCZE nic nie robią w
+    `simulateFight`/`atkPower`/ekonomii, to świadomie osobny późniejszy krok, nie
+    zapomnieć** (patrz NEXT_STEPS.md krok 8). Drop: REUSE istniejącego `petBoxes.ts`
+    (`LOOT_BOXES` sardine/silver/gold, id BEZ ZMIAN żeby nie migrować zapisów, tylko
+    `name`→"Drewniana/Srebrna/Złota") — nowy `gearChance`+`gearRarityWeight` branch w
+    `rollBox()` (4. parametr `level` filtruje pulę do `unlockedGearFor`), DODANY obok
+    istniejących cosmetics branchy (colorChance/startupChance zostają — user przenosi
+    tylko RĘCZNE kupno kolorów do modala imienia, skrzynki nadal mogą je losowo dawać).
+    `BoxReward` ma nowy wariant `{ type: 'gear' }`; `BoxRevealModal.tsx` liczy `meta` z
+    `RARITY_META` (gear.ts, 5 tierów) zamiast `CRATE_META` (crates.ts, 4 tiery) gdy
+    `reward.type === 'gear'` — DWIE różne skale rzadkości w tym samym pliku, nie pomylić.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po

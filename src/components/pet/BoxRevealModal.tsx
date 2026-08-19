@@ -3,6 +3,7 @@ import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing } from 'reac
 import { Snowflake } from 'lucide-react-native';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
+import { RARITY_META, SLOT_META, GearSlot } from '@/utils/gear';
 import { haptic } from '@/utils/haptics';
 
 // Cząstka lecąca od (sx,sy) do (ex,ey) — monety/iskry na zewnątrz, ❄ z boków do środka.
@@ -46,7 +47,9 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
     return () => l.stop();
   }, [visible, phase]);
 
-  const meta = reward ? CRATE_META[reward.rarity] : CRATE_META.basic;
+  const meta = reward
+    ? (reward.type === 'gear' ? RARITY_META[reward.rarity] : CRATE_META[reward.rarity])
+    : CRATE_META.basic;
 
   const doOpen = () => {
     if (phase !== 'closed' || !reward) return;
@@ -70,7 +73,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
             ex: (Math.random() - 0.5) * 40, ey: -20 + (Math.random() - 0.5) * 40, emoji: '❄️', size: 20 + Math.random() * 12 };
         }));
       } else {
-        const n = reward.rarity === 'legendary' ? 18 : reward.rarity === 'epic' ? 13 : 9;
+        const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
         const em = reward.type === 'coins' ? '🪙' : '✨';
         setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
           sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
@@ -85,7 +88,7 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
   const glowOp = burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0.28] });
   const cardScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
-  const rewardTitle = reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'startup' ? 'NOWY STARTUP!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : 'MONETY';
+  const rewardTitle = reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'startup' ? 'NOWY STARTUP!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : reward?.type === 'gear' ? 'EKWIPUNEK!' : 'MONETY';
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -124,6 +127,11 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
                     <>
                       <Snowflake size={40} color="#7DD3FC" />
                       <Text style={st.rewardName}>+{reward.count} zamrożenie</Text>
+                    </>
+                  ) : reward?.type === 'gear' ? (
+                    <>
+                      <Text style={{ fontSize: 40 }}>{SLOT_META[reward.slot as GearSlot]?.icon ?? '🎁'}</Text>
+                      <Text style={st.rewardName}>{reward.name}</Text>
                     </>
                   ) : (
                     <Text style={st.coins}>+{reward?.coins} 🪙</Text>
