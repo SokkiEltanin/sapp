@@ -918,6 +918,16 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       rarity, cost)` — reużywa ISTNIEJĄCY `dayClaims` (ten sam mechanizm co odbiór
       questów) z kluczem `gearDaily:${date}:${itemId}`, żeby nie dało się kupić tego
       samego slotu dwa razy tego samego dnia — zero nowego pola w store potrzebne.
+  - **`GearPanel.tsx` — 6 slotów przy kotku + porównanie itemów** (krok 7). Rząd 6
+    przycisków (`GEAR_SLOTS`) wstawiony w `app/pet.tsx` między sceną kotka a kartą Misji.
+    Tap w slot → `GearSlotModal` (bottom sheet): lista POSIADANYCH itemów danego slotu z
+    `RARITY_META` kolorem, `gearStatValue(item, rarity)`, i deltą vs aktualnie założony
+    (`▲`/`▼`/`=`, zielony/czerwony/szary). Equip/unequip przez istniejące
+    `petStore.equipGear/unequipGear`. Brak osobnego "plecaka" — S&F-owy przepływ przez
+    kliknięcie slotu, nie osobna lista wszystkich itemów. **WCIĄŻ BRAKUJE (krok 8, ostatni
+    z planu)**: staty z `equippedGear` nic jeszcze nie robią w `simulateFight`/`atkPower`/
+    ekonomii — to CAŁY sens systemu i nie jest zrobione, patrz NEXT_STEPS.md krok 8 dla
+    dokładnego planu (potrzebna throwaway-symulacja przed shipem, jak przy MAD_HITS_MULT).
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po
