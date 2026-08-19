@@ -9,6 +9,21 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 8 z 22 bossów kampanii pokazywało "undefinedundefined" zamiast symboli — NIEsprawdzone (2026-08-19)
+
+User przesłał screenshot listy Bossy — część zablokowanych (jeszcze nie odblokowanych) bossów
+pokazywała np. "◆undefinedundefined" zamiast trzech mistycznych symboli. Realny bug w
+`mysteryBossName()` (`bosses.ts`): `>>` (signed shift) zamiast `>>>` (unsigned) na hashu który
+mógł mieć bit 31 ustawiony — dla ~połowy bossów wychodził ujemny indeks tablicy, co w JS daje
+`undefined` zamiast zawinięcia. Zweryfikowane node'em że dokładnie 8 bossów (dragon, scroll,
+stress, procrast, jaguar, piratecapitan, princess, wizard) miało ten problem — wszystkie
+naprawione. Dodany też mocniejszy test (cały roster + 200 syntetycznych id, sprawdza brak
+"undefined" w wyniku) — stare testy przypadkiem nie łapały tego bugu.
+
+Pełny opis w ARCHITECTURE §9 (szukaj "8 z 22 bossów"). **Priorytet testu:** wejdź na listę
+kampanii, przewiń przez wszystkich zablokowanych bossów — każdy powinien pokazywać dokładnie 3
+symbole (np. "✦✧☽"), żaden nie powinien zawierać słowa "undefined".
+
 ## 🐛 Kontratak zaokrąglał się do 0 przy niskim HP + pigułki energii w kolumnie — NIEsprawdzone (2026-08-19)
 
 Follow-up po poprzednim fixie ("kotek atakuje 2 raz"). User zapytał czy to samo dotyczy

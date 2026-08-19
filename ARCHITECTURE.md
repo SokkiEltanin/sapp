@@ -489,6 +489,19 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     (nie miga losowo między odświeżeniami). Hero card ("current" boss, gotowy do walki) i
     ekran walki (`boss-fight.tsx`, zawsze pokazuje TYLKO `current`) bez zmian — user
     potwierdził że tam już działało dobrze.
+    - **BUG: 8 z 22 bossów pokazywało "undefinedundefined"** (2026-08-19, user przesłał
+      screenshot listy kampanii) — `h` w `mysteryBossName` jest wymuszone na unsigned 32-bit
+      przez `>>> 0` w pętli hasha, ale `(h >> 4)`/`(h >> 8)` (SIGNED shift, nie unsigned) z
+      powrotem przeliczały go na signed int32 (ToInt32) przed przesunięciem — dla ~połowy
+      wartości hash (gdy bit 31 ustawiony) wynik wychodził UJEMNY (arytmetyczny shift
+      rozciąga znak), a `(ujemna) % 14` w JS zostaje ujemne (JS zachowuje znak dzielnej, nie
+      zawija jak Python) — `MYSTERY_GLYPHS[ujemny_indeks]` w JS zwraca `undefined`, nie
+      zawija się na koniec tablicy. Fix: `>>>` (unsigned shift) zamiast `>>` na obu liniach —
+      zweryfikowane node'em, że dokładnie te same 8 bossów z zepsutego kodu (dragon/scroll/
+      stress/procrast/jaguar/piratecapitan/princess/wizard) teraz daje poprawne 3 symbole.
+      Nowy test w `bosses.test.ts` przechodzi CAŁY roster + 200 syntetycznych id, sprawdzając
+      brak `"undefined"` w wyniku — stare testy (tylko `sloth`/deterministyczność/brak
+      prawdziwej nazwy) przypadkiem NIE łapały tego, bo nie sprawdzały treści wyniku wprost.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

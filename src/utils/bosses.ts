@@ -269,12 +269,19 @@ export function bossById(id: string): Boss | undefined { return BOSSES.find(b =>
 // Deterministyczne po `id` (ten sam hash-wzorzec co `raidForWeek` w raid.ts) — TEN SAM boss
 // zawsze pokazuje TEN SAM placeholder, nie migocze losowo między odświeżeniami ekranu.
 const MYSTERY_GLYPHS = ['✦', '✧', '☽', '☾', '⚝', '✵', '⟁', '⌬', '⚚', '✴', '⛧', '❖', '◈', '⚶'];
+// BUG FIX (2026-08-19, user screenshot: "◆undefinedundefined" zamiast trzech symboli) — `h`
+// jest wymuszone na unsigned 32-bit przez `>>> 0` w pętli, ALE `>>` (signed shift) niżej
+// przelicza go z powrotem na SIGNED int32 (ToInt32) przed przesunięciem — dla ~połowy wartości
+// hash (gdy bit 31 ustawiony) `h >> 4`/`h >> 8` wychodziły UJEMNE (arytmetyczny shift
+// rozciąga znak), a `(ujemna) % 14` w JS zostaje ujemne (JS zachowuje znak dzielnej, nie jak
+// Python) — indeksowanie tablicy ujemnym indeksem w JS zwraca `undefined`, nie zawija się. Fix:
+// `>>>` (unsigned shift) zamiast `>>` — wynik zawsze nieujemny, więc zawsze poprawny indeks.
 export function mysteryBossName(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
   const a = MYSTERY_GLYPHS[h % MYSTERY_GLYPHS.length];
-  const b = MYSTERY_GLYPHS[(h >> 4) % MYSTERY_GLYPHS.length];
-  const c = MYSTERY_GLYPHS[(h >> 8) % MYSTERY_GLYPHS.length];
+  const b = MYSTERY_GLYPHS[(h >>> 4) % MYSTERY_GLYPHS.length];
+  const c = MYSTERY_GLYPHS[(h >>> 8) % MYSTERY_GLYPHS.length];
   return `${a}${b}${c}`;
 }
 

@@ -149,6 +149,20 @@ describe('bosses — mysteryBossName (placeholder dla jeszcze nieodblokowanych)'
       expect(placeholder.toLowerCase()).not.toContain(b.name.toLowerCase());
     }
   });
+  // BUG FIX (2026-08-19, user screenshot: "◆undefinedundefined" na liście bossów) — `>>`
+  // (signed shift) na hashu unsigned dawał UJEMNE przesunięcie dla ~połowy wartości hash,
+  // `(ujemna) % 14` w JS zostawało ujemne, indeks tablicy ujemny → `undefined`. Ten test
+  // przeszedłby na starym, zepsutym kodzie dla WSZYSTKICH 22 bossów kampanii tylko przez
+  // przypadek (gdyby żaden hash nie ustawił bitu 31) — dlatego sprawdzamy TAKŻE szeroki,
+  // syntetyczny zestaw id (nie tylko realny roster), żeby złapać oba znaki hasha.
+  test('zawsze dokładnie 3 symbole z MYSTERY_GLYPHS, nigdy "undefined" — dla całego rosteru i syntetycznych id', () => {
+    const ids = [...BOSSES.map(b => b.id), ...Array.from({ length: 200 }, (_, i) => `synthetic_id_${i}`)];
+    for (const id of ids) {
+      const placeholder = mysteryBossName(id);
+      expect(placeholder).not.toContain('undefined');
+      expect([...placeholder].length).toBe(3);
+    }
+  });
 });
 
 describe('bosses — bossTier (derywowana z unlockLevel)', () => {
