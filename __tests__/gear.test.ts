@@ -1,6 +1,7 @@
 import {
   GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT,
   gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots,
+  gearCombatBonuses, gearFlatHp, gearCoinsMult,
 } from '@/utils/gear';
 
 describe('gear — katalog', () => {
@@ -112,5 +113,63 @@ describe('gear — dailyShopSlots (sklep dnia, deterministyczny wg daty)', () =>
 
   test('poziom 0 (teoretyczny, brak odblokowanych itemów) → pusta lista, nie crash', () => {
     expect(dailyShopSlots('2026-08-19', 0)).toEqual([]);
+  });
+});
+
+describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
+  test('gearCombatBonuses: pusty ekwipunek → same zera', () => {
+    expect(gearCombatBonuses({}, {})).toEqual({ atk: 0, dodge: 0, crit: 0, energyMult: 0 });
+  });
+
+  test('gearCombatBonuses: jeden założony item dokłada się do właściwego statu', () => {
+    const b = gearCombatBonuses({ helm: 'helm_slomiany' }, { helm_slomiany: 'common' });
+    expect(b).toEqual({ atk: 0, dodge: 0, crit: 0.0015, energyMult: 0 });
+  });
+
+  // Kalibracja balansu (patrz komentarz nad GEAR_ITEMS w gear.ts): pełny mityczny T5
+  // loadout na WSZYSTKICH 4 slotach walki NIE MOŻE przebić sumy bonusów z całej kampanii
+  // (22 bossy, policzone raz node'em z bosses.ts: atk 0.92, dodge 0.72, crit 0.36,
+  // energyMult 0.75) — jeśli ten test kiedyś zacznie failować po zmianie baseValue w
+  // gear.ts, to sygnał że ktoś przypadkiem złamał tę kalibrację, nie "false positive".
+  test('pełny mityczny T5 loadout (wszystkie 4 sloty walki) zostaje WYRAŹNIE poniżej sumy bonusów z całej kampanii', () => {
+    const equipped = { helm: 'helm_koronaBurzy', buty: 'buty_kometa', obroza: 'obroza_tytan', talizman: 'talizman_nieskonczonosc' };
+    const owned = { helm_koronaBurzy: 'mythic', buty_kometa: 'mythic', obroza_tytan: 'mythic', talizman_nieskonczonosc: 'mythic' } as const;
+    const b = gearCombatBonuses(equipped as any, owned as any);
+    const CAMPAIGN_SUM = { atk: 0.92, dodge: 0.72, crit: 0.36, energyMult: 0.75 };
+    expect(b.crit).toBeLessThan(CAMPAIGN_SUM.crit);
+    expect(b.dodge).toBeLessThan(CAMPAIGN_SUM.dodge);
+    expect(b.atk).toBeLessThan(CAMPAIGN_SUM.atk);
+    expect(b.energyMult).toBeLessThan(CAMPAIGN_SUM.energyMult);
+    // I nie jest to śladowa wartość — powinno być zauważalne (>5% dla każdego statu).
+    expect(b.crit).toBeGreaterThan(0.05);
+    expect(b.dodge).toBeGreaterThan(0.05);
+    expect(b.atk).toBeGreaterThan(0.05);
+    expect(b.energyMult).toBeGreaterThan(0.05);
+  });
+
+  test('gearFlatHp: mityczna T5 zbroja zostaje wyraźnie poniżej CAT_BASE_MAX_HP (100)', () => {
+    const hp = gearFlatHp({ zbroja: 'zbroja_aegis' }, { zbroja_aegis: 'mythic' });
+    expect(hp).toBeLessThan(100);
+    expect(hp).toBeGreaterThan(0);
+  });
+  test('gearFlatHp: brak zbroi → 0', () => {
+    expect(gearFlatHp({}, {})).toBe(0);
+  });
+
+  test('gearCoinsMult: brak kolczyków → mnożnik 1 (bez zmiany)', () => {
+    expect(gearCoinsMult({}, {})).toBe(1);
+  });
+  test('gearCoinsMult: mityczne T5 kolczyki dają rozsądny, nie absurdalny bonus', () => {
+    const mult = gearCoinsMult({ kolczyki: 'kolczyki_krezus' }, { kolczyki_krezus: 'mythic' });
+    expect(mult).toBeGreaterThan(1);
+    expect(mult).toBeLessThan(1.5); // +50% złota z jednego itemu byłoby już za dużo
+  });
+
+  test('gearCombatBonuses ignoruje sloty bez odpowiednika w Bonuses (zbroja/kolczyki)', () => {
+    const b = gearCombatBonuses(
+      { zbroja: 'zbroja_szmaciana', kolczyki: 'kolczyki_drewniane' },
+      { zbroja_szmaciana: 'common', kolczyki_drewniane: 'common' },
+    );
+    expect(b).toEqual({ atk: 0, dodge: 0, crit: 0, energyMult: 0 });
   });
 });
