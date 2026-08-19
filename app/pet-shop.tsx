@@ -10,7 +10,7 @@ import CatArt from '@/components/pet/CatArt';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import StartupPreview from '@/components/pet/StartupPreview';
 import PupilNavbar from '@/components/pet/PupilNavbar';
-import { usePetStore, loginBonusCoins } from '@/store/petStore';
+import { usePetStore, loginBonusCoins, levelFromXp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
@@ -72,7 +72,8 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak } = usePetStore();
+  const { coins, xp, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup, claimDailyBox, dayClaims, loginStreak, grantGear } = usePetStore();
+  const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
@@ -173,11 +174,12 @@ export default function PetShop() {
     if (coins < box.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${box.cost}`); return; }
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
-      const reward = rollBox(box, SHOP_COLORS, ownedItems);
+      const reward = rollBox(box, SHOP_COLORS, ownedItems, petLevel);
       if (reward.type === 'color') buyItem(reward.colorId, 0);
       else if (reward.type === 'startup') grantStartup(reward.startupId);
       else if (reward.type === 'coins') addCoins(reward.coins);
       else if (reward.type === 'freeze') addFreezes(reward.count);
+      else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity);
       haptic.success();
       setReveal({ box, reward });
     }, 'Otwórz');
@@ -188,11 +190,12 @@ export default function PetShop() {
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems);
+    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, petLevel);
     if (reward.type === 'color') buyItem(reward.colorId, 0);
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
+    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity);
     haptic.success();
     setReveal({ box: DAILY_BOX, reward });
   };

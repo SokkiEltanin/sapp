@@ -1,12 +1,17 @@
 import { boxById, rollBox, LOOT_BOXES } from '@/utils/petBoxes';
 import { ShopColor } from '@/utils/petShop';
 
-// rollBox kaskaduje kilka niezależnych progów (kolor → startup → zamrożenie → monety) i
-// czyta Math.random() bez wstrzykiwania. Sekwencja mockReturnValueOnce dla każdego testu
-// odzwierciedla DOKŁADNĄ kolejność wywołań w źródle: (1) r decydujący o strefie, (2) drugi
-// rzut WEWNĄTRZ ważonego losowania koloru/startupu (jeśli dotyczy) lub sprawdzenie jackpota
-// (dla monet), (3) trzeci rzut na kwotę monet (tylko gdy NIE jackpot — ternary go pomija
-// przy jackpocie, co też jest tu sprawdzone).
+// rollBox kaskaduje kilka niezależnych progów (kolor → startup → zamrożenie → EKWIPUNEK →
+// monety) i czyta Math.random() bez wstrzykiwania. Sekwencja mockReturnValueOnce dla
+// każdego testu odzwierciedla DOKŁADNĄ kolejność wywołań w źródle: (1) r decydujący o
+// strefie, (2) drugi rzut WEWNĄTRZ ważonego losowania koloru/startupu/itemu ekwipunku
+// (jeśli dotyczy) lub sprawdzenie jackpota (dla monet), (3) trzeci rzut na rzadkość
+// ekwipunku lub kwotę monet (tylko gdy NIE jackpot — ternary go pomija przy jackpocie, co
+// też jest tu sprawdzone).
+//
+// Progi (2026-08-19, po dodaniu gearChance — patrz petBoxes.ts):
+// sardine: colorCut=0.20, startupCut=0.20 (brak startupChance), freezeCut=0.25, gearCut=0.40
+// gold:    colorCut=0.32, startupCut=0.48, freezeCut=0.58, gearCut=0.96
 const color = (o: Partial<ShopColor>): ShopColor => ({
   id: 'test-color', name: 'Testowy', cost: 25, tier: 'basic',
   palette: { id: 'test-color', name: 'Testowy', coat: '#ABCDEF', shade: '#000', ear: '#000', ink: '#000', cost: 25, mark: '' } as any,
@@ -24,12 +29,12 @@ describe('petBoxes — boxById', () => {
 
 describe('petBoxes — rollBox (kaskada stref prawdopodobieństwa)', () => {
   afterEach(() => jest.restoreAllMocks());
-  const sardine = boxById('sardine'); // colorCut=0.25, startupCut=0.25 (brak startupChance), freezeCut=0.30
-  const gold = boxById('gold');       // colorCut=0.48, startupCut=0.64, freezeCut=0.82
+  const sardine = boxById('sardine');
+  const gold = boxById('gold');
 
   test('strefa koloru: r < colorChance i jest nieposiadany kolor → nagroda typu color', () => {
     jest.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.5);
-    const reward = rollBox(sardine, [color({ id: 'niebieski', tier: 'basic' })], []);
+    const reward = rollBox(sardine, [color({ id: 'niebieski', tier: 'basic' })], [], 1);
     expect(reward.type).toBe('color');
     if (reward.type === 'color') {
       expect(reward.colorId).toBe('niebieski');
@@ -38,33 +43,49 @@ describe('petBoxes — rollBox (kaskada stref prawdopodobieństwa)', () => {
   });
 
   test('strefa startupu: r pomiędzy colorChance a startupChance → nagroda typu startup (nawet gdy kolory dostępne, bo r poza ich zakresem)', () => {
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.55).mockReturnValueOnce(0.5);
-    const reward = rollBox(gold, [color({ id: 'niebieski' })], []); // kolor nieposiadany, ale r=0.55 >= colorCut(0.48)
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.40).mockReturnValueOnce(0.5); // gold: [0.32, 0.48)
+    const reward = rollBox(gold, [color({ id: 'niebieski' })], [], 1); // kolor nieposiadany, ale r=0.40 >= colorCut(0.32)
     expect(reward.type).toBe('startup');
   });
 
   test('strefa zamrożenia: r poza kolorem/startupem, w zakresie freezeChance', () => {
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.27); // sardine: [0.25, 0.30)
-    const reward = rollBox(sardine, [], []);
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.22); // sardine: [0.20, 0.25)
+    const reward = rollBox(sardine, [], [], 1);
     expect(reward).toEqual({ type: 'freeze', count: 1, rarity: 'rare' });
   });
   test('zamrożenie ze złotej skrzynki ma wyższą rzadkość (epic, nie rare)', () => {
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.70); // gold: [0.64, 0.82)
-    const reward = rollBox(gold, [], []);
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.53); // gold: [0.48, 0.58)
+    const reward = rollBox(gold, [], [], 1);
     expect(reward).toEqual({ type: 'freeze', count: 1, rarity: 'epic' });
   });
 
+  test('strefa ekwipunku: r w zakresie gearChance → nagroda typu gear, item wg poziomu odblokowania', () => {
+    // sardine: [0.25, 0.40). Drugi rzut=0 → floor(0*N)=0 → pierwszy odblokowany item
+    // (helm_slomiany, T1/Lv1 — GEAR_SLOTS zaczyna się od 'helm'). Trzeci rzut=0 → pierwsza
+    // rzadkość z niezerową wagą w gearRarityWeight (common, insertion order).
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    const reward = rollBox(sardine, [], [], 1);
+    expect(reward).toEqual({ type: 'gear', itemId: 'helm_slomiany', name: 'Słomiany Kapelusz', slot: 'helm', rarity: 'common' });
+  });
+  test('strefa ekwipunku: item niedostępny na niskim poziomie nie może wypaść (pula filtrowana wg unlockLevel)', () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    const reward = rollBox(sardine, [], [], 1);
+    expect(reward.type).toBe('gear');
+    if (reward.type === 'gear') expect(reward.itemId).not.toBe('helm_koronaBurzy'); // unlockLevel=90
+  });
+
   test('strefa monet (bez jackpota): kwota w zakresie [min,max] skrzynki', () => {
-    // r=0.9 poza wszystkimi wcześniejszymi strefami; drugi rzut (jackpot check) wysoki → NIE jackpot;
-    // trzeci rzut (kwota) = 0 → dolna granica zakresu (min=3 dla sardine)
+    // r=0.9 poza wszystkimi wcześniejszymi strefami (w tym gearCut=0.40 dla sardine); drugi
+    // rzut (jackpot check) wysoki → NIE jackpot; trzeci rzut (kwota) = 0 → dolna granica
+    // zakresu (min=3 dla sardine)
     jest.spyOn(Math, 'random').mockReturnValueOnce(0.9).mockReturnValueOnce(0.99).mockReturnValueOnce(0);
-    const reward = rollBox(sardine, [], []);
+    const reward = rollBox(sardine, [], [], 1);
     expect(reward).toEqual({ type: 'coins', coins: sardine.coins.min, rarity: 'basic' });
   });
 
   test('jackpot: drugi rzut trafia w jackpotChance → stała kwota jackpota, rzadkość legendary, TRZECI rzut w ogóle nie następuje', () => {
     const spy = jest.spyOn(Math, 'random').mockReturnValueOnce(0.9).mockReturnValueOnce(0); // 0 < każdy dodatni jackpotChance
-    const reward = rollBox(sardine, [], []);
+    const reward = rollBox(sardine, [], [], 1);
     expect(reward).toEqual({ type: 'coins', coins: sardine.coins.jackpot, rarity: 'legendary' });
     expect(spy).toHaveBeenCalledTimes(2); // nie 3 — ternary pomija rzut o kwotę przy jackpocie
   });

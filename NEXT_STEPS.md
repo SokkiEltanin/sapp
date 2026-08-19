@@ -9,6 +9,93 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕🏗️ SYSTEM EKWIPUNKU — duża wieloetapowa funkcja, W TRAKCIE (2026-08-19)
+
+User zaakceptował pełen plan ("Tak git zapisz wszystko i lecimy wszystko po kolei bez
+przerwy") po kilku turach dopracowywania. To jest ŹRÓDŁO PRAWDY dla całej funkcji —
+aktualizuj listę kroków poniżej po każdym PR, nie zaczynaj od zera w nowej sesji.
+
+### Spec (ustalone z userem)
+
+**6 slotów wokół kotka**, każdy steruje JEDNĄ statystyką:
+1. Hełm/czapka → crit%
+2. Zbroja/napierśnik → flat HP
+3. Buty → dodge%
+4. Obroża → atk%
+5. Talizman → energyMult%
+6. Kolczyki → coins% bonus (NOWA statystyka, nie istniała wcześniej)
+
+**30 itemów** = 5 per slot × 6 slotów. Każdy item ma JEDNĄ grafikę (rarity = kolorowa
+obwódka w apce, NIE osobna grafika na rarity — patrz `assets/ekwipunek/README.md` z pełną
+listą nazw plików i opisów, wysłaną userowi do skopiowania). 5 itemów w slocie = progresja
+odblokowania wg poziomu pupila (T1=Lv1, T2=Lv20, T3=Lv40, T4=Lv65, T5=Lv90) — to NIEZALEŻNE
+od rarity.
+
+**5 rarity per item** (item można wylosować w dowolnej rzadkości niezależnie od tego jak
+"wysoki tier" to jest): common (szara obwódka) ×1, rare (zielona) ×5, epic (niebieska) ×8,
+legendary (różowa) ×11, mythic (gradient niebiesko-jasnoróżowo-fioletowy) ×15 — mnożnik do
+bazowej wartości statu itemu. Zakotwiczone na przykładzie usera: pancerz T1 common=+1hp,
+rare=+5hp (1×5), mythic=+15hp (1×15) — pasuje idealnie do ×1/×5/×15, epic/legendary (×8/×11)
+dointerpolowane, TODO-balance jeśli się nie sprawdzą w praniu.
+
+**Skrzynki — REUSE istniejącego `petBoxes.ts` (`LOOT_BOXES`: sardine/silver/gold, koszt
+35/90/200), NIE nowy system.** User chciał "3 skrzynki drewniana/srebrna/złota" — to
+dokładnie te same 3 skrzynki co już są w sklepie (id zostają sardine/silver/gold żeby nie
+migrować zapisanych danych, zmienia się tylko `name` na "Drewniana/Srebrna/Złota"). Dodajemy
+DO nich (nie zamiast) branch na drop gear — `gearChance` + `gearTierWeight` per skrzynka,
+różne tylko w szansach na wyższe rarity (jak user chciał: "jedyne co się różni to szansa na
+lepsze statystyki"). Cosmetics (colorChance/startupChance) w skrzynkach ZOSTAJĄ bez zmian —
+user przenosi TYLKO ręczne kupno kolorów z shopu do modala imienia, skrzynki nadal mogą je
+losowo dawać jako bonus.
+
+**Nawigacja** — scalić staty + itemy w zakładkę Pupil (`/pet`), questy do OSOBNEJ nowej
+zakładki. PupilNavbar.tsx ma dziś 4 taby (pet/bosses/shop/stats) — trzeba dodać/przenieść.
+
+**Sklep (`/pet-shop.tsx`)** — traci sekcję kosmetyki całkowicie (przenosi się do modala
+imienia, patrz niżej). Zostają: skrzynki (LOOT_BOXES) + NOWE 3 sloty daily-reroll (konkretny
+item+rarity wylosowany raz dziennie, kupowany za gold, reset co 24h jak inne dailies).
+
+**Kosmetyka kotka → modal edycji imienia.** User pierwotnie chciał "klik w kotka", potem
+sam to odrzucił: "nie przecież kliknięciem głaskam kotka to nie może... lepiej dać przy
+edycji imienia". Dziś tap w wiersz z imieniem (`app/pet.tsx:437`, `nameRow`) przełącza
+inline `TextInput` (linia 430). Ma się stać modalem `PetCustomizeModal` (imię na górze +
+CAŁA siatka kosmetyki 1:1 przeniesiona z `pet-shop.tsx` — kolor futra/pasy/oczy/nos/wąsy/
+pręgi na łapach, te same `buyColor/buyStripes/buyEyeColor/buyNoseColor/buyWhiskers/
+buyLegStripes` z petStore, tylko UI przeniesione). TEN SAM modal użyty też jako
+**jednorazowy onboarding przy pierwszym uruchomieniu** — dziś pupil startuje z twardym
+defaultem `name: 'Blobek'` i domyślnymi kolorami, zero pytania usera. Potrzebna nowa flaga
+`onboarded: boolean` w petStore.
+
+**Backup — NIC nie trzeba robić.** Sprawdzone: `backupService.ts` → `gatherSnapshot()`
+bierze WSZYSTKIE klucze AsyncStorage poza `firebase:*`, więc `pet-v1` (persist key
+petStore) leci do backupu automatycznie, cały nowy stan ekwipunku wejdzie z automatu, zero
+zmian potrzebnych.
+
+**Porównanie itemów** — karta itemu w plecaku pokazuje deltę względem aktualnie założonego
+w tym samym slocie (+3 HP / -2% crit itp.), reużywalny komponent `ItemCompareCard`, użyty
+w plecaku i w podglądzie po otwarciu skrzynki.
+
+### Kroki implementacji (patrz TaskList tego repo dla live statusu)
+
+1. [x] `src/utils/gear.ts` — 30 itemów, typy `GearSlot`/`GearRarity`, `gearStatValue(item, rarity)`.
+   12 testów w `__tests__/gear.test.ts`. Ikony na razie PLACEHOLDERY w `assets/ekwipunek/`.
+2. [x] petStore: `ownedGear`, `equippedGear` (per slot), `onboarded` + `grantGear`/`equipGear`/
+   `unequipGear`/`setOnboarded`. Dodane do `partialize` (persist) i migracji w
+   `onRehydrateStorage` (`onboarded` domyślnie `true` na migracji starych zapisów, `false`
+   tylko dla NOWYCH pupili — inaczej onboarding pokazałby się wszystkim istniejącym userom).
+   **UWAGA — WCIĄŻ NIE ZROBIONE: staty NIC jeszcze nie robią w `simulateFight`/`atkPower`/
+   ekonomii — to świadomie osobny, późniejszy krok 8. Nie zapomnieć — inaczej ekwipunek to
+   tylko kolekcjonowanie bez efektu.**
+3. [x] `petBoxes.ts` — `gearChance`/`gearRarityWeight` branch w `rollBox()` (4. param `level`),
+   rename sardine `name`→"Drewniana skrzynka". Zaktualizowane 3 call site'y (`pet-shop.tsx` ×2,
+   `pet.tsx` ×1 dla skrzynki dnia przy kocie) + `BoxRevealModal.tsx` (osobna `RARITY_META` dla
+   gear vs `CRATE_META` dla reszty — 2 różne skale rzadkości w jednym pliku).
+4. [ ] Nawigacja: scal staty+itemy do `/pet`, questy do nowej zakładki
+5. [ ] `pet-shop.tsx`: usuń kosmetykę, dodaj 3 sloty daily-reroll
+6. [ ] `PetCustomizeModal` (imię+kosmetyka) + onboarding przy pierwszym uruchomieniu
+7. [ ] UI slotów przy kotku + plecak + `ItemCompareCard`
+8. [ ] **Wpięcie bonusów gear w realne formuły walki/ekonomii** (nie pomijać — patrz krok 2)
+
 ## 🆕 Duży animowany kafelek misji + anulowanie z potwierdzeniem — NIEsprawdzone (2026-08-19)
 
 User: "jak pupil jest w trakcie misji to może zrobić jednak większy ten kafelek jakby z

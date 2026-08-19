@@ -7,6 +7,7 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, ENERGY_MAX, energyRegenTick, energySpendTick } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
+import { GearSlot, GearRarity, gearById, RARITY_MULT } from '@/utils/gear';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -187,6 +188,15 @@ interface PetState {
   // NIC jeszcze tego nie czyta w walce — czysto dodatkowy stan, jak catHp wcześniej.
   ownedCombatItems: Partial<Record<CombatItemId, number>>;
   equippedCombatItems: CombatItemId[];   // max COMBAT_ITEM_SLOTS
+  // ── ekwipunek pasywny (gear.ts) — 6 slotów, staty na stałe, w odróżnieniu od itemów
+  // bojowych powyżej (aktywne zdolności w walce). Klucz nieobecny = nieposiadany. Wartość =
+  // NAJLEPSZA zdobyta rzadkość tego itemu (S&F-style — dubel w gorszej rzadkości nic nie
+  // daje). NIC jeszcze tego nie czyta w walce/ekonomii — czysto dodatkowy stan (patrz
+  // NEXT_STEPS.md "SYSTEM EKWIPUNKU", krok 2 — wpięcie staty to świadomie osobny krok).
+  ownedGear: Partial<Record<string, GearRarity>>;
+  equippedGear: Partial<Record<GearSlot, string>>;   // slot → id założonego itemu
+  // Jednorazowy onboarding (imię + wygląd) przy pierwszym uruchomieniu — patrz setOnboarded.
+  onboarded: boolean;
   // ── raid tygodniowy ──
   // WŁASNA pula energii — atak bossa i atak raidu NIE dzielą jednego zasobu (dawniej
   // dzieliły `energy`, więc trzeba było wybierać, w co uderzyć). Zasilana tym samym
@@ -294,6 +304,10 @@ interface PetState {
   upgradeCombatItem: (id: CombatItemId, cost: number, maxLevel: number) => boolean; // +1 poziom za monety, cap maxLevel
   equipCombatItem: (id: CombatItemId) => boolean;                               // false = brak slotu lub nieposiadany
   unequipCombatItem: (id: CombatItemId) => void;
+  grantGear: (itemId: string, rarity: GearRarity) => void;   // ze skrzynki/daily shopu — no-op jeśli już masz ≥ tę rzadkość
+  equipGear: (itemId: string) => boolean;                     // false = nieposiadany lub poziom za niski
+  unequipGear: (slot: GearSlot) => void;
+  setOnboarded: () => void;
   reset: () => void;
 }
 
@@ -361,6 +375,9 @@ export const usePetStore = create<PetState>()(
       atkStatBonus: 0,
       ownedCombatItems: {},
       equippedCombatItems: [],
+      ownedGear: {},
+      equippedGear: {},
+      onboarded: false,
       _hydrated: false,
 
       setName: (name) => set({ name: name.trim() || 'Blobek' }),
@@ -774,10 +791,29 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
+      grantGear: (itemId, rarity) => set((s) => {
+        const cur = s.ownedGear[itemId];
+        if (cur && RARITY_MULT[cur] >= RARITY_MULT[rarity]) return s;
+        return { ownedGear: { ...s.ownedGear, [itemId]: rarity } };
+      }),
+      equipGear: (itemId) => {
+        const s = get();
+        const item = gearById(itemId);
+        if (!item || !s.ownedGear[itemId]) return false;
+        if (item.unlockLevel > levelFromXp(s.xp).level) return false;
+        set({ equippedGear: { ...s.equippedGear, [item.slot]: itemId } });
+        return true;
+      },
+      unequipGear: (slot) => set((s) => {
+        const next = { ...s.equippedGear };
+        delete next[slot];
+        return { equippedGear: next };
+      }),
+      setOnboarded: () => set({ onboarded: true }),
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [] })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false })),
     }),
     {
       name: 'pet-v1',
@@ -805,6 +841,7 @@ export const usePetStore = create<PetState>()(
         menaceId: s.menaceId, menaceHp: s.menaceHp,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
+        ownedGear: s.ownedGear, equippedGear: s.equippedGear, onboarded: s.onboarded,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)
@@ -846,6 +883,13 @@ export const usePetStore = create<PetState>()(
         // po starcie samo go ustawi.
         state.menaceId = state.menaceId ?? null;
         state.menaceHp = state.menaceHp ?? 0;
+        // Ekwipunek (2026-08-19) — nowe pola, brak = stary stan sprzed tej funkcji.
+        // `onboarded` domyślnie TRUE na migracji (nie FALSE z initial state!) — to zapis
+        // istniejącego, już nazwanego pupila, onboarding ma się pokazać TYLKO nowym pupilom
+        // (initial state w create() ustawia false, to migracyjny fallback dla starych zapisów).
+        state.ownedGear = state.ownedGear ?? {};
+        state.equippedGear = state.equippedGear ?? {};
+        state.onboarded = state.onboarded ?? true;
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};

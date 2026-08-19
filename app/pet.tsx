@@ -50,7 +50,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, addCoins,
+  const { name, xp, coins, setName, careTick, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, grantGear, addCoins,
     pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
     missionStartedAt, missionEndsAt, startMission, cancelMission } = usePetStore();
@@ -127,11 +127,12 @@ export default function Pet() {
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems);
+    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, lvl.level);
     if (reward.type === 'color') buyItem(reward.colorId, 0);
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
+    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity);
     haptic.success();
     setBoxReveal({ box: DAILY_BOX, reward });
   };
