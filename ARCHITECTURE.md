@@ -866,6 +866,31 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     `BoxReward` ma nowy wariant `{ type: 'gear' }`; `BoxRevealModal.tsx` liczy `meta` z
     `RARITY_META` (gear.ts, 5 tierów) zamiast `CRATE_META` (crates.ts, 4 tiery) gdy
     `reward.type === 'gear'` — DWIE różne skale rzadkości w tym samym pliku, nie pomylić.
+  - **Restrukturyzacja nawigacji Pupila — staty+itemy scalone do `/pet`, questy do
+    NOWEJ `/pet-quests`** (2026-08-19, krok 2 planu z NEXT_STEPS.md "SYSTEM EKWIPUNKU",
+    user: "statystyki były w zakładce z kotkiem i itemami... reszta zadań w osobnej
+    zakładce"). `PupilNavbar.tsx`'s 4 taby to teraz `pet`/`bosses`/`shop`/`quests` (był
+    `stats` zamiast `quests`, ikona `BarChart3`→`ClipboardList`) — **`app/pet-stats.tsx`
+    USUNIĘTY**, jego JSX (Siła bojowa + Ekwipunek bojowy: statCard grid, itemRow lista z
+    equip/upgrade) wklejony 1:1 do `app/pet.tsx` (własne handlery `onBuyMaxHp/onBuyAtk/
+    onToggleEquip/onUpgradeItem`, `pendingUpgrade`+`ConfirmDialog` state — kopia, nie
+    reużyty komponent, bo oba ekrany i tak się nie renderują jednocześnie). Cała lista
+    questów (dzienne/bonusowe/tygodniowe/miesięczne/cele/zaległe-z-wczoraj) wyjechała do
+    **nowego `app/pet-quests.tsx`**.
+    - **Pułapka, którą trzeba było rozwiązać**: `questCtx` (co questy widzą) i pupilowy
+      `input`/`pet` (status/nastrój na `/pet`) obie zależały od TEJ SAMEJ delikatnej
+      logiki odświeżania zdrowia/wody/budżetu (3 osobne, historycznie ubugowane fixy:
+      focus/AppState/północ-podczas-aktywnego-ekranu — patrz komentarze w kodzie). Zamiast
+      duplikować ją w dwóch plikach (ryzyko rozjazdu), wydzielona do
+      **`src/hooks/usePetHealthSync.ts`** — obie zakładki wołają ten sam hook niezależnie
+      (osobne mounty, lekko podwojony odczyt przy przełączaniu tabów, ale to nic wobec
+      ryzyka dwóch kopii tego samego kodu z czasem rozjeżdżających się poprawek).
+      `/pet` bierze z niego tylko `health/stepGoal/budgets` (do `input`/`overBudget`);
+      `/pet-quests` bierze `health/waterGoal/waterToday/yData/cardsCollected` (do
+      `questCtx`/`missed`) — **żadnego nakładania się pól, czysty podział**.
+    - `celebrate` (animacja świętowania na kotku przy odbiorze nagrody) świadomie NIE
+      przeniesiony do `pet-quests.tsx` — quest-claim tam już nie animuje kotka (nie ma go
+      na tym ekranie), to oczekiwana konsekwencja rozdzielenia ekranów, nie regresja.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po

@@ -111,7 +111,7 @@ export const THORN_PCT = 0.02;             // gwarantowane -2% hp bossa co rund�
 
 export function itemById(id: CombatItemId): CombatItemDef { return COMBAT_ITEMS[id]; }
 
-// Ulepszanie itemów bojowych za monety (UI w app/pet-stats.tsx) — taniej niż HP/ATK w
+// Ulepszanie itemów bojowych za monety (UI w app/pet.tsx) — taniej niż HP/ATK w
 // sklepie, bo te itemy trzeba NAJPIERW wylosować ze skrzynki (COMBAT_ITEM_DROP_CHANCE_BY_TIER
 // w crates.ts), więc samo posiadanie już jest rzadkie. DRUGI, RÓWNOLEGŁY tor ulepszania
 // (2026-08-18) — epic/legendary skrzynki mogą ZAMIAST nowego itemu dać darmowy +1 poziom

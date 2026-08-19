@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Cat, Swords, ShoppingBag, BarChart3 } from 'lucide-react-native';
+import { Cat, Swords, ShoppingBag, ClipboardList } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -18,15 +18,18 @@ import { haptic } from '@/utils/haptics';
 // routes outside the (tabs) group), so there's no visual clash to worry about.
 // `trophies`/achievements.tsx was dropped from this bar (2026-08-09, user gave an
 // explicit 4-tab list without it) — general life achievements still reach it via
-// Settings/dashboard, just not from here; `stats` (pet power + boss loot/items) took
-// its slot since it's the pupil-specific screen the achievements shortcut wasn't.
-export type PupilTab = 'pet' | 'bosses' | 'shop' | 'stats';
+// Settings/dashboard, just not from here.
+// `stats` (pet power + itemy bojowe) tab USUNIĘTY (2026-08-19, user: "statystyki były w
+// zakładce z kotkiem i itemami, i misja tam będzie a reszta zadań będzie w osobnej
+// zakładce") — jego zawartość wchłonięta do `/pet` (app/pet.tsx), a zwolniony 4. slot
+// dostał NOWĄ zakładkę questów (`/pet-quests`, wcześniej żyły na `/pet` razem z kotkiem).
+export type PupilTab = 'pet' | 'bosses' | 'shop' | 'quests';
 
 const TABS: { key: PupilTab; Icon: typeof Cat; path: string; accent: string }[] = [
-  { key: 'pet',    Icon: Cat,         path: '/pet',        accent: '#2AC68F' },
-  { key: 'bosses', Icon: Swords,      path: '/bosses',     accent: '#38BDF8' },
-  { key: 'shop',   Icon: ShoppingBag, path: '/pet-shop',   accent: '#A78BFA' },
-  { key: 'stats',  Icon: BarChart3,   path: '/pet-stats',  accent: '#FBBF24' },
+  { key: 'pet',    Icon: Cat,           path: '/pet',         accent: '#2AC68F' },
+  { key: 'bosses', Icon: Swords,        path: '/bosses',      accent: '#38BDF8' },
+  { key: 'shop',   Icon: ShoppingBag,   path: '/pet-shop',    accent: '#A78BFA' },
+  { key: 'quests', Icon: ClipboardList, path: '/pet-quests',  accent: '#FBBF24' },
 ];
 
 export default function PupilNavbar({ current }: { current: PupilTab }) {

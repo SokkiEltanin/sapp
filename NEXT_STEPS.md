@@ -90,7 +90,14 @@ w plecaku i w podglądzie po otwarciu skrzynki.
    rename sardine `name`→"Drewniana skrzynka". Zaktualizowane 3 call site'y (`pet-shop.tsx` ×2,
    `pet.tsx` ×1 dla skrzynki dnia przy kocie) + `BoxRevealModal.tsx` (osobna `RARITY_META` dla
    gear vs `CRATE_META` dla reszty — 2 różne skale rzadkości w jednym pliku).
-4. [ ] Nawigacja: scal staty+itemy do `/pet`, questy do nowej zakładki
+4. [x] Nawigacja: scal staty+itemy do `/pet`, questy do nowej zakładki (`/pet-quests`).
+   `app/pet-stats.tsx` USUNIĘTY, treść wklejona do `pet.tsx`. Wspólna health/water/budget
+   logika (3 delikatne fixy odświeżania) wydzielona do `src/hooks/usePetHealthSync.ts`,
+   żeby nie duplikować jej między `/pet` i `/pet-quests`. `PupilNavbar` tab `stats`→`quests`.
+   **Priorytet testu na urządzeniu**: (a) `/pet` pokazuje kotka+misję+staty+ekwipunek
+   bojowy bez błędów, (b) nowa zakładka `/pet-quests` (ikona listy) pokazuje wszystkie
+   questy tak jak wcześniej, (c) odbieranie nagród/questów działa identycznie jak przed
+   zmianą, (d) status/nastrój kotka na `/pet` dalej reaguje na kroki/nawyki/nastrój.
 5. [ ] `pet-shop.tsx`: usuń kosmetykę, dodaj 3 sloty daily-reroll
 6. [ ] `PetCustomizeModal` (imię+kosmetyka) + onboarding przy pierwszym uruchomieniu
 7. [ ] UI slotów przy kotku + plecak + `ItemCompareCard`

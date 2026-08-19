@@ -23,7 +23,7 @@ import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
-// Ulepszenia HP/ATK PRZENIESIONE do pet-stats.tsx (2026-08-10, user: "ulepszenia statystyk
+// Ulepszenia HP/ATK PRZENIESIONE do pet.tsx (2026-08-10, user: "ulepszenia statystyk
 // niech będą w statystykach a nie w sklepie") — ten ekran zostaje czysto kosmetyczny.
 const WHISKERS_COST = 55;   // wąsy
 const LEGSTRIPES_COST = 65; // pręgi na łapkach
@@ -92,7 +92,7 @@ export default function PetShop() {
   // Potwierdzenie zakupu — żeby nie kupić przez przypadek (tylko przy PŁATNYCH akcjach;
   // założenie posiadanego / darmowa skrzynka dnia nie pytają). Themowany ConfirmDialog
   // zamiast Alert.alert (2026-08-15, user: "potwierdzenia nie są dokończone" — ten sam
-  // fix co w pet-stats.tsx, patrz komentarz w ConfirmDialog.tsx).
+  // fix co w pet.tsx, patrz komentarz w ConfirmDialog.tsx).
   const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string } | null>(null);
   const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup') => {
     setPendingBuy({ name, cost, onYes, verb });
