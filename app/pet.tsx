@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Animated, Easing, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
+import PetCustomizeModal from '@/components/pet/PetCustomizeModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
@@ -50,7 +51,7 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins,
+  const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins, onboarded,
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
     ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem } = usePetStore();
@@ -144,8 +145,10 @@ export default function Pet() {
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
   const { health, stepGoal, budgets } = usePetHealthSync();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(name);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  // Onboarding (2026-08-19) — pierwsze uruchomienie otwiera modal imienia+kosmetyki
+  // wymuszony (bez X), żeby nazwać i ostylować pupila zamiast cichego defaultu "Blobek".
+  useEffect(() => { if (!onboarded) setCustomizeOpen(true); }, [onboarded]);
 
   // Tap-to-pet: fills today's affection bar; a full bar pays a one-a-day bonus and
   // the cat throws a little party.
@@ -201,8 +204,6 @@ export default function Pet() {
       careTick(Math.max(1, Math.round(pet.wellbeing / 12)));
     }
   }, [pet.wellbeing, health.steps, habits.length, moodEntries.length]);
-
-  const saveName = () => { setName(draft); setEditing(false); haptic.success(); };
 
   // ── Siła bojowa + Ekwipunek bojowy (2026-08-19, scalone tu z pet-stats.tsx —
   // restrukturyzacja nawigacji, user: "statystyki były w zakładce z kotkiem i itemami").
@@ -285,18 +286,10 @@ export default function Pet() {
             kota (handlePet, niżej) zostaje jedynym sposobem głaskania, tak jak przed 2026-08-16). */}
         <View style={s.topHeader}>
           <View style={s.topLeft}>
-            {editing ? (
-              <View style={s.nameEdit}>
-                <TextInput value={draft} onChangeText={setDraft} style={s.nameInput} autoFocus maxLength={16}
-                  placeholder="Imię" placeholderTextColor={c.text.muted} onSubmitEditing={saveName} />
-                <TouchableOpacity onPress={saveName} style={s.nameSave}><Check size={18} color="#fff" /></TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={s.nameRow} onPress={() => { setDraft(name); setEditing(true); }} activeOpacity={0.7}>
-                <Text style={s.name}>{name}</Text>
-                <Pencil size={14} color={c.text.muted} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={s.nameRow} onPress={() => { haptic.tap(); setCustomizeOpen(true); }} activeOpacity={0.7}>
+              <Text style={s.name}>{name}</Text>
+              <Pencil size={14} color={c.text.muted} />
+            </TouchableOpacity>
             <View style={[s.moodChip, { backgroundColor: pet.color + '1E', borderColor: pet.color + '55' }]}>
               <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
             </View>
@@ -536,6 +529,11 @@ export default function Pet() {
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         onClose={() => setBoxReveal(null)}
       />
+      <PetCustomizeModal
+        visible={customizeOpen}
+        mode={onboarded ? 'edit' : 'onboarding'}
+        onClose={() => setCustomizeOpen(false)}
+      />
       <PupilNavbar current="pet" />
     </SafeAreaView>
   );
@@ -575,9 +573,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   miniBarFill: { height: '100%', borderRadius: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   name: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
-  nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  nameInput: { fontSize: 16, fontWeight: '800', color: c.text.primary, borderBottomWidth: 2, borderBottomColor: c.accent.blue, minWidth: 140, textAlign: 'center', paddingVertical: 2 },
-  nameSave: { width: 30, height: 30, borderRadius: 15, backgroundColor: c.accent.green, alignItems: 'center', justifyContent: 'center' },
   moodChip: { marginTop: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1 },
   status: { fontSize: 12, fontWeight: '800' },
   tip: { fontSize: 11.5, color: c.text.muted, marginTop: 3, textAlign: 'center' },

@@ -98,8 +98,17 @@ w plecaku i w podglądzie po otwarciu skrzynki.
    bojowy bez błędów, (b) nowa zakładka `/pet-quests` (ikona listy) pokazuje wszystkie
    questy tak jak wcześniej, (c) odbieranie nagród/questów działa identycznie jak przed
    zmianą, (d) status/nastrój kotka na `/pet` dalej reaguje na kroki/nawyki/nastrój.
-5. [ ] `pet-shop.tsx`: usuń kosmetykę, dodaj 3 sloty daily-reroll
-6. [ ] `PetCustomizeModal` (imię+kosmetyka) + onboarding przy pierwszym uruchomieniu
+5. [x] `pet-shop.tsx`: kosmetyka (kolory/dodatki) usunięta, nowa kategoria "Sklep dnia"
+   (3 konkretne itemy ekwipunku, gwarantowany zakup, `dailyShopSlots()` w gear.ts,
+   deterministyczne wg daty). Startupy (kosmetyk splasha) ZOSTAŁY w sklepie — to nie "kotek".
+6. [x] `PetCustomizeModal` (imię+kosmetyka) — pełnoekranowy modal, `mode="edit"` (tap w
+   imię na `/pet`) i `mode="onboarding"` (pierwsze uruchomienie, `petStore.onboarded`,
+   migracja `true` dla starych zapisów żeby nie zaskoczyć istniejących userów).
+   **Priorytet testu na urządzeniu**: (a) tap w imię otwiera modal z kolorami/dodatkami i
+   działa jak dawny sklep, (b) reset pupila (jeśli dostępny w dev) pokazuje wymuszony
+   onboarding przy starcie, (c) sklep dnia sprzedaje 3 różne itemy, kupno działa i nie da
+   się kupić drugi raz tego samego dnia, (d) stare zapisy (przed tym patchem) NIE dostają
+   wymuszonego onboardingu przy pierwszym otwarciu po update.
 7. [ ] UI slotów przy kotku + plecak + `ItemCompareCard`
 8. [ ] **Wpięcie bonusów gear w realne formuły walki/ekonomii** (nie pomijać — patrz krok 2)
 

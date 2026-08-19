@@ -891,6 +891,33 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     - `celebrate` (animacja świętowania na kotku przy odbiorze nagrody) świadomie NIE
       przeniesiony do `pet-quests.tsx` — quest-claim tam już nie animuje kotka (nie ma go
       na tym ekranie), to oczekiwana konsekwencja rozdzielenia ekranów, nie regresja.
+  - **`PetCustomizeModal.tsx` (imię+kosmetyka) + onboarding + przebudowa sklepu** —
+    krok 5-6 planu (NEXT_STEPS.md "SYSTEM EKWIPUNKU"). User: "nie przecież kliknięciem
+    głaskam kotka to nie może... lepiej dać przy edycji imienia kosmetyki".
+    - **`src/components/pet/PetCustomizeModal.tsx`** (nowy, pełnoekranowy `Modal`) —
+      wchłania sekcje Kolory+Dodatki (oczy/nosek/pasy/wąsy/pręgi łapek) 1:1 z dawnego
+      `pet-shop.tsx` (te same `onColor/onStripes/onEye/onNose/onToggleExtra` handlery,
+      ten sam preview-przed-kupnem wzorzec), PLUS pole imienia na górze. Startupy (kosmetyk
+      EKRANU ŁADOWANIA apki) zostały w sklepie — to nie "kotek", user o nich nie mówił.
+      Dwa tryby: `mode="edit"` (tap w wiersz imienia na `/pet` — zastąpił dawny inline
+      `TextInput`, X zamyka) i `mode="onboarding"` (pierwsze uruchomienie, brak X, wymusza
+      niepuste imię pod przyciskiem "Gotowe").
+    - **Onboarding** — nowe pole `petStore.onboarded: boolean` (initial state `false`,
+      ale migracja w `onRehydrateStorage` ustawia `true` dla ISTNIEJĄCYCH zapisów — inaczej
+      wszyscy obecni userzy dostaliby wymuszony onboarding przy update, ta sama pułapka co
+      bug `energyRegenAt` wcześniej w tej sesji, patrz komentarz tam). `app/pet.tsx`:
+      `useEffect(() => { if (!onboarded) setCustomizeOpen(true); }, [onboarded])`.
+    - **`app/pet-shop.tsx` przebudowany** — kategorie teraz Skrzynki/Sklep dnia/Startupy/
+      Posiadane (było: Skrzynki/Kolory/Startupy/Dodatki/Posiadane — Kolory+Dodatki
+      usunięte, Posiadane pokazuje już tylko startupy). **Sklep dnia** (nowa kategoria) —
+      3 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria jak skrzynki), roluje
+      się raz dziennie: `dailyShopSlots(date, level)` w `gear.ts`, ten sam deterministyczny
+      `hashOf` wzorzec co `dailyExercisePool`/`raidForWeek` (ten sam dzień = ten sam
+      zestaw). Cennik `TIER_BASE_COST` × `DAILY_RARITY_COST_MULT` — TODO-balance, brak
+      danych z playtestów. Zakup przez nową akcję `petStore.buyDailyGear(dayKey, itemId,
+      rarity, cost)` — reużywa ISTNIEJĄCY `dayClaims` (ten sam mechanizm co odbiór
+      questów) z kluczem `gearDaily:${date}:${itemId}`, żeby nie dało się kupić tego
+      samego slotu dwa razy tego samego dnia — zero nowego pola w store potrzebne.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po
