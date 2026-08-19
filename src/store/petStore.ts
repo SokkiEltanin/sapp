@@ -197,6 +197,13 @@ interface PetState {
   equippedGear: Partial<Record<GearSlot, string>>;   // slot → id założonego itemu
   // Jednorazowy onboarding (imię + wygląd) przy pierwszym uruchomieniu — patrz setOnboarded.
   onboarded: boolean;
+  // Level-up celebration (2026-08-19, user: "musimy dodac info o levelup pupila... jakby
+  // powiadomienie z confetti") — ostatni poziom, dla którego POKAZANO już celebrację.
+  // Wykrywanie (porównanie z levelFromXp(xp).level) i kolejkowanie żyje w app/_layout.tsx
+  // (jedyne miejsce zamontowane przez CAŁĄ sesję, niezależnie od aktualnego ekranu — xp
+  // rośnie z wielu miejsc: walki, questy, careTick — nie da się tego łatwo złapać w jednym
+  // konkretnym ekranie). ackPetLevel() niżej tylko przesuwa ten znacznik.
+  lastSeenLevel: number;
   // ── raid tygodniowy ──
   // WŁASNA pula energii — atak bossa i atak raidu NIE dzielą jednego zasobu (dawniej
   // dzieliły `energy`, więc trzeba było wybierać, w co uderzyć). Zasilana tym samym
@@ -312,6 +319,7 @@ interface PetState {
   // kupić tego samego slotu dwa razy tego samego dnia.
   buyDailyGear: (dayKey: string, itemId: string, rarity: GearRarity, cost: number) => boolean;
   setOnboarded: () => void;
+  ackPetLevel: (level: number) => void;   // po pokazaniu celebracji level-upu
   reset: () => void;
 }
 
@@ -382,6 +390,7 @@ export const usePetStore = create<PetState>()(
       ownedGear: {},
       equippedGear: {},
       onboarded: false,
+      lastSeenLevel: 1,
       _hydrated: false,
 
       setName: (name) => set({ name: name.trim() || 'Blobek' }),
@@ -827,10 +836,11 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       setOnboarded: () => set({ onboarded: true }),
+      ackPetLevel: (level) => set((s) => level > s.lastSeenLevel ? { lastSeenLevel: level } : s),
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
     }),
     {
       name: 'pet-v1',
@@ -859,6 +869,7 @@ export const usePetStore = create<PetState>()(
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
         ownedGear: s.ownedGear, equippedGear: s.equippedGear, onboarded: s.onboarded,
+        lastSeenLevel: s.lastSeenLevel,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) { usePetStore.setState({ _hydrated: true }); return; }   // błąd hydratacji → i tak otwórz bramkę (defaulty)
@@ -907,6 +918,11 @@ export const usePetStore = create<PetState>()(
         state.ownedGear = state.ownedGear ?? {};
         state.equippedGear = state.equippedGear ?? {};
         state.onboarded = state.onboarded ?? true;
+        // Level-up celebration (2026-08-19) — stary zapis nie ma `lastSeenLevel`. Ustaw na
+        // AKTUALNY poziom (nie na 1!), inaczej istniejący gracz na Lv20 dostałby przy
+        // najbliższym zdobyciu XP lawinę "Poziom 2! Poziom 3! ... Poziom 20!" — ta sama
+        // pułapka co `onboarded` wyżej.
+        state.lastSeenLevel = state.lastSeenLevel ?? levelFromXp(state.xp ?? 0).level;
         // Migrate: seed dayClaims from the single date dailyClaims still remembers, so a
         // quest claimed on the OLD build isn't offered again as "missed" after this update.
         state.dayClaims = state.dayClaims ?? {};
