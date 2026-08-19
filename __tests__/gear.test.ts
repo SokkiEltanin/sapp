@@ -1,6 +1,6 @@
 import {
   GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT,
-  gearById, gearBySlot, gearStatValue, unlockedGearFor,
+  gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots,
 } from '@/utils/gear';
 
 describe('gear — katalog', () => {
@@ -78,5 +78,39 @@ describe('gear — unlockedGearFor (gating wg poziomu pupila)', () => {
   test('poziom 39: T1/T2 tak, T3 (unlock 40) jeszcze nie', () => {
     const helm = unlockedGearFor('helm', 39);
     expect(helm.map(g => g.unlockLevel)).toEqual([1, 20]);
+  });
+});
+
+describe('gear — dailyShopSlots (sklep dnia, deterministyczny wg daty)', () => {
+  test('poziom 1: 3 sloty (tyle unlocked itemów dostępne — jeden T1 na slot × 6 slotów)', () => {
+    const slots = dailyShopSlots('2026-08-19', 1);
+    expect(slots).toHaveLength(3);
+    for (const slot of slots) expect(slot.item.unlockLevel).toBe(1);
+  });
+
+  test('ten sam dzień + poziom → identyczny zestaw (deterministyczne, nie tasuje się)', () => {
+    const a = dailyShopSlots('2026-08-19', 50);
+    const b = dailyShopSlots('2026-08-19', 50);
+    expect(a.map(x => x.item.id)).toEqual(b.map(x => x.item.id));
+    expect(a.map(x => x.rarity)).toEqual(b.map(x => x.rarity));
+    expect(a.map(x => x.cost)).toEqual(b.map(x => x.cost));
+  });
+
+  test('inny dzień → inny zestaw (w praktyce, nie gwarancja matematyczna, ale sprawdzamy że coś się różni)', () => {
+    const a = dailyShopSlots('2026-08-19', 90).map(x => x.item.id).join(',');
+    const b = dailyShopSlots('2026-08-20', 90).map(x => x.item.id).join(',');
+    expect(a).not.toBe(b);
+  });
+
+  test('cost > 0 dla każdego slotu, zero itemów bez odblokowania na tym poziomie', () => {
+    const slots = dailyShopSlots('2026-08-19', 90);
+    for (const slot of slots) {
+      expect(slot.cost).toBeGreaterThan(0);
+      expect(slot.item.unlockLevel).toBeLessThanOrEqual(90);
+    }
+  });
+
+  test('poziom 0 (teoretyczny, brak odblokowanych itemów) → pusta lista, nie crash', () => {
+    expect(dailyShopSlots('2026-08-19', 0)).toEqual([]);
   });
 });

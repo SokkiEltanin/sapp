@@ -1,40 +1,41 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState, Animated, Easing, Alert } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { ChevronLeft, Pencil, Check, Coins, Heart, Zap, Lock, Gift, Swords, Compass } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
-import TrainingSessionModal, { SelfReportExercise } from '@/components/pet/TrainingSessionModal';
+import PetCustomizeModal from '@/components/pet/PetCustomizeModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { usePetStore, levelFromXp, growthStage } from '@/store/petStore';
-import { useProfileStore } from '@/store/profileStore';
-import { ageFrom, targetsFor, dailyExercisePool, trainingStreakFrom } from '@/utils/personalQuests';
+import { usePetStore, levelFromXp, growthStage, catMaxHp, combatItemSlotsFor } from '@/store/petStore';
+import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
+import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
 import { paletteById } from '@/utils/catPalettes';
-import { getBudgets } from '@/utils/budgets';
-import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
-import { getWaterGlasses } from '@/utils/habits';
+import { useHabits } from '@/hooks/useHabits';
+import { usePetHealthSync } from '@/hooks/usePetHealthSync';
 import { useMoodStore } from '@/store/moodStore';
 import { useExpensesStore } from '@/store/expensesStore';
-import { getHealthHistory } from '@/utils/healthHistory';
-import { getHealthGoals } from '@/utils/healthGoals';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Coins as CoinsIcon, Check as CheckIcon, Gift, Swords, Compass } from 'lucide-react-native';
 import { missionMinutesFor, missionRewardFor, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
+
+const ITEM_IDS = Object.keys(COMBAT_ITEMS) as CombatItemId[];
+const HP_UPGRADE_AMOUNT = 20;
+const hpUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / HP_UPGRADE_AMOUNT) * 15;
+const ATK_UPGRADE_AMOUNT = 5;
+const atkUpgradeCost = (currentBonus: number) => 40 + Math.floor(currentBonus / ATK_UPGRADE_AMOUNT) * 15;
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
@@ -50,11 +51,10 @@ export default function Pet() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
 
-  const { name, xp, coins, setName, careTick, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, grantGear, addCoins,
-    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
-    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
-    missionStartedAt, missionEndsAt, startMission, cancelMission } = usePetStore();
-  const { birthdate, gender, trainingLevel } = useProfileStore();
+  const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins, onboarded,
+    missionStartedAt, missionEndsAt, startMission, cancelMission,
+    catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
+    ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem } = usePetStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
   // Misja (utils/missions.ts, 2026-08-15) — czas trwania to godziny, nie sekundy, więc tik co
@@ -141,181 +141,14 @@ export default function Pet() {
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const palette = useMemo(() => paletteById(catColor), [catColor]);
-  const { habits, todayDone, completions, getStreak } = useHabits();
+  const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
-
-  const [health, setHealth] = useState<{ steps: number; sleep: number; bestStepDay: number; stepTarget: number; stepsThisMonth: number; stepsThisWeek: number; cyclingMinutesToday: number }>({ steps: 0, sleep: 0, bestStepDay: 0, stepTarget: 0, stepsThisMonth: 0, stepsThisWeek: 0, cyclingMinutesToday: 0 });
-  const [stepGoal, setStepGoal] = useState(10000);
-  const [waterGoal, setWaterGoal] = useState(8);
-  const [budgets, setBudgets] = useState<Record<string, number>>({});
-  const [waterToday, setWaterToday] = useState(0);
-  // Yesterday's numbers, so rewards you earned but never opened the app to collect
-  // can still be claimed today (see `missed` below).
-  const [yData, setYData] = useState<{ steps: number; sleep: number; water: number } | null>(null);
-  const [cardsCollected, setCardsCollected] = useState(0);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(name);
-
-  // Reload on every focus (screens stay mounted here), so logging mood / walking /
-  // ticking a habit and coming back shows a fresh, reactive pet — not a stale one.
-  const readHealth = useCallback(() => {
-    const t = todayISO();
-    const month = t.slice(0, 7);
-    getHealthHistory(200).then(h => {
-      const steps = h[t]?.steps ?? 0;
-      // TODAY's sleep only. This used to fall back to the previous day on record when
-      // today hadn't synced yet, which silently credited LAST night-but-one's sleep to
-      // today's quest (claimed 7h while today was really 6,5h). No data for today = the
-      // quest simply isn't earned yet.
-      const sleep = h[t]?.sleepMinutes ?? 0;
-      const bestStepDay = Object.values(h).reduce((m, d) => Math.max(m, d.steps ?? 0), 0);
-      const stepsThisMonth = Object.entries(h).filter(([d]) => d.startsWith(month)).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
-      const wk = weekKeyOf();
-      const stepsThisWeek = Object.entries(h).filter(([d]) => d >= wk).reduce((m, [, v]) => m + (v.steps ?? 0), 0);
-      const recent = Object.values(h).map(d => d.steps).filter(x => x > 0).slice(0, 14);
-      const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
-      const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
-      const cyclingMinutesToday = h[t]?.cyclingMinutes ?? 0;
-      setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek, cyclingMinutesToday });
-      // yesterday's health + water, for the missed-rewards catch-up (habits come from
-      // the useHabits `completions` map, which already holds the last 30 days)
-      const y = yesterdayISO();
-      getWaterGlasses(y)
-        .then(water => setYData({ steps: h[y]?.steps ?? 0, sleep: h[y]?.sleepMinutes ?? 0, water }))
-        .catch(() => {});
-    }).catch(() => {});
-    getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
-    getBudgets().then(b => setBudgets(b as Record<string, number>)).catch(() => {});
-    getWaterGlasses(t).then(g => setWaterToday(g)).catch(() => {});
-    AsyncStorage.getItem('skin_progress').then(raw => { if (raw) setCardsCollected(JSON.parse(raw).cards ?? 0); }).catch(() => {});
-  }, []);
-  const reload = useCallback(() => {
-    readHealth(); // show cache immediately…
-    // …and pull fresh steps/sleep from the watch (force = ignore the 10-min throttle so
-    // the pet's needs reflect current data whenever you open it), re-read if anything changed.
-    import('@/services/healthAutoSync')
-      .then(({ autoSyncHealth }) => autoSyncHealth(7, true))
-      .then(() => readHealth())   // ZAWSZE re-czytaj po syncu (też gdy dołączyliśmy do trwającego runu) → nagrody aktualne
-      .catch(() => {});
-  }, [readHealth]);
-  useFocusEffect(reload);
-  // useFocusEffect ŁAPIE TYLKO nawigację (wejście na ten ekran) — NIE łapie powrotu z tła,
-  // gdy Pupil był JUŻ aktywnym ekranem kiedy telefon zasnął (react-navigation "focus" to co
-  // innego niż app foreground/background). User zgłosił (2026-08-12): otworzył telefon o 6:00
-  // z Pupilem już otwartym od wczoraj, i odebrał nagrodę za nawyki wczorajsze — `todayISO()`
-  // w reload() liczy się na bieżąco (poprawnie), ale samo reload() nigdy się nie odpaliło po
-  // przebudzeniu, więc questCtx (habitsDone itp.) dalej trzymał wczorajsze dane mimo poprawnej
-  // daty. Ten sam wzorzec AppState co index.tsx (dashboard) już ma — tam też screeny stoją
-  // zamontowane i to jest udokumentowany, rozwiązany problem.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
-    return () => sub.remove();
-  }, [reload]);
-  // DRUGA, ODDZIELNA dziura we wznawianiu (2026-08-15, user: "przejechałem wczoraj rowerem
-  // i dzisiaj rano się nie odświeżyło i odebrałem niechcący") — powyższe dwa triggery łapią
-  // powrót do ekranu i powrót z tła, ale NIE łapią północy mijającej podczas gdy telefon
-  // stał CAŁY CZAS aktywny na ekranie Pupila (np. leżał na ładowarce z appką otwartą przez
-  // noc) — wtedy nie ma ani nawigacji, ani zmiany AppState, więc `health`/quest-ctx zostają
-  // zamrożone na wczorajszych danych mimo że `todayISO()` (liczone na żywo) już wskazuje
-  // nowy dzień. Prosty poller: co minutę porównaj dzisiejszą datę z dniem ostatniego
-  // reload() — przy realnej zmianie odpal go ponownie. Koszt: jedno porównanie stringów co
-  // 60s, realny reload tylko raz na dobę (gdy data faktycznie się zmieni).
-  const lastReloadDay = useRef(todayISO());
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const t = todayISO();
-      if (t !== lastReloadDay.current) { lastReloadDay.current = t; reload(); }
-    }, 60000);
-    return () => clearInterval(iv);
-  }, [reload]);
-
-  const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
-  // Personalizacja (Ustawienia) → cele questów treningowych. Brak trainingLevel = questy
-  // po prostu się nie pokazują (available: c => (c.pushupTarget ?? 0) > 0 w quests.ts),
-  // więc nikogo nie zaskakują dopóki nie wypełni Personalizacji.
-  const personalTargets = useMemo(
-    () => trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null,
-    [trainingLevel, birthdate, gender],
-  );
-  // Rotacja (user 2026-08-11: "w stylu S&F lepiej działa pula z losowym podzbiorem
-  // dziennie") — DAILY_EXERCISE_COUNT z 6 możliwych, deterministyczne po dacie (ten sam
-  // dzień = ten sam zestaw, nie tasuje się przy re-renderze).
-  const todaysPool = useMemo(() => dailyExercisePool(todayISO()), []);
-  const questCtx: QuestCtx = useMemo(() => {
-    const t = todayISO();
-    const month = t.slice(0, 7);
-    const boughtSweetToday = expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === t
-      && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski')));
-    const moodDaysThisMonth = new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size;
-    return {
-      stepsToday: health.steps,
-      moodLoggedToday: moodEntries.some(e => e.date === t),
-      habitsDone: todayDone.length, habitsTotal: habits.length,
-      sweetlessDays: sweetlessDaysFrom(expenses),
-      bestStepDay: health.bestStepDay,
-      habitBestStreak,
-      cardsCollected,
-      boughtSweetToday,
-      stepTarget: health.stepTarget,
-      waterToday, waterGoal,
-      sleepMinutes: health.sleep,
-      moodDaysThisMonth,
-      stepsThisMonth: health.stepsThisMonth,
-      moodDaysThisWeek: new Set(moodEntries.filter(e => (e.date ?? '') >= weekKeyOf()).map(e => e.date)).size,
-      stepsThisWeek: health.stepsThisWeek,
-      affectionFull: affToday >= 100,
-      trainingStreak: trainingStreakFrom(trainingDays, t),
-      pushupTarget: personalTargets && todaysPool.includes('pushups') ? personalTargets.pushups : undefined,
-      squatTarget: personalTargets && todaysPool.includes('squats') ? personalTargets.squats : undefined,
-      situpTarget: personalTargets && todaysPool.includes('situps') ? personalTargets.situps : undefined,
-      plankTarget: personalTargets && todaysPool.includes('plank') ? personalTargets.plankSeconds : undefined,
-      stretchTarget: personalTargets && todaysPool.includes('stretch') ? personalTargets.stretchMinutes : undefined,
-      bikeTarget: personalTargets && todaysPool.includes('bike') ? personalTargets.bikeMinutes : undefined,
-      pushupsToday: pushupsDay === t,
-      squatsToday: squatsDay === t,
-      situpsToday: situpsDay === t,
-      plankToday: plankDay === t,
-      stretchToday: stretchDay === t,
-      bikeMinutesToday: health.cyclingMinutesToday,
-    };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay]);
-  const quests = useMemo(
-    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }, lvl.level),
-    [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],
-  );
-
-  // Rewards you actually earned YESTERDAY but never opened the app to collect. Built
-  // from yesterday's stored numbers (not today's), so nothing is credited from the
-  // wrong day. Only reconstructable quests appear — see RETRO_DAILY_IDS in quests.ts.
-  const missed = useMemo(() => {
-    if (!yData) return [];
-    const y = yesterdayISO();
-    const yCtx: QuestCtx = {
-      stepsToday: yData.steps,
-      moodLoggedToday: moodEntries.some(e => e.date === y),
-      habitsDone: habitsDoneOn(habits, completions, y).length,
-      habitsTotal: habits.length,
-      sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0, trainingStreak: 0,
-      waterToday: yData.water, waterGoal,
-      sleepMinutes: yData.sleep,
-    };
-    return buildMissedDaily(yCtx, dayClaims, y, lvl.level);
-  }, [yData, moodEntries, habits, completions, waterGoal, dayClaims, lvl.level]);
-
-  const claimMissed = (q: { id: string; label: string; coins: number; xp: number }) => {
-    if (claimDailyFor(q.id, yesterdayISO(), q.coins, q.xp)) {
-      haptic.success();
-      setCelebrate(v => v + 1);
-      toast.success(`Odebrano z wczoraj: ${q.label} +${q.coins}🪙`);
-    }
-  };
-  const claimAllMissed = () => {
-    const y = yesterdayISO();
-    let coins = 0;
-    missed.forEach(q => { if (claimDailyFor(q.id, y, q.coins, q.xp)) coins += q.coins; });
-    if (coins > 0) { haptic.success(); setCelebrate(v => v + 1); toast.success(`Odebrano zaległe nagrody +${coins}🪙`); }
-  };
+  const { health, stepGoal, budgets } = usePetHealthSync();
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  // Onboarding (2026-08-19) — pierwsze uruchomienie otwiera modal imienia+kosmetyki
+  // wymuszony (bez X), żeby nazwać i ostylować pupila zamiast cichego defaultu "Blobek".
+  useEffect(() => { if (!onboarded) setCustomizeOpen(true); }, [onboarded]);
 
   // Tap-to-pet: fills today's affection bar; a full bar pays a one-a-day bonus and
   // the cat throws a little party.
@@ -329,29 +162,8 @@ export default function Pet() {
     if (r.justFull) { haptic.success(); toast.success(`❤️ ${name} daje Ci skrzynkę sardynek!`); setCelebrate(c => c + 1); setCrateOpen(true); }
   };
 
-  const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
-    if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
-  };
-  const onClaimWeekly = (id: string, c2: number, x: number, label: string) => {
-    if (claimWeekly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); setCelebrate(c => c + 1); }
-  };
-
-  // Questy dzienne/bonusowe (2026-08-14 v2, user: "zamiast monet przyciski walk") — zamiast
-  // odbioru monet od razu, wykonany quest odblokowuje WALKĘ z minibossem (boss-fight.tsx
-  // ?kind=quest); wygrana rozlicza nagrodę TAM (claimQuestFight, > standardowa stawka —
-  // patrz minibosses.ts questFightCoins/Xp), nie tutaj. onClaimDaily zostaje TYLKO dla
-  // zaległych questów sprzed dni (missed/catch-up) — retroaktywna walka za wczoraj byłaby
-  // myląca (miniboss losowany na DZISIEJSZĄ datę), więc te zostają instant-claimem.
-  const onFightQuest = (id: string, coins: number, xp: number, label: string) => {
-    haptic.tap();
-    router.push(`/boss-fight?kind=quest&questId=${id}&questLabel=${encodeURIComponent(label)}&questCoins=${coins}&questXp=${xp}` as any);
-  };
-  const [training, setTraining] = useState<{ exercise: SelfReportExercise; target: number; action: () => void } | null>(null);
   const onSendMission = (profile: MissionProfile) => { haptic.tap(); startMission(lvl.level, profile); };
   const onFightMission = () => { haptic.tap(); router.push('/boss-fight?kind=mission' as any); };
-  const onClaimTier = (id: string, c2: number, x: number) => {
-    claimQuest(id, c2, x); haptic.success(); toast.success(`+${c2} 🪙 · nagroda odebrana`); setCelebrate(c => c + 1);
-  };
 
   // Over budget = any budgeted category exceeded its monthly limit → the pet gives a
   // gentle money nudge in its status line (it does NOT sadden the pet's core mood).
@@ -393,7 +205,53 @@ export default function Pet() {
     }
   }, [pet.wellbeing, health.steps, habits.length, moodEntries.length]);
 
-  const saveName = () => { setName(draft); setEditing(false); haptic.success(); };
+  // ── Siła bojowa + Ekwipunek bojowy (2026-08-19, scalone tu z pet-stats.tsx —
+  // restrukturyzacja nawigacji, user: "statystyki były w zakładce z kotkiem i itemami").
+  const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
+  const power = atkPower(atkStatBonus, lvl.level, bonuses);
+  const mult = atkMultiplier(lvl.level, bonuses);
+  const maxHp = catMaxHp(catMaxHpBonus);
+  const attempts = dailyAttempts(bonuses.energyMult);
+  const hpCost = hpUpgradeCost(catMaxHpBonus);
+  const atkCost = atkUpgradeCost(atkStatBonus);
+  const itemSlots = combatItemSlotsFor(lvl.level);
+  const sortedItemIds = useMemo(
+    () => [...ITEM_IDS].sort((a, b) => (ownedCombatItems[a] ? 0 : 1) - (ownedCombatItems[b] ? 0 : 1)),
+    [ownedCombatItems],
+  );
+  const [pendingUpgrade, setPendingUpgrade] = useState<{ name: string; cost: number; onYes: () => void } | null>(null);
+  const confirmUpgrade = (name: string, cost: number, onYes: () => void) => {
+    setPendingUpgrade({ name, cost, onYes });
+  };
+  const onBuyMaxHp = () => {
+    haptic.tap();
+    if (coins < hpCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${hpCost}`); return; }
+    confirmUpgrade('Ulepszenie HP kotka', hpCost, () => {
+      if (buyMaxHp(hpCost, HP_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${HP_UPGRADE_AMOUNT} max HP kotka`); }
+    });
+  };
+  const onBuyAtk = () => {
+    haptic.tap();
+    if (coins < atkCost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${atkCost}`); return; }
+    confirmUpgrade('Ulepszenie ATK', atkCost, () => {
+      if (buyAtkStat(atkCost, ATK_UPGRADE_AMOUNT)) { haptic.success(); toast.success(`Kupione: +${ATK_UPGRADE_AMOUNT} ATK`); }
+    });
+  };
+  const onToggleEquip = (id: CombatItemId) => {
+    haptic.tap();
+    if (equippedCombatItems.includes(id)) { unequipCombatItem(id); return; }
+    if (!equipCombatItem(id)) { haptic.error(); toast.error(`Masz już ${itemSlots} założone itemy — zdejmij coś najpierw`); return; }
+    haptic.success();
+  };
+  const onUpgradeItem = (id: CombatItemId, level: number, maxLevel: number) => {
+    haptic.tap();
+    if (level >= maxLevel) return;
+    const cost = combatItemUpgradeCost(level);
+    if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
+    confirmUpgrade(COMBAT_ITEMS[id].name, cost, () => {
+      if (upgradeCombatItem(id, cost, maxLevel)) { haptic.success(); toast.success(`${COMBAT_ITEMS[id].name} → poziom ${level + 1}`); }
+    });
+  };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -428,18 +286,10 @@ export default function Pet() {
             kota (handlePet, niżej) zostaje jedynym sposobem głaskania, tak jak przed 2026-08-16). */}
         <View style={s.topHeader}>
           <View style={s.topLeft}>
-            {editing ? (
-              <View style={s.nameEdit}>
-                <TextInput value={draft} onChangeText={setDraft} style={s.nameInput} autoFocus maxLength={16}
-                  placeholder="Imię" placeholderTextColor={c.text.muted} onSubmitEditing={saveName} />
-                <TouchableOpacity onPress={saveName} style={s.nameSave}><Check size={18} color="#fff" /></TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={s.nameRow} onPress={() => { setDraft(name); setEditing(true); }} activeOpacity={0.7}>
-                <Text style={s.name}>{name}</Text>
-                <Pencil size={14} color={c.text.muted} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={s.nameRow} onPress={() => { haptic.tap(); setCustomizeOpen(true); }} activeOpacity={0.7}>
+              <Text style={s.name}>{name}</Text>
+              <Pencil size={14} color={c.text.muted} />
+            </TouchableOpacity>
             <View style={[s.moodChip, { backgroundColor: pet.color + '1E', borderColor: pet.color + '55' }]}>
               <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
             </View>
@@ -570,127 +420,6 @@ export default function Pet() {
           </View>
         )}
 
-        {/* ── Missed yesterday: rewards earned but never collected ── */}
-        {missed.length > 0 && (
-          <>
-            <View style={s.qHead}>
-              <Text style={s.section}>Nieodebrane z wczoraj</Text>
-              <PressableScale onPress={claimAllMissed}>
-                <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>Odbierz wszystko</Text></View>
-              </PressableScale>
-            </View>
-            <View style={[s.qCard, s.missedCard]}>
-              {missed.map((q, i) => (
-                <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
-                    {q.note && <Text style={s.qNote}>{q.note}</Text>}
-                  </View>
-                  <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>
-                  <PressableScale onPress={() => claimMissed(q)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* ── Daily quests ── */}
-        <View style={s.qHead}>
-          <Text style={s.section}>Codzienne</Text>
-          {quests.claimableCount > 0 && <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>{quests.claimableCount} do odbioru</Text></View>}
-        </View>
-        <View style={s.qCard}>
-          {(() => {
-            // Odebrane znikają z aktywnej listy i zwijają się w jedną stopkę.
-            const active = quests.daily.filter(q => !q.claimed);
-            const claimedN = quests.daily.length - active.length;
-            return (
-              <>
-                {active.map((q, i) => (
-                  <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
-                      {q.note && <Text style={s.qNote}>{q.note}</Text>}
-                      {/* Pasek postępu na NIEZROBIONYCH questach z mierzalną wartością
-                          (2026-08-15, user: zamiast liczby monet chce pasek/wygaszony
-                          przycisk) — dane już liczone dla `note` wyżej, więc to zero
-                          dodatkowego "ładowania", tylko inny render tej samej liczby. */}
-                      {!q.done && q.progress != null && (
-                        <View style={s.qProgTrack}><View style={[s.qProgFill, { width: `${Math.round(q.progress * 100)}%` }]} /></View>
-                      )}
-                    </View>
-                    {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
-                    {q.done
-                      ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-                      : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
-                  </View>
-                ))}
-                {claimedN > 0 && (
-                  <View style={[s.qClaimedFoot, active.length > 0 && s.qRowBorder]}>
-                    <CheckIcon size={12} color="#2AC68F" />
-                    <Text style={s.qClaimedTxt}>{claimedN} {claimedN === 1 ? 'odebrane' : 'odebrane'} dziś</Text>
-                  </View>
-                )}
-              </>
-            );
-          })()}
-        </View>
-
-        {/* ── Bonus dailies (adaptive, higher reward) ── */}
-        {quests.bonusDaily.length > 0 && (
-          <>
-            <Text style={s.section}>Bonusowe dziś</Text>
-            <View style={s.qCard}>
-              {(() => {
-                const active = quests.bonusDaily.filter(q => !q.claimed);
-                const claimedN = quests.bonusDaily.length - active.length;
-                // Bodyweight questy (poza rowerem) nie mają czujnika liczącego powtórzenia —
-                // sesja w TrainingSessionModal (Rozpocznij → timer/licznik → UKOŃCZYŁEM) to
-                // jedyny sposób, żeby quest w ogóle mógł stać się `done` (patrz mark*Done w
-                // petStore, i komentarz w quests.ts). 2026-08-15 (user): dawniej jedno tapnięcie
-                // "Zrobione" — teraz realny przebieg ćwiczenia, patrz komentarz w modalu.
-                const selfReport: Record<string, { exercise: SelfReportExercise; target: number; action: () => void }> = {
-                  b_pushups: { exercise: 'pushups', target: questCtx.pushupTarget ?? 0, action: markPushupsDone },
-                  b_squats:  { exercise: 'squats',  target: questCtx.squatTarget ?? 0,  action: markSquatsDone },
-                  b_situps:  { exercise: 'situps',  target: questCtx.situpTarget ?? 0,  action: markSitupsDone },
-                  b_plank:   { exercise: 'plank',   target: questCtx.plankTarget ?? 0,  action: markPlankDone },
-                  b_stretch: { exercise: 'stretch', target: questCtx.stretchTarget ?? 0, action: markStretchDone },
-                };
-                return (
-                  <>
-                    {active.map((q, i) => {
-                      const session = selfReport[q.id];
-                      return (
-                        <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
-                          <View style={{ flex: 1, minWidth: 0 }}>
-                            <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
-                            {q.note && <Text style={s.qNote}>{q.note}</Text>}
-                            {!q.done && q.progress != null && (
-                              <View style={s.qProgTrack}><View style={[s.qProgFill, { width: `${Math.round(q.progress * 100)}%` }]} /></View>
-                            )}
-                          </View>
-                          {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
-                          {q.done
-                            ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-                            : session
-                              ? <PressableScale onPress={() => { haptic.tap(); setTraining(session); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Rozpocznij</Text></View></PressableScale>
-                              : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
-                        </View>
-                      );
-                    })}
-                    {claimedN > 0 && (
-                      <View style={[s.qClaimedFoot, active.length > 0 && s.qRowBorder]}>
-                        <CheckIcon size={12} color="#2AC68F" />
-                        <Text style={s.qClaimedTxt}>{claimedN} odebrane dziś</Text>
-                      </View>
-                    )}
-                  </>
-                );
-              })()}
-            </View>
-          </>
-        )}
-
         {pendingCrates > 0 && (
           <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
             <Text style={{ fontSize: 18 }}>🐟</Text>
@@ -698,91 +427,99 @@ export default function Pet() {
           </PressableScale>
         )}
 
-        {/* ── Weekly challenges ── */}
-        {quests.weekly.length > 0 && (
-          <>
-            <Text style={s.section}>Tygodniowe</Text>
-            <View style={{ width: '100%', gap: spacing[3] }}>
-              {quests.weekly.map(w => (
-                <View key={w.id} style={s.mCard}>
-                  <View style={s.mTop}>
-                    <Text style={s.mLabel}>{w.label}</Text>
-                    {w.done && !w.claimed
-                      ? <PressableScale onPress={() => onClaimWeekly(w.id, w.coins, w.xp, w.label)}>
-                          <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>Odbierz +{w.coins}</Text></View>
-                        </PressableScale>
-                      : w.claimed
-                        ? <View style={[s.mTier, s.mTierClaimed]}><CheckIcon size={10} color="#2AC68F" /><Text style={[s.mTierTxt, { color: '#2AC68F' }]}>odebrane</Text></View>
-                        : <Text style={s.mVal}>+{w.coins} 🪙</Text>}
-                  </View>
-                  <View style={s.moTrack}><View style={[s.moFill, { width: `${Math.round(w.progress * 100)}%`, backgroundColor: w.done ? '#2AC68F' : '#FBBF24' }]} /></View>
-                  <Text style={s.moVal}>{w.value.toLocaleString('pl-PL')} / {w.target.toLocaleString('pl-PL')} {w.unit}</Text>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* ── Monthly challenges ── */}
-        {quests.monthly.length > 0 && (
-          <>
-            <Text style={s.section}>Miesięczne</Text>
-            <View style={{ width: '100%', gap: spacing[3] }}>
-              {quests.monthly.map(m => (
-                <View key={m.id} style={s.mCard}>
-                  <View style={s.mTop}>
-                    <Text style={s.mLabel}>{m.label}</Text>
-                    {m.done && !m.claimed
-                      ? <PressableScale onPress={() => onClaimMonthly(m.id, m.coins, m.xp, m.label)}>
-                          <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>Odbierz +{m.coins}</Text></View>
-                        </PressableScale>
-                      : m.claimed
-                        ? <View style={[s.mTier, s.mTierClaimed]}><CheckIcon size={10} color="#2AC68F" /><Text style={[s.mTierTxt, { color: '#2AC68F' }]}>odebrane</Text></View>
-                        : <Text style={s.mVal}>+{m.coins} 🪙</Text>}
-                  </View>
-                  <View style={s.moTrack}><View style={[s.moFill, { width: `${Math.round(m.progress * 100)}%`, backgroundColor: m.done ? '#2AC68F' : '#FBBF24' }]} /></View>
-                  <Text style={s.moVal}>{m.value.toLocaleString('pl-PL')} / {m.target.toLocaleString('pl-PL')} {m.unit}</Text>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* ── Milestone quests ── */}
-        <Text style={s.section}>Cele</Text>
-        <View style={{ width: '100%', gap: spacing[3] }}>
-          {quests.milestones.map(m => (
-            <View key={m.id} style={s.mCard}>
-              <View style={s.mTop}>
-                <Text style={s.mLabel}>{m.label}</Text>
-                <Text style={s.mVal}>{m.value.toLocaleString('pl-PL')} {m.unit}{m.nextAt ? ` · do ${m.nextAt.toLocaleString('pl-PL')}` : ' · komplet'}</Text>
-              </View>
-              <View style={s.mTiers}>
-                {m.tiers.map(t => (
-                  t.reached && !t.claimed ? (
-                    <PressableScale key={t.id} onPress={() => onClaimTier(t.id, t.coins, t.xp)}>
-                      <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>{t.at.toLocaleString('pl-PL')} → +{t.coins}</Text></View>
-                    </PressableScale>
-                  ) : (
-                    <View key={t.id} style={[s.mTier, t.claimed && s.mTierClaimed]}>
-                      {t.claimed && <CheckIcon size={10} color="#2AC68F" />}
-                      <Text style={[s.mTierTxt, t.claimed && { color: '#2AC68F' }, !t.reached && { color: c.text.muted }]}>{t.at.toLocaleString('pl-PL')}</Text>
-                      {!t.claimed && <Text style={s.mTierCoins}>+{t.coins}</Text>}
-                    </View>
-                  )
-                ))}
-              </View>
-            </View>
-          ))}
+        {/* ── Siła bojowa (scalone z pet-stats.tsx, 2026-08-19) ── */}
+        <Text style={s.section}>Siła bojowa</Text>
+        <View style={s.statGrid}>
+          <View style={[s.statCard, { borderColor: '#F8717144', backgroundColor: '#F8717112' }]}>
+            <Swords size={18} color="#F87171" />
+            <Text style={s.statVal}>{Math.round(power)}</Text>
+            <Text style={s.statLabel}>Moc ataku</Text>
+            <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
+            <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+              <Swords size={10} color="#F87171" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT}</Text>
+              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{atkCost}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[s.statCard, { borderColor: '#2AC68F44', backgroundColor: '#2AC68F12' }]}>
+            <Heart size={18} color="#2AC68F" />
+            <Text style={s.statVal}>{maxHp}</Text>
+            <Text style={s.statLabel}>Max HP kotka</Text>
+            <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}</Text>
+            <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+              <Heart size={10} color="#2AC68F" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT}</Text>
+              <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
+            <Zap size={18} color="#38BDF8" />
+            <Text style={s.statVal}>{attempts}</Text>
+            <Text style={s.statLabel}>Prób dziennie</Text>
+            <Text style={s.statSub}>{bonuses.energyMult > 0 ? `+${Math.round(bonuses.energyMult * 100)}% z łupu` : 'baza 3'}</Text>
+          </View>
+          <View style={[s.statCard, { borderColor: '#FBBF2444', backgroundColor: '#FBBF2412' }]}>
+            <Text style={s.lvlBadge}>Lv{lvl.level}</Text>
+            <Text style={s.statVal}>{lvl.inLevel}/{lvl.needed}</Text>
+            <Text style={s.statLabel}>Doświadczenie</Text>
+            <View style={s.xpBarTrack}><View style={[s.xpBarFill, { width: `${Math.round(lvl.progress * 100)}%` }]} /></View>
+          </View>
         </View>
+        {(bonuses.dodge > 0 || bonuses.crit > 0) && (
+          <Text style={s.blurb}>Z łupu bossów: {bonuses.dodge > 0 ? `+${Math.round(bonuses.dodge * 100)}% unik ` : ''}{bonuses.crit > 0 ? `+${Math.round(bonuses.crit * 100)}% kryt` : ''}</Text>
+        )}
 
-        <View style={s.hintBox}>
-          <Text style={s.hintTxt}>
-            Monety zbierasz questami — za dbanie o SIEBIE. Wydaj je w sklepie 🛍️ na stroje i pokój dla {name}a, a energią z nawyków walcz z bossami ⚔️.
-          </Text>
+        {/* ── Ekwipunek bojowy (scalone z pet-stats.tsx, 2026-08-19) ── */}
+        <Text style={s.section}>Ekwipunek bojowy ({equippedCombatItems.length}/{itemSlots} założone)</Text>
+        <Text style={s.blurb}>Losowany ze skrzynek z głaskania. Załóż do {itemSlots} naraz (rośnie z poziomem, max 6) — działają w każdej walce kampanii.</Text>
+        <View style={{ gap: spacing[2], marginTop: spacing[2], width: '100%' }}>
+          {sortedItemIds.map(id => {
+            const def = COMBAT_ITEMS[id];
+            const level = ownedCombatItems[id] ?? 0;
+            const owned = level > 0;
+            const equipped = equippedCombatItems.includes(id);
+            const maxed = level >= def.maxLevel;
+            const cost = combatItemUpgradeCost(level);
+            return (
+              <View key={id} style={[s.itemRow, !owned && s.itemRowLocked]}>
+                <View style={[s.itemIcon, !owned && s.itemIconLocked]}>
+                  {owned
+                    ? <Image source={def.icons[Math.min(level, def.icons.length) - 1]} style={{ width: 30, height: 30 }} resizeMode="contain" />
+                    : <Lock size={18} color={c.text.muted} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.cellName}>{owned ? def.name : '???'}</Text>
+                  <Text style={s.cellState} numberOfLines={2}>{owned ? def.desc : 'Nieznaleziony — spróbuj skrzynki z głaskania'}</Text>
+                  {owned && def.maxLevel > 1 && <Text style={s.itemLevel}>poziom {level}/{def.maxLevel}</Text>}
+                </View>
+                {owned && (
+                  <View style={{ gap: 6, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={() => onToggleEquip(id)} style={[s.equipPill, equipped && s.equipPillOn]} activeOpacity={0.8}>
+                      {equipped && <Check size={11} color={c.bg.primary} />}
+                      <Text style={[s.equipPillTxt, equipped && s.equipPillTxtOn]}>{equipped ? 'Założone' : 'Załóż'}</Text>
+                    </TouchableOpacity>
+                    {!maxed && (
+                      <TouchableOpacity onPress={() => onUpgradeItem(id, level, def.maxLevel)} style={s.buyPill} activeOpacity={0.8}>
+                        <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
 
       </ScrollView>
+
+      <ConfirmDialog
+        visible={!!pendingUpgrade}
+        title="Potwierdź ulepszenie"
+        message={pendingUpgrade ? `${pendingUpgrade.name} — ${pendingUpgrade.cost} monet` : ''}
+        confirmLabel="Ulepsz"
+        cancelLabel="Anuluj"
+        destructive={false}
+        onConfirm={() => { pendingUpgrade?.onYes(); setPendingUpgrade(null); }}
+        onCancel={() => setPendingUpgrade(null)}
+      />
 
       <CrateModal visible={crateOpen} onClose={() => setCrateOpen(false)} onOpened={() => setCelebrate(c => c + 1)} />
       <BoxRevealModal
@@ -792,14 +529,11 @@ export default function Pet() {
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
         onClose={() => setBoxReveal(null)}
       />
-      <TrainingSessionModal
-        visible={!!training}
-        exercise={training?.exercise ?? 'pushups'}
-        target={training?.target ?? 0}
-        onClose={() => setTraining(null)}
-        onComplete={() => { training?.action(); setCelebrate(c => c + 1); }}
+      <PetCustomizeModal
+        visible={customizeOpen}
+        mode={onboarded ? 'edit' : 'onboarding'}
+        onClose={() => setCustomizeOpen(false)}
       />
-
       <PupilNavbar current="pet" />
     </SafeAreaView>
   );
@@ -839,9 +573,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   miniBarFill: { height: '100%', borderRadius: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   name: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
-  nameEdit: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  nameInput: { fontSize: 16, fontWeight: '800', color: c.text.primary, borderBottomWidth: 2, borderBottomColor: c.accent.blue, minWidth: 140, textAlign: 'center', paddingVertical: 2 },
-  nameSave: { width: 30, height: 30, borderRadius: 15, backgroundColor: c.accent.green, alignItems: 'center', justifyContent: 'center' },
   moodChip: { marginTop: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1 },
   status: { fontSize: 12, fontWeight: '800' },
   tip: { fontSize: 11.5, color: c.text.muted, marginTop: 3, textAlign: 'center' },
@@ -883,49 +614,30 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   missionBtn: { backgroundColor: '#38BDF8', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10 },
   missionBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 
-  hintBox: { width: '100%', marginTop: spacing[5], padding: spacing[3], borderRadius: radius.lg, backgroundColor: c.bg.card, borderWidth: 1, borderColor: c.border.subtle },
-  hintTxt: { fontSize: 12, color: c.text.muted, lineHeight: 17, textAlign: 'center' },
-
-  qHead: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[4], marginBottom: spacing[2] },
-  claimBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
-  claimBadgeTxt: { fontSize: 10.5, fontWeight: '900', color: '#0B0E1A' },
-  qCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3] },
-  missedCard: { borderColor: '#FBBF2466', backgroundColor: '#FBBF240D' },  // gold tint — these expire
-  qRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: spacing[3] },
-  qRowBorder: { borderTopWidth: 1, borderTopColor: c.border.subtle },
-  qLabel: { fontSize: 13.5, fontWeight: '700', color: c.text.primary },
-  qNote: { fontSize: 11, color: c.text.muted, marginTop: 1 },
-  qReward: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  qRewardTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
-  qClaim: { backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 10, shadowColor: '#2AC68F', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  qClaimTxt: { fontSize: 14, fontWeight: '900', color: '#07160F', letterSpacing: 0.2 },
   qFight: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10, shadowColor: '#EF4444', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   qFightTxt: { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
-  // Wygaszony "Walcz" na niezrobionym queście (2026-08-15) — sam kształt przycisku,
-  // niższa opacity zamiast osobnego stylu/koloru, żeby jasno czytało się jako "to samo,
-  // ale jeszcze niedostępne", nie inna akcja.
-  qFightOff: { opacity: 0.35, shadowOpacity: 0 },
-  qDone: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2AC68F1A' },
-  qClaimedFoot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing[2] },
-  qClaimedTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, letterSpacing: 0.2 },
-  // Pasek postępu na niezrobionym queście z mierzalną wartością (steps/habits/water/sen/rower).
-  qProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4, maxWidth: 160 },
-  qProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
-  qSelfReport: { backgroundColor: c.bg.elevated, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: c.border.default },
-  qSelfReportTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
 
-  mCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
-  mTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[2] },
-  mLabel: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
-  mVal: { fontSize: 11, fontWeight: '600', color: c.text.muted, flexShrink: 1, textAlign: 'right', marginLeft: 8 },
-  mTiers: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  mTier: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: c.border.default, borderRadius: radius.full, paddingHorizontal: 9, paddingVertical: 4 },
-  mTierClaimed: { borderColor: '#2AC68F55', backgroundColor: '#2AC68F14' },
-  mTierTxt: { fontSize: 11.5, fontWeight: '800', color: c.text.secondary },
-  mTierCoins: { fontSize: 10.5, fontWeight: '700', color: '#FBBF24' },
-  mClaim: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5 },
-  mClaimTxt: { fontSize: 11.5, fontWeight: '900', color: '#0B0E1A' },
-  moTrack: { height: 9, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 2 },
-  moFill: { height: '100%', borderRadius: 5 },
-  moVal: { fontSize: 11, color: c.text.muted, fontWeight: '600', marginTop: 4 },
+  // Siła bojowa + Ekwipunek bojowy (scalone z pet-stats.tsx, 2026-08-19).
+  blurb: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, width: '100%' },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], width: '100%' },
+  statCard: { width: '48%', borderRadius: radius.lg, borderWidth: 1, padding: spacing[3], gap: 2 },
+  statVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, marginTop: 4 },
+  statLabel: { fontSize: 11, color: c.text.secondary, fontWeight: '600' },
+  statSub: { fontSize: 9.5, color: c.text.muted },
+  lvlBadge: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
+  xpBarTrack: { height: 5, borderRadius: 3, backgroundColor: c.fill.subtle, marginTop: 4, overflow: 'hidden' },
+  xpBarFill: { height: '100%', borderRadius: 3, backgroundColor: '#FBBF24' },
+  cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
+  cellState: { fontSize: 10, color: c.text.muted },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  itemRowLocked: { opacity: 0.55 },
+  itemIcon: { width: 46, height: 46, borderRadius: 12, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center', backgroundColor: c.fill.subtle },
+  itemIconLocked: { backgroundColor: 'transparent' },
+  itemLevel: { fontSize: 9.5, color: '#FBBF24', fontWeight: '700', marginTop: 2 },
+  equipPill: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: c.border.default },
+  equipPillOn: { backgroundColor: '#2AC68F', borderColor: '#2AC68F' },
+  equipPillTxt: { fontSize: 10.5, fontWeight: '700', color: c.text.secondary },
+  equipPillTxtOn: { color: c.bg.primary },
+  buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#FBBF2440' },
+  buyPillTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
 }));

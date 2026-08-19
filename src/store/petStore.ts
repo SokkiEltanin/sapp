@@ -307,6 +307,10 @@ interface PetState {
   grantGear: (itemId: string, rarity: GearRarity) => void;   // ze skrzynki/daily shopu — no-op jeśli już masz ≥ tę rzadkość
   equipGear: (itemId: string) => boolean;                     // false = nieposiadany lub poziom za niski
   unequipGear: (slot: GearSlot) => void;
+  // Sklep dnia (gear.ts dailyShopSlots) — gwarantowany zakup, nie loteria. `dayKey` unikalny
+  // per (dzień, slot itemu) — ten sam mechanizm co dayClaims dla questów, żeby nie dało się
+  // kupić tego samego slotu dwa razy tego samego dnia.
+  buyDailyGear: (dayKey: string, itemId: string, rarity: GearRarity, cost: number) => boolean;
   setOnboarded: () => void;
   reset: () => void;
 }
@@ -809,6 +813,19 @@ export const usePetStore = create<PetState>()(
         delete next[slot];
         return { equippedGear: next };
       }),
+      buyDailyGear: (dayKey, itemId, rarity, cost) => {
+        const s = get();
+        if (s.dayClaims[dayKey]) return false;
+        if (s.coins < cost) return false;
+        const cur = s.ownedGear[itemId];
+        const better = cur && RARITY_MULT[cur] >= RARITY_MULT[rarity];
+        set({
+          coins: s.coins - cost,
+          dayClaims: { ...s.dayClaims, [dayKey]: true },
+          ...(better ? {} : { ownedGear: { ...s.ownedGear, [itemId]: rarity } }),
+        });
+        return true;
+      },
       setOnboarded: () => set({ onboarded: true }),
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),

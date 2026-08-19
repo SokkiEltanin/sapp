@@ -160,3 +160,52 @@ export function gearStatValue(item: GearItemDef, rarity: GearRarity): number {
 export function unlockedGearFor(slot: GearSlot, level: number): GearItemDef[] {
   return gearBySlot(slot).filter(g => g.unlockLevel <= level);
 }
+
+// ── Sklep dnia — 3 konkretne itemy do kupienia za gold, roluje się raz dziennie ────────
+// (2026-08-19, user: "3 itemy daily do kupienia za złoto roluje się codziennie"). Ten sam
+// deterministyczny wzorzec `hashOf` co `dailyExercisePool` (personalQuests.ts) i
+// `raidForWeek` (raid.ts) — ten sam dzień zawsze daje ten sam zestaw (nie tasuje się przy
+// re-renderze), inny dzień = inny zestaw. Gwarantowany zakup (nie loteria jak skrzynki),
+// więc rzadkości są mocno przechylone w stronę common/rare — mythic/legendary tu rzadkość
+// TODO-balance, brak danych z playtestów, jak reszta cenników w tym pliku.
+function hashOf(s: string, mul: number): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * mul + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+function pseudoRandom01(seed: string): number {
+  return (hashOf(seed, 31) % 100000) / 100000;
+}
+
+const TIER_LEVELS = [1, 20, 40, 65, 90];
+const TIER_BASE_COST = [40, 90, 160, 260, 400];
+const DAILY_RARITY_COST_MULT: Record<GearRarity, number> = {
+  common: 1, rare: 1.6, epic: 2.2, legendary: 3, mythic: 4.2,
+};
+const DAILY_RARITY_WEIGHT: Record<GearRarity, number> = {
+  common: 55, rare: 30, epic: 11, legendary: 3.5, mythic: 0.5,
+};
+
+function dailyRarityFor(seed: string): GearRarity {
+  const order: GearRarity[] = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+  const total = order.reduce((s2, r) => s2 + DAILY_RARITY_WEIGHT[r], 0);
+  let r = pseudoRandom01(seed + '|rarity') * total;
+  for (const rarity of order) { r -= DAILY_RARITY_WEIGHT[rarity]; if (r <= 0) return rarity; }
+  return 'common';
+}
+
+export interface DailyShopSlot { item: GearItemDef; rarity: GearRarity; cost: number }
+
+export function dailyShopSlots(date: string, level: number, count = 3): DailyShopSlot[] {
+  const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, level));
+  if (unlocked.length === 0) return [];
+  const picked = [...unlocked]
+    .sort((a, b) => hashOf(date + a.id, 31) - hashOf(date + b.id, 31))
+    .slice(0, Math.min(count, unlocked.length));
+  return picked.map(item => {
+    const rarity = dailyRarityFor(date + item.id);
+    const tierIdx = Math.max(0, TIER_LEVELS.indexOf(item.unlockLevel));
+    const cost = Math.round(TIER_BASE_COST[tierIdx] * DAILY_RARITY_COST_MULT[rarity]);
+    return { item, rarity, cost };
+  });
+}

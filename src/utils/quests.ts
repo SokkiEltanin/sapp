@@ -60,7 +60,7 @@ export interface ClaimState {
 interface DailyDef { id: string; label: string; coins: number; xp: number; done: (c: QuestCtx) => boolean; note?: (c: QuestCtx) => string; progress?: (c: QuestCtx) => number }
 // Nagrody podwojone (2026-08-12, user: "zadania pupila powinny być lepiej oceniane... dają
 // bardzo mało względem tego jak dużo trzeba wydawać na upgrady"). Policzone, nie zgadywane:
-// upgrade HP/ATK w pet-stats.tsx kosztuje `40 + floor(bonus/krok)×15` — 10 zakupów pod rząd
+// upgrade HP/ATK w pet.tsx kosztuje `40 + floor(bonus/krok)×15` — 10 zakupów pod rząd
 // (np. +200 max HP) to 1075 monet. Przy STARYCH stawkach (dailies=1, bonus=2, weekly/monthly
 // niżej) realny dzienny dochód zaangażowanego usera (wszystkie dailies + ~3 bonusy + darmowa
 // skrzynka dnia + rozłożone weekly/monthly) wychodził ~27,5 monety/dzień → ~39 dni na jedno
