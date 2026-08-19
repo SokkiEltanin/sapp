@@ -151,7 +151,20 @@ export default function Bosses() {
       <View style={s.header}>
         <PressableScale onPress={() => router.back()} style={s.backBtn}><ChevronLeft size={22} color={c.text.primary} /></PressableScale>
         <Text style={s.headerTitle}>Bossy</Text>
-        <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{energy}</Text></View>
+        {/* Dwie NIEZALEŻNE pule energii w prawym górnym rogu (2026-08-19, user: "w prawym
+            górnym timer z ładowaniem energii niebieskiej kampanijnej i czerwonej na bossy
+            eventowe wspólnej") — niebieska = kampania/MAD (`energy`), czerwona = wydarzenia
+            (`eventEnergy`, wspólna dla wszystkich sezonowych, nemesis jej nie zużywa). Druga
+            pigułka pokazywana dopiero od odblokowania eventów (level>=2, ten sam próg co
+            `eventUnlocked` niżej) — przed tym nie ma czego pokazywać. */}
+        <View style={s.energyPillRow}>
+          <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{energy}</Text></View>
+          {level >= 2 && (
+            <View style={[s.energyPill, { backgroundColor: '#F8717118', borderColor: '#F8717140' }]}>
+              <Zap size={13} color="#F87171" /><Text style={[s.energyTxt, { color: '#F87171' }]}>{eventEnergy}</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -201,8 +214,8 @@ export default function Bosses() {
                     ma sensu jako "ile mi zostało dziś". Sezonowe zostają przy energii. */}
                 {!isMenace && (
                   <View style={s.miniEnergyRow}>
-                    <Zap size={10} color="#38BDF8" />
-                    <Text style={s.miniEnergy}>{eventEnergy}</Text>
+                    <Zap size={10} color="#F87171" />
+                    <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
                   </View>
                 )}
               </View>
@@ -381,6 +394,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
+  energyPillRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110 },

@@ -813,11 +813,25 @@ export const usePetStore = create<PetState>()(
         // sięgać >ENERGY_MAX przy dużym energyMult z łupu, gate "1 boss/dzień" USUNIĘTY po
         // user feedback: "wolałem zamiast jeden dziennie raz na 3h atak może? i maksymalnie
         // regeneruje się do 2 energii") zamieniony na regenerujący się w czasie bank capowany
-        // na ENERGY_MAX. Przycinamy, `energyRegenAt` zawsze null po migracji — pierwsze
-        // wywołanie `syncEnergyRegen()` po starcie samo wystartuje zegar jeśli bank jest
-        // niepełny (patrz gałąź `!s.energyRegenAt` tam).
-        state.energy = Math.min(state.energy ?? ENERGY_MAX, ENERGY_MAX);
-        state.energyRegenAt = null;
+        // na ENERGY_MAX. `energyRegenAt` null po migracji — pierwsze wywołanie
+        // `syncEnergyRegen()` po starcie samo wystartuje zegar jeśli bank jest niepełny
+        // (patrz gałąź `!s.energyRegenAt` tam).
+        //
+        // BUG FIX (2026-08-19, user: "energia nie ładuje się wcale, pisze ciągle że za 3h
+        // odnowienie... czekam od wczoraj i nic") — `onRehydrateStorage` odpala się przy
+        // KAŻDYM starcie apki, nie tylko raz po update. Ta migracja BEZ warunku zerowała
+        // `energyRegenAt` przy KAŻDEJ hydratacji, więc już TYKAJĄCY zegar (np. "zostało 40
+        // min") dostawał reset do pełnych 3h za każdym razem gdy user zamknął i otworzył
+        // apkę — licznik nigdy realnie nie mógł dojść do zera przy normalnym korzystaniu
+        // (apka na telefonie prawie zawsze się zamyka/usypia między sprawdzeniami). Teraz
+        // migracja odpala się TYLKO RAZ — `energyRegenAt === undefined` znaczy naprawdę stary
+        // stan sprzed wprowadzenia tego pola (nigdy nie było `null` ani realną datą); jeśli
+        // pole już istnieje (`null` PO tej migracji, albo prawdziwa data z tykającym
+        // zegarem), zostaje NIETKNIĘTE.
+        if (state.energyRegenAt === undefined) {
+          state.energy = Math.min(state.energy ?? ENERGY_MAX, ENERGY_MAX);
+          state.energyRegenAt = null;
+        }
         // Stary stan sprzed 2026-08-18 nie miał trwałego banku nemesis (patrz menaceId/menaceHp
         // w interfejsie) — brak pola = brak aktywnego bossa jeszcze, pierwsze `menaceEnsure()`
         // po starcie samo go ustawi.

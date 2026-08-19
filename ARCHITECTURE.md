@@ -810,6 +810,31 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       `combatItemUpgradeCost`), nie zastępuje go, oba prowadzą do tego samego capu.
     - **`CrateModal.tsx`** — nowy napis "⬆️ {nazwa} +1 poziom (LvN)!" obok istniejącego "🎁
       Nowy item bojowy", zależnie od tego która gałąź trafiła.
+  - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
+    ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
+    `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po
+    update). Migracja energii z 2026-08-18 zerowała `energyRegenAt` BEZ WARUNKU przy każdej
+    hydratacji, więc już tykający zegar (np. "zostało 40 min") dostawał reset do pełnych 3h za
+    każdym razem gdy user zamknął i otworzył apkę — na telefonie to prawie ZAWSZE między
+    sprawdzeniami, więc licznik nigdy realnie nie mógł dojść do zera. Fix: migracja teraz
+    gated za `state.energyRegenAt === undefined` (naprawdę stary stan sprzed wprowadzenia tego
+    pola) — jeśli pole już istnieje (`null` po migracji, albo prawdziwa tykająca data), zostaje
+    NIETKNIĘTE. Przy okazji: prawy górny róg `app/bosses.tsx` dostał DRUGĄ pigułkę energii
+    (czerwoną, `eventEnergy` — user: "timer z ładowaniem energii niebieskiej kampanijnej i
+    czerwonej na bossy eventowe wspólnej"), obok niebieskiej kampanijnej; mini-karta wydarzenia
+    dostała ten sam czerwony kolor (było błędnie niebieskie, jak kampania/raid).
+  - **BUG: kotek atakował "dodatkowo" martwego bossa w raid/nemesis** (2026-08-19, user:
+    "często w walce pod koniec kotek atakuje 2 raz jakby czasami nawet jak przeciwnik ma zero
+    HP") — sesja raid/nemesis (patrz "sesja-wobec-trwałej-puli" wyżej) ZAWSZE animuje pełną
+    długość `result.rounds` (liczoną wobec MAŁEGO sesyjnego celu), ale PRAWDZIWA, trwała pula
+    mogła mieć MNIEJ HP niż cała sesja — przeliczona na realną skalę `liveBossHp` dochodziła
+    wtedy do 0 W ŚRODKU sesji, a animacja mimo to grała dalej wszystkie pozostałe rundy
+    (fikcyjne dodatkowe ciosy w już martwego bossa, czasem z fikcyjnym kontratakiem od trupa).
+    Prawdziwy wynik (`raidOutcome`/`menaceOutcome`) jest już policzony RAZ, PRZED animacją
+    (`raidAttack`/`menaceAttack`) — `attackRoundBased()` w `boss-fight.tsx` teraz sprawdza w
+    `playerBeat()`, czy przeliczona realna skala właśnie spadła do 0 (`realDead`), i jeśli tak,
+    skacze prosto do `finish()` zamiast kontynuować fikcyjne rundy — pomija też kontratak TEJ
+    rundy (martwy boss nie kontratakuje, tak samo jak `simulateFight` już robi wewnętrznie).
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).

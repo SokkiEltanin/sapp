@@ -9,6 +9,31 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Energia kampanii nigdy się nie ładowała + kotek atakował martwego bossa w raid/nemesis — NIEsprawdzone (2026-08-19)
+
+User: "energia nie ładuje się wgle pisze ciągle ze za 3h odnowienie xdd ale czekam od wczoraj i
+nic" + "często w walce pod koniec kotek atakuje 2 raz jakby czasami nawet jak przeciwnik ma zero
+HP". Dwa realne bugi, oba naprawione:
+
+1. **Energia nigdy realnie się nie ładowała** — `onRehydrateStorage` (odpala się przy KAŻDYM
+   starcie apki, nie tylko raz) zerowało `energyRegenAt` BEZ WARUNKU za każdym razem, więc
+   zamknięcie i otwarcie apki resetowało tykający zegar z powrotem do pełnych 3h — licznik
+   nigdy nie mógł dojść do zera przy normalnym korzystaniu. Migracja teraz gated (tylko dla
+   naprawdę starego stanu). Przy okazji: prawy górny róg ekranu Bossy dostał DRUGĄ (czerwoną)
+   pigułkę energii wydarzeń obok niebieskiej kampanijnej.
+2. **Kotek atakował już martwego bossa w raid/nemesis** — animacja sesji zawsze grała pełną
+   długość rund, nawet gdy prawdziwa (trwała) pula HP już dawno spadła do zera w środku sesji —
+   widoczne jako "dodatkowe ciosy" pod koniec walki. Teraz animacja zatrzymuje się dokładnie w
+   momencie gdy realna pula wyzerowuje się, zamiast kontynuować fikcyjne rundy.
+
+Pełny opis w ARCHITECTURE §9 (szukaj "BUG: energia kampanii" i "BUG: kotek atakował"). **Priorytet
+testu:** (a) wydaj energię kampanii do zera, ZAMKNIJ i otwórz apkę kilka razy w trakcie
+oczekiwania (nie zostawiaj jej cały czas otwartej) — sprawdź czy licznik "Kolejna energia za..."
+realnie maleje między sprawdzeniami, nie resetuje się do 3h za każdym razem, i czy punkt energii
+faktycznie dochodzi po ~3h; (b) stocz kilka sesji raidu/nemesis blisko dobicia trwałej puli do
+zera, sprawdź czy walka kończy się DOKŁADNIE na ostatnim realnym ciosie, bez dodatkowych "pustych"
+ataków po tym jak pasek HP już pokazuje 0.
+
 ## 🆕 MAD +15% HP (nie +30%) + itemy bojowe: droprate tierowany wg skrzynki — NIEsprawdzone (2026-08-18)
 
 Dwie osobne, ale tego samego dnia zmiany:

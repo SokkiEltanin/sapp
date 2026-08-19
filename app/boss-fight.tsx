@@ -472,12 +472,22 @@ export default function BossFight() {
         setAttackPulse(n => n + 1);
         // Raid: przelicz sesyjny postęp (mała, bezpiecznie skalowana pula) na PRAWDZIWĄ skalę
         // tygodniową — arena zawsze pokazuje prawdziwy pasek, nie sesyjny (patrz targetRemaining).
-        setLiveBossHp(
-          kind === 'raid' ? Math.max(0, raidRealStart - (raidSessionHp - round.bossHpAfter)) :
-          kind === 'event' && isMenace ? Math.max(0, menaceRealStart - (menaceSessionHp - round.bossHpAfter)) :
-          round.bossHpAfter
-        );
-        roundTimer.current = setTimeout(counterBeat, 480);
+        const raidRealHp = kind === 'raid' ? Math.max(0, raidRealStart - (raidSessionHp - round.bossHpAfter)) : null;
+        const menaceRealHp = kind === 'event' && isMenace ? Math.max(0, menaceRealStart - (menaceSessionHp - round.bossHpAfter)) : null;
+        setLiveBossHp(raidRealHp ?? menaceRealHp ?? round.bossHpAfter);
+        // BUG FIX (2026-08-19, user: "kotek atakuje 2 raz jakby czasami nawet jak przeciwnik
+        // ma zero HP") — sesja raid/nemesis ZAWSZE animuje się w pełnej długości (result.rounds
+        // liczone wobec MAŁEGO, bezpiecznie skalowanego celu sesji, patrz komentarz na górze
+        // pliku), ale PRAWDZIWA pula (raidRealStart/menaceRealStart) mogła mieć MNIEJ HP niż
+        // cała sesja — jeśli tak, przeliczona wyżej realna skala dochodzi do 0 w środku sesji,
+        // a animacja mimo to grała dalej wszystkie pozostałe rundy (dodatkowe, w rzeczywistości
+        // fikcyjne ciosy w już martwego bossa). Prawdziwy wynik (raidOutcome/menaceOutcome) jest
+        // już policzony RAZ, PRZED animacją (raidAttack/menaceAttack wyżej) — gdy realna skala
+        // spadnie do 0, przechodzimy prosto do finish() zamiast kontynuować fikcyjne rundy;
+        // pomijamy też kontratak TEJ rundy (martwy boss nie kontratakuje, tak samo jak w
+        // simulateFight — `if (bossHp > 0)` przed liczeniem kontrataku).
+        const realDead = raidRealHp === 0 || menaceRealHp === 0;
+        roundTimer.current = setTimeout(realDead ? finish : counterBeat, realDead ? 550 : 480);
       }, THROW_MS);
     };
 
