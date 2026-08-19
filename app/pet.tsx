@@ -11,6 +11,7 @@ import CatArt from '@/components/pet/CatArt';
 import CrateModal from '@/components/pet/CrateModal';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PetCustomizeModal from '@/components/pet/PetCustomizeModal';
+import GearPanel from '@/components/pet/GearPanel';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
@@ -343,6 +344,10 @@ export default function Pet() {
               onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
           )}
         </View>
+
+        {/* ── Ekwipunek (6 slotów, gear.ts) — patrz NEXT_STEPS.md "SYSTEM EKWIPUNKU" krok 7.
+            Staty JESZCZE nic nie robią w walce/ekonomii (krok 8, świadomie osobny). ── */}
+        <GearPanel />
 
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
             (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. Bez

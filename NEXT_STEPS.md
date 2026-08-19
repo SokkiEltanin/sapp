@@ -109,8 +109,22 @@ w plecaku i w podglądzie po otwarciu skrzynki.
    onboarding przy starcie, (c) sklep dnia sprzedaje 3 różne itemy, kupno działa i nie da
    się kupić drugi raz tego samego dnia, (d) stare zapisy (przed tym patchem) NIE dostają
    wymuszonego onboardingu przy pierwszym otwarciu po update.
-7. [ ] UI slotów przy kotku + plecak + `ItemCompareCard`
-8. [ ] **Wpięcie bonusów gear w realne formuły walki/ekonomii** (nie pomijać — patrz krok 2)
+7. [x] UI slotów przy kotku + porównanie itemów — `src/components/pet/GearPanel.tsx`, nowy
+   rząd 6 przycisków slotów pod sceną kotka na `/pet` (między kotkiem a kartą Misji). Tap w
+   slot → modal z listą POSIADANYCH itemów tego slotu (rzadkość, wartość statu, delta vs
+   aktualnie założony — kolor zielony/czerwony/szary), przycisk Załóż/Zdejmij. Pusty slot z
+   kropką = masz coś nieposiadanego w tym slocie ale nic nie założone. Brak osobnego
+   "plecaka" — wszystko przez sloty (S&F-owy przepływ, nie osobna lista itemów).
+   **Priorytet testu na urządzeniu**: (a) po zdobyciu itemu ze skrzynki/sklepu dnia slot
+   pokazuje kropkę, (b) tap w slot z pustą listą pokazuje sensowny komunikat, (c) equip/
+   unequip działa i widać to od razu w UI slotu, (d) porównanie liczy się poprawnie (▲/▼).
+8. [ ] **Wpięcie bonusów gear w realne formuły walki/ekonomii** (nie pomijać — patrz krok 2).
+   TO JEST GŁÓWNY BRAKUJĄCY KAWAŁEK — cały system na razie to kolekcjonowanie bez efektu.
+   Wymaga: (a) funkcji sumującej bonusy z `equippedGear` per stat (analogicznie do
+   `bossBonuses()` w bosses.ts dla itemów bojowych), (b) wpięcia w `atkPower`/`dailyAttempts`/
+   `counterDamage`/ekonomię coins tam gdzie odpowiedni stat pasuje, (c) throwaway-symulacji
+   PRZED shipowaniem (ten sam rygor co MAD_HITS_MULT/COUNTER_PCT wcześniej w tej sesji) —
+   6 nowych statów naraz to duże ryzyko balansu, nie robić na czuja.
 
 ## 🆕 Duży animowany kafelek misji + anulowanie z potwierdzeniem — NIEsprawdzone (2026-08-19)
 
