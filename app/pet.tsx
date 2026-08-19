@@ -19,6 +19,7 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { usePetStore, levelFromXp, growthStage, catMaxHp, combatItemSlotsFor } from '@/store/petStore';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
+import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
 import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
@@ -55,7 +56,8 @@ export default function Pet() {
   const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins, onboarded,
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
-    ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem } = usePetStore();
+    ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem,
+    equippedGear, ownedGear } = usePetStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
   // Misja (utils/missions.ts, 2026-08-15) — czas trwania to godziny, nie sekundy, więc tik co
@@ -208,10 +210,16 @@ export default function Pet() {
 
   // ── Siła bojowa + Ekwipunek bojowy (2026-08-19, scalone tu z pet-stats.tsx —
   // restrukturyzacja nawigacji, user: "statystyki były w zakładce z kotkiem i itemami").
-  const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
+  // Bonusy z lootu kampanii + gear (krok 8) — TE SAME wzory co w boss-fight.tsx, żeby
+  // wyświetlana "Siła bojowa" nie kłamała o realnej mocy w walce.
+  const bonuses = useMemo(() => {
+    const loot = bossBonuses(ownedItems);
+    const gear = gearCombatBonuses(equippedGear, ownedGear);
+    return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
+  }, [ownedItems, equippedGear, ownedGear]);
   const power = atkPower(atkStatBonus, lvl.level, bonuses);
   const mult = atkMultiplier(lvl.level, bonuses);
-  const maxHp = catMaxHp(catMaxHpBonus);
+  const maxHp = catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear);
   const attempts = dailyAttempts(bonuses.energyMult);
   const hpCost = hpUpgradeCost(catMaxHpBonus);
   const atkCost = atkUpgradeCost(atkStatBonus);
@@ -449,7 +457,7 @@ export default function Pet() {
             <Heart size={18} color="#2AC68F" />
             <Text style={s.statVal}>{maxHp}</Text>
             <Text style={s.statLabel}>Max HP kotka</Text>
-            <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}</Text>
+            <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}{gearFlatHp(equippedGear, ownedGear) > 0 ? ` + ${Math.round(gearFlatHp(equippedGear, ownedGear))} (ekwipunek)` : ''}</Text>
             <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
               <Heart size={10} color="#2AC68F" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text>

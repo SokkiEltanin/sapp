@@ -7,7 +7,7 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, ENERGY_MAX, energyRegenTick, energySpendTick } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
-import { GearSlot, GearRarity, gearById, RARITY_MULT } from '@/utils/gear';
+import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp } from '@/utils/gear';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -770,12 +770,12 @@ export const usePetStore = create<PetState>()(
       },
       healCat: (amount) => {
         const s = get();
-        const max = CAT_BASE_MAX_HP + s.catMaxHpBonus;
+        const max = CAT_BASE_MAX_HP + s.catMaxHpBonus + gearFlatHp(s.equippedGear, s.ownedGear);
         const next = Math.min(max, s.catHp + Math.max(0, amount));
         set({ catHp: next });
         return next;
       },
-      resetCatHp: () => set((s) => ({ catHp: CAT_BASE_MAX_HP + s.catMaxHpBonus })),
+      resetCatHp: () => set((s) => ({ catHp: CAT_BASE_MAX_HP + s.catMaxHpBonus + gearFlatHp(s.equippedGear, s.ownedGear) })),
       grantCombatItem: (id) => set((s) => s.ownedCombatItems[id] ? s : { ownedCombatItems: { ...s.ownedCombatItems, [id]: 1 } }),
       upgradeCombatItem: (id, cost, maxLevel) => {
         const s = get();

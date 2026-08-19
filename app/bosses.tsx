@@ -9,6 +9,7 @@ import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName, ENERGY_MAX } from '@/utils/bosses';
+import { gearCombatBonuses } from '@/utils/gear';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft, menaceHpFor } from '@/utils/seasonalEvents';
@@ -52,13 +53,19 @@ export default function Bosses() {
   const {
     xp, energy, energyRegenAt, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncRaidEnergy, syncEventEnergy,
     raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
-    menaceId, menaceHp, menaceEnsure,
+    menaceId, menaceHp, menaceEnsure, equippedGear, ownedGear,
   } = usePetStore();
   const { expenses } = useExpensesStore();
   const { events, gcalEvents } = useCalendarStore();
   const { settings: workSettings } = useWorkStore();
 
-  const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
+  // Krok 8 — gear dokłada się do bonusów z lootu (te same wzory co boss-fight.tsx/pet.tsx),
+  // energyMult stąd zasila syncRaidEnergy/syncEventEnergy niżej.
+  const bonuses = useMemo(() => {
+    const loot = bossBonuses(ownedItems);
+    const gear = gearCombatBonuses(equippedGear, ownedGear);
+    return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
+  }, [ownedItems, equippedGear, ownedGear]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
 
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz

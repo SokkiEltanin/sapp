@@ -924,10 +924,32 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     `RARITY_META` kolorem, `gearStatValue(item, rarity)`, i deltą vs aktualnie założony
     (`▲`/`▼`/`=`, zielony/czerwony/szary). Equip/unequip przez istniejące
     `petStore.equipGear/unequipGear`. Brak osobnego "plecaka" — S&F-owy przepływ przez
-    kliknięcie slotu, nie osobna lista wszystkich itemów. **WCIĄŻ BRAKUJE (krok 8, ostatni
-    z planu)**: staty z `equippedGear` nic jeszcze nie robią w `simulateFight`/`atkPower`/
-    ekonomii — to CAŁY sens systemu i nie jest zrobione, patrz NEXT_STEPS.md krok 8 dla
-    dokładnego planu (potrzebna throwaway-symulacja przed shipem, jak przy MAD_HITS_MULT).
+    kliknięcie slotu, nie osobna lista wszystkich itemów.
+  - **Krok 8 (OSTATNI z planu) — wpięcie gear w realne formuły walki/ekonomii, SYSTEM
+    KOMPLETNY** (2026-08-19). PRZED wpięciem: rebalans `GEAR_ITEMS` baseValue w gear.ts —
+    pierwsze przejście dałoby mythic T5 do 45-90% z JEDNEGO itemu, node-owe policzenie
+    sumy bonusów z CAŁEJ kampanii (22 bossy, bosses.ts) dało tylko atk+92%/dodge+72%/
+    crit+36%/energyMult+75% ŁĄCZNIE — jeden mityczny item przebijający całą kampanię byłby
+    jawnie zepsutym balansem (istniejące tuningi bossów, COUNTER_PCT/MAD_HITS_MULT, zakładają
+    tę pulę jako sufit). Wszystkie baseValue przeliczone pod mythic T5 ≈ 20-30% sumy
+    kampanijnej; zbroja T1 zostaje dokładnie jak user podał (+1/+5/+15), tylko T2-T5
+    dointerpolowane pod nowy sufit (~50 HP mythic T5, ~50% CAT_BASE_MAX_HP).
+    - **`gearCombatBonuses()`** (gear.ts) — sumuje helm/buty/obroza/talizman na kształt
+      `Bonuses{atk,dodge,crit,energyMult}`, TEN SAM kształt co `bossBonuses()` z lootu
+      kampanii → proste dodanie w KAŻDYM miejscu gdzie dotąd liczono `bossBonuses`:
+      `boss-fight.tsx` (realna walka), `pet.tsx` (wyświetlanie Siły bojowej), `bosses.tsx`
+      (feed do `syncRaidEnergy`/`syncEventEnergy`), `bossProgressReport.ts` (eksport, pola
+      opcjonalne dla starych testów/wywołań — ten sam wzorzec co `resetGeneration` tam).
+    - **`gearFlatHp()`** (zbroja) — wpięte WSZĘDZIE gdzie liczy się realny sufit HP kotka,
+      w tym `petStore.healCat/resetCatHp` (REALNA walka, nie tylko ekran statów — bez tego
+      gear HP byłby czysto kosmetyczny, nie chroniłby kotka naprawdę).
+    - **`gearCoinsMult()`** (kolczyki) — jedyny stat gear bez odpowiednika w `Bonuses`.
+      JEDEN choke point: `boss-fight.tsx`'s `finish()`, wszystkie 7 gałęzi nagrody (raid/
+      menace/campaign/event/quest/mad/mission) mnożą `Math.round(coins * coinsMult)` przed
+      zapisem do store I do victory modala (spójna liczba w obu miejscach).
+    - 8 nowych testów w `gear.test.ts`, w tym test kalibracji: pełny mityczny loadout na
+      wszystkich 4 slotach walki musi zostać `toBeLessThan` sumy bonusów z całej kampanii —
+      złapie regresję, jeśli ktoś kiedyś zmieni baseValue bez przeliczenia sufitu.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po

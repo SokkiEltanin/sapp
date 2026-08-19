@@ -17,6 +17,7 @@ import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from 
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { minibossForMission, missionRewardFor } from '@/utils/missions';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
+import { gearCombatBonuses, gearFlatHp, gearCoinsMult } from '@/utils/gear';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
@@ -72,7 +73,7 @@ export default function BossFight() {
     xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
     defeatedMadBosses, defeatMadBoss, logFightAttempt,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
-    ownedCombatItems, equippedCombatItems,
+    ownedCombatItems, equippedCombatItems, equippedGear, ownedGear,
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
     menaceId, menaceHp, menaceEnsure, menaceAttack, menaceClaim,
@@ -93,13 +94,24 @@ export default function BossFight() {
   const [fighting, setFighting] = useState(false);
   const [liveBossHp, setLiveBossHp] = useState<number | null>(null);
   const [attackPulse, setAttackPulse] = useState(0);
-  const bonuses = useMemo(() => bossBonuses(ownedItems), [ownedItems]);
+  // Krok 8 (NEXT_STEPS.md "SYSTEM EKWIPUNKU") — gear dokłada się DO bonusów z lootu
+  // kampanii, ten sam { atk, dodge, crit, energyMult } kształt (patrz gearCombatBonuses
+  // w gear.ts, przebalansowane żeby jeden mityczny item nie przebijał całej kampanii).
+  const bonuses = useMemo(() => {
+    const loot = bossBonuses(ownedItems);
+    const gear = gearCombatBonuses(equippedGear, ownedGear);
+    return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
+  }, [ownedItems, equippedGear, ownedGear]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
   const equippedItems: EquippedItem[] = useMemo(
     () => equippedCombatItems.map(id => ({ id, level: ownedCombatItems[id] ?? 1 })),
     [equippedCombatItems, ownedCombatItems],
   );
-  const catMax = catMaxHp(catMaxHpBonus);
+  const catMax = catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear);
+  // Kolczyki (coinsPct) — JEDYNY stat gear który nie pasuje do Bonuses{atk,dodge,crit,
+  // energyMult}, więc osobny mnożnik wołany tu, w jedynym miejscu gdzie liczy się finalna
+  // wypłata za zwycięstwo (wspólne dla wszystkich 6 trybów walki, patrz finish() niżej).
+  const coinsMult = useMemo(() => gearCoinsMult(equippedGear, ownedGear), [equippedGear, ownedGear]);
   // Kotek na ekranie walki musi wyglądać tak samo jak u Pupila (2026-08-15, user: "kolor
   // pupila musi się zgadzać z kolorem w walce") — CatArt tu w ogóle nie dostawał
   // palette/stripes/eyeColor/noseColor/whiskers/legStripes, więc zawsze renderował domyślny
@@ -373,8 +385,9 @@ export default function BossFight() {
       if (kind === 'raid') {
         if (raidOutcome?.defeated) {
           haptic.success();
-          raidClaim(weekKey, raidCoins(level), raidXp(level), raid.name, level, fightDetail);
-          setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: raidCoins(level), xp: raidXp(level) });
+          const coinsWon = Math.round(raidCoins(level) * coinsMult);
+          raidClaim(weekKey, coinsWon, raidXp(level), raid.name, level, fightDetail);
+          setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: coinsWon, xp: raidXp(level) });
         } else {
           // Sesja nie domknęła tygodniowej puli — bez nagrody, ale próba i tak realnie się
           // odbyła (patrz komentarz przy fightDetail), więc dostaje wpis do historii.
@@ -387,8 +400,9 @@ export default function BossFight() {
       if (kind === 'event' && isMenace) {
         if (menaceOutcome?.defeated && eventBoss && eventKey) {
           haptic.success();
-          const itemDropped = menaceClaim(eventKey, menaceCoins(level), menaceXp(level), eventBoss.name, level, fightDetail);
-          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: menaceCoins(level), xp: menaceXp(level), itemDropped: itemDropped ?? undefined, isMenace: true });
+          const coinsWon = Math.round(menaceCoins(level) * coinsMult);
+          const itemDropped = menaceClaim(eventKey, coinsWon, menaceXp(level), eventBoss.name, level, fightDetail);
+          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: coinsWon, xp: menaceXp(level), itemDropped: itemDropped ?? undefined, isMenace: true });
         } else if (eventBoss && eventKey) {
           logFightAttempt('event', eventKey, eventBoss.name, level, fightDetail);
         }
@@ -397,24 +411,28 @@ export default function BossFight() {
       if (result.won) {
         haptic.success();
         if (kind === 'campaign' && campaignBoss) {
-          defeatBoss(campaignBoss.id, campaignBoss.loot.id, campaignBoss.coins, campaignBoss.xp, campaignBoss.name, level, fightDetail);
-          setVictory({ kind: 'campaign', id: campaignBoss.id, name: campaignBoss.name, emoji: campaignBoss.emoji, coins: campaignBoss.coins, xp: campaignBoss.xp, loot: campaignBoss.loot });
+          const coinsWon = Math.round(campaignBoss.coins * coinsMult);
+          defeatBoss(campaignBoss.id, campaignBoss.loot.id, coinsWon, campaignBoss.xp, campaignBoss.name, level, fightDetail);
+          setVictory({ kind: 'campaign', id: campaignBoss.id, name: campaignBoss.name, emoji: campaignBoss.emoji, coins: coinsWon, xp: campaignBoss.xp, loot: campaignBoss.loot });
         } else if (kind === 'event' && eventBoss && eventKey) {
-          eventClaim(eventKey, eventCoins(level), eventXp(level), eventBoss.name, level, fightDetail);
-          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: eventCoins(level), xp: eventXp(level) });
+          const coinsWon = Math.round(eventCoins(level) * coinsMult);
+          eventClaim(eventKey, coinsWon, eventXp(level), eventBoss.name, level, fightDetail);
+          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: coinsWon, xp: eventXp(level) });
         } else if (kind === 'quest' && questBoss && questId) {
-          const coinsWon = questFightCoins(Number(questCoins) || 0);
+          const coinsWon = Math.round(questFightCoins(Number(questCoins) || 0) * coinsMult);
           const xpWon = questFightXp(Number(questXp) || 0);
           if (claimQuestFight(questId, coinsWon, xpWon, questBoss.name, level, fightDetail)) {
             if (TRAINING_QUEST_IDS.includes(questId)) markTrainingDay();
           }
           setVictory({ kind: 'quest', id: questBoss.id, name: questBoss.name, emoji: questBoss.emoji, coins: coinsWon, xp: xpWon });
         } else if (kind === 'mad' && madBoss && madBase) {
-          defeatMadBoss(madBase.id, madBoss.coins, madBoss.xp, madBoss.name, level, fightDetail);
-          setVictory({ kind: 'mad', id: madBoss.id, name: madBoss.name, emoji: madBoss.emoji, coins: madBoss.coins, xp: madBoss.xp });
+          const coinsWon = Math.round(madBoss.coins * coinsMult);
+          defeatMadBoss(madBase.id, coinsWon, madBoss.xp, madBoss.name, level, fightDetail);
+          setVictory({ kind: 'mad', id: madBoss.id, name: madBoss.name, emoji: madBoss.emoji, coins: coinsWon, xp: madBoss.xp });
         } else if (kind === 'mission' && missionBoss) {
-          claimMission(missionReward.coins, missionReward.xp, missionBoss.name, level, fightDetail);
-          setVictory({ kind: 'mission', id: missionBoss.id, name: missionBoss.name, emoji: missionBoss.emoji, coins: missionReward.coins, xp: missionReward.xp });
+          const coinsWon = Math.round(missionReward.coins * coinsMult);
+          claimMission(coinsWon, missionReward.xp, missionBoss.name, level, fightDetail);
+          setVictory({ kind: 'mission', id: missionBoss.id, name: missionBoss.name, emoji: missionBoss.emoji, coins: coinsWon, xp: missionReward.xp });
         }
       } else {
         haptic.error();

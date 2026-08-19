@@ -118,13 +118,36 @@ w plecaku i w podglądzie po otwarciu skrzynki.
    **Priorytet testu na urządzeniu**: (a) po zdobyciu itemu ze skrzynki/sklepu dnia slot
    pokazuje kropkę, (b) tap w slot z pustą listą pokazuje sensowny komunikat, (c) equip/
    unequip działa i widać to od razu w UI slotu, (d) porównanie liczy się poprawnie (▲/▼).
-8. [ ] **Wpięcie bonusów gear w realne formuły walki/ekonomii** (nie pomijać — patrz krok 2).
-   TO JEST GŁÓWNY BRAKUJĄCY KAWAŁEK — cały system na razie to kolekcjonowanie bez efektu.
-   Wymaga: (a) funkcji sumującej bonusy z `equippedGear` per stat (analogicznie do
-   `bossBonuses()` w bosses.ts dla itemów bojowych), (b) wpięcia w `atkPower`/`dailyAttempts`/
-   `counterDamage`/ekonomię coins tam gdzie odpowiedni stat pasuje, (c) throwaway-symulacji
-   PRZED shipowaniem (ten sam rygor co MAD_HITS_MULT/COUNTER_PCT wcześniej w tej sesji) —
-   6 nowych statów naraz to duże ryzyko balansu, nie robić na czuja.
+8. [x] **Wpięcie bonusów gear w realne formuły walki/ekonomii** — SYSTEM KOMPLETNY.
+   - **Rebalans PRZED wpięciem** (krytyczne): pierwsze przejście baseValue dla itemów
+     procentowych dałoby mythic T5 do 45-90% z JEDNEGO itemu — dla porównania CAŁA kampania
+     (22 bossy, node-owe policzenie sumy z bosses.ts) daje łącznie tylko atk+92%/dodge+72%/
+     crit+36%/energyMult+75%. Jeden mityczny item przebijający całą kampanię to zepsuty
+     balans (istniejące tuningi bossów zakładają TĘ pulę jako sufit). Wszystkie baseValue w
+     `GEAR_ITEMS` (gear.ts) PRZELICZONE tak, żeby mythic T5 lądował na ~20-30% sumy
+     kampanijnej — zauważalny dodatek, nie dominujący. zbroja T1 zostaje dokładnie jak user
+     podał (+1/+5/+15), tylko T2-T5 dointerpolowane pod nowy sufit (~50 HP na mythic T5,
+     ~50% z CAT_BASE_MAX_HP=100).
+   - **`gearCombatBonuses()`** (gear.ts) — sumuje 4 sloty (helm/buty/obroza/talizman) na
+     kształt `Bonuses{atk,dodge,crit,energyMult}` — TEN SAM kształt co `bossBonuses()` z
+     lootu kampanii, więc wpięcie to proste dodanie w KAŻDYM miejscu gdzie dotąd liczono
+     `bossBonuses(ownedItems)`: `app/boss-fight.tsx` (realna walka), `app/pet.tsx` (Siła
+     bojowa), `app/bosses.tsx` (feed do syncRaidEnergy/syncEventEnergy), `bossProgressReport.ts`
+     (eksport diagnostyczny, pola opcjonalne dla starych wywołań/testów).
+   - **`gearFlatHp()`** (zbroja) — wpięte WSZĘDZIE gdzie liczy się realny sufit HP kotka:
+     `petStore.healCat/resetCatHp` (realna walka, nie tylko wyświetlanie!), `boss-fight.tsx`
+     (`catMax` do symulacji), `pet.tsx`/`bossProgressReport.ts` (wyświetlanie).
+   - **`gearCoinsMult()`** (kolczyki) — JEDEN choke point: `boss-fight.tsx`'s `finish()`,
+     wszystkie 7 gałęzi nagrody (raid/menace/campaign/event/quest/mad/mission) mnożą
+     `Math.round(coins * coinsMult)` przed zapisem DO store i DO victory modala (żeby
+     modal nie pokazywał innej liczby niż faktycznie przyznana).
+   - 8 nowych testów w `gear.test.ts` (`gearCombatBonuses`/`gearFlatHp`/`gearCoinsMult`),
+     w tym test kalibracji: pełny mityczny loadout musi zostać `toBeLessThan` sumy z całej
+     kampanii — złapie regresję, jeśli ktoś kiedyś zmieni baseValue bez przeliczenia.
+   **Priorytet testu na urządzeniu**: (a) Siła bojowa na `/pet` rośnie po założeniu itemu,
+   (b) max HP kotka w walce faktycznie rośnie (nie tylko na ekranie stat), (c) nagroda
+   monet po wygranej faktycznie większa z założonymi kolczykami, (d) żadna walka nie stała
+   się "za łatwa" na oko (subiektywna ocena, symulacja node'em to tylko dolna granica).
 
 ## 🆕 Duży animowany kafelek misji + anulowanie z potwierdzeniem — NIEsprawdzone (2026-08-19)
 

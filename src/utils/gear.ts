@@ -96,51 +96,61 @@ const ICONS: Record<string, ImageSourcePropType> = {
   kolczyki_krezus: require('../../assets/ekwipunek/kolczyki/kolczyki_krezus.png'),
 };
 
-// TODO-balance: wartości bazowe (common, T1..T5) pierwszego przejścia — brak danych z
-// playtestów dla itemów procentowych (crit/dodge/atk/energyMult/coins), tylko flat HP ma
-// twarde zakotwiczenie usera (patrz RARITY_MULT). Do wyregulowania po realnej rozgrywce.
+// TODO-balance: wciąż brak danych z realnych playtestów — do wyregulowania po rozgrywce,
+// ale PRZEBALANSOWANE RAZ już (2026-08-19, krok 8 — wpięcie w realne formuły). Pierwsze przejście
+// baseValue dla itemów procentowych dałoby przy mythic T5 (×15): crit/dodge do 45%, atk do
+// 52%, energyMult do 90% — Z JEDNEGO ITEMU. Dla porównania CAŁA kampania (22 bossy, suma
+// wszystkich loot bonusów) daje łącznie: atk +92%, dodge +72%, crit +36%, energyMult +75%
+// (policzone node'em z bosses.ts). Jeden mityczny gear-item przebijający całą kampanię to
+// jawnie zepsuty balans — dotychczasowe tuningi bossów (COUNTER_PCT, MAD_HITS_MULT) zakładają
+// tę pulę jako sufit. Stąd niżej: baseValue dobrane tak, żeby mythic T5 (najlepszy możliwy
+// pojedynczy item) lądował w okolicach 20-30% TEJ sumy — zauważalny, ale nie dominujący
+// dodatek. zbroja (flatHp) T1 ZOSTAJE dokładnie jak podał user (common+1/rare+5/mythic+15) —
+// tylko T2-T5 dointerpolowane tak, żeby mythic T5 nie przekraczał ~50% CAT_BASE_MAX_HP (100).
 export const GEAR_ITEMS: GearItemDef[] = [
-  // ── Hełm (crit%) ──
-  { id: 'helm_slomiany', slot: 'helm', name: 'Słomiany Kapelusz', unlockLevel: 1, baseValue: 0.005, icon: ICONS.helm_slomiany },
-  { id: 'helm_skorzany', slot: 'helm', name: 'Skórzany Kaptur', unlockLevel: 20, baseValue: 0.010, icon: ICONS.helm_skorzany },
-  { id: 'helm_zelazny', slot: 'helm', name: 'Żelazny Hełm Zwiadowcy', unlockLevel: 40, baseValue: 0.015, icon: ICONS.helm_zelazny },
-  { id: 'helm_krucza', slot: 'helm', name: 'Kruczy Diadem', unlockLevel: 65, baseValue: 0.020, icon: ICONS.helm_krucza },
-  { id: 'helm_koronaBurzy', slot: 'helm', name: 'Korona Burzy', unlockLevel: 90, baseValue: 0.030, icon: ICONS.helm_koronaBurzy },
+  // ── Hełm (crit%) — mythic T5 = 0.008×15 = 12% (kampania: suma 36%) ──
+  { id: 'helm_slomiany', slot: 'helm', name: 'Słomiany Kapelusz', unlockLevel: 1, baseValue: 0.0015, icon: ICONS.helm_slomiany },
+  { id: 'helm_skorzany', slot: 'helm', name: 'Skórzany Kaptur', unlockLevel: 20, baseValue: 0.003, icon: ICONS.helm_skorzany },
+  { id: 'helm_zelazny', slot: 'helm', name: 'Żelazny Hełm Zwiadowcy', unlockLevel: 40, baseValue: 0.0045, icon: ICONS.helm_zelazny },
+  { id: 'helm_krucza', slot: 'helm', name: 'Kruczy Diadem', unlockLevel: 65, baseValue: 0.006, icon: ICONS.helm_krucza },
+  { id: 'helm_koronaBurzy', slot: 'helm', name: 'Korona Burzy', unlockLevel: 90, baseValue: 0.008, icon: ICONS.helm_koronaBurzy },
 
-  // ── Zbroja (flat HP) ──
+  // ── Zbroja (flat HP) — T1 anchor od usera, mythic T5 = 3.3×15 ≈ 50 HP (~50% base 100) ──
   { id: 'zbroja_szmaciana', slot: 'zbroja', name: 'Szmaciana Kamizelka', unlockLevel: 1, baseValue: 1, icon: ICONS.zbroja_szmaciana },
-  { id: 'zbroja_skorzana', slot: 'zbroja', name: 'Wzmacniana Kamizelka', unlockLevel: 20, baseValue: 3, icon: ICONS.zbroja_skorzana },
-  { id: 'zbroja_kolczuga', slot: 'zbroja', name: 'Kolczuga Strażnika', unlockLevel: 40, baseValue: 6, icon: ICONS.zbroja_kolczuga },
-  { id: 'zbroja_smoczaLuska', slot: 'zbroja', name: 'Pancerz ze Smoczej Łuski', unlockLevel: 65, baseValue: 10, icon: ICONS.zbroja_smoczaLuska },
-  { id: 'zbroja_aegis', slot: 'zbroja', name: 'Aegis Świtu', unlockLevel: 90, baseValue: 16, icon: ICONS.zbroja_aegis },
+  { id: 'zbroja_skorzana', slot: 'zbroja', name: 'Wzmacniana Kamizelka', unlockLevel: 20, baseValue: 1.5, icon: ICONS.zbroja_skorzana },
+  { id: 'zbroja_kolczuga', slot: 'zbroja', name: 'Kolczuga Strażnika', unlockLevel: 40, baseValue: 2, icon: ICONS.zbroja_kolczuga },
+  { id: 'zbroja_smoczaLuska', slot: 'zbroja', name: 'Pancerz ze Smoczej Łuski', unlockLevel: 65, baseValue: 2.7, icon: ICONS.zbroja_smoczaLuska },
+  { id: 'zbroja_aegis', slot: 'zbroja', name: 'Aegis Świtu', unlockLevel: 90, baseValue: 3.3, icon: ICONS.zbroja_aegis },
 
-  // ── Buty (dodge%) ──
-  { id: 'buty_znoszone', slot: 'buty', name: 'Znoszone Sandały', unlockLevel: 1, baseValue: 0.005, icon: ICONS.buty_znoszone },
-  { id: 'buty_skorzane', slot: 'buty', name: 'Zwinne Buty Skauta', unlockLevel: 20, baseValue: 0.010, icon: ICONS.buty_skorzane },
-  { id: 'buty_wiatr', slot: 'buty', name: 'Buty Wiatrołaza', unlockLevel: 40, baseValue: 0.015, icon: ICONS.buty_wiatr },
-  { id: 'buty_cien', slot: 'buty', name: 'Sandały Cienia', unlockLevel: 65, baseValue: 0.020, icon: ICONS.buty_cien },
-  { id: 'buty_kometa', slot: 'buty', name: 'Buty Komety', unlockLevel: 90, baseValue: 0.030, icon: ICONS.buty_kometa },
+  // ── Buty (dodge%) — mythic T5 = 0.013×15 = 19.5% (kampania: suma 72%, ale counterDamage
+  // capuje redukcję na 90% niezależnie od źródła, więc endgame i tak zbliża się do sufitu) ──
+  { id: 'buty_znoszone', slot: 'buty', name: 'Znoszone Sandały', unlockLevel: 1, baseValue: 0.002, icon: ICONS.buty_znoszone },
+  { id: 'buty_skorzane', slot: 'buty', name: 'Zwinne Buty Skauta', unlockLevel: 20, baseValue: 0.004, icon: ICONS.buty_skorzane },
+  { id: 'buty_wiatr', slot: 'buty', name: 'Buty Wiatrołaza', unlockLevel: 40, baseValue: 0.007, icon: ICONS.buty_wiatr },
+  { id: 'buty_cien', slot: 'buty', name: 'Sandały Cienia', unlockLevel: 65, baseValue: 0.009, icon: ICONS.buty_cien },
+  { id: 'buty_kometa', slot: 'buty', name: 'Buty Komety', unlockLevel: 90, baseValue: 0.013, icon: ICONS.buty_kometa },
 
-  // ── Obroża (atk%) ──
-  { id: 'obroza_sznurek', slot: 'obroza', name: 'Sznurkowa Obroża', unlockLevel: 1, baseValue: 0.005, icon: ICONS.obroza_sznurek },
-  { id: 'obroza_kolce', slot: 'obroza', name: 'Nabijana Obroża', unlockLevel: 20, baseValue: 0.010, icon: ICONS.obroza_kolce },
-  { id: 'obroza_wilcza', slot: 'obroza', name: 'Wilczy Kieł', unlockLevel: 40, baseValue: 0.018, icon: ICONS.obroza_wilcza },
-  { id: 'obroza_plomien', slot: 'obroza', name: 'Płonący Naszyjnik', unlockLevel: 65, baseValue: 0.025, icon: ICONS.obroza_plomien },
-  { id: 'obroza_tytan', slot: 'obroza', name: 'Obroża Tytana', unlockLevel: 90, baseValue: 0.035, icon: ICONS.obroza_tytan },
+  // ── Obroża (atk%) — mythic T5 = 0.0167×15 ≈ 25% (kampania: suma 92%) ──
+  { id: 'obroza_sznurek', slot: 'obroza', name: 'Sznurkowa Obroża', unlockLevel: 1, baseValue: 0.0025, icon: ICONS.obroza_sznurek },
+  { id: 'obroza_kolce', slot: 'obroza', name: 'Nabijana Obroża', unlockLevel: 20, baseValue: 0.005, icon: ICONS.obroza_kolce },
+  { id: 'obroza_wilcza', slot: 'obroza', name: 'Wilczy Kieł', unlockLevel: 40, baseValue: 0.0085, icon: ICONS.obroza_wilcza },
+  { id: 'obroza_plomien', slot: 'obroza', name: 'Płonący Naszyjnik', unlockLevel: 65, baseValue: 0.012, icon: ICONS.obroza_plomien },
+  { id: 'obroza_tytan', slot: 'obroza', name: 'Obroża Tytana', unlockLevel: 90, baseValue: 0.0167, icon: ICONS.obroza_tytan },
 
-  // ── Talizman (energyMult%) ──
-  { id: 'talizman_kamyk', slot: 'talizman', name: 'Talizman z Kamyka', unlockLevel: 1, baseValue: 0.010, icon: ICONS.talizman_kamyk },
-  { id: 'talizman_piorko', slot: 'talizman', name: 'Talizman z Piórka', unlockLevel: 20, baseValue: 0.020, icon: ICONS.talizman_piorko },
-  { id: 'talizman_ksiezyc', slot: 'talizman', name: 'Talizman Półksiężyca', unlockLevel: 40, baseValue: 0.030, icon: ICONS.talizman_ksiezyc },
-  { id: 'talizman_gwiazda', slot: 'talizman', name: 'Talizman Spadającej Gwiazdy', unlockLevel: 65, baseValue: 0.040, icon: ICONS.talizman_gwiazda },
-  { id: 'talizman_nieskonczonosc', slot: 'talizman', name: 'Talizman Nieskończoności', unlockLevel: 90, baseValue: 0.060, icon: ICONS.talizman_nieskonczonosc },
+  // ── Talizman (energyMult%) — mythic T5 = 0.0133×15 ≈ 20% (kampania: suma 75%) ──
+  { id: 'talizman_kamyk', slot: 'talizman', name: 'Talizman z Kamyka', unlockLevel: 1, baseValue: 0.002, icon: ICONS.talizman_kamyk },
+  { id: 'talizman_piorko', slot: 'talizman', name: 'Talizman z Piórka', unlockLevel: 20, baseValue: 0.004, icon: ICONS.talizman_piorko },
+  { id: 'talizman_ksiezyc', slot: 'talizman', name: 'Talizman Półksiężyca', unlockLevel: 40, baseValue: 0.007, icon: ICONS.talizman_ksiezyc },
+  { id: 'talizman_gwiazda', slot: 'talizman', name: 'Talizman Spadającej Gwiazdy', unlockLevel: 65, baseValue: 0.009, icon: ICONS.talizman_gwiazda },
+  { id: 'talizman_nieskonczonosc', slot: 'talizman', name: 'Talizman Nieskończoności', unlockLevel: 90, baseValue: 0.0133, icon: ICONS.talizman_nieskonczonosc },
 
-  // ── Kolczyki (coins% bonus) ──
-  { id: 'kolczyki_drewniane', slot: 'kolczyki', name: 'Drewniane Kolczyki', unlockLevel: 1, baseValue: 0.010, icon: ICONS.kolczyki_drewniane },
-  { id: 'kolczyki_miedziane', slot: 'kolczyki', name: 'Miedziane Kolczyki', unlockLevel: 20, baseValue: 0.020, icon: ICONS.kolczyki_miedziane },
-  { id: 'kolczyki_srebrne', slot: 'kolczyki', name: 'Srebrne Kolczyki', unlockLevel: 40, baseValue: 0.030, icon: ICONS.kolczyki_srebrne },
-  { id: 'kolczyki_zlote', slot: 'kolczyki', name: 'Złote Kolczyki z Monetą', unlockLevel: 65, baseValue: 0.050, icon: ICONS.kolczyki_zlote },
-  { id: 'kolczyki_krezus', slot: 'kolczyki', name: 'Kolczyki Krezusa', unlockLevel: 90, baseValue: 0.080, icon: ICONS.kolczyki_krezus },
+  // ── Kolczyki (coins% bonus) — brak precedensu w istniejącym balansie (nowy stat), ale
+  // ta sama ostrożna skala co reszta: mythic T5 = 0.0167×15 ≈ 25% więcej złota z walk ──
+  { id: 'kolczyki_drewniane', slot: 'kolczyki', name: 'Drewniane Kolczyki', unlockLevel: 1, baseValue: 0.002, icon: ICONS.kolczyki_drewniane },
+  { id: 'kolczyki_miedziane', slot: 'kolczyki', name: 'Miedziane Kolczyki', unlockLevel: 20, baseValue: 0.004, icon: ICONS.kolczyki_miedziane },
+  { id: 'kolczyki_srebrne', slot: 'kolczyki', name: 'Srebrne Kolczyki', unlockLevel: 40, baseValue: 0.006, icon: ICONS.kolczyki_srebrne },
+  { id: 'kolczyki_zlote', slot: 'kolczyki', name: 'Złote Kolczyki z Monetą', unlockLevel: 65, baseValue: 0.010, icon: ICONS.kolczyki_zlote },
+  { id: 'kolczyki_krezus', slot: 'kolczyki', name: 'Kolczyki Krezusa', unlockLevel: 90, baseValue: 0.0167, icon: ICONS.kolczyki_krezus },
 ];
 
 export function gearById(id: string): GearItemDef | undefined {
@@ -208,4 +218,63 @@ export function dailyShopSlots(date: string, level: number, count = 3): DailySho
     const cost = Math.round(TIER_BASE_COST[tierIdx] * DAILY_RARITY_COST_MULT[rarity]);
     return { item, rarity, cost };
   });
+}
+
+// ── Krok 8 — wpięcie w realne formuły walki/ekonomii ──────────────────────────────────
+// Cztery sloty (helm/buty/obroza/talizman) mapują 1:1 na `Bonuses{atk,dodge,crit,
+// energyMult}` z bosses.ts (ten sam kształt co bonusy z lootu kampanii, patrz
+// `bossBonuses()` tam) — jeden slot = jeden stat, więc SUMOWANIE tu to zawsze co najwyżej
+// jeden składnik (gracz ma max 1 item założony na slot). zbroja (flatHp) i kolczyki
+// (coinsPct) nie pasują do tego kształtu, stąd osobne funkcje niżej.
+export interface GearCombatBonuses { atk: number; dodge: number; crit: number; energyMult: number }
+
+export function gearCombatBonuses(
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, GearRarity>>,
+): GearCombatBonuses {
+  const out: GearCombatBonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+  for (const slot of GEAR_SLOTS) {
+    const itemId = equippedGear[slot];
+    if (!itemId) continue;
+    const item = gearById(itemId);
+    const rarity = ownedGear[itemId];
+    if (!item || !rarity) continue;
+    const val = gearStatValue(item, rarity);
+    const stat = SLOT_STAT[slot];
+    if (stat === 'critPct') out.crit += val;
+    else if (stat === 'dodgePct') out.dodge += val;
+    else if (stat === 'atkPct') out.atk += val;
+    else if (stat === 'energyMultPct') out.energyMult += val;
+  }
+  return out;
+}
+
+// Doda się do CAT_BASE_MAX_HP + catMaxHpBonus (petStore.ts) — wołane WSZĘDZIE gdzie liczy
+// się realny sufit HP kotka (wyświetlanie ORAZ damageCat/healCat/resetCatHp), inaczej gear
+// pokazywałby się w statach ale nie chroniłby kotka naprawdę w walce.
+export function gearFlatHp(
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, GearRarity>>,
+): number {
+  const itemId = equippedGear.zbroja;
+  if (!itemId) return 0;
+  const item = gearById(itemId);
+  const rarity = ownedGear[itemId];
+  if (!item || !rarity) return 0;
+  return gearStatValue(item, rarity);
+}
+
+// Mnożnik do nagrody monet z walki (1 = bez bonusu). Wołane w JEDNYM miejscu —
+// app/boss-fight.tsx, tam gdzie liczy się finalna wypłata za zwycięstwo (wspólne dla
+// wszystkich 6 trybów walki), żeby nie trzeba było mnożyć w wielu rozrzuconych miejscach.
+export function gearCoinsMult(
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, GearRarity>>,
+): number {
+  const itemId = equippedGear.kolczyki;
+  if (!itemId) return 1;
+  const item = gearById(itemId);
+  const rarity = ownedGear[itemId];
+  if (!item || !rarity) return 1;
+  return 1 + gearStatValue(item, rarity);
 }

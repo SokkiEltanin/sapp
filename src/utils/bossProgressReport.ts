@@ -4,6 +4,7 @@
 import { BOSSES, bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK, combatItemSlotsFor } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { levelFromXp, catMaxHp, CAT_BASE_MAX_HP, type BossLogEntry } from '@/store/petStore';
+import { gearCombatBonuses, gearFlatHp, GearSlot, GearRarity } from '@/utils/gear';
 
 export interface ProgressReportInput {
   xp: number;
@@ -19,6 +20,8 @@ export interface ProgressReportInput {
   bossLog: BossLogEntry[];
   resetGeneration?: number;   // 2026-08-17 — patrz komentarz w petStore.ts. Opcjonalne, żeby
   lastResetAt?: string | null; // istniejące wywołania/testy bez tych pól dalej działały.
+  equippedGear?: Partial<Record<GearSlot, string>>;   // 2026-08-19 — krok 8, opcjonalne z tego
+  ownedGear?: Partial<Record<string, GearRarity>>;    // samego powodu co pola resetu wyżej.
 }
 
 const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
@@ -27,10 +30,14 @@ const KIND_LABEL: Record<BossLogEntry['kind'], string> = {
 
 export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): string {
   const lvl = levelFromXp(s.xp);
-  const bonuses = bossBonuses(s.ownedItems);
+  const equippedGear = s.equippedGear ?? {};
+  const ownedGear = s.ownedGear ?? {};
+  const gear = gearCombatBonuses(equippedGear, ownedGear);
+  const loot = bossBonuses(s.ownedItems);
+  const bonuses = { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
   const power = atkPower(s.atkStatBonus, lvl.level, bonuses);
   const mult = atkMultiplier(lvl.level, bonuses);
-  const maxHp = catMaxHp(s.catMaxHpBonus);
+  const maxHp = catMaxHp(s.catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear);
   const attempts = dailyAttempts(bonuses.energyMult);
   const slots = combatItemSlotsFor(lvl.level);
 
