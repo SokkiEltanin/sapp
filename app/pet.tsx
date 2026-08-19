@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, AppState, Animated, Easing, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
@@ -53,7 +53,7 @@ export default function Pet() {
   const { name, xp, coins, setName, careTick, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, buyItem, grantStartup, addCoins,
     pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
-    missionStartedAt, missionEndsAt, startMission } = usePetStore();
+    missionStartedAt, missionEndsAt, startMission, cancelMission } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
@@ -93,6 +93,34 @@ export default function Pet() {
     return () => loop.stop();
   }, [missionEndsAt, missionReady]);
   const missionBounceY = missionBounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
+  // Duży kotek na scenie w trakcie misji (2026-08-19, user: "zrobić jednak większy ten
+  // kafelek... animowanym ładnym kotka zrobić jakby tak na boki się lekko gibał jakby szedł")
+  // — osobne, WOLNIEJSZE wahadło (rotacja, nie translateY jak `missionBounce` wyżej — to
+  // "chód" dużego kotka na scenie, nie podskakiwanie małej ikony na pasku) — ten sam
+  // start/stop-przy-away wzorzec.
+  const missionSway = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!missionEndsAt || missionReady) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(missionSway, { toValue: 1, duration: 480, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(missionSway, { toValue: -1, duration: 960, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(missionSway, { toValue: 0, duration: 480, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [missionEndsAt, missionReady]);
+  const missionSwayRotate = missionSway.interpolate({ inputRange: [-1, 1], outputRange: ['-7deg', '7deg'] });
+  const onCancelMission = () => {
+    haptic.tap();
+    Alert.alert(
+      'Wrócić z misji?',
+      'Jeżeli chcesz anulować, NIE otrzymasz nagrody za misję.',
+      [
+        { text: 'Zostań w misji', style: 'cancel' },
+        { text: 'Wróć natychmiast', style: 'destructive', onPress: () => { cancelMission(); haptic.tap(); toast.info('Misja anulowana — bez nagrody'); } },
+      ],
+    );
+  };
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
@@ -428,17 +456,35 @@ export default function Pet() {
         </View>
         <Text style={s.tip}>{petStatusLine(pet)}</Text>
 
-        {/* stage — no room backdrop any more; the cat IS the stage */}
-        <View style={s.stage}>
+        {/* stage — no room backdrop any more; the cat IS the stage. W trybie "w podróży"
+            (2026-08-19) kafelek jest WYŻSZY niż zwykle (kotek+tekst+pasek+przycisk nie mieszczą
+            się w stałych 300px) — `height: undefined` pozwala rosnąć, `minHeight` zostawia
+            normalny rozmiar jako dolny próg. */}
+        <View style={[s.stage, missionEndsAt && !missionReady && { height: undefined, minHeight: 300 }]}>
           {/* Kotek znika ze sceny gdy jest w misji (2026-08-18, user: "miał znikać z ekranu
               że niby jest w misji czaisz???") — dziwnie wyglądało, żeby główny portret
               siedział normalnie na scenie, podczas gdy karta Misja niżej mówi że go nie ma.
               `missionReady` (wrócił, czeka walka) NIE liczy się jako "away" — jest już z
               powrotem, tylko jeszcze nieodebrana walka/nagroda. */}
           {missionEndsAt && !missionReady ? (
+            // Duży kafelek podróży (2026-08-19, user: "zrobić jednak większy ten kafelek
+            // jakby z paskiem ładowania podróży animowanym ładnym kotka... na boki się lekko
+            // gibał jakby szedł, i z przyciskiem wróć natychmiast z potwierdzeniem") —
+            // zastępuje dawny mały placeholder (Compass+tekst): duży kotek (`animate` żywe
+            // idle jak normalnie, `missionSwayRotate` DODATKOWO kołysze go jak w marszu),
+            // ten sam pasek postępu co w karcie Misja niżej (ten NIE usunięty — zostaje jako
+            // kompaktowe odniesienie), i przycisk anulowania z potwierdzeniem (bez nagrody).
             <View style={s.stageAway}>
-              <Compass size={48} color={c.text.muted} />
-              <Text style={s.stageAwayTxt}>Pupil poszedł na misję…</Text>
+              <Animated.View style={{ transform: [{ rotate: missionSwayRotate }] }}>
+                <CatArt size={STAGE_SIZE[stage] + 20} animate palette={palette} stripes={catStripes}
+                  eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+              </Animated.View>
+              <Text style={s.stageAwayTxt}>Pupil w podróży…</Text>
+              <Text style={s.stageAwaySub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+              <View style={s.stageAwayProgTrack}><View style={[s.stageAwayProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
+              <PressableScale onPress={onCancelMission}>
+                <View style={s.stageAwayCancelBtn}><Text style={s.stageAwayCancelTxt}>Wróć natychmiast</Text></View>
+              </PressableScale>
             </View>
           ) : (
             <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
@@ -768,8 +814,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110, alignItems: 'center' },
 
   stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
-  stageAway: { alignItems: 'center', gap: spacing[2] },
-  stageAwayTxt: { fontSize: 13, fontWeight: '700', color: c.text.muted },
+  stageAway: { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3] },
+  stageAwayTxt: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  stageAwaySub: { fontSize: 13, fontWeight: '600', color: c.text.muted, marginTop: -spacing[1] },
+  stageAwayProgTrack: { width: '80%', height: 8, borderRadius: 4, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: spacing[1] },
+  stageAwayProgFill: { height: '100%', borderRadius: 4, backgroundColor: '#38BDF8' },
+  stageAwayCancelBtn: { marginTop: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[2], borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
+  stageAwayCancelTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
   // Nazwa/status skurczone (2026-08-16, user: "nazwę zbić, nad pupilem zajmuje w pizdu

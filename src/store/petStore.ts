@@ -257,6 +257,10 @@ interface PetState {
   defeatMadBoss: (baseBossId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   startMission: (level: number, profile: MissionProfile) => void;
   claimMission: (coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
+  // "Wróć natychmiast" (2026-08-19) — anuluje AKTYWNĄ misję PRZED czasem, BEZ nagrody (user:
+  // "jeżeli chcesz anulować nie otrzymasz nagrody za misję"). No-op jeśli misja już gotowa
+  // (missionReady — powinieneś wtedy walczyć, nie anulować coś co już się skończyło).
+  cancelMission: () => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
   raidAttack: (damage: number) => { remaining: number; defeated: boolean };
@@ -643,6 +647,11 @@ export const usePetStore = create<PetState>()(
           coins: s.coins + coins, xp: s.xp + xp,
           bossLog: [...s.bossLog, { kind: 'mission', id: 'mission', name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         };
+      }),
+      cancelMission: () => set((s) => {
+        if (!s.missionEndsAt || Date.now() >= new Date(s.missionEndsAt).getTime()) return s; // brak misji / już gotowa — nic do anulowania
+        require('@/services/notificationsService').notificationsService.cancelMissionReady().catch(() => {});
+        return { missionStartedAt: null, missionEndsAt: null, missionProfile: null };
       }),
       healBoss: (bossId, amount, maxHp) => set((s) => ({ bossHp: { ...s.bossHp, [bossId]: Math.min(maxHp, (s.bossHp[bossId] ?? maxHp) + Math.max(0, amount)) } })),
       raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp })),

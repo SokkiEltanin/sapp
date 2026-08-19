@@ -9,6 +9,27 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Duży animowany kafelek misji + anulowanie z potwierdzeniem — NIEsprawdzone (2026-08-19)
+
+User: "jak pupil jest w trakcie misji to może zrobić jednak większy ten kafelek jakby z
+paskiem ładowania podróży animowanym ładnym kotka zrobić jakby tak na boki się lekko gibał
+jakby szedł, i z przyciskiem wróć natychmiast z potwierdzeniem (JEŻELI CHCESZ ANULOWAĆ NIE
+OTRZYMASZ NAGRODY ZA MISJĘ)". Mały placeholder ("Pupil poszedł na misję…" + ikonka kompasu) na
+scenie Pupila zastąpiony dużym kafelkiem:
+
+1. **Duży, animowany kotek** — pełny `CatArt` (żywe idle: mrugnięcia, ogon) owinięty w wolne
+   wahadło rotacji (-7°→7°, ~1s w każdą stronę) — wygląda jak chodzenie, nie podskakiwanie.
+2. **Pasek postępu + odliczanie** — ten sam postęp co mała karta Misja niżej (ta zostaje,
+   nie usunięta).
+3. **"Wróć natychmiast"** — przycisk z potwierdzeniem (Alert): jeśli anulujesz, misja się
+   kończy natychmiast, ale BEZ nagrody (nowa akcja `cancelMission()` w `petStore.ts`).
+
+Pełny opis w ARCHITECTURE §9 (szukaj "Placeholder rozbudowany na duży"). **Priorytet testu:**
+(a) wyślij misję, sprawdź czy kotek na scenie realnie kołysze się na boki (nie tylko mruga);
+(b) sprawdź czy pasek postępu na dużym kafelku i ten na małej karcie Misja pokazują to samo;
+(c) w trakcie misji dotknij "Wróć natychmiast", potwierdź w dialogu — misja powinna się
+natychmiast zakończyć BEZ żadnej nagrody (można od razu wysłać kolejną).
+
 ## 🐛 8 z 22 bossów kampanii pokazywało "undefinedundefined" zamiast symboli — NIEsprawdzone (2026-08-19)
 
 User przesłał screenshot listy Bossy — część zablokowanych (jeszcze nie odblokowanych) bossów

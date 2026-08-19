@@ -644,6 +644,25 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
         całą scenę na placeholder (`Compass` + "Pupil poszedł na misję…"), zamiast renderować
         `<CatArt>`. `missionReady` (wrócił, czeka walka) CELOWO nie liczy się jako "away" —
         jest już z powrotem.
+      - **Placeholder rozbudowany na duży, animowany kafelek + anulowanie misji** (2026-08-19,
+        user: "zrobić jednak większy ten kafelek jakby z paskiem ładowania podróży animowanym
+        ładnym kotka zrobić jakby tak na boki się lekko gibał jakby szedł, i z przyciskiem
+        wróć natychmiast z potwierdzeniem") — mały `Compass`+tekst placeholder zastąpiony
+        DUŻYM kafelkiem: pełny `CatArt` (`animate` ŻYWE — mrugnięcia/ogon jak normalny
+        portret, w przeciwieństwie do mini-ikony na pasku niżej) owinięty w DODATKOWY
+        `Animated.View` z `rotate` (`missionSway`, wolne wahadło -7°→7°→-7°, `Easing.
+        inOut(Easing.sin)`, 480/960/480ms — WOLNIEJSZE i na ROTACJI, nie `translateY` jak
+        `missionBounce` — to "chód" dużego kotka, nie podskakiwanie 22px ikony), ten sam
+        `missionProgress` co karta Misja niżej (NIE usunięta — zostaje jako kompaktowe
+        odniesienie, redundancja celowa, nie duplikat-do-wycięcia), i tekst "Wraca za...".
+        `s.stage` (stały `height:300`) dostaje `height:undefined, minHeight:300` TYLKO w tym
+        stanie — duży kotek+tekst+pasek+przycisk nie mieszczą się w stałej wysokości.
+        **Anulowanie misji** — NOWA akcja `cancelMission()` w `petStore.ts` (zeruje
+        `missionStartedAt`/`missionEndsAt`/`missionProfile` BEZ nagrody, no-op jeśli misja już
+        `missionReady` — nie ma czego anulować, powinieneś wtedy walczyć), za przyciskiem
+        "Wróć natychmiast" + `Alert.alert` potwierdzenie (user: "JEŻELI CHCESZ ANULOWAĆ NIE
+        OTRZYMASZ NAGRODY ZA MISJĘ", `style:'destructive'`, ten sam wzorzec co reset postępu
+        pupila w `settings.tsx`).
     - **Misja blokuje pozostałe tory walki** (2026-08-18, user: "wtedy nie może walczyć w
       innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dotąd
       misja była całkiem niezależna od kampanii/raidu/eventu/questów/MAD (osobna pula, osobny
