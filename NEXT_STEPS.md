@@ -9,6 +9,23 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Kontratak bossa STAŁY (nie malejący z HP) + przepołowiony COUNTER_PCT — NIEsprawdzone (2026-08-20)
+
+User przejrzał świeży log walk (30+ walk, Lv20): "boss atakują coraz mniej o co chodzi to błąd??"
+— kontratak/rundę w logu malał razem z malejącym HP bossa (świadomy mechanizm z 2026-08-13,
+patrz ARCHITECTURE §9), user to zinterpretował jako bug i poprosił o odwrócenie: "zrob mu
+stały dmg xd wszystkim". `counterDamage()` woła się teraz z `boss.hp` (stały max) zamiast
+malejącego `bossHp`; `COUNTER_PCT` przepołowiony 0.05→0.025 (throwaway-symulacja całego
+rosteru 22 bossów potwierdziła praktycznie IDENTYCZNY profil ryzyka co wcześniej — patrz
+ARCHITECTURE §9 pełny opis). `tsc`/`jest` zielone (700/700, kilka testów przepisanych pod
+nowe zachowanie/wartości). **Priorytet testu na urządzeniu**: (a) stocz kilka wielorundowych
+walk (kampania, najlepiej boss z regen albo guard) i sprawdź w logu że "kontratak/rundę" jest
+teraz STAŁY (ta sama liczba w każdej rundzie, nie malejąca), (b) subiektywnie oceń czy
+trudność/ryzyko zemdlenia "czuje się" podobnie jak wcześniej (nie drastycznie łatwiej/trudniej)
+— symulacja mówi że tak powinno być, ale to warto potwierdzić realną grą, (c) sprawdź boss z
+guard (np. Cukrowy Potwór, Duch Perfekcjonizmu) i regen (np. Widmo Porównań) — to kombinacje
+najbardziej wrażliwe na tę zmianę.
+
 ## 🆕 Level-up celebration — baner + confetti — NIEsprawdzone (2026-08-19)
 
 User: "musimy dodac info o levelup pupila jakby albo animacje xd nie wiem chyba

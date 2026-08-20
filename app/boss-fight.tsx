@@ -55,8 +55,9 @@ type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins:
 //   zachowane, żeby dało się odrabiać po trochu, w przeciwieństwie do eventu). Ale każda próba
 //   to teraz PEŁNA rundowa walka jak kampania — wobec MAŁEJ "sesji" (`raidSessionHpFor` w
 //   raid.ts, ten sam bezpieczny wzorzec co questBossHpFor/madBossHpFor: `atkPower × mała
-//   stała`), NIE wobec surowej `raidHpFor` (za duża, `counterDamage()` liczony od aktualnego
-//   hp bossa zabiłby kotka jednym kontratakiem). Realny postęp sesji (`raidAsBoss` hp przed
+//   stała`), NIE wobec surowej `raidHpFor` (za duża, `counterDamage()` liczony wprost od
+//   `boss.hp` — od 2026-08-20 zawsze stały procent maksimum — zabiłby kotka jednym kontratakiem).
+//   Realny postęp sesji (`raidAsBoss` hp przed
 //   minus po) dopisuje się do PRAWDZIWEJ, trwałej puli osobnym wywołaniem `raidAttack()` —
 //   `targetRemaining`/pasek HP w arenie ZAWSZE pokazuje PRAWDZIWĄ skalę tygodniową, `liveBossHp`
 //   podczas animacji jest przeliczany z sesyjnej skali na prawdziwą (patrz w attackRoundBased).

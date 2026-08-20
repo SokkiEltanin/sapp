@@ -47,7 +47,7 @@ describe('raid — raidHpFor (HP skaluje z poziomem, zaokrąglone do 100)', () =
 // 2026-08-17: raid dostał pełną rundową walkę (attackRoundBased w boss-fight.tsx) zamiast
 // jednego kliknięcia — user: "miała być zwykła walka tylko taka która nie restartuje jego HP".
 // Każda próba to sesja wobec raidSessionHpFor, NIE wobec surowej raidHpFor (za duża — patrz
-// komentarz w raid.ts: counterDamage() liczy % od AKTUALNEGO hp bossa, więc surowa tygodniowa
+// komentarz w raid.ts: counterDamage() liczy % od `boss.hp` wprost, więc surowa tygodniowa
 // pula zabiłaby kotka jednym kontratakiem). Te testy pilnują że sesja jest bezpiecznie
 // skalowana jak reszta trybów (ten sam wzorzec co questBossHpFor/madBossHpFor).
 describe('raid — raidSessionHpFor / raidAsBoss (sesja rundowa, 2026-08-17)', () => {
@@ -78,7 +78,7 @@ describe('raid — raidSessionHpFor / raidAsBoss (sesja rundowa, 2026-08-17)', (
   test('kontratak sesji NIE zabija kotka (base 100 HP) w 1 rundzie na żadnym z tych poziomów', () => {
     for (const level of [2, 30, 60, 100]) {
       const sessionHp = raidSessionHpFor(0, level, ZERO);
-      const counter = counterDamage(sessionHp, 0); // round 1: aktualne hp = max sesji
+      const counter = counterDamage(sessionHp, 0); // stały % max hp sesji, ta sama wartość co w każdej rundzie
       expect(counter).toBeLessThan(100);
     }
   });

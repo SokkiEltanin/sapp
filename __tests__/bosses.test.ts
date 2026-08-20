@@ -192,34 +192,42 @@ describe('bosses — bossTier (derywowana z unlockLevel)', () => {
   });
 });
 
-describe('bosses — counterDamage (2026-08-13: liczy od AKTUALNEGO, nie max HP bossa)', () => {
-  test('skaluje z aktualnym HP bossa, bez uniku', () => {
-    expect(counterDamage(300, 0)).toBe(15);   // 300 * 0.05
-    expect(counterDamage(1000, 0)).toBe(50);  // 1000 * 0.05
+describe('bosses — counterDamage (2026-08-20: liczy od STAŁEGO max HP bossa, nie malejącego)', () => {
+  // ODWRÓCONE z powrotem na stały % (2026-08-20, user: log pokazywał kontratak malejący
+  // rundę-po-rundzie razem z HP bossa i wyglądało to jak bug, mimo że było świadome — user
+  // wolał przewidywalność). COUNTER_PCT przepołowione 0.05→0.025 (throwaway-symulacją całego
+  // rosteru, patrz komentarz przy COUNTER_PCT w bosses.ts) żeby zachować TEN SAM profil
+  // ryzyka co wcześniej, tylko bez malejącego wzorca. Wielokrotności 40 w testach niżej —
+  // 1/0.025 — dają czyste liczby całkowite bez granicznych przypadków zaokrąglania .5.
+  test('skaluje z podanym (max) HP bossa, bez uniku', () => {
+    expect(counterDamage(400, 0)).toBe(10);   // 400 * 0.025
+    expect(counterDamage(4000, 0)).toBe(100); // 4000 * 0.025
   });
   test('unik redukuje obrażenia, cap 90%', () => {
-    expect(counterDamage(1000, 0.5)).toBe(25);   // połowa
-    expect(counterDamage(1000, 0.9)).toBe(5);    // 10% zostaje
-    expect(counterDamage(1000, 1.5)).toBe(5);    // cap na 0.9, nie ujemne
+    expect(counterDamage(4000, 0.5)).toBe(50);   // połowa
+    expect(counterDamage(4000, 0.9)).toBe(10);   // 10% zostaje
+    expect(counterDamage(4000, 1.5)).toBe(10);   // cap na 0.9, nie ujemne
   });
-  test('słabnie w miarę jak boss traci HP — nie stały numer całej walki', () => {
-    expect(counterDamage(1000, 0)).toBeGreaterThan(counterDamage(200, 0));
-    expect(counterDamage(0, 0)).toBe(0); // wybity boss nie kontratakuje
+  test('rośnie z podanym max HP (nie z przebiegiem walki — od 2026-08-20 wołane ZAWSZE z boss.hp, stały numer całej walki)', () => {
+    expect(counterDamage(4000, 0)).toBeGreaterThan(counterDamage(400, 0));
+    expect(counterDamage(0, 0)).toBe(0); // wybity boss (hp=0) nie kontratakuje
   });
   // 2026-08-17: guard (Twój cios ×0.5) BEZ tego fixu podwaja skumulowany kontratak wobec
   // bossa bez guard o tym samym hp (2× rund ekspozycji na TĘ SAMĄ % stawkę) — symulacja
   // znalazła że to robiło finałowego bossa kampanii praktycznie niewygrywalnym.
   test('guard tnie kontratak o połowę — kompensuje 2× rund ekspozycji z ciosem ×0.5', () => {
-    expect(counterDamage(1000, 0, true)).toBe(counterDamage(1000, 0, false) / 2);
-    expect(counterDamage(1000, 0)).toBe(counterDamage(1000, 0, false)); // domyślnie bez guard
+    expect(counterDamage(4000, 0, true)).toBe(counterDamage(4000, 0, false) / 2);
+    expect(counterDamage(4000, 0)).toBe(counterDamage(4000, 0, false)); // domyślnie bez guard
   });
   // 2026-08-19 — user przejrzał log walk questowych: boss przy 1 HP (żywy!) miał kontratak
   // zaokrąglony w dół do 0 (5% z 1 = 0.05 → round → 0), co wyglądało jak "martwy boss nadal
   // dostaje ciosy" (dobijający cios w kolejnej rundzie renderował się bez poprzedzającego go
-  // kontrataku). Żywy boss ma teraz ZAWSZE co najmniej 1 obrażenie na kontratak.
+  // kontrataku). Żywy boss ma teraz ZAWSZE co najmniej 1 obrażenie na kontratak. Fix technicznie
+  // nadmiarowy od 2026-08-20 (bo teraz liczy się od max hp, nigdy nie zaokrągli się w dół dla
+  // żywego bossa poza absurdalnie małych `boss.hp`), ale bezpieczny fallback, test zostaje.
   test('żywy boss (hp>0) zadaje ZAWSZE co najmniej 1 obrażenie, nawet przy mikroskopijnym hp', () => {
-    expect(counterDamage(1, 0)).toBe(1);   // 1*0.05=0.05 → bez fixu zaokrągliłoby do 0
-    expect(counterDamage(5, 0)).toBe(1);   // 5*0.05=0.25 → też by się zaokrągliło do 0
+    expect(counterDamage(1, 0)).toBe(1);   // 1*0.025=0.025 → bez fixu zaokrągliłoby do 0
+    expect(counterDamage(5, 0)).toBe(1);   // 5*0.025=0.125 → też by się zaokrągliło do 0
     expect(counterDamage(1, 0.9)).toBe(1); // nawet z maks. unikiem, żywy boss wciąż >=1
   });
 });
@@ -291,14 +299,21 @@ describe('bosses — simulateFight (silnik rund)', () => {
     expect(r.won || r.catFainted).toBe(true);   // realny wynik: ktoś padł, nie "czas się skończył"
   });
 
-  test('kontratak SŁABNIE w miarę wielorundowej walki — regresja na "kwadratowy" balance bug (2026-08-13: liczony był ze STAŁEGO max HP bossa, więc każdy kontratak całej walki był tej samej, ogromnej wielkości niezależnie od tego ile bossowi zostało)', () => {
+  // ODWRÓCONE (2026-08-20, user po zobaczeniu logu walk: "boss atakują coraz mniej o co
+  // chodzi to błąd?? ... zrob mu stały dmg xd wszystkim") — malejący kontratak (2026-08-13
+  // fix) wyglądał w logu jak bug, mimo że był świadomy. Ten test dawniej PILNOWAŁ że kontratak
+  // MALEJE (regresja na jeszcze wcześniejszy "kwadratowy" bug ze STAŁEGO max HP) — teraz
+  // pilnuje odwrotnej własności: stały, PRZEWIDYWALNY kontratak niezależnie od przebiegu
+  // walki (COUNTER_PCT przepołowiony 0.05→0.025 żeby zachować ten sam profil ryzyka mimo
+  // usunięcia decaya, patrz throwaway-symulacja w komentarzu przy COUNTER_PCT w bosses.ts).
+  test('kontratak jest STAŁY w całej walce, nie maleje z HP bossa (2026-08-20, user: "stały dmg")', () => {
     const b = boss({ hp: 5000 });
     // słaby gracz → wiele rund, dużo kontrataków do porównania; ogromne HP kotka żeby
-    // walka dobiegła końca (nie interesuje nas tu wynik, tylko TREND kontrataku w rundach)
+    // walka dobiegła końca (nie interesuje nas tu wynik, tylko czy kontratak jest STAŁY)
     const r = simulateFight(0, 1, noCrit, b, 1_000_000, 200);
     const hits = r.rounds.filter(x => x.counterDmg > 0);
     expect(hits.length).toBeGreaterThan(5); // realnie wieloruudowa walka
-    expect(hits[0].counterDmg).toBeGreaterThan(hits[hits.length - 1].counterDmg);
+    expect(hits[0].counterDmg).toBe(hits[hits.length - 1].counterDmg);
   });
 
   test('OSŁONA: wrodzona cecha bossa → Twoje ciosy w całej walce o połowę słabsze', () => {

@@ -208,8 +208,9 @@ export const eventXp   = (level: number) => 250 + Math.max(0, level) * 25;
 // "ten drugi niech nie ma timera tylko pasek zdrowia większy, ma nielimitowany czas i próby
 // podejścia ale ma wpizdu HP żeby go długo klepać... dobre nagrody, szansa na item kilka prc,
 // XP sporo i golda"). Dokładnie ten sam wzorzec co raid.ts: prawdziwa pula jest ZA DUŻA żeby
-// wrzucić bezpośrednio do simulateFight (counterDamage liczy % od AKTUALNEGO hp bossa — przy
-// tysiącach HP jeden kontratak zabiłby kotka), więc każda próba to mała, bezpiecznie skalowana
+// wrzucić bezpośrednio do simulateFight (counterDamage liczy % od `boss.hp` wprost, od
+// 2026-08-20 zawsze STAŁY procent maksimum — przy tysiącach HP jeden kontratak zabiłby
+// kotka), więc każda próba to mała, bezpiecznie skalowana
 // SESJA (menaceSessionHpFor, ten sam `atkPower × stała` kształt), a realny postęp (sesyjne hp
 // przed minus po) dopisuje się do prawdziwej puli osobnym wywołaniem store'u (menaceAttack).
 // Baza WYŻSZA niż raid (raid ma limit energii/tydzień; nemesis ma NIEOGRANICZONE próby, więc

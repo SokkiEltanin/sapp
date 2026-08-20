@@ -159,7 +159,7 @@ describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 202
   test('kontratak nie zabija kotka (base 100 HP) w 1 rundzie na żadnym z tych poziomów', () => {
     for (const level of [2, 25, 50, 100]) {
       const hp = eventHpFor(level);
-      const counter = counterDamage(hp, 0); // round 1: aktualne HP = max HP
+      const counter = counterDamage(hp, 0); // stały % max HP, ta sama wartość co w każdej rundzie
       expect(counter).toBeLessThan(100);
     }
   });
@@ -179,7 +179,7 @@ describe('seasonalEvents — eventHpFor / eventAsBoss (round-based rebalance 202
 // 2026-08-18 — nemesis przebudowany na TRWAŁY bank HP (jak raid), user: "ten drugi niech nie
 // ma timera tylko pasek zdrowia większy, ma nielimitowany czas i próby podejścia ale ma
 // wpizdu HP żeby go długo klepać". Ten sam sesja-wobec-trwałej-puli wzorzec i te same testy-
-// -strażnicy co raid.test.ts (counterDamage% liczony od AKTUALNEGO hp bossa — surowa
+// -strażnicy co raid.test.ts (counterDamage% liczony od `boss.hp` wprost — surowa
 // menaceHpFor jest za duża, żeby wrzucić bezpośrednio do simulateFight).
 describe('seasonalEvents — menaceHpFor / menaceSessionHpFor / menaceAsBoss (trwały bank, 2026-08-18)', () => {
   test('menaceHpFor rośnie z poziomem i jest WIĘKSZE niż raidHpFor na tym samym poziomie (nieograniczone próby → musi starczyć na dłużej)', () => {
