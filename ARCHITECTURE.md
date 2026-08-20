@@ -982,23 +982,44 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     się w wąskiej kolumnie obok kotka) — szczegóły zostają w `GearSlotModal` po tapnięciu.
     - **Mission UI**: dawny duży `stageAway` kafelek (kotek znikał ze sceny, zastępowany
       wymachującym dużym CatArt) USUNIĘTY — kolidował wizualnie z osobną kartą "Misja" niżej
-      (to samo pokazane dwa razy) i zachodził tekstem na ramki gear slotów. Teraz kotek W
-      MISJI zostaje NA scenie (wewnątrz `GearPanel`, więc dalej flankowany gearem) ale
-      KURCZY SIĘ (`MISSION_STAGE_SIZE`, wyraźnie mniejszy niż zwykły portret `STAGE_SIZE+90`)
-      i dostaje mini pasek postępu + odliczanie POD sobą, z tym samym odbijającym się
-      miniaturowym kotkiem co wcześniej (`missionBounce`/`missionCatWrap`, reużyty 1:1, nie
-      przepisany). Osobna sekcja "Misja" (inline lista 3 profili) USUNIĘTA — zastąpiona (1)
-      `MissionSendModal` w `app/pet.tsx` (nowy komponent, bottom-sheet identyczny wzorcem do
-      `GearSlotModal`, 3 wiersze `MISSION_PROFILE_ORDER`) i (2) małym kaflem misji w gridzie
-      "Siła bojowa", który zastąpił dawną kartę "Doświadczenie" (Lv+XP) — 3 stany: brak misji
-      → ikona Compass + przycisk "Wyślij" (otwiera modal), w drodze → ikona Hourglass +
-      odliczanie, gotowa → ikona Swords + przycisk "Walcz" (nawiguje do `boss-fight?kind=
-      mission`). Header `topRight`'s pasek Lv POWIĘKSZONY (`lvlBarRow`/`lvlBarTrack`, szerszy
-      i grubszy niż affection `miniBarRow`, który zostaje bez zmian) + nowa linijka
-      `{lvl.inLevel}/{lvl.needed} XP` pod paskiem — jedyny wskaźnik poziomu na ekranie odkąd
-      karta "Doświadczenie" zniknęła z grida. "Wróć natychmiast" (anulowanie bez nagrody,
-      `onCancelMission`) przeniesione z dawnego pełnego przycisku na mały podkreślony link
-      tekstowy pod odliczaniem na scenie — funkcja bez zmian, tylko mniej wizualnego ciężaru.
+      (to samo pokazane dwa razy) i zachodził tekstem na ramki gear slotów. Osobna sekcja
+      "Misja" (inline lista 3 profili) USUNIĘTA — zastąpiona (1) `MissionSendModal` w
+      `app/pet.tsx` (nowy komponent, bottom-sheet identyczny wzorcem do `GearSlotModal`, 3
+      wiersze `MISSION_PROFILE_ORDER`) i (2) małym kaflem misji w gridzie "Siła bojowa", który
+      zastąpił dawną kartę "Doświadczenie" (Lv+XP) — 3 stany: brak misji → ikona Compass +
+      przycisk "Wyślij" (otwiera modal), w drodze → ikona Hourglass + odliczanie, gotowa →
+      ikona Swords + przycisk "Walcz" (nawiguje do `boss-fight?kind=mission`). Header
+      `topRight`'s pasek Lv POWIĘKSZONY (`lvlBarRow`/`lvlBarTrack`, szerszy i grubszy niż
+      affection `miniBarRow`, który zostaje bez zmian) + nowa linijka `{lvl.inLevel}/
+      {lvl.needed} XP` pod paskiem — jedyny wskaźnik poziomu na ekranie odkąd karta
+      "Doświadczenie" zniknęła z grida.
+    - **Runda 2 — kotek na scenie w trakcie misji dalej był PODWOJONY** (2026-08-20, user po
+      teście na urządzeniu: "kotek jest podwojony chce tylko animacje jak on wchodzi na pasek
+      zmniejsza sie w trakcie wchodzenia i sobie tak idzie z paskiem"). Pierwsza wersja tylko
+      ZMNIEJSZYŁA duży portret (`MISSION_STAGE_SIZE`), ale zostawiła go RENDEROWANY RAZEM z
+      osobnym małym kotkiem na pasku — dwa elementy naraz, dokładnie ten sam typ duplikatu co
+      dawny `stageAway` vs karta Misja. `MISSION_STAGE_SIZE` USUNIĘTE — duży portret w trakcie
+      misji zniknął CAŁKOWICIE, jedyny kotek to ten na pasku. Dostaje jednorazową animację
+      wejścia `missionEnter` (`Animated.Value` 0→1, 550ms `Easing.out(cubic)`, odtwarzana przy
+      każdym zamontowaniu ekranu w trakcie aktywnej misji, nie tylko raz globalnie — prostsze
+      niż śledzenie "czy user już widział"): dwa zagnieżdżone `Animated.View`, zewnętrzny
+      interpoluje `scale` 3.2→1 i `translateY` -90→0 (start "duży i wysoko", tam gdzie siedział
+      dawny portret), wewnętrzny to NIEZMIENIONY `missionBounce`/`missionSwayRotate` (bounce +
+      lekkie wahadło, amplituda wahadła zmniejszona z ±7° do ±4° pod mały rozmiar). Pasek
+      (`missionBarTrack`) przebudowany z cienkich 4px na grubą pigułkę 30px, pełna szerokość
+      `catCol` (było sztywne 140px) — wypełnienie to `LinearGradient` + zapętlona "fala"
+      (`missionBarWave`, jasny ukośny pasek przesuwający się `translateX`, przycięty
+      `overflow:hidden`-em `missionBarFillWrap`-a do aktualnej szerokości wypełnienia, nie
+      trzeba znać jej w px). Nad paskiem nowy `missionHeadRow`: nazwa miejsca podróży (lewo) +
+      odliczanie (prawo) zamiast osobnej linijki tekstu pod spodem. Nazwy miejsc = nowe pole
+      `MiniBoss.destination` w `minibosses.ts` (8 nazw dopasowanych tematycznie do zwierzaka,
+      np. Kapibara Chillu → "Leniwe Bajoro", Harpia Wichru → "Wichrowy Szczyt") — odczytywane
+      przez `missionMb = minibossForMission(missionStartedAt)`, TĘ SAMĄ deterministyczną
+      funkcję którą `boss-fight.tsx` już wołał do wyboru przeciwnika PO powrocie — nazwa
+      miejsca na scenie i przeciwnik w walce są więc ZAWSZE tym samym zwierzakiem (zero
+      nowego stanu, tylko wcześniejszy odczyt istniejącej czystej funkcji). "Wróć natychmiast"
+      (anulowanie bez nagrody, `onCancelMission`) zostaje małym podkreślonym linkiem pod
+      paskiem, bez zmian funkcjonalnych.
   - **Level-up celebration** (2026-08-19, user: "musimy dodac info o levelup pupila...
     powiadomienie z confetti albo fajna animacja") — baner spadający z góry na 3,2s +
     `Confetti` (reużyty z `achievements/Confetti.tsx`), LŻEJSZY niż `BadgeCelebration.tsx`

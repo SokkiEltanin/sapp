@@ -41,37 +41,37 @@ gear/loot z `energyMult` bonusem, sprawdź czy cap poszedł w górę (np. z 2 na
 całą energię, sprawdź czy regeneracja nadal działa co `ENERGY_REGEN_HOURS` i zatrzymuje się na
 nowym, wyższym capie, nie na starym 2.
 
-## 🆕🏗️ Gear layout (3 lewo/3 prawo) + konsolidacja UI misji — NIEsprawdzone (2026-08-20)
+## 🆕🏗️ Gear layout (3 lewo/3 prawo) + konsolidacja UI misji — NIEsprawdzone (2026-08-20, runda 2)
 
-User (screenshot `/pet`): itemy ekwipunku mają być 3 po LEWEJ i 3 po PRAWEJ stronie kotka
-(był jeden rząd pod kotkiem), z lepszymi ikonami lucide zamiast emoji — puste sloty
-bezbarwne/outline. Osobno: kafelek misji był PODWÓJNY — duży "stageAway" tile (kotek
-zniknięty, wymachujący duży CatArt) I osobna sekcja "Misja" niżej pokazywały to samo, tekst
-zachodził na ramki itemów.
+User (screenshot `/pet`): itemy ekwipunku mają być 3 po LEWEJ i 3 po PRAWEJ stronie kotka, z
+lepszymi ikonami lucide (puste sloty bezbarwne) — **zrobione w rundzie 1, na urządzeniu OK**.
+Kafelek misji był PODWÓJNY (duży + osobna sekcja) — **zrobione w rundzie 1, ALE** po teście na
+urządzeniu user zgłosił NOWY duplikat: skurczony duży kotek NA scenie i mały kotek na pasku
+renderowały się RAZEM naraz ("kotek jest podwojony") — pierwsza wersja nie usunęła w pełni
+dużego portretu, tylko go zmniejszyła, a osobny mały na pasku został.
 
-Zrobione: `GearPanel` bierze teraz kotka jako `children` (`GearPanel({children})` w
-`app/pet.tsx`, `<GearPanel>{catRender}</GearPanel>`) i renderuje go w środkowej kolumnie
-flankowanej `flankCol` lewo/prawo (`GEAR_SLOTS.slice(0,3)`/`.slice(3)`) — ikony z nowego
-`SLOT_ICON: Record<GearSlot, LucideIcon>` w `GearPanel.tsx` (HardHat/Shield/Footprints/
-Link2/Gem/Coins), kolor = `meta.color` (rarity) gdy założone, `c.text.muted` + cieńszy
-`strokeWidth` gdy puste ("bez koloru jakby były puste"). Stary `stageAway` USUNIĘTY —
-kotek w misji teraz się KURCZY (`MISSION_STAGE_SIZE`, mniejszy niż normalny portret) i
-dostaje mini pasek postępu + odliczanie WEWNĄTRZ sceny (reużyty `missionBounce`/
-`missionCatWrap`, ten sam mechanizm co dawna karta Misja). Stara pełna sekcja "Misja"
-(inline lista 3 profili) USUNIĘTA, zastąpiona: (1) `MissionSendModal` — popup bottom-sheet
-z 3 profilami, otwierany z (2) małego kafla misji w gridzie "Siła bojowa", który zastąpił
-dawną kartę "Doświadczenie" (3 stany: brak misji → przycisk Wyślij, w drodze → Hourglass +
-odliczanie, gotowa → przycisk Walcz). Header Lv bar POWIĘKSZONY (`lvlBarRow`/`lvlBarTrack`
-szersze/grubsze niż affection bar) + nowa linijka `lvl.inLevel/lvl.needed XP` pod spodem —
-jedyny wskaźnik poziomu teraz. `tsc`/`jest` zielone (700/700, bez nowych testów — czysto UI).
-**Priorytet testu na urządzeniu**: (a) sprawdź czy 3+3 sloty realnie mieszczą się obok kotka
-bez zachodzenia na siebie na różnych stage'ach (baby/kid/teen/adult — adult ma największego
-kotka, najciaśniej), (b) puste vs założone sloty — kolor/kontrast ikon czytelny w ciemnym
-motywie, (c) wyślij misję przez nowy popup, sprawdź czy kotek na scenie się kurczy i pasek+
-odliczanie+kropka-kotek działają jak dawniej, (d) "Wróć natychmiast" pod paskiem nadal działa
-(przeniesiony z dawnego dużego przycisku na mały link tekstowy), (e) po powrocie z misji kafel
-w gridzie pokazuje "Walcz" i faktycznie nawiguje do walki, (f) sprawdź czytelność liczb XP na
-powiększonym pasku Lv w nagłówku.
+Runda 2 (ten commit): kotek na pasku to TERAZ JEDEN element, nie dwa. Duży portret w trakcie
+misji USUNIĘTY CAŁKOWICIE — jedyny kotek to ten na pasku, który "wchodzi" na niego
+jednorazową animacją `missionEnter` (Animated.Value 0→1, 550ms, `Easing.out(cubic)`): startuje
+DUŻY (scale ×3.2) i WYSOKO (translateY -90, tam gdzie siedział dawny portret), potem kurczy
+się i opada dokładnie na pasek. Sam pasek: był 4px, teraz GRUBY (30px, pigułka) i SZERSZY (pełna
+szerokość `catCol` w GearPanel zamiast sztywnych 140px) — `LinearGradient` wypełnienie +
+przesuwająca się w pętli "fala" (`missionWave`, jasny ukośny pasek, przycięty
+`overflow:hidden`-em wypełnienia). NAD paskiem: nazwa miejsca podróży (lewo) + odliczanie
+(prawo) zamiast osobnej linijki tekstu pod spodem. Miejsca podróży = NOWE pole
+`MiniBoss.destination` w `minibosses.ts` (8 nazw dopasowanych tematycznie do zwierzaka, np.
+Kapibara → "Leniwe Bajoro") — pokazywane przez `minibossForMission(missionStartedAt)`, TA SAMA
+deterministyczna funkcja co `boss-fight.tsx` już wołał do wyboru przeciwnika, więc nazwa na
+scenie i przeciwnik po powrocie ZAWSZE się zgadzają (zero nowego stanu, tylko odczyt istniejącej
+funkcji wcześniej niż dawniej). `tsc`/`jest` zielone (700/700, bez nowych testów — czysto UI,
+`destination` nieużywane przez żadną logikę testowaną jednostkowo). **Priorytet testu na
+urządzeniu**: (a) NAJWAŻNIEJSZE — sprawdź że kotek NIE jest już podwojony, tylko jeden element
+na pasku, (b) wyślij misję i sprawdź animację wejścia (duży→mały, z góry na pasek) wygląda
+płynnie, nie migocze, (c) fala na wypełnieniu widoczna i nie wystaje poza pasek, (d) nazwa
+miejsca + odliczanie czytelne nad paskiem na różnych szerokościach ekranu, (e) po powrocie z
+misji walka faktycznie toczy się z tym SAMYM zwierzakiem co pokazywała nazwa miejsca w trakcie
+podróży, (f) 3+3 sloty ekwipunku dalej mieszczą się obok kotka w stanie spoczynku (bez zmian
+w tej rundzie, ale sprawdź czy nic się nie rozjechało).
 
 User zaakceptował pełen plan ("Tak git zapisz wszystko i lecimy wszystko po kolei bez
 przerwy") po kilku turach dopracowywania. To jest ŹRÓDŁO PRAWDY dla całej funkcji —

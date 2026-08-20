@@ -18,19 +18,26 @@ export interface MiniBoss {
   emoji: string;
   taunt: string;
   attackKind?: AttackKind; // 2026-08-17 — patrz komentarz nad AttackKind w bosses.ts
+  // Nazwa MIEJSCA gdzie pupil podróżuje w misji (utils/missions.ts, 2026-08-20, user: "musimy
+  // im nazwy dać miejsc w które podróżuje i dopasować bosy z którym walczy pupil" — miejsce
+  // dopasowane tematycznie do zwierzaka, żeby "Wysyła kotka do Leniwego Bajora" pasowało do
+  // tego KTO tam czeka (`minibossForMission` już deterministycznie łączy jedno z drugim, to
+  // pole tylko dodaje nazwę widoczną NA scenie w trakcie podróży, patrz `app/pet.tsx`).
+  // Nieużywane przez dzienne questy (`minibossForQuest`) — tam nie ma pojęcia "podróży".
+  destination: string;
 }
 
 // Tylko harpia dostaje jednoznaczny wpis (szpony/talony = claw) — reszta rosteru to zwierzęta
 // bez pazur/miecza/magii w charakterze, zostają na fallback pięści.
 export const MINIBOSSES: MiniBoss[] = [
-  { id: 'mb_capybara', name: 'Kapibara Chillu', emoji: '🦫', taunt: 'Po co się wysilać, i tak jest się chill…' },
-  { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…' },
-  { id: 'mb_shark', name: 'Rekinek Fali', emoji: '🦈', taunt: 'Ledwo mokro, po co ten wysiłek…' },
-  { id: 'mb_whale', name: 'Wieloryb Głębin', emoji: '🐳', taunt: 'Jedna rzecz nic nie zmieni…' },
-  { id: 'mb_goat', name: 'Koza Uparta', emoji: '🐐', taunt: 'Po co iść dalej, tu jest wygodnie…' },
-  { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw' },
-  { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…' },
-  { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…' },
+  { id: 'mb_capybara', name: 'Kapibara Chillu', emoji: '🦫', taunt: 'Po co się wysilać, i tak jest się chill…', destination: 'Leniwe Bajoro' },
+  { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…', destination: 'Kałuża za Płotem' },
+  { id: 'mb_shark', name: 'Rekinek Fali', emoji: '🦈', taunt: 'Ledwo mokro, po co ten wysiłek…', destination: 'Rafa Przypływu' },
+  { id: 'mb_whale', name: 'Wieloryb Głębin', emoji: '🐳', taunt: 'Jedna rzecz nic nie zmieni…', destination: 'Otchłań Oceanu' },
+  { id: 'mb_goat', name: 'Koza Uparta', emoji: '🐐', taunt: 'Po co iść dalej, tu jest wygodnie…', destination: 'Kozia Przełęcz' },
+  { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw', destination: 'Wichrowy Szczyt' },
+  { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…', destination: 'Szmaragdowa Dżungla' },
+  { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…', destination: 'Piaszczysta Ścieżka' },
 ];
 
 function hashOf(s: string, mul: number): number {

@@ -31,7 +31,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { missionMinutesFor, missionRewardFor, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
+import { missionMinutesFor, missionRewardFor, minibossForMission, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
 
 const ITEM_IDS = Object.keys(COMBAT_ITEMS) as CombatItemId[];
 const HP_UPGRADE_AMOUNT = 20;
@@ -43,10 +43,6 @@ const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const todayISO = () => ymdOf(new Date());
 const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
-// Kotek W MISJI (2026-08-20) — wyraźnie mniejszy niż normalny portret (user: "kotek się
-// zmniejsza i wskakuje u siebie na dopasowany pasek ładowania"), zastępuje dawny wielki
-// "stageAway" kafelek (był WIĘKSZY niż normalny kotek, nie mniejszy — user to teraz odwraca).
-const MISSION_STAGE_SIZE = { baby: 78, kid: 88, teen: 98, adult: 108 } as const;
 function fmtMissionDuration(minutes: number): string {
   const total = Math.max(0, Math.round(minutes));
   const h = Math.floor(total / 60), m = total % 60;
@@ -100,11 +96,9 @@ export default function Pet() {
     return () => loop.stop();
   }, [missionEndsAt, missionReady]);
   const missionBounceY = missionBounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
-  // Duży kotek na scenie w trakcie misji (2026-08-19, user: "zrobić jednak większy ten
-  // kafelek... animowanym ładnym kotka zrobić jakby tak na boki się lekko gibał jakby szedł")
-  // — osobne, WOLNIEJSZE wahadło (rotacja, nie translateY jak `missionBounce` wyżej — to
-  // "chód" dużego kotka na scenie, nie podskakiwanie małej ikony na pasku) — ten sam
-  // start/stop-przy-away wzorzec.
+  // Lekkie wahadło "chodu" MAŁEGO kotka na pasku (2026-08-20, przeskalowane z dawnego dużego
+  // kołysania — user chciał wtedy duży kafelek "gibający się jakby szedł", teraz to samo
+  // wahadło (mniejsza amplituda, -4/4° zamiast -7/7°) na małym jeżdżącym po pasku kotku).
   const missionSway = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!missionEndsAt || missionReady) return;
@@ -116,7 +110,36 @@ export default function Pet() {
     loop.start();
     return () => loop.stop();
   }, [missionEndsAt, missionReady]);
-  const missionSwayRotate = missionSway.interpolate({ inputRange: [-1, 1], outputRange: ['-7deg', '7deg'] });
+  const missionSwayRotate = missionSway.interpolate({ inputRange: [-1, 1], outputRange: ['-4deg', '4deg'] });
+  // Animacja WEJŚCIA na pasek (2026-08-20, user: "kotek jest podwojony chce tylko animacje jak
+  // on wchodzi na pasek zmniejsza sie w trakcie wchodzenia i sobie tak idzie z paskiem" —
+  // dawniej DWA kotki naraz: duży skurczony na scenie + mały na pasku, wyglądało jak duplikat.
+  // Teraz JEDEN kotek: startuje duży (`outputRange` scale 3.2) i wysoko (translateY -90, tam
+  // gdzie siedział normalny portret), potem kurczy się i opada DOKŁADNIE na pasek w jednej,
+  // płynnej animacji. Odtwarza się przy KAŻDYM zamontowaniu ekranu w trakcie misji (nie tylko
+  // raz przy starcie) — prościej niż śledzenie "czy user już to widział", i nieszkodliwe
+  // (user i tak wraca na ten ekran raz na jakiś czas, nie w pętli).
+  const missionEnter = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!missionEndsAt || missionReady) return;
+    missionEnter.setValue(0);
+    Animated.timing(missionEnter, { toValue: 1, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [missionEndsAt, missionReady]);
+  const missionEnterScale = missionEnter.interpolate({ inputRange: [0, 1], outputRange: [3.2, 1] });
+  const missionEnterY = missionEnter.interpolate({ inputRange: [0, 1], outputRange: [-90, 0] });
+  // Fala "ładowania" przesuwająca się po wypełnionej części paska (2026-08-20, user: "za nim
+  // taka ładująca się fala") — jasny pasek skośnie przecinający wypełnienie, zapętlony,
+  // przycięty przez `overflow:hidden` na `missionBarFillWrap` do aktualnej szerokości
+  // wypełnienia (nie trzeba znać jej w px).
+  const missionWave = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!missionEndsAt || missionReady) return;
+    const loop = Animated.loop(Animated.timing(missionWave, { toValue: 1, duration: 1300, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [missionEndsAt, missionReady]);
+  const missionWaveX = missionWave.interpolate({ inputRange: [0, 1], outputRange: [-70, 280] });
+  const missionMb = missionStartedAt ? minibossForMission(missionStartedAt) : null;
   const onCancelMission = () => {
     haptic.tap();
     Alert.alert(
@@ -334,31 +357,34 @@ export default function Pet() {
             (kotek W MISJI jest teraz MNIEJSZY, nie większy, mieści się bez problemu). */}
         <View style={s.stage}>
           <GearPanel>
-            {/* Kotek W MISJI kurczy się i dostaje mini pasek postępu z odbijającą się miniaturką
-                zamiast dawnego wielkiego "stageAway" kafelka, który dublował kartę Misja niżej
-                i zachodził tekstem na ramki itemów ekwipunku (2026-08-20, user: "kafelek misji
-                jest jakby podwojony... kotek się zmniejsza i wskakuje u siebie na dopasowany
-                pasek ładowania z licznikiem... malutki porusza się z paskiem jakby z tą
-                animacją co teraz" — ten sam `missionBounce`/`missionCatWrap` mechanizm co
-                wcześniej w osobnej karcie, teraz PRZENIESIONY na scenę). `missionReady`
-                (wrócił, czeka walka) wraca do normalnego rozmiaru — akcja "Walcz" żyje teraz w
-                małym kaflu misji w gridzie Siła bojowa niżej, nie tu. */}
+            {/* Kotek W MISJI — JEDEN kotek, nie dwa (2026-08-20, user: "kotek jest podwojony" —
+                dawniej duży skurczony portret NA scenie + osobny mały na pasku renderowały się
+                RAZEM, wyglądało jak duplikat). Teraz tylko ten na pasku istnieje — "wchodzi"
+                na niego jednorazową animacją `missionEnter` (duży i wysoko → mały i na pasku),
+                potem jeździ wzdłuż wypełnienia z tym samym bounce/sway co dawniej. Nad paskiem
+                nazwa miejsca (`missionMb.destination`, `minibossForMission` — DETERMINISTYCZNIE
+                ten sam zwierzak/miejsce co dostanie do walki `boss-fight.tsx` po powrocie, patrz
+                minibosses.ts) i odliczanie po przeciwnej stronie. */}
             {missionEndsAt && !missionReady ? (
               <View style={s.stageMissionWrap}>
-                <Animated.View style={{ transform: [{ rotate: missionSwayRotate }] }}>
-                  <CatArt size={MISSION_STAGE_SIZE[stage]} animate palette={palette} stripes={catStripes}
-                    eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
-                </Animated.View>
-                <View style={s.missionProgWrap}>
-                  <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
-                  <View style={[s.missionCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
-                    <Animated.View style={{ transform: [{ translateY: missionBounceY }] }}>
-                      <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
-                        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                <View style={s.missionHeadRow}>
+                  <Text style={s.missionDestTxt} numberOfLines={1}>{missionMb ? `${missionMb.emoji} ${missionMb.destination}` : 'W drodze…'}</Text>
+                  <Text style={s.missionTimerTxt}>{fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+                </View>
+                <View style={s.missionBarTrack}>
+                  <View style={[s.missionBarFillWrap, { width: `${Math.round(missionProgress * 100)}%` }]}>
+                    <LinearGradient colors={['#2AA9E0', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                    <Animated.View style={[s.missionBarWave, { transform: [{ translateX: missionWaveX }, { rotate: '18deg' }] }]} />
+                  </View>
+                  <View style={[s.missionBarCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
+                    <Animated.View style={{ transform: [{ translateY: missionEnterY }, { scale: missionEnterScale }] }}>
+                      <Animated.View style={{ transform: [{ translateY: missionBounceY }, { rotate: missionSwayRotate }] }}>
+                        <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
+                          eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                      </Animated.View>
                     </Animated.View>
                   </View>
                 </View>
-                <Text style={s.stageMissionCountdown}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
                 <TouchableOpacity onPress={onCancelMission} hitSlop={8}>
                   <Text style={s.stageMissionCancel}>Wróć natychmiast</Text>
                 </TouchableOpacity>
@@ -578,10 +604,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110, alignItems: 'center' },
 
   stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
-  // Kotek W MISJI na scenie (2026-08-20) — zastępuje dawny `stageAway` (był WIĘKSZYM
-  // kafelkiem niż zwykły portret, teraz kotek się KURCZY, patrz `MISSION_STAGE_SIZE`).
-  stageMissionWrap: { alignItems: 'center', gap: spacing[1] },
-  stageMissionCountdown: { fontSize: 12.5, fontWeight: '700', color: c.text.muted, marginTop: spacing[1] },
+  // Kotek W MISJI (2026-08-20) — JEDEN kotek jeżdżący po pasku (nie osobny duży portret NA
+  // scenie + mały na pasku naraz, patrz `missionEnter` przy hookach wyżej w pliku).
+  stageMissionWrap: { alignItems: 'center', gap: spacing[2], width: '84%' },
   stageMissionCancel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textDecorationLine: 'underline', marginTop: 2 },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
@@ -634,13 +659,20 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
   missionSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
-  // `missionProgWrap` NIE ma `overflow:'hidden'` (w przeciwieństwie do `missionProgTrack`
-  // pod spodem) — kotek musi móc wystawać NAD cienki pasek, przycięcie by go obcięło. Szerokość
-  // stała (2026-08-20, przeniesione ze sceny obok kotka w misji, nie pełna szerokość karty).
-  missionProgWrap: { position: 'relative', marginTop: 16, width: 140 },
-  missionProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden' },
-  missionProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
-  missionCatWrap: { position: 'absolute', top: -9, marginLeft: -11 },
+  // Nazwa miejsca (lewo) / odliczanie (prawo) NAD paskiem (2026-08-20, user: "nad paskiem
+  // nazwa a naprzeciwko timer ile zostało").
+  missionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
+  missionDestTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.primary, flexShrink: 1, marginRight: spacing[2] },
+  missionTimerTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  // Pasek GRUBSZY i SZERSZY niż dawny cienki 4px (2026-08-20, user: "ten pasek troszeczkę
+  // tłuszczy i o wiele szerszy") — pełna szerokość dostępnej kolumny (`catCol` w GearPanel),
+  // pigułka (borderRadius = połowa wysokości). `missionBarFillWrap` ma `overflow:'hidden'`
+  // żeby fala (`missionBarWave`) i gradient nie wystawały poza aktualną szerokość wypełnienia
+  // — `missionBarTrack` sam NIE przycina, bo kotek musi wystawać NAD/PONAD cienką krawędzią.
+  missionBarTrack: { position: 'relative', width: '100%', height: 30, borderRadius: 15, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 15, overflow: 'hidden' },
+  missionBarWave: { position: 'absolute', top: -10, bottom: -10, width: 34, backgroundColor: 'rgba(255,255,255,0.32)' },
+  missionBarCatWrap: { position: 'absolute', top: 3, marginLeft: -11 },
 
   // Popup wyboru profilu misji (2026-08-20) — zastępuje dawną inline `missionChooseCard`
   // (user: "kafelek misji jest jakby podwojony... miał być malutki przycisk... otwierany
