@@ -44,22 +44,29 @@ trudność/ryzyko zemdlenia "czuje się" podobnie jak wcześniej (nie drastyczni
 guard (np. Cukrowy Potwór, Duch Perfekcjonizmu) i regen (np. Widmo Porównań) — to kombinacje
 najbardziej wrażliwe na tę zmianę.
 
-## 🆕 Level-up celebration — baner + confetti — NIEsprawdzone (2026-08-19)
+## 🆕 Level-up celebration — baner + confetti + pasek XP — NIEsprawdzone (2026-08-20, runda 2)
 
 User: "musimy dodac info o levelup pupila jakby albo animacje xd nie wiem chyba
 powiadomienie wystarczy z confetti albo z fajna animacja XP czy cos". Baner spadający
-z góry ekranu (nie blokujący, jak `Toast.tsx`) + `Confetti`, auto-znika po 3,2s (albo tap).
+z góry ekranu (nie blokujący, jak `Toast.tsx`) + `Confetti`, auto-znika (albo tap).
 Wykrywanie w `app/_layout.tsx` (jedyny komponent żywy przez całą sesję, xp rośnie z wielu
 miejsc — walki/questy/careTick), nowe `petStore.lastSeenLevel` (migracja dla starych
 zapisów = aktualny poziom, NIE 1, żeby nie zalać istniejącego gracza lawiną poziomów).
 Dodatkowy tekst gdy level-up trafia na próg wzrostu (Lv3/6/12 → kid/teen/adult).
-Pełny opis w ARCHITECTURE §9. **Priorytet testu na urządzeniu**: (a) zdobądź XP (dowolna
-walka/quest) tak żeby przejść na kolejny poziom, sprawdź czy baner się pojawia z confetti
-i sam znika, (b) zamknij apkę W TRAKCIE animacji (przed autozniknięciem) i otwórz ponownie
-— level-up powinien wrócić, nie zniknąć bezpowrotnie, (c) zdobądź duży skok XP przez kilka
-poziomów naraz (np. wygrana z dużą nagrodą) — powinien pokazać się JEDEN baner z finalnym
-poziomem, nie lawina po jednym na każdy przeskoczony poziom, (d) sprawdź tekst progu
-wzrostu przy Lv3/6/12 jeśli akurat masz tam pupila.
+
+Runda 2 (2026-08-20, user po zobaczeniu bannera na żywo: "ten toast powiadomienie levelupu
+pupila zrob lepiej teraz jest tylko emotka i confetii i nie wiadomo o co chodzi xd") —
+pojedyncza emotka 🎉 obok numeru poziomu ginęła wizualnie przy confetti, mało informacji.
+Emoji zastąpione kolorową odznaką z ikoną `ChevronsUp` (jednoznaczny motyw "poszedłeś w
+górę") + nowy kicker "AWANS POZIOMU" NAD numerem (ten sam wzorzec co `vKicker` w victory
+modalu bossów) + nowy mini pasek XP pod spodem ("X/Y XP" w nowym poziomie, liczone z
+ŻYWEGO `xp` w store przez `levelFromXp`, nie zamrożone na moment level-upu). Auto-dismiss
+wydłużony 3,2s→4,2s (więcej do przeczytania). Pełny opis w ARCHITECTURE §9. **Priorytet
+testu na urządzeniu**: (a) zdobądź XP tak żeby przejść na kolejny poziom, sprawdź czy nowy
+baner (odznaka+kicker+pasek XP) jest czytelny i nie ginie przy confetti, (b) zamknij apkę
+W TRAKCIE animacji i otwórz ponownie — level-up powinien wrócić, (c) zdobądź duży skok XP
+przez kilka poziomów naraz — JEDEN baner z finalnym poziomem, (d) sprawdź tekst progu
+wzrostu przy Lv3/6/12, (e) sprawdź czy pasek XP pokazuje sensowną liczbę (nie 0/0 ani ujemną).
 
 ## 🆕 Cap energii kampanii skaluje się z energyMult — NIEsprawdzone (2026-08-20)
 
