@@ -1138,6 +1138,22 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       zamrożonego na moment wykrycia level-upu), więc jeśli w międzyczasie doszło więcej XP
       zanim baner się pokazał, pasek pokazuje PRAWDZIWY aktualny stan, nie stary snapshot.
       `AUTO_DISMISS_MS` wydłużony 3200→4200ms — więcej treści do przeczytania niż sam numer.
+  - **"Pomiń walkę" — przycisk pomijający animację walki, wszystkie 6 trybów naraz**
+    (2026-08-20, user: "możesz dodać przycisk jak walka jakakoliwek pomiń walke?"). Kluczowa
+    obserwacja umożliwiająca prosty, bezpieczny fix: wynik walki jest w 100% ROZSTRZYGNIĘTY
+    w momencie kliknięcia WALCZ! — `simulateFight()` i (dla raid/nemesis) `raidAttack()`/
+    `menaceAttack()`, a dla reszty trybów `spendEnergy()`, wołane SYNCHRONICZNIE w
+    `attackRoundBased()` PRZED odtworzeniem animacji (`playerBeat`/`counterBeat` łańcuch
+    `setTimeout`). Cała animacja to więc czysto KOSMETYCZNE odtworzenie już gotowego
+    `result` — skip nie może "zepsuć" ani zmienić wyniku, bo wynik już istnieje. Implementacja:
+    nowy `skipFightRef` (`useRef<(() => void) | null>`, bo `finish()`/`roundTimer` żyją w
+    domknięciu `attackRoundBased()`, ustawiane na nowo przy KAŻDYM ataku) — ustawiany tuż
+    przed pierwszym `playerBeat()`, czyszczony w `finish()`. `skipFight()` (przycisk) czyści
+    pending `roundTimer`, resetuje stan lotu łap/pazurów (`pawFlying`/`boltFlying`) i ostatnich
+    trafień (`catHit`/`lastHit`) żeby nic nie zostało "w locie" pod modalem wygranej/przegranej,
+    i woła `finish()` wprost. Przycisk (mały, podkreślony tekst pod głównym "WALCZ!") widoczny
+    TYLKO gdy `fighting===true` — jedna wspólna implementacja dla kampanii/raidu/wydarzenia/
+    questa/MAD/misji, bo `attackRoundBased()` to już jedna wspólna funkcja dla wszystkich 6.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po

@@ -9,6 +9,23 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 "Pomiń walkę" — przycisk pomijający animację, wszystkie 6 trybów — NIEsprawdzone (2026-08-20)
+
+User: "możesz dodać przycisk jak walka jakakoliwek pomiń walke?". Wynik walki jest już w 100%
+rozstrzygnięty w momencie WALCZ! (`simulateFight`/`raidAttack`/`menaceAttack`/`spendEnergy`
+wołane synchronicznie PRZED animacją) — animacja to czysto kosmetyczne odtworzenie gotowego
+wyniku, więc skip jest bezpieczny i nie może zmienić rezultatu. Nowy `skipFightRef` w
+`app/boss-fight.tsx`, mały podkreślony przycisk "Pomiń walkę" pod głównym WALCZ!, widoczny
+tylko w trakcie animacji (`fighting===true`) — jedna implementacja dla wszystkich 6 trybów
+(kampania/raid/event/quest/mad/misja), bo dzielą jedną `attackRoundBased()`. Pełny opis w
+ARCHITECTURE §9. `tsc`/`jest` zielone (703/703, bez nowych testów — czysto UI/timing, logika
+wyniku niezmieniona). **Priorytet testu na urządzeniu**: (a) rozpocznij walkę (dowolny tryb)
+i kliknij "Pomiń walkę" w trakcie animacji — sprawdź czy od razu pokazuje się modal
+wygranej/przegranej z PRAWIDŁOWĄ nagrodą (tą samą co gdyby animacja doleciała do końca),
+(b) sprawdź że po skipie nic nie zostaje "w locie" (paw/bolt) widoczne pod modalem po jego
+zamknięciu, (c) sprawdź raid/nemesis (sesja wobec trwałej puli) — skip powinien poprawnie
+domknąć/nie domknąć prawdziwą pulę zależnie od realnego wyniku, tak samo jak bez skipu.
+
 ## 🐛 Paragon: "Razem" liczył sumę PRZED zwrotem kaucji, nie realnie zapłaconą kwotę — NIEsprawdzone (2026-08-20)
 
 User przesłał realny paragon Lidl ze zwrotem kaucji za butelki (-6 zł) — ekran "Wklej paragon"
