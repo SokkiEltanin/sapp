@@ -23,7 +23,8 @@ import { Boss, BOSSES, Bonuses, atkPower } from '@/utils/bosses';
 // UWAGA (sprawdzone throwaway-symulacją z realistycznym profilem inwestycji gracza, nie
 // zgadywane): pierwsza wersja celowała w 14-25 ciosów (start od GÓRY zakresu kampanii) —
 // symulacja pokazała że to matematycznie NIEWYGRYWALNE (0% win-rate) już od ok. 8-10 ciosów,
-// bo `counterDamage()` liczy % od AKTUALNEGO hp bossa (bosses.ts), a hp bossa rośnie z
+// bo `counterDamage()` liczy % od `boss.hp` wprost (bosses.ts, od 2026-08-20 zawsze STAŁY
+// procent maksimum, nie malejący — patrz komentarz przy COUNTER_PCT), a hp bossa rośnie z
 // atkPower(level) podczas gdy pula HP kotka NIE rośnie automatycznie z levelem (tylko z
 // zakupionym catMaxHpBonus) — więcej ciosów = kwadratowo więcej skumulowanych kontrataków,
 // nie liniowo. Bezpieczny, wciąż wyraźnie trudniejszy niż quest (4 ciosy) zakres: 6→8 ciosów

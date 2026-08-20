@@ -76,8 +76,9 @@ export const raidXp = (level: number) => 400 + Math.max(0, level) * 40;
 // restartuje jego HP jak z tym drugim [event]") — raid dostaje TERAZ pełną, animowaną walkę
 // rundową (simulateFight, jak kampania), ale prawdziwa pula `raidHpFor` jest z założenia
 // OGROMNA (ma wystarczyć na cały tydzień wielu prób) — nie da się jej użyć bezpośrednio jako
-// `boss.hp` w simulateFight, bo `counterDamage()` liczy % od AKTUALNEGO hp bossa (bosses.ts):
-// przy hp rzędu tysięcy jeden kontratak zabijałby kotka natychmiast (dokładnie problem, który
+// `boss.hp` w simulateFight, bo `counterDamage()` liczy % od `boss.hp` wprost (bosses.ts, od
+// 2026-08-20 zawsze STAŁY % maksimum, nie tylko na starcie walki — patrz komentarz przy
+// COUNTER_PCT): przy hp rzędu tysięcy jeden kontratak zabijałby kotka natychmiast (dokładnie problem, który
 // stary model omijał liczeniem kontrataku od `catMax`, nie od `raidMaxHp` — patrz historyczny
 // komentarz w app/boss-fight.tsx). Rozwiązanie: każda próba to osobna, MAŁA "sesja" wg
 // DOKŁADNIE tego samego, już zwalidowanego wzorca co questBossHpFor/madBossHpFor (`atkPower ×

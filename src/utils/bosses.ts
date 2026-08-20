@@ -423,37 +423,38 @@ export function eventDailyAttempts(energyMult: number): number {
 // bez znaczenia ile bossowi już zostało. Połączone z tym, że „ciosów potrzeba" TEŻ rośnie z
 // boss.hp, całkowite obrażenia na kotka w jednej walce rosły z KWADRATEM HP bossa. Przy
 // rozstępie HP bossów kampanii 300→368000 (×1200) to była gwarantowana śmierć od jednego
-// kontrataku już od ok. połowy roster'a, niezależnie od inwestycji. Teraz bierze AKTUALNE,
-// nie maksymalne HP — słabnie w miarę jak bossa zbijasz, więc nie eksploduje kwadratowo.
-// Nie jest to jeszcze pełne rozwiązanie „endgame jest zbyt trudny" (to osobna decyzja o
-// krzywej HP bossów / mocy ataku — patrz memory), ale usuwa patologiczne, niewygrywalne
-// przypadki i sprawia że kontratak faktycznie reaguje na przebieg walki, nie tylko na to
-// KTÓRY to boss.
+// kontrataku już od ok. połowy roster'a, niezależnie od inwestycji. FIX WTEDY: liczone od
+// AKTUALNEGO, malejącego HP zamiast maksymalnego — słabło w miarę jak bossa zbijałeś.
 //
-// PODBITE 0.04→0.05 (2026-08-18, user przesłał świeży log walk: kotek kończył każdą walkę
-// 45-70% pełnego HP, nigdy realnie blisko zemdlenia — "bossy muszą być trudniejsze, zobacz
-// na log i pomyśl"). Throwaway-symulacją PEŁNEGO rosteru 22 bossów (profil inwestycji
-// kalibrowany wprost na realnych danych z logu usera: Lv9/order4, atkStatBonus=20,
-// catMaxHpBonus=40, ekstrapolowane liniowo przez order) sprawdzono że 0.05 daje dalej 100%
-// winrate na CAŁYM rosterze przy tej realnej inwestycji, ale podnosi avgLoss z ~35-60% do
-// ~45-75% (worstLoss 70-92%) — realna, odczuwalna trudność i szansa na zemdlenie przy
-// niedoinwestowaniu, bez powtórki historycznego "6 z 22 bossów niewygrywalnych" (sprawdzone:
-// 0.06 już łamie boss #19 dla lżejszej inwestycji — 0.05 to bezpieczny górny sufit). Ten sam
-// stały COUNTER_PCT jest współdzielony przez WSZYSTKIE 6 trybów walki (kampania/raid/event/
-// quest/mad/misja) — jedna zmiana podnosi trudność wszędzie naraz, spójnie.
-const COUNTER_PCT = 0.05; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kontratak
+// ODWRÓCONE Z POWROTEM na STAŁY kontratak (2026-08-20, user po zobaczeniu logu walk: "boss
+// atakują coraz mniej o co chodzi to błąd?? ... zrob mu stały dmg xd wszystkim") — malejący
+// kontratak z aktualnego HP wyglądał w logu jak bug (kontratak/rundę malał w lockstep z HP
+// bossa, np. 31,26,22,...,2,0), mimo że to był świadomy mechanizm. User wolał przewidywalność
+// kosztem "realizmu" rannego bossa. Licząc od STAŁEGO `boss.hp` znowu, żeby nie wrócić do
+// historycznego kwadratowego problemu z 2026-08-13 (rozstęp HP bossów kampanii 382→2690, ×7 —
+// dużo mniejszy niż ówczesne ×1200, bo krzywa HP już wtedy przepisana, patrz komentarz nad
+// BOSSES), `COUNTER_PCT` przepołowione (0.05→0.025): throwaway-symulacją CAŁEGO rosteru 22
+// bossów (ten sam profil inwestycji co przy poprzednich kalibracjach, teraz z DWOMA realnymi
+// punktami — stary anchor order4/Lv9 I świeży log usera order10/Lv20 — interpolowane liniowo
+// przez `order`) sprawdzono że 0.025 przy STAŁYM liczeniu daje PRAKTYCZNIE IDENTYCZNY profil
+// ryzyka co 0.05 przy MALEJĄCYM: przy realistycznej inwestycji 100% winrate/avgLoss ~51% (było
+// ~48% dla starego modelu), przy ×1.5 inwestycji 100%/~25% (było ~23%) — spójne z oczekiwaniem:
+// usunięcie decaya z grubsza PODWAJA sumę kontrataków w jednej walce (każda runda liczona od
+// pełnego, nie malejącego HP), więc połowa starego procentu odtwarza TĘ SAMĄ całkowitą
+// trudność, tylko bez malejącego wzorca w logu.
+const COUNTER_PCT = 0.025; // ułamek MAX (stałego) hp bossa zadawany kotkowi na kontratak
 //
 // FIX 2026-08-17 (throwaway-symulacją, znalezione przy audycie "za łatwe walki" — patrz
 // komentarz nad BOSSES): `guard` (Twój cios ×0.5) BEZ zmiany tutaj podwaja skumulowany
 // kontratak w całej walce względem bossa bez guard o tym samym hp — potrzeba ~2× rund
-// (bo każdy Twój cios słabszy), a każda z tych rund nadal liczy kontratak jako 4% AKTUALNEGO
-// hp bossa, które przy guard maleje WOLNIEJ (mniej dmg/rundę), więc suma kontrataków rośnie,
-// nie tylko liczba rund. Symulacja: bez tego fixu boss #22 (finał kampanii, Iluzja Kontroli)
-// był praktycznie niewygrywalny (0% winrate) nawet przy realistycznej inwestycji. `guard`
-// tnie kontratak o połowę tutaj — przywraca parytet: guard boss z tym samym hp/docelową
-// liczbą ciosów daje w sumie TYLE SAMO skumulowanych obrażeń na kotka co odpowiednik bez
-// guard, zamiast dwa razy tyle. Guard nadal robi swoje (2× dłuższa walka, tankowy typ), tylko
-// przestaje BEZ ZAMIERZENIA mnożyć całkowite ryzyko.
+// (bo każdy Twój cios słabszy), a każda z tych rund liczy TEN SAM kontratak (stały % max hp,
+// 2026-08-20), więc suma kontrataków rośnie z liczbą rund, nie tylko z hp bossa. Symulacja:
+// bez tego fixu boss #22 (finał kampanii, Iluzja Kontroli) był praktycznie niewygrywalny (0%
+// winrate) nawet przy realistycznej inwestycji. `guard` tnie kontratak o połowę tutaj —
+// przywraca parytet: guard boss z tym samym hp/docelową liczbą ciosów daje w sumie TYLE SAMO
+// skumulowanych obrażeń na kotka co odpowiednik bez guard, zamiast dwa razy tyle. Guard nadal
+// robi swoje (2× dłuższa walka, tankowy typ), tylko przestaje BEZ ZAMIERZENIA mnożyć całkowite
+// ryzyko.
 // PODBITE (2026-08-19, user przejrzał log walk questowych: "boss HP: ...78→1→0, kontratak:
 // ...0,0" — boss przy 1 HP wciąż ŻYJE, ale 5% z 1 zaokrągla się w dół do 0, więc kontratak
 // znikał, mimo że boss jeszcze nie padł. User: "napraw żeby nie zaokrąglało tego") — `Math.
@@ -463,9 +464,11 @@ const COUNTER_PCT = 0.05; // ułamek AKTUALNEGO hp bossa zadawany kotkowi na kon
 // `Math.max(1, ...)` zamiast gołego zaokrąglenia. Martwy boss (hp<=0) dalej zwraca 0 (guard na
 // górze, nie dotyczy tej zmiany). Osobny mechanizm CAŁKOWITEGO uniku (item 'dodge' w
 // combatItems.ts) i tak potrafi wyzerować to PO fakcie w simulateFight — ta zmiana nie koliduje,
-// dotyczy tylko bazowego wyliczenia, nie efektów itemów.
-export function counterDamage(currentBossHp: number, dodge: number, guard = false): number {
-  const hp = Math.max(0, currentBossHp);
+// dotyczy tylko bazowego wyliczenia, nie efektów itemów. (2026-08-20: skoro kontratak liczy
+// się teraz od STAŁEGO max hp, ten fix jest technicznie nadmiarowy — max hp nigdy nie
+// zaokrągli się do 0 dla żywego bossa — ale zostaje jako bezpieczny fallback, nic nie kosztuje.)
+export function counterDamage(bossMaxHp: number, dodge: number, guard = false): number {
+  const hp = Math.max(0, bossMaxHp);
   if (hp <= 0) return 0;
   const base = hp * COUNTER_PCT * (guard ? 0.5 : 1);
   const reduced = base * (1 - Math.min(0.9, Math.max(0, dodge)));
@@ -568,7 +571,7 @@ export function simulateFight(
         // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
         const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
         if (!controlled) {
-          counterDmg = counterDamage(bossHp, bonuses.dodge, guarded);
+          counterDmg = counterDamage(boss.hp, bonuses.dodge, guarded);
           // 'dodge' — całkowity unik kontrataku
           if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
           // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka

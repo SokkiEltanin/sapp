@@ -839,6 +839,32 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       sufit — order1-6 przy Lv15-20 zostaje 100% winrate, wyraźnie trudniejsze (avgLoss
       54-86% zamiast 48-64%). Świadomie NIE dano usera dokładnie tego o co prosił — jawnie
       wyjaśnione w PR-ie, nie po cichu ucięte.
+  - **Kontratak bossa ODWRÓCONY z powrotem na STAŁY (nie malejący z HP bossa)** (2026-08-20,
+    user przejrzał świeży log walk: "boss atakują coraz mniej o co chodzi to błąd?? ... zrob
+    mu stały dmg xd wszystkim"). Malejący kontratak (fix z 2026-08-13, patrz wyżej) był
+    świadomym mechanizmem — kontratak/rundę w logu maleje w lockstep z HP bossa (np.
+    31,26,22,...,2,0), co user zinterpretował jako bug, nie feature. Rozwiązanie: `counterDamage()`
+    woła się teraz WSZĘDZIE (jedyne miejsce wywołania — `simulateFight`) z `boss.hp` (STAŁE
+    max) zamiast malejącego `bossHp` — sygnatura funkcji niezmieniona (dalej bierze jeden
+    argument hp-podobny), tylko CO się do niej przekazuje. Żeby nie wrócić do historycznego
+    "kwadratowego" problemu z 2026-08-13 (wtedy: rozstęp HP bossów kampanii 300→368000, ×1200
+    — dziś krzywa HP już przepisana, rozstęp tylko 382→2690, ×7, patrz komentarz nad `BOSSES`),
+    `COUNTER_PCT` przepołowiony 0.05→0.025: throwaway-symulacją CAŁEGO rosteru 22 bossów
+    (profil inwestycji z DWOMA realnymi punktami kalibracji — stary anchor order4/Lv9 z
+    audytu 0.04→0.05 I świeży log tego usera order10/Lv20 — interpolowane liniowo przez
+    `order`) sprawdzono że 0.025 przy stałym liczeniu daje PRAKTYCZNIE IDENTYCZNY profil
+    ryzyka co 0.05 przy malejącym (realistyczna inwestycja: 100% winrate/avgLoss ~51% vs
+    dawne ~48%; ×1.5 inwestycji: 100%/~25% vs dawne ~23%) — usunięcie decaya z grubsza
+    PODWAJA sumę kontrataków w jednej walce, połowa procentu odtwarza tę samą całkowitą
+    trudność. Raid/nemesis/MAD/quest/misja NIE wymagały zmian poza samą stałą — ich `boss.hp`
+    w `simulateFight` to już wcześniej deliberatnie MAŁA, sesyjna wartość (`raidSessionHpFor`/
+    `menaceSessionHpFor`/`madBossHpFor`/`questBossHpFor`, nie surowa trwała pula), więc
+    liczenie kontrataku od `boss.hp` zamiast malejącego `bossHp` było dla nich BEZPIECZNE z
+    założenia (te tryby już nigdy nie liczyły od "prawdziwej" ogromnej puli). Stare komentarze
+    dokumentujące "counterDamage liczy % od AKTUALNEGO hp bossa" w `raid.ts`/`madBosses.ts`/
+    `seasonalEvents.ts`/`boss-fight.tsx` zaktualizowane żeby nie kłamać o aktualnym zachowaniu
+    — historyczna narracja fixu z 2026-08-13 w `bosses.ts` ZOSTAJE nietknięta (opisuje co było
+    prawdą WTEDY), nowy wpis nad `COUNTER_PCT` jasno oznacza odwrócenie jako aktualny stan.
   - **Itemy bojowe — droprate tierowany wg skrzynki + darmowy level-up z epic/legendary**
     (2026-08-18, user: "zrob zeby itemy z bossów miały większy droprate... że te itemy mają
     poziomy, najsłabsze niech lecą na niższych gorszych boksach a lepsze poziomy czyli
