@@ -9,6 +9,24 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Paragon: "Razem" liczył sumę PRZED zwrotem kaucji, nie realnie zapłaconą kwotę — NIEsprawdzone (2026-08-20)
+
+User przesłał realny paragon Lidl ze zwrotem kaucji za butelki (-6 zł) — ekran "Wklej paragon"
+pokazywał "Razem: 29,66 zł" i fałszywy warning "mogły zostać pominięte pozycje", mimo że
+WSZYSTKIE pozycje (w tym zwrot kaucji) były poprawnie wykryte, tylko realnie zapłacono 23,66 zł
+(zgodnie z linijką "Płatność Karta płatnicza" na paragonie). Przyczyna: `detectTotal()`/
+`parseGeneric()` w `receiptParser.ts` łapały "SUMA PLN" (suma towarów PRZED zwrotem kaucji)
+jako pierwsze dopasowanie w tekście, ignorując że to nie finalna kwota. Fix: nowy
+`detectPaymentTotal()` — linia "Płatność ... <kwota>" sprawdzana NAJPIERW (zawsze finalna,
+uwzględnia każdą korektę), fallback do starych wzorców gdy jej brak. Pełny opis w
+ARCHITECTURE §7b. `tsc`/`jest` zielone (703/703, +3 nowe testy z pełnym tekstem paragonu
+usera jako fixture). **Priorytet testu na urządzeniu**: (a) wklej dokładnie ten paragon Lidl
+(albo dowolny inny ze zwrotem kaucji) i sprawdź czy "Razem" pokazuje realnie zapłaconą kwotę
+bez fałszywego warningu, (b) sprawdź paragony BEZ zwrotu kaucji (Lidl/inne) — total dalej
+powinien się zgadzać (fallback do starych wzorców gdy brak linii "Płatność" nie powinien nic
+popsuć), (c) sprawdź czy dopasowanie do transakcji bankowej (bankCommit.ts) nadal działa
+poprawnie z nową, niższą kwotą total.
+
 ## 🆕 Kontratak bossa STAŁY (nie malejący z HP) + przepołowiony COUNTER_PCT — NIEsprawdzone (2026-08-20)
 
 User przejrzał świeży log walk (30+ walk, Lv20): "boss atakują coraz mniej o co chodzi to błąd??"
