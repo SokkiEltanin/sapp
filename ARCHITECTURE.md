@@ -144,6 +144,33 @@ Auto-akceptacja zaufanych sklepów: `bankAutoProcess.ts` + `merchantMemory.ts`.
 konto" (cel) vs „z konta *cyfry"/„wykonano przelew" (wychodzący). Przelew na własne
 konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
 
+## 7b. Paragon → wydatek (skan/wklej) — `src/utils/receiptParser.ts`, `app/expenses/scan.tsx`
+
+`parseReceiptText(text)` routuje po `storeKeyFromText` do `parseKaufland`/`parseBiedronka`/
+`parseGeneric` (Lidl i reszta lecą przez `parseGeneric` — Lidl NIE ma osobnej gałęzi w
+switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMethod}` —
+`scan.tsx` pokazuje `Razem: {total}` i ostrzega (`mismatchBadge`) gdy `|subtotal-total|>0.05`
+("Suma produktów X zł < kwota na paragonie — mogły zostać pominięte pozycje" itp.).
+
+- **Zwrot kaucji** (`DEPOSIT_RETURN_RE`) trafia do `products` jako pozycja `kind:'deposit'` z
+  UJEMNĄ `finalPrice` — poprawnie odejmuje się od `subtotal`. Linie-nagłówki sekcji
+  ("Opakowania zwrotne przyjęcia"/"...suma", `DEPOSIT_SECTION_TOTAL_RE`) są POMIJANE, żeby nie
+  policzyć zwrotu podwójnie.
+- **BUG + FIX (2026-08-20, user przesłał realny paragon Lidl): `total` mógł być WYŻSZY niż
+  realnie zapłacona kwota, gdy paragon miał zwrot kaucji.** Lidl (i inne) drukują "SUMA PLN"
+  jako sumę towarów PRZED odjęciem zwrotu kaucji, a finalną, po korekcie kwotę (ta sama co
+  przy "Płatność ... Karta płatnicza") jako OSOBNĄ, PÓŹNIEJSZĄ linijkę "Suma". Stare
+  `totalPatterns` (w `detectTotal()` i osobno, prawie identyczne, w `parseGeneric()`) łapały
+  PIERWSZE dopasowanie w całym tekście przez `text.match()` — "SUMA PLN" wygrywało, dając
+  `total` zawyżony o dokładnie kwotę zwrotu kaucji (np. 29,66 zamiast realnych 23,66), co
+  fałszywie odpalało "mogły zostać pominięte pozycje" mimo że WSZYSTKIE pozycje były poprawnie
+  wykryte. Fix: nowy `detectPaymentTotal()` — linia "Płatność ... <kwota>" (metoda płatności +
+  kwota) to zawsze NAJBARDZIEJ wiarygodna, finalna kwota (dosłownie ile zapłacono, uwzględnia
+  KAŻDĄ korektę z paragonu) — sprawdzana PRZED resztą wzorców w obu miejscach
+  (`detectTotal`/`parseGeneric`), z fallbackiem do starych wzorców gdy nie znajdzie linii
+  "Płatność" (np. wyblakły/nietypowy paragon). Testy: `__tests__/receiptParser.test.ts`
+  (pełny tekst realnego paragonu Lidl usera jako fixture).
+
 ## 8. Zdrowie / Health Connect
 
 - `healthConnectService.ts` (natywny odczyt), `healthAutoSync.ts` (`autoSyncHealth(days,

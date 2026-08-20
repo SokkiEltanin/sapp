@@ -627,7 +627,22 @@ function detectDate(text: string): string | undefined {
   return undefined;
 }
 
+// "Płatność ... <kwota>" (metoda płatności + kwota, np. "Płatność Karta płatnicza 23,66") to
+// NAJBARDZIEJ wiarygodne źródło "Razem" — to dosłownie ile realnie zapłacono, więc zawsze
+// uwzględnia WSZYSTKIE korekty zastosowane wcześniej na paragonie (rabaty, zwrot kaucji).
+// 2026-08-20 (user, paragon Lidl): "SUMA PLN" na Lidlu to suma towarów PRZED odjęciem zwrotu
+// kaucji (np. 29,66), a finalna kwota PO zwrocie (np. 23,66, ta sama co przy "Płatność") jest
+// osobną, PÓŹNIEJSZĄ linijką "Suma" — stare `totalPatterns` (poniżej) łapały "SUMA PLN" jako
+// PIERWSZE dopasowanie w całym tekście, ignorując że to nie ostateczna kwota. Sprawdzane
+// PRZED resztą wzorców w obu miejscach które ich używają (`detectTotal`, `parseGeneric`).
+function detectPaymentTotal(text: string): number {
+  const m = text.match(/P[łl]atno[śs][ćc][^\n\d]*?(\d+\s*[.,]\s*\d{2})/i);
+  return m ? parsePrice(m[1]) : 0;
+}
+
 function detectTotal(text: string): number {
+  const paymentTotal = detectPaymentTotal(text);
+  if (paymentTotal > 0) return paymentTotal;
   const totalPatterns = [
     /SUMA\s+PLN\s+(\d+\s*[.,]\s*\d{2})/i,
     /DO\s+ZAP[ŁL]ATY\s+(?:PLN\s+)?(\d+\s*[.,]\s*\d{2})/i,
@@ -821,18 +836,25 @@ function parseGeneric(text: string): ParsedReceipt {
     date = `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
 
-  // Try multiple total patterns in priority order
-  const totalPatterns = [
-    /SUMA\s+PLN\s+(\d+[.,]\d{2})/i,
-    /DO\s+ZAP[ŁL]ATY\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-    /RAZEM\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-    /SUMA\s*:?\s*(\d+[.,]\d{2})/i,
-    /[ŁL][AĄ]CZNIE\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-    /TOTAL\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-  ];
-  for (const pat of totalPatterns) {
-    const m = text.match(pat);
-    if (m) { total = parseFloat(m[1].replace(',', '.')); break; }
+  // "Płatność ... <kwota>" sprawdzane NAJPIERW — patrz komentarz przy `detectPaymentTotal`
+  // wyżej (Lidl: "SUMA PLN" to suma PRZED zwrotem kaucji, "Płatność" zawsze finalna kwota).
+  const paymentTotal = detectPaymentTotal(text);
+  if (paymentTotal > 0) {
+    total = paymentTotal;
+  } else {
+    // Try multiple total patterns in priority order
+    const totalPatterns = [
+      /SUMA\s+PLN\s+(\d+[.,]\d{2})/i,
+      /DO\s+ZAP[ŁL]ATY\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
+      /RAZEM\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
+      /SUMA\s*:?\s*(\d+[.,]\d{2})/i,
+      /[ŁL][AĄ]CZNIE\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
+      /TOTAL\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
+    ];
+    for (const pat of totalPatterns) {
+      const m = text.match(pat);
+      if (m) { total = parseFloat(m[1].replace(',', '.')); break; }
+    }
   }
 
   const addProduct = (p: ReceiptProduct) => {
