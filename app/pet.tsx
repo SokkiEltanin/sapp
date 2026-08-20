@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Alert, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins, Heart, Zap, Lock, Gift, Swords, Compass } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Check, Coins, Heart, Zap, Lock, Gift, Swords, Compass, Hourglass, X } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -43,6 +43,10 @@ const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const todayISO = () => ymdOf(new Date());
 const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
+// Kotek W MISJI (2026-08-20) — wyraźnie mniejszy niż normalny portret (user: "kotek się
+// zmniejsza i wskakuje u siebie na dopasowany pasek ładowania"), zastępuje dawny wielki
+// "stageAway" kafelek (był WIĘKSZY niż normalny kotek, nie mniejszy — user to teraz odwraca).
+const MISSION_STAGE_SIZE = { baby: 78, kid: 88, teen: 98, adult: 108 } as const;
 function fmtMissionDuration(minutes: number): string {
   const total = Math.max(0, Math.round(minutes));
   const h = Math.floor(total / 60), m = total % 60;
@@ -167,6 +171,7 @@ export default function Pet() {
 
   const onSendMission = (profile: MissionProfile) => { haptic.tap(); startMission(lvl.level, profile); };
   const onFightMission = () => { haptic.tap(); router.push('/boss-fight?kind=mission' as any); };
+  const [missionModalOpen, setMissionModalOpen] = useState(false);
 
   // Over budget = any budgeted category exceeded its monthly limit → the pet gives a
   // gentle money nudge in its status line (it does NOT sadden the pet's core mood).
@@ -304,10 +309,15 @@ export default function Pet() {
             </View>
           </View>
           <View style={s.topRight}>
-            <View style={s.miniBarRow}>
-              <Text style={s.miniBarLabel}>Lv {lvl.level}</Text>
-              <View style={s.miniBarTrack}><View style={[s.miniBarFill, { width: `${Math.round(lvl.progress * 100)}%`, backgroundColor: '#A78BFA' }]} /></View>
+            {/* Pasek Lv POWIĘKSZONY (2026-08-20) — jedyny wskaźnik poziomu na ekranie odkąd
+                osobna karta "Doświadczenie" w gridzie Siła bojowa zniknęła (zastąpiona kaflem
+                misji, patrz niżej) — user: "tamten na górze level zostawiamy jako jedyny
+                powiększamy trochę żeby było widać ile na ile XP jeszcze". */}
+            <View style={s.lvlBarRow}>
+              <Text style={s.lvlBarLabel}>Lv {lvl.level}</Text>
+              <View style={s.lvlBarTrack}><View style={[s.lvlBarFill, { width: `${Math.round(lvl.progress * 100)}%`, backgroundColor: '#A78BFA' }]} /></View>
             </View>
+            <Text style={s.lvlXpTxt}>{lvl.inLevel}/{lvl.needed} XP</Text>
             <View style={s.miniBarRow}>
               <Text style={s.affHeart}>{affToday >= 100 ? '❤️' : affToday > 0 ? '🩵' : '🤍'}</Text>
               <View style={s.miniBarTrack}><View style={[s.miniBarFill, { width: `${affToday}%`, backgroundColor: '#F472B6' }]} /></View>
@@ -316,122 +326,62 @@ export default function Pet() {
         </View>
         <Text style={s.tip}>{petStatusLine(pet)}</Text>
 
-        {/* stage — no room backdrop any more; the cat IS the stage. W trybie "w podróży"
-            (2026-08-19) kafelek jest WYŻSZY niż zwykle (kotek+tekst+pasek+przycisk nie mieszczą
-            się w stałych 300px) — `height: undefined` pozwala rosnąć, `minHeight` zostawia
-            normalny rozmiar jako dolny próg. */}
-        <View style={[s.stage, missionEndsAt && !missionReady && { height: undefined, minHeight: 300 }]}>
-          {/* Kotek znika ze sceny gdy jest w misji (2026-08-18, user: "miał znikać z ekranu
-              że niby jest w misji czaisz???") — dziwnie wyglądało, żeby główny portret
-              siedział normalnie na scenie, podczas gdy karta Misja niżej mówi że go nie ma.
-              `missionReady` (wrócił, czeka walka) NIE liczy się jako "away" — jest już z
-              powrotem, tylko jeszcze nieodebrana walka/nagroda. */}
-          {missionEndsAt && !missionReady ? (
-            // Duży kafelek podróży (2026-08-19, user: "zrobić jednak większy ten kafelek
-            // jakby z paskiem ładowania podróży animowanym ładnym kotka... na boki się lekko
-            // gibał jakby szedł, i z przyciskiem wróć natychmiast z potwierdzeniem") —
-            // zastępuje dawny mały placeholder (Compass+tekst): duży kotek (`animate` żywe
-            // idle jak normalnie, `missionSwayRotate` DODATKOWO kołysze go jak w marszu),
-            // ten sam pasek postępu co w karcie Misja niżej (ten NIE usunięty — zostaje jako
-            // kompaktowe odniesienie), i przycisk anulowania z potwierdzeniem (bez nagrody).
-            <View style={s.stageAway}>
-              <Animated.View style={{ transform: [{ rotate: missionSwayRotate }] }}>
-                <CatArt size={STAGE_SIZE[stage] + 20} animate palette={palette} stripes={catStripes}
-                  eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
-              </Animated.View>
-              <Text style={s.stageAwayTxt}>Pupil w podróży…</Text>
-              <Text style={s.stageAwaySub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
-              <View style={s.stageAwayProgTrack}><View style={[s.stageAwayProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
-              <PressableScale onPress={onCancelMission}>
-                <View style={s.stageAwayCancelBtn}><Text style={s.stageAwayCancelTxt}>Wróć natychmiast</Text></View>
-              </PressableScale>
-            </View>
-          ) : (
-            <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
-              eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
-              onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
-          )}
+        {/* stage — no room backdrop any more; the cat IS the stage. Ekwipunek (6 slotów,
+            gear.ts) flankuje kotka 3 lewo/3 prawo (2026-08-20, `GearPanel` bierze kotka jako
+            `children` żeby otoczyć go z obu stron — patrz NEXT_STEPS.md "SYSTEM EKWIPUNKU"
+            krok 7 i wpis "Gear layout + konsolidacja UI misji"). Stały rozmiar 300px zawsze —
+            dawny dynamiczny `minHeight` dla wielkiego kafelka podróży zniknął razem z nim
+            (kotek W MISJI jest teraz MNIEJSZY, nie większy, mieści się bez problemu). */}
+        <View style={s.stage}>
+          <GearPanel>
+            {/* Kotek W MISJI kurczy się i dostaje mini pasek postępu z odbijającą się miniaturką
+                zamiast dawnego wielkiego "stageAway" kafelka, który dublował kartę Misja niżej
+                i zachodził tekstem na ramki itemów ekwipunku (2026-08-20, user: "kafelek misji
+                jest jakby podwojony... kotek się zmniejsza i wskakuje u siebie na dopasowany
+                pasek ładowania z licznikiem... malutki porusza się z paskiem jakby z tą
+                animacją co teraz" — ten sam `missionBounce`/`missionCatWrap` mechanizm co
+                wcześniej w osobnej karcie, teraz PRZENIESIONY na scenę). `missionReady`
+                (wrócił, czeka walka) wraca do normalnego rozmiaru — akcja "Walcz" żyje teraz w
+                małym kaflu misji w gridzie Siła bojowa niżej, nie tu. */}
+            {missionEndsAt && !missionReady ? (
+              <View style={s.stageMissionWrap}>
+                <Animated.View style={{ transform: [{ rotate: missionSwayRotate }] }}>
+                  <CatArt size={MISSION_STAGE_SIZE[stage]} animate palette={palette} stripes={catStripes}
+                    eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                </Animated.View>
+                <View style={s.missionProgWrap}>
+                  <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
+                  <View style={[s.missionCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
+                    <Animated.View style={{ transform: [{ translateY: missionBounceY }] }}>
+                      <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
+                        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                    </Animated.View>
+                  </View>
+                </View>
+                <Text style={s.stageMissionCountdown}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+                <TouchableOpacity onPress={onCancelMission} hitSlop={8}>
+                  <Text style={s.stageMissionCancel}>Wróć natychmiast</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
+                eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
+                onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
+            )}
+          </GearPanel>
         </View>
 
-        {/* ── Ekwipunek (6 slotów, gear.ts) — patrz NEXT_STEPS.md "SYSTEM EKWIPUNKU" krok 7.
-            Staty JESZCZE nic nie robią w walce/ekonomii (krok 8, świadomie osobny). ── */}
-        <GearPanel />
-
         {/* ── Misja (utils/missions.ts, 2026-08-15) — user: wysyłasz pupila na X minut/godzin
-            (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. Bez
-            dziennego limitu — od razu po odebraniu nagrody można wysłać kolejną. ── */}
-        <Text style={s.section}>Misja</Text>
-        {!missionEndsAt ? (
-          // Wybór profilu (2026-08-18, user: "trzeba zrobić że mam jak w sfgame że mogę
-          // wybrać misję czy pod złoto czy pod XP... mogą być 3 do wyboru") — 3 wiersze,
-          // każdy z własną nagrodą-podglądem i przyciskiem Wyślij (jeden card na trzy
-          // przyciski zamiast jednego uniwersalnego, bo user wybiera CZYM wysłać, nie tylko
-          // KIEDY). Czas trwania (`missionMinutesFor`) TEN SAM dla wszystkich profili — user
-          // nie prosił o różny czas, tylko o inny balans coins/XP.
-          <View style={s.missionChooseCard}>
-            <View style={s.missionChooseHead}>
-              <Compass size={22} color="#38BDF8" />
-              <Text style={s.missionTitle}>Wyślij pupila na misję</Text>
-            </View>
-            <View style={{ gap: spacing[2] }}>
-              {MISSION_PROFILE_ORDER.map(profile => {
-                const reward = missionRewardFor(lvl.level, profile);
-                return (
-                  <View key={profile} style={s.missionChoiceRow}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={s.missionChoiceLabel}>{MISSION_PROFILE_LABEL[profile]}</Text>
-                      <Text style={s.missionSub} numberOfLines={1}>
-                        ~{fmtMissionDuration(missionMinutesFor(lvl.level))} · +{reward.coins} 🪙 +{reward.xp} XP
-                      </Text>
-                    </View>
-                    <PressableScale onPress={() => onSendMission(profile)}>
-                      <View style={s.missionBtn}><Text style={s.missionBtnTxt}>Wyślij</Text></View>
-                    </PressableScale>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : (
-          <View style={s.missionCard}>
-            <Compass size={26} color={missionReady ? '#2AC68F' : '#38BDF8'} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              {missionReady ? (
-                <>
-                  <Text style={s.missionTitle}>Pupil wrócił z misji!</Text>
-                  <Text style={s.missionSub}>Czeka walka i nagroda</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={s.missionTitle}>Pupil w misji…</Text>
-                  <Text style={s.missionSub}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
-                  {/* Kotek "w podróży" na pasku (2026-08-18, user: "musi przeskalowywać się na
-                      pasek podróży... pasek kotek wskakuje i tak jakby porusza się z
-                      progressem misji") — user zaproponował export osobnych ikon kotków per
-                      kolor, ale CatArt to już komponent SVG parametryzowany paletą/dodatkami
-                      (nie bitmapa) — więc renderujemy TEGO SAMEGO kotka co reszta ekranu, po
-                      prostu mały i wyłączony `animate`, bez potrzeby nowych assetów. Pozycja
-                      `left` = % postępu, offset przez `missionCatWrap` centruje go dokładnie
-                      NAD kropką na pasku (ta sama technika co `pawX`/`boltX` w boss-fight.tsx).
-                      Bounce (`missionBounceY`) w osobnym Animated.View wokół — patrz komentarz
-                      przy `missionBounce` wyżej. */}
-                  <View style={s.missionProgWrap}>
-                    <View style={s.missionProgTrack}><View style={[s.missionProgFill, { width: `${Math.round(missionProgress * 100)}%` }]} /></View>
-                    <View style={[s.missionCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
-                      <Animated.View style={{ transform: [{ translateY: missionBounceY }] }}>
-                        <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
-                          eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
-                      </Animated.View>
-                    </View>
-                  </View>
-                </>
-              )}
-            </View>
-            {missionReady && (
-              <PressableScale onPress={onFightMission}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-            )}
-          </View>
-        )}
+            (rośnie z levelem), po powrocie walka z większą nagrodą niż daily quest. UI misji
+            skonsolidowane (2026-08-20) do JEDNEGO małego kafla w gridzie "Siła bojowa" niżej
+            (zastępuje dawną kartę "Doświadczenie" — Lv/XP ma teraz TYLKO górny pasek nagłówka)
+            + popup z wyborem profilu zamiast inline listy 3 wierszy. ── */}
+        <MissionSendModal
+          visible={missionModalOpen}
+          onClose={() => setMissionModalOpen(false)}
+          level={lvl.level}
+          onSend={(profile) => { setMissionModalOpen(false); onSendMission(profile); }}
+        />
 
         {pendingCrates > 0 && (
           <PressableScale onPress={() => { haptic.tap(); setCrateOpen(true); }} style={s.crateBtn}>
@@ -469,11 +419,37 @@ export default function Pet() {
             <Text style={s.statLabel}>Prób dziennie</Text>
             <Text style={s.statSub}>{bonuses.energyMult > 0 ? `+${Math.round(bonuses.energyMult * 100)}% z łupu` : 'baza 3'}</Text>
           </View>
-          <View style={[s.statCard, { borderColor: '#FBBF2444', backgroundColor: '#FBBF2412' }]}>
-            <Text style={s.lvlBadge}>Lv{lvl.level}</Text>
-            <Text style={s.statVal}>{lvl.inLevel}/{lvl.needed}</Text>
-            <Text style={s.statLabel}>Doświadczenie</Text>
-            <View style={s.xpBarTrack}><View style={[s.xpBarFill, { width: `${Math.round(lvl.progress * 100)}%` }]} /></View>
+          {/* Kafel misji (2026-08-20) — zastępuje dawną kartę "Doświadczenie" (XP/Lv ma teraz
+              TYLKO powiększony pasek w nagłówku, patrz `topRight`/`miniBarRow` niżej). Trzy
+              stany: brak misji → przycisk otwierający `MissionSendModal`; w drodze → ikona
+              klepsydry + odliczanie (kotek na scenie ma już swój pasek, tu tylko skrót);
+              gotowa → przycisk Walcz. */}
+          <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
+            {!missionEndsAt ? (
+              <>
+                <Compass size={18} color="#38BDF8" />
+                <Text style={s.statLabel}>Misja</Text>
+                <Text style={s.statSub}>Wyślij po nagrodę</Text>
+                <TouchableOpacity onPress={() => { haptic.tap(); setMissionModalOpen(true); }} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+                  <Compass size={10} color="#38BDF8" /><Text style={s.buyPillTxt}>Wyślij</Text>
+                </TouchableOpacity>
+              </>
+            ) : missionReady ? (
+              <>
+                <Swords size={18} color="#2AC68F" />
+                <Text style={s.statVal}>Gotowe!</Text>
+                <Text style={s.statLabel}>Misja</Text>
+                <TouchableOpacity onPress={onFightMission} style={[s.buyPill, { marginTop: 6, backgroundColor: '#2AC68F18', borderColor: '#2AC68F40' }]} activeOpacity={0.8}>
+                  <Swords size={10} color="#2AC68F" /><Text style={[s.buyPillTxt, { color: '#2AC68F' }]}>Walcz</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Hourglass size={18} color="#38BDF8" />
+                <Text style={s.statVal}>{fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+                <Text style={s.statLabel}>Misja w drodze</Text>
+              </>
+            )}
           </View>
         </View>
         {(bonuses.dodge > 0 || bonuses.crit > 0) && (
@@ -552,6 +528,46 @@ export default function Pet() {
   );
 }
 
+// Popup wyboru profilu misji (2026-08-20) — wyniesiony z inline `missionChooseCard` do
+// osobnego Modala (user: "miał być malutki przycisk obok wyślij na misje otwierany popup z
+// wyborem"), otwierany z kafla misji w gridzie Siła bojowa. Te same 3 wiersze
+// (`MISSION_PROFILE_ORDER`) co dawniej, tylko w bottom-sheet zamiast inline karty.
+function MissionSendModal({ visible, onClose, level, onSend }: {
+  visible: boolean; onClose: () => void; level: number; onSend: (profile: MissionProfile) => void;
+}) {
+  const c = useColors();
+  const s = useMemo(() => makeS(c), [c]);
+  if (!visible) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.missionModalOverlay}>
+        <View style={s.missionModalSheet}>
+          <View style={s.missionModalHead}>
+            <Text style={s.missionModalTitle}>Wyślij pupila na misję</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
+          </View>
+          {MISSION_PROFILE_ORDER.map(profile => {
+            const reward = missionRewardFor(level, profile);
+            return (
+              <View key={profile} style={s.missionModalRow}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={s.missionTitle}>{MISSION_PROFILE_LABEL[profile]}</Text>
+                  <Text style={s.missionSub} numberOfLines={1}>
+                    ~{fmtMissionDuration(missionMinutesFor(level))} · +{reward.coins} 🪙 +{reward.xp} XP
+                  </Text>
+                </View>
+                <PressableScale onPress={() => onSend(profile)}>
+                  <View style={s.missionModalBtn}><Text style={s.missionModalBtnTxt}>Wyślij</Text></View>
+                </PressableScale>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const makeS = themedStyles((c: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: c.bg.primary },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
@@ -562,13 +578,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110, alignItems: 'center' },
 
   stage: { alignItems: 'center', justifyContent: 'center', height: 300, marginTop: spacing[2], width: '100%' },
-  stageAway: { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3] },
-  stageAwayTxt: { fontSize: 15, fontWeight: '800', color: c.text.primary },
-  stageAwaySub: { fontSize: 13, fontWeight: '600', color: c.text.muted, marginTop: -spacing[1] },
-  stageAwayProgTrack: { width: '80%', height: 8, borderRadius: 4, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: spacing[1] },
-  stageAwayProgFill: { height: '100%', borderRadius: 4, backgroundColor: '#38BDF8' },
-  stageAwayCancelBtn: { marginTop: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[2], borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.elevated },
-  stageAwayCancelTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  // Kotek W MISJI na scenie (2026-08-20) — zastępuje dawny `stageAway` (był WIĘKSZYM
+  // kafelkiem niż zwykły portret, teraz kotek się KURCZY, patrz `MISSION_STAGE_SIZE`).
+  stageMissionWrap: { alignItems: 'center', gap: spacing[1] },
+  stageMissionCountdown: { fontSize: 12.5, fontWeight: '700', color: c.text.muted, marginTop: spacing[1] },
+  stageMissionCancel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textDecorationLine: 'underline', marginTop: 2 },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
   // Nazwa/status skurczone (2026-08-16, user: "nazwę zbić, nad pupilem zajmuje w pizdu
@@ -579,7 +593,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // z poprzedniej wersji, które schodziły niżej na ekranie.
   topHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: spacing[1] },
   topLeft: { alignItems: 'flex-start', gap: 4, flexShrink: 1 },
-  topRight: { alignItems: 'flex-end', gap: 6, minWidth: 108 },
+  topRight: { alignItems: 'flex-end', gap: 6, minWidth: 132 },
+  // Pasek Lv POWIĘKSZONY (2026-08-20) — szerszy i grubszy niż `miniBarRow` (affection zostaje
+  // małe), plus osobna linijka z liczbami XP pod spodem (user: "powiększamy trochę żeby było
+  // widać ile na ile XP jeszcze" — jedyny wskaźnik poziomu odkąd karta "Doświadczenie"
+  // zniknęła z grida Siła bojowa, patrz kafel misji tam).
+  lvlBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 132 },
+  lvlBarLabel: { fontSize: 11.5, fontWeight: '800', color: c.text.muted, width: 34 },
+  lvlBarTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: c.bg.elevated, overflow: 'hidden' },
+  lvlBarFill: { height: '100%', borderRadius: 4 },
+  lvlXpTxt: { fontSize: 9.5, fontWeight: '700', color: c.text.muted, marginTop: -4 },
   miniBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 108 },
   miniBarLabel: { fontSize: 10.5, fontWeight: '800', color: c.text.muted, width: 30 },
   miniBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden' },
@@ -609,26 +632,26 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   addonCost: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 2 },
   addonCostTxt: { fontSize: 10.5, fontWeight: '800', color: '#FBBF24' },
 
-  missionCard: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
-  // Karta wyboru profilu (2026-08-18) — kolumna (head + lista wierszy), stąd OSOBNY styl od
-  // `missionCard` (ten jest `flexDirection:'row'`, pasuje do stanu w-trakcie/gotowa).
-  missionChooseCard: { width: '100%', gap: spacing[3], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
-  missionChooseHead: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  missionChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
-  missionChoiceLabel: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
   missionSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
   // `missionProgWrap` NIE ma `overflow:'hidden'` (w przeciwieństwie do `missionProgTrack`
-  // pod spodem) — kotek musi móc wystawać NAD cienki pasek, przycięcie by go obcięło.
-  missionProgWrap: { position: 'relative', marginTop: 16 },
+  // pod spodem) — kotek musi móc wystawać NAD cienki pasek, przycięcie by go obcięło. Szerokość
+  // stała (2026-08-20, przeniesione ze sceny obok kotka w misji, nie pełna szerokość karty).
+  missionProgWrap: { position: 'relative', marginTop: 16, width: 140 },
   missionProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden' },
   missionProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
   missionCatWrap: { position: 'absolute', top: -9, marginLeft: -11 },
-  missionBtn: { backgroundColor: '#38BDF8', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10 },
-  missionBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 
-  qFight: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10, shadowColor: '#EF4444', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  qFightTxt: { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
+  // Popup wyboru profilu misji (2026-08-20) — zastępuje dawną inline `missionChooseCard`
+  // (user: "kafelek misji jest jakby podwojony... miał być malutki przycisk... otwierany
+  // popup z wyborem"). Ten sam bottom-sheet wzorzec co `GearSlotModal` w GearPanel.tsx.
+  missionModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
+  missionModalSheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[2] },
+  missionModalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
+  missionModalTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary },
+  missionModalRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3], borderTopWidth: 1, borderTopColor: c.border.subtle },
+  missionModalBtn: { backgroundColor: '#38BDF8', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10 },
+  missionModalBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 
   // Siła bojowa + Ekwipunek bojowy (scalone z pet-stats.tsx, 2026-08-19).
   blurb: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, width: '100%' },
@@ -637,9 +660,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   statVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, marginTop: 4 },
   statLabel: { fontSize: 11, color: c.text.secondary, fontWeight: '600' },
   statSub: { fontSize: 9.5, color: c.text.muted },
-  lvlBadge: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
-  xpBarTrack: { height: 5, borderRadius: 3, backgroundColor: c.fill.subtle, marginTop: 4, overflow: 'hidden' },
-  xpBarFill: { height: '100%', borderRadius: 3, backgroundColor: '#FBBF24' },
   cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   cellState: { fontSize: 10, color: c.text.muted },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },

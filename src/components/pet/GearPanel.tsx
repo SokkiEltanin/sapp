@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { X, Check } from 'lucide-react-native';
+import { X, Check, HardHat, Shield, Footprints, Link2, Gem, Coins, LucideIcon } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import { usePetStore } from '@/store/petStore';
 import {
@@ -12,6 +12,18 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 
+// Ikony lucide zamiast emoji dla sloty flankujące kotka (2026-08-20, user: "lepsze ikony
+// lucid bez koloru jako by były puste" — puste/niezałożone sloty renderują ikonę wyciszonym
+// kolorem, bez wypełnienia rarity). Emoji z SLOT_META.icon ZOSTAJE dla innych miejsc
+// (pet-shop.tsx, BoxRevealModal.tsx) — to celowe, nie dead code.
+const SLOT_ICON: Record<GearSlot, LucideIcon> = {
+  helm: HardHat, zbroja: Shield, buty: Footprints, obroza: Link2, talizman: Gem, kolczyki: Coins,
+};
+// 3 lewo / 3 prawo flankujące kotka (2026-08-20, user: "itemy będą 3 z prawej i 3 z lewej
+// kotka" — zastępuje dawny pojedynczy rząd POD kotkiem, patrz historia niżej przy `flankRow`).
+const LEFT_SLOTS = GEAR_SLOTS.slice(0, 3);
+const RIGHT_SLOTS = GEAR_SLOTS.slice(3);
+
 const STAT_LABEL: Record<string, string> = {
   critPct: 'krytyk', flatHp: 'HP', dodgePct: 'unik', atkPct: 'atak', energyMultPct: 'energia', coinsPct: 'monety',
 };
@@ -20,12 +32,13 @@ const STAT_UNIT: Record<string, string> = {
 };
 const fmtStat = (stat: string, v: number) => stat === 'flatHp' ? `+${Math.round(v)}` : `+${(v * 100).toFixed(1)}%`;
 
-// 6 slotów ekwipunku przy kotku (2026-08-19, krok 7 planu z NEXT_STEPS.md "SYSTEM
-// EKWIPUNKU"). Staty JESZCZE nic nie robią w walce/ekonomii (krok 8, świadomie osobny —
-// patrz komentarz w petStore.ts przy ownedGear) — to czysto zarządzanie kolekcją: patrz
-// jaki masz item w slocie, otwórz slot → wybierz spośród POSIADANYCH z porównaniem do
-// aktualnie założonego.
-export default function GearPanel() {
+// 6 slotów ekwipunku FLANKUJĄCYCH kotka, 3 lewo/3 prawo (2026-08-20, user: "itemy będą 3 z
+// prawej i 3 z lewej kotka" — zastępuje dawny pojedynczy rząd emoji POD kotkiem, którego
+// napisy zachodziły na kartę misji niżej). `children` = render kotka (przekazany przez
+// pet.tsx), wstawiany w środkową kolumnę żeby sloty otaczały go z obu stron zamiast żyć
+// jako osobna sekcja pod nim. Staty JESZCZE nic nie robią w walce/ekonomii bezpośrednio TU —
+// to czysto zarządzanie kolekcją (realne wpięcie w combat jest w bosses.ts/gear.ts, krok 8).
+export default function GearPanel({ children }: { children: ReactNode }) {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { ownedGear, equippedGear } = usePetStore();
@@ -33,15 +46,14 @@ export default function GearPanel() {
 
   const slotButton = (slot: GearSlot) => {
     const equippedId = equippedGear[slot];
-    const equippedItem = equippedId ? gearById(equippedId) : undefined;
     const rarity = equippedId ? ownedGear[equippedId] : undefined;
     const meta = rarity ? RARITY_META[rarity] : null;
     const ownedCount = gearBySlot(slot).filter(g => ownedGear[g.id]).length;
+    const Icon = SLOT_ICON[slot];
     return (
       <PressableScale key={slot} onPress={() => { haptic.tap(); setOpenSlot(slot); }}>
-        <View style={[s.slot, meta && { borderColor: meta.color, backgroundColor: meta.color + '1A' }]}>
-          <Text style={s.slotIcon}>{SLOT_META[slot].icon}</Text>
-          <Text style={s.slotLabel} numberOfLines={1}>{equippedItem ? equippedItem.name : SLOT_META[slot].label}</Text>
+        <View style={[s.slot, meta ? { borderColor: meta.color, backgroundColor: meta.color + '1A' } : { borderColor: c.border.default, backgroundColor: c.bg.card }]}>
+          <Icon size={18} color={meta ? meta.color : c.text.muted} strokeWidth={meta ? 2.3 : 1.6} />
           {ownedCount > 0 && !equippedId && <View style={s.slotDot} />}
         </View>
       </PressableScale>
@@ -50,7 +62,11 @@ export default function GearPanel() {
 
   return (
     <>
-      <View style={s.row}>{GEAR_SLOTS.map(slotButton)}</View>
+      <View style={s.flankRow}>
+        <View style={s.flankCol}>{LEFT_SLOTS.map(slotButton)}</View>
+        <View style={s.catCol}>{children}</View>
+        <View style={s.flankCol}>{RIGHT_SLOTS.map(slotButton)}</View>
+      </View>
       <GearSlotModal slot={openSlot} onClose={() => setOpenSlot(null)} />
     </>
   );
@@ -119,11 +135,15 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
 }
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], width: '100%', justifyContent: 'center', marginTop: spacing[2] },
-  slot: { width: 84, alignItems: 'center', gap: 3, paddingVertical: spacing[2], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card, position: 'relative' },
-  slotIcon: { fontSize: 20 },
-  slotLabel: { fontSize: 9.5, fontWeight: '700', color: c.text.secondary, maxWidth: 76, textAlign: 'center' },
-  slotDot: { position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: 4, backgroundColor: '#FBBF24' },
+  // Flankujące kolumny (2026-08-20) — `catCol` bierze resztę szerokości (flex:1) i centruje
+  // przekazanego kotka, kolumny slotów po bokach mają STAŁĄ, wąską szerokość (nie flex) żeby
+  // nie ściskać kotka gdy jest mało itemów; ikony bez etykiet (dawny `slotLabel` z nazwą itemu
+  // nie mieścił się obok kotka i zachodził na inne karty — szczegóły itemu są w modalu).
+  flankRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: spacing[2] },
+  flankCol: { width: 46, gap: spacing[2], alignItems: 'center' },
+  catCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  slot: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
+  slotDot: { position: 'absolute', top: 3, right: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: '#FBBF24' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
   sheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[2] },
