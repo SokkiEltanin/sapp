@@ -1019,7 +1019,36 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       miejsca na scenie i przeciwnik w walce są więc ZAWSZE tym samym zwierzakiem (zero
       nowego stanu, tylko wcześniejszy odczyt istniejącej czystej funkcji). "Wróć natychmiast"
       (anulowanie bez nagrody, `onCancelMission`) zostaje małym podkreślonym linkiem pod
-      paskiem, bez zmian funkcjonalnych.
+      paskiem — patrz Runda 3 niżej za design potwierdzenia.
+    - **Runda 3 — brak designu na potwierdzeniu + pełnoekranowy blok zamiast popupu**
+      (2026-08-20, user: "komunikat wróć natychmiast z potwierdzeniem nie ma designu, i tak
+      samo zamiast full screen powiadomien jak pupil jest w misji to zrób mini popup window").
+      Dwa osobne fixy: (1) `onCancelMission` w `app/pet.tsx` wołał gołego `Alert.alert`
+      (systemowa, nieostylowana skrzynka) zamiast istniejącego `ConfirmDialog.tsx` — komponent
+      zbudowany DOKŁADNIE po to (2026-08-11, patrz komentarz w pliku: "potwierdzenia przed
+      usunięciem nie są customowe, są jakimiś kwadratami bez naszego stylu"), po prostu
+      przeoczony przy dodawaniu anulowania misji (2026-08-19). Zamienione na stan
+      `cancelMissionConfirm` + `<ConfirmDialog destructive .../>`, ten sam wzorzec co
+      potwierdzenia ulepszeń HP/ATK na tym samym ekranie; nieużywany już import `Alert`
+      usunięty. (2) `app/boss-fight.tsx` — próba wejścia w walkę KTÓREGOKOLWIEK trybu
+      (kampania/raid/event/mad, też bezpośrednio `?kind=mission`) podczas gdy pupil jest w
+      drodze (`missionAway`) renderowała statyczny tekstowy blok wypełniający całą treść
+      ekranu (`s.done`/`s.lockBox`). Zastąpione małym wyśrodkowanym `Modal`-em
+      (`missionAwayOverlay`/`missionAwayCard`, ta sama karta-na-przyciemnionym-tle stylistyka
+      co `ConfirmDialog`) z nazwą miejsca podróży (`missionMb.destination`, TERAZ czytane
+      niezależnie od `missionReady` — patrz zmiana w gatingu niżej), cienkim paskiem postępu,
+      odliczaniem, przyciskiem "Wróć do ekranu" (`router.back()`) i CZERWONYM "Wróć
+      natychmiast" (otwiera TEN SAM `ConfirmDialog` wzorzec, osobny stan
+      `missionCancelConfirm` lokalny dla tego ekranu). Treść scrolla za popupem to teraz
+      pusty `<View style={s.done} />` — cała reszta (kod bossa/itemów/ataku) i tak jest
+      niedostępna dopóki `missionAway`. Gating: `missionMb` (surowe dane zwierzaka/miejsca)
+      odczytywane teraz ZAWSZE gdy `missionStartedAt` istnieje (gotowa LUB w drodze), ale
+      `missionBoss`/`target` (realny cel do ataku) zostają gated WYŁĄCZNIE na `missionReady`
+      — rozdzielenie żeby popup mógł pokazać nazwę miejsca przed powrotem, bez ryzyka że dałoby
+      się zaatakować przedwcześnie. `fmtMissionDuration` (było lokalną, niewyeksportowaną
+      funkcją w `app/pet.tsx`) przeniesione do `utils/missions.ts` jako eksport — `boss-fight.
+      tsx` potrzebował identycznej logiki formatowania, duplikowanie zamiast reużycia byłoby
+      dokładnie tym czego CLAUDE.md zabrania.
   - **Level-up celebration** (2026-08-19, user: "musimy dodac info o levelup pupila...
     powiadomienie z confetti albo fajna animacja") — baner spadający z góry na 3,2s +
     `Confetti` (reużyty z `achievements/Confetti.tsx`), LŻEJSZY niż `BadgeCelebration.tsx`

@@ -15,6 +15,15 @@ export function missionMinutesFor(level: number): number {
   return Math.min(MISSION_MAX_MIN, MISSION_BASE_MIN + Math.max(0, level - 1) * MISSION_MIN_PER_LEVEL);
 }
 
+// Format "Xh Ymin"/"Ymin" — wspólne dla ekranu Pupila (pasek w trakcie misji) i ekranu walki
+// (popup "pupil w trakcie podróży", 2026-08-20) — jedno źródło prawdy zamiast dwóch kopii tej
+// samej funkcji w app/pet.tsx i app/boss-fight.tsx.
+export function fmtMissionDuration(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60), m = total % 60;
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
+
 // Nagroda BAZOWA wyraźnie wyższa niż typowy daily quest (2-6 monet/5-15 xp) — user: "trochę
 // więcej xp i coinow jak za daily questa". Skaluje się z levelem TYM SAMYM mnożnikiem co
 // reszta questów (`questRewardMult` z quests.ts) — jedno źródło prawdy dla całej ekonomii,

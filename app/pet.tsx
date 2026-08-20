@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Alert, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -31,7 +31,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { missionMinutesFor, missionRewardFor, minibossForMission, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
+import { missionMinutesFor, missionRewardFor, minibossForMission, fmtMissionDuration, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
 
 const ITEM_IDS = Object.keys(COMBAT_ITEMS) as CombatItemId[];
 const HP_UPGRADE_AMOUNT = 20;
@@ -43,11 +43,6 @@ const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const todayISO = () => ymdOf(new Date());
 const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
-function fmtMissionDuration(minutes: number): string {
-  const total = Math.max(0, Math.round(minutes));
-  const h = Math.floor(total / 60), m = total % 60;
-  return h > 0 ? `${h}h ${m}min` : `${m}min`;
-}
 
 export default function Pet() {
   const c = useColors();
@@ -140,17 +135,13 @@ export default function Pet() {
   }, [missionEndsAt, missionReady]);
   const missionWaveX = missionWave.interpolate({ inputRange: [0, 1], outputRange: [-70, 280] });
   const missionMb = missionStartedAt ? minibossForMission(missionStartedAt) : null;
-  const onCancelMission = () => {
-    haptic.tap();
-    Alert.alert(
-      'Wrócić z misji?',
-      'Jeżeli chcesz anulować, NIE otrzymasz nagrody za misję.',
-      [
-        { text: 'Zostań w misji', style: 'cancel' },
-        { text: 'Wróć natychmiast', style: 'destructive', onPress: () => { cancelMission(); haptic.tap(); toast.info('Misja anulowana — bez nagrody'); } },
-      ],
-    );
-  };
+  // Potwierdzenie anulowania misji przez WŁASNY `ConfirmDialog`, nie `Alert.alert` (2026-08-20,
+  // user: "komunikat wróć natychmiast z potwierdzeniem nie ma designu" — `Alert.alert`
+  // renderuje gołą, systemową skrzynkę bez motywu aplikacji, dokładnie ten sam problem który
+  // `ConfirmDialog` już rozwiązał gdzie indziej (patrz komentarz w ConfirmDialog.tsx), tylko
+  // to konkretne miejsce zostało przeoczone przy dodawaniu misji).
+  const [cancelMissionConfirm, setCancelMissionConfirm] = useState(false);
+  const onCancelMission = () => { haptic.tap(); setCancelMissionConfirm(true); };
   const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
@@ -534,6 +525,17 @@ export default function Pet() {
         destructive={false}
         onConfirm={() => { pendingUpgrade?.onYes(); setPendingUpgrade(null); }}
         onCancel={() => setPendingUpgrade(null)}
+      />
+
+      <ConfirmDialog
+        visible={cancelMissionConfirm}
+        title="Wrócić z misji?"
+        message="Jeżeli chcesz anulować, NIE otrzymasz nagrody za misję."
+        confirmLabel="Wróć natychmiast"
+        cancelLabel="Zostań w misji"
+        destructive
+        onConfirm={() => { setCancelMissionConfirm(false); cancelMission(); haptic.tap(); toast.info('Misja anulowana — bez nagrody'); }}
+        onCancel={() => setCancelMissionConfirm(false)}
       />
 
       <CrateModal visible={crateOpen} onClose={() => setCrateOpen(false)} onOpened={() => setCelebrate(c => c + 1)} />

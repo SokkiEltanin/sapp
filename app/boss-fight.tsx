@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, HandFist, HandGrab, Sparkles, Sword, Trophy, Compass } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
@@ -15,7 +16,7 @@ import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidSessionHpFor
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft, menaceHpFor, menaceSessionHpFor, menaceAsBoss, menaceCoins, menaceXp } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
-import { minibossForMission, missionRewardFor } from '@/utils/missions';
+import { minibossForMission, missionRewardFor, fmtMissionDuration } from '@/utils/missions';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp, gearCoinsMult } from '@/utils/gear';
 import { lootIcon } from '@/utils/bossUiIcons';
@@ -78,7 +79,7 @@ export default function BossFight() {
     eventWon, spendEventEnergy, eventClaim,
     menaceId, menaceHp, menaceEnsure, menaceAttack, menaceClaim,
     dayClaims, claimQuestFight, markTrainingDay,
-    missionStartedAt, missionEndsAt, missionProfile, claimMission,
+    missionStartedAt, missionEndsAt, missionProfile, claimMission, cancelMission,
     catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
   } = usePetStore();
   const { expenses } = useExpensesStore();
@@ -91,6 +92,10 @@ export default function BossFight() {
   // bosses.ts — walka teraz leci do faktycznego 0 HP jednej ze stron, nie sztywnych 3
   // rund). `result.won`/`result.catFainted` z simulateFight NIE są dopełnieniem siebie.
   const [defeat, setDefeat] = useState<{ fainted: boolean } | null>(null);
+  // Potwierdzenie "Wróć natychmiast" z popupu misji-w-drodze niżej (2026-08-20) — ten sam
+  // `ConfirmDialog` wzorzec co w `app/pet.tsx`, żeby anulowanie misji wyglądało identycznie
+  // niezależnie skąd user je odpala.
+  const [missionCancelConfirm, setMissionCancelConfirm] = useState(false);
   const [fighting, setFighting] = useState(false);
   const [liveBossHp, setLiveBossHp] = useState<number | null>(null);
   const [attackPulse, setAttackPulse] = useState(0);
@@ -178,9 +183,18 @@ export default function BossFight() {
   // BLOKUJE wszystkie POZOSTAŁE tory walki (kampania/raid/event/quest/mad), nie tylko samą
   // misję. `kind==='mission'` to jedyny wyjątek — to WŁAŚNIE ekran na powrót z misji.
   const missionAway = !!missionEndsAt && Date.now() < new Date(missionEndsAt).getTime();
-  const missionMb = missionReady && missionStartedAt ? minibossForMission(missionStartedAt) : null;
-  const missionBoss = missionMb ? minibossAsBoss(missionMb, atkStatBonus, level, bonuses) : null;
+  // `missionMb` czytany ZAWSZE gdy misja aktywna (gotowa LUB w drodze) — potrzebny w obu
+  // stanach: jako przeciwnik do walki (gotowa) i jako nazwa miejsca w popupie "w trakcie
+  // podróży" (w drodze, 2026-08-20). `missionBoss` (realny cel do ataku) zostaje gated TYLKO
+  // na `missionReady`, żeby nie dało się zaatakować przed czasem.
+  const missionMb = missionStartedAt ? minibossForMission(missionStartedAt) : null;
+  const missionBoss = missionReady && missionMb ? minibossAsBoss(missionMb, atkStatBonus, level, bonuses) : null;
   const missionReward = missionRewardFor(level, missionProfile ?? 'balanced');
+  const missionRemainingMs = missionEndsAt ? new Date(missionEndsAt).getTime() - Date.now() : 0;
+  const missionTotalMs = missionStartedAt && missionEndsAt
+    ? new Date(missionEndsAt).getTime() - new Date(missionStartedAt).getTime() : 0;
+  const missionProgress = missionTotalMs > 0
+    ? Math.min(1, Math.max(0, 1 - missionRemainingMs / missionTotalMs)) : 0;
 
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
   type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind };
@@ -555,20 +569,24 @@ export default function BossFight() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {!target ? (
+        {/* Pupil w trakcie podróży (2026-08-20) — renderowany jako MINI POPUP niżej
+            (`missionAwayOverlay`/`missionAwayCard`), nie jako pełnoekranowy tekst w treści
+            ekranu (user: "zamiast full screen powiadomień jak pupil jest w misji zrób mini
+            popup window"). Tu w scrollu zostaje tylko PUSTA scena za popupem — dotyczy
+            KAŻDEGO trybu walki (kampania/raid/event/quest/mad/misja), bo dopóki misja trwa,
+            nic nie da się zaatakować (`target` i tak jest `null` dla kind==='mission', a dla
+            reszty trybów blokuje `missionAway` w `attack()` poniżej). */}
+        {missionAway ? (
+          <View style={s.done} />
+        ) : !target ? (
           <View style={s.done}>
             <Swords size={30} color={c.text.muted} />
             <Text style={s.doneTxt}>
               {kind === 'campaign' ? 'Wszyscy bossowie pokonani! Kolejni wkrótce.'
                 : kind === 'mad' ? 'Brak dostępnego MAD celu — pokonaj (kolejnego) bossa kampanii, żeby odblokować jego MAD wersję.'
-                : kind === 'mission' ? (missionStartedAt ? 'Misja jeszcze trwa — wróć jak pupil wróci.' : 'Brak aktywnej misji — wyślij pupila z ekranu Pupil.')
+                : kind === 'mission' ? 'Brak aktywnej misji — wyślij pupila z ekranu Pupil.'
                 : 'Brak aktywnego wydarzenia teraz — wróć innym razem.'}
             </Text>
-          </View>
-        ) : kind !== 'mission' && missionAway ? (
-          <View style={s.lockBox}>
-            <Compass size={16} color={c.text.muted} />
-            <Text style={s.lockTxt}>Pupil jest w trakcie misji — wróć jak dotrze, wtedy znowu będzie mógł walczyć.</Text>
           </View>
         ) : !target.unlocked ? (
           <View style={s.lockBox}>
@@ -770,6 +788,46 @@ export default function BossFight() {
           <Text style={s.vHint}>Stuknij, aby zamknąć</Text>
         </Pressable>
       </Modal>
+
+      {/* Mini popup "pupil w trakcie podróży" (2026-08-20, user: "zamiast full screen
+          powiadomień jak pupil jest w misji to zrób mini popup window pupil w trakcie
+          podróży pasek ładowania na nim i czerwony przycisk powróc natychmiast") — zastępuje
+          dawny pełnoekranowy tekstowy blok (`s.done`/`s.lockBox`) który pokazywał się gdy
+          user próbował walczyć w KTÓRYMKOLWIEK trybie podczas gdy pupil jest w drodze. Ten
+          sam pasek/nazwa-miejsca co na scenie w `app/pet.tsx` (uproszczony, bez animacji
+          wejścia/fali — to króciutki popup, nie hero element ekranu). */}
+      <Modal visible={missionAway} transparent statusBarTranslucent animationType="fade" onRequestClose={() => router.back()}>
+        <View style={s.missionAwayOverlay}>
+          <View style={s.missionAwayCard}>
+            <Compass size={26} color="#38BDF8" />
+            <Text style={s.missionAwayTitle}>Pupil w trakcie podróży</Text>
+            {missionMb && <Text style={s.missionAwayDest}>{missionMb.emoji} {missionMb.destination}</Text>}
+            <View style={s.missionAwayBarTrack}>
+              <View style={[s.missionAwayBarFill, { width: `${Math.round(missionProgress * 100)}%` }]} />
+            </View>
+            <Text style={s.missionAwayTimer}>Wraca za {fmtMissionDuration(missionRemainingMs / 60000)}</Text>
+            <View style={s.missionAwayBtnRow}>
+              <PressableScale onPress={() => router.back()} style={{ flex: 1 }}>
+                <View style={s.missionAwayBackBtn}><Text style={s.missionAwayBackTxt}>Wróć do ekranu</Text></View>
+              </PressableScale>
+              <PressableScale onPress={() => { haptic.tap(); setMissionCancelConfirm(true); }} style={{ flex: 1 }}>
+                <View style={s.missionAwayCancelBtn}><Text style={s.missionAwayCancelTxt}>Wróć natychmiast</Text></View>
+              </PressableScale>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <ConfirmDialog
+        visible={missionCancelConfirm}
+        title="Wrócić z misji?"
+        message="Jeżeli chcesz anulować, NIE otrzymasz nagrody za misję."
+        confirmLabel="Wróć natychmiast"
+        cancelLabel="Zostań w misji"
+        destructive
+        onConfirm={() => { setMissionCancelConfirm(false); cancelMission(); haptic.tap(); toast.info('Misja anulowana — bez nagrody'); router.back(); }}
+        onCancel={() => setMissionCancelConfirm(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -810,6 +868,21 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   attackTxt: { fontSize: 17, fontWeight: '900', color: '#fff' },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[6], paddingHorizontal: spacing[3] },
   lockTxt: { flex: 1, fontSize: 12.5, color: c.text.muted, lineHeight: 17 },
+
+  // Mini popup "pupil w trakcie podróży" (2026-08-20) — ta sama karta-na-przyciemnionym-tle
+  // stylistyka co `ConfirmDialog` (mały wyśrodkowany box, nie pełny ekran).
+  missionAwayOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[5] },
+  missionAwayCard: { width: '100%', maxWidth: 360, backgroundColor: c.bg.secondary, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[4], gap: spacing[2], alignItems: 'center' },
+  missionAwayTitle: { fontSize: 16, fontWeight: '800', color: c.text.primary, marginTop: 2 },
+  missionAwayDest: { fontSize: 13, fontWeight: '700', color: c.text.secondary, marginTop: -4 },
+  missionAwayBarTrack: { width: '100%', height: 10, borderRadius: 5, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: spacing[2] },
+  missionAwayBarFill: { height: '100%', borderRadius: 5, backgroundColor: '#38BDF8' },
+  missionAwayTimer: { fontSize: 12, fontWeight: '700', color: c.text.muted, marginTop: -2 },
+  missionAwayBtnRow: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[2], width: '100%' },
+  missionAwayBackBtn: { alignItems: 'center', justifyContent: 'center', height: 46, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
+  missionAwayBackTxt: { fontSize: 13, fontWeight: '700', color: c.text.secondary },
+  missionAwayCancelBtn: { alignItems: 'center', justifyContent: 'center', height: 46, borderRadius: radius.lg, backgroundColor: '#EF4444' },
+  missionAwayCancelTxt: { fontSize: 13, fontWeight: '800', color: '#fff' },
 
   vBackdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(8,8,16,0.94)', paddingHorizontal: 32 },
   vCenter: { alignItems: 'center' },
