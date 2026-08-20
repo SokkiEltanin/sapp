@@ -968,6 +968,37 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     - 8 nowych testów w `gear.test.ts`, w tym test kalibracji: pełny mityczny loadout na
       wszystkich 4 slotach walki musi zostać `toBeLessThan` sumy bonusów z całej kampanii —
       złapie regresję, jeśli ktoś kiedyś zmieni baseValue bez przeliczenia sufitu.
+  - **Layout slotów przebudowany na 3 lewo/3 prawo flankujące kotka + konsolidacja UI
+    misji** (2026-08-20, user screenshot `/pet`: "itemy będą 3 z prawej i 3 z lewej kotka...
+    kafelek misji jest jakby podwojony... napis zachodzi na ramki itemów"). Dawny pojedynczy
+    rząd 6 przycisków POD kotkiem (opis wyżej) zastąpiony: `GearPanel` bierze teraz `children`
+    (kotek, przekazany przez `app/pet.tsx`) i renderuje go w środkowej kolumnie `catCol`
+    (`flex:1`), flankowanej dwiema stałej-szerokości kolumnami `flankCol` po 3 sloty
+    (`GEAR_SLOTS.slice(0,3)`/`.slice(3)`). Ikony emoji (`SLOT_META.icon`, zostaje bez zmian
+    dla `pet-shop.tsx`/`BoxRevealModal.tsx`) zastąpione w `GearPanel.tsx` nowym
+    `SLOT_ICON: Record<GearSlot, LucideIcon>` (HardHat/Shield/Footprints/Link2/Gem/Coins) —
+    kolor `meta.color` (rarity) gdy założone, `c.text.muted` + cieńszy `strokeWidth` gdy
+    slot pusty ("bez koloru jakby były puste"). Nazwa itemu pod ikoną USUNIĘTA (nie mieściła
+    się w wąskiej kolumnie obok kotka) — szczegóły zostają w `GearSlotModal` po tapnięciu.
+    - **Mission UI**: dawny duży `stageAway` kafelek (kotek znikał ze sceny, zastępowany
+      wymachującym dużym CatArt) USUNIĘTY — kolidował wizualnie z osobną kartą "Misja" niżej
+      (to samo pokazane dwa razy) i zachodził tekstem na ramki gear slotów. Teraz kotek W
+      MISJI zostaje NA scenie (wewnątrz `GearPanel`, więc dalej flankowany gearem) ale
+      KURCZY SIĘ (`MISSION_STAGE_SIZE`, wyraźnie mniejszy niż zwykły portret `STAGE_SIZE+90`)
+      i dostaje mini pasek postępu + odliczanie POD sobą, z tym samym odbijającym się
+      miniaturowym kotkiem co wcześniej (`missionBounce`/`missionCatWrap`, reużyty 1:1, nie
+      przepisany). Osobna sekcja "Misja" (inline lista 3 profili) USUNIĘTA — zastąpiona (1)
+      `MissionSendModal` w `app/pet.tsx` (nowy komponent, bottom-sheet identyczny wzorcem do
+      `GearSlotModal`, 3 wiersze `MISSION_PROFILE_ORDER`) i (2) małym kaflem misji w gridzie
+      "Siła bojowa", który zastąpił dawną kartę "Doświadczenie" (Lv+XP) — 3 stany: brak misji
+      → ikona Compass + przycisk "Wyślij" (otwiera modal), w drodze → ikona Hourglass +
+      odliczanie, gotowa → ikona Swords + przycisk "Walcz" (nawiguje do `boss-fight?kind=
+      mission`). Header `topRight`'s pasek Lv POWIĘKSZONY (`lvlBarRow`/`lvlBarTrack`, szerszy
+      i grubszy niż affection `miniBarRow`, który zostaje bez zmian) + nowa linijka
+      `{lvl.inLevel}/{lvl.needed} XP` pod paskiem — jedyny wskaźnik poziomu na ekranie odkąd
+      karta "Doświadczenie" zniknęła z grida. "Wróć natychmiast" (anulowanie bez nagrody,
+      `onCancelMission`) przeniesione z dawnego pełnego przycisku na mały podkreślony link
+      tekstowy pod odliczaniem na scenie — funkcja bez zmian, tylko mniej wizualnego ciężaru.
   - **Level-up celebration** (2026-08-19, user: "musimy dodac info o levelup pupila...
     powiadomienie z confetti albo fajna animacja") — baner spadający z góry na 3,2s +
     `Confetti` (reużyty z `achievements/Confetti.tsx`), LŻEJSZY niż `BadgeCelebration.tsx`

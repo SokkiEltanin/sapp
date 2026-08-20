@@ -41,21 +41,37 @@ gear/loot z `energyMult` bonusem, sprawdź czy cap poszedł w górę (np. z 2 na
 całą energię, sprawdź czy regeneracja nadal działa co `ENERGY_REGEN_HOURS` i zatrzymuje się na
 nowym, wyższym capie, nie na starym 2.
 
-## 🆕🏗️ Gear layout (3 lewo/3 prawo) + konsolidacja UI misji — NIEROZPOCZĘTE (2026-08-20)
+## 🆕🏗️ Gear layout (3 lewo/3 prawo) + konsolidacja UI misji — NIEsprawdzone (2026-08-20)
 
 User (screenshot `/pet`): itemy ekwipunku mają być 3 po LEWEJ i 3 po PRAWEJ stronie kotka
-(teraz jeden rząd pod kotkiem), z lepszymi ikonami lucide zamiast emoji — puste sloty
-bezbarwne/outline. Osobno: kafelek misji jest PODWÓJNY — duży "stageAway" tile (kotek
-zniknięty, wymachujący duży CatArt) I osobna sekcja "Misja" niżej pokazują to samo, tekst
-zachodzi na ramki itemów. Ma być: mały przycisk (otwiera popup z 3 profilami misji zamiast
-obecnej listy 3 wierszy inline), po wysłaniu ikonka przełącza się na stan ładowania, kotek na
-scenie SIĘ ZMNIEJSZA i dostaje dopasowany mini pasek postępu + licznik (reużyć ISTNIEJĄCĄ
-animację małego kotka odbijającego się na pasku — `missionBounce`/`missionCatWrap`, NIE duży
-sway tile). Ten mały przycisk/status misji ma zastąpić kartę "Doświadczenie" (Lv+XP) w gridzie
-"Siła bojowa" (4 kafelki), bo górny pasek Lv w nagłówku zostaje JEDYNYM wskaźnikiem poziomu —
-powiększyć go trochę żeby liczby XP (np. "299/860") były czytelne. Pliki: `GearPanel.tsx`
-(layout+ikony), `app/pet.tsx` (usunięcie `stageAway` + starej sekcji Misja, nowy Modal
-popup, nowy mały mission-status kafelek w `statGrid`, powiększenie header Lv bara).
+(był jeden rząd pod kotkiem), z lepszymi ikonami lucide zamiast emoji — puste sloty
+bezbarwne/outline. Osobno: kafelek misji był PODWÓJNY — duży "stageAway" tile (kotek
+zniknięty, wymachujący duży CatArt) I osobna sekcja "Misja" niżej pokazywały to samo, tekst
+zachodził na ramki itemów.
+
+Zrobione: `GearPanel` bierze teraz kotka jako `children` (`GearPanel({children})` w
+`app/pet.tsx`, `<GearPanel>{catRender}</GearPanel>`) i renderuje go w środkowej kolumnie
+flankowanej `flankCol` lewo/prawo (`GEAR_SLOTS.slice(0,3)`/`.slice(3)`) — ikony z nowego
+`SLOT_ICON: Record<GearSlot, LucideIcon>` w `GearPanel.tsx` (HardHat/Shield/Footprints/
+Link2/Gem/Coins), kolor = `meta.color` (rarity) gdy założone, `c.text.muted` + cieńszy
+`strokeWidth` gdy puste ("bez koloru jakby były puste"). Stary `stageAway` USUNIĘTY —
+kotek w misji teraz się KURCZY (`MISSION_STAGE_SIZE`, mniejszy niż normalny portret) i
+dostaje mini pasek postępu + odliczanie WEWNĄTRZ sceny (reużyty `missionBounce`/
+`missionCatWrap`, ten sam mechanizm co dawna karta Misja). Stara pełna sekcja "Misja"
+(inline lista 3 profili) USUNIĘTA, zastąpiona: (1) `MissionSendModal` — popup bottom-sheet
+z 3 profilami, otwierany z (2) małego kafla misji w gridzie "Siła bojowa", który zastąpił
+dawną kartę "Doświadczenie" (3 stany: brak misji → przycisk Wyślij, w drodze → Hourglass +
+odliczanie, gotowa → przycisk Walcz). Header Lv bar POWIĘKSZONY (`lvlBarRow`/`lvlBarTrack`
+szersze/grubsze niż affection bar) + nowa linijka `lvl.inLevel/lvl.needed XP` pod spodem —
+jedyny wskaźnik poziomu teraz. `tsc`/`jest` zielone (700/700, bez nowych testów — czysto UI).
+**Priorytet testu na urządzeniu**: (a) sprawdź czy 3+3 sloty realnie mieszczą się obok kotka
+bez zachodzenia na siebie na różnych stage'ach (baby/kid/teen/adult — adult ma największego
+kotka, najciaśniej), (b) puste vs założone sloty — kolor/kontrast ikon czytelny w ciemnym
+motywie, (c) wyślij misję przez nowy popup, sprawdź czy kotek na scenie się kurczy i pasek+
+odliczanie+kropka-kotek działają jak dawniej, (d) "Wróć natychmiast" pod paskiem nadal działa
+(przeniesiony z dawnego dużego przycisku na mały link tekstowy), (e) po powrocie z misji kafel
+w gridzie pokazuje "Walcz" i faktycznie nawiguje do walki, (f) sprawdź czytelność liczb XP na
+powiększonym pasku Lv w nagłówku.
 
 User zaakceptował pełen plan ("Tak git zapisz wszystko i lecimy wszystko po kolei bez
 przerwy") po kilku turach dopracowywania. To jest ŹRÓDŁO PRAWDY dla całej funkcji —
