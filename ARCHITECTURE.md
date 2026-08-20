@@ -1125,6 +1125,19 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     - Baner dodatkowo podkreśla przejście progu wzrostu (`STAGE_START_LEVEL`: 3→kid,
       6→teen, 12→adult, lustro `growthStage()`) — "Pupil urósł — teraz to nastolatek!"
       zamiast generycznego tekstu, gdy level-up akurat trafia na próg.
+    - **Runda 2 — sam emoji + confetti niewystarczające** (2026-08-20, user po zobaczeniu na
+      żywo: "ten toast powiadomienie levelupu pupila zrob lepiej teraz jest tylko emotka i
+      confetii i nie wiadomo o co chodzi xd") — 🎉 obok numeru poziomu wizualnie ginęło przy
+      confetti, banner niósł mało informacji poza samym numerem. Emoji zastąpione kolorową
+      odznaką (`st.badge`, koło #FBBF24) z ikoną lucide `ChevronsUp` — jednoznaczny motyw
+      "awansu", nie ozdobnik. Dodany kicker "AWANS POZIOMU" (`st.kicker`, mały, wielka litera,
+      letter-spacing) NAD numerem poziomu, TEN SAM wzorzec co `vKicker` w victory modalu
+      bossów (`boss-fight.tsx`) — spójny język "to jest DUŻA wygrana" w obu miejscach. Nowy
+      mini pasek XP pod tekstem (`st.xpRow`/`xpTrack`/`xpFill`) pokazujący "{lvl.inLevel}/
+      {lvl.needed} XP" — liczone `levelFromXp(xp)` z ŻYWEGO `xp` w `petStore` (nie
+      zamrożonego na moment wykrycia level-upu), więc jeśli w międzyczasie doszło więcej XP
+      zanim baner się pokazał, pasek pokazuje PRAWDZIWY aktualny stan, nie stary snapshot.
+      `AUTO_DISMISS_MS` wydłużony 3200→4200ms — więcej treści do przeczytania niż sam numer.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po
