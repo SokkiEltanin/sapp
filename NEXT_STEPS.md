@@ -73,6 +73,36 @@ misji walka faktycznie toczy się z tym SAMYM zwierzakiem co pokazywała nazwa m
 podróży, (f) 3+3 sloty ekwipunku dalej mieszczą się obok kotka w stanie spoczynku (bez zmian
 w tej rundzie, ale sprawdź czy nic się nie rozjechało).
 
+## 🆕 Design potwierdzenia misji + mini popup zamiast pełnoekranowego bloku — NIEsprawdzone (2026-08-20, runda 3)
+
+Dwie rzeczy user zgłosił po teście: (1) "komunikat wróć natychmiast z potwierdzeniem nie ma
+designu" — potwierdzenie anulowania misji leciało przez gołego `Alert.alert` (systemowa,
+nieostylowana skrzynka), mimo że apka MA już własny `ConfirmDialog` (dokładnie do tego
+zbudowany w 2026-08-11 po identycznej skardze gdzie indziej) — po prostu przeoczony przy
+dodawaniu anulowania misji. (2) "zamiast full screen powiadomień jak pupil jest w misji to
+zrób mini popup window... pasek ładowania... czerwony przycisk" — próba wejścia w walkę
+KTÓREGOKOLWIEK trybu (kampania/raid/event/mad, oraz bezpośrednio `?kind=mission`) podczas gdy
+pupil jest w drodze pokazywała statyczny tekstowy blok wypełniający całą treść ekranu walki.
+
+Zrobione: (1) `app/pet.tsx`'s `onCancelMission` zamieniony z `Alert.alert` na stan
+`cancelMissionConfirm` + istniejący `<ConfirmDialog destructive .../>` (ten sam wzorzec co
+potwierdzenia ulepszeń HP/ATK na tym samym ekranie) — usunięty nieużywany już import `Alert`.
+(2) `app/boss-fight.tsx`: `missionAway` (pupil w drodze) teraz renderuje malutki wyśrodkowany
+popup (`missionAwayOverlay`/`missionAwayCard`, ta sama stylistyka co `ConfirmDialog` — karta
+na przyciemnionym tle, NIE pełny ekran) z nazwą miejsca podróży, cienkim paskiem postępu,
+odliczaniem, przyciskiem "Wróć do ekranu" (`router.back()`) i CZERWONYM "Wróć natychmiast"
+(otwiera TEN SAM `ConfirmDialog` co w `pet.tsx`, osobna instancja/stan `missionCancelConfirm`
+w tym pliku). Treść scrolla za popupem zostaje pustym `<View style={s.done} />` (placeholder,
+popup i tak zasłania wszystko). `fmtMissionDuration` wyniesione z `app/pet.tsx` do
+`utils/missions.ts` (eksportowane) żeby nie duplikować identycznej funkcji w drugim pliku,
+który teraz też jej potrzebuje. `tsc`/`jest` zielone (700/700, bez nowych testów — czysto UI).
+**Priorytet testu na urządzeniu**: (a) anuluj misję ze sceny `/pet` — potwierdzenie powinno
+wyglądać jak reszta apki (ciemna karta), nie jak systemowy alert, (b) spróbuj zaatakować
+bossa kampanii/raidu/eventu/MAD podczas gdy pupil jest w drodze — powinien pojawić się mały
+popup (nie pełny ekran) z paskiem/nazwą miejsca/odliczaniem, (c) w popupie sprawdź "Wróć do
+ekranu" (wraca bez akcji) i "Wróć natychmiast" → potwierdzenie → misja faktycznie anulowana
+bez nagrody i ekran wraca.
+
 User zaakceptował pełen plan ("Tak git zapisz wszystko i lecimy wszystko po kolei bez
 przerwy") po kilku turach dopracowywania. To jest ŹRÓDŁO PRAWDY dla całej funkcji —
 aktualizuj listę kroków poniżej po każdym PR, nie zaczynaj od zera w nowej sesji.
