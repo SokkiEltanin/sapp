@@ -331,9 +331,12 @@ export function atkPower(atkStatBonus: number, level: number, bonuses: Bonuses):
 }
 
 // Ile prób walki dziennie — FLAT, nie liczone z danych zdrowia (v5 pivot). Loot z
-// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower). Od 2026-08-18
-// używane TYLKO przez raid (`raidEnergy`/`syncRaidEnergy`) — kampania/MAD dostały OSOBNY,
-// regenerujący się w czasie model, patrz ENERGY_MAX/ENERGY_REGEN_HOURS niżej.
+// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower). Używane przez
+// raid/event (`raidEnergy`/`syncRaidEnergy`, `eventDailyAttempts` niżej) ORAZ (2026-08-20,
+// cofnięcie wcześniejszej decyzji) jako sufit banku energii kampanii/MAD — patrz
+// `campaignEnergyMax` w petStore.ts, który woła tę samą funkcję żeby wyświetlana liczba
+// "Prób dziennie" i realny cap nigdy się nie rozjechały (user: "mam napisane 4 a maksymalnie
+// ładuje mi się do 2").
 export const BASE_DAILY_ATTEMPTS = 3;
 export function dailyAttempts(energyMult: number): number {
   return Math.max(1, Math.round(BASE_DAILY_ATTEMPTS * (1 + Math.max(0, energyMult))));
@@ -345,37 +348,44 @@ export function dailyAttempts(energyMult: number): number {
 // Zamierzony efekt TEN SAM co odrzucony gate (nie da się zblitzować kampanii w jednej
 // sesji), ale przez organiczny mechanizm regeneracji zamiast sztywnej ściany "wróć jutro" —
 // można wydać oba punkty naraz, ale trzeba poczekać (realnie, nie do północy) na kolejne.
-// Świadomie FLAT, bez skalowania energyMult z łupu (user podał konkretne liczby bez
-// wspominania o skalowaniu) — energyMult dalej ma sens dla raidu/eventu, po prostu przestał
-// wpływać na energię kampanii.
-export const ENERGY_MAX = 2;
+//
+// CAP BYŁ FLAT (2026-08-19, ODWRÓCONE) — pierwotnie świadomie NIE skalował się z
+// energyMult z łupu/gear (user wtedy podał konkretne liczby bez wspominania o skalowaniu).
+// User (2026-08-19, po zobaczeniu ekranu statów): "niech maksymalna energia się nakłada do
+// tych walk bo teraz mam napisane 4 a maksymalnie ładuje mi się do 2 i tak czy siak" —
+// "Prób dziennie" na ekranie Siła bojowa ZAWSZE liczyło `dailyAttempts(energyMult)` (z
+// bonusów), ale realny bank kampanii ignorował to i zostawał na sztywnym 2 — dwie różne
+// liczby dla tej samej rzeczy. Cap bankowy jest teraz TĄ SAMĄ funkcją co wyświetlacz
+// ("dailyAttempts") — jedna prawda, nie osobny wzór.
 export const ENERGY_REGEN_HOURS = 3;
 
 // Czyste, testowalne jądro regeneracji — petStore.ts woła je z realnym `Date.now()`, testy
 // wołają z ustalonym `now`. `regenAt` = ISO czas kiedy dotrze NASTĘPNY punkt (null = bank
-// pełny, nic nie tyka).
+// pełny, nic nie tyka). `max` = sufit banku, liczony przez wołającego z `dailyAttempts(energyMult)`
+// (ten sam wzór co wyświetlana "Prób dziennie") — WYMAGANY, nie ma tu domyślnej wartości
+// celowo, żeby nikt przypadkiem nie wrócił do starego sztywnego capu.
 export interface EnergyState { energy: number; regenAt: string | null }
 
 // Doganianie tyknięć które minęły (np. offline) — PĘTLA, nie jedno odejmowanie różnicy
 // czasu, żeby zwrócony `regenAt` zawsze wskazywał REALNY, przyszły moment, nigdy przeszły.
-export function energyRegenTick(energy: number, regenAt: string | null, now: number = Date.now()): EnergyState {
-  if (energy >= ENERGY_MAX) return { energy: ENERGY_MAX, regenAt: null };
+export function energyRegenTick(energy: number, regenAt: string | null, max: number, now: number = Date.now()): EnergyState {
+  if (energy >= max) return { energy: max, regenAt: null };
   if (!regenAt) return { energy, regenAt: new Date(now + ENERGY_REGEN_HOURS * 3600000).toISOString() };
   let e = energy;
   let nextAt = new Date(regenAt).getTime();
-  while (nextAt <= now && e < ENERGY_MAX) {
+  while (nextAt <= now && e < max) {
     e++;
     nextAt += ENERGY_REGEN_HOURS * 3600000;
   }
-  if (e >= ENERGY_MAX) return { energy: ENERGY_MAX, regenAt: null };
+  if (e >= max) return { energy: max, regenAt: null };
   return { energy: e, regenAt: new Date(nextAt).toISOString() };
 }
 
 // -1 z banku. Zegar startuje TYLKO przy przejściu pełny→niepełny — jeśli już tykał (bank był
 // już niepełny), zostaje bez zmian, żeby wydanie drugiego punktu nie zresetowało postępu w
 // stronę pierwszego.
-export function energySpendTick(energy: number, regenAt: string | null, now: number = Date.now()): EnergyState {
-  const wasFull = energy >= ENERGY_MAX;
+export function energySpendTick(energy: number, regenAt: string | null, max: number, now: number = Date.now()): EnergyState {
+  const wasFull = energy >= max;
   const next = Math.max(0, energy - 1);
   const nextRegenAt = wasFull ? new Date(now + ENERGY_REGEN_HOURS * 3600000).toISOString() : regenAt;
   return { energy: next, regenAt: nextRegenAt };

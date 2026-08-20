@@ -725,6 +725,24 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
       energia za Xh Ymin" (`fmtEnergyCountdown`, statyczny w chwili renderu jak
       `fmtMissionDuration` w `pet.tsx`, nie żywy tiker) gdy bank niepełny — user widzi KIEDY
       wróci, nie tylko suchą liczbę "0 energii".
+    - **CAP ODWRÓCONY z FLAT na skalujący (2026-08-20)** — powyższy opis "świadomie FLAT, BEZ
+      skalowania energyMult" był celowy w momencie napisania, ale user po zobaczeniu ekranu
+      statów: "niech maksymalna energia się nakłada do tych walk bo teraz mam napisane 4 a
+      maksymalnie ładuje mi się do 2 i tak czy siak" — "Prób dziennie" na ekranie Siła bojowa
+      ZAWSZE liczyło `dailyAttempts(energyMult)` (z bonusów łupu+gear), ale realny bank
+      kampanii ignorował to i zostawał na sztywnym `ENERGY_MAX=2` — dwie różne liczby dla tej
+      samej rzeczy. `ENERGY_MAX` USUNIĘTE z `bosses.ts`; `energyRegenTick`/`energySpendTick`
+      biorą teraz WYMAGANY parametr `max` (bez domyślnej wartości, celowo — żeby nikt
+      przypadkiem nie wrócił do sztywnego capu) zamiast czytać stałą modułu. `petStore.ts`
+      dostał `campaignEnergyMax(ownedItems, equippedGear, ownedGear)` — łączy `bossBonuses`
+      (łup) + `gearCombatBonuses` (gear) i woła `dailyAttempts()`, TĘ SAMĄ funkcję co
+      wyświetlacz — jedna prawda, cap bankowy i "Prób dziennie" nigdy się już nie rozjadą.
+      Wołane przy `syncEnergyRegen`/`spendEnergy`/`reset()`/initial state/migracji (migracja
+      liczy z `state.ownedItems ?? []`/`equippedGear ?? {}`/`ownedGear ?? {}` bezpośrednio,
+      NIE polegając na kolejności z późniejszymi migracja-guardami tych pól w tym samym
+      `onRehydrateStorage` — inline fallback jest odporny na kolejność). `app/bosses.tsx`
+      liczy `campaignEnergyMax = dailyAttempts(bonuses.energyMult)` z tego samego
+      już-połączonego `bonuses` co krok 8 (loot+gear).
   - **Nemesis (`kind='menace'` w `seasonalEvents.ts`) przebudowany na TRWAŁY bank HP, bez
     timera/limitu prób** (2026-08-18, user: "wyłączyć czas tym eventowym i zostawić tylko
     sezonowe bossy że mają dużo HP, wspólną energię... a ten drugi [nemesis] niech nie ma

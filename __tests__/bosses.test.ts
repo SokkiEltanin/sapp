@@ -1,7 +1,7 @@
 import {
   bossTier, counterDamage, atkPower, atkMultiplier, dailyAttempts, eventDailyAttempts,
   EVENT_MAX_DAILY_ATTEMPTS, simulateFight, mysteryBossName,
-  energyRegenTick, energySpendTick, ENERGY_MAX, ENERGY_REGEN_HOURS,
+  energyRegenTick, energySpendTick, ENERGY_REGEN_HOURS,
   EquippedItem, Bonuses, BOSSES, Boss, combatItemSlotsFor, COMBAT_ITEM_SLOTS,
 } from '@/utils/bosses';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
@@ -65,68 +65,77 @@ describe('bosses — combatItemSlotsFor (2026-08-13: sloty rosną z poziomem)', 
 });
 
 // 2026-08-18, user (po odrzuceniu wcześniejszego gate'u "1 nowy boss dziennie"): "wolałem
-// zamiast jeden dziennie raz na 3h atak może? i maksymalnie regeneruje się do 2 energii" —
-// regeneracja energii kampanii/MAD w czasie rzeczywistym, patrz komentarz nad ENERGY_MAX
-// w bosses.ts. Testy wołają z ustalonym `now` (trzeci param), nie prawdziwym Date.now(), żeby
-// były deterministyczne.
+// zamiast jeden dziennie raz na 3h atak może?" — regeneracja energii kampanii/MAD w czasie
+// rzeczywistym. Cap (`max`) był kiedyś sztywnym `ENERGY_MAX=2`, teraz WOŁAJĄCY (petStore.ts)
+// go liczy z `dailyAttempts(energyMult)` i przekazuje jawnie (2026-08-19, user: "mam
+// napisane 4 a maksymalnie ładuje mi się do 2" — patrz komentarz nad `campaignEnergyMax` w
+// petStore.ts) — tu testujemy samo jądro tick, `MAX` to dowolna testowa wartość, nie stała
+// z produkcji. Testy wołają z ustalonym `now` (czwarty param), nie prawdziwym Date.now(),
+// żeby były deterministyczne.
 describe('bosses — energyRegenTick / energySpendTick (regeneracja energii w czasie)', () => {
   const H = 3600000;
-  test('ENERGY_MAX=2, ENERGY_REGEN_HOURS=3 — dokładnie liczby z prośby usera', () => {
-    expect(ENERGY_MAX).toBe(2);
+  const MAX = 2;
+  test('ENERGY_REGEN_HOURS=3 — dokładnie liczba z prośby usera', () => {
     expect(ENERGY_REGEN_HOURS).toBe(3);
   });
-  test('pełny bank (już ENERGY_MAX) — tick to no-op, regenAt zawsze null', () => {
-    const r = energyRegenTick(ENERGY_MAX, null, 1000);
-    expect(r).toEqual({ energy: ENERGY_MAX, regenAt: null });
+  test('pełny bank (już max) — tick to no-op, regenAt zawsze null', () => {
+    const r = energyRegenTick(MAX, null, MAX, 1000);
+    expect(r).toEqual({ energy: MAX, regenAt: null });
   });
   test('niepełny bank bez zegara (świeży spend/migracja) — startuje zegar na +3h od `now`', () => {
     const now = 1_000_000;
-    const r = energyRegenTick(0, null, now);
+    const r = energyRegenTick(0, null, MAX, now);
     expect(r.energy).toBe(0);
     expect(new Date(r.regenAt!).getTime()).toBe(now + 3 * H);
   });
   test('zegar jeszcze nie doszedł — bez zmian', () => {
     const now = 1_000_000;
     const regenAt = new Date(now + H).toISOString(); // za godzinę, jeszcze nie teraz
-    const r = energyRegenTick(0, regenAt, now);
+    const r = energyRegenTick(0, regenAt, MAX, now);
     expect(r.energy).toBe(0);
     expect(r.regenAt).toBe(regenAt);
   });
   test('dokładnie jeden punkt minął — +1 energii, zegar przesunięty o kolejne 3h', () => {
     const now = 1_000_000;
     const regenAt = new Date(now - 1).toISOString(); // już minęło
-    const r = energyRegenTick(0, regenAt, now);
+    const r = energyRegenTick(0, regenAt, MAX, now);
     expect(r.energy).toBe(1);
     expect(new Date(r.regenAt!).getTime()).toBe(new Date(regenAt).getTime() + 3 * H);
   });
-  test('offline długo (kilka okresów naraz) — dogania, ale CAPUJE na ENERGY_MAX, nie przelewa', () => {
+  test('offline długo (kilka okresów naraz) — dogania, ale CAPUJE na max, nie przelewa', () => {
     const now = 1_000_000;
     const regenAt = new Date(now - 100 * H).toISOString(); // 100h temu — dawno przekroczone
-    const r = energyRegenTick(0, regenAt, now);
-    expect(r.energy).toBe(ENERGY_MAX);
+    const r = energyRegenTick(0, regenAt, MAX, now);
+    expect(r.energy).toBe(MAX);
     expect(r.regenAt).toBeNull(); // pełny bank = nic już nie tyka
   });
   test('regenAt zwrócony przez tick zawsze jest w PRZYSZŁOŚCI względem `now` (nigdy przeszły)', () => {
     const now = 1_000_000;
     const regenAt = new Date(now - 7 * H).toISOString(); // wielokrotność 3h przekroczona
-    const r = energyRegenTick(0, regenAt, now);
+    const r = energyRegenTick(0, regenAt, MAX, now);
     if (r.regenAt) expect(new Date(r.regenAt).getTime()).toBeGreaterThan(now);
+  });
+  test('wyższy max (np. z bonusów energyMult) pozwala bankowi urosnąć dalej niż stary sztywny cap', () => {
+    const now = 1_000_000;
+    const regenAt = new Date(now - 100 * H).toISOString();
+    const r = energyRegenTick(0, regenAt, 4, now);
+    expect(r.energy).toBe(4); // nie ucięte na starym ENERGY_MAX=2
   });
   test('spend z pełnego banku (2→1) startuje zegar na +3h od `now`', () => {
     const now = 2_000_000;
-    const r = energySpendTick(ENERGY_MAX, null, now);
-    expect(r.energy).toBe(ENERGY_MAX - 1);
+    const r = energySpendTick(MAX, null, MAX, now);
+    expect(r.energy).toBe(MAX - 1);
     expect(new Date(r.regenAt!).getTime()).toBe(now + 3 * H);
   });
   test('spend z NIEpełnego banku (już tykał) NIE resetuje istniejącego zegara', () => {
     const now = 2_000_000;
     const existingRegenAt = new Date(now + H).toISOString(); // w trakcie odliczania
-    const r = energySpendTick(1, existingRegenAt, now);
+    const r = energySpendTick(1, existingRegenAt, MAX, now);
     expect(r.energy).toBe(0);
     expect(r.regenAt).toBe(existingRegenAt); // bez zmian — user nie traci postępu
   });
   test('spend z zerowego banku nie schodzi poniżej zera', () => {
-    const r = energySpendTick(0, null, 1000);
+    const r = energySpendTick(0, null, MAX, 1000);
     expect(r.energy).toBe(0);
   });
 });

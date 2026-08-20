@@ -8,7 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
-import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName, ENERGY_MAX } from '@/utils/bosses';
+import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName } from '@/utils/bosses';
 import { gearCombatBonuses } from '@/utils/gear';
 import { raidForWeek, raidHpFor } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
@@ -29,7 +29,7 @@ const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
 
-// Odliczanie do kolejnego punktu energii kampanii (2026-08-18, patrz ENERGY_MAX/
+// Odliczanie do kolejnego punktu energii kampanii (2026-08-18, patrz
 // ENERGY_REGEN_HOURS w bosses.ts) — statyczne w chwili renderu (jak fmtMissionDuration w
 // pet.tsx), nie żywy tiker; wystarczy bo user i tak wraca na ten ekran co jakiś czas
 // (useFocusEffect już odświeża `reload()` przy każdym powrocie).
@@ -67,9 +67,13 @@ export default function Bosses() {
     return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
   }, [ownedItems, equippedGear, ownedGear]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
+  // Sufit banku (2026-08-19) — TA SAMA formuła co `syncEnergyRegen()` w petStore.ts, żeby
+  // pigułka energii i realny cap nigdy nie pokazywały różnych liczb (user: "mam napisane 4
+  // a maksymalnie ładuje mi się do 2").
+  const campaignEnergyMax = dailyAttempts(bonuses.energyMult);
 
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
-  // ENERGY_MAX/ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
+  // ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
   // które minęły offline, wołane tak samo jak stary flat sync przy każdym powrocie na ekran.
   // Raid/wydarzenie ZOSTAJĄ przy starym flat dziennym modelu (`dailyAttempts`/
   // `eventDailyAttempts`, skalowane energyMult z łupu) — ta zmiana dotyczy TYLKO energii
@@ -279,10 +283,10 @@ export default function Bosses() {
             {/* Tylko HP + motyw — BEZ nagrody/mechanik przed walką (2026-08-10, user:
                 "zbyt dużo opisu bossa"). Reszta szczegółów żyje na ekranie walki. */}
             <Text style={s.hpTxt}>{current.hp} HP · Motyw: <Text style={{ color: '#2AC68F', fontWeight: '800' }}>{current.weaknessLabel}</Text></Text>
-            {/* Regeneracja w czasie (2026-08-18, patrz ENERGY_MAX/ENERGY_REGEN_HOURS w
-                bosses.ts) — gdy bank niepełny, pokazuje ZA ILE realnie dotrze kolejny punkt,
-                nie tylko "0 energii" bez kontekstu kiedy wróci. */}
-            {energy < ENERGY_MAX && energyRegenAt && (
+            {/* Regeneracja w czasie (2026-08-18, patrz ENERGY_REGEN_HOURS w bosses.ts) —
+                gdy bank niepełny, pokazuje ZA ILE realnie dotrze kolejny punkt, nie tylko
+                "0 energii" bez kontekstu kiedy wróci. */}
+            {energy < campaignEnergyMax && energyRegenAt && (
               <Text style={[s.hpTxt, { color: c.text.muted }]}>Kolejna energia za {fmtEnergyCountdown(energyRegenAt)}</Text>
             )}
 
