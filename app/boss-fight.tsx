@@ -241,6 +241,15 @@ export default function BossFight() {
   // stop: cofnięcie w trakcie walki po prostu PRZERYWA ją.
   const alive = useRef(true);
   const roundTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // "Pomiń walkę" (2026-08-20, user: "możesz dodać przycisk jak walka jakakoliwek pomiń
+  // walke?") — wynik walki (win/loss, nagrody, zapis do store'u) jest już w 100% ROZSTRZYGNIĘTY
+  // w momencie kliknięcia WALCZ! (`simulateFight`/`raidAttack`/`menaceAttack`/`spendEnergy`
+  // wołane SYNCHRONICZNIE w `attackRoundBased`, PRZED odtworzeniem animacji) — cała pętla
+  // `playerBeat`/`counterBeat` to czysto KOSMETYCZNE odtworzenie już gotowego `result`. Skip
+  // więc bezpiecznie przerywa tylko `setTimeout`-owy łańcuch i skacze prosto do `finish()`,
+  // bez wpływu na wynik. Ref zamiast bezpośredniego wołania `finish` z zewnątrz — `finish`
+  // żyje w domknięciu `attackRoundBased`, ustawiane na nowo przy KAŻDYM ataku.
+  const skipFightRef = useRef<(() => void) | null>(null);
   useEffect(() => () => {
     alive.current = false;
     if (roundTimer.current) clearTimeout(roundTimer.current);
@@ -391,6 +400,7 @@ export default function BossFight() {
 
     const finish = () => {
       fightingRef.current = false;
+      skipFightRef.current = null;
       if (!alive.current) return;
       setFighting(false);
       setLiveBossHp(null);
@@ -524,8 +534,18 @@ export default function BossFight() {
       }, THROW_MS);
     };
 
+    skipFightRef.current = () => {
+      if (roundTimer.current) { clearTimeout(roundTimer.current); roundTimer.current = null; }
+      setPawFlying(false);
+      setBoltFlying(false);
+      setCatHit(null);
+      setLastHit(null);
+      finish();
+    };
     playerBeat();
   };
+
+  const skipFight = () => { haptic.tap(); skipFightRef.current?.(); };
 
   // Raid dołączył do attackRoundBased 2026-08-17 (patrz komentarz na górze pliku) — jedna
   // wspólna funkcja obsługuje teraz wszystkie 6 trybów.
@@ -729,6 +749,15 @@ export default function BossFight() {
                 </View>
               </PressableScale>
             )}
+            {/* "Pomiń walkę" (2026-08-20, user: "możesz dodać przycisk jak walka jakakoliwek
+                pomiń walke?") — wynik jest już rozstrzygnięty w momencie WALCZ!, ten przycisk
+                tylko przerywa kosmetyczną animację i skacze do finish(), patrz komentarz przy
+                `skipFightRef`. Widoczny TYLKO w trakcie animacji, każdy z 6 trybów walki. */}
+            {fighting && (
+              <PressableScale onPress={skipFight} style={{ marginTop: spacing[2] }}>
+                <Text style={s.skipFightTxt}>Pomiń walkę</Text>
+              </PressableScale>
+            )}
           </View>
         )}
       </ScrollView>
@@ -867,6 +896,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   doneInlineTxt: { fontSize: 13, fontWeight: '800', color: '#2AC68F', textAlign: 'center', marginTop: spacing[4] },
   attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: radius.lg, paddingVertical: 16, marginTop: spacing[4], width: '100%' },
   attackTxt: { fontSize: 17, fontWeight: '900', color: '#fff' },
+  skipFightTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, textAlign: 'center', textDecorationLine: 'underline' },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[6], paddingHorizontal: spacing[3] },
   lockTxt: { flex: 1, fontSize: 12.5, color: c.text.muted, lineHeight: 17 },
 
