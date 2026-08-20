@@ -26,7 +26,36 @@ poziomów naraz (np. wygrana z dużą nagrodą) — powinien pokazać się JEDEN
 poziomem, nie lawina po jednym na każdy przeskoczony poziom, (d) sprawdź tekst progu
 wzrostu przy Lv3/6/12 jeśli akurat masz tam pupila.
 
-## 🆕🏗️ SYSTEM EKWIPUNKU — duża wieloetapowa funkcja (2026-08-19)
+## 🆕 Cap energii kampanii skaluje się z energyMult — NIEsprawdzone (2026-08-20)
+
+User po zobaczeniu ekranu Siła bojowa: "niech maksymalna energia się nakłada do tych walk bo
+teraz mam napisane 4 a maksymalnie ładuje mi się do 2 i tak czy siak". Bug: "Prób dziennie"
+liczyło `dailyAttempts(energyMult)` (z bonusów łupu+gear), ale realny bank energii kampanii
+był sztywnym `ENERGY_MAX=2` (wcześniejsza, teraz odwrócona decyzja — patrz ARCHITECTURE §9
+"CAP ODWRÓCONY z FLAT na skalujący"). Fix: `ENERGY_MAX` usunięte, `energyRegenTick`/
+`energySpendTick` biorą wymagany `max`, nowy `campaignEnergyMax()` w `petStore.ts` woła TĘ
+SAMĄ `dailyAttempts()` co wyświetlacz. `tsc`/`jest` zielone (700/700, +1 nowy test). **Priorytet
+testu na urządzeniu**: (a) sprawdź czy liczba w "Prób dziennie" na Siła bojowa TERAZ zgadza
+się z tym do ilu realnie ładuje się pasek energii kampanii na ekranie bossów, (b) jeśli masz
+gear/loot z `energyMult` bonusem, sprawdź czy cap poszedł w górę (np. z 2 na 3-4), (c) wydaj
+całą energię, sprawdź czy regeneracja nadal działa co `ENERGY_REGEN_HOURS` i zatrzymuje się na
+nowym, wyższym capie, nie na starym 2.
+
+## 🆕🏗️ Gear layout (3 lewo/3 prawo) + konsolidacja UI misji — NIEROZPOCZĘTE (2026-08-20)
+
+User (screenshot `/pet`): itemy ekwipunku mają być 3 po LEWEJ i 3 po PRAWEJ stronie kotka
+(teraz jeden rząd pod kotkiem), z lepszymi ikonami lucide zamiast emoji — puste sloty
+bezbarwne/outline. Osobno: kafelek misji jest PODWÓJNY — duży "stageAway" tile (kotek
+zniknięty, wymachujący duży CatArt) I osobna sekcja "Misja" niżej pokazują to samo, tekst
+zachodzi na ramki itemów. Ma być: mały przycisk (otwiera popup z 3 profilami misji zamiast
+obecnej listy 3 wierszy inline), po wysłaniu ikonka przełącza się na stan ładowania, kotek na
+scenie SIĘ ZMNIEJSZA i dostaje dopasowany mini pasek postępu + licznik (reużyć ISTNIEJĄCĄ
+animację małego kotka odbijającego się na pasku — `missionBounce`/`missionCatWrap`, NIE duży
+sway tile). Ten mały przycisk/status misji ma zastąpić kartę "Doświadczenie" (Lv+XP) w gridzie
+"Siła bojowa" (4 kafelki), bo górny pasek Lv w nagłówku zostaje JEDYNYM wskaźnikiem poziomu —
+powiększyć go trochę żeby liczby XP (np. "299/860") były czytelne. Pliki: `GearPanel.tsx`
+(layout+ikony), `app/pet.tsx` (usunięcie `stageAway` + starej sekcji Misja, nowy Modal
+popup, nowy mały mission-status kafelek w `statGrid`, powiększenie header Lv bara).
 
 User zaakceptował pełen plan ("Tak git zapisz wszystko i lecimy wszystko po kolei bez
 przerwy") po kilku turach dopracowywania. To jest ŹRÓDŁO PRAWDY dla całej funkcji —

@@ -4,10 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { weekKeyOf } from '@/utils/quests';
 import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
-import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, ENERGY_MAX, energyRegenTick, energySpendTick } from '@/utils/bosses';
+import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
-import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp } from '@/utils/gear';
+import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses } from '@/utils/gear';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -23,6 +23,20 @@ export { COMBAT_ITEM_SLOTS, combatItemSlotsFor };
 // w kodzie, żeby balans był w jednym miejscu.
 export const CAT_BASE_MAX_HP = 100;
 export function catMaxHp(bonus: number): number { return CAT_BASE_MAX_HP + Math.max(0, bonus); }
+
+// Sufit banku energii kampanii/MAD — TA SAMA formuła co wyświetlana "Prób dziennie" na
+// ekranie Siła bojowa (2026-08-19, user: "niech maksymalna energia się nakłada do tych
+// walk bo teraz mam napisane 4 a maksymalnie ładuje mi się do 2" — cap był kiedyś świadomie
+// FLAT niezależnie od bonusów, patrz historyczny komentarz w bosses.ts, teraz odwrócone).
+function campaignEnergyMax(
+  ownedItems: string[],
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, GearRarity>>,
+): number {
+  const loot = bossBonuses(ownedItems);
+  const gear = gearCombatBonuses(equippedGear, ownedGear);
+  return dailyAttempts(loot.energyMult + gear.energyMult);
+}
 
 // The companion blob's PERSISTED state: identity, growth (xp), the coin wallet,
 // owned/equipped cosmetics and which quest milestones have already paid out. Its
@@ -143,10 +157,12 @@ interface PetState {
   // Energia kampanii/MAD (2026-08-18, user, po odrzuceniu wcześniejszego gate'u "1 nowy boss
   // dziennie" — patrz historia w ARCHITECTURE.md: "wolałem zamiast jeden dziennie raz na 3h
   // atak może? i maksymalnie regeneruje się do 2 energii") — TERAZ regeneracja w czasie
-  // rzeczywistym, nie flat dzienny grant: bank 0..ENERGY_MAX (bosses.ts), +1 co
-  // ENERGY_REGEN_HOURS. `energyRegenAt` = ISO czas KIEDY dotrze następny punkt (null = bank
-  // pełny, nic nie tyka). `syncEnergyRegen()` w petStore doganiaja tyknięcia które minęły
-  // podczas gdy aplikacja była zamknięta.
+  // rzeczywistym, nie flat dzienny grant: bank 0..`campaignEnergyMax()` (niżej w tym pliku,
+  // 2026-08-20: TA SAMA formuła `dailyAttempts(energyMult)` co wyświetlana "Prób dziennie",
+  // żeby te dwie liczby nigdy się nie rozjechały), +1 co ENERGY_REGEN_HOURS. `energyRegenAt`
+  // = ISO czas KIEDY dotrze następny punkt (null = bank pełny, nic nie tyka).
+  // `syncEnergyRegen()` w petStore doganiaja tyknięcia które minęły podczas gdy aplikacja
+  // była zamknięta.
   energy: number;
   energyRegenAt: string | null;
   defeatedBosses: string[];
@@ -269,7 +285,7 @@ interface PetState {
   syncEnergyRegen: () => void;  // dogania tyknięcia regeneracji energii kampanii/MAD które minęły offline
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // FLAT dzienny grant, bez zmian — osobna pula raidu
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
-  spendEnergy: () => void;   // -1 z banku regenerującego się w czasie, patrz ENERGY_MAX/ENERGY_REGEN_HOURS
+  spendEnergy: () => void;   // -1 z banku regenerującego się w czasie, patrz campaignEnergyMax()/ENERGY_REGEN_HOURS
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   defeatMadBoss: (baseBossId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
   startMission: (level: number, profile: MissionProfile) => void;
@@ -359,7 +375,7 @@ export const usePetStore = create<PetState>()(
       plankDay: null,
       stretchDay: null,
       trainingDays: {},
-      energy: ENERGY_MAX,
+      energy: campaignEnergyMax([], {}, {}),
       energyRegenAt: null,
       raidEnergy: 0,
       raidEnergyDate: null,
@@ -606,7 +622,8 @@ export const usePetStore = create<PetState>()(
       // bosses.tsx), analogicznie do starego syncEnergy, ale bez zależności od "dzisiejszych
       // danych" — czysto zegar. Samo jądro (`energyRegenTick`) czyste i testowane w bosses.ts.
       syncEnergyRegen: () => set((s) => {
-        const r = energyRegenTick(s.energy, s.energyRegenAt);
+        const max = campaignEnergyMax(s.ownedItems, s.equippedGear, s.ownedGear);
+        const r = energyRegenTick(s.energy, s.energyRegenAt, max);
         return { energy: r.energy, energyRegenAt: r.regenAt };
       }),
       // Identical shape to syncEnergy, targeting the raid's own bank — see the
@@ -640,7 +657,8 @@ export const usePetStore = create<PetState>()(
       },
       // Samo jądro (`energySpendTick`) czyste i testowane w bosses.ts.
       spendEnergy: () => set((s) => {
-        const r = energySpendTick(s.energy, s.energyRegenAt);
+        const max = campaignEnergyMax(s.ownedItems, s.equippedGear, s.ownedGear);
+        const r = energySpendTick(s.energy, s.energyRegenAt, max);
         return { energy: r.energy, energyRegenAt: r.regenAt };
       }),
       defeatBoss: (bossId, lootId, coins, xp, name, level, fight) => set((s) => s.defeatedBosses.includes(bossId) ? s : ({
@@ -840,7 +858,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: ENERGY_MAX, energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
     }),
     {
       name: 'pet-v1',
@@ -884,12 +902,13 @@ export const usePetStore = create<PetState>()(
         // nagrody, dokładnie to co wtedy dostałaby), inaczej null (brak aktywnej misji).
         state.missionProfile = state.missionProfile ?? (state.missionEndsAt ? 'balanced' : null);
         // Migracja energii kampanii (2026-08-18) — stary model (flat dzienny grant, mógł
-        // sięgać >ENERGY_MAX przy dużym energyMult z łupu, gate "1 boss/dzień" USUNIĘTY po
-        // user feedback: "wolałem zamiast jeden dziennie raz na 3h atak może? i maksymalnie
-        // regeneruje się do 2 energii") zamieniony na regenerujący się w czasie bank capowany
-        // na ENERGY_MAX. `energyRegenAt` null po migracji — pierwsze wywołanie
-        // `syncEnergyRegen()` po starcie samo wystartuje zegar jeśli bank jest niepełny
-        // (patrz gałąź `!s.energyRegenAt` tam).
+        // sięgać >max przy dużym energyMult z łupu, gate "1 boss/dzień" USUNIĘTY po
+        // user feedback: "wolałem zamiast jeden dziennie raz na 3h atak może?") zamieniony na
+        // regenerujący się w czasie bank capowany na `campaignEnergyMax()` (2026-08-19: cap
+        // TERAZ skaluje się z energyMult zamiast być sztywny, patrz komentarz przy tej
+        // funkcji). `energyRegenAt` null po migracji — pierwsze wywołanie `syncEnergyRegen()`
+        // po starcie samo wystartuje zegar jeśli bank jest niepełny (patrz gałąź
+        // `!s.energyRegenAt` tam).
         //
         // BUG FIX (2026-08-19, user: "energia nie ładuje się wcale, pisze ciągle że za 3h
         // odnowienie... czekam od wczoraj i nic") — `onRehydrateStorage` odpala się przy
@@ -903,7 +922,8 @@ export const usePetStore = create<PetState>()(
         // pole już istnieje (`null` PO tej migracji, albo prawdziwa data z tykającym
         // zegarem), zostaje NIETKNIĘTE.
         if (state.energyRegenAt === undefined) {
-          state.energy = Math.min(state.energy ?? ENERGY_MAX, ENERGY_MAX);
+          const max = campaignEnergyMax(state.ownedItems ?? [], state.equippedGear ?? {}, state.ownedGear ?? {});
+          state.energy = Math.min(state.energy ?? max, max);
           state.energyRegenAt = null;
         }
         // Stary stan sprzed 2026-08-18 nie miał trwałego banku nemesis (patrz menaceId/menaceHp
