@@ -220,6 +220,19 @@ export function dailyShopSlots(date: string, level: number, count = 3): DailySho
   });
 }
 
+// Sprzedaż zbędnego/słabszego itemu za monety (2026-08-20, user: "co robimy z itemami co sa
+// słabsze ale je mamy w eq? mozna je sprzedać?"). Wartość = 40% tego co ten sam tier/rarity
+// kosztowałby w sklepie dnia (`TIER_BASE_COST`/`DAILY_RARITY_COST_MULT` wyżej) — celowo MNIEJ
+// niż cena kupna, żeby kup-i-sprzedaj nie było darmowym arbitrażem, ale wciąż realna wartość
+// za coś czego już nie używasz (np. słabszy duplikat po lepszym dropie ze skrzynki). Działa
+// dla WSZYSTKICH itemów niezależnie od tego skąd przyszły (skrzynka/sklep dnia) — cena to
+// wewnętrzna wartość tier+rarity, nie historia zakupu.
+const SELL_FRACTION = 0.4;
+export function gearSellValue(item: GearItemDef, rarity: GearRarity): number {
+  const tierIdx = Math.max(0, TIER_LEVELS.indexOf(item.unlockLevel));
+  return Math.max(1, Math.round(TIER_BASE_COST[tierIdx] * DAILY_RARITY_COST_MULT[rarity] * SELL_FRACTION));
+}
+
 // ── Krok 8 — wpięcie w realne formuły walki/ekonomii ──────────────────────────────────
 // Cztery sloty (helm/buty/obroza/talizman) mapują 1:1 na `Bonuses{atk,dodge,crit,
 // energyMult}` z bosses.ts (ten sam kształt co bonusy z lootu kampanii, patrz

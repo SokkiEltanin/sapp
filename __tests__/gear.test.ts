@@ -1,6 +1,6 @@
 import {
   GEAR_ITEMS, GEAR_SLOTS, RARITY_MULT, SLOT_STAT,
-  gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots,
+  gearById, gearBySlot, gearStatValue, unlockedGearFor, dailyShopSlots, gearSellValue,
   gearCombatBonuses, gearFlatHp, gearCoinsMult,
 } from '@/utils/gear';
 
@@ -113,6 +113,32 @@ describe('gear — dailyShopSlots (sklep dnia, deterministyczny wg daty)', () =>
 
   test('poziom 0 (teoretyczny, brak odblokowanych itemów) → pusta lista, nie crash', () => {
     expect(dailyShopSlots('2026-08-19', 0)).toEqual([]);
+  });
+});
+
+// Sprzedaż zbędnego/słabszego itemu (2026-08-20, user: "co robimy z itemami co sa słabsze
+// ale je mamy w eq? mozna je sprzedać?") — wartość = 40% ceny sklepu dnia dla TEGO SAMEGO
+// tier/rarity, żeby kup-i-sprzedaj nie było darmowym arbitrażem.
+describe('gear — gearSellValue (sprzedaż, 2026-08-20)', () => {
+  const helm = gearById('helm_slomiany')!; // T1, unlockLevel 1
+
+  test('T1 common = 40% z bazowego kosztu sklepu dnia (40 × 1 × 0.4 = 16)', () => {
+    expect(gearSellValue(helm, 'common')).toBe(16);
+  });
+
+  test('rośnie z rzadkością (mythic > legendary > ... > common)', () => {
+    const order = ['common', 'rare', 'epic', 'legendary', 'mythic'] as const;
+    const values = order.map(r => gearSellValue(helm, r));
+    for (let i = 1; i < values.length; i++) expect(values[i]).toBeGreaterThan(values[i - 1]);
+  });
+
+  test('minimum 1 moneta nawet dla najsłabszego T1 common', () => {
+    expect(gearSellValue(helm, 'common')).toBeGreaterThanOrEqual(1);
+  });
+
+  test('wyraźnie mniejsza wartość niż item o wyższym tier tej samej rzadkości', () => {
+    const tier5 = gearById('helm_koronaBurzy')!; // T5
+    expect(gearSellValue(tier5, 'common')).toBeGreaterThan(gearSellValue(helm, 'common'));
   });
 });
 

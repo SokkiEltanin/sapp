@@ -9,6 +9,29 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Per-item grafiki w kafelkach gearu + sprzedaż itemów — NIEsprawdzone (2026-08-20)
+
+User: (1) "dodałeś ze ikony te które dodam wyświetlają sie jako w tych kafelkach u pupila?"
+(2) "co robimy z itemami co sa słabsze ale je mamy w eq? mozna je sprzedać? jak tak dodaj
+przycisk sprzedaj z potwierdzeniem". Odkryte przy okazji: `GearItemDef.icon` (grafika per
+item, `assets/ekwipunek/`) istniało w danych od kroku 1, ale NIC go nigdzie nie renderowało —
+flankujące sloty i modal pokazywały tylko generyczną ikonę/emoji KATEGORII slotu. Fix: (1)
+`GearPanel.tsx` — flankujący slot z założonym itemem pokazuje TERAZ jego własną grafikę
+(`equippedItem.icon`), puste sloty zostają na lucide ikonie kategorii; `GearSlotModal` dostał
+`itemImg` przy każdym wierszu. **`pet-shop.tsx`/`BoxRevealModal.tsx` NIE zrobione w tym PR-ze
+— dalej pokazują emoji kategorii zamiast grafiki konkretnego itemu, świadomie odłożone
+(user pytał konkretnie o "kafelki u pupila").** (2) Nowy `gearSellValue()` (40% ceny sklepu
+dnia dla tier/rarity) + `petStore.sellGear(itemId)` (auto-zdejmuje jeśli założony, dodaje
+monety) + mały link "Sprzedaj +X 🪙" w każdym wierszu modala, otwiera `ConfirmDialog`. `tsc`/
+`jest` zielone (707/707, +4 nowe testy `gearSellValue` w `gear.test.ts` — `sellGear` w
+petStore NIE testowany, konsekwentnie z resztą store'u). **Priorytet testu na urządzeniu**:
+(a) załóż dowolny item — sprawdź czy jego GRAFIKA (nie generyczna ikonka) pokazuje się w
+kafelku obok kotka i w wierszu modala, (b) sprawdź czy różne itemy tego samego slotu mają
+WIDOCZNIE różne grafiki, (c) sprzedaj założony item — sprawdź że zdejmuje się ze slotu, dodaje
+monety, i znika z listy w modalu, (d) sprzedaj NIEzałożony item — sprawdź że nie rusza
+aktualnie założonego, (e) rozważ czy dodać per-item grafiki też do `pet-shop.tsx`/
+`BoxRevealModal.tsx` (świadomie pominięte, patrz wyżej) jeśli user tego oczekuje.
+
 ## 🆕 "Pomiń walkę" — przycisk pomijający animację, wszystkie 6 trybów — NIEsprawdzone (2026-08-20)
 
 User: "możesz dodać przycisk jak walka jakakoliwek pomiń walke?". Wynik walki jest już w 100%

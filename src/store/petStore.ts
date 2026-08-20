@@ -7,7 +7,7 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
-import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses } from '@/utils/gear';
+import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses, gearSellValue } from '@/utils/gear';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -330,6 +330,7 @@ interface PetState {
   grantGear: (itemId: string, rarity: GearRarity) => void;   // ze skrzynki/daily shopu — no-op jeśli już masz ≥ tę rzadkość
   equipGear: (itemId: string) => boolean;                     // false = nieposiadany lub poziom za niski
   unequipGear: (slot: GearSlot) => void;
+  sellGear: (itemId: string) => number;   // sprzedaje POSIADANY item za monety (auto-unequip jeśli założony); zwraca zarobione monety, 0 = nieposiadany
   // Sklep dnia (gear.ts dailyShopSlots) — gwarantowany zakup, nie loteria. `dayKey` unikalny
   // per (dzień, slot itemu) — ten sam mechanizm co dayClaims dla questów, żeby nie dało się
   // kupić tego samego slotu dwa razy tego samego dnia.
@@ -840,6 +841,22 @@ export const usePetStore = create<PetState>()(
         delete next[slot];
         return { equippedGear: next };
       }),
+      // Sprzedaż (2026-08-20, user: "co robimy z itemami co sa słabsze ale je mamy w eq?
+      // mozna je sprzedać?"). Auto-zdejmuje ze slotu jeśli akurat założony (nie da się
+      // sprzedać czegoś co dalej "jest na kotku") — `gearSellValue` w gear.ts liczy monety.
+      sellGear: (itemId) => {
+        const s = get();
+        const rarity = s.ownedGear[itemId];
+        const item = gearById(itemId);
+        if (!rarity || !item) return 0;
+        const coinsEarned = gearSellValue(item, rarity);
+        const nextOwned = { ...s.ownedGear };
+        delete nextOwned[itemId];
+        const nextEquipped = { ...s.equippedGear };
+        if (nextEquipped[item.slot] === itemId) delete nextEquipped[item.slot];
+        set({ ownedGear: nextOwned, equippedGear: nextEquipped, coins: s.coins + coinsEarned });
+        return coinsEarned;
+      },
       buyDailyGear: (dayKey, itemId, rarity, cost) => {
         const s = get();
         if (s.dayClaims[dayKey]) return false;
