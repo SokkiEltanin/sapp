@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, ChevronUp, Zap, Lock, Check, Swords, Trophy } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import BossArt from '@/components/bosses/BossArt';
@@ -116,6 +116,16 @@ export default function Bosses() {
   // jaki wyważono hp/atak tego bossa), tylko przestał być bramką — stąd WALCZ! niżej jest
   // teraz bezwarunkowe, gdy tylko `current` istnieje.
   const current = BOSSES.find(b => !defeatedBosses.includes(b.id)) ?? null;
+  // Pokonani bossowie zwijani w liście (2026-08-20, user: "bossy te pokonane sa zwinięte w
+  // liscie") — kampania rośnie do 22 bossów, im dalej user zajdzie, tym dłuższa lista
+  // pełnowymiarowych, identycznych "Pokonany ✓" wierszy przed aktualnym/zablokowanymi. Bossy
+  // pokonane są zawsze CIĄGŁYM prefiksem `BOSSES` (kampania leci sekwencyjnie, patrz `current`
+  // wyżej), więc dzielimy tablicę raz na `defeatedList`/`restList` zamiast filtrować w pętli.
+  // Domyślnie ZWINIĘTE (true) — user zobaczy od razu aktualnego/zablokowanych bez przewijania.
+  const [defeatedCollapsed, setDefeatedCollapsed] = useState(true);
+  const currentIdx = current ? BOSSES.findIndex(b => b.id === current.id) : BOSSES.length;
+  const defeatedList = BOSSES.slice(0, currentIdx);
+  const restList = BOSSES.slice(currentIdx);
 
   // ── MAD (2026-08-15) — druga, silniejsza fala kampanii dla lvl 50+, TYLKO po pokonaniu
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
@@ -299,29 +309,48 @@ export default function Bosses() {
           </View>
         )}
 
-        {/* campaign list */}
+        {/* campaign list — pokonani (zawsze ciągły prefiks, patrz komentarz przy
+            `defeatedList` wyżej) domyślnie zwinięci pod jeden nagłówek, żeby lista nie rosła
+            do 22 identycznych "Pokonany ✓" wierszy w miarę postępu. */}
         <Text style={s.section}>Kampania</Text>
         <View style={{ gap: spacing[2] }}>
-          {BOSSES.map(b => {
-            const def = defeatedBosses.includes(b.id);
+          {defeatedList.length > 0 && (
+            <PressableScale onPress={() => { haptic.tap(); setDefeatedCollapsed(v => !v); }}>
+              <View style={s.collapseRow}>
+                <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
+                <Text style={s.collapseTxt}>Pokonani bossowie ({defeatedList.length})</Text>
+                {defeatedCollapsed ? <ChevronDown size={16} color={c.text.muted} /> : <ChevronUp size={16} color={c.text.muted} />}
+              </View>
+            </PressableScale>
+          )}
+          {!defeatedCollapsed && defeatedList.map(b => (
+            <View key={b.id} style={s.row}>
+              <View style={{ opacity: 0.5 }}>
+                <BossArt id={b.id} emoji={b.emoji} size={32} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.rowName} numberOfLines={1}>{b.name}</Text>
+                <Text style={s.rowSub}>Pokonany · {b.loot.name}</Text>
+              </View>
+              <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
+            </View>
+          ))}
+          {restList.map(b => {
             const isCur = current?.id === b.id;
             // 2026-08-17 — lock w liście to teraz czysto "jeszcze nie doszedłeś tu w
             // kolejności" (nie def, nie current), NIE poziom — patrz komentarz przy `current`
             // wyżej. Wciąż informacyjne (lista nie ma własnego przycisku walki, tylko hero
             // card current-bossa wyżej), ale już nie sugeruje nieistniejącego wymogu poziomu.
-            const lock = !def && !isCur;
+            const lock = !isCur;
             return (
               <View key={b.id} style={[s.row, isCur && { borderColor: '#38BDF8' }]}>
-                <View style={def && { opacity: 0.5 }}>
-                  <BossArt id={b.id} emoji={b.emoji} size={32} mystery={lock} />
-                </View>
+                <BossArt id={b.id} emoji={b.emoji} size={32} mystery={lock} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={s.rowName} numberOfLines={1}>{lock ? mysteryBossName(b.id) : b.name}</Text>
-                  <Text style={s.rowSub}>{def ? `Pokonany · ${b.loot.name}` : lock ? 'Pokonaj poprzednich' : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
+                  <Text style={s.rowSub}>{lock ? 'Pokonaj poprzednich' : `${b.hp} HP · ${b.weaknessLabel}`}</Text>
                 </View>
-                {def ? <View style={s.rowBadge}><Check size={14} color="#2AC68F" /></View>
-                  : lock ? <Lock size={15} color={c.text.muted} />
-                    : isCur ? <View style={[s.rowBadge, { backgroundColor: '#38BDF822' }]}><Swords size={13} color="#38BDF8" /></View> : null}
+                {lock ? <Lock size={15} color={c.text.muted} />
+                  : <View style={[s.rowBadge, { backgroundColor: '#38BDF822' }]}><Swords size={13} color="#38BDF8" /></View>}
               </View>
             );
           })}
@@ -431,6 +460,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   rowName: { fontSize: 14, fontWeight: '800', color: c.text.primary },
   rowSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
   rowBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2AC68F1A', alignItems: 'center', justifyContent: 'center' },
+  collapseRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: '#2AC68F44', padding: spacing[3] },
+  collapseTxt: { flex: 1, fontSize: 13, fontWeight: '800', color: c.text.primary },
 
   miniRow: { flexDirection: 'row', gap: spacing[2], marginBottom: spacing[3] },
   miniCard: { flex: 1, minWidth: 0, backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: 6 },
