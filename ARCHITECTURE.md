@@ -1102,6 +1102,36 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       funkcją w `app/pet.tsx`) przeniesione do `utils/missions.ts` jako eksport — `boss-fight.
       tsx` potrzebował identycznej logiki formatowania, duplikowanie zamiast reużycia byłoby
       dokładnie tym czego CLAUDE.md zabrania.
+    - **Runda 4 — per-item grafiki NIGDY nie były renderowane + sprzedaż itemów** (2026-08-20,
+      user: (1) "dodałeś ze ikony te które dodam wyświetlają sie jako w tych kafelkach u
+      pupila?" (2) "co robimy z itemami co sa słabsze ale je mamy w eq? mozna je sprzedać?
+      jak tak dodaj przycisk sprzedaj z potwierdzeniem"). (1): `GearItemDef.icon`
+      (`ImageSourcePropType`, `require()` per plik w `assets/ekwipunek/<slot>/`) istniało w
+      `gear.ts` od kroku 1 dla WSZYSTKICH 30 itemów, ale ŻADNE miejsce w apce go faktycznie
+      nie renderowało — flankujące sloty (obie rundy), sklep dnia (`pet-shop.tsx`) i reveal
+      skrzynki (`BoxRevealModal.tsx`) wszystkie leciały na `SLOT_META[slot].icon` (generyczna
+      emoji/ikona KATEGORII slotu, nie konkretnego itemu) — README w `assets/ekwipunek/`
+      obiecywało "wrzuć plik o tej nazwie, apka go od razu podłapie", co było FAŁSZYWE aż do
+      tego commitu. Fix (scope: `GearPanel.tsx`, tam gdzie user pyta o "kafelki u pupila"):
+      flankujący `slotButton` renderuje TERAZ `<Image source={equippedItem.icon}>` gdy slot
+      ma coś założonego (puste sloty ZOSTAJĄ na `SLOT_ICON` — nie ma czego pokazać), a każdy
+      wiersz w `GearSlotModal` dostał `itemImg` (44×44, obwódka koloru rarity) przed
+      nazwą/statem. `pet-shop.tsx`/`BoxRevealModal.tsx` NIE dotknięte w tym PR-ze (dalej
+      emoji kategorii) — user pytał konkretnie o kafelki Pupila, rozszerzenie na
+      shop/reveal to świadomie odłożony follow-up, patrz NEXT_STEPS.md. (2): nowy
+      `gearSellValue(item, rarity)` w `gear.ts` — 40% tego co ten sam tier/rarity kosztowałby
+      w sklepie dnia (`TIER_BASE_COST`/`DAILY_RARITY_COST_MULT`, też słuszące `dailyShopSlots`)
+      — celowo MNIEJ niż cena kupna (kup-i-sprzedaj nie może być darmowym arbitrażem), ale
+      realna wartość za coś czego już nie używasz. Nowa akcja `petStore.sellGear(itemId)` —
+      usuwa z `ownedGear`, AUTO-zdejmuje ze slotu jeśli akurat założony (`equippedGear`), dodaje
+      monety, zwraca zarobioną kwotę. UI: mały podkreślony link "Sprzedaj +X 🪙" pod
+      przyciskiem Załóż w każdym wierszu `GearSlotModal`, otwiera ISTNIEJĄCY `ConfirmDialog`
+      (destructive, wzorzec z Rundy 3 wyżej) z komunikatem ostrzegającym jeśli item jest akurat
+      założony ("Zostanie zdjęty ze slotu"). Testy: `__tests__/gear.test.ts` (4 nowe, formuła
+      `gearSellValue` — 40% T1 common, monotoniczność wg rarity, minimum 1 moneta, tier5 >
+      tier1) — `sellGear` w petStore.ts NIE testowany bezpośrednio (żaden test w tym repo nie
+      importuje `petStore.ts` wprost, wymagałoby mockowania AsyncStorage/zustand persist —
+      ten sam brak co reszta store'owych akcji, konsekwentne z istniejącą konwencją).
   - **Level-up celebration** (2026-08-19, user: "musimy dodac info o levelup pupila...
     powiadomienie z confetti albo fajna animacja") — baner spadający z góry na 3,2s +
     `Confetti` (reużyty z `achievements/Confetti.tsx`), LŻEJSZY niż `BadgeCelebration.tsx`
