@@ -950,6 +950,29 @@ konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
     - 8 nowych testów w `gear.test.ts`, w tym test kalibracji: pełny mityczny loadout na
       wszystkich 4 slotach walki musi zostać `toBeLessThan` sumy bonusów z całej kampanii —
       złapie regresję, jeśli ktoś kiedyś zmieni baseValue bez przeliczenia sufitu.
+  - **Level-up celebration** (2026-08-19, user: "musimy dodac info o levelup pupila...
+    powiadomienie z confetti albo fajna animacja") — baner spadający z góry na 3,2s +
+    `Confetti` (reużyty z `achievements/Confetti.tsx`), LŻEJSZY niż `BadgeCelebration.tsx`
+    (ta jest pełnoekranowym blokującym `Modal` dla osiągnięć; level-up to zwykły
+    absolutnie-pozycjonowany `View` jak `Toast.tsx`, nie blokuje interakcji).
+    - **`petStore.lastSeenLevel`** — ostatni poziom, dla którego POKAZANO celebrację.
+      Migracja dla starych zapisów ustawia go na AKTUALNY poziom (nie 1!) — inaczej
+      istniejący gracz na Lv20 dostałby lawinę "Poziom 2! 3! ... 20!" przy najbliższym
+      zdobyciu XP (ta sama pułapka co `onboarded` opisana wyżej).
+    - **Wykrywanie w `app/_layout.tsx`** (nie w żadnym ekranie Pupila) — `useEffect`
+      porównujący `levelFromXp(xp).level` z `lastSeenLevel` na KAŻDĄ zmianę `xp`. xp rośnie
+      z wielu miejsc (walki/questy/careTick), a `_layout.tsx` to jedyny komponent
+      zamontowany przez całą sesję niezależnie od aktualnego ekranu — inaczej level-up
+      zdobyty np. w `boss-fight.tsx` mógłby przepaść, gdyby user od razu wyszedł z apki.
+    - **`src/store/petLevelUpStore.ts`** — kolejka `number[]` (ten sam wzorzec co
+      `celebrationStore.ts` dla osiągnięć, osobny bo inny kształt danych/komponent).
+      `ackPetLevel()` (petStore) PRZESUWA `lastSeenLevel` dopiero PO faktycznym
+      zamknięciu banera (`LevelUpCelebration.tsx`, tap albo auto-timer), nie w momencie
+      wykrycia — zabity proces w trakcie animacji nie "zjada" level-upu bezpowrotnie,
+      wróci przy następnym starcie.
+    - Baner dodatkowo podkreśla przejście progu wzrostu (`STAGE_START_LEVEL`: 3→kid,
+      6→teen, 12→adult, lustro `growthStage()`) — "Pupil urósł — teraz to nastolatek!"
+      zamiast generycznego tekstu, gdy level-up akurat trafia na próg.
   - **BUG: energia kampanii nigdy realnie się nie ładowała** (2026-08-19, user: "energia nie
     ładuje się wcale, pisze ciągle że za 3h odnowienie... czekam od wczoraj i nic") —
     `onRehydrateStorage` (`petStore.ts`) odpala się przy KAŻDYM starcie apki (nie tylko raz po

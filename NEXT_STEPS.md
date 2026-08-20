@@ -9,7 +9,24 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
-## 🆕🏗️ SYSTEM EKWIPUNKU — duża wieloetapowa funkcja, W TRAKCIE (2026-08-19)
+## 🆕 Level-up celebration — baner + confetti — NIEsprawdzone (2026-08-19)
+
+User: "musimy dodac info o levelup pupila jakby albo animacje xd nie wiem chyba
+powiadomienie wystarczy z confetti albo z fajna animacja XP czy cos". Baner spadający
+z góry ekranu (nie blokujący, jak `Toast.tsx`) + `Confetti`, auto-znika po 3,2s (albo tap).
+Wykrywanie w `app/_layout.tsx` (jedyny komponent żywy przez całą sesję, xp rośnie z wielu
+miejsc — walki/questy/careTick), nowe `petStore.lastSeenLevel` (migracja dla starych
+zapisów = aktualny poziom, NIE 1, żeby nie zalać istniejącego gracza lawiną poziomów).
+Dodatkowy tekst gdy level-up trafia na próg wzrostu (Lv3/6/12 → kid/teen/adult).
+Pełny opis w ARCHITECTURE §9. **Priorytet testu na urządzeniu**: (a) zdobądź XP (dowolna
+walka/quest) tak żeby przejść na kolejny poziom, sprawdź czy baner się pojawia z confetti
+i sam znika, (b) zamknij apkę W TRAKCIE animacji (przed autozniknięciem) i otwórz ponownie
+— level-up powinien wrócić, nie zniknąć bezpowrotnie, (c) zdobądź duży skok XP przez kilka
+poziomów naraz (np. wygrana z dużą nagrodą) — powinien pokazać się JEDEN baner z finalnym
+poziomem, nie lawina po jednym na każdy przeskoczony poziom, (d) sprawdź tekst progu
+wzrostu przy Lv3/6/12 jeśli akurat masz tam pupila.
+
+## 🆕🏗️ SYSTEM EKWIPUNKU — duża wieloetapowa funkcja (2026-08-19)
 
 User zaakceptował pełen plan ("Tak git zapisz wszystko i lecimy wszystko po kolei bez
 przerwy") po kilku turach dopracowywania. To jest ŹRÓDŁO PRAWDY dla całej funkcji —

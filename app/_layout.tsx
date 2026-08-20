@@ -15,6 +15,9 @@ import { colors } from '@/theme';
 import Toast from '@/components/ui/Toast';
 import PomodoroIndicator from '@/components/ui/PomodoroIndicator';
 import BadgeCelebration from '@/components/achievements/BadgeCelebration';
+import LevelUpCelebration from '@/components/pet/LevelUpCelebration';
+import { usePetStore, levelFromXp } from '@/store/petStore';
+import { usePetLevelUp } from '@/store/petLevelUpStore';
 import AnimatedSplash from '@/components/AnimatedSplash';
 import { appSettings } from '@/utils/appSettings';
 import { notificationsService } from '@/services/notificationsService';
@@ -195,6 +198,22 @@ export default function RootLayout() {
   useEffect(() => { appSettings.loadAll(); }, []);
   useEffect(() => { migrateBalanceModel().catch(() => {}); }, []);
   useEffect(() => { loadNonFood().catch(() => {}); }, []);   // "to nie jedzenie" exclusions → module set
+
+  // Level-up celebration (2026-08-19, user: "musimy dodac info o levelup pupila...
+  // powiadomienie z confetti") — xp rośnie z WIELU miejsc (walki, questy, careTick), więc
+  // wykrywanie żyje TU, w jedynym komponencie zamontowanym przez całą sesję niezależnie od
+  // aktualnego ekranu, zamiast w którymkolwiek z ekranów Pupila (łatwo by było przegapić
+  // level-up zdobyty np. w boss-fight.tsx, jeśli user od razu wyjdzie z apki). `lastSeenLevel`
+  // NIE jest tu przesuwane — to robi ackPetLevel() w LevelUpCelebration.tsx dopiero PO
+  // faktycznym pokazaniu/zamknięciu banera, żeby zabity proces w trakcie animacji nie
+  // "zjadł" level-upu bezpowrotnie.
+  const petXp = usePetStore(s => s.xp);
+  const lastSeenLevel = usePetStore(s => s.lastSeenLevel);
+  const celebrateLevel = usePetLevelUp(s => s.celebrate);
+  useEffect(() => {
+    const level = levelFromXp(petXp).level;
+    if (level > lastSeenLevel) celebrateLevel(level);
+  }, [petXp, lastSeenLevel, celebrateLevel]);
 
   // Surface a FRESH crash right after a restart, so a black-screen crash reports
   // itself (message + top of stack) instead of the user having to dig into Settings.
@@ -467,6 +486,7 @@ export default function RootLayout() {
         <PomodoroIndicator />
         <Toast />
         <BadgeCelebration />
+        <LevelUpCelebration />
         <AutoMoodPopup />
         </>
         )}
