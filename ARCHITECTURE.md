@@ -544,6 +544,34 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       gdy `current===null` (cała kampania pokonana), `currentIdx=BOSSES.length`, więc
       `defeatedList` to WSZYSTKIE 22 a `restList` puste — nagłówek zwinięcia nadal działa,
       po prostu nic nie zostaje do pokazania pod nim.
+    - **Re-zgłoszone jako "nadal nie ma" (2026-08-21)** — user: "bossy pokonane nadal nie mają
+      zwijane zakładki". Kod z powyższego opisu jest NIETKNIĘTY od merge'a (git log potwierdza
+      `app/bosses.tsx` ostatnio zmieniany TYLKO w tym PR-ze), więc `defeatedList.length > 0` /
+      `s.collapseRow` istnieją dokładnie jak opisano — najbardziej prawdopodobne wyjaśnienie to
+      stary zainstalowany APK (build sprzed tego mergea) ALBO świeży reset postępu pupila (jeśli
+      `defeatedBosses` jest akurat puste w tej rundzie testowej, nagłówek słusznie się nie
+      pokazuje — nie ma czego zwijać). Nie dotknięte ponownie w tym przejściu — brak
+      potwierdzonego buga w kodzie do naprawienia; jeśli po świeżym buildzie z pokonanym co
+      najmniej jednym bossem nadal nie widać nagłówka, to realny bug do dalszego śledztwa.
+  - **Przełącznik Kampania/MAD + pigułki energii "X/max" + odliczanie w headerze** (2026-08-21,
+    user: (2) "dodaj zeby byl przełącznik pomiędzy mad bosami a kampanijnymi" (3) "dodaj zeby
+    bylo widać w prawym górnym licznik do następnej energii oraz ile na ile mam np 0/5"). (2):
+    dawniej sekcje "Kampania" (do 22 wierszy) i "MAD bossy" stały jedna pod drugą na tym samym
+    scrollu — dotarcie do MAD wymagało przewinięcia całej listy kampanii. Nowy `useState
+    bossView: 'campaign'|'mad'` + segmented control (`s.modeToggle`, dwa `PressableScale` pół-
+    na-pół) TUŻ NAD obiema sekcjami — każda owinięta w `{bossView === '...' && (<>...</>)}`,
+    domyślnie `'campaign'`. Raid/wydarzenie (osobne tory, mini-karty na górze) i ściany medali
+    NIE są częścią przełącznika — zostają zawsze widoczne, przełącznik dotyczy TYLKO dwóch
+    heroCard+lista bloków kampanii/MAD. (3): pigułki w prawym górnym rogu pokazywały dotąd
+    SUROWĄ liczbę energii bez sufitu (user: "widać... ile na ile mam np 0/5") — dołożony
+    `eventEnergyMax = eventDailyAttempts(bonuses.energyMult)` (TA SAMA formuła co
+    `syncEventEnergy` w `reload()`, jak `campaignEnergyMax` już wcześniej dla drugiej pigułki),
+    obie pigułki renderują teraz `{energy}/{max}`. Odliczanie do kolejnego punktu energii
+    kampanii (`fmtEnergyCountdown`, dotąd widoczne TYLKO w karcie bohatera kampanii — trzeba
+    było przewinąć) dostało DRUGĄ kopię pod niebieską pigułką w headerze (nowy `s.
+    energyCountdown`, mały wyciszony tekst), widoczną bez scrollowania. Kopia w karcie
+    bohatera ZOSTAJE — redundancja celowa, ten sam wzorzec co "Wróć natychmiast"/pasek misji
+    w `pet.tsx` (kontekstowo przydatna w obu miejscach, nie duplikat-do-wycięcia).
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

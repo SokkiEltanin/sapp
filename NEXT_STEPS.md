@@ -9,6 +9,37 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 "Zwijana zakładka pokonanych" wciąż niepotwierdzona przez usera — SPRAWDŹ NA ŚWIEŻYM BUILDZIE (2026-08-21)
+
+User zgłosił drugi raz (po PR #53): "bossy pokonane nadal nie mają zwijane zakładki". Kod
+zweryfikowany — `app/bosses.tsx` ma poprawnie działający `defeatedList`/`s.collapseRow`/
+`defeatedCollapsed`, plik nietknięty od merge'a #53 (git log potwierdza). Najbardziej
+prawdopodobne wyjaśnienie: (a) user testował na APK sprzed tego mergea, ALBO (b) świeży reset
+postępu pupila (nowa runda testowa) z zerem pokonanych bossów — wtedy nagłówek SŁUSZNIE się nie
+pokazuje (nie ma czego zwijać), to nie bug. **Priorytet**: po instalacji NAJNOWSZEGO APK, pokonaj
+przynajmniej jednego bossa kampanii i sprawdź czy nagłówek "Pokonani bossowie (N)" faktycznie się
+pojawia i zwija/rozwija po tapnięciu. Jeśli NIE pojawia się mimo pokonanego bossa na świeżym
+buildzie — to realny bug wymagający dalszego śledztwa (podejrzany kandydat: `defeatedBosses` w
+`petStore` nie synchronizuje się z listą na tym ekranie, albo `useFocusEffect`/`reload()` nie
+odświeża stanu po powrocie z walki).
+
+## 🆕 Przełącznik Kampania/MAD + pigułki energii "X/max" z odliczaniem — NIEsprawdzone (2026-08-21)
+
+User: (2) "dodaj zeby byl przełącznik pomiędzy mad bosami a kampanijnymi" (3) "dodaj zeby bylo
+widać w prawym górnym licznik do następnej energii oraz ile na ile mam np 0/5". Pełny opis w
+ARCHITECTURE.md, sekcja bossów (nowy sub-punkt po "Pokonani bossowie zwijani domyślnie"). `tsc`/
+`jest` zielone (707/707, bez nowych testów — czysto UI/lokalny stan, `bossView` toggle i format
+stringa w pigułkach nie mają logiki biznesowej wartej testu). **Priorytet testu na urządzeniu**:
+(a) wejdź na ekran Bossy — sprawdź czy nad kartą aktualnego bossa jest segmented control
+"Kampania | MAD", domyślnie na Kampanii,
+(b) tapnij "MAD bossy" — czy lista kampanii znika i pokazuje się TYLKO karta MAD (bez
+przewijania), i odwrotnie po powrocie na "Kampania",
+(c) sprawdź obie pigułki energii w prawym górnym rogu — czy pokazują format "X/max" (np. "2/5"),
+nie samą surową liczbę jak dawniej,
+(d) gdy niebieska (kampania) pigułka jest niepełna, sprawdź czy pod nią pojawia się mały
+wyciszony tekst "za Xh Ymin" z odliczaniem do kolejnego punktu — powinien zniknąć gdy bank się
+napełni.
+
 ## 🆕 Bossowie kampanii trudniejsi (hp×√2/√3) + kafle uniku/krytu + misje krótsze i bardziej opłacalne — NIEsprawdzone (2026-08-21)
 
 Batch 3 rzeczy z jednej wiadomości po przejrzeniu raportu postępu (Lv67, 17/22 kampanii, test

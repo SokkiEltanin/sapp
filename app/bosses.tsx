@@ -71,6 +71,17 @@ export default function Bosses() {
   // pigułka energii i realny cap nigdy nie pokazywały różnych liczb (user: "mam napisane 4
   // a maksymalnie ładuje mi się do 2").
   const campaignEnergyMax = dailyAttempts(bonuses.energyMult);
+  // Sufit eventowej puli (2026-08-21, user: "widać w prawym górnym licznik... ile na ile mam
+  // np 0/5") — TA SAMA formuła co `syncEventEnergy` w `reload()` niżej, jedna prawda dla
+  // pigułki w headerze.
+  const eventEnergyMax = eventDailyAttempts(bonuses.energyMult);
+
+  // Przełącznik Kampania/MAD (2026-08-21, user: "dodaj zeby byl przełącznik pomiędzy mad
+  // bosami a kampanijnymi") — obie sekcje dawniej stały jedna pod drugą, więc dotarcie do MAD
+  // wymagało przewinięcia całej (do 22-pozycyjnej) listy kampanii. Teraz jeden segmented
+  // control pokazuje TYLKO wybraną sekcję na raz; raid/wydarzenie (osobne tory) i ściany
+  // medali zostają poza przełącznikiem, zawsze widoczne.
+  const [bossView, setBossView] = useState<'campaign' | 'mad'>('campaign');
 
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
   // ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
@@ -178,14 +189,23 @@ export default function Bosses() {
             wspólna dla wszystkich sezonowych, nemesis jej nie zużywa) NA GÓRZE, niebieska
             (kampania/MAD, `energy`) POD NIĄ. Czerwona pokazywana dopiero od odblokowania
             eventów (level>=2, ten sam próg co `eventUnlocked` niżej) — przed tym nie ma czego
-            pokazywać. */}
+            pokazywać.
+            PIGUŁKI "X/max" + odliczanie (2026-08-21, user: "widać w prawym górnym licznik do
+            następnej energii oraz ile na ile mam np 0/5") — dawniej pigułki pokazywały TYLKO
+            surową liczbę bez sufitu, a odliczanie do kolejnego punktu żyło jedynie w karcie
+            bohatera kampanii niżej (trzeba było przewinąć, żeby je zobaczyć). Sufit dokłada
+            się z TYCH SAMYCH formuł co reszta ekranu (`campaignEnergyMax`/`eventEnergyMax`
+            wyżej) — jedna prawda, nie druga zgadywana liczba. */}
         <View style={s.energyPillCol}>
           {level >= 2 && (
             <View style={[s.energyPill, { backgroundColor: '#F8717118', borderColor: '#F8717140' }]}>
-              <Zap size={13} color="#F87171" /><Text style={[s.energyTxt, { color: '#F87171' }]}>{eventEnergy}</Text>
+              <Zap size={13} color="#F87171" /><Text style={[s.energyTxt, { color: '#F87171' }]}>{eventEnergy}/{eventEnergyMax}</Text>
             </View>
           )}
-          <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{energy}</Text></View>
+          <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{energy}/{campaignEnergyMax}</Text></View>
+          {energy < campaignEnergyMax && energyRegenAt && (
+            <Text style={s.energyCountdown} numberOfLines={1}>za {fmtEnergyCountdown(energyRegenAt)}</Text>
+          )}
         </View>
       </View>
 
@@ -276,8 +296,23 @@ export default function Bosses() {
           )}
         </View>
 
+        {/* Przełącznik Kampania/MAD — patrz komentarz przy `bossView` wyżej. */}
+        <View style={s.modeToggle}>
+          <PressableScale onPress={() => { haptic.tap(); setBossView('campaign'); }} style={{ flex: 1 }}>
+            <View style={[s.modeBtn, bossView === 'campaign' && s.modeBtnActive]}>
+              <Text style={[s.modeBtnTxt, bossView === 'campaign' && s.modeBtnTxtActive]}>Kampania</Text>
+            </View>
+          </PressableScale>
+          <PressableScale onPress={() => { haptic.tap(); setBossView('mad'); }} style={{ flex: 1 }}>
+            <View style={[s.modeBtn, bossView === 'mad' && s.modeBtnActive]}>
+              <Text style={[s.modeBtnTxt, bossView === 'mad' && s.modeBtnTxtActive]}>MAD bossy</Text>
+            </View>
+          </PressableScale>
+        </View>
+
         {/* ── KAMPANIA: aktualny boss jako karta-bohater z jednym przyciskiem WALCZ,
             który przenosi na osobny ekran walki (S&F). Reszta = zwykła lista. ── */}
+        {bossView === 'campaign' && (<>
         {!current ? (
           <View style={s.done}>
             <Swords size={30} color={c.text.muted} />
@@ -312,7 +347,6 @@ export default function Bosses() {
         {/* campaign list — pokonani (zawsze ciągły prefiks, patrz komentarz przy
             `defeatedList` wyżej) domyślnie zwinięci pod jeden nagłówek, żeby lista nie rosła
             do 22 identycznych "Pokonany ✓" wierszy w miarę postępu. */}
-        <Text style={s.section}>Kampania</Text>
         <View style={{ gap: spacing[2] }}>
           {defeatedList.length > 0 && (
             <PressableScale onPress={() => { haptic.tap(); setDefeatedCollapsed(v => !v); }}>
@@ -355,11 +389,12 @@ export default function Bosses() {
             );
           })}
         </View>
+        </>)}
 
         {/* ── MAD (2026-08-15) — druga fala kampanii, lvl 50+, tylko po pokonaniu normalnej
             wersji danego bossa. Ten sam heroCard co kampania wyżej, art dostaje czerwoną
             aurę (`powered`, patrz BossArt) żeby czytać się jako "wzmocniony wariant". ── */}
-        <Text style={s.section}>MAD bossy</Text>
+        {bossView === 'mad' && (<>
         {!madBoss ? (
           <View style={s.done}>
             <Swords size={30} color={c.text.muted} />
@@ -390,6 +425,7 @@ export default function Bosses() {
             )}
           </View>
         )}
+        </>)}
 
         {raidWon.length > 0 && (
           <>
@@ -438,7 +474,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   energyPillCol: { flexDirection: 'column', alignItems: 'flex-end', gap: 4 },
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
+  energyCountdown: { fontSize: 9.5, fontWeight: '700', color: c.text.muted },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110 },
+
+  modeToggle: { flexDirection: 'row', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: 4, marginBottom: spacing[3] },
+  modeBtn: { alignItems: 'center', paddingVertical: 9, borderRadius: radius.md },
+  modeBtnActive: { backgroundColor: '#38BDF822' },
+  modeBtnTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.muted },
+  modeBtnTxtActive: { color: '#38BDF8' },
 
   done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   doneTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
