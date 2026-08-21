@@ -172,7 +172,7 @@ export default function BossFight() {
   // TYLKO po pokonaniu normalnej wersji (madBosses.ts). Jeden wspólny cel po kolejności
   // `order`, dokładnie jak campaignBoss wyżej — bez osobnego id w URL.
   const madBase = kind === 'mad' ? madCandidate(defeatedBosses, defeatedMadBosses) : null;
-  const madBoss = madBase ? madBossFor(madBase, atkStatBonus, level, bonuses) : null;
+  const madBoss = madBase ? madBossFor(madBase) : null;
 
   // ── Misja (utils/missions.ts, 2026-08-15) — jeden globalny slot w store (petStore.
   // missionStartedAt/missionEndsAt), bez id w URL: gotowość i tożsamość miniboss'a (seedowany
