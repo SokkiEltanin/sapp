@@ -7,7 +7,8 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
-import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses, gearSellValue } from '@/utils/gear';
+import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses, gearSellValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
+import { boxById, pickWeighted } from '@/utils/petBoxes';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -279,8 +280,10 @@ interface PetState {
   markTrainingDay: () => void;   // called once per claimed training quest — feeds m_training streak
   // itemDropped = nowy, jeszcze nieposiadany item (poziom 1). itemLeveledUp = ulepszenie JUŻ
   // posiadanego itemu o +1 poziom (2026-08-18, tylko epic/legendary — patrz COMBAT_ITEM_DROP_
-  // CHANCE_BY_TIER w crates.ts). Zawsze co najwyżej JEDNO z dwóch, nigdy oba naraz.
-  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null } | null; // open one pending crate
+  // CHANCE_BY_TIER w crates.ts). Zawsze co najwyżej JEDNO z dwóch, nigdy oba naraz. gearDropped
+  // (2026-08-20, patrz komentarz przy implementacji) — NIEZALEŻNY roll, może wypaść RAZEM z
+  // itemDropped/itemLeveledUp w tym samym otwarciu.
+  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null; gearDropped: { itemId: string; name: string; rarity: GearRarity } | null } | null; // open one pending crate
   // boss battles
   syncEnergyRegen: () => void;  // dogania tyknięcia regeneracji energii kampanii/MAD które minęły offline
   syncRaidEnergy: (todayEnergy: number, mult: number) => void; // FLAT dzienny grant, bez zmian — osobna pula raidu
@@ -610,13 +613,35 @@ export const usePetStore = create<PetState>()(
             if (candidates.length > 0) itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
           }
         }
+        // Ekwipunek ZE SKRZYNKI SARDYNEK (2026-08-20, user: "ze skrzynek kupowany w sklepie
+        // nie dropi ekwipunek") — ta skrzynka (głaskanie do pełnego paska afekcji) dotąd
+        // dawała TYLKO monety + itemy BOJOWE (wyżej), nigdy ekwipunek (helm/zbroja/itd.),
+        // mimo że wizualnie/nazewniczo to DOKŁADNIE ta sama "Drewniana skrzynka" co w
+        // sklepie (`boxById('sardine')` w petBoxes.ts) — TAMTA gałąź (`onBuyBox` w
+        // pet-shop.tsx) poprawnie losuje ekwipunek przez `rollBox()`, ale ta (`openCrate`,
+        // skrzynka z pieszczenia) nigdy nie wołała tej logiki. Reużywamy TĘ SAMĄ konfigurację
+        // (`gearChance`/`gearRarityWeight` skrzynki 'sardine') zamiast wymyślać nową tabelę —
+        // niezależny roll od itemów bojowych wyżej, może wypaść RAZEM w tym samym otwarciu.
+        let gearDropped: { itemId: string; name: string; rarity: GearRarity } | null = null;
+        const sardineBox = boxById('sardine');
+        if (Math.random() < sardineBox.gearChance) {
+          const level = levelFromXp(s.xp).level;
+          const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, level));
+          if (unlocked.length > 0) {
+            const item = unlocked[Math.floor(Math.random() * unlocked.length)];
+            const rarity = pickWeighted((Object.keys(sardineBox.gearRarityWeight) as GearRarity[]).map(g => ({ item: g, w: sardineBox.gearRarityWeight[g] })));
+            if (rarity) gearDropped = { itemId: item.id, name: item.name, rarity };
+          }
+        }
         set({
           pendingCrates: s.pendingCrates - 1,
           coins: s.coins + roll.coins,
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
           ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
+          ...(gearDropped && (!s.ownedGear[gearDropped.itemId] || RARITY_MULT[s.ownedGear[gearDropped.itemId]!] < RARITY_MULT[gearDropped.rarity])
+            ? { ownedGear: { ...s.ownedGear, [gearDropped.itemId]: gearDropped.rarity } } : {}),
         });
-        return { ...roll, itemDropped, itemLeveledUp };
+        return { ...roll, itemDropped, itemLeveledUp, gearDropped };
       },
       // Dogania regenerację energii kampanii/MAD która minęła podczas gdy aplikacja była
       // zamknięta — wołane przy każdym otwarciu/powrocie na ekran bossów (patrz reload() w

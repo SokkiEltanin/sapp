@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { usePetStore } from '@/store/petStore';
 import { CRATE_META, CrateTier } from '@/utils/crates';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
+import { GearRarity, RARITY_META, gearById } from '@/utils/gear';
 import { haptic } from '@/utils/haptics';
 
 // A coin/spark that flies outward and fades on the reveal burst.
@@ -25,7 +26,7 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
   const pending = usePetStore(s => s.pendingCrates);
 
   const [phase, setPhase] = useState<'closed' | 'opening' | 'revealed'>('closed');
-  const [result, setResult] = useState<{ tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null } | null>(null);
+  const [result, setResult] = useState<{ tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null; gearDropped: { itemId: string; name: string; rarity: GearRarity } | null } | null>(null);
   const [shown, setShown] = useState(0);
   const [flies, setFlies] = useState<{ id: number; dx: number; dy: number; emoji: string }[]>([]);
 
@@ -117,6 +118,16 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
                   {result?.itemLeveledUp && (
                     <Text style={st.itemDrop}>⬆️ {COMBAT_ITEMS[result.itemLeveledUp.id].name} +1 poziom (Lv{result.itemLeveledUp.level})!</Text>
                   )}
+                  {result?.gearDropped && (() => {
+                    const gearItem = gearById(result.gearDropped!.itemId);
+                    const rarityMeta = RARITY_META[result.gearDropped!.rarity];
+                    return (
+                      <View style={st.gearDrop}>
+                        {gearItem && <Image source={gearItem.icon} style={[st.gearDropImg, { borderColor: rarityMeta.color }]} resizeMode="contain" />}
+                        <Text style={st.itemDrop}>🎁 Ekwipunek: {result.gearDropped!.name} (<Text style={{ color: rarityMeta.color }}>{rarityMeta.label}</Text>)!</Text>
+                      </View>
+                    );
+                  })()}
                 </Animated.View>
               </View>
               <Pressable style={[st.btn, { backgroundColor: meta.color }]} onPress={onClose}>
@@ -149,6 +160,8 @@ const st = StyleSheet.create({
   coins: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
   fish2: { fontSize: 26 },
   itemDrop: { color: '#FBBF24', fontSize: 12, fontWeight: '800', textAlign: 'center', marginTop: 4 },
+  gearDrop: { alignItems: 'center', gap: 4, marginTop: 4 },
+  gearDropImg: { width: 34, height: 34, borderRadius: 8, borderWidth: 1.5 },
   btn: { paddingHorizontal: 26, paddingVertical: 13, borderRadius: 14 },
   btnTxt: { color: '#07160F', fontSize: 15, fontWeight: '900' },
   again: { color: '#9AA6B2', fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },

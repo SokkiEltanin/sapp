@@ -2,14 +2,14 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Flame, Backpack, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Backpack, Sparkles } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import StartupPreview from '@/components/pet/StartupPreview';
 import PupilNavbar from '@/components/pet/PupilNavbar';
-import { usePetStore, loginBonusCoins, levelFromXp } from '@/store/petStore';
+import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
@@ -27,6 +27,32 @@ const todayKey = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+// "Dzień sklepu" dla Sklepu dnia (2026-08-20, user: "dodaj za ile odświeża sie sklep,
+// codziennie o 6:00") — rolluje się o 6:00 rano, NIE o północy jak `todayKey()` (dailybox/
+// streak zostają na starym, kalendarzowym `todayKey` — user prosił konkretnie o sklep, nie o
+// całą apkę). Przed 6:00 to dalej "wczorajszy" dzień sklepowy — zestaw 3 itemów trzyma się
+// przez noc do 6:00, nie znika o północy.
+const SHOP_REFRESH_HOUR = 6;
+function shopDayKey(d: Date = new Date()): string {
+  const shifted = new Date(d);
+  if (shifted.getHours() < SHOP_REFRESH_HOUR) shifted.setDate(shifted.getDate() - 1);
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}-${String(shifted.getDate()).padStart(2, '0')}`;
+}
+function nextShopRefresh(d: Date = new Date()): Date {
+  const next = new Date(d);
+  next.setHours(SHOP_REFRESH_HOUR, 0, 0, 0);
+  if (next <= d) next.setDate(next.getDate() + 1);
+  return next;
+}
+// Statyczne w chwili renderu, nie żywy tiker (ten sam wzorzec co fmtEnergyCountdown w
+// bosses.tsx) — user i tak wraca na ten ekran co jakiś czas, nie trzeba tykać co sekundę.
+function fmtShopRefresh(): string {
+  const ms = Math.max(0, nextShopRefresh().getTime() - Date.now());
+  const totalMin = Math.ceil(ms / 60000);
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+}
 
 // Sklep (2026-08-19, restrukturyzacja) — kosmetyka kotka (kolory/oczy/nosek/dodatki)
 // PRZENIESIONA do PetCustomizeModal (modal edycji imienia na /pet) — user: "nie przecież
@@ -47,7 +73,7 @@ export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup,
-    claimDailyBox, dayClaims, loginStreak, grantGear, buyDailyGear } = usePetStore();
+    claimDailyBox, dayClaims, grantGear, buyDailyGear } = usePetStore();
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
@@ -102,11 +128,11 @@ export default function PetShop() {
   };
 
   // Sklep dnia — 3 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
-  // co dzień (dailyShopSlots w gear.ts, deterministycznie po dacie).
-  const dailySlots = useMemo(() => dailyShopSlots(todayKey(), petLevel), [petLevel]);
+  // co dzień o 6:00 rano (dailyShopSlots w gear.ts, deterministycznie po `shopDayKey`).
+  const dailySlots = useMemo(() => dailyShopSlots(shopDayKey(), petLevel), [petLevel]);
   const onBuyDaily = (itemId: string, rarity: ReturnType<typeof dailyShopSlots>[number]['rarity'], cost: number, name: string) => {
     haptic.tap();
-    const dayKey = `gearDaily:${todayKey()}:${itemId}`;
+    const dayKey = `gearDaily:${shopDayKey()}:${itemId}`;
     if (dayClaims[dayKey]) return;
     if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
     confirmBuy(name, cost, () => {
@@ -172,16 +198,6 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
-        {/* Seria logowań — nowe źródło monet (bonus przyznawany przy wejściu na pulpit) */}
-        {loginStreak > 0 && (
-          <View style={s.loginStrip}>
-            <Flame size={14} color="#FB923C" />
-            <Text style={s.loginTxt}>Seria logowań: {loginStreak} {loginStreak === 1 ? 'dzień' : 'dni'}</Text>
-            <View style={{ flex: 1 }} />
-            <Text style={s.loginNext}>jutro +{loginBonusCoins(loginStreak + 1)}</Text>
-          </View>
-        )}
-
         {/* PRZYPIĘTE NA GÓRZE — zamrożenie serii (najważniejsze, funkcjonalne) */}
         <PressableScale onPress={onBuyFreeze}>
           <View style={s.freezeHero}>
@@ -233,15 +249,16 @@ export default function PetShop() {
           </View>
         )}
 
-        {/* ── SKLEP DNIA — gwarantowane itemy ekwipunku, roluje się codziennie ──────── */}
+        {/* ── SKLEP DNIA — gwarantowane itemy ekwipunku, roluje się codziennie o 6:00 ── */}
         {cat === 'daily' && (
           <View style={{ gap: spacing[2] }}>
-            <Text style={s.blurbTop}>3 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria. Nowy zestaw jutro.</Text>
+            <Text style={s.blurbTop}>3 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
+            <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
             {dailySlots.length === 0 && (
               <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
             )}
             {dailySlots.map(({ item, rarity, cost }) => {
-              const dayKey = `gearDaily:${todayKey()}:${item.id}`;
+              const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
               const bought = !!dayClaims[dayKey];
               const meta = RARITY_META[rarity];
               const afford = coins >= cost;
@@ -249,7 +266,7 @@ export default function PetShop() {
                 <PressableScale key={item.id} onPress={() => !bought && onBuyDaily(item.id, rarity, cost, item.name)}>
                   <View style={[s.boxRow, { borderColor: meta.color + '55' }]}>
                     <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55' }]}>
-                      <Text style={s.boxEmoji}>{SLOT_META[item.slot].icon}</Text>
+                      <Image source={item.icon} style={s.boxImg} resizeMode="contain" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.cellName}>{item.name}</Text>
@@ -370,8 +387,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   boxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   boxIcon: { width: 46, height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boxEmoji: { fontSize: 26 },
+  boxImg: { width: 30, height: 30 },
   oddsTxt: { fontSize: 10, color: c.text.muted, marginTop: 3, fontWeight: '600' },
   blurbTop: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
+  refreshTxt: { fontSize: 10.5, color: c.text.muted, fontWeight: '700', marginTop: -4 },
 
   subHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[1] },
   tierDot: { width: 8, height: 8, borderRadius: 4 },
@@ -387,9 +406,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
 
   // seria logowań
-  loginStrip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md, borderWidth: 1, borderColor: '#FB923C3A', backgroundColor: '#FB923C12' },
-  loginTxt: { fontSize: 12, fontWeight: '800', color: c.text.primary },
-  loginNext: { fontSize: 11, fontWeight: '800', color: '#FB923C' },
 
   // skrzynka dnia (darmowa, przypięta)
   dailyHero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#FBBF2455', backgroundColor: '#FBBF2414' },

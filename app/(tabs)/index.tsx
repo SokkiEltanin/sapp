@@ -99,7 +99,7 @@ import { BOSSES } from '@/utils/bosses';
 import { buildPersonConsumption } from '@/utils/personConsumption';
 import PetTile from '@/components/pet/PetTile';
 import { computePetState } from '@/utils/petState';
-import { usePetStore, levelFromXp } from '@/store/petStore';
+import { usePetStore, levelFromXp, loginBonusCoins } from '@/store/petStore';
 import { buildQuests, sweetlessDaysFrom } from '@/utils/quests';
 import { correlationInsights, DailyPoint } from '@/utils/correlations';
 import { deserializeBlocks } from '@/utils/richText';
@@ -1866,6 +1866,7 @@ export default function DashboardScreen() {
   const petDefeated = usePetStore(st => st.defeatedBosses);
   const petBossHp = usePetStore(st => st.bossHp);
   const petHydrated = usePetStore(st => st._hydrated);
+  const petLoginStreak = usePetStore(st => st.loginStreak);
   const registerLogin = usePetStore(st => st.registerLogin);
   const loginRan = useRef(false);
   // Login-streak coin bonus: once per day, after the wallet hydrates → toast the reward.
@@ -2724,9 +2725,22 @@ export default function DashboardScreen() {
               })();
 
               nodes['pet'] = (
-                <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }}>
-                  <PetTile name={petName} pet={petState} level={petLevel} claimable={petClaimable + (dailyBoxReady ? 1 : 0)} />
-                </TouchableOpacity>
+                <View style={{ gap: spacing[2] }}>
+                  <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }}>
+                    <PetTile name={petName} pet={petState} level={petLevel} claimable={petClaimable + (dailyBoxReady ? 1 : 0)} />
+                  </TouchableOpacity>
+                  {/* Seria logowań — PRZENIESIONA (2026-08-21) z pet-shop.tsx na główny pulpit,
+                      obok kafla pupila (bonus jest przyznawany tutaj, przy wejściu na pulpit —
+                      user: "serię logowan przenieśmy na główny pulpit"). */}
+                  {petLoginStreak > 0 && (
+                    <View style={s.loginStrip}>
+                      <Flame size={14} color="#FB923C" />
+                      <Text style={s.loginStripTxt}>Seria logowań: {petLoginStreak} {petLoginStreak === 1 ? 'dzień' : 'dni'}</Text>
+                      <View style={{ flex: 1 }} />
+                      <Text style={s.loginStripNext}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
+                    </View>
+                  )}
+                </View>
               );
 
               nodes['month-summary'] = featuredCard && (
@@ -4710,6 +4724,11 @@ const buildStyles = (c: any) => StyleSheet.create({
     borderWidth: 1,
   },
   quickMoodEmoji: { fontSize: 20 },
+
+  // ── Login streak strip (przeniesiona ze sklepu pod kafel pupila) ────────────
+  loginStrip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md, borderWidth: 1, borderColor: '#FB923C3A', backgroundColor: '#FB923C12' },
+  loginStripTxt: { fontSize: 12, fontWeight: '800', color: c.text.primary },
+  loginStripNext: { fontSize: 11, fontWeight: '800', color: '#FB923C' },
 
   // ── Budget warning card ───────────────────────────────────────────────────
   budgetWarnCard: {

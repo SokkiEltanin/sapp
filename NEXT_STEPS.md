@@ -9,6 +9,28 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Skrzynki sardynek dropią gear + ikony/licznik sklepu + seria logowań na dashboard — NIEsprawdzone (2026-08-21)
+
+Batch 4 rzeczy z jednej wiadomości: (1) "ze skrzynek kupowany w sklepie nie dropi ekwipunek",
+(2) "dodaj w sklepie te same ikony co w slotach i dodaj za ile odświeża sie sklep, codziennie o
+6:00", (3) "serię logowan przenieśmy na główny pulpit", (4) "wywalmy te dodatkowy napis obok
+kotka co pisze smacznie śpi". Pełny opis w ARCHITECTURE §"SYSTEM EKWIPUNKU" Runda 5 + nowy
+bullet "Seria logowań przeniesiona na dashboard". `tsc`/`jest` zielone (707/707, bez nowych
+testów — (1) reużywa już przetestowaną `rollBox`/`pickWeighted` logikę z `petBoxes.ts`, (2)-(4)
+czysto UI/przenosiny). **Priorytet testu na urządzeniu**:
+(a) głaszcz kotka aż dostaniesz skrzynkę sardynek (`pendingCrates`), otwórz kilka — sprawdź czy
+w reveal pojawia się czasem karta "🎁 Ekwipunek: ... (rzadkość)" z grafiką itemu, nie tylko
+monety/itemy bojowe,
+(b) w Sklepie → Sklep dnia sprawdź czy 3 wiersze pokazują RÓŻNE grafiki itemów (nie tę samą
+emoji kategorii co wcześniej), to samo w reveal skrzynki kupionej w Skrzynkach,
+(c) sprawdź licznik "Nowy zestaw za Xh Ym (codziennie o 6:00)" pod Sklepem dnia — czy liczba
+maleje sensownie między wejściami i czy zestaw NIE zmienia się o północy, tylko dopiero o 6:00
+rano,
+(d) wejdź na główny pulpit — sprawdź czy pasek "Seria logowań: X dni" (płomyk) pokazuje się pod
+kafelkiem pupila (jeśli masz streak > 0) i czy zniknął ze Sklepu,
+(e) sprawdź kafelek pupila na pulpicie wieczorem/w nocy (po 22:00) — nie powinno już być napisu
+"Smacznie śpi 💤" pod statusem, tylko sam status (np. "Śpi") i ew. pasek nagród do odbioru.
+
 ## 🆕 Pokonani bossowie zwijani w liście kampanii — NIEsprawdzone (2026-08-20)
 
 User: "i dodałeś ze bossy te pokonane sa zwinięte w liscie." — nie było, teraz jest. Lista
