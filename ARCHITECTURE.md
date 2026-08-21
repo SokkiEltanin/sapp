@@ -287,6 +287,16 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   animacja propów SVG stutteruje. RN nie ma transform-origin → piwot = translate→rotate→translate.
 - **AnimatedSplash** używa CatArt (nie PNG) — te same ID/rozmiar co natywny splash, start
   na pełnej widoczności (bez fade-in), żeby statyczny obrazek płynnie „ożył".
+- **Pręgi na łapkach znikały podczas animacji liźnięcia/swata (2026-08-21, user: "jak liże
+  łapkę to jak mam paski na łapkach to one z jednej łapki znikają na czas animacji a po niej
+  wracają")** — uniesiona lewa łapka (lick/swat) renderuje się w OSOBNYM overlay'u POZA
+  głównym `<Svg>` (patrz komentarz "The raised foreleg lives OUTSIDE the SVG" w pliku, RN-owy
+  pivot-trick translate→rotate→translate), bo tylko tak da się ją animować native-driverem.
+  Statyczna łapka w spoczynku (główny SVG) chowa się pod `!armOut` na czas animacji — poprawnie,
+  żeby nie renderować dwóch łap naraz — ale jej `legStripes` (3 poziome `Rect`) nigdy nie były
+  skopiowane do overlay'u z uniesioną łapką, więc przez czas animacji łapka była bez pasków.
+  Fix: te same 3 `Rect` (ten sam lokalny układ współrzędnych, x=779) dodane do overlay'u,
+  warunkowo pod `legStripes`.
 - **Bossy — SZEŚĆ trybów walki (`?kind=campaign|raid|event|quest|mad|mission`), wszystkie
   przez `simulateFight` w `utils/bosses.ts`
   (round-based, prawdziwy kontratak, można przegrać):**

@@ -9,6 +9,19 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Pręgi na uniesionej łapce (animacja liźnięcia/swata) — NIEsprawdzone (2026-08-21)
+
+User: "jak liże łapkę to jak mam paski na łapkach to one z jednej łapki znikają na czas
+animacji a po niej wracają". Przyczyna: uniesiona łapka renderuje się w osobnym overlay'u POZA
+głównym SVG (musi być animowana native-driverem), a ten overlay nigdy nie miał dorysowanych
+pasków — miał tylko gołą łapkę. Dodane te same 3 `Rect` co na statycznej łapce. Pełny opis w
+ARCHITECTURE.md §9. `tsc`/`jest` zielone (707/707 — `CatArt.tsx` to czysto wizualny SVG
+komponent, bez testów jednostkowych, jak reszta wizualnych komponentów w tym repo). **Priorytet
+testu na urządzeniu**: ustaw kotkowi pręgi na łapkach (personalizacja), poczekaj aż sam zacznie
+się lizać (albo przytrzymaj kotka — long press = przytulenie, też odpala liźnięcie) i sprawdź
+czy paski na uniesionej łapce widoczne są PRZEZ CAŁĄ animację, nie tylko przed/po niej. To samo
+przy swatnięciu (tap reakcja).
+
 ## 🆕 MAD bossy: hp STAŁE = kampania×10 (było: dynamiczne, rosło z levelem) — NIEsprawdzone (2026-08-21)
 
 User: "Czekaj, ty zrobiles ze im większy level tym większe HP mad bossów?????" → wyjaśnione że

@@ -405,7 +405,10 @@ export default function CatArt({
               </G>
               {!armOut && <Paw cx={829} p={p} />}
               <Paw cx={1077} p={p} />
-              {/* pręgi na łapkach — poziome bandki na goleniach (tabby); lewa znika gdy łapa uniesiona */}
+              {/* pręgi na łapkach — poziome bandki na goleniach (tabby); lewa znika tu (statyczna
+                  łapka jest schowana pod `!armOut`, jak reszta lewej nogi wyżej), ale WRACA na
+                  uniesionej łapce w osobnym overlay'u niżej (2026-08-21 fix) — bez tego, przez
+                  chwilę animacji, kotek wyglądał jakby paski na chwilę znikały. */}
               {legStripes && !armOut && (
                 <G fill={p.mark} opacity={0.32}>
                   <Rect x={779} y={1300} width={100} height={13} rx={5} />
@@ -541,6 +544,19 @@ export default function CatArt({
                     <Ellipse cx={829} cy={1541} rx={76} ry={48} fill={p.coat} />
                     <Path d="M799 1516 v26 M829 1511 v31 M859 1516 v26" stroke={p.ink} strokeWidth={7} strokeLinecap="round" opacity={0.4} />
                   </G>
+                  {/* pręgi na tej samej łapce co w spoczynku (2026-08-21, user: "jak liże łapkę
+                      to paski na łapkach znikają na czas animacji a po niej wracają") — ten
+                      overlay rysuje uniesioną łapkę OSOBNO od statycznej w SVG wyżej (patrz
+                      komentarz przy `!armOut`), ale nigdy nie kopiował na nią pręg — łapka
+                      znikała bez wzoru, wyglądało jakby paski "znikały". Te same 3 Rect co przy
+                      spoczynkowej łapce (x=779, ten sam lokalny układ współrzędnych). */}
+                  {legStripes && (
+                    <G fill={p.mark} opacity={0.32}>
+                      <Rect x={779} y={1300} width={100} height={13} rx={5} />
+                      <Rect x={779} y={1360} width={100} height={13} rx={5} />
+                      <Rect x={779} y={1420} width={100} height={13} rx={5} />
+                    </G>
+                  )}
                 </Svg>
               </Animated.View>
             )}
