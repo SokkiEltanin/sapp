@@ -9,6 +9,22 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Skumulowany unik z łupu bossów przycięty 72%→30% + usunięty ostatni "Trofeum" w nazwie — NIEsprawdzone (2026-08-21)
+
+User: (1) "musimy uwzględnić ze 47% uniku to kurewsko duzo lepiej z bossów zeby nie dostawać
+takich statystyk" (2) "nadal nie usunąłeś chyba ze wszystkich bossów trofeow?". Pełny opis w
+ARCHITECTURE.md, nowy sub-punkt zaraz po HP×√2/√3 rekalibracji. `tsc`/`jest` zielone (707/707,
+bez nowych testów — czyste dane liczbowe w `BOSSES`, żaden test nie sumował dotąd
+`bossBonuses` na pełnym rosterze). **Priorytet testu na urządzeniu**:
+(a) sprawdź ekran Pupila → kafel "Unik" (dodany w poprzednim batchu) — powinien pokazywać
+NIŻSZĄ wartość niż przed tą zmianą, jeśli masz pokonanych bossów z dodge w łupie (dragon/
+stress/burnout/compare/doubt/devourer/jaguar/hades/princess/wizard),
+(b) pokonaj Smoka Chaosu (jeśli jeszcze go nie masz w tej rundzie) i sprawdź czy victory modal
+pokazuje "Łuska Chaosu" zamiast starego "Trofeum Smoka",
+(c) subiektywnie: czy walki z bossami PÓŹNIEJ w kampanii (gdzie skumulowany unik był
+największy) czują się teraz bardziej ryzykowne/napięte niż wcześniej, zamiast prawie
+całkowicie neutralizować kontratak.
+
 ## 🐛 "Zwijana zakładka pokonanych" wciąż niepotwierdzona przez usera — SPRAWDŹ NA ŚWIEŻYM BUILDZIE (2026-08-21)
 
 User zgłosił drugi raz (po PR #53): "bossy pokonane nadal nie mają zwijane zakładki". Kod

@@ -148,7 +148,7 @@ export const BOSSES: Boss[] = [
   {
     id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 700,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_dragon', name: 'Trofeum Smoka', emoji: '🐲', desc: '+5% uniku, +3% siły ataku', bonus: { dodge: 0.05, atk: 0.03 } },
+    loot: { id: 'loot_dragon', name: 'Łuska Chaosu', emoji: '🐲', desc: '+2% uniku, +3% siły ataku', bonus: { dodge: 0.02, atk: 0.03 } },
     coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
   },
   {
@@ -160,7 +160,7 @@ export const BOSSES: Boss[] = [
   {
     id: 'stress', name: 'Potwór Stresu', emoji: '😰', order: 6, unlockLevel: 15, hp: 841,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+6% uniku', bonus: { dodge: 0.06 } },
+    loot: { id: 'loot_calm', name: 'Amulet Spokoju', emoji: '🧿', desc: '+2% uniku', bonus: { dodge: 0.02 } },
     coins: 60, xp: 600, taunt: 'Martw się wszystkim naraz…',
   },
   {
@@ -172,7 +172,7 @@ export const BOSSES: Boss[] = [
   {
     id: 'burnout', name: 'Pustka Wypalenia', emoji: '🌑', order: 8, unlockLevel: 22, hp: 1010,
     weakness: 'steps', weaknessLabel: 'kroki',
-    loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +5% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.05, energyMult: 0.05 } },
+    loot: { id: 'loot_spark', name: 'Iskra Życia', emoji: '⭐', desc: '+5% atak, +2% unik, +5% energii', bonus: { atk: 0.05, dodge: 0.02, energyMult: 0.05 } },
     coins: 120, xp: 1200, taunt: 'Nic już nie ma sensu…', regenPct: 0.03,
   },
   // ── endgame (dłuższy cel; łup coraz mocniejszy, żeby dało się dogonić rosnące HP) ──
@@ -186,7 +186,7 @@ export const BOSSES: Boss[] = [
     id: 'compare', name: 'Widmo Porównań', emoji: '👻', order: 10, unlockLevel: 30, hp: 1481,
     attackKind: 'magic', // atakmagicrod_magician.png
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+7% uniku, +3% atak', bonus: { dodge: 0.07, atk: 0.03 } },
+    loot: { id: 'loot_mirror', name: 'Lustro Prawdy', emoji: '🪞', desc: '+3% uniku, +3% atak', bonus: { dodge: 0.03, atk: 0.03 } },
     coins: 200, xp: 2000, taunt: 'Zobacz, o ile innym lepiej…', regenPct: 0.03,
   },
   {
@@ -206,13 +206,13 @@ export const BOSSES: Boss[] = [
     id: 'doubt', name: 'Cień Zwątpienia', emoji: '🌫️', order: 13, unlockLevel: 46, hp: 1978,
     attackKind: 'claw', // pazurattack_cerberus.png
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
-    loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +6% uniku', bonus: { atk: 0.08, dodge: 0.06 } },
+    loot: { id: 'loot_lantern', name: 'Latarnia Wiary', emoji: '🏮', desc: '+8% atak, +3% uniku', bonus: { atk: 0.08, dodge: 0.03 } },
     coins: 550, xp: 5500, taunt: 'I tak ci się nie uda…', regenPct: 0.04,
   },
   {
     id: 'devourer', name: 'Pożeracz Nawyków', emoji: '👹', order: 14, unlockLevel: 52, hp: 2130,
     weakness: 'sweetless', weaknessLabel: 'dni bez słodyczy',
-    loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +8% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.08, energyMult: 0.08, crit: 0.05 } },
+    loot: { id: 'loot_crown', name: 'Korona Mistrza', emoji: '👑', desc: '+10% atak, +3% uniku, +8% energii, +5% kryt', bonus: { atk: 0.10, dodge: 0.03, energyMult: 0.08, crit: 0.05 } },
     coins: 900, xp: 9000, taunt: 'Wróć do starych nawyków, będzie łatwiej…', guard: true,
   },
   // ── prestiż (2026-08-09) — 8 nowych, z zapasowych portretów w assets/ikonybosów/;
@@ -229,7 +229,7 @@ export const BOSSES: Boss[] = [
     id: 'jaguar', name: 'Cień Impulsu', emoji: '🐆', order: 16, unlockLevel: 65, hp: 2460,
     attackKind: 'claw', // atakpazurty_jaguar.png
     weakness: 'habits', weaknessLabel: 'nawyki',
-    loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+9% uniku', bonus: { dodge: 0.09 } },
+    loot: { id: 'loot_clawreflex', name: 'Pazur Refleksu', emoji: '🐾', desc: '+4% uniku', bonus: { dodge: 0.04 } },
     coins: 2000, xp: 20000, taunt: 'Kup to teraz, pomyślisz później…',
   },
   {
@@ -249,7 +249,7 @@ export const BOSSES: Boss[] = [
   {
     id: 'hades', name: 'Władca Katastrof', emoji: '🔥', order: 19, unlockLevel: 88, hp: 3533,
     weakness: 'sleep', weaknessLabel: 'sen (7h+)',
-    loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+11% uniku, +4% atak', bonus: { dodge: 0.11, atk: 0.04 } },
+    loot: { id: 'loot_hadesscepter', name: 'Berło Podziemi', emoji: '⚱️', desc: '+5% uniku, +4% atak', bonus: { dodge: 0.05, atk: 0.04 } },
     coins: 6800, xp: 68000, taunt: 'Wszystko na pewno się posypie…', regenPct: 0.04,
   },
   {
@@ -261,14 +261,14 @@ export const BOSSES: Boss[] = [
   {
     id: 'princess', name: 'Czekanie Na Ratunek', emoji: '👸', order: 21, unlockLevel: 106, hp: 4053,
     weakness: 'habits', weaknessLabel: 'nawyki',
-    loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +5% uniku', bonus: { energyMult: 0.12, dodge: 0.05 } },
+    loot: { id: 'loot_crownindep', name: 'Korona Niezależności', emoji: '👑', desc: '+12% energii, +2% uniku', bonus: { energyMult: 0.12, dodge: 0.02 } },
     coins: 15000, xp: 150000, taunt: 'Ktoś w końcu to za ciebie naprawi…',
   },
   {
     id: 'wizard', name: 'Iluzja Kontroli', emoji: '🧙', order: 22, unlockLevel: 116, hp: 4659,
     attackKind: 'magic', // magicattack_wizard.png
     weakness: 'water', weaknessLabel: 'woda (cel dnia)',
-    loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +10% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.10, energyMult: 0.10, crit: 0.08 } },
+    loot: { id: 'loot_clarity', name: 'Różdżka Jasności', emoji: '🪄', desc: '+14% atak, +4% uniku, +10% energii, +8% kryt', bonus: { atk: 0.14, dodge: 0.04, energyMult: 0.10, crit: 0.08 } },
     coins: 22000, xp: 225000, taunt: 'Machniesz różdżką jutro i będzie dobrze, prawda…', guard: true,
   },
 ];

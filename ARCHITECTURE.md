@@ -949,6 +949,30 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       pytany konkretnie o kampanię (miał przed oczami raport z jej postępu), inne tory mają
       WŁASNE, udokumentowane historie wrażliwości (zwłaszcza MAD, patrz wyżej) i wymagałyby
       osobnego audytu, nie tego samego mnożnika "na hurra".
+    - **Skumulowany unik z łupu przepołowiony + ostatni "Trofeum" w nazwie itemu usunięty**
+      (2026-08-21, user: (1) "musimy uwzględnić ze 47% uniku to kurewsko duzo lepiej z bossów
+      zeby nie dostawać takich statystyk" (2) "nadal nie usunąłeś chyba ze wszystkich bossów
+      trofeow?"). (1): zsumowane WSZYSTKIE `dodge` z `BOSSES[].loot.bonus` dawały przy pełnej
+      (22/22) kampanii **72% uniku** — user zgłosił 47% przy 17/22 (zgadza się, brakowało mu
+      jeszcze hades+princess+wizard, razem +25 punktów). `counterDamage()` tnie kontratak wg
+      `1 - min(0.9, dodge)`, więc 72% oznaczało że kontratak spadał do niecałej 1/3 swojej
+      wartości na KAŻDY hit po ukończeniu kampanii — bezpośrednio podkopuje sens dopiero co
+      zrobionej rekalibracji trudności wyżej (ta liczyła z lekką-umiarkowaną inwestycją, nie z
+      72% uniku z samego lootu). Wszystkie 10 wartości `dodge` w `BOSSES` przycięte ~×0.4,
+      zaokrąglone do równych punktów procentowych, z zachowaniem WZGLĘDNEJ kolejności/wag
+      między bossami (dragon/burnout/princess/stress 0.05-0.06→0.02, compare/doubt/devourer
+      0.06-0.08→0.03, jaguar/wizard 0.09-0.10→0.04, hades 0.11→0.05 — najwyższy) — nowa suma
+      pełnej kampanii to **30% uniku**, wciąż realna nagroda za progres, ale nie neutralizuje
+      całej mechaniki kontrataku. `desc` string każdego zmienionego lootu zaktualizowany w
+      parze z liczbą (user-facing tekst, nie tylko dane). (2): `loot_dragon` (Smok Chaosu,
+      order 4) wciąż nosił nazwę **"Trofeum Smoka"** mimo że gablota trofeów i cała reszta
+      nazewnictwa lootu zostały zdetrofeizowane 2026-08-12 (patrz komentarz przy `loot_pillow`
+      wyżej — TEN item akurat przeoczono wtedy). Zmienione na "Łuska Chaosu" (fizyczny
+      przedmiot z pokonanego smoka, ten sam styl co "Figurka Węża"/"Pazur Refleksu") — `id`
+      ZOSTAJE `loot_dragon` (klucz w `ownedItems`, zmiana złamałaby już zdobyty przedmiot,
+      dokładnie ten sam wzorzec co przy `loot_pillow`). Grep całego repo po "trofe"
+      (case-insensitive) potwierdza że to było JEDYNE pozostałe wystąpienie w nazwie itemu —
+      reszta trafień to komentarze/klucze wyszukiwania ustawień, nie user-facing tekst lootu.
   - **Kontratak bossa ODWRÓCONY z powrotem na STAŁY (nie malejący z HP bossa)** (2026-08-20,
     user przejrzał świeży log walk: "boss atakują coraz mniej o co chodzi to błąd?? ... zrob
     mu stały dmg xd wszystkim"). Malejący kontratak (fix z 2026-08-13, patrz wyżej) był
