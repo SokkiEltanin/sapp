@@ -664,6 +664,30 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       hits 6→8 przez roster) — liczone z AKTUALNEGO poziomu gracza (jak `questBossHpFor`),
       nie zamrożone przy `unlockLevel` jak zwykła kampania — MAD nigdy nie robi się
       przestarzały niezależnie jak wysoko urośnie level (dokładnie unika pułapki raidu).
+      **[HISTORYCZNY OPIS — ODWRÓCONE 2026-08-21, patrz niżej]**
+    - **PRZEBUDOWANE Z DYNAMICZNEGO NA STAŁE, "POJEBANE" (2026-08-21)** — user, po zobaczeniu
+      że MAD hp rośnie z KAŻDYM levelem: "Czekaj, ty zrobiles ze im większy level tym większe
+      HP mad bossów?????". Wyjaśnione że to nietknięty, oryginalny design z 2026-08-15 (patrz
+      wyżej — "MAD nigdy nie robi się przestarzały"), nie coś zmienionego w dzisiejszej
+      rekalibracji kampanii. User świadomie zdecydował się to ODWRÓCIĆ: "nie chce stałe ale
+      pojebanae wartości tak zeby mad bossy byly 10x silniejsze od kampanijnych odzwierciedleń
+      ale stałe, i z większym o wiele atakiem". `madBossHpFor`/`madHitsFor`/`MAD_HITS_MULT`
+      USUNIĘTE CAŁKOWICIE — MAD hp jest teraz WPROST `boss.hp (kampania) × MAD_HP_MULT` (=10),
+      STAŁE, niezależne od poziomu/statów gracza w momencie walki (dokładnie jak zwykli
+      bossowie kampanii — zamrożone raz, nie przeliczane). `madBossFor(boss)` stracił
+      parametry `atkStatBonus/level/bonuses` (już niepotrzebne), oba call site'y (`app/
+      bosses.tsx`, `app/boss-fight.tsx`) zaktualizowane. DODATKOWO nowe pole `counterMult?:
+      number` na `Boss` (bosses.ts, domyślnie brak=×1) — `counterDamage()` bierze je jako 4.
+      opcjonalny argument, mnoży bazowy `hp × COUNTER_PCT` PONAD to co już naturalnie wynika
+      z 10× hp. `madBossFor` ustawia `counterMult: MAD_COUNTER_MULT` (=3) — user chciał "z
+      większym o wiele atakiem" jako OSOBNY lever, nie tylko efekt uboczny większego hp.
+      Konkretne liczby (przykład: Kanapowy Leniwiec, kampanijne hp=540 po dzisiejszej
+      rekalibracji): MAD hp=5400, kontratak na trafienie = 5400×0.025×3 = **405 obrażeń PRZED
+      redukcją uniku** — przy typowym HP kotka na Lv15 (MAD_UNLOCK_LEVEL, ~100-150) to
+      praktycznie jednorazowy nokaut bez solidnej inwestycji w HP/unik. Świadomie EKSTREMALNE —
+      user explicite poprosił o "pojebane" wartości, to celowy superboss/prestiżowy tor, NIE
+      kalibrowany pod normalną wygrywalność jak reszta trybów walki w tej sesji (kampania/
+      quest/raid/event nadal mają swoje zwykłe, zbalansowane krzywe).
     - ⚠️ **Metodologiczna pułapka znaleziona throwaway-symulacją, warta zapamiętania na
       przyszłość**: pierwsza wersja celowała w 14-25 ciosów (start od góry zakresu kampanii,
       "dużo silniejsza") — symulacja pokazała że to matematycznie NIEWYGRYWALNE (0% win-rate)

@@ -69,6 +69,11 @@ export interface Boss {
   guard?: boolean;    // OSŁONA: ten boss zawsze redukuje Twój cios ×0.5 (tankowy typ)
   regenPct?: number;  // REGENERACJA: ten boss zawsze leczy ten % max HP co przeżytą rundę (enrage)
   attackKind?: AttackKind; // wizualny typ kontrataku — patrz komentarz nad AttackKind
+  counterMult?: number; // 2026-08-21 (MAD, patrz madBosses.ts) — DODATKOWY mnożnik kontrataku
+                         // PONAD standardowy COUNTER_PCT×hp, niezależny od samego hp. Domyślnie
+                         // brak = ×1 (zwykłe bossy). Osobny od `guard` (który TNIE kontratak
+                         // o połowę) — oba mogą działać naraz, guard i tak zniknął z MAD
+                         // (madBossFor go czyści), ale mechanizm zostaje ogólny, nie MAD-specific.
 }
 
 // BALANCE REVIEW (2026-08-13, patrz memory boss_design.md „balance review") — `hp` wartości
@@ -483,10 +488,10 @@ const COUNTER_PCT = 0.025; // ułamek MAX (stałego) hp bossa zadawany kotkowi n
 // dotyczy tylko bazowego wyliczenia, nie efektów itemów. (2026-08-20: skoro kontratak liczy
 // się teraz od STAŁEGO max hp, ten fix jest technicznie nadmiarowy — max hp nigdy nie
 // zaokrągli się do 0 dla żywego bossa — ale zostaje jako bezpieczny fallback, nic nie kosztuje.)
-export function counterDamage(bossMaxHp: number, dodge: number, guard = false): number {
+export function counterDamage(bossMaxHp: number, dodge: number, guard = false, counterMult = 1): number {
   const hp = Math.max(0, bossMaxHp);
   if (hp <= 0) return 0;
-  const base = hp * COUNTER_PCT * (guard ? 0.5 : 1);
+  const base = hp * COUNTER_PCT * (guard ? 0.5 : 1) * Math.max(0, counterMult);
   const reduced = base * (1 - Math.min(0.9, Math.max(0, dodge)));
   return Math.max(1, Math.round(reduced));
 }
@@ -587,7 +592,7 @@ export function simulateFight(
         // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
         const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
         if (!controlled) {
-          counterDmg = counterDamage(boss.hp, bonuses.dodge, guarded);
+          counterDmg = counterDamage(boss.hp, bonuses.dodge, guarded, boss.counterMult ?? 1);
           // 'dodge' — całkowity unik kontrataku
           if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
           // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka

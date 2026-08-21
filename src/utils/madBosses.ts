@@ -1,4 +1,4 @@
-import { Boss, BOSSES, Bonuses, atkPower } from '@/utils/bosses';
+import { Boss, BOSSES } from '@/utils/bosses';
 
 // MAD bossy (2026-08-15) — user: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną
 // krzywą HP w nieskończoność (dokładnie ten problem audyt 14.08 znalazł w raidzie: output
@@ -63,10 +63,24 @@ export const MAD_REWARD_MULT = 3;
 // user'a już i tak przychodzi ZA DARMO z COUNTER_PCT=0.05 (współdzielony z kampanią) +
 // wcześniejszym odblokowaniem (Lv15 zamiast 50, mniej czasu na inwestycję) — ten +15% HP to
 // TRZECI, dodatkowy mnożnik na wierzchu tamtych dwóch, nie jedyny.
-const MAD_HITS_MULT = 1.15;
-const madHitsFor = (order: number) => (6 + (order - 1) * (2 / 21)) * MAD_HITS_MULT;
-export const madBossHpFor = (atkStatBonus: number, level: number, bonuses: Bonuses, order: number) =>
-  Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * madHitsFor(order));
+// PRZEBUDOWANE Z DYNAMICZNEGO NA STAŁE, "POJEBANE" HP (2026-08-21) — user po zrozumieniu że
+// powyższy model (hp z AKTUALNEJ mocy gracza) oznacza "im wyższy level, tym większe hp MAD
+// bossa": "Czekaj, ty zrobiles ze im większy level tym większe HP mad bossów?????" →
+// wyjaśnione że to ZAWSZE tak działało (od 2026-08-15, patrz komentarz wyżej, nietknięte w
+// dzisiejszej rekalibracji trudności kampanii) — user świadomie zdecydował się to ODWRÓCIĆ:
+// "nie chce stałe ale pojebanae wartości tak zeby mad bossy byly 10x silniejsze od
+// kampanijnych odzwierciedleń ale stałe, i z większym o wiele atakiem". Zamiast liczyć hp z
+// `atkPower(level)` (rosło z KAŻDYM levelem gracza, nigdy nie "zamrożone"), MAD hp jest teraz
+// WPROST 10× hp odpowiadającego bossa kampanii z `BOSSES` (te same, już rekalibrowane
+// hp×√2/√3 wartości z dzisiejszej sesji) — STAŁE, nie zależy od poziomu/statów gracza w
+// momencie walki, dokładnie jak zwykli bossowie kampanii (zamrożone raz, nie przeliczane).
+// DODATKOWO kontratak MAD dostaje własny mnożnik `counterMult` (bosses.ts, nowe pole na
+// `Boss`) PONAD to co już naturalnie wynika z 10× hp — user chciał "z większym o wiele
+// atakiem" jako OSOBNY lever, nie tylko efekt uboczny większego hp. Świadomie EKSTREMALNE —
+// user explicite poprosił o "pojebane" wartości, to celowy superboss/prestiżowy tor, nie
+// coś kalibrowane pod normalną wygrywalność jak reszta trybów walki w tej sesji.
+export const MAD_HP_MULT = 10;      // MAD hp = boss.hp (kampania) × 10, STAŁE
+export const MAD_COUNTER_MULT = 3;  // dodatkowy mnożnik kontrataku PONAD naturalny wzrost z 10× hp
 
 export function madBossId(baseId: string): string { return `mad_${baseId}`; }
 
@@ -84,12 +98,13 @@ export function madCandidate(defeatedBosses: string[], defeatedMadBosses: string
 // bezpieczny zakres (0% win-rate w symulacji od lvl 100 wzwyż). "Oszalały" to nowy, osobno
 // wyważony tryb — nie musi kopiować każdej mechaniki oryginału, żeby czuć się jak ten sam
 // boss (art+nazwa+weakness wystarczą).
-export function madBossFor(boss: Boss, atkStatBonus: number, level: number, bonuses: Bonuses): Boss {
+export function madBossFor(boss: Boss): Boss {
   return {
     ...boss,
     id: madBossId(boss.id),
     name: `${boss.name} (Oszalały)`,
-    hp: madBossHpFor(atkStatBonus, level, bonuses, boss.order),
+    hp: boss.hp * MAD_HP_MULT,
+    counterMult: MAD_COUNTER_MULT,
     coins: Math.round(boss.coins * MAD_REWARD_MULT),
     xp: Math.round(boss.xp * MAD_REWARD_MULT),
     unlockLevel: MAD_UNLOCK_LEVEL,

@@ -1,7 +1,5 @@
-import { BOSSES, Bonuses } from '@/utils/bosses';
-import { madBossHpFor, madBossId, madCandidate, madBossFor, MAD_UNLOCK_LEVEL, MAD_REWARD_MULT } from '@/utils/madBosses';
-
-const ZERO: Bonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
+import { BOSSES } from '@/utils/bosses';
+import { madBossId, madCandidate, madBossFor, MAD_UNLOCK_LEVEL, MAD_REWARD_MULT, MAD_HP_MULT, MAD_COUNTER_MULT } from '@/utils/madBosses';
 
 describe('madBosses — madCandidate (pierwszy pokonany-ale-nie-MAD, po kolejności)', () => {
   test('brak pokonanych bossów kampanii → brak kandydata', () => {
@@ -23,39 +21,40 @@ describe('madBosses — madCandidate (pierwszy pokonany-ale-nie-MAD, po kolejno�
   });
 });
 
-describe('madBosses — balans (rośnie z AKTUALNYM poziomem, nie zamrożone jak kampania)', () => {
-  test('HP rośnie z poziomem gracza (na TYM SAMYM bossie)', () => {
-    expect(madBossHpFor(0, 100, ZERO, 1)).toBeGreaterThan(madBossHpFor(0, 50, ZERO, 1));
+// PRZEBUDOWANE (2026-08-21) — MAD hp dawniej liczyło się z AKTUALNEJ mocy gracza (rosło z
+// levelem, "nigdy nie przestarzałe"). User: "ty zrobiles ze im większy level tym większe HP
+// mad bossów?????" → po wyjaśnieniu (tak zawsze działało, nie dzisiejsza zmiana) user świadomie
+// odwrócił na STAŁE, "pojebane" wartości: "chce stałe... mad bossy byly 10x silniejsze od
+// kampanijnych odzwierciedleń... i z większym o wiele atakiem". Testy niżej pilnują nowego
+// modelu: hp = boss.hp(kampania) × MAD_HP_MULT, STAŁE (niezależne od poziomu/statów gracza).
+describe('madBosses — balans (STAŁE hp = kampania × MAD_HP_MULT, 2026-08-21)', () => {
+  const sloth = BOSSES.find(b => b.id === 'sloth')!;
+
+  test('MAD_HP_MULT to dokładnie 10 (user: "10x silniejsze od kampanijnych odzwierciedleń")', () => {
+    expect(MAD_HP_MULT).toBe(10);
   });
 
-  test('HP rośnie z `order` bossa (późniejszy boss kampanii = trudniejszy MAD)', () => {
-    expect(madBossHpFor(0, 50, ZERO, 22)).toBeGreaterThan(madBossHpFor(0, 50, ZERO, 1));
+  test('hp MAD bossa to dokładnie boss.hp × MAD_HP_MULT, niezależnie od parametrów gracza', () => {
+    const mad = madBossFor(sloth);
+    expect(mad.hp).toBe(sloth.hp * MAD_HP_MULT);
   });
 
-  test('HP rośnie z realną inwestycją gracza (fix 2026-08-15 #2, ta sama poprawka co questBossHpFor)', () => {
-    const invested: Bonuses = { atk: 0.20, dodge: 0.10, crit: 0.05, energyMult: 0 };
-    expect(madBossHpFor(50, 50, invested, 5)).toBeGreaterThan(madBossHpFor(0, 50, ZERO, 5));
+  test('hp rośnie z `order` bossa TYLKO przez to że kampanijne hp też rośnie z order — nie osobną krzywą', () => {
+    const wizard = BOSSES.find(b => b.id === 'wizard')!;
+    const madSloth = madBossFor(sloth);
+    const madWizard = madBossFor(wizard);
+    expect(madWizard.hp).toBe(wizard.hp * MAD_HP_MULT);
+    expect(madWizard.hp).toBeGreaterThan(madSloth.hp);
+  });
+
+  test('counterMult ustawiony na MAD_COUNTER_MULT (dodatkowy mnożnik kontrataku, user: "z większym o wiele atakiem")', () => {
+    const mad = madBossFor(sloth);
+    expect(mad.counterMult).toBe(MAD_COUNTER_MULT);
+    expect(MAD_COUNTER_MULT).toBeGreaterThan(1);
   });
 
   test('id ma prefiks mad_, nie koliduje z bossem bazowym w defeatedBosses/bossLog', () => {
     expect(madBossId('sloth')).toBe('mad_sloth');
-  });
-
-  // 2026-08-18 — user: "daj im o +30% HP więcej niż teraz jest". Throwaway-symulacją
-  // sprawdzono że dosłowne +30% łamie winnability dla świeżo Lv15 gracza (MAD_UNLOCK_LEVEL)
-  // na order6 (~45% winrate/55% faintRate) — +15% to sprawdzony bezpieczny sufit (order1-6 @
-  // Lv15-20 zostaje 100% winrate). Ten test pilnuje że ktoś przypadkiem nie wróci do +30%
-  // (albo 0%) bez ponownej walidacji.
-  test('HP podbite ~1.15× względem gołej formuły 6→8 ciosów (2026-08-18, nie 1.3× — patrz komentarz w madBosses.ts)', () => {
-    const bare1 = 6, bare22 = 8; // stara formuła: 6 + (order-1)*(2/21), order=1→6, order=22→8
-    const hp1 = madBossHpFor(0, 50, ZERO, 1);
-    const hp22 = madBossHpFor(0, 50, ZERO, 22);
-    const bareHp1 = Math.round((40 * (1 + 50 * 0.03)) * bare1);
-    const bareHp22 = Math.round((40 * (1 + 50 * 0.03)) * bare22);
-    expect(hp1 / bareHp1).toBeGreaterThan(1.1);
-    expect(hp1 / bareHp1).toBeLessThan(1.2);
-    expect(hp22 / bareHp22).toBeGreaterThan(1.1);
-    expect(hp22 / bareHp22).toBeLessThan(1.2);
   });
 });
 
@@ -63,14 +62,14 @@ describe('madBosses — madBossFor (kształt gotowy do simulateFight)', () => {
   const sloth = BOSSES.find(b => b.id === 'sloth')!;
 
   test('nagroda WYŻSZA niż bazowa stawka bossa (MAD_REWARD_MULT)', () => {
-    const mad = madBossFor(sloth, 0, 50, ZERO);
+    const mad = madBossFor(sloth);
     expect(mad.coins).toBe(Math.round(sloth.coins * MAD_REWARD_MULT));
     expect(mad.xp).toBe(Math.round(sloth.xp * MAD_REWARD_MULT));
     expect(MAD_REWARD_MULT).toBeGreaterThan(1);
   });
 
   test('unlockLevel to FLAT MAD_UNLOCK_LEVEL, nie oryginalny unlockLevel bossa', () => {
-    const mad = madBossFor(sloth, 0, 50, ZERO);
+    const mad = madBossFor(sloth);
     expect(mad.unlockLevel).toBe(MAD_UNLOCK_LEVEL);
     expect(mad.unlockLevel).not.toBe(sloth.unlockLevel);
   });
@@ -78,14 +77,13 @@ describe('madBosses — madBossFor (kształt gotowy do simulateFight)', () => {
   test('guard/regenPct NIE są dziedziczone z oryginału (fix 2026-08-15, patrz komentarz)', () => {
     const sugar = BOSSES.find(b => b.id === 'sugar')!; // ma guard: true
     expect(sugar.guard).toBe(true);
-    const mad = madBossFor(sugar, 0, 50, ZERO);
+    const mad = madBossFor(sugar);
     expect(mad.guard).toBeUndefined();
   });
 
-  test('id/name/weakness pochodzą od bossa bazowego, hp od madBossHpFor', () => {
-    const mad = madBossFor(sloth, 0, 60, ZERO);
+  test('id/name/weakness pochodzą od bossa bazowego', () => {
+    const mad = madBossFor(sloth);
     expect(mad.id).toBe('mad_sloth');
     expect(mad.weakness).toBe(sloth.weakness);
-    expect(mad.hp).toBe(madBossHpFor(0, 60, ZERO, sloth.order));
   });
 });

@@ -142,7 +142,7 @@ export default function Bosses() {
   // normalnej wersji danego bossa (madBosses.ts). Ten sam "aktualny cel po kolejności"
   // wzorzec co `current` wyżej.
   const madBase = madCandidate(defeatedBosses, defeatedMadBosses);
-  const madBoss = madBase ? madBossFor(madBase, atkStatBonus, level, bonuses) : null;
+  const madBoss = madBase ? madBossFor(madBase) : null;
   const madUnlocked = level >= MAD_UNLOCK_LEVEL && !!madBase;
 
   // ── raid tygodniowy ──

@@ -9,6 +9,25 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 MAD bossy: hp STAŁE = kampania×10 (było: dynamiczne, rosło z levelem) — NIEsprawdzone (2026-08-21)
+
+User: "Czekaj, ty zrobiles ze im większy level tym większe HP mad bossów?????" → wyjaśnione że
+to oryginalny design z 2026-08-15 (MAD ma NIGDY nie być przestarzały), nie zmiana z tej sesji.
+User świadomie zdecydował się odwrócić: "nie chce stałe ale pojebanae wartości tak zeby mad
+bossy byly 10x silniejsze od kampanijnych odzwierciedleń ale stałe, i z większym o wiele
+atakiem". Pełny opis w ARCHITECTURE.md, sekcja MAD (przebudowany sub-punkt). **TO JEST CELOWO
+EKSTREMALNE** — MAD hp = kampanijne hp × 10 (STAŁE, nie zależy już od poziomu gracza) + nowy
+mnożnik kontrataku ×3 PONAD to co wynika z 10× hp. Przykład: Kanapowy Leniwiec ma teraz MAD hp
+5400 (kampania: 540), kontratak ~405 obrażeń PRZED redukcją uniku — przy typowym HP kotka na
+Lv15 (~100-150) to realnie jednorazowy nokaut bez solidnej inwestycji w HP/unik. `tsc`/`jest`
+zielone (707/707, `madBosses.test.ts` przepisany pod nowy model — stare testy dynamicznego hp
+usunięte, nowe pilnują `hp = boss.hp × MAD_HP_MULT` i `counterMult = MAD_COUNTER_MULT`).
+**Priorytet testu na urządzeniu**: (a) wejdź w MAD (przełącznik Kampania/MAD na ekranie
+Bossy) i sprawdź czy HP faktycznie jest teraz dużo wyższe niż wcześniej pamiętasz, (b) stoczy
+walkę i sprawdź czy kontratak faktycznie zadaje drastycznie więcej niż w kampanii — to jest
+oczekiwane, nie bug, chyba że wyjdzie że jest DOSŁOWNIE niemożliwe do wygrania nawet przy
+maksymalnej inwestycji (wtedy warto rozważyć złagodzenie `MAD_COUNTER_MULT`/`MAD_HP_MULT`).
+
 ## 🐛 Etykieta "masa mięśniowa" w Zdrowiu poprawiona na "masa beztłuszczowa" — NIEsprawdzone (2026-08-21)
 
 User zauważył (screenshot karty CIAŁO): "przecież tam jest 60kg mięśni wpisane plus 40kg wody
