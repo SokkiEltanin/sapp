@@ -19,10 +19,13 @@ describe('missions — missionMinutesFor (rośnie z levelem, user: "od 10 min, i
     expect(missionMinutesFor(10000)).toBe(MISSION_MAX_MIN);
   });
 
-  test('lvl 50 (próg MAD) daje ok. 5h — user\'s own przykład z pierwszej wiadomości', () => {
+  // 2026-08-21, user: "misje wyprawy sa absurdalnie długie" — MISSION_MIN_PER_LEVEL
+  // przepisane 6→1 (patrz komentarz w missions.ts), więc Lv50 dawne ~5h (300min) skróciło
+  // się do ok. godziny, nie kilku.
+  test('lvl 50 daje ok. 1h (skrócone z dawnych ~5h, 2026-08-21)', () => {
     const min = missionMinutesFor(50);
-    expect(min).toBeGreaterThan(250);
-    expect(min).toBeLessThan(350);
+    expect(min).toBeGreaterThan(45);
+    expect(min).toBeLessThan(75);
   });
 });
 

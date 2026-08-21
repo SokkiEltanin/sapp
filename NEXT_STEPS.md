@@ -9,6 +9,36 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Bossowie kampanii trudniejsi (hp×√2/√3) + kafle uniku/krytu + misje krótsze i bardziej opłacalne — NIEsprawdzone (2026-08-21)
+
+Batch 3 rzeczy z jednej wiadomości po przejrzeniu raportu postępu (Lv67, 17/22 kampanii, test
+runda #3): (1) "boss sa za latwe zdecydowanie... utrudnij bym je minimum 2x HP i 2x dmg każdy a
+te dalsze nawet po 3x wszystko", (2) "tam te statystyki unik+ kryt dodaj jako kafelki pod
+spodem bo dziwnie wyglądają jako tekst", (3) "misje wyprawy sa absurdalnie długie i dają mało...
+co level zmieniaj dodając +1minuta, +1coin, +1xp". Pełny opis w ARCHITECTURE.md "Trudność
+bossów podbita" (nowy sub-punkt), "SYSTEM EKWIPUNKU" Runda 6, "Misja pupila" (nowy sub-punkt).
+`tsc`/`jest` zielone (707/707 — testy `bosses.test.ts` używają lokalnego `boss()` helpera z
+własnymi hp, nie odczytują `BOSSES[]` wprost poza jednym testem nieczułym na dokładną wartość
+hp; `missions.test.ts`'s "lvl 50 ~5h" zaktualizowany na nową rzeczywistość "lvl 50 ~1h").
+**WAŻNE — (1) wymagało throwaway-symulacji i jednego AskUserQuestion do usera** (dosłowne
+hp×2/×3 dawało ~4x/~9x łącznych obrażeń przez kwadratową interakcję hp×counterDamage, prawie
+ściana nie do przejścia — user wybrał "przelicz na realny 2x/3x", więc hp skaluje się
+PIERWIASTKIEM: ×√2≈1.41 dla common (order 1-8), ×√3≈1.73 dla elite (order 9-22). **Priorytet
+testu na urządzeniu**:
+(a) stocz walkę z bossem którego JUŻ pokonałeś dawniej w rundzie testowej (jeśli robisz reset)
+i sprawdź czy faktycznie czuje się WYRAŹNIE trudniej niż poprzednio, ale wciąż wygrywalnie przy
+Twojej aktualnej inwestycji,
+(b) **zwróć szczególną uwagę na bossa #1 (Kanapowy Leniwiec, Lv2)** — symulacja pokazała że
+nawet po przeskalowaniu może być zaskakująco trudny dla świeżo startującego gracza (0% winrate
+przy zerowej-lekkiej inwestycji w symulacji) — jeśli faktycznie czuje się jak ściana od
+pierwszej walki w grze, zgłoś, to kandydat na osobny wyjątek,
+(c) sprawdź ekran Pupila → grid "Siła bojowa" — czy unik/kryt pokazują się teraz jako osobne
+kafelki (Wind/cyan i Target/fiolet) w nowym wierszu pod ATK/HP/Prób/Misja, zamiast dawnego
+tekstu pod gridem,
+(d) wyślij nową misję i sprawdź czas trwania — powinien być WYRAŹNIE krótszy niż wcześniej na
+Twoim poziomie (Lv67: było ~6h46m, teraz ~1h16m), i sprawdź nagrodę po powrocie — powinna być
+zauważalnie wyższa niż przed zmianą (Lv67: było ~16 monet/40 XP, teraz ~70 monet/76 XP).
+
 ## 🆕 Skrzynki sardynek dropią gear + ikony/licznik sklepu + seria logowań na dashboard — NIEsprawdzone (2026-08-21)
 
 Batch 4 rzeczy z jednej wiadomości: (1) "ze skrzynek kupowany w sklepie nie dropi ekwipunek",
