@@ -737,6 +737,19 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       używa starej `missionCard`, bez zmian. Migracja: stary zapisany stan bez `missionProfile`
       dostaje `'balanced'` JEŚLI akurat trwała aktywna misja (dokładnie to co wtedy dostałaby),
       inaczej `null`.
+    - **Czas trwania + nagroda przepisane na wprost-liniowy wzór** (2026-08-21, user: "misje
+      wyprawy sa absurdalnie długie i dają mało... co level zmieniaj dodając +1minuta, +1coin,
+      +1xp") — stary `MISSION_MIN_PER_LEVEL=6` dawał na Lv67 misję 406 min (6h46m), podczas gdy
+      nagroda skalowała się `questRewardMult` (~+0.045×poziom na MNOŻNIKU, czyli ułamek
+      monety/XP za poziom) — czas rósł DUŻO szybciej niż nagroda, więc "opłacalność za minutę
+      czekania" malała właśnie w środkowej fazie gry (Lv30-150), zanim znów rosła bliżej sufitu
+      480 min. Fix: `MISSION_MIN_PER_LEVEL` 6→1 (misja rośnie WOLNIEJ, Lv67 teraz 76 min zamiast
+      406) I `missionRewardFor` przepisane z `questRewardMult` na WŁASNY, prosty wzór —
+      `MISSION_COIN_PER_LEVEL`/`MISSION_XP_PER_LEVEL` = +1/+1 za KAŻDY poziom, dokładnie w parze
+      z +1 minutą wyżej (Lv67: 16 monet/40 XP → 70 monet/76 XP). Czas i nagroda rosną teraz TĄ
+      SAMĄ jednostką (poziom), więc opłacalność-za-minutę nigdy nie zapada się w środku gry.
+      `questRewardMult` import usunięty z `missions.ts` (misja ma teraz własną krzywą, nie
+      dzieli już jej z resztą questów). Sufit 480 min (8h) osiągany dopiero ~Lv470 zamiast ~Lv79.
   - **Energia kampanii/MAD — regeneracja w czasie rzeczywistym** (2026-08-18, ZASTĘPUJE gate
     "1 nowy boss dziennie" z 2026-08-17, patrz wpis wyżej — user: "wolałem zamiast jeden
     dziennie raz na 3h atak może? i maksymalnie regeneruje się do 2 energii") — dotąd `energy`
@@ -881,6 +894,33 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       sufit — order1-6 przy Lv15-20 zostaje 100% winrate, wyraźnie trudniejsze (avgLoss
       54-86% zamiast 48-64%). Świadomie NIE dano usera dokładnie tego o co prosił — jawnie
       wyjaśnione w PR-ie, nie po cichu ucięte.
+    - **Kampania: HP podbite hp×√2 (common, order 1-8) / hp×√3 (elite, order 9-22)** (2026-08-21,
+      user po świeżym teście: "boss sa za latwe zdecydowanie... utrudnij bym je minimum 2x HP i
+      2x dmg każdy a te dalsze nawet po 3x wszystko") — TEN SAM wzorzec ostrożności co reszta
+      tej sekcji: user zapytany wprost (AskUserQuestion) po throwaway-symulacji pokazującej że
+      NAIWNE hp×2/hp×3 daje ~4x/~9x ŁĄCZNYCH obrażeń w walce (nie 2x/3x) — `counterDamage()` =
+      `COUNTER_PCT × boss.hp`, więc podwojenie hp jednocześnie podwaja LICZBĘ ciosów potrzebnych
+      I obrażenia z KAŻDEGO kontrataku, total ~ hits × dmgPerHit ~ hp² (ten sam kwadratowy
+      mechanizm co historyczny bug z 2026-08-13). Przy tym naiwnym mnożniku i realistycznej
+      rosnącej inwestycji symulacja dała 0-2% winrate na WIĘKSZOŚCI rostera — praktyczna ściana.
+      User wybrał "Przelicz na realny 2x/3x" (rekomendowane) zamiast dosłownego mnożnika: żeby
+      ŁĄCZNE ryzyko (nie surowe hp) rosło faktycznie ~2x/~3x, hp skaluje się PIERWIASTKIEM
+      (√2≈1.41 / √3≈1.73, bo total ryzyko ~ hp²). Zweryfikowane throwaway-symulacją (profil
+      inwestycji rosnący z `order`, jak poprzednie audyty): przy lekkiej inwestycji avgLoss
+      rośnie z 9-62% (stare, trywialne) do 30-100% (wyraźnie trudniej), 100% winrate prawie
+      wszędzie; przy umiarkowanej inwestycji czysto 100% winrate z avgLoss 6-91%. **Wyjątek:
+      boss #1 (Kanapowy Leniwiec, Lv2, pierwsza walka w grze)** zostaje ryzykowny nawet po
+      przeskalowaniu — 0% winrate przy lekkiej inwestycji (naturalne, zero czasu na zakupy tak
+      wcześnie), 96% przy umiarkowanej. Świadomie zostawione tak jak user wybrał (nie ma dobrego
+      kompromisu między "trudniej wszędzie" a "pierwsza walka musi być łatwo dostępna") — WARTO
+      obserwować na urządzeniu, patrz NEXT_STEPS.md. 22 wartości `hp` w `BOSSES` (bosses.ts)
+      przepisane bezpośrednio (nie runtime-owy mnożnik — ten sam styl co poprzednie balance-
+      review'e, łatwiej grepować/tunować pojedynczy numer niż śledzić warstwę mnożników).
+      Raid/quest/mad/event/menace (osobne rostery, `raidSessionHpFor`/`questBossHpFor`/
+      `madBossHpFor`/`eventHpFor`/`menaceSessionHpFor`) ŚWIADOMIE NIETKNIĘTE w tym PR-ze — user
+      pytany konkretnie o kampanię (miał przed oczami raport z jej postępu), inne tory mają
+      WŁASNE, udokumentowane historie wrażliwości (zwłaszcza MAD, patrz wyżej) i wymagałyby
+      osobnego audytu, nie tego samego mnożnika "na hurra".
   - **Kontratak bossa ODWRÓCONY z powrotem na STAŁY (nie malejący z HP bossa)** (2026-08-20,
     user przejrzał świeży log walk: "boss atakują coraz mniej o co chodzi to błąd?? ... zrob
     mu stały dmg xd wszystkim"). Malejący kontratak (fix z 2026-08-13, patrz wyżej) był
@@ -1175,6 +1215,15 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       niepowiązana) i globalne serie/nawyki zostają na kalendarzowej północy — to samo
       "static-at-render-time" co `fmtEnergyCountdown`/`fmtMissionDuration`, licznik NIE tyka
       co sekundę (user i tak wraca na ekran co jakiś czas).
+    - **Runda 6 — unik/kryt jako kafelki, nie tekst** (2026-08-21, user: "tam te statystyki
+      unik+ kryt dodaj jako kafelki pod spodem bo dziwnie wyglądają jako tekst") — `app/pet.tsx`'s
+      grid "Siła bojowa" (`s.statGrid`, `flexWrap`, kafle `width:48%`) kończył się ATK/HP/Prób
+      dziennie/Misja, a łup bossów (dodge/crit z `bossBonuses`) dostawał osobny wolnostojący
+      `Text` (`s.blurb`) POD gridem — jedyny tekstowy element wśród samych kafli. Zamienione na
+      2 kolejne `statCard` WEWNĄTRZ tego samego `s.statGrid` (dorabiają 3. wiersz dzięki
+      `flexWrap`) — `Wind` (cyan `#22D3EE`) dla uniku, `Target` (fiolet `#C084FC`) dla krytu,
+      ten sam layout co reszta gridu (ikona/wartość/etykieta/podpis), każdy renderowany TYLKO
+      gdy odpowiedni bonus > 0 (jak stary warunkowy tekst).
   - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
     user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
     obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +

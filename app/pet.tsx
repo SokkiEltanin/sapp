@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ChevronLeft, Pencil, Check, Coins, Heart, Zap, Lock, Gift, Swords, Compass, Hourglass, X } from 'lucide-react-native';
+import { ChevronLeft, Pencil, Check, Coins, Heart, Zap, Lock, Gift, Swords, Compass, Hourglass, X, Wind, Target } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -468,10 +468,27 @@ export default function Pet() {
               </>
             )}
           </View>
+          {/* Unik/kryt jako kafelki, nie tekst (2026-08-21, user: "tam te statystyki unik+
+              kryt dodaj jako kafelki pod spodem bo dziwnie wyglądają jako tekst") — dawny
+              wspólny `s.blurb` string zamieniony na 2 osobne statCard, ten sam wzorzec co
+              reszta gridu (dorabiają nowy wiersz dzięki flexWrap na `s.statGrid`, width 48%). */}
+          {bonuses.dodge > 0 && (
+            <View style={[s.statCard, { borderColor: '#22D3EE44', backgroundColor: '#22D3EE12' }]}>
+              <Wind size={18} color="#22D3EE" />
+              <Text style={s.statVal}>+{Math.round(bonuses.dodge * 100)}%</Text>
+              <Text style={s.statLabel}>Unik</Text>
+              <Text style={s.statSub}>z łupu bossów</Text>
+            </View>
+          )}
+          {bonuses.crit > 0 && (
+            <View style={[s.statCard, { borderColor: '#C084FC44', backgroundColor: '#C084FC12' }]}>
+              <Target size={18} color="#C084FC" />
+              <Text style={s.statVal}>+{Math.round(bonuses.crit * 100)}%</Text>
+              <Text style={s.statLabel}>Kryt</Text>
+              <Text style={s.statSub}>z łupu bossów</Text>
+            </View>
+          )}
         </View>
-        {(bonuses.dodge > 0 || bonuses.crit > 0) && (
-          <Text style={s.blurb}>Z łupu bossów: {bonuses.dodge > 0 ? `+${Math.round(bonuses.dodge * 100)}% unik ` : ''}{bonuses.crit > 0 ? `+${Math.round(bonuses.crit * 100)}% kryt` : ''}</Text>
-        )}
 
         {/* ── Ekwipunek bojowy (scalone z pet-stats.tsx, 2026-08-19) ── */}
         <Text style={s.section}>Ekwipunek bojowy ({equippedCombatItems.length}/{itemSlots} założone)</Text>
