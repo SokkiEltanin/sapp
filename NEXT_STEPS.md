@@ -9,6 +9,25 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Kotek na pasku misji: chód zamiast skoku, +18% rozmiar, jasna otoczka, kwadratowy fluid — NIEsprawdzone (2026-08-21)
+
+User (2 wiadomości, druga ze screenshotem): (1) "kotka skaczące lekko na boki jakby szedł na
+prawdę a nie skakał", (2) "większego o 15-20% zeby byl w tym pasku realnie", (3) "jeżeli jest
+wybrany ciemny kolor to dawaj mu chyba jasna otoczkę", (4) "ten pasek ładowania niech sie
+ładuje w kształcie a nie randomowo bo ładujący sie fluid jest w postaci kwadratu a sam pasek
+[jest] zaokrąglone". Pełny opis w ARCHITECTURE.md §9, "SYSTEM EKWIPUNKU" Runda 7. `tsc`/`jest`
+zielone (707/707 — czysto wizualne zmiany w `pet.tsx`/`CatArt` na pasku misji, bez logiki
+biznesowej wartej testu). **Priorytet testu na urządzeniu**:
+(a) wyślij misję, patrz na kotka na pasku przez pełny cykl wahadła (~2s) — powinien przechylać
+się I przesuwać w bok RAZEM (chód), bez pionowego podskakiwania,
+(b) sprawdź czy kotek na pasku jest wyraźnie większy niż wcześniej pamiętasz (26px zamiast 22),
+(c) ustaw kotkowi ciemny kolor (czarny/szary/brązowy) i sprawdź czy na pasku misji ma teraz
+jasną poświatę za sobą — powinien być wyraźnie widoczny na ciemnym tle paska, zamiast wtapiać
+się w nie,
+(d) sprawdź kształt wypełnienia paska przy RÓŻNYCH poziomach postępu (świeżo wysłana misja =
+mały procent, prawie gotowa = duży) — lewa krawędź wypełnienia powinna być zaokrąglona pod
+kapsel paska, bez kwadratowego "klocka" na starcie jak na screenshocie usera.
+
 ## 🐛 Pręgi na uniesionej łapce (animacja liźnięcia/swata) — NIEsprawdzone (2026-08-21)
 
 User: "jak liże łapkę to jak mam paski na łapkach to one z jednej łapki znikają na czas

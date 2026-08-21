@@ -1322,6 +1322,34 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `flexWrap`) — `Wind` (cyan `#22D3EE`) dla uniku, `Target` (fiolet `#C084FC`) dla krytu,
       ten sam layout co reszta gridu (ikona/wartość/etykieta/podpis), każdy renderowany TYLKO
       gdy odpowiedni bonus > 0 (jak stary warunkowy tekst).
+    - **Runda 7 — kotek na pasku misji: chód zamiast skoku, większy, jasna otoczka na
+      ciemnym futrze + kwadratowy fluid** (2026-08-21, user: (1) "kotka skaczące lekko na
+      boki jakby szedł na prawdę a nie skakał", (2) "większego o 15-20% zeby byl w tym pasku
+      realnie", (3) "jeżeli jest wybrany ciemny kolor to dawaj mu chyba jasna otoczkę zeby go
+      było jakis widać", (4, osobna wiadomość ze screenshotem) "ten pasek ładowania niech sie
+      ładuje w kształcie a nie randomowo bo ładujący sie fluid jest w postaci kwadratu a sam
+      pasek [jest] zaokrąglone". (1): dawny PIONOWY `missionBounce` (hop ±6px co 320ms)
+      USUNIĘTY CAŁKOWICIE — czytał się jak podskakiwanie. Chód to teraz JEDEN wzorzec: to samo
+      wahadło `missionSway` napędza RÓWNOCZEŚNIE `missionSwayRotate` (obrót, bez zmian) I nowy
+      `missionSwayX` (przesunięcie ±3px W TĘ SAMĄ STRONĘ co przechył) — przenoszenie ciężaru w
+      bok jak przy prawdziwym chodzie, zamiast pionowego hopu. (2): nowa stała
+      `MISSION_CAT_SIZE=26` (było zaszyte inline `22`, +18%, środek żądanego 15-20%) —
+      `missionBarCatWrap`'s `top`/`marginLeft` doliczone pod nowy rozmiar. (3): `luma()` z
+      `catPalettes.ts` WYEKSPORTOWANE (był private) — `catCoatIsDark = luma(palette.coat) <=
+      0.55`, TEN SAM próg co `markFor()` już używa do jasne/ciemne pręgi (jedna prawda, nie
+      druga zgadywana granica). Gdy ciemne — nowy `s.missionCatHalo` (biały okrąg
+      `rgba(255,255,255,0.55)`, 10px większy niż kotek, wyśrodkowany) renderuje się ZA kotkiem
+      (sibling przed `Animated.View` w drzewie, `pointerEvents="none"`) — ciemny kotek (czarny/
+      szary/brązowy) wtapiał się w ciemne tło paska (`c.bg.elevated`, ciemny motyw apki) bez
+      tego. (4): `missionBarFillWrap` miało jednolite `borderRadius:15` na WSZYSTKICH 4 rogach
+      — przy małym postępie (wąskie wypełnienie, mniej niż 2×15px) dawało zdegenerowany,
+      kwadratowo wyglądający kształt zamiast pigułki (widoczne na screenshocie usera: mały
+      niebieski "klocek" zamiast zaokrąglonego skrawka). Fix: TYLKO lewe rogi zaokrąglone
+      (`borderTopLeftRadius`/`borderBottomLeftRadius: 15`, prawe = 0) — semantycznie POPRAWNE
+      niezależnie od tego (rosnąca prawa krawędź wypełnienia POWINNA być prosta, nie
+      zaokrąglona — zaokrąglenie ma sens tylko tam gdzie wypełnienie styka się z zaokrąglonym
+      lewym kapslem `missionBarTrack`), więc naprawia problem przy KAŻDEJ szerokości, nie tylko
+      przy małym postępie.
   - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
     user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
     obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +
