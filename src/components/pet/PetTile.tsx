@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { ChevronRight, Gift } from 'lucide-react-native';
 import CatArt from '@/components/pet/CatArt';
-import { PetState, petStatusLine } from '@/utils/petState';
+import { PetState } from '@/utils/petState';
 import { usePetStore } from '@/store/petStore';
 import { paletteById } from '@/utils/catPalettes';
 import { useColors } from '@/theme/useColors';
 
-// Dashboard companion tile: a mini cat + its name + a kind status line.
+// Dashboard companion tile: a mini cat + its name + level.
 // Taps through to the full pet page.
 export default function PetTile({ name, pet, level, claimable = 0 }: { name: string; pet: PetState; level: number; claimable?: number }) {
   const c = useColors();
@@ -27,9 +27,9 @@ export default function PetTile({ name, pet, level, claimable = 0 }: { name: str
           <View style={[st.lvl, { backgroundColor: '#A78BFA22' }]}><Text style={st.lvlTxt}>lvl {level}</Text></View>
         </View>
         <Text style={[st.status, { color: pet.color }]}>{pet.label}</Text>
-        {claimable > 0
-          ? <View style={st.claim}><Gift size={11} color="#0B0E1A" /><Text style={st.claimTxt}>{claimable} nagród do odbioru</Text></View>
-          : <Text style={[st.tip, { color: c.text.muted }]} numberOfLines={1}>{petStatusLine(pet)}</Text>}
+        {claimable > 0 && (
+          <View style={st.claim}><Gift size={11} color="#0B0E1A" /><Text style={st.claimTxt}>{claimable} nagród do odbioru</Text></View>
+        )}
       </View>
       <ChevronRight size={18} color={c.text.muted} />
     </View>
@@ -43,7 +43,6 @@ const st = StyleSheet.create({
   lvl: { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 1 },
   lvlTxt: { fontSize: 10, fontWeight: '900', color: '#A78BFA', letterSpacing: 0.3 },
   status: { fontSize: 13, fontWeight: '800', marginTop: 2 },
-  tip: { fontSize: 11.5, fontWeight: '500', marginTop: 1 },
   claim: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: '#FBBF24', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginTop: 3 },
   claimTxt: { fontSize: 10.5, fontWeight: '900', color: '#0B0E1A' },
 });

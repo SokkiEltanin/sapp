@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import { Modal, View, Text, StyleSheet, Pressable, Animated, Easing, Image } from 'react-native';
 import { Snowflake } from 'lucide-react-native';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
-import { RARITY_META, SLOT_META, GearSlot } from '@/utils/gear';
+import { RARITY_META, gearById } from '@/utils/gear';
 import { haptic } from '@/utils/haptics';
 
 // Cząstka lecąca od (sx,sy) do (ex,ey) — monety/iskry na zewnątrz, ❄ z boków do środka.
@@ -130,7 +130,9 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
                     </>
                   ) : reward?.type === 'gear' ? (
                     <>
-                      <Text style={{ fontSize: 40 }}>{SLOT_META[reward.slot as GearSlot]?.icon ?? '🎁'}</Text>
+                      {(() => { const g = gearById(reward.itemId); return g
+                        ? <Image source={g.icon} style={[st.gearImg, { borderColor: meta.color }]} resizeMode="contain" />
+                        : <Text style={{ fontSize: 40 }}>🎁</Text>; })()}
                       <Text style={st.rewardName}>{reward.name}</Text>
                     </>
                   ) : (
@@ -166,6 +168,7 @@ const st = StyleSheet.create({
   startupSwatch: { width: 96, height: 46, borderRadius: 10, backgroundColor: '#000', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   startupMark: { fontSize: 20, fontWeight: '900', letterSpacing: 1 },
   coins: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+  gearImg: { width: 44, height: 44, borderRadius: 10, borderWidth: 2 },
   rewardName: { fontSize: 16, fontWeight: '800', color: '#fff' },
   rewardKind: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.5)', letterSpacing: 1.5 },
   btn: { paddingHorizontal: 26, paddingVertical: 13, borderRadius: 14 },

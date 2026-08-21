@@ -1147,6 +1147,50 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       tier1) — `sellGear` w petStore.ts NIE testowany bezpośrednio (żaden test w tym repo nie
       importuje `petStore.ts` wprost, wymagałoby mockowania AsyncStorage/zustand persist —
       ten sam brak co reszta store'owych akcji, konsekwentne z istniejącą konwencją).
+    - **Runda 5 — skrzynki sardynek (głaskanie) nie dropiły ekwipunku + follow-up sklepu z
+      Rundy 4** (2026-08-21, user: (1) "ze skrzynek kupowany w sklepie nie dropi ekwipunek"
+      (2) "dodaj w sklepie te same ikony co w slotach i dodaj za ile odświeża sie sklep,
+      codziennie o 6:00"). (1): user mylił DWA równolegle istniejące, podobnie nazwane
+      systemy skrzynek — `crates.ts`'s `rollCrate()`/`CrateTier` (`pendingCrates`,
+      przyznawane za głaskanie, otwierane `CrateModal.tsx`) miało TYLKO monety+itemy bojowe,
+      NIGDY nie losowało gear; `petBoxes.ts`'s `LOOT_BOXES`/`rollBox()` (kupowane w
+      `pet-shop.tsx`, otwierane `BoxRevealModal.tsx`) miało gear-drop poprawnie podpięty od
+      kroku 1. Fix mostkuje `openCrate()` w `petStore.ts` do REUŻYCIA gotowych, dostrojonych
+      szans `boxById('sardine').gearChance`/`gearRarityWeight` z `petBoxes.ts` (żadnej nowej
+      tabeli tierów) — losuje item z `unlockedGearFor` dla wszystkich `GEAR_SLOTS`, przyznaje
+      TYLKO jeśli rzucona rzadkość jest LEPSZA niż to co user już ma w tym slocie (żeby
+      głaskanie nie zaśmiecało ekwipunku gorszymi duplikatami). `pickWeighted<T>` w
+      `petBoxes.ts` wyeksportowane (było prywatne) do reużycia zamiast duplikowania ważonego
+      losowania. `CrateModal.tsx` — nowy blok reveal z `<Image source={gearById(id).icon}>` +
+      etykietą rzadkości, ten sam wzorzec co Runda 4 dla `GearSlotModal`. (2): follow-up z
+      Rundy 4 wyżej ("`pet-shop.tsx`/`BoxRevealModal.tsx` NIE dotknięte... świadomie odłożony
+      follow-up") — teraz zrobiony: `pet-shop.tsx`'s wiersze Sklepu dnia i
+      `BoxRevealModal.tsx`'s karta nagrody dostały `<Image source={item.icon}>` zamiast
+      `SLOT_META[slot].icon` (generyczna emoji kategorii). Licznik odświeżenia: nowy
+      `SHOP_REFRESH_HOUR = 6` + `shopDayKey()`/`fmtShopRefresh()` w `pet-shop.tsx` — rolluje
+      się o 6:00 rano zamiast o północy jak zwykłe `todayKey()`, bo user chciał konkretnie
+      "sklep dnia" żeby trzymał zestaw przez noc do rana, nie znikał o północy. CELOWO wąski
+      zasięg — TYLKO 3 call site'y `dailyShopSlots`/`onBuyDaily`/render tied do gwarantowanego
+      sklepu dostały `shopDayKey()`; `dailybox:${todayKey()}` (darmowa skrzynka dnia,
+      niepowiązana) i globalne serie/nawyki zostają na kalendarzowej północy — to samo
+      "static-at-render-time" co `fmtEnergyCountdown`/`fmtMissionDuration`, licznik NIE tyka
+      co sekundę (user i tak wraca na ekran co jakiś czas).
+  - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
+    user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
+    obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +
+    podgląd jutrzejszego bonusu `loginBonusCoins`) PRZENIESIONY z `app/pet-shop.tsx` do
+    `app/(tabs)/index.tsx`'s `nodes['pet']`, tuż pod kaflem `PetTile` — user prosił o
+    "przenieś", nie duplikat, więc pasek + jego style (`loginStrip`/`loginTxt`/`loginNext`)
+    i destrukturyzacja `loginStreak`/import `loginBonusCoins` USUNIĘTE ze sklepu całkowicie.
+    Sensowne miejsce i tak, skoro `registerLogin()` jest wołane właśnie z mount `useEffect`
+    w `index.tsx` (bonus przyznawany "przy wejściu na pulpit", zgodnie z dawnym komentarzem
+    przy starym miejscu w sklepie). (4): `PetTile.tsx` (kafel pupila na dashboardzie) — pod
+    statusem (`pet.label`, np. "Zadowolony") renderował dodatkową linię `petStatusLine(pet)`
+    (np. "Smacznie śpi 💤" po 22:00), user uznał ją za zbędną. Linia USUNIĘTA CAŁKOWICIE (nie
+    zamieniona na nic) — kafel z `claimable > 0` dalej pokazuje pasek "X nagród do odbioru",
+    tylko brakuje mu teraz fallbacku gdy nic nie ma do odebrania. `petStatusLine`/
+    `computePetState` w `utils/petState.ts` BEZ zmian (dalej używane w `app/pet.tsx`'s
+    pełnym ekranie Pupila, tam user nic nie zgłaszał).
   - **Level-up celebration** (2026-08-19, user: "musimy dodac info o levelup pupila...
     powiadomienie z confetti albo fajna animacja") — baner spadający z góry na 3,2s +
     `Confetti` (reużyty z `achievements/Confetti.tsx`), LŻEJSZY niż `BadgeCelebration.tsx`

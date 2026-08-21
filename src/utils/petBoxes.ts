@@ -83,7 +83,9 @@ export type BoxReward =
 // Kolor mapuje na „mocniejszą" celebrację niż jego tier sklepowy (zdobycie koloru = święto).
 const COLOR_RARITY: Record<CosmeticTier, CrateTier> = { basic: 'rare', rare: 'epic', epic: 'legendary' };
 
-function pickWeighted<T>(items: { item: T; w: number }[]): T | null {
+// Eksportowane (2026-08-20) — petStore.ts's openCrate() reużywa tego samego ważonego losowania
+// dla itemów ekwipunku ze skrzynki sardynek (patrz komentarz przy `gearDropped` tam).
+export function pickWeighted<T>(items: { item: T; w: number }[]): T | null {
   const total = items.reduce((s, x) => s + Math.max(0, x.w), 0);
   if (total <= 0) return null;
   let r = Math.random() * total;
