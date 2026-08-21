@@ -180,6 +180,18 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   `dailyBurnFromHc(hc)` = dzienne całkowite spalanie (total ≥1200, inaczej BMR+aktywne) —
   wspólne dla karty energii w Zdrowiu i kafelka kalorii w Jedzeniu. Zegarek = źródło
   prawdy; tylko wagę można nadpisać ręcznie. Uprawnienia w app.json (patrz §11).
+- **`leanMassKg` etykietowane "masa mięśniowa" — BŁĘDNIE (2026-08-21, user zauważył sumę
+  60.2kg+44.1kg=104.3kg > jego wagi 71.2kg: "przecież tam jest 60kg mięśni wpisane plus 40kg
+  wody co wychodzi ponad 100kg jak ja ważę 72")** — dane były poprawne, tylko etykieta. Health
+  Connect's `LeanBodyMassRecord` (czytane w `readHealthDay()`, `healthConnectService.ts`) to
+  masa BEZTŁUSZCZOWA (waga MINUS tłuszcz — mięśnie+kości+narządy+woda RAZEM), NIE osobne
+  "skeletal muscle mass" które Samsung Health pokazuje we własnym UI (32.9kg w screenshocie
+  usera vs 60.2kg z Health Connect — Health Connect nie ma osobnego typu rekordu na samo
+  mięśnie). Etykieta "masa mięśniowa" sugerowała że to coś ROZŁĄCZNEGO z wodą (stąd próba
+  zsumowania obu i wyjście ponad realną wagę) — poprawione na "masa beztłuszczowa" w 3
+  miejscach `health.tsx` (kafel w karcie CIAŁO, tile w rozwiniętym dniu, etykieta ręcznego
+  wpisu). Sam `leanMassKg` (nazwa pola, komentarz w interfejsie) i logika odczytu BEZ ZMIAN —
+  to czysto etykietowy fix, dane z Health Connect są tym czym zawsze były.
 
 ## 8b. Jedzenie / liczenie kalorii — MANUALNE, ODDZIELNE od paragonów
 

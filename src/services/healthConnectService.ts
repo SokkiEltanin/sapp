@@ -319,7 +319,15 @@ export interface HealthConnectDay {
   respiratoryRate: number | null;  // breaths/min
   bodyFatPct: number | null;       // %
   bmr: number | null;              // basal metabolic rate, kcal/day
-  leanMassKg: number | null;       // lean / skeletal mass, kg (BIA)
+  // Health Connect's `LeanBodyMassRecord` = fat-free mass (weight MINUS fat: mięśnie+kości+
+  // narządy+woda RAZEM), NIE samo "skeletal muscle mass" które Samsung Health pokazuje we
+  // własnym UI (Health Connect nie ma osobnego typu rekordu na to). 2026-08-21, user: "w
+  // zakladce zdrowie... tam jest 60kg mięśni wpisane plus 40kg wody co wychodzi ponad 100kg
+  // jak ja ważę 72" — dane były poprawne (60.2=waga-tłuszcz), etykieta "masa mięśniowa" była
+  // BŁĘDNA (sugerowała że to SAME mięśnie, osobne od wody, więc sumowanie z wodą "powinno" się
+  // zmieścić w wadze — nie zmieści się, bo woda jest JUŻ WLICZONA w leanMassKg). Patrz etykiety
+  // w health.tsx ("masa beztłuszczowa", nie "masa mięśniowa").
+  leanMassKg: number | null;
   bodyWaterKg: number | null;      // body water, kg (BIA)
   hydrationMl: number | null;      // water logged, ml
 }
