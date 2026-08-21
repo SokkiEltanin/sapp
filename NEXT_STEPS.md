@@ -9,6 +9,20 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Etykieta "masa mięśniowa" w Zdrowiu poprawiona na "masa beztłuszczowa" — NIEsprawdzone (2026-08-21)
+
+User zauważył (screenshot karty CIAŁO): "przecież tam jest 60kg mięśni wpisane plus 40kg wody
+co wychodzi ponad 100kg jak ja ważę 72 xdddddd". Dane były poprawne — `leanMassKg` z Health
+Connect to masa BEZTŁUSZCZOWA (waga minus tłuszcz, już ZAWIERA wodę/kości/narządy), nie samo
+"skeletal muscle" które Samsung Health pokazuje we własnym UI (32.9kg, screenshot usera) —
+Health Connect nie eksponuje osobnego typu rekordu na samą tkankę mięśniową. Etykieta zmieniona
+z "masa mięśniowa"/"mięśnie"/"Mięśnie kg" na "masa beztłuszczowa"/"beztłuszczowa"/
+"Beztłuszczowa kg" w 3 miejscach `health.tsx`. Pełny opis w ARCHITECTURE.md §8. `tsc`/`jest`
+zielone (707/707, czysto etykietowa zmiana, zero logiki). **Priorytet testu na urządzeniu**:
+otwórz zakładkę Zdrowie → karta CIAŁO — sprawdź czy kafel pokazuje teraz "masa beztłuszczowa"
+zamiast "masa mięśniowa" (ta sama liczba, 60.2kg, tylko poprawna nazwa) — to samo w rozwiniętym
+widoku dnia i w polu ręcznego wpisu.
+
 ## 🆕 Skumulowany unik z łupu bossów przycięty 72%→30% + usunięty ostatni "Trofeum" w nazwie — NIEsprawdzone (2026-08-21)
 
 User: (1) "musimy uwzględnić ze 47% uniku to kurewsko duzo lepiej z bossów zeby nie dostawać

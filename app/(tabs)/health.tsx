@@ -1015,7 +1015,7 @@ export default function HealthScreen() {
                 <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bodyFatPct}%</Text><Text style={styles.bodyCompLabel}>tk. tłuszczowa</Text></View>
               )}
               {(hcExtra.leanMassKg as number) > 0 && (
-                <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.leanMassKg} kg</Text><Text style={styles.bodyCompLabel}>masa mięśniowa</Text></View>
+                <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.leanMassKg} kg</Text><Text style={styles.bodyCompLabel}>masa beztłuszczowa</Text></View>
               )}
               {(hcExtra.bodyWaterKg as number) > 0 && (
                 <View style={styles.bodyCompTile}><Text style={styles.bodyCompVal}>{hcExtra.bodyWaterKg} kg</Text><Text style={styles.bodyCompLabel}>woda w ciele</Text></View>
@@ -1478,7 +1478,7 @@ export default function HealthScreen() {
                   { v: cur > 0 ? `${cur.toFixed(1)} kg` : '—', l: 'waga' },
                   ...(weightGoal > 0 ? [{ v: `${weightGoal} kg`, l: 'cel' }] : []),
                   ...((hcExtra.bodyFatPct as number) > 0 ? [{ v: `${hcExtra.bodyFatPct}%`, l: 'tk. tłuszczowa' }] : []),
-                  ...((hcExtra.leanMassKg as number) > 0 ? [{ v: `${hcExtra.leanMassKg} kg`, l: 'mięśnie' }] : []),
+                  ...((hcExtra.leanMassKg as number) > 0 ? [{ v: `${hcExtra.leanMassKg} kg`, l: 'beztłuszczowa' }] : []),
                   ...((hcExtra.bodyWaterKg as number) > 0 ? [{ v: `${hcExtra.bodyWaterKg} kg`, l: 'woda' }] : []),
                   ...((hcExtra.bmr as number) > 0 ? [{ v: `${hcExtra.bmr}`, l: 'BMR' }] : []),
                 ];
@@ -1497,7 +1497,7 @@ export default function HealthScreen() {
                       <View style={styles.bodyEditRow}>
                         {[
                           { k: 'bodyFatPct', l: 'Tłuszcz %' },
-                          { k: 'leanMassKg', l: 'Mięśnie kg' },
+                          { k: 'leanMassKg', l: 'Beztłuszczowa kg' },
                           { k: 'bodyWaterKg', l: 'Woda kg' },
                         ].map(f => (
                           <View key={f.k} style={styles.bodyEditField}>
