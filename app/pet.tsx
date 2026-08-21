@@ -21,7 +21,7 @@ import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { paletteById } from '@/utils/catPalettes';
+import { paletteById, luma } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
 import { useMoodStore } from '@/store/moodStore';
@@ -43,6 +43,9 @@ const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSta
 const todayISO = () => ymdOf(new Date());
 const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
+// Kotek na pasku misji (2026-08-21, user: "większego o 15-20% zeby byl w tym pasku realnie")
+// — było 22, +18% zaokrąglone do 26 (środek żądanego zakresu).
+const MISSION_CAT_SIZE = 26;
 
 export default function Pet() {
   const c = useColors();
@@ -75,25 +78,12 @@ export default function Pet() {
     ? new Date(missionEndsAt).getTime() - new Date(missionStartedAt).getTime() : 0;
   const missionProgress = missionTotalMs > 0
     ? Math.min(1, Math.max(0, 1 - missionRemainingMs / missionTotalMs)) : 0;
-  // Kotek na pasku misji ma podskakiwać (2026-08-18, user: "miał tam podskakiwać jak w tych
-  // paskach na dashboardzie") — zewnętrzna, prosta pętla bounce na WRAPPERZE (nie
-  // wewnętrzny `animate` CatArt, ten jest budowany pod interakcje/idle na głównym portrecie,
-  // nie pod ciągłe "chodzenie w miejscu" małej ikony) — start/stop przy wejściu/wyjściu z
-  // trybu "w misji", żeby nie animować w tle gdy karta tego nie pokazuje.
-  const missionBounce = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!missionEndsAt || missionReady) return;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(missionBounce, { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      Animated.timing(missionBounce, { toValue: 0, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [missionEndsAt, missionReady]);
-  const missionBounceY = missionBounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
-  // Lekkie wahadło "chodu" MAŁEGO kotka na pasku (2026-08-20, przeskalowane z dawnego dużego
-  // kołysania — user chciał wtedy duży kafelek "gibający się jakby szedł", teraz to samo
-  // wahadło (mniejsza amplituda, -4/4° zamiast -7/7°) na małym jeżdżącym po pasku kotku).
+  // Kotek na pasku misji ma IŚĆ, nie skakać (2026-08-21, user: "kotka skaczące lekko na boki
+  // jakby szedł na prawdę a nie skakał") — dawny PIONOWY `missionBounce` (hop w górę/dół co
+  // 320ms) czytał się jak podskakiwanie, nie chód, USUNIĘTY CAŁKOWICIE. Chód to teraz JEDEN
+  // wzorzec: wahadło `missionSway` napędza RÓWNOCZEŚNIE obrót (`missionSwayRotate`) I lekkie
+  // przesunięcie W TĘ SAMĄ STRONĘ (`missionSwayX`) — przechył + realny krok w bok, jak
+  // przenoszenie ciężaru przy chodzeniu, zamiast pionowego hopu.
   const missionSway = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!missionEndsAt || missionReady) return;
@@ -106,6 +96,7 @@ export default function Pet() {
     return () => loop.stop();
   }, [missionEndsAt, missionReady]);
   const missionSwayRotate = missionSway.interpolate({ inputRange: [-1, 1], outputRange: ['-4deg', '4deg'] });
+  const missionSwayX = missionSway.interpolate({ inputRange: [-1, 1], outputRange: [-3, 3] });
   // Animacja WEJŚCIA na pasek (2026-08-20, user: "kotek jest podwojony chce tylko animacje jak
   // on wchodzi na pasek zmniejsza sie w trakcie wchodzenia i sobie tak idzie z paskiem" —
   // dawniej DWA kotki naraz: duży skurczony na scenie + mały na pasku, wyglądało jak duplikat.
@@ -162,6 +153,13 @@ export default function Pet() {
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const palette = useMemo(() => paletteById(catColor), [catColor]);
+  // Jasna otoczka za kotkiem na TEMNYM pasku misji, gdy futro jest ciemne (2026-08-21, user:
+  // "jeżeli jest wybrany ciemny kolor to dawaj mu chyba jasna otoczkę zeby go było jakis
+  // widać") — `missionBarTrack` ma ciemne tło (`c.bg.elevated`, ciemny motyw apki), więc
+  // czarny/szary/brązowy kotek wtapiał się w pasek. TEN SAM próg `luma>0.55` co
+  // `markFor(coat)` w catPalettes.ts (jasny/ciemny kolor pręg) — jedna prawda, nie druga
+  // zgadywana granica jasności.
+  const catCoatIsDark = useMemo(() => luma(palette.coat) <= 0.55, [palette]);
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -368,9 +366,10 @@ export default function Pet() {
                     <Animated.View style={[s.missionBarWave, { transform: [{ translateX: missionWaveX }, { rotate: '18deg' }] }]} />
                   </View>
                   <View style={[s.missionBarCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
+                    {catCoatIsDark && <View style={s.missionCatHalo} pointerEvents="none" />}
                     <Animated.View style={{ transform: [{ translateY: missionEnterY }, { scale: missionEnterScale }] }}>
-                      <Animated.View style={{ transform: [{ translateY: missionBounceY }, { rotate: missionSwayRotate }] }}>
-                        <CatArt size={22} animate={false} palette={palette} stripes={catStripes}
+                      <Animated.View style={{ transform: [{ translateX: missionSwayX }, { rotate: missionSwayRotate }] }}>
+                        <CatArt size={MISSION_CAT_SIZE} animate={false} palette={palette} stripes={catStripes}
                           eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                       </Animated.View>
                     </Animated.View>
@@ -688,10 +687,22 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // pigułka (borderRadius = połowa wysokości). `missionBarFillWrap` ma `overflow:'hidden'`
   // żeby fala (`missionBarWave`) i gradient nie wystawały poza aktualną szerokość wypełnienia
   // — `missionBarTrack` sam NIE przycina, bo kotek musi wystawać NAD/PONAD cienką krawędzią.
+  //
+  // TYLKO lewe rogi zaokrąglone (2026-08-21, user: "ładujący sie fluid jest w postaci kwadratu
+  // a sam pasek [jest] zaokrąglone") — dawne jednolite `borderRadius:15` na WSZYSTKICH 4 rogach
+  // przy małym postępie (wąskie wypełnienie, szerokość rzędu kilku-kilkunastu px, mniej niż
+  // 2×15) dawało zdegenerowany, kwadratowo wyglądający kształt zamiast pigułki. Prawa krawędź
+  // wypełnienia i tak POWINNA być prosta (to rosnąca krawędź progresu, nie kraniec paska) —
+  // zaokrąglone TYLKO lewe rogi (dopasowane do lewego kapsla `missionBarTrack`) usuwa problem
+  // przy każdej szerokości, nie tylko naprawia efekt uboczny małego postępu.
   missionBarTrack: { position: 'relative', width: '100%', height: 30, borderRadius: 15, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
-  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 15, overflow: 'hidden' },
+  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: 15, borderBottomLeftRadius: 15, overflow: 'hidden' },
   missionBarWave: { position: 'absolute', top: -10, bottom: -10, width: 34, backgroundColor: 'rgba(255,255,255,0.32)' },
-  missionBarCatWrap: { position: 'absolute', top: 3, marginLeft: -11 },
+  // top/marginLeft dopasowane do MISSION_CAT_SIZE (było 22px, teraz 26px — patrz stała).
+  missionBarCatWrap: { position: 'absolute', top: 1, marginLeft: -13 },
+  // Jasna otoczka za ciemnym kotkiem (2026-08-21, patrz `catCoatIsDark` wyżej) — okrąg 10px
+  // większy niż kotek, wyśrodkowany na tym samym punkcie (`top`/`left` = -połowa różnicy).
+  missionCatHalo: { position: 'absolute', width: MISSION_CAT_SIZE + 10, height: MISSION_CAT_SIZE + 10, borderRadius: (MISSION_CAT_SIZE + 10) / 2, top: -5, left: -5, backgroundColor: 'rgba(255,255,255,0.55)' },
 
   // Popup wyboru profilu misji (2026-08-20) — zastępuje dawną inline `missionChooseCard`
   // (user: "kafelek misji jest jakby podwojony... miał być malutki przycisk... otwierany

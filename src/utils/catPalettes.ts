@@ -29,7 +29,9 @@ function shade(hex: string, amt: number): string {
   const f = (c: number) => Math.max(0, Math.min(255, Math.round(amt > 0 ? c + (255 - c) * amt : c * (1 + amt))));
   return '#' + ((1 << 24) + (f(r) << 16) + (f(g) << 8) + f(b)).toString(16).slice(1);
 }
-function luma(hex: string): number {
+// Wyeksportowane (2026-08-21) — app/pet.tsx reużywa tego samego progu do decyzji "czy ciemny
+// kolor kotka potrzebuje jasnej otoczki na pasku misji" (patrz komentarz przy missionCatHalo).
+export function luma(hex: string): number {
   const n = parseInt(hex.slice(1), 16);
   return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
 }
