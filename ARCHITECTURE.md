@@ -529,6 +529,21 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       Nowy test w `bosses.test.ts` przechodzi CAŁY roster + 200 syntetycznych id, sprawdzając
       brak `"undefined"` w wyniku — stare testy (tylko `sloth`/deterministyczność/brak
       prawdziwej nazwy) przypadkiem NIE łapały tego, bo nie sprawdzały treści wyniku wprost.
+    - **Pokonani bossowie zwijani domyślnie** (2026-08-20, user: "bossy te pokonane sa
+      zwinięte w liscie") — kampania rośnie do 22 bossów, im dalej user zajdzie, tym dłuższa
+      lista identycznych pełnowymiarowych "Pokonany ✓" wierszy PRZED aktualnym/zablokowanymi
+      (user właśnie doszedł do 10/22, lista scrollowała się bez końca zanim dotarłeś do
+      "current"). Bossy pokonane są ZAWSZE ciągłym prefiksem `BOSSES` (kampania leci
+      sekwencyjnie, `current = BOSSES.find(b => !defeatedBosses.includes(b.id))`), więc lista
+      dzieli się RAZ na `defeatedList`/`restList` przez `currentIdx`, zamiast filtrować/gałęzić
+      w pętli renderującej jak wcześniej. `defeatedList` chowa się pod jeden nagłówek
+      "Pokonani bossowie (N)" (`s.collapseRow`, zielona obwódka jak `rowBadge`, `ChevronDown`/
+      `ChevronUp` wg stanu) — nowy `useState defeatedCollapsed`, domyślnie `true` (zwinięte),
+      tap toggle'uje. `restList` (current + locked) renderuje się bez zmian, zawsze widoczne —
+      to one są tym co user faktycznie chce widzieć od razu po wejściu na ekran. Edge case:
+      gdy `current===null` (cała kampania pokonana), `currentIdx=BOSSES.length`, więc
+      `defeatedList` to WSZYSTKIE 22 a `restList` puste — nagłówek zwinięcia nadal działa,
+      po prostu nic nie zostaje do pokazania pod nim.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

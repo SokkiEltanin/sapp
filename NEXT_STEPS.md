@@ -9,6 +9,22 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Pokonani bossowie zwijani w liście kampanii — NIEsprawdzone (2026-08-20)
+
+User: "i dodałeś ze bossy te pokonane sa zwinięte w liscie." — nie było, teraz jest. Lista
+kampanii (`app/bosses.tsx`) pokazywała KAŻDEGO z 22 bossów jako pełny wiersz niezależnie od
+statusu — im dalej user zajdzie (obecnie 10/22), tym dłużej trzeba przewijać przez identyczne
+"Pokonany ✓" zanim dotrze się do aktualnego/zablokowanych. Pokonani bossowie (zawsze ciągły
+prefiks listy, kampania leci sekwencyjnie) chowają się teraz pod jeden nagłówek "Pokonani
+bossowie (N)" z chevronem, domyślnie ZWINIĘTE — tap rozwija/zwija. Pełny opis w ARCHITECTURE
+§9. `tsc`/`jest` zielone (707/707, bez nowych testów — czysto UI/lokalny stan, logika
+`defeatedList`/`restList` to proste dzielenie tablicy bez nowej logiki biznesowej wartej
+testu). **Priorytet testu na urządzeniu**: (a) sprawdź czy nagłówek zwinięcia pokazuje
+poprawną liczbę (powinno być 10 przy Twoim obecnym postępie), (b) tap rozwija listę pokonanych
+bossów — sprawdź czy każdy ma poprawną nazwę/loot, (c) tap ponownie zwija z powrotem, (d) po
+pokonaniu KOLEJNEGO bossa sprawdź czy liczba w nagłówku rośnie i nowy boss trafia do zwiniętej
+sekcji zamiast zostać jako osobny wiersz.
+
 ## 🆕 Per-item grafiki w kafelkach gearu + sprzedaż itemów — NIEsprawdzone (2026-08-20)
 
 User: (1) "dodałeś ze ikony te które dodam wyświetlają sie jako w tych kafelkach u pupila?"
