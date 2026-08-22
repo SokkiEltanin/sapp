@@ -594,6 +594,15 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     energyCountdown`, mały wyciszony tekst), widoczną bez scrollowania. Kopia w karcie
     bohatera ZOSTAJE — redundancja celowa, ten sam wzorzec co "Wróć natychmiast"/pasek misji
     w `pet.tsx` (kontekstowo przydatna w obu miejscach, nie duplikat-do-wycięcia).
+    - **Fix kształtu podświetlenia (2026-08-22)** — user: "podświetlenie przełącznika przycisku
+      mad bossy / kampania ma niedopracowany kształt". Przyczyna: kontener `s.modeToggle` miał
+      `radius.lg` (16), a aktywna pigułka `s.modeBtnActive` w środku `radius.md` (10) —
+      niepełne, "ni to kwadratowe ni to pigułkowe" zaokrąglenie, bez obrysu definiującego
+      krawędź. Naprawione na pełny pill-w-pillu jak reszta apki (`PupilNavbar` island,
+      `qClaim`/`claimBadge`/`coinPill`) — oba `radius.full`, `modeBtnActive` dostał też
+      `borderColor` (ten sam wzorzec co chipy filtrów w `finances.tsx`: fill + obrys w tym
+      samym akcencie), `gap` między przyciskami zmniejszony `spacing[2]→spacing[1]` żeby tor
+      czytał się jako jedna spójna kapsuła, nie dwa oddzielne kafle.
   - **Art rajdowych bossów (2026-08-15, dwie fazy)** — 6 bossów `raid.ts` startowały bez
     własnych rysunków. Faza 1: `bossIcons.ts` POŻYCZAŁ PNG z kampanii pod tymi samymi id +
     `BossArt` (`components/bosses/BossArt.tsx`) dostał `powered` prop — czerwona `RadialGlow`

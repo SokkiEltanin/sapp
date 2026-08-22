@@ -477,9 +477,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   energyCountdown: { fontSize: 9.5, fontWeight: '700', color: c.text.muted },
   scroll: { padding: spacing[4], paddingTop: spacing[2], paddingBottom: 110 },
 
-  modeToggle: { flexDirection: 'row', gap: spacing[2], backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: 4, marginBottom: spacing[3] },
-  modeBtn: { alignItems: 'center', paddingVertical: 9, borderRadius: radius.md },
-  modeBtnActive: { backgroundColor: '#38BDF822' },
+  modeToggle: { flexDirection: 'row', gap: spacing[1], backgroundColor: c.bg.card, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, padding: 4, marginBottom: spacing[3] },
+  modeBtn: { alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: 'transparent' },
+  modeBtnActive: { backgroundColor: '#38BDF81F', borderColor: '#38BDF855' },
   modeBtnTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.muted },
   modeBtnTxtActive: { color: '#38BDF8' },
 
