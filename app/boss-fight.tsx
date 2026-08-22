@@ -72,7 +72,7 @@ export default function BossFight() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    xp, energy, raidEnergy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
+    xp, energy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
     defeatedMadBosses, defeatMadBoss, logFightAttempt,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
     ownedCombatItems, equippedCombatItems, equippedGear, ownedGear,
@@ -206,7 +206,7 @@ export default function BossFight() {
     // tutaj jest już z definicji "pierwszy niepokonany", więc zawsze dostępny do walki.
     target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, unlocked: true, unlockLevel: campaignBoss.unlockLevel, done: false, attackKind: campaignBoss.attackKind };
   } else if (kind === 'raid') {
-    target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: raidEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
+    target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: eventEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
   } else if (kind === 'event' && eventBoss && eventKey) {
     // Nemesis (2026-08-18): maxHp = TRWAŁA pula (menaceMaxHp, jak raid), energy = stała 1
     // (zawsze "ma próbę" — nielimitowane ataki, patrz komentarz przy `pool` w attackRoundBased).
@@ -362,10 +362,11 @@ export default function BossFight() {
     if (!roundBoss) return;
     // Quest/misja: bez puli prób — quest już wykonany realnie / misja już odczekana realnie,
     // przegrana = darmowy retry. MAD dzieli pulę energii z kampanią (to jej rozszerzenie, nie
-    // osobny tor jak raid/event). Nemesis (2026-08-18): NIELIMITOWANE próby (user: "nielimitowany
+    // osobny tor jak raid/event). Raid dzieli pulę z event (2026-08-22, patrz komentarz przy
+    // raidWeek w petStore.ts). Nemesis (2026-08-18): NIELIMITOWANE próby (user: "nielimitowany
     // czas i próby podejścia") — bez sprawdzania puli, tak jak quest/misja.
     if (kind !== 'quest' && kind !== 'mission' && !(kind === 'event' && isMenace)) {
-      const pool = kind === 'campaign' || kind === 'mad' ? energy : kind === 'raid' ? raidEnergy : eventEnergy;
+      const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
       if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     }
     resetCatHp();
@@ -384,8 +385,8 @@ export default function BossFight() {
     };
     // Raid: JEDNO wywołanie raidAttack (nie per rundę) — dopisuje realny postęp tej sesji
     // (sesyjne hp przed minus po) do prawdziwej, trwałej puli tygodniowej i zużywa DOKŁADNIE
-    // 1 raidEnergy (1 próba = 1 atak, tak jak reszta trybów), niezależnie od liczby rund w
-    // środku sesji.
+    // 1 punkt eventEnergy (2026-08-22: wspólna pula z wydarzeniami, dawniej własna raidEnergy;
+    // 1 próba = 1 atak, tak jak reszta trybów), niezależnie od liczby rund w środku sesji.
     let raidOutcome: { remaining: number; defeated: boolean } | null = null;
     let menaceOutcome: { remaining: number; defeated: boolean } | null = null;
     if (kind === 'campaign' || kind === 'mad') spendEnergy();

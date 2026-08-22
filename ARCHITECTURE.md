@@ -433,6 +433,23 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     zemdleć w środku pojedynczej sesji przy pechu (wariancja) — to NIE bug, po prostu ta próba
     dobija mniej HP, spróbuj ponownie następnym razem (energia i tak już zużyta, jak przy
     każdym innym trybie).
+    - **Raid przeszedł na wspólną czerwoną pulę z wydarzeniami (2026-08-22)** — user: "ogarnąłeś
+      zeby raid ten korzystał z czerwonej energii?", zapytany o zakres wybrał "realne
+      połączenie z pulą eventów" (nie tylko kosmetyczny kolor ikony). Dawna, własna
+      `raidEnergy`/`raidEnergyDate`/`raidEnergyToday` w `petStore.ts` (interfejs, initial
+      state, `reset()`, `persist` partialize) oraz akcja `syncRaidEnergy` — CAŁKOWICIE
+      USUNIĘTE. `raidAttack()` teraz dekrementuje `eventEnergy` zamiast `raidEnergy`;
+      `app/bosses.tsx`'s `reload()` już nie woła `syncRaidEnergy` (jeden `syncEventEnergy`
+      zasila obie); `app/boss-fight.tsx`'s `pool` (gate "czy stać mnie na próbę") scalone —
+      `kind==='raid'` spada teraz do tej samej gałęzi co `kind==='event'`. Mini-karta raidu w
+      `bosses.tsx` (ikona `Zap` + liczba) przefarbowana z niebieskiego `#38BDF8` (kolor
+      kampanii — mylące, sugerowało błędnie że raid dzieli pulę z kampanią) na czerwony
+      `#F87171` (kolor wydarzeń), pokazuje teraz `eventEnergy` zamiast (usuniętej) `raidEnergy`.
+      **Świadomy kompromis balansu, NIE dociążony**: `eventDailyAttempts()` (dzienny grant tej
+      puli) NIE został podniesiony żeby zrekompensować nowego konsumenta — user poprosił o
+      połączenie pul, nie o zmianę ich wielkości, więc gracz grający regularnie w OBA (raid +
+      wydarzenie) będzie miał łącznie mniej prób dziennie niż wcześniej (dawniej dwie osobne
+      pule, teraz jedna dzielona). Do obserwacji po świeżym teście — patrz NEXT_STEPS.md.
   - **Kampania: gate "1 nowy boss dziennie" — WPROWADZONY 2026-08-17, ZASTĄPIONY 2026-08-18**
     (patrz "Energia kampanii/MAD — regeneracja w czasie" niżej dla aktualnego mechanizmu) —
     user przysłał pełny eksport z czystego resetu (3/3 bossów w ~4 minuty, "zdecydowanie za
@@ -1450,6 +1467,21 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       zamrożonego na moment wykrycia level-upu), więc jeśli w międzyczasie doszło więcej XP
       zanim baner się pokazał, pasek pokazuje PRAWDZIWY aktualny stan, nie stary snapshot.
       `AUTO_DISMISS_MS` wydłużony 3200→4200ms — więcej treści do przeczytania niż sam numer.
+    - **BUG: cały tekst z Rundy 2 znikał, widać było TYLKO odznakę z ikoną (2026-08-22)** —
+      user ze screenshotem: "jak dostaje lewel to nic [tekstu] oprócz [ikonki] nie jest
+      napisane". Przyczyna: `card` (Pressable, `flexDirection:'row'`) miał tylko
+      `maxWidth: 360`, NIGDY realny `width`. `wrap` centruje przez `alignItems:'center'`, co
+      daje `Animated.View`/`card` szerokość "po zawartości" (hug-content), nie stałą — a RN
+      `flex:1` to skrót na `flexBasis:'0%'` ("zacznij od zera, rośnij w DOSTĘPNĄ przestrzeń").
+      Bez definitywnej szerokości rodzica kolumna tekstu (`flex:1`, kicker+tytuł+opis+pasek
+      XP) nie ma w co rosnąć i zapada się do 0px — sąsiadująca sztywna 44px odznaka z ikoną
+      renderuje się normalnie, cały tekst realnie się renderuje, tylko o szerokości zero.
+      Fix: `useWindowDimensions()` liczy REALNĄ szerokość karty (`Math.min(screenW-40, 360)`)
+      i podaje ją jako jawny `width` na `card` zamiast samej górnej granicy — to daje
+      wewnętrznemu `flex:1` definitywną podstawę do policzenia dostępnej przestrzeni. Ten sam
+      wzorzec-pułapka (centrujący rodzic + `flex:1` dziecko bez width) do zapamiętania przy
+      innych wyśrodkowanych bannerach/toastach w apce — zwykłe karty w listach (np. `qCard` w
+      `pet-quests.tsx`) tego nie mają, bo żyją w kontenerach z jawnym `width:'100%'`.
   - **"Pomiń walkę" — przycisk pomijający animację walki, wszystkie 6 trybów naraz**
     (2026-08-20, user: "możesz dodać przycisk jak walka jakakoliwek pomiń walke?"). Kluczowa
     obserwacja umożliwiająca prosty, bezpieczny fix: wynik walki jest w 100% ROZSTRZYGNIĘTY

@@ -352,12 +352,13 @@ export function atkPower(atkStatBonus: number, level: number, bonuses: Bonuses):
 }
 
 // Ile prób walki dziennie — FLAT, nie liczone z danych zdrowia (v5 pivot). Loot z
-// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower). Używane przez
-// raid/event (`raidEnergy`/`syncRaidEnergy`, `eventDailyAttempts` niżej) ORAZ (2026-08-20,
-// cofnięcie wcześniejszej decyzji) jako sufit banku energii kampanii/MAD — patrz
+// energyMult daje WIĘCEJ prób, nie większą siłę ciosu (siła to już atkPower). Używane jako
+// sufit banku energii kampanii/MAD (2026-08-20, cofnięcie wcześniejszej decyzji) — patrz
 // `campaignEnergyMax` w petStore.ts, który woła tę samą funkcję żeby wyświetlana liczba
 // "Prób dziennie" i realny cap nigdy się nie rozjechały (user: "mam napisane 4 a maksymalnie
-// ładuje mi się do 2").
+// ładuje mi się do 2"). Raid/event mają OSOBNĄ formułę — `eventDailyAttempts` niżej — a od
+// 2026-08-22 raid dzieli tę samą pulę co event (patrz komentarz przy `raidWeek` w
+// petStore.ts), nie korzysta już z tej funkcji.
 export const BASE_DAILY_ATTEMPTS = 3;
 export function dailyAttempts(energyMult: number): number {
   return Math.max(1, Math.round(BASE_DAILY_ATTEMPTS * (1 + Math.max(0, energyMult))));
