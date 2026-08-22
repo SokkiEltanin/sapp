@@ -1560,6 +1560,21 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     emoji-sufiksy w `quests.ts` (`note: 'zrobione 💪'` itd. dla `b_pushups/squats/situps/
     plank/stretch`) ścięte do gołego `'zrobione'` — sama nazwa ćwiczenia (label questu)
     bez zmian.
+    - **Nazwa ćwiczenia w trakcie + "Pomiń" na czasowych (2026-08-22)** — user: "z nazwą
+      ćwiczenia w trakcie wykonywania i jak jest czasowe jakieś np plank lub rozciąganie
+      przycisk pomiń z potwierdzeniem tak wykonałem ćwiczenie nie kontynuuj". Dwie zmiany:
+      (1) faza `active` (i timed, i reps) dostała `meta.label` jako tytuł NAD timerem/celem —
+      wcześniej nazwa ćwiczenia znikała po wciśnięciu "Rozpocznij" (widoczna tylko w fazie
+      `ready`), więc w trakcie robienia serii nie było widać CO się właśnie robi. (2) deska/
+      rozciąganie (`TIMED`) dostały przycisk "Pomiń" pod paskiem odliczania — dotąd
+      `setInterval` MUSIAŁ dobiec do zera, nie było jak zamknąć timera wcześniej, jeśli user
+      faktycznie skończył ćwiczenie przed czasem. Pomiń otwiera `ConfirmDialog` (NIE
+      `Alert.alert` — ten sam wzorzec co "Wróć natychmiast" w `pet.tsx`, gdzie user explicit
+      odrzucił goły systemowy Alert jako "bez designu"), `destructive={false}` (to nie
+      niebezpieczna akcja, zwykły plain-styl przycisk potwierdzenia) — dopiero po
+      potwierdzeniu `skip()` czyści interval i przechodzi od razu do `finish()`/fazy `done`,
+      dokładnie jak naturalne dobicie timera do zera. Pompki/przysiady/brzuszki (nie-timed)
+      NIE dostały tego przycisku — tam nie ma na co czekać, "UKOŃCZYŁEM" już jest natychmiastowe.
   - **Layout `app/pet.tsx` (2026-08-16)** — user: "zadania i ta walka jest za nisko, wywalić
     potrzeby bo nic nie mówi, zrobić głaskanie, nazwę zbić bo nad pupilem zajmuje w pizdu
     miejsca". Nowa kolejność sekcji w ScrollView: nazwa/nastrój (skurczone — `name` 24→16px,

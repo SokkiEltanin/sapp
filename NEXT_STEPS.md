@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Sesja treningowa: nazwa ćwiczenia w trakcie + "Pomiń" na czasowych — NIEsprawdzone (2026-08-22)
+
+User: "z nazwą ćwiczenia w trakcie wykonywania i jak jest czasowe jakieś np plank lub
+rozciąganie przycisk pomiń z potwierdzeniem tak wykonałem ćwiczenie nie kontynuuj" —
+`TrainingSessionModal.tsx` (pompki/przysiady/brzuszki/deska/rozciąganie). (1) Nazwa ćwiczenia
+(`meta.label`) teraz widoczna jako tytuł RÓWNIEŻ w trakcie wykonywania (fazę `active`), nie
+tylko na ekranie startowym. (2) Deska/rozciąganie (czasowe, `TIMED`) dostały przycisk "Pomiń"
+pod paskiem odliczania — z potwierdzeniem przez `ConfirmDialog` (nie goły `Alert.alert`),
+kończy timer wcześniej i przechodzi do zaliczenia, tak jakby odliczanie dobiło do zera. Pełny
+opis w ARCHITECTURE.md, sekcja "Sesja treningowa self-report" (nowy sub-punkt). `tsc`/`jest`
+zielone (709/709 — czysto UI, bez logiki wartej osobnego testu). **Priorytet testu na
+urządzeniu** (pet-quests.tsx → dowolny quest bonusowy z self-reportem):
+(a) wciśnij "Rozpocznij" na pompkach/przysiadach/brzuszkach — nazwa ćwiczenia powinna być
+widoczna nad liczbą powtórzeń, nie tylko na ekranie startowym,
+(b) wciśnij "Rozpocznij" na desce/rozciąganiu — nazwa nad timerem + przycisk "Pomiń" pod
+paskiem odliczania,
+(c) wciśnij "Pomiń" w trakcie odliczania — powinno pokazać potwierdzenie w stylu apki (nie
+systemowy szary Alert), "Kontynuuj" wraca do TRWAJĄCEGO odliczania (nie resetuje go),
+"Tak, wykonałem" od razu kończy ćwiczenie i zalicza quest.
+
 ## 🐛 Level-up celebration: tekst znikał, widać było TYLKO odznakę z ikoną — NIEsprawdzone (2026-08-22)
 
 User ze screenshotem: "jak dostaje lewel to nic [tekstu] oprócz [ikonki] nie jest napisane,

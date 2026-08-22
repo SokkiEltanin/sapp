@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { Check, X } from 'lucide-react-native';
 import { haptic } from '@/utils/haptics';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import type { TrainingExercise } from '@/utils/personalQuests';
 
 // Self-report training questy (b_pushups/b_squats/b_situps/b_plank/b_stretch, quests.ts) nie
@@ -43,12 +44,21 @@ export default function TrainingSessionModal({ visible, exercise, target, onClos
 
   const [phase, setPhase] = useState<'ready' | 'active' | 'done'>('ready');
   const [remaining, setRemaining] = useState(totalSeconds);
+  // "Pomiń" na ćwiczeniach czasowych (2026-08-22, user: "jak jest czasowe jakieś np plank
+  // lub rozciąganie przycisk pomiń z potwierdzeniem tak wykonałem ćwiczenie nie kontynuuj")
+  // — deska/rozciąganie mają realnie ODLICZANY timer bez sposobu zamknięcia go wcześniej,
+  // jeśli user faktycznie skończył ćwiczenie przed czasem (np. target ustawiony zbyt
+  // ostrożnie) musiał czekać do zera. `ConfirmDialog` (nie `Alert.alert` — ten sam wzorzec
+  // co "Wróć natychmiast" w pet.tsx, gdzie user explicit odrzucił goły systemowy Alert jako
+  // "bez designu") zapobiega przypadkowemu tapnięciu kończącemu ćwiczenie od razu.
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     setPhase('ready');
     setRemaining(totalSeconds);
+    setConfirmSkip(false);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, exercise, target]);
@@ -73,6 +83,12 @@ export default function TrainingSessionModal({ visible, exercise, target, onClos
   };
 
   const finish = () => { haptic.success(); setPhase('done'); };
+
+  const skip = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setConfirmSkip(false);
+    finish();
+  };
 
   const close = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -106,16 +122,21 @@ export default function TrainingSessionModal({ visible, exercise, target, onClos
 
           {phase === 'active' && timed && (
             <>
+              <Text style={st.title}>{meta.label}</Text>
               <Text style={st.timer}>{fmt(remaining)}</Text>
               <View style={st.track}><View style={[st.fill, { width: `${Math.round(progress * 100)}%` }]} /></View>
               <Text style={st.hint}>Trzymaj do końca odliczania…</Text>
+              <TouchableOpacity style={st.skipBtn} onPress={() => { haptic.tap(); setConfirmSkip(true); }} activeOpacity={0.7}>
+                <Text style={st.skipTxt}>Pomiń</Text>
+              </TouchableOpacity>
             </>
           )}
 
           {phase === 'active' && !timed && (
             <>
+              <Text style={st.title}>{meta.label}</Text>
               <Text style={st.repsTarget}>{target}</Text>
-              <Text style={st.sub}>{meta.label.toLowerCase()} do zrobienia</Text>
+              <Text style={st.sub}>do zrobienia</Text>
               <TouchableOpacity style={st.doneBtn} onPress={finish} activeOpacity={0.85}>
                 <Check size={16} color="#07160F" />
                 <Text style={st.doneTxt}>UKOŃCZYŁEM</Text>
@@ -135,6 +156,16 @@ export default function TrainingSessionModal({ visible, exercise, target, onClos
           )}
         </Pressable>
       </Pressable>
+      <ConfirmDialog
+        visible={confirmSkip}
+        title="Pominąć odliczanie?"
+        message={`Potwierdź, że wykonałeś już całe ćwiczenie (${meta.label.toLowerCase()}) — dalej nie kontynuujemy odliczania.`}
+        confirmLabel="Tak, wykonałem"
+        cancelLabel="Kontynuuj"
+        destructive={false}
+        onConfirm={skip}
+        onCancel={() => setConfirmSkip(false)}
+      />
     </Modal>
   );
 }
@@ -151,6 +182,8 @@ const st = StyleSheet.create({
   track: { width: '100%', height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', marginTop: 14, marginBottom: 10 },
   fill: { height: '100%', borderRadius: 4, backgroundColor: '#2AC68F' },
   hint: { fontSize: 12, color: '#8A93A8', fontWeight: '600' },
+  skipBtn: { marginTop: 14, paddingHorizontal: 20, paddingVertical: 8 },
+  skipTxt: { fontSize: 13, fontWeight: '700', color: '#8A93A8', textDecorationLine: 'underline' },
   repsTarget: { fontSize: 56, fontWeight: '900', color: '#fff', letterSpacing: -1 },
   doneBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 30, paddingVertical: 14, borderRadius: 14, backgroundColor: '#2AC68F' },
   doneTxt: { color: '#07160F', fontSize: 14, fontWeight: '900' },
