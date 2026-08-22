@@ -166,6 +166,18 @@ export function gearStatValue(item: GearItemDef, rarity: GearRarity): number {
   return item.baseValue * RARITY_MULT[rarity];
 }
 
+// Formatowanie statów do UI — WYDZIELONE z GearPanel.tsx (2026-08-22, user: "jak klikam w
+// sklepiku... żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem
+// założonym") — dawniej żyły TYLKO tam (jedyny konsument), teraz potrzebne też w
+// pet-shop.tsx (podgląd przed zakupem w Sklepie dnia), więc jedna wspólna definicja
+// zamiast dwóch kopii tej samej mapy/formatu.
+export const GEAR_STAT_LABEL: Record<GearStat, string> = {
+  critPct: 'krytyk', flatHp: 'HP', dodgePct: 'unik', atkPct: 'atak', energyMultPct: 'energia', coinsPct: 'monety',
+};
+export function fmtGearStat(stat: GearStat, v: number): string {
+  return stat === 'flatHp' ? `+${Math.round(v)}` : `+${(v * 100).toFixed(1)}%`;
+}
+
 // Itemy odblokowane (możliwe do wylosowania) dla danego poziomu pupila, per slot.
 export function unlockedGearFor(slot: GearSlot, level: number): GearItemDef[] {
   return gearBySlot(slot).filter(g => g.unlockLevel <= level);
