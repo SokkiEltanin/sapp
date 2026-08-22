@@ -9,6 +9,20 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Odliczanie energii przeniesione na lewo + nowy licznik dla czerwonej — NIEsprawdzone (2026-08-22)
+
+User: "to odliczanie do następnej energii dodałeś na dole, tam możesz dodać po lewej od
+energii i dodać dla czerwonej też taki licznik?" — ekran Bossy, pigułki w prawym górnym rogu.
+Odliczanie do kolejnego punktu energii kampanijnej (niebieska) przeniesione z tekstu POD
+obiema pigułkami na osobny wiersz PO LEWEJ od SWOJEJ pigułki. Czerwona (event+raid, wspólna
+pula) dostała analogiczny licznik — liczy do najbliższej lokalnej północy (płaski dzienny
+grant, nie regenerujący się bank jak kampania). Pełny opis w ARCHITECTURE.md, sekcja "Energia:
+pigułki w prawym górnym rogu" (nowy sub-punkt). `tsc`/`jest` zielone (709/709 — czysto UI).
+**Priorytet testu na urządzeniu**: ekran Bossy → sprawdź czy (a) niebieska pigułka ma teraz
+odliczanie PO LEWEJ (nie pod spodem), (b) czerwona pigułka (widoczna od level 2) TEŻ ma
+odliczanie po lewej, licząca w dół do najbliższej północy, (c) oba liczniki znikają gdy pula
+jest pełna/zbankowana ponad limit dnia.
+
 ## 🆕 Sesja treningowa: nazwa ćwiczenia w trakcie + "Pomiń" na czasowych — NIEsprawdzone (2026-08-22)
 
 User: "z nazwą ćwiczenia w trakcie wykonywania i jak jest czasowe jakieś np plank lub

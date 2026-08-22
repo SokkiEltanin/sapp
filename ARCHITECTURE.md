@@ -1546,6 +1546,21 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     zwykła niebieska pod kampanię") — `app/bosses.tsx` header: czerwona pigułka (`eventEnergy`)
     NA GÓRZE, niebieska (`energy`, kampania/MAD) POD NIĄ (`s.energyPillCol`,
     `flexDirection:'column'`, było `energyPillRow`/`row`).
+    - **Odliczanie przeniesione na LEWO od każdej pigułki + nowe dla czerwonej (2026-08-22)**
+      — user: "to odliczanie do następnej energii... możesz dodać po lewej od energii i
+      dodać dla czerwonej też taki licznik?". Dawniej JEDEN wspólny tekst odliczania
+      (`s.energyCountdown`) żył POD obiema pigułkami (ostatni element kolumny) i dotyczył
+      TYLKO niebieskiej (`energyRegenAt`) — czerwona nie miała żadnego licznika. Teraz każda
+      pigułka ma WŁASNY wiersz (`s.energyRow`, `flexDirection:'row'`) z tekstem odliczania
+      jako lewym sąsiadem, zamiast jednego zbitego napisu pod spodem całości. Czerwona
+      (event+raid, wspólna pula od 2026-08-22, patrz komentarz przy `raidWeek` w
+      `petStore.ts`) dostała analogiczny licznik, ale liczy do NAJBLIŻSZEJ LOKALNEJ PÓŁNOCY
+      (`nextLocalMidnightIso()`), nie do zapisanego `energyRegenAt` jak kampania — czerwona
+      pula to płaski dzienny grant (`syncEventEnergy`), nie regenerujący się w czasie bank,
+      więc "kolejny punkt" realnie przychodzi o północy, nie po X godzinach od ostatniego
+      ataku. Pokazywana tylko gdy `eventEnergy < eventEnergyMax` (ten sam wzorzec warunku co
+      niebieska, choć czerwona formalnie nie ma twardego sufitu — może się bankować ponad
+      `eventEnergyMax` z nieużytych dni, licznik wtedy i tak by nic nie wnosił).
   - **Sesja treningowa self-report** (2026-08-15, `components/pet/TrainingSessionModal.tsx`)
     — pompki/przysiady/brzuszki/deska/rozciąganie (`b_pushups`/`b_squats`/`b_situps`/
     `b_plank`/`b_stretch` w `quests.ts`) nie mają czujnika (rower ma, przez Health Connect).
