@@ -48,7 +48,24 @@ import { Boss, BOSSES } from '@/utils/bosses';
 // odczuwalną trudność MAD dostaje ZA DARMO ze wspólnego COUNTER_PCT (bosses.ts, ten sam silnik
 // walki co kampania) bez ryzyka powtórki "MAD niewygrywalny od lvl~90" z pierwszej wersji.
 export const MAD_UNLOCK_LEVEL = 15;
-export const MAD_REWARD_MULT = 3;
+
+// PRZEBUDOWANE NAGRODY (2026-08-22) — user po zobaczeniu logu walk: "mad bossy mają być
+// nagrody z nich kontynuacja jak po ostatnim busie kampanii". Stary `MAD_REWARD_MULT` (×3 na
+// WŁASNĄ, oryginalną nagrodę bazowego bossa) dawał absurdalnie mało dla wczesnych bossów
+// kampanii — np. MAD Cukrowy Potwór (boss #2, coins:12/xp:100 bazowo) dawał tylko 36 monet/
+// 300 XP, mimo że PO przebudowie na stałe hp×10 + counterMult×3 wyżej jest teraz trudniejszy
+// niż nawet finałowy boss kampanii. Zapytany wprost (AskUserQuestion) o dokładny kształt
+// wzrostu — dosłowna kontynuacja krzywej kampanii (~1.48× na krok, ekstrapolowana z 22
+// istniejących wartości `coins`) dałaby przy MAD order 22 ~88 MILIONÓW monet za jedną walkę,
+// user wybrał zamiast tego "start od końca kampanii, łagodny wzrost": KAŻDY MAD boss startuje
+// od nagrody OSTATNIEGO bossa kampanii (`BOSSES` posortowane po `order`, ostatni = Iluzja
+// Kontroli, floor niezależny od tego jak mało dawał WŁASNY bazowy boss), rosnąc liniowo +15%
+// tej bazy za każdy krok WŁASNEGO order MAD-a (order1 = dokładnie finał kampanii, order22 =
+// ~4.15× tego — wyraźnie więcej niż finał, ale bez wykładniczej eksplozji).
+const MAD_REWARD_GROWTH_PER_ORDER = 0.15;
+function madRewardMultFor(order: number): number {
+  return 1 + Math.max(0, order - 1) * MAD_REWARD_GROWTH_PER_ORDER;
+}
 
 // PODBITE ×1.15 (2026-08-18, user: "mad wtedy niech będą 2x trudniejsze od podstaw albo
 // 4razy trudniejsze nie wiem jeszcze na pewno, daj im o +30% HP więcej niż teraz jest") — user
@@ -99,14 +116,16 @@ export function madCandidate(defeatedBosses: string[], defeatedMadBosses: string
 // wyważony tryb — nie musi kopiować każdej mechaniki oryginału, żeby czuć się jak ten sam
 // boss (art+nazwa+weakness wystarczą).
 export function madBossFor(boss: Boss): Boss {
+  const finale = BOSSES[BOSSES.length - 1];
+  const mult = madRewardMultFor(boss.order);
   return {
     ...boss,
     id: madBossId(boss.id),
     name: `${boss.name} (Oszalały)`,
     hp: boss.hp * MAD_HP_MULT,
     counterMult: MAD_COUNTER_MULT,
-    coins: Math.round(boss.coins * MAD_REWARD_MULT),
-    xp: Math.round(boss.xp * MAD_REWARD_MULT),
+    coins: Math.round(finale.coins * mult),
+    xp: Math.round(finale.xp * mult),
     unlockLevel: MAD_UNLOCK_LEVEL,
     guard: undefined,
     regenPct: undefined,

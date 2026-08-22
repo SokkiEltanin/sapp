@@ -9,6 +9,41 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Nagrody MAD przebudowane — start od finału kampanii, łagodny wzrost — NIEsprawdzone (2026-08-22)
+
+User po zobaczeniu logu walk ze starego builda (Runda testowa #3, Lv183): "mad bossy mają być
+nagrody z nich kontynuacja jak po ostatnim busie kampanii". Log pokazał że MAD Cukrowy Potwór
+(boss #2) dawał tylko 36 monet/300 XP mimo bycia trudniejszym niż finał kampanii (po
+przebudowie z poprzedniej sesji: hp×10 + counterMult×3). Zapytany o dokładny kształt wzrostu —
+dosłowna kontynuacja krzywej kampanii dałaby ~88 mln monet na order22, user wybrał "start od
+końca kampanii, łagodny wzrost". Pełny opis w ARCHITECTURE.md, sekcja MAD (nowy sub-punkt).
+`tsc`/`jest` zielone (709/709, `madBosses.test.ts` przepisany pod nowy model nagród — 3 nowe
+testy). **Priorytet testu na urządzeniu (po restarcie na najnowszym buildzie)**:
+(a) pokonaj DOWOLNEGO wczesnego MAD bossa (np. mad_sloth, mad_sugar) i sprawdź czy nagroda jest
+teraz na poziomie finału kampanii (rzędu dziesiątek tysięcy monet/setek tysięcy XP), nie
+kilkudziesięciu monet jak wcześniej,
+(b) porównaj nagrodę z wczesnego MAD bossa vs późnego (np. mad_wizard) — późniejszy powinien
+dawać wyraźnie więcej (~4x), ale nie astronomicznie więcej.
+
+## ⚠️ Stary build: kampania daje płaski XP/monety niezależnie od realnej trudności walki — DO OBSERWACJI po świeżym reset-teście (2026-08-22)
+
+User z logu Runda testowa #3 (Lv183, przed dzisiejszym MAD-fixem): "zobacz jak bardzo nie był
+zoptymalizowany, jakie bugi ile XP wgle jak spory lewej jak na kilka dni raptem xdddd bez
+sensu". Zaobserwowany wzorzec: kampania jest SEKWENCYJNA (trzeba pokonać poprzedniego bossa),
+ale gracz levelował się SZYBCIEJ z innych źródeł (questy/misje/MAD) niż postępował przez
+kampanię — więc dotarł do późnych bossów kampanii (np. Iluzja Kontroli, docelowo Lv116) już
+jako Lv150+, miażdżąc je w 2-4 rundy. Kampania daje PŁASKĄ nagrodę per boss (`coins`/`xp` w
+`BOSSES`, niezależnie jak trywialna była walka) — więc trywialne zwycięstwa i tak dawały pełne,
+duże nagrody (Iluzja Kontroli: +22088 monet/+225000 XP w 4 rundach), co samo nakręcało jeszcze
+szybsze lewelowanie (runaway feedback loop). User zdecydował: poczekać na świeży reset na
+najnowszym buildzie (z już wdrożoną rekalibracją hp×√2/√3 z poprzedniej sesji) zanim
+diagnozować dalej — NIE naprawiane w tym przejściu, bo dane są ze STAREGO builda sprzed
+rekalibracji trudności. **Jeśli po świeżym teście problem się powtórzy** (kampania dalej
+trywialna mimo hp×√2/√3, bo tempo lewelowania z questów/misji/MAD i tak wyprzedza sekwencyjny
+postęp kampanii), rozważyć: (a) skalowanie nagrody kampanii w DÓŁ gdy walka była trywialnie
+łatwa (np. <3 rundy), (b) jakiś soft-cap na tempo XP z questów/misji względem postępu kampanii,
+(c) coś innego — do przedyskutowania z userem po jego raporcie.
+
 ## 🆕 Kotek na pasku misji: chód zamiast skoku, +18% rozmiar, jasna otoczka, kwadratowy fluid — NIEsprawdzone (2026-08-21)
 
 User (2 wiadomości, druga ze screenshotem): (1) "kotka skaczące lekko na boki jakby szedł na

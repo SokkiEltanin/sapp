@@ -698,6 +698,22 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       user explicite poprosił o "pojebane" wartości, to celowy superboss/prestiżowy tor, NIE
       kalibrowany pod normalną wygrywalność jak reszta trybów walki w tej sesji (kampania/
       quest/raid/event nadal mają swoje zwykłe, zbalansowane krzywe).
+    - **Nagrody MAD przebudowane — start od finału kampanii, łagodny wzrost** (2026-08-22, user
+      po zobaczeniu logu walk ze starego builda: "mad bossy mają być nagrody z nich kontynuacja
+      jak po ostatnim busie kampanii") — stary `MAD_REWARD_MULT` (×3 na WŁASNĄ, oryginalną
+      nagrodę bazowego bossa kampanii) dawał absurdalnie mało dla wczesnych bossów: MAD Cukrowy
+      Potwór (boss #2, coins:12/xp:100 bazowo) dawał tylko 36 monet/300 XP, mimo że PO
+      przebudowie wyżej (hp×10 + counterMult×3) jest teraz trudniejszy niż nawet finałowy boss
+      kampanii — kompletny rozjazd trudność-vs-nagroda. Zapytany wprost (AskUserQuestion) o
+      dokładny kształt wzrostu, bo dosłowna kontynuacja krzywej kampanii (~1.48×/krok,
+      ekstrapolowana z 22 istniejących wartości `coins`) dałaby przy MAD order 22 **~88
+      MILIONÓW monet** za jedną walkę — user wybrał "start od końca kampanii, łagodny wzrost"
+      zamiast pełnej eksplozji wykładniczej. `MAD_REWARD_MULT` USUNIĘTY, zastąpiony
+      `madRewardMultFor(order) = 1 + max(0,order-1)×0.15` — `madBossFor` liczy `coins`/`xp` z
+      `BOSSES[BOSSES.length-1]` (Iluzja Kontroli, floor niezależny od tego jak mało dawał
+      WŁASNY bazowy boss) × ten mnożnik. MAD order1 (Kanapowy Leniwiec) = dokładnie nagroda
+      finału kampanii; order22 (Iluzja Kontroli Oszalała, najtrudniejszy MAD) = ×4.15 tego —
+      wyraźnie więcej, liniowo, bez eksplozji. `madBosses.test.ts` przepisany pod nowy model.
     - ⚠️ **Metodologiczna pułapka znaleziona throwaway-symulacją, warta zapamiętania na
       przyszłość**: pierwsza wersja celowała w 14-25 ciosów (start od góry zakresu kampanii,
       "dużo silniejsza") — symulacja pokazała że to matematycznie NIEWYGRYWALNE (0% win-rate)
