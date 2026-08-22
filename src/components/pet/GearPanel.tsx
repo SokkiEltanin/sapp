@@ -6,7 +6,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePetStore } from '@/store/petStore';
 import {
   GEAR_SLOTS, GearSlot, GearRarity, RARITY_META, SLOT_META, SLOT_STAT,
-  gearById, gearBySlot, gearStatValue, gearSellValue,
+  gearById, gearBySlot, gearStatValue, gearSellValue, GEAR_STAT_LABEL, fmtGearStat,
 } from '@/utils/gear';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -25,14 +25,6 @@ const SLOT_ICON: Record<GearSlot, LucideIcon> = {
 // kotka" — zastępuje dawny pojedynczy rząd POD kotkiem, patrz historia niżej przy `flankRow`).
 const LEFT_SLOTS = GEAR_SLOTS.slice(0, 3);
 const RIGHT_SLOTS = GEAR_SLOTS.slice(3);
-
-const STAT_LABEL: Record<string, string> = {
-  critPct: 'krytyk', flatHp: 'HP', dodgePct: 'unik', atkPct: 'atak', energyMultPct: 'energia', coinsPct: 'monety',
-};
-const STAT_UNIT: Record<string, string> = {
-  critPct: '%', flatHp: '', dodgePct: '%', atkPct: '%', energyMultPct: '%', coinsPct: '%',
-};
-const fmtStat = (stat: string, v: number) => stat === 'flatHp' ? `+${Math.round(v)}` : `+${(v * 100).toFixed(1)}%`;
 
 // 6 slotów ekwipunku FLANKUJĄCYCH kotka, 3 lewo/3 prawo (2026-08-20, user: "itemy będą 3 z
 // prawej i 3 z lewej kotka" — zastępuje dawny pojedynczy rząd emoji POD kotkiem, którego
@@ -128,10 +120,10 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
                     <View style={{ flex: 1 }}>
                       <Text style={s.itemName}>{item.name}</Text>
                       <Text style={[s.itemRarity, { color: meta.color }]}>{meta.label}</Text>
-                      <Text style={s.itemStat}>{STAT_LABEL[stat]}: {fmtStat(stat, val)}{STAT_UNIT[stat] === '' ? ' HP' : ''}</Text>
+                      <Text style={s.itemStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, val)}{stat === 'flatHp' ? ' HP' : ''}</Text>
                       {!isEquipped && equippedItem && (
                         <Text style={[s.deltaTxt, { color: delta > 0 ? '#2AC68F' : delta < 0 ? '#EF4444' : c.text.muted }]}>
-                          {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {delta === 0 ? 'tyle samo' : `${fmtStat(stat, Math.abs(delta))} vs założony`}
+                          {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {delta === 0 ? 'tyle samo' : `${fmtGearStat(stat, Math.abs(delta))} vs założony`}
                         </Text>
                       )}
                     </View>

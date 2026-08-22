@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Backpack, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Backpack, Sparkles, X } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -14,7 +14,7 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { STARTUPS, startupById, ANIM_LABEL, Startup } from '@/utils/petStartups';
-import { dailyShopSlots, RARITY_META, SLOT_META } from '@/utils/gear';
+import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, gearStatValue, GearSlot, GearRarity } from '@/utils/gear';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -73,7 +73,7 @@ export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup,
-    claimDailyBox, dayClaims, grantGear, buyDailyGear } = usePetStore();
+    claimDailyBox, dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear } = usePetStore();
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
@@ -81,6 +81,12 @@ export default function PetShop() {
   const [cat, setCat] = useState<Cat>('boxes');
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);
+  // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
+  // żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem założonym") — dawniej
+  // tap na kafelku szedł od razu do `onBuyDaily`/ConfirmDialog bez pokazania CO właściwie się
+  // kupuje. Tylko Sklep dnia — jedyna zakładka sprzedająca KONKRETNE itemy ekwipunku o znanym
+  // staty/rarity; skrzynki (losowe) i startupy (kosmetyka bez statów bojowych) tego nie mają.
+  const [gearPreview, setGearPreview] = useState<DailyShopSlot | null>(null);
 
   const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string } | null>(null);
   const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup') => {
@@ -257,13 +263,14 @@ export default function PetShop() {
             {dailySlots.length === 0 && (
               <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
             )}
-            {dailySlots.map(({ item, rarity, cost }) => {
+            {dailySlots.map(slot => {
+              const { item, rarity, cost } = slot;
               const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
               const bought = !!dayClaims[dayKey];
               const meta = RARITY_META[rarity];
               const afford = coins >= cost;
               return (
-                <PressableScale key={item.id} onPress={() => !bought && onBuyDaily(item.id, rarity, cost, item.name)}>
+                <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }}>
                   <View style={[s.boxRow, { borderColor: meta.color + '55' }]}>
                     <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55' }]}>
                       <Image source={item.icon} style={s.boxImg} resizeMode="contain" />
@@ -358,7 +365,86 @@ export default function PetShop() {
         onConfirm={() => { pendingBuy?.onYes(); setPendingBuy(null); }}
         onCancel={() => setPendingBuy(null)}
       />
+      <GearPreviewModal
+        slot={gearPreview}
+        equippedGear={equippedGear}
+        ownedGear={ownedGear}
+        dayClaims={dayClaims}
+        coins={coins}
+        onBuy={(item, rarity, cost) => { setGearPreview(null); onBuyDaily(item.id, rarity, cost, item.name); }}
+        onClose={() => setGearPreview(null)}
+      />
     </SafeAreaView>
+  );
+}
+
+// Podgląd itemu przed zakupem (2026-08-22) — patrz komentarz przy `gearPreview` state wyżej.
+// Ten sam wzorzec porównania co GearSlotModal w GearPanel.tsx (stat + delta vs założony), ale
+// tu ITEM JESZCZE NIE JEST WŁASNOŚCIĄ gracza — porównanie idzie do TEGO CO JEST ZAŁOŻONE W
+// TYM SLOCIE TERAZ, nie do listy posiadanych wariantów jak w GearSlotModal.
+function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onBuy, onClose }: {
+  slot: DailyShopSlot | null;
+  equippedGear: Partial<Record<GearSlot, string>>;
+  ownedGear: Partial<Record<string, GearRarity>>;
+  dayClaims: Record<string, true>;
+  coins: number;
+  onBuy: (item: DailyShopSlot['item'], rarity: DailyShopSlot['rarity'], cost: number) => void;
+  onClose: () => void;
+}) {
+  const c = useColors();
+  const s = useMemo(() => makeS(c), [c]);
+  if (!slot) return null;
+  const { item, rarity, cost } = slot;
+  const meta = RARITY_META[rarity];
+  const stat = SLOT_STAT[item.slot];
+  const val = gearStatValue(item, rarity);
+  const equippedId = equippedGear[item.slot];
+  const equippedItem = equippedId ? gearById(equippedId) : undefined;
+  const equippedRarity = equippedId ? ownedGear[equippedId] : undefined;
+  const equippedVal = equippedItem && equippedRarity ? gearStatValue(equippedItem, equippedRarity) : 0;
+  const delta = val - equippedVal;
+  const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
+  const bought = !!dayClaims[dayKey];
+  const afford = coins >= cost;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.previewOverlay}>
+        <View style={s.previewSheet}>
+          <View style={s.sheetHead}>
+            <Text style={s.title2}>{item.name}</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
+          </View>
+          <View style={s.previewTop}>
+            <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55', width: 64, height: 64 }]}>
+              <Image source={item.icon} style={{ width: 40, height: 40 }} resizeMode="contain" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.cellState, { color: meta.color, fontSize: 12, fontWeight: '800' }]}>{meta.label} · {SLOT_META[item.slot].label}</Text>
+              <Text style={s.previewStat}>{GEAR_STAT_LABEL[stat]}: {fmtGearStat(stat, val)}{stat === 'flatHp' ? ' HP' : ''}</Text>
+              {equippedItem ? (
+                <Text style={[s.deltaTxt, { color: delta > 0 ? '#2AC68F' : delta < 0 ? '#EF4444' : c.text.muted }]}>
+                  {delta > 0 ? '▲' : delta < 0 ? '▼' : '='} {delta === 0 ? 'tyle samo' : `${fmtGearStat(stat, Math.abs(delta))} vs założony (${equippedItem.name})`}
+                </Text>
+              ) : (
+                <Text style={[s.deltaTxt, { color: c.text.muted }]}>Nic nie masz założone w tym slocie</Text>
+              )}
+            </View>
+          </View>
+          {bought ? (
+            <View style={s.previewBoughtRow}><Check size={16} color={meta.color} /><Text style={[s.previewBoughtTxt, { color: meta.color }]}>Już kupione dziś</Text></View>
+          ) : (
+            <TouchableOpacity
+              style={[s.previewBuyBtn, !afford && { opacity: 0.5 }]}
+              onPress={() => { haptic.tap(); onBuy(item, rarity, cost); }}
+              disabled={!afford}
+            >
+              <Coins size={15} color="#0B0E1A" /><Text style={s.previewBuyTxt}>Kup za {cost}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -428,4 +514,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // Posiadane — pusty stan
   emptyOwned: { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[6] },
   emptyOwnedTxt: { fontSize: 12.5, color: c.text.muted, textAlign: 'center', lineHeight: 17, maxWidth: 220 },
+
+  // podgląd itemu ze Sklepu dnia przed zakupem
+  previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
+  previewSheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[3] },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title2: { fontSize: 16, fontWeight: '800', color: c.text.primary, flex: 1, marginRight: spacing[2] },
+  previewTop: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  previewStat: { fontSize: 13, color: c.text.primary, fontWeight: '700', marginTop: 4 },
+  deltaTxt: { fontSize: 11, fontWeight: '700', marginTop: 3 },
+  previewBoughtRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing[3] },
+  previewBoughtTxt: { fontSize: 13, fontWeight: '800' },
+  previewBuyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FBBF24', borderRadius: radius.lg, paddingVertical: 14 },
+  previewBuyTxt: { fontSize: 14, fontWeight: '900', color: '#0B0E1A' },
 }));

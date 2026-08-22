@@ -1214,6 +1214,22 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     (`▲`/`▼`/`=`, zielony/czerwony/szary). Equip/unequip przez istniejące
     `petStore.equipGear/unequipGear`. Brak osobnego "plecaka" — S&F-owy przepływ przez
     kliknięcie slotu, nie osobna lista wszystkich itemów.
+    - **Podgląd statów + porównanie w Sklepie dnia (2026-08-22)** — user: "jak klikam w
+      sklepiku to żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem
+      założonym". Dawniej tap na kafelku w `pet-shop.tsx`'s "Sklep dnia" szedł OD RAZU do
+      `ConfirmDialog` zakupu, bez pokazania CO faktycznie się kupuje. Nowy `GearPreviewModal`
+      (lokalny do `pet-shop.tsx`, ten sam wzorzec co `GearSlotModal` w `GearPanel.tsx` — bottom
+      sheet, nie osobny plik) — tap na kafelku otwiera podgląd: ikona/nazwa/rarity, wartość
+      statu, i delta vs to co JEST ZAŁOŻONE W TYM SLOCIE TERAZ (▲/▼/=, zielony/czerwony/szary),
+      dopiero stamtąd przycisk "Kup" (dalej przechodzi przez ten sam `onBuyDaily`/
+      `ConfirmDialog` co wcześniej — druga warstwa potwierdzenia zostaje, ten podgląd tylko
+      POPRZEDZA ją informacją). Różni się od `GearSlotModal`: tu item NIE jest jeszcze
+      własnością gracza, więc porównanie idzie do aktualnie założonego (`equippedGear[item.
+      slot]`), nie do listy posiadanych wariantów. Skrzynki (losowe nagrody) i Startupy
+      (kosmetyka ekranu ładowania, bez statów bojowych) NIE dostały tego podglądu — nie mają
+      z góry znanego, konkretnego itemu do pokazania. Formatowanie statów (`GEAR_STAT_LABEL`/
+      `fmtGearStat`) WYDZIELONE z `GearPanel.tsx` (dawniej lokalne `STAT_LABEL`/`fmtStat`,
+      jedyny konsument) do `utils/gear.ts` — jedna definicja dla obu ekranów zamiast kopii.
   - **Krok 8 (OSTATNI z planu) — wpięcie gear w realne formuły walki/ekonomii, SYSTEM
     KOMPLETNY** (2026-08-19). PRZED wpięciem: rebalans `GEAR_ITEMS` baseValue w gear.ts —
     pierwsze przejście dałoby mythic T5 do 45-90% z JEDNEGO itemu, node-owe policzenie

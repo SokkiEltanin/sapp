@@ -9,6 +9,25 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Podgląd statów + porównanie przed zakupem w Sklepie dnia — NIEsprawdzone (2026-08-22)
+
+User: "jak klikam w sklepiku to żeby po kliknięciu w item pokazywało jego staty i porównanie z
+itemem założonym". `pet-shop.tsx` → zakładka "Sklep dnia" (jedyna sprzedająca konkretne itemy
+ekwipunku o znanym staty) — tap na kafelku otwiera teraz podgląd (`GearPreviewModal`): stat
+itemu + delta vs to co jest ZAŁOŻONE W TYM SLOCIE teraz (▲/▼/=), dopiero stamtąd przycisk
+"Kup" (dalej idzie przez to samo potwierdzenie zakupu co wcześniej). Skrzynki i Startupy tego
+nie dostały — brak z góry znanego konkretnego itemu do pokazania. Pełny opis w ARCHITECTURE.md,
+sekcja "GearPanel.tsx" (nowy sub-punkt). `tsc`/`jest` zielone (709/709 — czysto UI, logika
+porównania to ta sama, przetestowana wcześniej formuła co `GearSlotModal`). **Priorytet testu
+na urządzeniu**:
+(a) w Sklepie dnia stuknij dowolny item — powinien pokazać się podgląd ze statem i porównaniem
+(nie od razu okno potwierdzenia zakupu),
+(b) sprawdź czy porównanie jest sensowne: załóż coś w danym slocie na ekranie Pupil, wróć do
+sklepu — delta powinna pokazywać różnicę względem TEGO konkretnego założonego itemu,
+(c) pusty slot (nic założone) → tekst "Nic nie masz założone w tym slocie" zamiast delty,
+(d) przycisk "Kup" w podglądzie działa identycznie jak wcześniej (to samo potwierdzenie,
+zakup trafia na konto).
+
 ## 🆕 Odliczanie energii przeniesione na lewo + nowy licznik dla czerwonej — NIEsprawdzone (2026-08-22)
 
 User: "to odliczanie do następnej energii dodałeś na dole, tam możesz dodać po lewej od
