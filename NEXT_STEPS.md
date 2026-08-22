@@ -9,6 +9,34 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Questy bez walki (samo "Odbierz") + ping na zakładce Zadania — NIEsprawdzone (2026-08-22)
+
+User: "obok przycisku walcz pokazuje sie ile dostanę monet, a to bez sensu... questy zrobimy
+bez walk, wtedy będzie szybciej odbierać bo to nic nie zmienia... zostawimy tylko odbierz" +
+"dodaj ping na zakladce questów ze coś jest tam do odebrania". Dotyczy TYLKO questów
+dziennych/bonusowych (`app/pet-quests.tsx`, sekcje "Codzienne"/"Bonusowe dziś") — misje
+(system wypraw kota) i kampania/raid/event/MAD walki NIE ruszone, zostają jak były. Przycisk
+"Walcz" → "Odbierz" (bez przejścia do ekranu walki), nagroda liczona identycznie jak wcześniej
+(`questFightCoins × gearCoinsMult`, `questFightXp`), przez ożywioną wcześniej martwą akcję
+`petStore.claimDaily`. Nowy hook `src/hooks/usePetQuests.ts` (questCtx/quests/missed, dzielony
+z `PupilNavbar.tsx`) zasila nową żółtą kropkę-ping przy ikonie zakładki "Zadania" widoczną z
+KTÓREGOKOLWIEK z 4 ekranów Pupila. Pełny opis w ARCHITECTURE.md, sekcja "Questy-jako-walki"
+(nowy sub-punkt "USUNIĘTA walka..."). `tsc`/`jest` zielone (709/709 — brak nowych testów, to
+czysto UI/flow zmiana bez nowej logiki liczbowej wartej osobnego testu). **Priorytet testu na
+urządzeniu**:
+(a) wykonaj dowolny quest dzienny (np. kroki) i sprawdź czy zamiast "Walcz" pokazuje się od
+razu zielone "Odbierz", klik daje nagrodę natychmiast bez ekranu walki,
+(b) sprawdź czy pigułka z monetami przy quest'cie pokazuje TĘ SAMĄ liczbę co realnie dostajesz
+po kliknięciu (nie samą bazową stawkę sprzed mnożnika),
+(c) zrób quest treningowy (pompki/przysiady/itd.) — sprawdź czy seria treningowa
+("m_training") dalej się liczy mimo braku ekranu walki,
+(d) z zakładki Bossy albo Sklep (NIE Zadania) sprawdź czy przy ikonie "Zadania" na dolnym pasku
+pojawia się żółta kropka gdy jest coś do odebrania, i znika po odebraniu wszystkiego.
+
+**Do rozważenia osobno (niepilne)**: `boss-fight.tsx`'s `kind==='quest'` branch (dawny ekran
+walki questowej) jest teraz nieosiągalny z UI, zostawiony celowo bez sprzątania w tym PR —
+kandydat do usunięcia jako martwy kod przy najbliższej okazji dotykania tego pliku.
+
 ## 🆕 Nagrody MAD przebudowane — start od finału kampanii, łagodny wzrost — NIEsprawdzone (2026-08-22)
 
 User po zobaczeniu logu walk ze starego builda (Runda testowa #3, Lv183): "mad bossy mają być

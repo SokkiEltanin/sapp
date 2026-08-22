@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
+import { usePetQuests } from '@/hooks/usePetQuests';
 
 // Floating tab bar for the pupil section (Pupil/Bosy/Sklep/Statystyki) — these 4
 // screens are flat sibling routes with no shared layout (app/pet.tsx, bosses.tsx,
@@ -38,6 +39,15 @@ export default function PupilNavbar({ current }: { current: PupilTab }) {
   const s = useMemo(() => makeS(c), [c]);
   const currentIndex = Math.max(0, TABS.findIndex(t => t.key === current));
   const activeAccent = TABS[currentIndex].accent;
+  // "Ping" na zakładce questów (2026-08-22, user: "dodaj ping na zakladce questów ze coś jest
+  // tam do odebrania") — navbar żyje na WSZYSTKICH 4 ekranach Pupila, więc badge musi być
+  // widoczny nawet gdy user jest np. na Bossach, nie tylko po wejściu na sam ekran Zadań.
+  // `usePetQuests()` wołany tu niezależnie od pet-quests.tsx — ten sam wzorzec co
+  // `usePetHealthSync` (patrz komentarz w hooku), akceptowany koszt lekkiego podwojenia
+  // odczytu na rzecz jednego źródła prawdy zamiast osobnej, potencjalnie rozjeżdżającej się
+  // logiki liczenia "czy jest coś do odebrania".
+  const { quests, missed } = usePetQuests();
+  const hasClaimable = quests.claimableCount > 0 || missed.length > 0;
 
   // Sliding island under the active tab — identical spring feel to the main TabBar.
   const [pillW, setPillW] = useState(0);
@@ -93,6 +103,7 @@ export default function PupilNavbar({ current }: { current: PupilTab }) {
                   }}
                 >
                   <Icon size={focused ? 23 : 20} color={focused ? t.accent : c.text.muted} strokeWidth={focused ? 2.4 : 1.6} />
+                  {t.key === 'quests' && hasClaimable && <View style={s.badge} pointerEvents="none" />}
                 </TouchableOpacity>
               );
             })}
@@ -111,4 +122,5 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   tabRow: { flexDirection: 'row', flex: 1 },
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, position: 'relative' },
   island: { position: 'absolute', left: 8, top: 4, bottom: 4, borderRadius: 999, borderWidth: 1 },
+  badge: { position: 'absolute', top: 6, right: '28%', width: 8, height: 8, borderRadius: 4, backgroundColor: '#FBBF24', borderWidth: 1.5, borderColor: c.bg.elevated },
 }));

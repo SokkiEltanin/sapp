@@ -2,19 +2,16 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Coins as CoinsIcon, Check as CheckIcon, Gift, Swords } from 'lucide-react-native';
+import { ChevronLeft, Coins, Coins as CoinsIcon, Check as CheckIcon, Gift } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import TrainingSessionModal, { SelfReportExercise } from '@/components/pet/TrainingSessionModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
-import { usePetStore, levelFromXp } from '@/store/petStore';
-import { useProfileStore } from '@/store/profileStore';
-import { usePetHealthSync } from '@/hooks/usePetHealthSync';
-import { ageFrom, targetsFor, dailyExercisePool, trainingStreakFrom } from '@/utils/personalQuests';
-import { buildQuests, buildMissedDaily, sweetlessDaysFrom, QuestCtx, weekKeyOf } from '@/utils/quests';
-import { useHabits, habitsDoneOn } from '@/hooks/useHabits';
-import { useMoodStore } from '@/store/moodStore';
-import { useExpensesStore } from '@/store/expensesStore';
+import { usePetStore } from '@/store/petStore';
+import { usePetQuests } from '@/hooks/usePetQuests';
+import { questFightCoins, questFightXp } from '@/utils/minibosses';
+import { TRAINING_QUEST_IDS } from '@/utils/quests';
+import { gearCoinsMult } from '@/utils/gear';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -26,90 +23,24 @@ const todayISO = () => ymdOf(new Date());
 const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 
 // Wydzielone z app/pet.tsx (2026-08-19, restrukturyzacja nawigacji — user: "reszta zadań
-// będzie w osobnej zakładce"). Cała logika questCtx/quests/missed to 1:1 kopia stamtąd —
-// health/water/budget dane przez usePetHealthSync (współdzielony hook, patrz jego komentarz
-// dlaczego nie ma jednego globalnego store'a dla tego).
+// będzie w osobnej zakładce"). questCtx/quests/missed od 2026-08-22 żyją w `usePetQuests()`
+// (patrz komentarz tam) — ten ekran woła hook i dokłada tylko UI + akcje claim.
 export default function PetQuests() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    xp, coins, claimDailyFor, claimQuest, claimMonthly, claimWeekly, claimedQuests,
-    dailyClaims, dayClaims, weeklyClaims, monthlyClaims, affection, affectionDay,
-    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
+    coins, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly,
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
+    markTrainingDay, equippedGear, ownedGear,
   } = usePetStore();
-  const { birthdate, gender, trainingLevel } = useProfileStore();
-  const lvl = levelFromXp(xp);
-  const { health, waterGoal, waterToday, yData, cardsCollected } = usePetHealthSync();
-  const { habits, todayDone, completions, getStreak } = useHabits();
-  const { entries: moodEntries } = useMoodStore();
-  const { expenses } = useExpensesStore();
-
-  const affToday = affectionDay === todayISO() ? affection : 0;
-
-  const habitBestStreak = useMemo(() => habits.length ? Math.max(0, ...habits.map(h => getStreak(h.id))) : 0, [habits, getStreak]);
-  const personalTargets = useMemo(
-    () => trainingLevel ? targetsFor(trainingLevel, ageFrom(birthdate), gender) : null,
-    [trainingLevel, birthdate, gender],
-  );
-  const todaysPool = useMemo(() => dailyExercisePool(todayISO()), []);
-  const questCtx: QuestCtx = useMemo(() => {
-    const t = todayISO();
-    const month = t.slice(0, 7);
-    const boughtSweetToday = expenses.some(e => e.type !== 'income' && (e.date ?? '').slice(0, 10) === t
-      && (e.receiptItems ?? []).some(it => !it.excluded && (it.tags ?? []).some(tg => tg === 'słodycze' || tg === 'przekąski')));
-    const moodDaysThisMonth = new Set(moodEntries.filter(e => (e.date ?? '').startsWith(month)).map(e => e.date)).size;
-    return {
-      stepsToday: health.steps,
-      moodLoggedToday: moodEntries.some(e => e.date === t),
-      habitsDone: todayDone.length, habitsTotal: habits.length,
-      sweetlessDays: sweetlessDaysFrom(expenses),
-      bestStepDay: health.bestStepDay,
-      habitBestStreak,
-      cardsCollected,
-      boughtSweetToday,
-      stepTarget: health.stepTarget,
-      waterToday, waterGoal,
-      sleepMinutes: health.sleep,
-      moodDaysThisMonth,
-      stepsThisMonth: health.stepsThisMonth,
-      moodDaysThisWeek: new Set(moodEntries.filter(e => (e.date ?? '') >= weekKeyOf()).map(e => e.date)).size,
-      stepsThisWeek: health.stepsThisWeek,
-      affectionFull: affToday >= 100,
-      trainingStreak: trainingStreakFrom(trainingDays, t),
-      pushupTarget: personalTargets && todaysPool.includes('pushups') ? personalTargets.pushups : undefined,
-      squatTarget: personalTargets && todaysPool.includes('squats') ? personalTargets.squats : undefined,
-      situpTarget: personalTargets && todaysPool.includes('situps') ? personalTargets.situps : undefined,
-      plankTarget: personalTargets && todaysPool.includes('plank') ? personalTargets.plankSeconds : undefined,
-      stretchTarget: personalTargets && todaysPool.includes('stretch') ? personalTargets.stretchMinutes : undefined,
-      bikeTarget: personalTargets && todaysPool.includes('bike') ? personalTargets.bikeMinutes : undefined,
-      pushupsToday: pushupsDay === t,
-      squatsToday: squatsDay === t,
-      situpsToday: situpsDay === t,
-      plankToday: plankDay === t,
-      stretchToday: stretchDay === t,
-      bikeMinutesToday: health.cyclingMinutesToday,
-    };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay]);
-  const quests = useMemo(
-    () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }, lvl.level),
-    [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],
-  );
-
-  const missed = useMemo(() => {
-    if (!yData) return [];
-    const y = yesterdayISO();
-    const yCtx: QuestCtx = {
-      stepsToday: yData.steps,
-      moodLoggedToday: moodEntries.some(e => e.date === y),
-      habitsDone: habitsDoneOn(habits, completions, y).length,
-      habitsTotal: habits.length,
-      sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0, trainingStreak: 0,
-      waterToday: yData.water, waterGoal,
-      sleepMinutes: yData.sleep,
-    };
-    return buildMissedDaily(yCtx, dayClaims, y, lvl.level);
-  }, [yData, moodEntries, habits, completions, waterGoal, dayClaims, lvl.level]);
+  const { questCtx, quests, missed } = usePetQuests();
+  // "Kolczyki" (gear) mnożą monety ze WSZYSTKICH źródeł, w tym questów — ten sam wzorzec co
+  // boss-fight.tsx (`gearCoinsMult`), żeby zainwestowany gear liczył się też tutaj.
+  const coinsMult = useMemo(() => gearCoinsMult(equippedGear, ownedGear), [equippedGear, ownedGear]);
+  // Finalna nagroda za dziś wykonany quest = ta sama formuła co dawny "Walcz" (FIGHT_BONUS ×
+  // gear coinsMult) — patrz komentarz przy `onClaimQuest` niżej. Liczone tu też do WYŚWIETLENIA
+  // (żeby pigułka pokazywała DOKŁADNIE tyle ile realnie dostaniesz, nie samą bazową stawkę).
+  const finalQuestCoins = (baseCoins: number) => Math.round(questFightCoins(baseCoins) * coinsMult);
 
   const claimMissed = (q: { id: string; label: string; coins: number; xp: number }) => {
     if (claimDailyFor(q.id, yesterdayISO(), q.coins, q.xp)) {
@@ -132,9 +63,21 @@ export default function PetQuests() {
   const onClaimMonthly = (id: string, c2: number, x: number, label: string) => {
     if (claimMonthly(id, c2, x)) { haptic.success(); toast.success(`+${c2} 🪙 · ${label}`); }
   };
-  const onFightQuest = (id: string, coins: number, xp: number, label: string) => {
-    haptic.tap();
-    router.push(`/boss-fight?kind=quest&questId=${id}&questLabel=${encodeURIComponent(label)}&questCoins=${coins}&questXp=${xp}` as any);
+  // Zastępuje dawny onFightQuest (2026-08-22) — user: "questy bez walk ... zostawimy tylko
+  // odbierz. dawaj zróbmy tak będzie łatwiej" — wynik walki questowej był i tak w 100%
+  // przesądzony w momencie klika, więc pomijamy ekran walki i od razu odbieramy nagrodę.
+  // Formuła nagrody BEZ ZMIAN (ten sam FIGHT_BONUS × gearCoinsMult co dawniej dawał
+  // boss-fight.tsx) — user: "to nic nie zmienia", chodziło o usunięcie zbędnego kroku, nie
+  // o obniżenie wypłaty. `claimDaily` (dawniej martwy kod) ustawia oba mapy klaimów bez
+  // wpisu do bossLog — patrz komentarz przy tej akcji w petStore.ts.
+  const onClaimQuest = (id: string, baseCoins: number, baseXp: number) => {
+    const coinsWon = Math.round(questFightCoins(baseCoins) * coinsMult);
+    const xpWon = questFightXp(baseXp);
+    if (claimDaily(id, coinsWon, xpWon)) {
+      if (TRAINING_QUEST_IDS.includes(id)) markTrainingDay();
+      haptic.success();
+      toast.success(`+${coinsWon} 🪙 · nagroda odebrana`);
+    }
   };
   const [training, setTraining] = useState<{ exercise: SelfReportExercise; target: number; action: () => void } | null>(null);
 
@@ -194,10 +137,10 @@ export default function PetQuests() {
                         <View style={s.qProgTrack}><View style={[s.qProgFill, { width: `${Math.round(q.progress * 100)}%` }]} /></View>
                       )}
                     </View>
-                    {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
+                    {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{finalQuestCoins(q.coins)}</Text></View>}
                     {q.done
-                      ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
-                      : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
+                      ? <PressableScale onPress={() => onClaimQuest(q.id, q.coins, q.xp)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                      : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Odbierz</Text></View>}
                   </View>
                 ))}
                 {claimedN > 0 && (
@@ -238,12 +181,12 @@ export default function PetQuests() {
                               <View style={s.qProgTrack}><View style={[s.qProgFill, { width: `${Math.round(q.progress * 100)}%` }]} /></View>
                             )}
                           </View>
-                          {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>}
+                          {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{finalQuestCoins(q.coins)}</Text></View>}
                           {q.done
-                            ? <PressableScale onPress={() => onFightQuest(q.id, q.coins, q.xp, q.label)}><View style={s.qFight}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View></PressableScale>
+                            ? <PressableScale onPress={() => onClaimQuest(q.id, q.coins, q.xp)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
                             : session
                               ? <PressableScale onPress={() => { haptic.tap(); setTraining(session); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Rozpocznij</Text></View></PressableScale>
-                              : <View style={[s.qFight, s.qFightOff]}><Swords size={11} color="#fff" /><Text style={s.qFightTxt}>Walcz</Text></View>}
+                              : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Odbierz</Text></View>}
                         </View>
                       );
                     })}
@@ -382,9 +325,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qRewardTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
   qClaim: { backgroundColor: '#2AC68F', borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 10, shadowColor: '#2AC68F', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   qClaimTxt: { fontSize: 14, fontWeight: '900', color: '#07160F', letterSpacing: 0.2 },
-  qFight: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EF4444', borderRadius: radius.full, paddingHorizontal: 16, paddingVertical: 10, shadowColor: '#EF4444', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  qFightTxt: { fontSize: 13, fontWeight: '900', color: '#fff', letterSpacing: 0.2 },
-  qFightOff: { opacity: 0.35, shadowOpacity: 0 },
+  qClaimOff: { opacity: 0.35, shadowOpacity: 0 },
   qClaimedFoot: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing[2] },
   qClaimedTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, letterSpacing: 0.2 },
   qProgTrack: { height: 4, borderRadius: 2, backgroundColor: c.bg.elevated, overflow: 'hidden', marginTop: 4, maxWidth: 160 },

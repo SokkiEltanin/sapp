@@ -656,6 +656,29 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     reszta walki — ten sam fix zastosowany od razu profilaktycznie do `madBossHpFor`/
     `madBossFor` (madBosses.ts), bo to identyczna formuła z identyczną luką, tylko jeszcze
     nie zgłoszona (MAD jest zbyt świeże, żeby user zdążył to zauważyć).
+    - **USUNIĘTA walka z questów-jako-walk (2026-08-22)** — user: "questy bez walk spoko ale
+      z walkami nie chociaż zastanawiam sie i chyba questy zrobimy bez walk, wtedy będzie
+      szybciej odbierać bo to nic nie zmienia... zostawimy tylko odbierz." Wynik walki
+      questowej był zawsze w 100% przesądzony w momencie kliknięcia "Walcz" (deterministyczny
+      miniboss, brak realnej interakcji poza animacją), więc powyższy cały tor `?kind=quest`
+      w `boss-fight.tsx` przestał być NAWIGOWALNY z UI — `app/pet-quests.tsx` (patrz "Nawigacja
+      Pupila" niżej) teraz od razu odbiera nagrodę przyciskiem "Odbierz" zamiast pushować do
+      ekranu walki. Formuła nagrody BEZ ZMIAN — nowy handler `onClaimQuest` w
+      `pet-quests.tsx` liczy DOKŁADNIE to samo co dawniej liczył `boss-fight.tsx`
+      (`questFightCoins(base) × gearCoinsMult`, `questFightXp(base)`), tylko przez ożywioną,
+      wcześniej martwą akcję `petStore.claimDaily(id, coins, xp)` zamiast `claimQuestFight`
+      (ta sama para map `dailyClaims`+`dayClaims`, bez wpisu do `bossLog` — questowa walka i
+      tak nigdy nie miała realnego przeciwnika do zalogowania). `TRAINING_QUEST_IDS` side-effect
+      (`markTrainingDay()`) zachowany. **`boss-fight.tsx`'s `kind==='quest'` branch pozostaje w
+      kodzie jako nieosiągalny z UI** — celowo NIE usunięty w tym samym PR (ryzyko przy dużym
+      pliku walki na rzecz szybkiego, bezpiecznego shipu; kandydat do sprzątnięcia osobno,
+      patrz NEXT_STEPS.md). Dodatkowo: nowy "ping" badge na zakładce Zadania we
+      `PupilNavbar.tsx` (user: "dodaj ping na zakladce questów ze coś jest tam do odebrania")
+      — kropka przy ikonie `quests`, widoczna z KTÓREGOKOLWIEK z 4 ekranów Pupila (nie tylko
+      po wejściu na sam ekran Zadań), bo navbar montuje się niezależnie na wszystkich 4.
+      Logika questCtx/quests/missed WYDZIELONA do nowego `src/hooks/usePetQuests.ts` (ten sam
+      wzorzec co `usePetHealthSync`) — jedno źródło prawdy zamiast duplikowania obliczeń
+      między pełnym ekranem Zadań a badge'em w navbarze.
   - **MAD bossy** (2026-08-15, `utils/madBosses.ts`) — PIĄTY tor, `?kind=mad` w
     `boss-fight.tsx`. User: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną krzywą
     HP w nieskończoność (dokładnie problem raidu wyżej), druga fala TYCH SAMYCH 22 bossów
