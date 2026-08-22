@@ -9,6 +9,41 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Level-up celebration: tekst znikał, widać było TYLKO odznakę z ikoną — NIEsprawdzone (2026-08-22)
+
+User ze screenshotem: "jak dostaje lewel to nic [tekstu] oprócz [ikonki] nie jest napisane,
+poprawisz?" — baner level-upu (`LevelUpCelebration.tsx`) pokazywał samą żółtą odznakę z ikoną
+`ChevronsUp`, cały tekst ("AWANS POZIOMU"/"Poziom N!"/opis/pasek XP) był niewidoczny. Przyczyna:
+klasyczna RN-owa pułapka `flex:1` w rzędzie bez definitywnej szerokości rodzica (`card` miał
+tylko `maxWidth`, nigdy realny `width`; wyśrodkowujący `wrap` daje mu szerokość "po
+zawartości") — kolumna tekstu z `flex:1` zapadała się do 0px, sąsiadująca sztywna odznaka
+44px renderowała się normalnie. Fix: `useWindowDimensions()` liczy realną szerokość karty i
+podaje ją jako jawny `width`. Pełny opis w ARCHITECTURE.md, sekcja "Level-up celebration"
+(nowy sub-punkt "BUG: cały tekst..."). `tsc`/`jest` zielone (709/709 — czysto layoutowa
+zmiana w jednym komponencie, bez logiki wartej osobnego testu). **Priorytet testu na
+urządzeniu**: zdobądź poziom (albo poczekaj na kolejny naturalny level-up) i sprawdź czy baner
+pokazuje PEŁNY tekst — kicker "AWANS POZIOMU", "Poziom N!", opis, mini pasek XP — nie samą
+odznakę z ikoną.
+
+## 🆕 Raid dzieli teraz czerwoną pulę energii z wydarzeniami — NIEsprawdzone (2026-08-22)
+
+User: "ogarnąłeś zeby raid ten korzystał z czerwonej energii?" — zapytany o zakres wybrał
+"realne połączenie z pulą eventów" (nie tylko zmianę koloru ikony). Dawna własna pula
+`raidEnergy` w `petStore.ts` USUNIĘTA — raid zużywa teraz `eventEnergy` (tę samą czerwoną
+pulę co sezonowe wydarzenia), mini-karta raidu na ekranie Bossy pokazuje ją na czerwono
+zamiast dawnego niebieskiego (który mylnie sugerował że raid dzieli pulę z kampanią). Pełny
+opis w ARCHITECTURE.md, sekcja "Raid dostał pełną rundową walkę" (nowy sub-punkt). `tsc`/
+`jest` zielone (709/709). **Świadomo NIEdociążony balans** — dzienny grant tej puli
+(`eventDailyAttempts`) nie został podniesiony żeby zrekompensować nowego konsumenta, więc
+grający regularnie w OBA (raid + wydarzenie) będzie miał łącznie mniej prób dziennie niż
+wcześniej (dawniej dwie osobne pule). **Priorytet testu na urządzeniu**:
+(a) na ekranie Bossy sprawdź czy mini-karta RAID pokazuje teraz czerwoną (nie niebieską)
+liczbę energii, tę samą co pigułka WYDARZENIA w prawym górnym rogu,
+(b) stoczyć walkę raidową i sprawdzić czy liczba w obu miejscach (pigułka nagłówka + mini-karta
+raidu) spada o tyle samo (to jedna, wspólna pula),
+(c) obserwuj czy łączna liczba prób raid+event dziennie faktycznie wystarcza — jeśli za mało
+przy regularnym korzystaniu z obu, rozważyć podniesienie `eventDailyAttempts`.
+
 ## 🆕 Questy bez walki (samo "Odbierz") + ping na zakładce Zadania — NIEsprawdzone (2026-08-22)
 
 User: "obok przycisku walcz pokazuje sie ile dostanę monet, a to bez sensu... questy zrobimy

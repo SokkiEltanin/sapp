@@ -222,17 +222,19 @@ interface PetState {
   // konkretnym ekranie). ackPetLevel() niżej tylko przesuwa ten znacznik.
   lastSeenLevel: number;
   // ── raid tygodniowy ──
-  // WŁASNA pula energii — atak bossa i atak raidu NIE dzielą jednego zasobu (dawniej
-  // dzieliły `energy`, więc trzeba było wybierać, w co uderzyć). Zasilana tym samym
-  // wzorem co energia bossa (ta sama codzienna samo-opieka napędza obie), ale osobno.
-  raidEnergy: number;
-  raidEnergyDate: string | null;
-  raidEnergyToday: number;
+  // Dawniej WŁASNA pula energii (raidEnergy, żeby atak bossa i atak raidu nie dzieliły
+  // jednego zasobu z kampanią). PRZEBUDOWANE (2026-08-22, user: "ogarnąłeś zeby raid ten
+  // korzystał z czerwonej energii?" → wybrał "realne połączenie z pulą eventów") — raid
+  // zużywa teraz TĘ SAMĄ czerwoną pulę co sezonowe wydarzenia (`eventEnergy` niżej), bo
+  // oba to tematycznie te same "dodatkowe" tryby obok głównej, sekwencyjnej kampanii
+  // (niebieska `energy`). Osobne pole `raidEnergy`/`raidEnergyDate`/`raidEnergyToday`
+  // USUNIĘTE — patrz `eventEnergy` niżej, teraz wspólne dla raid+event.
   raidWeek: string | null;      // klucz tygodnia, dla którego raidHp jest aktualne
   raidHp: number;               // pozostałe HP raidu tego tygodnia
   raidWon: string[];            // klucze tygodni pokonanych (kolekcjonerskie medale)
   // ── wydarzenia (sezonowe święta / nemesis miesiąca) ──
-  // TRZECIA niezależna pula energii — patrz raidEnergy wyżej, ten sam powód.
+  // Wspólna czerwona pula dla WYDARZEŃ i RAIDU (2026-08-22, patrz komentarz przy raidWeek
+  // wyżej) — dawniej trzecia, niezależna pula tylko dla wydarzeń.
   eventEnergy: number;
   eventEnergyDate: string | null;
   eventEnergyToday: number;
@@ -286,7 +288,6 @@ interface PetState {
   openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null; gearDropped: { itemId: string; name: string; rarity: GearRarity } | null } | null; // open one pending crate
   // boss battles
   syncEnergyRegen: () => void;  // dogania tyknięcia regeneracji energii kampanii/MAD które minęły offline
-  syncRaidEnergy: (todayEnergy: number, mult: number) => void; // FLAT dzienny grant, bez zmian — osobna pula raidu
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
   spendEnergy: () => void;   // -1 z banku regenerującego się w czasie, patrz campaignEnergyMax()/ENERGY_REGEN_HOURS
   defeatBoss: (bossId: string, lootId: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;
@@ -299,7 +300,7 @@ interface PetState {
   cancelMission: () => void;
   healBoss: (bossId: string, amount: number, maxHp: number) => void;   // mechanika: boss leczy się gdy go zaniedbasz
   raidEnsure: (weekKey: string, hp: number) => void;                   // ustaw HP raidu na nowy tydzień (raz)
-  raidAttack: (damage: number) => { remaining: number; defeated: boolean };
+  raidAttack: (damage: number) => { remaining: number; defeated: boolean };  // zużywa eventEnergy (wspólna pula, patrz komentarz przy raidWeek)
   raidClaim: (weekKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => void;     // pokonany raid → medal + nagroda (raz/tydzień)
   // wydarzenia
   syncEventEnergy: (todayEnergy: number, mult: number) => void;
@@ -381,9 +382,6 @@ export const usePetStore = create<PetState>()(
       trainingDays: {},
       energy: campaignEnergyMax([], {}, {}),
       energyRegenAt: null,
-      raidEnergy: 0,
-      raidEnergyDate: null,
-      raidEnergyToday: 0,
       raidWeek: null,
       raidHp: 0,
       raidWon: [],
@@ -652,21 +650,6 @@ export const usePetStore = create<PetState>()(
         const r = energyRegenTick(s.energy, s.energyRegenAt, max);
         return { energy: r.energy, energyRegenAt: r.regenAt };
       }),
-      // Identical shape to syncEnergy, targeting the raid's own bank — see the
-      // raidEnergy comment above for why this is separate from `energy`.
-      syncRaidEnergy: (todayEnergy, mult) => {
-        const t = todayISO();
-        const s = get();
-        const grantedToday = s.raidEnergyDate === t ? s.raidEnergyToday : 0;
-        const target = Math.round(todayEnergy * (1 + mult));
-        const delta = target - grantedToday;
-        if (delta <= 0 && s.raidEnergyDate === t) return;
-        set({
-          raidEnergy: s.raidEnergy + Math.max(0, delta),
-          raidEnergyDate: t,
-          raidEnergyToday: Math.max(grantedToday, target),
-        });
-      },
       attackBoss: (bossId, maxHp, damage, dodge) => {
         const s = get();
         const cur = s.bossHp[bossId] ?? maxHp;
@@ -732,7 +715,7 @@ export const usePetStore = create<PetState>()(
       raidAttack: (damage) => {
         const s = get();
         const remaining = Math.max(0, s.raidHp - damage);
-        set({ raidEnergy: Math.max(0, s.raidEnergy - 1), raidHp: remaining });
+        set({ eventEnergy: Math.max(0, s.eventEnergy - 1), raidHp: remaining });
         return { remaining, defeated: remaining <= 0 };
       },
       raidClaim: (weekKey, coins, xp, name, level, fight) => set((s) => (s.raidWon.includes(weekKey) ? s : {
@@ -900,7 +883,7 @@ export const usePetStore = create<PetState>()(
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidEnergy: 0, raidEnergyDate: null, raidEnergyToday: 0, raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
     }),
     {
       name: 'pet-v1',
@@ -921,7 +904,6 @@ export const usePetStore = create<PetState>()(
         missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt, missionProfile: s.missionProfile,
         bossHp: s.bossHp, bossLog: s.bossLog,
         resetGeneration: s.resetGeneration, lastResetAt: s.lastResetAt,
-        raidEnergy: s.raidEnergy, raidEnergyDate: s.raidEnergyDate, raidEnergyToday: s.raidEnergyToday,
         raidWeek: s.raidWeek, raidHp: s.raidHp, raidWon: s.raidWon,
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
         eventWon: s.eventWon,

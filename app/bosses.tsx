@@ -51,7 +51,7 @@ export default function Bosses() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const {
-    xp, energy, energyRegenAt, raidEnergy, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncRaidEnergy, syncEventEnergy,
+    xp, energy, energyRegenAt, eventEnergy, ownedItems, defeatedBosses, syncEnergyRegen, syncEventEnergy,
     raidWeek, raidHp, raidWon, raidEnsure, eventWon, defeatedMadBosses, atkStatBonus,
     menaceId, menaceHp, menaceEnsure, equippedGear, ownedGear,
   } = usePetStore();
@@ -60,7 +60,7 @@ export default function Bosses() {
   const { settings: workSettings } = useWorkStore();
 
   // Krok 8 — gear dokłada się do bonusów z lootu (te same wzory co boss-fight.tsx/pet.tsx),
-  // energyMult stąd zasila syncRaidEnergy/syncEventEnergy niżej.
+  // energyMult stąd zasila syncEventEnergy niżej.
   const bonuses = useMemo(() => {
     const loot = bossBonuses(ownedItems);
     const gear = gearCombatBonuses(equippedGear, ownedGear);
@@ -86,12 +86,12 @@ export default function Bosses() {
   // Energia kampanii/MAD regeneruje się w czasie rzeczywistym (2026-08-18, patrz
   // ENERGY_REGEN_HOURS w bosses.ts) — `syncEnergyRegen()` dogania tyknięcia
   // które minęły offline, wołane tak samo jak stary flat sync przy każdym powrocie na ekran.
-  // Raid/wydarzenie ZOSTAJĄ przy starym flat dziennym modelu (`dailyAttempts`/
-  // `eventDailyAttempts`, skalowane energyMult z łupu) — ta zmiana dotyczy TYLKO energii
-  // kampanii, nie ich.
+  // Wydarzenie ZOSTAJE przy starym flat dziennym modelu (`eventDailyAttempts`, skalowane
+  // energyMult z łupu) — ta zmiana dotyczy TYLKO energii kampanii. Raid (2026-08-22, patrz
+  // komentarz przy raidWeek w petStore.ts) zużywa TĘ SAMĄ pulę co wydarzenie — bez własnego
+  // sync, jeden `syncEventEnergy()` zasila oba.
   const reload = useCallback(() => {
     syncEnergyRegen();
-    syncRaidEnergy(dailyAttempts(bonuses.energyMult), 0);
     syncEventEnergy(eventDailyAttempts(bonuses.energyMult), 0);
     raidEnsure(weekKeyOf(), raidHpFor(level, weekKeyOf()));
     // Nemesis (2026-08-18): trwały bank jak raid — ensure na KAŻDY reload (no-op jeśli id się
@@ -108,7 +108,7 @@ export default function Bosses() {
       sweetsThisMonth: sweetsVsAvg.thisMonth, sweetsAvg: sweetsVsAvg.avg,
     });
     if (eb && eb.kind === 'menace') menaceEnsure(eb.id, menaceHpFor(level));
-  }, [bonuses.energyMult, syncEnergyRegen, syncRaidEnergy, syncEventEnergy, level, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
+  }, [bonuses.energyMult, syncEnergyRegen, syncEventEnergy, level, raidEnsure, menaceEnsure, events, gcalEvents, workSettings, expenses]);
   useFocusEffect(reload);
   // useFocusEffect łapie tylko nawigację, nie powrót z tła (ekrany zostają zamontowane) —
   // ten sam fix co pet.tsx (2026-08-12/13, patrz memory focus_vs_appstate_refresh.md). Tu
@@ -186,10 +186,12 @@ export default function Bosses() {
         {/* Dwie NIEZALEŻNE pule energii w prawym górnym rogu, W KOLUMNIE (2026-08-19, user:
             "energia eventowych ma być czerwona i wspólna dla obu w prawym górnym, i pod nią
             energia zwykła niebieska pod kampanię") — czerwona (wydarzenia, `eventEnergy`,
-            wspólna dla wszystkich sezonowych, nemesis jej nie zużywa) NA GÓRZE, niebieska
-            (kampania/MAD, `energy`) POD NIĄ. Czerwona pokazywana dopiero od odblokowania
-            eventów (level>=2, ten sam próg co `eventUnlocked` niżej) — przed tym nie ma czego
-            pokazywać.
+            wspólna dla wszystkich sezonowych) NA GÓRZE, niebieska (kampania/MAD, `energy`)
+            POD NIĄ. Czerwona pokazywana dopiero od odblokowania eventów (level>=2, ten sam
+            próg co `eventUnlocked` niżej) — przed tym nie ma czego pokazywać. Nemesis jej nie
+            zużywa (nielimitowane próby). Raid (2026-08-22, user: "ogarnąłeś zeby raid ten
+            korzystał z czerwonej energii?") DOŁĄCZYŁ do tej samej czerwonej puli — patrz
+            mini-karta raidu niżej, teraz też `eventEnergy` zamiast dawnej własnej `raidEnergy`.
             PIGUŁKI "X/max" + odliczanie (2026-08-21, user: "widać w prawym górnym licznik do
             następnej energii oraz ile na ile mam np 0/5") — dawniej pigułki pokazywały TYLKO
             surową liczbę bez sufitu, a odliczanie do kolejnego punktu żyło jedynie w karcie
@@ -220,8 +222,8 @@ export default function Bosses() {
                 <Text style={s.miniKicker}>{raidWon.length}</Text>
               </View>
               <View style={s.miniEnergyRow}>
-                <Zap size={10} color="#38BDF8" />
-                <Text style={s.miniEnergy}>{raidEnergy}</Text>
+                <Zap size={10} color="#F87171" />
+                <Text style={[s.miniEnergy, { color: '#F87171' }]}>{eventEnergy}</Text>
               </View>
             </View>
             <View style={s.miniBody}>
@@ -235,7 +237,7 @@ export default function Bosses() {
               <Text style={s.miniDoneTxt}>Pokonany ✓ · nowy w pon.</Text>
             ) : raidUnlocked ? (
               <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=raid' as any); }}>
-                <View style={[s.miniBtn, raidEnergy <= 0 && { opacity: 0.5 }]}>
+                <View style={[s.miniBtn, eventEnergy <= 0 && { opacity: 0.5 }]}>
                   <Text style={s.miniBtnTxt}>WALCZ</Text>
                 </View>
               </PressableScale>

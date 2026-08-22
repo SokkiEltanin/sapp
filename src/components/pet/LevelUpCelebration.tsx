@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Easing, useWindowDimensions } from 'react-native';
 import { ChevronsUp } from 'lucide-react-native';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetLevelUp } from '@/store/petLevelUpStore';
@@ -42,6 +42,18 @@ export default function LevelUpCelebration() {
   const ackPetLevel = usePetStore(s => s.ackPetLevel);
   const xp = usePetStore(s => s.xp);
   const level = queue[0] ?? null;
+  // Fix (2026-08-22, user: "jak dostaje lewel to nic oprócz [ikonki] nie jest napisane") —
+  // `card` miał tylko `maxWidth: 360`, nigdy realny `width`. `wrap` centruje przez
+  // `alignItems:'center'`, więc Animated.View/Pressable dostają szerokość "po zawartości"
+  // (hug-content), nie stałą. Wewnątrz `card`-a kolumna tekstu ma `flex:1` — a `flex:1` w RN
+  // to `flexBasis:'0%'`, czyli "zacznij od zera i rośnij w dostępną przestrzeń". Bez
+  // DEFINITYWNEJ szerokości rodzica nie ma w co rosnąć, więc kolumna tekstu zapadała się do
+  // 0px — widoczna zostawała tylko sztywna 44px odznaka z ikoną, cały tekst (kicker/tytuł/
+  // pasek XP) był realnie wyrenderowany, ale o szerokości zero. Fix: policz REALNĄ szerokość
+  // karty z ekranu (`useWindowDimensions`), nie samą górną granicę — to daje wewnętrznemu
+  // `flex:1` coś, w co może faktycznie urosnąć.
+  const { width: screenW } = useWindowDimensions();
+  const cardWidth = Math.min(screenW - 40, 360);
 
   const y = useRef(new Animated.Value(-160)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -82,7 +94,7 @@ export default function LevelUpCelebration() {
     <View style={st.wrap} pointerEvents="box-none">
       <Confetti colors={['#FBBF24', '#2AC68F', '#38BDF8', '#F472B6', '#A78BFA']} />
       <Animated.View style={{ transform: [{ translateY: y }], opacity }}>
-        <Pressable style={st.card} onPress={dismiss}>
+        <Pressable style={[st.card, { width: cardWidth }]} onPress={dismiss}>
           <View style={st.badge}><ChevronsUp size={24} color="#0B0E1A" strokeWidth={3} /></View>
           <View style={{ flex: 1 }}>
             <Text style={st.kicker}>AWANS POZIOMU</Text>
@@ -104,7 +116,7 @@ export default function LevelUpCelebration() {
 const st = StyleSheet.create({
   wrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', paddingTop: 56, zIndex: 1000 },
   card: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, maxWidth: 360, marginHorizontal: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#161A1A', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16,
     borderWidth: 1, borderColor: '#FBBF2455',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8,
