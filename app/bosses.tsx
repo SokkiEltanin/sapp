@@ -40,6 +40,16 @@ function fmtEnergyCountdown(regenAtIso: string): string {
   return h > 0 ? `${h}h ${m}min` : `${m}min`;
 }
 
+// Czerwona pula (event+raid) NIE regeneruje się w czasie rzeczywistym jak kampania — to
+// płaski, dzienny grant (`syncEventEnergy`, patrz petStore.ts), więc "kolejny punkt" realnie
+// przychodzi o północy, nie po X godzinach jak `energyRegenAt`. Ten sam `fmtEnergyCountdown`
+// format, tylko cel = najbliższa lokalna północ zamiast zapisanego timestampu regeneracji.
+function nextLocalMidnightIso(): string {
+  const d = new Date();
+  d.setHours(24, 0, 0, 0);
+  return d.toISOString();
+}
+
 // Ekran-LISTA (S&F-style): kampania + raid + wydarzenie, WYŁĄCZNIE przegląd. Klik "WALCZ"
 // na KAŻDYM z trzech nawiguje do app/boss-fight.tsx (kampania bez parametru, raid/wydarzenie
 // przez ?kind=raid|event) — 2026-08-10, user: "przyjrzyj się teraz eventowym bossom żeby
@@ -197,17 +207,32 @@ export default function Bosses() {
             surową liczbę bez sufitu, a odliczanie do kolejnego punktu żyło jedynie w karcie
             bohatera kampanii niżej (trzeba było przewinąć, żeby je zobaczyć). Sufit dokłada
             się z TYCH SAMYCH formuł co reszta ekranu (`campaignEnergyMax`/`eventEnergyMax`
-            wyżej) — jedna prawda, nie druga zgadywana liczba. */}
+            wyżej) — jedna prawda, nie druga zgadywana liczba.
+            Odliczanie PO LEWEJ od pigułki, nie pod obiema (2026-08-22, user: "to odliczanie
+            do następnej energii... możesz dodać po lewej od energii i dodać dla czerwonej
+            też taki licznik?") — każda pigułka dostaje WŁASNY wiersz (`s.energyRow`) z
+            odliczaniem jako lewy sąsiad, zamiast jednego wspólnego tekstu zbitego pod spodem
+            całej kolumny (dawniej dotyczył tylko niebieskiej). Czerwona liczy do najbliższej
+            lokalnej północy (`nextLocalMidnightIso`) — to płaski dzienny grant, nie
+            regenerujący się w czasie bank jak kampania, więc "kolejny punkt" realnie
+            przychodzi o północy. */}
         <View style={s.energyPillCol}>
           {level >= 2 && (
-            <View style={[s.energyPill, { backgroundColor: '#F8717118', borderColor: '#F8717140' }]}>
-              <Zap size={13} color="#F87171" /><Text style={[s.energyTxt, { color: '#F87171' }]}>{eventEnergy}/{eventEnergyMax}</Text>
+            <View style={s.energyRow}>
+              {eventEnergy < eventEnergyMax && (
+                <Text style={[s.energyCountdown, { color: '#F87171' }]} numberOfLines={1}>za {fmtEnergyCountdown(nextLocalMidnightIso())}</Text>
+              )}
+              <View style={[s.energyPill, { backgroundColor: '#F8717118', borderColor: '#F8717140' }]}>
+                <Zap size={13} color="#F87171" /><Text style={[s.energyTxt, { color: '#F87171' }]}>{eventEnergy}/{eventEnergyMax}</Text>
+              </View>
             </View>
           )}
-          <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{energy}/{campaignEnergyMax}</Text></View>
-          {energy < campaignEnergyMax && energyRegenAt && (
-            <Text style={s.energyCountdown} numberOfLines={1}>za {fmtEnergyCountdown(energyRegenAt)}</Text>
-          )}
+          <View style={s.energyRow}>
+            {energy < campaignEnergyMax && energyRegenAt && (
+              <Text style={s.energyCountdown} numberOfLines={1}>za {fmtEnergyCountdown(energyRegenAt)}</Text>
+            )}
+            <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{energy}/{campaignEnergyMax}</Text></View>
+          </View>
         </View>
       </View>
 
@@ -474,6 +499,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', ...typography.h3, color: c.text.primary },
   energyPillCol: { flexDirection: 'column', alignItems: 'flex-end', gap: 4 },
+  energyRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   energyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#38BDF818', borderRadius: radius.full, paddingHorizontal: 10, height: 30, borderWidth: 1, borderColor: '#38BDF840' },
   energyTxt: { fontSize: 13, fontWeight: '800', color: '#38BDF8' },
   energyCountdown: { fontSize: 9.5, fontWeight: '700', color: c.text.muted },
