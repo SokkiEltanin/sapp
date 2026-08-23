@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState } from 'react-native';
 import { router } from 'expo-router';
-import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles } from 'lucide-react-native';
+import { Timer, Briefcase, AlertTriangle, ListTodo, Wallet, CalendarClock, Flame, Smile, Check, Sparkles, Cat, Swords } from 'lucide-react-native';
 import { usePomodoroStore } from '@/store/pomodoroStore';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useWorkStore } from '@/store/workStore';
@@ -10,6 +10,8 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { useMoodStore } from '@/store/moodStore';
 import { useHabits } from '@/hooks/useHabits';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
+import { usePetStore } from '@/store/petStore';
+import { fmtMissionDuration } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors, fonts } from '@/theme';
@@ -68,6 +70,8 @@ function pillIcon(key: string): any {
   if (key.startsWith('budget-')) return Wallet;
   if (key.startsWith('gcal-') || key.startsWith('deadline-')) return CalendarClock;
   if (key.startsWith('habit-')) return Flame;
+  if (key.startsWith('mission-')) return Cat;
+  if (key.startsWith('bossenergy-')) return Swords;
   if (key === 'mood-missing') return Smile;
   if (key === 'all-clear') return Check;
   return Sparkles;
@@ -121,6 +125,12 @@ export default function TopPill() {
   const { habits, todayDone } = useHabits();
   const todayMoodEntry = useMoodStore(s => s.todayEntry);
 
+  // Pupil (2026-08-23, user: "dodac pupila że jak jest na misji to tez pokazuje że jest") —
+  // misja w toku i energia bossów gotowa do walki, oba jako kandydaci na LUŹNĄ (nie-pilną)
+  // pulę rotacji niżej, obok habit-risk/mood/pending/all-clear.
+  const missionEndsAt = usePetStore(s => s.missionEndsAt);
+  const bossEnergy    = usePetStore(s => s.energy);
+
   // The pill never re-focuses (it lives in the tab bar), so reload budgets on
   // cold start AND every foreground — otherwise a limit changed in Settings would
   // leave the pill's "near limit" warning stale for the whole session.
@@ -130,6 +140,23 @@ export default function TopPill() {
     reload();
     const sub = AppState.addEventListener('change', s => { if (s === 'active') reload(); });
     return () => sub.remove();
+  }, []);
+
+  // Rotacja LUŹNEJ puli (2026-08-23, user: "żeby nie pokazywało się miesiąc ten sam że mam
+  // jedno zadanie tylko żeby trochę tego trochę tamtego") — dawniej gdy żaden pilny stan
+  // (1-7: pomodoro/praca/zaległe/dziś/budżet/kalendarz/deadline) nie pasował, pill pokazywał
+  // ZAWSZE TEN SAM fallback (pierwszy pasujący z 8-10 wg sztywnego priorytetu) — jeśli user
+  // miał tylko "1 zadanie w toku" i nic innego pilnego, widział dokładnie ten sam napis
+  // tygodniami. Teraz WSZYSTKIE luźne kandydaty (streak zagrożony/misja pupila/energia
+  // bossów/brak nastroju/zadania w toku/"wszystko ogarnięte") zbierane są do jednej listy i
+  // pokazywane PO KOLEI, zmieniając się co CALM_ROTATE_MS — realna odmiana zamiast jednego
+  // zamrożonego stanu. Pilne stany (1-7) NADAL mają twardy priorytet i przerywają rotację
+  // natychmiast, gdy się pojawią (liczone PRZED tą pulą, bez zmian).
+  const CALM_ROTATE_MS = 8000;
+  const [calmTick, setCalmTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setCalmTick(t => t + 1), CALM_ROTATE_MS);
+    return () => clearInterval(id);
   }, []);
 
   // ── Priority logic ─────────────────────────────────────────────────────────
@@ -289,51 +316,85 @@ export default function TopPill() {
       };
     }
 
-    // 8 — Habit streak at risk (after 17:00, any habit not done today)
+    // 8+ — LUŹNA pula (nic pilne z 1-7 nie pasuje) — zbierz WSZYSTKICH pasujących kandydatów
+    // i pokaż jednego na zmianę, nie zawsze tego samego (patrz komentarz przy `calmTick`
+    // wyżej). Kolejność w tablicy NIE jest priorytetem — to tylko kolejność rotacji.
+    const calmCandidates: PillItem[] = [];
+
+    // Habit streak at risk (after 17:00, any habit not done today)
     if (hour >= 17) {
       const undone = habits.filter(h => !todayDone.includes(h.id));
       if (undone.length > 0) {
         const first = undone[0];
-        return {
+        calmCandidates.push({
           badge: 'SERIA!',
           color:  '#F59E0B',             // amber
           text:   `${up(first.title)} NIE ZAZNACZONY`,
           route:  '/habits',
           key:    `habit-${first.id}`,
-        };
+        });
       }
     }
 
-    // 9 — No mood entry today (after 18:00)
+    // Pupil na misji (2026-08-23) — dopóki misja trwa, pokaż że pupil jest w podróży.
+    if (missionEndsAt) {
+      const remainingMs = new Date(missionEndsAt).getTime() - Date.now();
+      const ready = remainingMs <= 0;
+      calmCandidates.push({
+        badge:  ready ? 'GOTOWA' : fmtMissionDuration(remainingMs / 60000),
+        color:  '#2AC68F',             // zielony — kolor Pupila w tab barze
+        text:   ready ? 'PUPIL WRÓCIŁ Z MISJI' : 'PUPIL NA MISJI',
+        route:  '/pet',
+        key:    `mission-${ready ? 'ready' : Math.round(remainingMs / 60000)}`,
+      });
+    }
+
+    // Energia bossów gotowa do walki (2026-08-23) — patrz komentarz przy `bossEnergy` wyżej.
+    if (bossEnergy > 0) {
+      calmCandidates.push({
+        badge: `${bossEnergy}`,
+        color:  '#38BDF8',             // niebieski — kolor energii kampanii w app/bosses.tsx
+        text:   'MOŻESZ WALCZYĆ Z BOSSEM',
+        route:  '/bosses',
+        key:    `bossenergy-${bossEnergy}`,
+      });
+    }
+
+    // No mood entry today (after 18:00)
     if (hour >= 18 && !todayMoodEntry) {
-      return {
+      calmCandidates.push({
         badge: 'NASTRÓJ',
         color:  '#F472B6',             // pink
         text:   'JAK SIĘ CZUJESZ DZISIAJ?',
         route:  '/(tabs)/mood',
         key:    'mood-missing',
-      };
+      });
     }
 
-    // 10 — Fallback: nothing pressing → a calm positive state so the lifebar
-    // never just disappears. Shows pending count, or an "all clear" message.
+    // Fallback: pending count — zawsze dopisywany, jeśli są jakieś niezrobione zadania.
     const pending = calTasks.filter(t => t.status !== 'done').length;
     if (pending > 0) {
-      return {
+      calmCandidates.push({
         badge: `${pending}`,
         color:  timeAccent,
         text:   `${plPlural(pending, 'ZADANIE', 'ZADANIA', 'ZADAŃ')} W TOKU`,
         route:  '/(tabs)/tasks',
         key:    `pending-${pending}`,
-      };
+      });
     }
-    return {
-      badge: 'LUZ',
-      color:  colors.tabs.tasks,       // green
-      text:   'WSZYSTKO OGARNIĘTE',
-      route:  '/(tabs)/tasks',
-      key:    'all-clear',
-    };
+
+    // Ostateczny fallback — TYLKO gdy nic powyżej nie pasuje, żeby pill nigdy nie znikał.
+    if (calmCandidates.length === 0) {
+      calmCandidates.push({
+        badge: 'LUZ',
+        color:  colors.tabs.tasks,       // green
+        text:   'WSZYSTKO OGARNIĘTE',
+        route:  '/(tabs)/tasks',
+        key:    'all-clear',
+      });
+    }
+
+    return calmCandidates[calmTick % calmCandidates.length];
    } catch {
     // Never let the pill crash — bad data just hides it this render
     return null;
@@ -345,6 +406,7 @@ export default function TopPill() {
     calTasks,
     gcalEvents,
     expenses, budgets,
+    missionEndsAt, bossEnergy, calmTick,
     habits, todayDone,
     todayMoodEntry,
     today, tomorrow, weekEnd, hour, timeAccent, openWorkPanel,

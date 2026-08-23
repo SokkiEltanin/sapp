@@ -9,6 +9,27 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 TopPill: rotacja luźnej puli + pupil na misji/energia bossów — NIEsprawdzone (2026-08-23)
+
+User: "żeby nie pokazywało się miesiąc ten sam że mam jedno zadanie tylko żeby trochę tego
+trochę tamtego i dodać pupila że jak jest na misji to też pokazuje że jest... tak samo z
+energią do bossa". Pilne stany pigułki (pomodoro/praca/zaległe/dziś/budżet/kalendarz/
+deadline) bez zmian — pierwsze pasujące nadal wygrywa natychmiast. Reszta (streak zagrożony/
+nastrój/zadania w toku/all-clear) + dwaj NOWI kandydaci (pupil na misji, energia bossów >0)
+zbierani do jednej puli i pokazywani PO KOLEI co 8s zamiast zawsze tego samego. Pełny opis w
+ARCHITECTURE.md, sekcja "TopPill.tsx". `tsc`/`jest` zielone (709/709 — logika czysto
+UI/rotacyjna, brak nowej logiki liczbowej wartej osobnego testu jednostkowego).
+**Priorytet testu na urządzeniu** (to dotyka GLOBALNEJ pigułki widocznej z każdego ekranu —
+warto przetestować dokładnie):
+(a) gdy nic pilnego się nie dzieje (brak pomodoro/pracy/zaległych/dziś/budżetu/kalendarza),
+obserwuj pigułkę przez >30s — powinna zmieniać treść co ~8s, nie stać w miejscu,
+(b) wyślij pupila na misję, sprawdź czy pigułka w rotacji pokazuje "PUPIL NA MISJI" z
+odliczaniem, i "PUPIL WRÓCIŁ Z MISJI" gdy misja gotowa,
+(c) miej energię bossów >0 (np. świeży start/po regeneracji) — sprawdź czy w rotacji pojawia
+się "MOŻESZ WALCZYĆ Z BOSSEM" z liczbą energii jako badge,
+(d) sprawdź czy pilne stany (np. rozpocznij pomodoro) NADAL natychmiast przerywają rotację i
+przejmują pigułkę, tak jak wcześniej — to nie powinno się zmienić.
+
 ## 🆕 Podgląd statów + porównanie przed zakupem w Sklepie dnia — NIEsprawdzone (2026-08-22)
 
 User: "jak klikam w sklepiku to żeby po kliknięciu w item pokazywało jego staty i porównanie z

@@ -28,6 +28,21 @@ ciemny motyw. APK budowany przez GitHub Actions/Releases. Dystrybucja: jeden uż
   swipe się rozjadą.
 - Pasek zakładek: `src/components/ui/TabBar.tsx` (własny, nie natywny). Górna pigułka:
   `TopPill`. „+” = overlay w drzewie (NIE natywny Modal).
+  - **`TopPill.tsx` — priorytet 1-7 PILNE (sztywne, pierwsze pasujące wygrywa) + rotacja
+    LUŹNEJ puli (2026-08-23)** — user: "żeby nie pokazywało się miesiąc ten sam że mam
+    jedno zadanie tylko żeby trochę tego trochę tamtego". Dawniej stany 8-10 (streak
+    zagrożony/brak nastroju/zadania w toku/"wszystko ogarnięte") miały TEN SAM sztywny
+    priorytet co 1-7 — jeśli user miał tylko np. "1 zadanie w toku" i nic pilniejszego, pill
+    pokazywał DOKŁADNIE ten sam napis tygodniami. Teraz: pilne stany 1-7 (pomodoro/praca/
+    zaległe/dziś/budżet/kalendarz/deadline) bez zmian, sztywny priorytet, przerywają
+    natychmiast. Gdy żaden nie pasuje, WSZYSCY luźni kandydaci (streak/misja pupila/energia
+    bossów/nastrój/zadania w toku/all-clear) trafiają do jednej listy `calmCandidates` i
+    pokazują się PO KOLEI, zmieniając się co 8s (`calmTick`, `setInterval` w komponencie) —
+    `calmCandidates[calmTick % calmCandidates.length]`. Dwaj NOWI kandydaci: **pupil na
+    misji** (`missionEndsAt` z `petStore`, tekst różni się gotowa/w drodze, `fmtMissionDuration`
+    jako badge) i **energia bossów gotowa do walki** (`energy` z `petStore`, badge = liczba,
+    tylko gdy >0) — user: "dodać pupila że jak jest na misji to też pokazuje... tak samo z
+    energią do bossa".
 
 ## 2. Mapa katalogów (co gdzie żyje)
 
