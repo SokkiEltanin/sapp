@@ -72,7 +72,7 @@ const DAILY: DailyDef[] = [
   { id: 'd_steps10', label: '10 000 kroków',          coins: 2, xp: 5, done: c => c.stepsToday >= 10000, note: c => `${c.stepsToday}/10000`, progress: c => c.stepsToday / 10000 },
   { id: 'd_steps20', label: '20 000 kroków',          coins: 2, xp: 6, done: c => c.stepsToday >= 20000, note: c => `${c.stepsToday}/20000`, progress: c => c.stepsToday / 20000 },
   { id: 'd_habits',  label: 'Wszystkie nawyki',       coins: 2, xp: 5, done: c => c.habitsTotal > 0 && c.habitsDone >= c.habitsTotal, note: c => c.habitsTotal > 0 ? `${c.habitsDone}/${c.habitsTotal}` : 'brak nawyków', progress: c => c.habitsTotal > 0 ? c.habitsDone / c.habitsTotal : 0 },
-  { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 2, xp: 5, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione ❤️' : 'stuknij kota' },
+  { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 2, xp: 5, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione' : 'stuknij kota' },
 ];
 
 export interface DailyQuestState { id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string; progress?: number }

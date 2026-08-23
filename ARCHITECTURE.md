@@ -1606,6 +1606,17 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       potwierdzeniu `skip()` czyści interval i przechodzi od razu do `finish()`/fazy `done`,
       dokładnie jak naturalne dobicie timera do zera. Pompki/przysiady/brzuszki (nie-timed)
       NIE dostały tego przycisku — tam nie ma na co czekać, "UKOŃCZYŁEM" już jest natychmiastowe.
+    - **Przegapiony emoji w questach (2026-08-22)** — user: "jak nazwałeś te questy te miejsca
+      to wywal z nich te emotki xdd". Fix 2026-08-17 wyżej ściął emoji-sufiksy tylko z
+      questów TRENINGOWYCH (`b_pushups/squats/situps/plank/stretch`) — `d_pet` (DZIENNY quest
+      "Pogłaszcz pupila do pełna", `note: 'zrobione ❤️'`) był poza jego zasięgiem (inna
+      kategoria, dzienny nie bonusowy) i został przeoczony. Ścięty do gołego `'zrobione'`, ten
+      sam wzorzec. Przy okazji: hint na dole `app/pet-quests.tsx` ("Wydaj je w sklepie 🛍️, a
+      energią z nawyków walcz z bossami ⚔️") też miał dekoracyjne emoji — usunięte, sam tekst
+      zostaje. Pełny skan `quests.ts`/`pet-quests.tsx` pod kątem pozostałych emoji (2026-08-22)
+      nie znalazł nic więcej — 🪙 (moneta) w toastach/pigułkach nagród ZOSTAJE, to pervazywny
+      wzorzec w CAŁEJ apce (dziesiątki plików), nie coś specyficznego dla questów do wycięcia
+      w tym samym ruchu.
   - **Layout `app/pet.tsx` (2026-08-16)** — user: "zadania i ta walka jest za nisko, wywalić
     potrzeby bo nic nie mówi, zrobić głaskanie, nazwę zbić bo nad pupilem zajmuje w pizdu
     miejsca". Nowa kolejność sekcji w ScrollView: nazwa/nastrój (skurczone — `name` 24→16px,
