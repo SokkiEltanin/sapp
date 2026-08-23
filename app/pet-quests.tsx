@@ -280,7 +280,7 @@ export default function PetQuests() {
 
         <View style={s.hintBox}>
           <Text style={s.hintTxt}>
-            Monety zbierasz questami — za dbanie o siebie. Wydaj je w sklepie 🛍️, a energią z nawyków walcz z bossami ⚔️.
+            Monety zbierasz questami — za dbanie o siebie. Wydaj je w sklepie, a energią z nawyków walcz z bossami.
           </Text>
         </View>
       </ScrollView>
