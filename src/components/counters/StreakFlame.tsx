@@ -76,8 +76,21 @@ export function StreakFlameGlow({ days, size = 100 }: { days: number; size?: num
   const glowSize = coreSize * 1.45;
   const glowLeft = (size - glowSize) / 2;
   const glowTop = size * 0.315 - (glowSize - coreSize) / 2;
+  // Drugi, dużo większy kontur (2026-08-23, user: "między samym tłem kafelka a ogniem...
+  // jeszcze jeden kontur słabo widoczny z białego opacity 15%, centralnie powiększone go
+  // od tamtego [ognia] o 5x") — kolejna warstwa MIĘDZY tłem kafelka a płomieniem (renderuje
+  // się NAJPIERW, więc leży NAJGŁĘBIEJ, pod istniejącą poświatą `glowSize` powyżej), biały,
+  // 5× bazowy `size`, wyśrodkowana na TYM SAMYM punkcie co reszta warstw (środek `size×size`
+  // boxa — ten sam wzorzec `(size - X) / 2` co `glowLeft`/`glowTop`). Przy overflow:hidden
+  // kafelka (StreakWallCard) większość i tak jest przycięta — czyta się jako miękka,
+  // symetryczna łuna w tle, nie kolejny kontrastowy kształt płomienia.
+  const contourSize = size * 5;
+  const contourOffset = (size - contourSize) / 2;
   return (
     <View style={{ width: size, height: size, opacity: days < 1 ? 0.6 : 1 }}>
+      <View style={{ position: 'absolute', left: contourOffset, top: contourOffset, opacity: 0.15 }}>
+        <Flame size={contourSize} color="#FFFFFF" fill="#FFFFFF" strokeWidth={0} />
+      </View>
       <View style={{ position: 'absolute', left: glowLeft, top: glowTop, opacity: 0.35 }}>
         <Flame size={glowSize} color={t.core} fill={t.core} strokeWidth={0} />
       </View>
