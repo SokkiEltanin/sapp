@@ -46,6 +46,13 @@ const STAGE_SIZE = { baby: 150, kid: 172, teen: 194, adult: 214 } as const;
 // Kotek na pasku misji (2026-08-21, user: "większego o 15-20% zeby byl w tym pasku realnie")
 // — było 22, +18% zaokrąglone do 26 (środek żądanego zakresu).
 const MISSION_CAT_SIZE = 26;
+// Wysokość paska (2026-08-24, user: "kotek musi być bardziej w tym pasku... wystaje za
+// dużo") — dawny pasek 30px dawał kotkowi (26px) tylko ~2px marginesu na stronę, więc
+// realnie wyrenderowana sylwetka (SVG ma naturalny "oddech" wokół właściwego kształtu)
+// wizualnie wystawała poza krawędzie. Powiększone zamiast pomniejszać kotka z powrotem —
+// user WCZEŚNIEJ explicit prosił o większego kotka (wyżej), więc rozwiązaniem jest więcej
+// miejsca w pasku, nie cofnięcie tamtej zmiany.
+const MISSION_BAR_HEIGHT = 34;
 
 export default function Pet() {
   const c = useColors();
@@ -695,11 +702,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // wypełnienia i tak POWINNA być prosta (to rosnąca krawędź progresu, nie kraniec paska) —
   // zaokrąglone TYLKO lewe rogi (dopasowane do lewego kapsla `missionBarTrack`) usuwa problem
   // przy każdej szerokości, nie tylko naprawia efekt uboczny małego postępu.
-  missionBarTrack: { position: 'relative', width: '100%', height: 30, borderRadius: 15, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
-  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: 15, borderBottomLeftRadius: 15, overflow: 'hidden' },
+  missionBarTrack: { position: 'relative', width: '100%', height: MISSION_BAR_HEIGHT, borderRadius: MISSION_BAR_HEIGHT / 2, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: MISSION_BAR_HEIGHT / 2, borderBottomLeftRadius: MISSION_BAR_HEIGHT / 2, overflow: 'hidden' },
   missionBarWave: { position: 'absolute', top: -10, bottom: -10, width: 34, backgroundColor: 'rgba(255,255,255,0.32)' },
-  // top/marginLeft dopasowane do MISSION_CAT_SIZE (było 22px, teraz 26px — patrz stała).
-  missionBarCatWrap: { position: 'absolute', top: 1, marginLeft: -13 },
+  // top = wyśrodkowanie MISSION_CAT_SIZE w MISSION_BAR_HEIGHT (formuła, nie magiczna liczba —
+  // przeżyje kolejną zmianę rozmiaru paska/kotka bez ręcznego przeliczania). marginLeft =
+  // -połowa MISSION_CAT_SIZE (centrowanie poziome na punkcie postępu).
+  missionBarCatWrap: { position: 'absolute', top: (MISSION_BAR_HEIGHT - MISSION_CAT_SIZE) / 2, marginLeft: -MISSION_CAT_SIZE / 2 },
   // Jasna otoczka za ciemnym kotkiem (2026-08-21, patrz `catCoatIsDark` wyżej) — okrąg 10px
   // większy niż kotek, wyśrodkowany na tym samym punkcie (`top`/`left` = -połowa różnicy).
   missionCatHalo: { position: 'absolute', width: MISSION_CAT_SIZE + 10, height: MISSION_CAT_SIZE + 10, borderRadius: (MISSION_CAT_SIZE + 10) / 2, top: -5, left: -5, backgroundColor: 'rgba(255,255,255,0.55)' },
