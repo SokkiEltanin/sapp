@@ -36,7 +36,6 @@ export const DEFAULT_DASHBOARD_SECTIONS = [
   'habits-today',
   'stats-scope',
   'finances',
-  'savings',
   'fixed-variable',
   'food-breakdown',
   'sweets-vs-food',
@@ -88,7 +87,6 @@ export const SECTION_TITLES: Record<string, string> = {
   'habits-today':   'Nawyki dziś',
   'stats-scope':    'Przełącznik statystyk',
   'finances':       'Finanse (tydzień / miesiąc)',
-  'savings':        'Zaoszczędzone (kupony)',
   'fixed-variable': 'Na co idą pieniądze (stałe/zmienne/jedzenie)',
   'food-breakdown': 'Jedzenie — rozkład',
   'sweets-vs-food': 'Słodycze vs jedzenie (8 tyg.)',
@@ -139,7 +137,6 @@ export const SECTION_DESC: Record<string, string> = {
   'habits-today':   'Nawyki do odhaczenia dziś',
   'stats-scope':    'Przełącznik: ja / wszyscy',
   'finances':       'Saldo, wydatki i przychody (tydzień/miesiąc)',
-  'savings':        'Ile złapałeś na kuponach/promocjach (Lidl Plus itd.) — łącznie i w tym miesiącu',
   'fixed-variable': 'Stałe (z nazwami) vs zmienne vs jedzenie + trend 4 mies.',
   'food-breakdown': 'Jedzenie: miesiąc, tygodnie/dni i podkategorie (mięso, nabiał…)',
   'sweets-vs-food': 'Słodycze vs jedzenie (8 tygodni)',
@@ -165,7 +162,13 @@ export const SECTION_GROUP: Record<string, string> = {
   'tag-limits': 'Przypomnienia', 'habits-nudge': 'Przypomnienia',
   'tasks-work-row': 'Zadania i nawyki', 'today-tasks': 'Zadania i nawyki', 'month-tasks': 'Zadania i nawyki',
   'habits-today': 'Zadania i nawyki',
-  'finances': 'Finanse', 'savings': 'Finanse', 'fixed-variable': 'Finanse', 'sweets-vs-food': 'Finanse',
+  // `streak-wall` ("Twoje serie" — nawyki + liczniki "dni bez") 2026-08-24, user: "żeby ta
+  // nie jedzenie słodyczy było jakby tam gdzie nawyki bo tam gdzie odliczania to bez sensu"
+  // — dawniej w grupie "Nastrój i liczniki" razem z `countdowns` (odliczania DO wydarzeń,
+  // zupełnie inna koncepcja niż serie/streaki). Przeniesione do "Zadania i nawyki", bo to
+  // koncepcyjnie ta sama rodzina co `habits-today`/`daily-rings` — codzienne, nawykowe.
+  'streak-wall': 'Zadania i nawyki',
+  'finances': 'Finanse', 'fixed-variable': 'Finanse', 'sweets-vs-food': 'Finanse',
   'spend-by-day': 'Finanse', 'top-products': 'Finanse', 'work-hours': 'Finanse', 'who-ate': 'Finanse',
   'shops-collection': 'Finanse', 'food-breakdown': 'Finanse',
   'weekly-insights': 'Przegląd i statystyki', 'stats-scope': 'Przegląd i statystyki',
@@ -173,7 +176,7 @@ export const SECTION_GROUP: Record<string, string> = {
   'calorie-balance': 'Przegląd i statystyki', 'sleep-chart': 'Przegląd i statystyki',
   'mood-cal': 'Nastrój i liczniki', 'mood-wave': 'Nastrój i liczniki', 'countdowns': 'Nastrój i liczniki',
   'counters-since': 'Nastrój i liczniki', 'gablota-card': 'Nastrój i liczniki',
-  'streak-wall': 'Nastrój i liczniki', 'personal-records': 'Nastrój i liczniki', 'trivia': 'Inne',
+  'personal-records': 'Nastrój i liczniki', 'trivia': 'Inne',
   'time-capsule': 'Inne',
   'reflections': 'Inne',
   'pinned-notes': 'Inne', 'gcal': 'Inne', 'daily-rings': 'Zadania i nawyki', 'month-summary': 'Przegląd i statystyki',

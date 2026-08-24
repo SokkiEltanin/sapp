@@ -110,7 +110,23 @@ gubiłoby wpisy dodane od ostatniego odświeżenia.
 **Customowe kafelki** (`renderStatTile` w index.tsx): viz `number | wave | list | donut |
 compare | pixels`. Każdy nagłówek ma plakietkę jednostki (`unitChip`), a wykresy podpis
 okresu (`periodCaption`). Szczegóły po tapnięciu = modal `statDetail` z przełącznikiem
-Tydzień/Miesiąc (`detailPeriod`).
+Tydzień/Miesiąc (`detailPeriod`). Patrz §5 — cały system USUNIĘTY poza `viz==='pixels'`,
+przywróconym punktowo 2026-08-24.
+
+**Zmiany 2026-08-24** — user: (1) "widget oszczędzone z tych lidlowskich usuń mi... i możesz
+posprzątać po nim bo nie używam go wgle", (2) "żeby ta nie jedzenie słodyczy było jakby tam
+gdzie nawyki bo tam gdzie odliczania to bez sensu". (1): sekcja `savings` ("Zaoszczędzone
+(kupony)" — suma rabatów/kuponów z paragonów, w tym osobno Lidl) CAŁKOWICIE usunięta: node w
+index.tsx, wpisy w `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/`SECTION_DESC`/
+`SECTION_GROUP` (dashboardLayout.ts), komponent `SavingsSection.tsx`, util `utils/savings.ts`
+(`computeSavings`) i jego test `savings.test.ts` — usunięte w całości, nie tylko ukryte
+(zero pozostałych konsumentów po sprawdzeniu). NIE mylić z metryką custom-kafelków `savings`
+("Odłożone — przelewy własne", statWidgets.ts) — inna, NIEPOWIĄZANA rzecz, ten sam
+identyfikator to przypadek, zostaje bez zmian. (2): `streak-wall` ("Twoje serie" — nawyki +
+liczniki "dni bez", w tym "bez słodyczy") był w grupie edytora "Nastrój i liczniki" razem z
+`countdowns` (odliczania DO wydarzeń — koncepcyjnie coś zupełnie innego). Przeniesiony do
+"Zadania i nawyki" (`SECTION_GROUP` w dashboardLayout.ts) — ta sama rodzina co `habits-today`/
+`daily-rings`.
 
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 
@@ -120,10 +136,27 @@ Tydzień/Miesiąc (`detailPeriod`).
   metryki z `StatCtx` (expenses, scope, moodEntries, healthDays, workEvents, tasks, …).
   Etykiety osi z `predsFor` → `monthLabel` (nazwa miesiąca) / `weekLabel` ("DD.MM" =
   poniedziałek tygodnia).
-- **Kreator** `app/widget-builder.tsx` ma podgląd na PRAWDZIWYCH danych (buduje własny
-  `StatCtx` ze storów). Zapisuje `CustomTile` do `dashboardLayout` (`addCustomTile`).
+- **CAŁY system customowych kafelków 'stat' USUNIĘTY (data nieznana, przed tą sesją)** —
+  user: "wywal system custom widgetów" (były "niedopracowane"). Dawny kreator
+  `app/widget-builder.tsx` skasowany, `customTiles.filter(t => t.type !== 'stat')`
+  wszędzie — renderer (`renderStatTile`) i cały silnik metryk w `statWidgets.ts` ZOSTAŁY
+  (kompletne, działające), tylko martwe — nie było skąd stworzyć taki kafelek.
+  - **WYJĄTEK: "Rok w pikselach" PRZYWRÓCONY, tylko TEN JEDEN viz (2026-08-24)** — user:
+    "dodaj mi pixel year widget z możliwością wybrania czego". Nie przywrócono całego
+    systemu (liczby/wave/donut/porównania zostają wywalone, zgodnie z pierwotną decyzją) —
+    tylko `viz==='pixels'` (`YearPixels.tsx`, `PIXEL_METRICS`/`dailyValue`/`pixelTiers`
+    poniżej). `isVisibleCustomTile` (`app/(tabs)/index.tsx`) zastąpił blankietowy
+    `type !== 'stat'` filtrem `type !== 'stat' || viz === 'pixels'` we WSZYSTKICH miejscach
+    (`orderedSections`, `reorderVisible`, `moveVisible`, pętla `nodes[t.id]`). Nowy picker
+    (`pixelPickerOpen` state, modal mirror notatek-pickera, te same style `np*`) w edytorze
+    dashboardu — przycisk "Dodaj kafelek: Rok w pikselach" listuje `PIXEL_METRICS` (spend/
+    food/sweets/income/moodAvg/energyAvg/steps/sleepAvg/weight/tasksDone), tap tworzy
+    `addCustomTile({ type:'stat', viz:'pixels', metric, title })`. To JEDYNE miejsce
+    tworzące kafelki 'stat' — żaden inny wariant nie może już powstać.
 - `isSelfTransfer(e)` (statWidgets) = przelew własny (kategoria `transfer` lub tag
-  oszczednosci/przelew/revolut) — wykluczany ze spend I z przychodów, liczony w `savings`.
+  oszczednosci/przelew/revolut) — wykluczany ze spend I z przychodów, liczony w metryce
+  `savings` ("Odłożone (przelewy własne)" — TO NIE TO SAMO co usunięty dashboardowy kafel
+  "Zaoszczędzone (kupony)" niżej, tylko przypadkowo ten sam angielski identyfikator).
 
 ## 6. Finanse / model pieniędzy
 
