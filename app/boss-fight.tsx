@@ -832,7 +832,7 @@ export default function BossFight() {
           <View style={s.missionAwayCard}>
             <Compass size={26} color="#38BDF8" />
             <Text style={s.missionAwayTitle}>Pupil w trakcie podróży</Text>
-            {missionMb && <Text style={s.missionAwayDest}>{missionMb.emoji} {missionMb.destination}</Text>}
+            {missionMb && <Text style={s.missionAwayDest}>{missionMb.destination}</Text>}
             <View style={s.missionAwayBarTrack}>
               <View style={[s.missionAwayBarFill, { width: `${Math.round(missionProgress * 100)}%` }]} />
             </View>

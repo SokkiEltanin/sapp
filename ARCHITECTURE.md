@@ -1424,6 +1424,13 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       nowego stanu, tylko wcześniejszy odczyt istniejącej czystej funkcji). "Wróć natychmiast"
       (anulowanie bez nagrody, `onCancelMission`) zostaje małym podkreślonym linkiem pod
       paskiem — patrz Runda 3 niżej za design potwierdzenia.
+    - **Bez emoji przy nazwie miejsca (2026-08-24)** — user: "wyrzucić emotkę z nazwy tych, nie
+      lubię emotek" (screenshot: "🐳 Otchłań Oceanu" na pasku misji). Oba miejsca renderujące
+      `${missionMb.emoji} ${missionMb.destination}` (`app/pet.tsx` pasek misji na scenie i
+      `app/boss-fight.tsx` popup "Pupil w trakcie podróży") pokazują TERAZ samo
+      `missionMb.destination`, bez prefiksu emoji. `MiniBoss.emoji` w `minibosses.ts` ZOSTAJE
+      nietknięte — to osobne pole, dalej używane jako avatar zwierzaka W WALCE
+      (`minibossAsBoss`), user prosił o usunięcie emoji z NAZWY miejsca, nie z pola emoji w ogóle.
     - **Runda 3 — brak designu na potwierdzeniu + pełnoekranowy blok zamiast popupu**
       (2026-08-20, user: "komunikat wróć natychmiast z potwierdzeniem nie ma designu, i tak
       samo zamiast full screen powiadomien jak pupil jest w misji to zrób mini popup window").

@@ -364,7 +364,7 @@ export default function Pet() {
             {missionEndsAt && !missionReady ? (
               <View style={s.stageMissionWrap}>
                 <View style={s.missionHeadRow}>
-                  <Text style={s.missionDestTxt} numberOfLines={1}>{missionMb ? `${missionMb.emoji} ${missionMb.destination}` : 'W drodze…'}</Text>
+                  <Text style={s.missionDestTxt} numberOfLines={1}>{missionMb ? missionMb.destination : 'W drodze…'}</Text>
                   <Text style={s.missionTimerTxt}>{fmtMissionDuration(missionRemainingMs / 60000)}</Text>
                 </View>
                 <View style={s.missionBarTrack}>
