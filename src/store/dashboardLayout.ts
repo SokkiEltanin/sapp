@@ -213,6 +213,11 @@ export interface CustomTile {
   period?: 'week' | 'month';
   target?: number;       // optional goal — drawn as a line / progress on number & wave
   tag?: string;          // for tag-based metrics (e.g. spend / count / kg on #tag)
+  // viz 'pixels' (2026-08-24, user: "w ustawieniach w personalizacji nie dałeś mi
+  // możliwości zmiany roku") — który rok pokazuje siatka. Brak = domyślnie bieżący rok
+  // (`new Date().getFullYear()` w index.tsx), więc już ISTNIEJĄCE kafelki (utworzone przed
+  // tym polem) zachowują się dokładnie jak wcześniej bez żadnej migracji.
+  year?: number;
 }
 
 interface DashboardLayoutState {

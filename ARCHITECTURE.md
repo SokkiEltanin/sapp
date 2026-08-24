@@ -153,6 +153,15 @@ liczniki "dni bez", w tym "bez słodyczy") był w grupie edytora "Nastrój i lic
     food/sweets/income/moodAvg/energyAvg/steps/sleepAvg/weight/tasksDone), tap tworzy
     `addCustomTile({ type:'stat', viz:'pixels', metric, title })`. To JEDYNE miejsce
     tworzące kafelki 'stat' — żaden inny wariant nie może już powstać.
+  - **Zmiana roku na kafelku (2026-08-24)** — user: "w ustawieniach w personalizacji nie
+    dałeś mi możliwości zmiany roku xdd" (picker przy tworzeniu wybierał tylko metrykę, rok
+    był na sztywno `new Date().getFullYear()`). `CustomTile.year?: number` (opcjonalne,
+    brak = bieżący rok — istniejące kafelki bez migracji). W `renderStatTile` strzałki
+    ‹/› obok podpisu "Rok {year}" wywołują `updateCustomTile(t.id, { year: year ± 1 })`
+    (pierwsze realne użycie tej akcji store'a — istniała, ale nigdzie nie była wołana).
+    Strzałka w przód disabled przy `year >= currentYear` (nie da się zobaczyć przyszłości).
+    `dailyValue()` jest w pełni datowana (filtruje po YYYY-MM-DD z już załadowanej pełnej
+    historii) — zmiana roku nie wymagała żadnej zmiany w warstwie danych.
 - `isSelfTransfer(e)` (statWidgets) = przelew własny (kategoria `transfer` lub tag
   oszczednosci/przelew/revolut) — wykluczany ze spend I z przychodów, liczony w metryce
   `savings` ("Odłożone (przelewy własne)" — TO NIE TO SAMO co usunięty dashboardowy kafel
