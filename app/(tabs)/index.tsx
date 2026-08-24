@@ -19,7 +19,7 @@ import {
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronDown, Trash2, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock, Layers,
-  PiggyBank, Utensils, Coins, Apple, ListChecks, Search,
+  PiggyBank, Utensils, Coins, Apple, ListChecks, Search, Grid3x3,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -29,7 +29,6 @@ import { usePomodoroStore } from '@/store/pomodoroStore';
 import MoodCheckInModal from '@/components/mood/MoodCheckInModal';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useExpensesStore } from '@/store/expensesStore';
-import { computeSavings } from '@/utils/savings';
 import { useTasks } from '@/hooks/useTasks';
 import { useHabits } from '@/hooks/useHabits';
 import { useMoodCheckIn } from '@/hooks/useMoodCheckIn';
@@ -88,7 +87,6 @@ import SpendByDaySection from '@/components/dashboard/SpendByDaySection';
 import FixedVariableSection from '@/components/dashboard/FixedVariableSection';
 import YearAgoSection from '@/components/dashboard/YearAgoSection';
 import CalorieBalanceSection from '@/components/dashboard/CalorieBalanceSection';
-import SavingsSection from '@/components/dashboard/SavingsSection';
 import CorrelationsSection from '@/components/dashboard/CorrelationsSection';
 import TopProductsSection from '@/components/dashboard/TopProductsSection';
 import MoodWaveSection from '@/components/dashboard/MoodWaveSection';
@@ -128,7 +126,7 @@ import { maintenanceService, dueInDays } from '@/services/maintenanceService';
 import { maintenanceDueMonths } from '@/utils/vehicleMatch';
 import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, isAutoSection, CustomTile } from '@/store/dashboardLayout';
-import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers } from '@/utils/statWidgets';
+import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers, PIXEL_METRICS } from '@/utils/statWidgets';
 import YearPixels from '@/components/dashboard/YearPixels';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import { colors, spacing, radius, fonts } from '@/theme';
@@ -377,10 +375,23 @@ export default function DashboardScreen() {
   const clearEditRequest = useDashboardLayout(s => s.clearEditRequest);
   const [editingDash, setEditingDash] = useState(false);
   const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const [pixelPickerOpen, setPixelPickerOpen] = useState(false);
   const [showHiddenPool, setShowHiddenPool] = useState(false);
   // Custom widgety STATYSTYK usunięte (user: „wywal system custom widgetów" — były
   // niedopracowane). Proste piny (notatka/pogoda) zostają. Filtrujemy 'stat' wszędzie.
-  const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles.filter(t => t.type !== 'stat')), [dashOrder, customTiles]);
+  //
+  // WYJĄTEK (2026-08-24, user: "dodaj mi pixel year widget z możliwością wybrania czego") —
+  // renderer (`renderStatTile`'s `viz==='pixels'` gałąź, `YearPixels.tsx`) i cały silnik
+  // metryk (`PIXEL_METRICS`/`dailyValue`/`pixelTiers` w statWidgets.ts) były KOMPLETNE i
+  // działające, tylko martwe — nie było skąd stworzyć taki kafelek (usunięty razem z resztą
+  // "niedopracowanego" systemu). User poprosił konkretnie o TEN JEDEN widok (rok w
+  // pikselach + wybór metryki), nie o przywrócenie CAŁEGO systemu (liczby/wave/donut/
+  // porównania zostają wywalone, zgodnie z pierwotną decyzją). Zamiast blankietowego
+  // `type !== 'stat'`, filtr NIŻEJ przepuszcza WYŁĄCZNIE `type==='stat' && viz==='pixels'`
+  // — nowy picker (`pixelPickerOpen` niżej) jest JEDYNYM miejscem tworzącym kafelki 'stat',
+  // więc żaden inny wariant (number/wave/…) nie może już powstać.
+  const isVisibleCustomTile = useCallback((t: CustomTile) => t.type !== 'stat' || t.viz === 'pixels', []);
+  const orderedSections = useMemo(() => effectiveOrder(dashOrder, customTiles.filter(isVisibleCustomTile)), [dashOrder, customTiles, isVisibleCustomTile]);
   const hiddenSet = useMemo(() => new Set(dashHidden), [dashHidden]);
   // The editor list shows only VISIBLE sections (not hidden, not auto-managed alerts),
   // so drag/arrow indices are positions in THAT list. Both handlers reorder the visible
@@ -390,7 +401,7 @@ export default function DashboardScreen() {
   // same as full-order index N once anything hidden/auto sits between the rows.
   const reorderVisible = useCallback((id: string, target: number) => {
     const st = useDashboardLayout.getState();
-    const cur = effectiveOrder(st.order, st.customTiles.filter(t => t.type !== 'stat'));
+    const cur = effectiveOrder(st.order, st.customTiles.filter(isVisibleCustomTile));
     const hidden = new Set(st.hidden);
     const isVis = (x: string) => !hidden.has(x) && !isAutoSection(x);
     const vis = cur.filter(isVis);
@@ -403,18 +414,18 @@ export default function DashboardScreen() {
     const next = cur.map(x => (isVis(x) ? vis[k++] : x));
     setSectionOrder(next);
     haptic.tap();
-  }, [setSectionOrder]);
+  }, [setSectionOrder, isVisibleCustomTile]);
 
   const handleMoveTo = useCallback((id: string, target: number) => reorderVisible(id, target), [reorderVisible]);
   const moveVisible = useCallback((id: string, dir: -1 | 1) => {
     const st = useDashboardLayout.getState();
-    const cur = effectiveOrder(st.order, st.customTiles.filter(t => t.type !== 'stat'));
+    const cur = effectiveOrder(st.order, st.customTiles.filter(isVisibleCustomTile));
     const hidden = new Set(st.hidden);
     const vis = cur.filter(x => !hidden.has(x) && !isAutoSection(x));
     const from = vis.indexOf(id);
     if (from < 0) return;
     reorderVisible(id, from + dir);
-  }, [reorderVisible]);
+  }, [reorderVisible, isVisibleCustomTile]);
 
   // Payday prompt — ask (on a configurable day) whether the paycheck arrived.
   const [paydayCfg, setPaydayCfg] = useState<PaydayConfig>({ enabled: false, day: 10 });
@@ -460,7 +471,6 @@ export default function DashboardScreen() {
   // Fixed vs variable spend — last 4 months so you see your real discretionary
   // "kieszonkowe" once rent/bills are taken out.
   const fvMonths = useMemo(() => fixedVariableMonths(expenses, 4), [expenses]);
-  const savings = useMemo(() => computeSavings(expenses), [expenses]);
   const fvFixedItems = useMemo(() => {
     const cur = fvMonths[fvMonths.length - 1];
     return cur ? fixedBreakdown(expenses, cur.month) : [];
@@ -3566,9 +3576,6 @@ export default function DashboardScreen() {
             </View>
             );
 
-            nodes['savings'] = savings.total > 0 &&
-              <SavingsSection s={s} cardBg={cardBgDark} colors={colors} savings={savings} />;
-
             nodes['sweets-vs-food'] = weekOverview.filter(w => w.food > 0 || w.sweets > 0).length >= 2 &&
               <SweetsVsFoodSection s={s} cardBg={cardBgDark} accentColor={accentColor} colors={colors} weekOverview={weekOverview} />;
 
@@ -3783,7 +3790,7 @@ export default function DashboardScreen() {
             );
 
               // custom user tiles
-              for (const t of customTiles) if (t.type !== 'stat') nodes[t.id] = renderCustomTile(t);
+              for (const t of customTiles) if (isVisibleCustomTile(t)) nodes[t.id] = renderCustomTile(t);
 
               // ── Edit mode: reorder / hide / add / reset ──────────────────
               if (editingDash) {
@@ -3889,6 +3896,10 @@ export default function DashboardScreen() {
                     <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); addCustomTile({ type: 'weather', title: 'Pogoda' }); }} activeOpacity={0.85}>
                       <CloudSun size={15} color={accentColor} />
                       <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek z pogodą</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.editAddBtn} onPress={() => { haptic.tap(); setPixelPickerOpen(true); }} activeOpacity={0.85}>
+                      <Grid3x3 size={15} color={accentColor} />
+                      <Text style={[s.editAddText, { color: accentColor }]}>Dodaj kafelek: Rok w pikselach</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={s.editResetBtn} onPress={() => { haptic.medium(); resetLayout(); }} activeOpacity={0.8}>
                       <RotateCcw size={13} color={colors.text.muted} />
@@ -4603,6 +4614,47 @@ export default function DashboardScreen() {
                 ))}
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* "Rok w pikselach" — wybór METRYKI (2026-08-24, user: "dodaj mi pixel year widget z
+          możliwością wybrania czego"). Ten sam wzorzec co picker notatki wyżej (te same style
+          `np*`) — tylko lista PIXEL_METRICS zamiast notatek. Zawsze tworzy `viz:'pixels'`,
+          patrz komentarz przy `isVisibleCustomTile` wyżej — to JEDYNE miejsce tworzące kafelki
+          'stat', więc żaden inny wariant (number/wave/…) z dawnego, wywalonego systemu nie
+          może już powstać. */}
+      <Modal visible={pixelPickerOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPixelPickerOpen(false)}>
+        <View style={s.npOverlay}>
+          <View style={s.npCard}>
+            <View style={s.npHeader}>
+              <Text style={s.npTitle}>Rok w pikselach — wybierz co śledzić</Text>
+              <TouchableOpacity onPress={() => setPixelPickerOpen(false)} hitSlop={8}>
+                <X size={18} color={colors.text.muted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {[...PIXEL_METRICS].map(id => {
+                const def = metricById(id);
+                if (!def) return null;
+                const Ic = metricIcon(def);
+                return (
+                  <TouchableOpacity
+                    key={id}
+                    style={s.npRow}
+                    onPress={() => {
+                      haptic.tap();
+                      addCustomTile({ type: 'stat', viz: 'pixels', metric: id, title: def.label });
+                      setPixelPickerOpen(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ic size={14} color={accentColor} />
+                    <Text style={s.npRowText} numberOfLines={1}>{def.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         </View>
       </Modal>

@@ -9,6 +9,29 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Dashboard: usunięty "Zaoszczędzone", przeniesione "Twoje serie", nowy widget "Rok w pikselach" — NIEsprawdzone (2026-08-24)
+
+User: (1) "widget oszczędzone z tych lidlowskich usuń mi... i możesz posprzątać po nim bo nie
+używam go wgle", (2) "żeby ta nie jedzenie słodyczy było jakby tam gdzie nawyki bo tam gdzie
+odliczania to bez sensu", (3) "dodaj mi pixel year widget z możliwością wybrania czego".
+(1) sekcja "Zaoszczędzone (kupony)" usunięta całkowicie z dashboardu (kod + komponent + util +
+test, nie tylko ukryta). (2) "Twoje serie" przeniesione w edytorze dashboardu z grupy "Nastrój
+i liczniki" do "Zadania i nawyki". (3) NOWY przycisk w edytorze dashboardu "Dodaj kafelek: Rok
+w pikselach" — otwiera picker metryki (kroki/nastrój/sen/waga/wydatki/słodycze/itd.), tworzy
+kafelek z rocznym gridem pikseli jak GitHub-contributions. To ożywienie JEDNEGO viz z dawno
+wywalonego systemu custom-widgetów (reszta — liczby/wave/donut — zostaje wywalona zgodnie z
+wcześniejszą decyzją usera). Pełny opis w ARCHITECTURE.md, §4 "Zmiany 2026-08-24" i §5 (nowy
+sub-punkt "WYJĄTEK"). `tsc`/`jest` zielone (701/701 — 8 mniej niż poprzednio, bo usunięty
+`savings.test.ts` razem z testowanym plikiem). **Priorytet testu na urządzeniu**:
+(a) sprawdź że dashboard NIE pokazuje już karty "Zaoszczędzone" (nawet jeśli masz paragony z
+rabatami/kuponami Lidl),
+(b) w edytorze dashboardu (ołówek/edycja) sprawdź że "Twoje serie" jest teraz w grupie "Zadania
+i nawyki" w puli "dodaj sekcję", nie w "Nastrój i liczniki",
+(c) w edytorze dashboardu stuknij "Dodaj kafelek: Rok w pikselach", wybierz metrykę (np.
+kroki) — sprawdź czy kafelek się tworzy, pokazuje siatkę 365 kwadracików kolorowanych wg
+wartości dnia, i czy tapnięcie w niego otwiera sensowny szczegółowy widok (tydzień/miesiąc),
+(d) sprawdź czy kafelek pikseli przetrwa przełączenie zakładek i restart apki (persist).
+
 ## 🐛 Fix: dashboard undercountował serie nawyków o 1 dzień, gdy dziś jeszcze nie zaliczone — NIEsprawdzone (2026-08-24)
 
 User ze screenshotem: "jak wchodzę [w habit-year] jest napisane 30 dni a na kafelku [dashboard]
