@@ -9,6 +9,30 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Optymalizacja: "Rok w pikselach" liczony raz dziennie w tle — NIEsprawdzone (2026-08-24)
+
+User: "ogólnie na wejście apki laguje" → doprecyzował: EVENTY/KALENDARZ/ZADANIA/PUPIL/NAWYKI/
+KROKI/SEN/FINANSE + sprawdzenie powiadomień bankowych mają zostać żywe, "widgety które mają np
+PIXEL YEAR kafelek [powinny] dziennie ładować raz na dzień w tle, tak samo inne nieistotne".
+Znaleziony i naprawiony konkretny bug: kafel "Rok w pikselach" skanował CAŁĄ historię wydatków/
+zadań/zdrowia DLA KAŻDEGO z 365 dni, i robił to przy KAŻDYM (nawet niezwiązanym) renderze
+dashboardu — bo memo w `YearPixels.tsx` było zdefektowane przez świeżą funkcję-domknięcie z
+`index.tsx` tworzoną na nowo za każdym razem. Naprawione cache'em raz-na-dzień (AsyncStorage).
+Pełny opis w ARCHITECTURE.md §5 (sub-punkt "Cache raz-na-dzień, w tle"). `tsc`/`jest` zielone
+(58/711, +5 nowych testów `dailyTileCache`). Reszta widgetów (correlations/personal-records/
+food-breakdown/itd.) już była poprawnie zmemoizowana (nie miała tego samego buga) — dalsze
+kroki optymalizacji (staged/deferred render mniej istotnych sekcji) w toku, osobny wpis niżej
+jak się pojawi. **Priorytet testu na urządzeniu**:
+(a) otwórz apkę, przejdź do kafelka "Rok w pikselach" na dashboardzie — sprawdź że siatka
+pokazuje POPRAWNE dane (te same co przed zmianą, nie zera/puste),
+(b) stuknij strzałkę zmiany roku — powinno zmienić się OD RAZU, bez zauważalnego opóźnienia
+(fallback na żywe liczenie, zanim cache dogoni nowy rok w tle),
+(c) dodaj nowy wydatek/zadanie DZIŚ — sprawdź że kafelek pikseli NIE aktualizuje się od razu
+(to ŚWIADOME zachowanie — cache odświeży się dopiero jutro; jeśli to przeszkadza, powiedz,
+można skrócić okno cache'u lub wymusić odświeżenie przy pull-to-refresh),
+(d) subiektywnie: czy wejście na dashboard (szczególnie z kilkoma kaflami "Rok w pikselach")
+czuje się szybsze niż wcześniej?
+
 ## 🐛 Raid: walka czasem się przerywa przedwcześnie — ZGŁOSZONE, NIEZBADANE (2026-08-24)
 
 User (bez fixa, wprost: "zapisz sobie") — screenshot ekranu Raid: "ten rajd co jest to on się

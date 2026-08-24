@@ -179,6 +179,36 @@ samodzielny `<PetTile />` (bez `bare`) — nie ma czego dokleić.
     Strzałka w przód disabled przy `year >= currentYear` (nie da się zobaczyć przyszłości).
     `dailyValue()` jest w pełni datowana (filtruje po YYYY-MM-DD z już załadowanej pełnej
     historii) — zmiana roku nie wymagała żadnej zmiany w warstwie danych.
+  - **Cache raz-na-dzień, w tle (2026-08-24)** — user: "ogólnie na wejście apki laguje", potem
+    doprecyzował priorytety: EVENTY/KALENDARZ/ZADANIA/PUPIL/NAWYKI/KROKI/SEN/FINANSE +
+    sprawdzenie z powiadomień bankowych mają zostać żywe, ale "widgety które mają np PIXEL
+    YEAR kafelek [powinny] dziennie ładować raz na dzień w tle, tak samo inne nieistotne".
+    Zdiagnozowane: `dailyValue()` skanuje CAŁĄ historię (expenses/tasks/health) DLA KAŻDEGO
+    z 365 dni osobno — O(365×n) — i `YearPixels.tsx` MIAŁ już własny `useMemo` na to, ale był
+    permanentnie zdefektowany, bo `valueFor` w `renderStatTile` to była ŚWIEŻA funkcja-domknięcie
+    tworzona na KAŻDYM renderze (nowa referencja → `useMemo`'owy dep `[year, valueFor]` nigdy
+    się nie zgadzał, więc 365-dniowy skan przeliczał się przy KAŻDYM, nawet niezwiązanym
+    re-renderze dashboardu — jedyny prawdziwy "policz to na każdej klatce" hotspot w całym
+    ~1400-liniowym bloku `nodes`; reszta sekcji już konsumowała POPRAWNIE zmemoizowane
+    wartości typu `records`/`correlations`/`fvMonths`, więc problem był punktowy, nie
+    wszechobecny). Fix: nowy `src/utils/dailyTileCache.ts` (`getDailyCached`/`setDailyCached`,
+    AsyncStorage, klucz z dzisiejszą datą lokalną — przeżywa restart appki w tym samym dniu).
+    `index.tsx`: `pixelTilesSig` (stabilny "odcisk palca" widocznych kafli pixels:
+    id:rok:metryka) + `useEffect` na `[isLoading, pixelTilesSig]` (CELOWO BEZ `statCtx` w
+    deps — inaczej odpalałby się przy każdym dodanym wydatku/zadaniu, dokładnie czego user
+    chciał uniknąć; `eslint-disable-next-line react-hooks/exhaustive-deps`, ten sam wzorzec
+    co istniejący przy `achStates`). 3s opóźnienia po `!isLoading` (finanse+zadania gotowe) —
+    zdrowie/nastrój ładują się z osobnych efektów bez własnej flagi `isLoading`, więc bufor
+    czasu zamiast dokładnego trackingu gotowości WSZYSTKICH źródeł dla WSZYSTKICH metryk.
+    Wynik trafia do `pixelDayCache` (stan) — `renderStatTile`'s `viz==='pixels'` czyta stamtąd
+    (`pixelCached[d] ?? 0`), z fallbackiem na żywe `dailyValue()` dopóki cache się nie wypełni
+    (świeżo dodany kafel / pierwsze sekundy po starcie) — zmiana roku strzałkami (wyżej)
+    zostaje INSTANT jak dawniej, bo trafia dokładnie w ten fallback zanim cache dogoni nowy
+    rok. Testy: `__tests__/dailyTileCache.test.ts`. Świadomie NIE rozszerzone na pozostałe
+    viz (`wave`/`donut`/`compare`, `metricSeries`/`metricList`) — te skanują ~6 kubełków
+    zamiast 365 dni (~60× tańsze), więc ten sam mechanizm dałby dużo mniejszy zysk za dodaną
+    złożoność; jeśli w przyszłości okażą się realnym problemem, ten sam wzorzec (klucz +
+    `getDailyCached`/`setDailyCached`) da się powielić.
 - `isSelfTransfer(e)` (statWidgets) = przelew własny (kategoria `transfer` lub tag
   oszczednosci/przelew/revolut) — wykluczany ze spend I z przychodów, liczony w metryce
   `savings` ("Odłożone (przelewy własne)" — TO NIE TO SAMO co usunięty dashboardowy kafel
