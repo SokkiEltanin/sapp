@@ -256,6 +256,25 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+// Sekcje dashboardu które NIE muszą pojawić się w pierwszej, synchronicznej klatce —
+// historyczne/statystyczne/kolekcjonerskie, bez znaczenia "co dziś muszę zrobić" (2026-08-24,
+// user: "ogólnie na wejście apki laguje" → doprecyzował priorytety: EVENTY/KALENDARZ/ZADANIA/
+// PUPIL/NAWYKI/KROKI/SEN/FINANSE + sprawdzenie powiadomień bankowych mają zostać żywe, "inne
+// nieistotne" mogą "ładować się w tle"). Sprawdzane w PUNKCIE KONSUMPCJI (pętla renderująca
+// `orderedSections`), nie przy każdym z ~24 osobnych `nodes[id] = ...` — jedno miejsce, dużo
+// mniejsze ryzyko pomyłki niż rozrzucone zmiany po całym 1400-liniowym bloku. Kafle custom
+// ('stat'/'weather'/'note'/'countdown' — user dodane widgety) DEFERRED bezwarunkowo, patrz
+// gdzie `DEFERRED_SECTIONS` jest czytany niżej. Klasyfikacja jest subiektywna w kilku miejscach
+// (np. `pinned-notes`, `mood-cal`/`mood-wave`) — nic nie znika na stałe, tylko pojawia się
+// ułamek sekundy później, więc błędna klasyfikacja to kosmetyka do poprawienia, nie bug.
+const DEFERRED_SECTIONS = new Set<string>([
+  'month-summary', 'weekly-insights', 'maintenance-reminders', 'pinned-notes',
+  'personal-records', 'trivia', 'reflections', 'time-capsule', 'year-ago',
+  'food-breakdown', 'shops-collection', 'gablota-card', 'sweets-vs-food', 'who-ate',
+  'fixed-variable', 'spend-by-day', 'work-hours', 'top-products', 'fun-facts',
+  'correlations', 'insights-web', 'mood-cal', 'mood-wave', 'month-tasks',
+]);
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -957,6 +976,17 @@ export default function DashboardScreen() {
       return m;
     })(),
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
+
+  // Staged render — sekcje z `DEFERRED_SECTIONS` (patrz definicja na górze pliku) czekają na
+  // `deferredReady` zamiast renderować się w PIERWSZEJ, synchronicznej klatce dashboardu.
+  // `InteractionManager.runAfterInteractions` odpala callback zaraz PO ewentualnych trwających
+  // animacjach/gestach — pierwsza klatka buduje tylko "ważne" sekcje, reszta dogania ją
+  // milisekundy później, rozkładając robotę JS na dwie klatki zamiast jednej.
+  const [deferredReady, setDeferredReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => setDeferredReady(true));
+    return () => task.cancel();
+  }, []);
 
   // "Rok w pikselach" — ciężkie do policzenia (365× dailyValue(), każde wywołanie skanuje
   // CAŁĄ historię expenses/tasks dla jednego dnia) więc liczone RAZ DZIENNIE w tle, nie na
@@ -4027,6 +4057,10 @@ export default function DashboardScreen() {
                     if (id === 'bill-suggest') return null;  // rendered pinned above
                     if (id === 'bank-queue') return null;    // rendered pinned above
                     if (hiddenSet.has(id)) return null;
+                    // Staged render (patrz `DEFERRED_SECTIONS`/`deferredReady` na górze pliku)
+                    // — kafle custom (id zaczyna się `custom:`, patrz addCustomTile w
+                    // dashboardLayout.ts) traktowane jak "widgety" bezwarunkowo.
+                    if (!deferredReady && (DEFERRED_SECTIONS.has(id) || id.startsWith('custom:'))) return null;
                     const node = nodes[id];
                     if (node === undefined) return null;
                     return <React.Fragment key={id}>{node}</React.Fragment>;
