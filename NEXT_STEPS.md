@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Raid: walka czasem się przerywa przedwcześnie — ZGŁOSZONE, NIEZBADANE (2026-08-24)
+
+User (bez fixa, wprost: "zapisz sobie") — screenshot ekranu Raid: "ten rajd co jest to on się
+buguje czasami i walkę przerywa a miało być do końca HP kotka jakby jak zwykła walka tylko HP
+rajdu restartuje się co tydzień nie co walkę". Zamierzone zachowanie TO DOKŁADNIE to co jest w
+kodzie (potwierdzone, nie mylić z bugiem): `raidSessionHpFor()` (`src/utils/raid.ts:91`) daje
+KAŻDEJ próbie małą, animowaną "sesję" (~`RAID_SESSION_HITS`=6 ciosów, ten sam sprawdzony wzorzec
+co questBossHpFor/madBossHpFor) — realny postęp tej sesji dopisuje się do PRAWDZIWEJ, trwałej
+puli tygodniowej (`raidHp` w petStore, resetowanej co tydzień wg `weekKeyOf()`) osobnym
+wywołaniem `raidAttack()` (`app/boss-fight.tsx:395`) PO zakończeniu sesji — więc walka MA
+kończyć się szybciej niż "do zera kotka", to nie jest to zgłoszenie. Prawdziwy problem — walka
+PRZERYWA SIĘ w trakcie, niekompletnie/buggy, nie normalne dojście sesji do końca — NIE ZBADANE.
+Podejrzane miejsca do sprawdzenia jako pierwsze: `app/boss-fight.tsx:227`
+(`liveBossHp ?? raidRemaining` — wyświetlana hp PRZED walką, możliwy konflikt z sesyjną hp po
+starcie), `:519` (`raidRealHp` liczone z `raidRealStart - (raidSessionHp - round.bossHpAfter)` —
+możliwy błąd znaku/kolejności przy niskim `raidRemaining` blisko wyczerpania tygodniowej puli).
+**Priorytet: odtworzyć bug na urządzeniu** (jak dokładnie "przerywa" — crash, biały ekran,
+zamrożenie, czy walka kończy się natychmiast po 1 rundzie?) zanim cokolwiek naprawiać —
+za mało informacji od usera żeby zgadywać fix na ślepo.
+
 ## 🆕 Auto-tagowanie rozpoznanych sprzedawców z banku — NIEsprawdzone (2026-08-24)
 
 User: "jak mi dodało autopłatność z banku to chciałbym móc jej nadać że to jest opłata za
