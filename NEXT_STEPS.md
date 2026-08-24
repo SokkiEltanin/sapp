@@ -9,6 +9,29 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Optymalizacja: "nieistotne" sekcje dashboardu doskakują w drugiej klatce — NIEsprawdzone (2026-08-24)
+
+User: "ogólnie na wejście apki laguje" → doprecyzował: EVENTY/KALENDARZ/ZADANIA/PUPIL/NAWYKI/
+KROKI/SEN/FINANSE + sprawdzenie powiadomień bankowych żywe, "nieistotne" widgety mogą ładować
+się w tle. Kontynuacja poprzedniego wpisu (cache pikseli) — ~24 historyczne/statystyczne/
+kolekcjonerskie sekcje (Wrapped, przegląd tygodnia, rekordy, ciekawostki, rozkłady wydatków,
+korelacje, nastrój-wykresy, kolekcje sklepów, itd.) + WSZYSTKIE własne kafle ("widgety")
+NIE renderują się w pierwszej klatce dashboardu — doskakują milisekundy później
+(`InteractionManager.runAfterInteractions`), żeby ważne sekcje zdążyły się zbudować i
+zamontować pierwsze. Pełny opis + pełna lista sekcji w ARCHITECTURE.md §4 (sub-punkt
+"Staged render"). `tsc`/`jest` zielone (58/711, bez nowych testów — zmiana renderu ekranu,
+nie logiki w `utils/`). **Priorytet testu na urządzeniu** (to jest subiektywne odczucie, więc
+najważniejszy test to Twoje wrażenie, nie konkretna liczba):
+(a) zamknij i otwórz apkę od zera (nie tylko przełącz zakładkę) — czy wejście na dashboard
+czuje się WYRAŹNIE szybsze/płynniejsze niż wcześniej,
+(b) sprawdź czy WSZYSTKIE sekcje w końcu się pojawiają (nawet te "nieistotne") — powinny
+doskoczyć ułamek sekundy po ważnych, nie zniknąć na stałe,
+(c) jeśli któraś sekcja z Twojej perspektywy jest WAŻNA a wylądowała w grupie "nieistotnych"
+(deferred) — powiedz którą, to jednolinijkowa poprawka (edycja `DEFERRED_SECTIONS` w
+`index.tsx`), lista klasyfikacji w pełni w ARCHITECTURE.md,
+(d) sprawdź edytor dashboardu (ołówek) — powinien pokazywać WSZYSTKIE sekcje jak dawniej,
+bez zmian (ta zmiana go nie dotyka).
+
 ## 🆕 Optymalizacja: "Rok w pikselach" liczony raz dziennie w tle — NIEsprawdzone (2026-08-24)
 
 User: "ogólnie na wejście apki laguje" → doprecyzował: EVENTY/KALENDARZ/ZADANIA/PUPIL/NAWYKI/

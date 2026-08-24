@@ -209,6 +209,34 @@ samodzielny `<PetTile />` (bez `bare`) — nie ma czego dokleić.
     zamiast 365 dni (~60× tańsze), więc ten sam mechanizm dałby dużo mniejszy zysk za dodaną
     złożoność; jeśli w przyszłości okażą się realnym problemem, ten sam wzorzec (klucz +
     `getDailyCached`/`setDailyCached`) da się powielić.
+  - **Staged render — "nieistotne" sekcje czekają na drugą klatkę (2026-08-24)** — kontynuacja
+    tego samego zgłoszenia lagu na wejściu. Nowy moduł-level `DEFERRED_SECTIONS: Set<string>`
+    (góra `index.tsx`, przed komponentem) — ~24 sekcje historyczne/statystyczne/kolekcjonerskie
+    (month-summary, weekly-insights, maintenance-reminders, pinned-notes, personal-records,
+    trivia, reflections, time-capsule, year-ago, food-breakdown, shops-collection,
+    gablota-card, sweets-vs-food, who-ate, fixed-variable, spend-by-day, work-hours,
+    top-products, fun-facts, correlations, insights-web, mood-cal, mood-wave, month-tasks) +
+    WSZYSTKIE kafle custom (id zaczyna się `custom:`, patrz `addCustomTile` w
+    dashboardLayout.ts) — bez znaczenia "co dziś muszę zrobić" wg user'a. Reszta (payday/debt/
+    bank-queue/bill/sub-confirm, pet, tag-limits/budget-warning/finances, tasks-work-row/
+    today-tasks/countdowns, sleep-chart, counters-since/streak-wall/habits-nudge/habits-today,
+    calorie-balance/daily-rings, stats-scope, gcal) renderuje się NATYCHMIAST jak dawniej.
+    Nowy stan `deferredReady` (domyślnie `false`) ustawiany przez
+    `InteractionManager.runAfterInteractions(() => setDeferredReady(true))` w efekcie na
+    mount — odpala się zaraz po ewentualnych trwających animacjach/gestach, więc PIERWSZA
+    klatka dashboardu buduje tylko "ważne" sekcje, reszta doskakuje milisekundy później.
+    Gating w PUNKCIE KONSUMPCJI (`orderedSections.map` w normalnym trybie renderowania), NIE
+    przy każdym z osobna `nodes[id] = ...` — jedna, łatwa do zweryfikowania zmiana zamiast
+    24 rozrzuconych po całym bloku (edytor dashboardu — tryb drag-to-reorder — nietknięty,
+    czyta tylko `SECTION_TITLES`, nie `nodes[id]`, więc pokazuje WSZYSTKIE sekcje zawsze).
+    `deferredReady` ustawiany RAZ na całą sesję (nie resetuje się) — dotyczy tylko pierwszej
+    klatki po starcie/wejściu na dashboard, nie kolejnych interakcji. Klasyfikacja część/
+    część subiektywna (np. `pinned-notes`, `mood-cal`/`mood-wave`) — nic nie znika na stałe,
+    tylko pojawia się chwilę później, więc błędna klasyfikacja to kosmetyka do poprawienia
+    (edycja jednego `Set` literału), nie regresja. Bez dedykowanego testu — to zmiana
+    zachowania renderu ekranu, nie logiki w `utils/` (ten sam wzorzec co inne zmiany
+    layoutu w tej sesji: pełny `tsc`/`jest` jako bar, bez component-render testów, których
+    ten projekt w ogóle nie ma).
 - `isSelfTransfer(e)` (statWidgets) = przelew własny (kategoria `transfer` lub tag
   oszczednosci/przelew/revolut) — wykluczany ze spend I z przychodów, liczony w metryce
   `savings` ("Odłożone (przelewy własne)" — TO NIE TO SAMO co usunięty dashboardowy kafel
