@@ -128,6 +128,7 @@ import { Vehicle, MaintenanceItem } from '@/types';
 import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTION_GROUP, SECTION_GROUP_ORDER, isAutoSection, CustomTile } from '@/store/dashboardLayout';
 import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers, PIXEL_METRICS } from '@/utils/statWidgets';
 import YearPixels from '@/components/dashboard/YearPixels';
+import { getDailyCached, setDailyCached } from '@/utils/dailyTileCache';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -957,6 +958,65 @@ export default function DashboardScreen() {
     })(),
   }), [expenses, scope, moodEntries, allEvents, workSettings, workEarnings, calTasks, habits, habitsDoneIds, nameAliases, weightMemory, healthDays]);
 
+  // "Rok w pikselach" — ciężkie do policzenia (365× dailyValue(), każde wywołanie skanuje
+  // CAŁĄ historię expenses/tasks dla jednego dnia) więc liczone RAZ DZIENNIE w tle, nie na
+  // każdym renderze dashboardu (2026-08-24, user zgłosił ogólny lag na wejściu apki, potem
+  // sprecyzował: "EVENTY/KALENDARZ/ZADANIA/PUPIL/NAWYKI/KROKI/SEN/FINANSE" mają zostać żywe,
+  // ale widgety jak "Rok w pikselach" mogą "ładować się raz na dzień w tle"). Persist przez
+  // `dailyTileCache.ts` (AsyncStorage, klucz z dzisiejszą datą) — przeżywa restart appki w
+  // tym samym dniu, nie tylko bieżącą sesję. `pixelTilesSig` = stabilny "odcisk palca"
+  // widocznych kafli pixels (id:rok:metryka) — efekt niżej odpala się TYLKO gdy ten zestaw
+  // faktycznie się zmienia (nowy kafel / zmiana roku strzałką), NIE przy każdej zmianie
+  // `statCtx` (czyli NIE przy każdym dodanym wydatku/zadaniu w ciągu dnia — to świadomy
+  // kompromis świeżości za szybkość, wprost na życzenie usera).
+  const pixelTilesSig = useMemo(
+    () => customTiles
+      .filter(t => t.type === 'stat' && t.viz === 'pixels' && t.metric)
+      .map(t => `${t.id}:${t.year ?? new Date().getFullYear()}:${t.metric}`)
+      .join('|'),
+    [customTiles],
+  );
+  const [pixelDayCache, setPixelDayCache] = useState<Record<string, Record<string, number>>>({});
+  useEffect(() => {
+    // Czeka aż finanse+zadania skończą wstępne ładowanie, PLUS mały bufor czasu (zdrowie/
+    // nastrój ładują się z osobnych efektów bez własnej flagi `isLoading`) — żeby nie
+    // zamrozić w cache'u na cały dzień policzonych z jeszcze pustych danych zer. Kafel i tak
+    // ma się ładować "w tle", więc te kilka sekund różnicy jest niezauważalne.
+    if (isLoading || !pixelTilesSig) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      (async () => {
+        for (const sig of pixelTilesSig.split('|')) {
+          const [id, yearStr, metric] = sig.split(':');
+          const cacheKey = `pixels:${id}:${yearStr}`;
+          if (cancelled) return;
+          const cached = await getDailyCached<Record<string, number>>(cacheKey);
+          if (cancelled) return;
+          if (cached) {
+            setPixelDayCache(prev => (prev[cacheKey] ? prev : { ...prev, [cacheKey]: cached }));
+            continue;
+          }
+          const year = parseInt(yearStr, 10);
+          const end = new Date(year, 11, 31);
+          const values: Record<string, number> = {};
+          for (const cur = new Date(year, 0, 1); cur <= end; cur.setDate(cur.getDate() + 1)) {
+            const ds = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+            values[ds] = dailyValue(metric, statCtx, ds);
+          }
+          if (cancelled) return;
+          setPixelDayCache(prev => ({ ...prev, [cacheKey]: values }));
+          setDailyCached(cacheKey, values).catch(() => {});
+        }
+      })();
+    }, 3000);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // statCtx CELOWO nie jest zależnością — inaczej efekt odpalałby się przy KAŻDEJ zmianie
+    // danych (każdy dodany wydatek/zadanie), dokładnie to czego ma unikać. Domyka aktualny
+    // statCtx z renderu w którym isLoading/pixelTilesSig się zmieniły — to wystarczające
+    // "świeże na dziś" źródło (patrz komentarz nad efektem).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, pixelTilesSig]);
+
   // Achievements — AsyncStorage-backed signals the badge counters need (bank
   // corrections, stats visits, self-test/backup flags, auto-merchant graduation).
   // Reloaded on focus so e.g. accepting a bank correction elsewhere shows up here
@@ -1164,7 +1224,14 @@ export default function DashboardScreen() {
       const currentYear = new Date().getFullYear();
       const year = t.year ?? currentYear;
       const mood = isMoodPixelMetric(t.metric!);
-      const valueFor = (d: string) => dailyValue(t.metric!, statCtx, d);
+      // Czyta z `pixelDayCache` (raz-na-dzień cache w tle, patrz komentarz nad
+      // `pixelTilesSig` wyżej) zamiast liczyć 365× dailyValue() na KAŻDYM renderze. Zanim
+      // cache się wypełni (świeżo dodany kafel / pierwsze sekundy po starcie appki) — fallback
+      // na bezpośrednie liczenie, żeby kafelek nie pokazywał samych zer w międzyczasie.
+      const pixelCached = pixelDayCache[`pixels:${t.id}:${year}`];
+      const valueFor = pixelCached
+        ? (d: string) => pixelCached[d] ?? 0
+        : (d: string) => dailyValue(t.metric!, statCtx, d);
       const tiers = pixelTiers(t.metric!);
       // human hint of the absolute tiers (steps: "co 5k · 30k+ złoty")
       const tierHint = tiers ? (t.metric === 'steps' ? 'co 5k kroków · 30k+ = złoty'
