@@ -64,6 +64,10 @@ export async function ingestBankNotification(title: string, text: string): Promi
     store: learned?.name ?? tx.store,
     category,
     suggestedCategory: category,
+    // Recognised merchant with saved tags (2026-08-24, user: "chciałbym móc jej nadać że
+    // to jest opłata za internet, żeby mi łapało jak z wypłatą") — auto-carried onto every
+    // future payment from this recipient, same as the learned category above.
+    ...(learned?.tags?.length ? { tags: learned.tags } : {}),
     // Full autopilot logs every card payment straight away; otherwise a merchant has to
     // earn trust (5 clean accepts) before its payments skip review — and uncertain ones
     // always fall back to review regardless.

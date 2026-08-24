@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Auto-tagowanie rozpoznanych sprzedawców z banku — NIEsprawdzone (2026-08-24)
+
+User: "jak mi dodało autopłatność z banku to chciałbym móc jej nadać że to jest opłata za
+internet, żeby mi łapało jak z wypłatą — hej jak widzisz tę automatyczną płatność od tego
+odbiorcy o tym tytule to [otaguj]" (screenshot: wydatek "P4 Sp. o.o. Warszawa" bez tagów).
+Rozszerzone istniejące uczenie się kategorii sprzedawcy (`merchantMemory.ts`) o tagi —
+dotknij tagów na wydatku z rozpoznanym sprzedawcą, kolejne auto-złapane płatności od TEGO
+SAMEGO odbiorcy dostają te same tagi bez pytania. Pełny opis w ARCHITECTURE.md §7 (nowy
+sub-punkt "Auto-tagowanie rozpoznanych sprzedawców"). `tsc`/`jest` zielone (57/706 — 5 nowych
+testów `saveMerchantTags`). **Priorytet testu na urządzeniu** (wymaga realnej auto-płatności
+z banku, więc trudniej przetestować niż zwykłą zmianę UI):
+(a) na wydatku z rozpoznanym sprzedawcą (bank-matched, ma `storeName`) dodaj tag np.
+"internet" i zapisz,
+(b) poczekaj na KOLEJNĄ automatyczną płatność od TEGO SAMEGO odbiorcy (ten sam pierwszy człon
+nazwy, np. "P4") — sprawdź czy nowo dodany wydatek ma już ten tag BEZ ręcznego dodawania,
+(c) sprawdź że kategoria tego sprzedawcy i jego licznik zaufania (`cleanAccepts`/`auto`) NIE
+zmieniły się przez samo dodanie taga,
+(d) usuń tag z wydatku i zapisz — sprawdź czy kolejna płatność od tego sprzedawcy PRZESTAJE
+dostawać ten tag (nadpisanie pustą listą, nie tylko dodawanie).
+
 ## 🆕 "Twoje serie" sklejone z kaflem pupila — NIEsprawdzone (2026-08-24)
 
 User: "zróbmy te ilość seri jako łączny kafelek z pupilem po prostu po prawej stronie oke??"

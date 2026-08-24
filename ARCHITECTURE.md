@@ -218,6 +218,26 @@ Auto-akceptacja zaufanych sklepów: `bankAutoProcess.ts` + `merchantMemory.ts`.
 konto" (cel) vs „z konta *cyfry"/„wykonano przelew" (wychodzący). Przelew na własne
 konto → `selfTransfer` → kategoria `transfer` + tag `revolut`.
 
+- **Auto-tagowanie rozpoznanych sprzedawców (2026-08-24)** — user: "jak mi dodało autopłatność
+  z banku to chciałbym móc jej nadać że to jest opłata za internet, żeby mi łapało jak z
+  wypłatą — hej jak widzisz tę automatyczną płatność od tego odbiorcy o tym tytule to [otaguj]"
+  (screenshot: bank-matched wydatek "P4 Sp. o.o. Warszawa" bez tagów). `MerchantInfo` (w
+  `merchantMemory.ts`, ten sam store co uczenie kategorii) dostał opcjonalne `tags?: string[]`
+  + nowa funkcja `saveMerchantTags(storeKey, tags, name?)` — NADPISUJE (nie dokleja) tagi,
+  NIE rusza liczników zaufania kategorii (`cleanAccepts`/`auto`), zero okresu "nauki" (w
+  przeciwieństwie do kategorii, która potrzebuje `AUTO_THRESHOLD` czystych akceptacji zanim
+  zacznie księgować automatycznie — tagi to jednorazowa, świadoma decyzja z ekranu wydatku,
+  działa od NASTĘPNEJ pasującej płatności). `app/expenses/[id].tsx handleSave()`: obok
+  istniejącego "ucz kategorii" (linia z `saveMerchant`, odpala się gdy kategoria się zmieniła)
+  analogiczny blok dla tagów — odpala się gdy `tags` różni się od `expense.tags`, zapisuje pod
+  tym samym `storeKey` (pierwsze słowo `storeName`, lowercase — identyczny klucz co parser
+  powiadomień). `bankIngest.ts`: w gałęzi wychodzącej (`tx.direction !== 'in'`) po
+  `merchantFor(tx.storeKey, mem)` doklejone `...(learned?.tags?.length ? { tags: learned.tags
+  } : {})` do `store.enqueue()` — `PendingBankTx.tags` już istniało (self-transfer → `
+  ['revolut']`) i już płynęło do końca przez `bankCommit.ts` (`tags: p.tags ?? []` przy
+  tworzeniu wydatku) — WYSTARCZYŁO wypełnić je z pamięci sprzedawcy, żadnej nowej ścieżki
+  danych. Test: `__tests__/merchantMemory.test.ts` (nowe opisy `saveMerchantTags`).
+
 ## 7b. Paragon → wydatek (skan/wklej) — `src/utils/receiptParser.ts`, `app/expenses/scan.tsx`
 
 `parseReceiptText(text)` routuje po `storeKeyFromText` do `parseKaufland`/`parseBiedronka`/
