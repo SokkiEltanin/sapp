@@ -240,6 +240,29 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   miejscach `health.tsx` (kafel w karcie CIAŁO, tile w rozwiniętym dniu, etykieta ręcznego
   wpisu). Sam `leanMassKg` (nazwa pola, komentarz w interfejsie) i logika odczytu BEZ ZMIAN —
   to czysto etykietowy fix, dane z Health Connect są tym czym zawsze były.
+- **Odkrywalność sync + kolorowe kafelki + zbity widget wody (2026-08-24)** — user: (1)
+  "dodaj ze tam ukryty jest ten przeciągnij w dół aby zsynchronizować", (2) "te małe
+  kafelki dodaj im tło odpowiadające ikonie, ikony daj wypełnione", (3) "ten widget wody
+  zrob ładniejszy i mniejszy bardziej zbity tylko z dodaj, a po kliknięciu otwiera sie z
+  edycja cupsize lub cofnij dodanie". (1): sama funkcja (`RefreshControl`) już istniała,
+  ale wskazówka pod headerem była gołym 11px wyciszonym tekstem z ujemnym marginesem —
+  łatwo przegapić. Dołożona ikona `ChevronDown` + pigułkowy layout (`s.syncHint`), treść/
+  akcja bez zmian. (2): 5 kafelków "Today at a glance" (`summaryRow`) miało jednolite szare
+  tło niezależnie od koloru ikony i ikony bez `fill` — każdy kafelek dostał własny
+  `backgroundColor`/`borderColor` = kolor ikony przy niskiej krycie (wzorzec `color+'18'`/
+  `'40'` z reszty apki) + `fill={kolor}` na ikonie. Kroki dostały WŁASNY niebieski akcent
+  (`#38BDF8`) zamiast prawie-białego `T.accent` (biały na 18% wyszedłby jako szarość, nie
+  kolor). (3): dawny widget wody miał 158px `WaterGauge` + osobne przyciski minus/plus +
+  osobną pigułkę "cel". Nowy: mały 52px gauge BEZ wewnętrznego tekstu (`WaterGauge` dostał
+  nowy `showText?: boolean` prop, domyślnie `true` — jedyne inne wywołanie zostaje bez
+  zmian), JEDEN wyraźny przycisk "Dodaj". Nagłówek (osobny `TouchableOpacity`, SIBLING
+  względem przycisku Dodaj, nie zagnieżdżony — nested Touchable-w-Touchable w tym repo już
+  wymagał `stopPropagation` gdzie indziej, index.tsx) otwiera TEN SAM `waterCfgOpen` sheet
+  co wcześniej (edycja celu/rozmiaru kubka), który dostał NOWY przycisk "Cofnij ostatnie
+  dodanie" (`bumpWater(-1)`, ukryty gdy `water<=0`) — realizuje "edycja cupsize LUB cofnij
+  dodanie" w jednym miejscu zamiast osobnego stałego przycisku minus na głównym ekranie.
+  Osierocone przez redesign: `Minus` import, style `waterBody`/`weightBtn`/`waterSub`
+  (jedyne miejsca użycia usunięte) — sprzątnięte w tym samym ruchu.
 
 ## 8b. Jedzenie / liczenie kalorii — MANUALNE, ODDZIELNE od paragonów
 

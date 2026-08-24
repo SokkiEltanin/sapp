@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, Pressable, KeyboardAvoidingView, Platform, RefreshControl, Alert, AppState } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { Footprints, Moon, Droplets, Plus, Minus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, X, Award } from 'lucide-react-native';
+import { Footprints, Moon, Droplets, Plus, Activity, Timer, RefreshCw, Heart, MapPin, Flame, Dumbbell, Wind, ChevronRight, ChevronDown, X, Award } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getTodaySessions } from '@/utils/pomodoroHistory';
 
@@ -621,72 +621,100 @@ export default function HealthScreen() {
           />
         </View>
 
+        {/* Odkrywalność pull-to-refresh (2026-08-24, user: "dodaj ze tam ukryty jest ten
+            przeciągnij w dół aby zsynchronizować") — sama funkcja (RefreshControl wyżej)
+            już istniała, ale wskazówka pod headerem była gołym, wyciszonym 11px tekstem
+            przyklejonym do góry (ujemny marginTop) — łatwo przegapić. Dodana ikonka
+            ChevronDown + pigułkowe tło, żeby czytało się jako realna wskazówka UI, nie
+            fragment opisu. Treść/akcja (tap → otwórz Health Connect) bez zmian. */}
         <PressableScale onPress={async () => { const ok = await openHealthConnect(); if (!ok) toast.error('Nie można otworzyć Health Connect'); }}>
-          <Text style={styles.syncFallback}>Pociągnij w dół, by zsynchronizować z zegarka · nie działa? Otwórz Health Connect</Text>
+          <View style={styles.syncHint}>
+            <ChevronDown size={12} color={T.muted} />
+            <Text style={styles.syncFallback}>Pociągnij w dół, by zsynchronizować z zegarka · nie działa? Otwórz Health Connect</Text>
+          </View>
         </PressableScale>
 
-        {/* Today at a glance */}
+        {/* Today at a glance — tło pod kolor ikony + wypełnione ikony (2026-08-24, user:
+            "te małe kafelki dodaj im tło odpowiadające ikonie, ikony daj wypełnione") —
+            dawniej jednolite szare tło (`t.card`) na wszystkich 5 kafelkach niezależnie od
+            koloru ikony, same ikony w wersji outline (bez `fill`). Każdy kafelek ma teraz
+            `backgroundColor`/`borderColor` = własny akcent przy niskiej krycie (ten sam
+            wzorzec `color+'18'`/`color+'40'` co reszta apki, np. `qualityBadge` niżej), a
+            ikony dostały `fill={kolor}` (Lucide renderuje wypełniony kształt zamiast samego
+            obrysu — widoczne dla Moon/Heart/Flame/Activity, Footprints jest z natury
+            kreskowa sylwetka więc fill nie zmienia jej wyglądu, ale nie szkodzi). Kroki
+            dostały własny niebieski akcent (`#38BDF8`, ten sam co "steps" gdzie indziej w
+            apce) zamiast prawie-białego `T.accent` — inaczej tło wyszłoby prawie
+            niewidoczne (biały na 18% to szarość, nie kolor). */}
         <View style={styles.summaryRow}>
-          <View style={styles.summaryTile}>
-            <Footprints size={15} color={T.accent} />
+          <View style={[styles.summaryTile, { backgroundColor: '#38BDF818', borderColor: '#38BDF840' }]}>
+            <Footprints size={15} color="#38BDF8" fill="#38BDF8" />
             <Text style={styles.summaryVal}>{steps > 0 ? (steps >= 1000 ? `${(steps / 1000).toFixed(1)}k` : steps) : '—'}</Text>
             <Text style={styles.summaryLabel}>kroki</Text>
           </View>
-          <View style={styles.summaryTile}>
-            <Moon size={15} color="#A78BFA" />
+          <View style={[styles.summaryTile, { backgroundColor: '#A78BFA18', borderColor: '#A78BFA40' }]}>
+            <Moon size={15} color="#A78BFA" fill="#A78BFA" />
             <Text style={styles.summaryVal}>{sleepH === 0 && sleepM === 0 ? '—' : `${sleepH}:${pad(sleepM)}`}</Text>
             <Text style={styles.summaryLabel}>sen</Text>
           </View>
-          <View style={styles.summaryTile}>
-            <Heart size={15} color="#FF6B6B" />
+          <View style={[styles.summaryTile, { backgroundColor: '#FF6B6B18', borderColor: '#FF6B6B40' }]}>
+            <Heart size={15} color="#FF6B6B" fill="#FF6B6B" />
             <Text style={styles.summaryVal}>{(hcExtra.heartRateAvg as number) > 0 ? hcExtra.heartRateAvg : '—'}</Text>
             <Text style={styles.summaryLabel}>tętno</Text>
           </View>
-          <View style={styles.summaryTile}>
-            <Flame size={15} color="#FB923C" />
+          <View style={[styles.summaryTile, { backgroundColor: '#FB923C18', borderColor: '#FB923C40' }]}>
+            <Flame size={15} color="#FB923C" fill="#FB923C" />
             <Text style={styles.summaryVal}>{(hcExtra.activeCalories as number) > 0 ? hcExtra.activeCalories : '—'}</Text>
             <Text style={styles.summaryLabel}>kcal</Text>
           </View>
-          <View style={styles.summaryTile}>
-            <Activity size={15} color="#34D399" />
+          <View style={[styles.summaryTile, { backgroundColor: '#34D39918', borderColor: '#34D39940' }]}>
+            <Activity size={15} color="#34D399" fill="#34D399" />
             <Text style={styles.summaryVal}>{(weight > 0 ? weight : lastWeight) > 0 ? (weight > 0 ? weight : lastWeight).toFixed(1) : '—'}</Text>
             <Text style={styles.summaryLabel}>waga</Text>
           </View>
         </View>
 
-        {/* Water — the top tile. One number shared with the "Woda" habit in Nawyki,
-            fed by Health Connect hydration, and driving the pet's hydration quest. */}
-        <GlassCard padding={spacing[4]} style={styles.tealCard}>
-          <View style={styles.cardRow}>
-            <Droplets size={13} color="#46B0DE" />
-            <Text style={styles.cardLabel}>NAWODNIENIE</Text>
-            <View style={{ flex: 1 }} />
-            {waterFromWatch && (
-              <View style={styles.watchChip}><Activity size={9} color={T.accent} /><Text style={styles.watchChipText}>z zegarka</Text></View>
-            )}
-            <TouchableOpacity
-              onPress={() => { haptic.tap(); setWaterGoalInput(String(waterGoal)); setGlassMlInput(String(glassMl)); setWaterCfgOpen(true); }}
-              style={[styles.goalChip, { marginLeft: 4 }]}
-            >
-              <Text style={styles.goalChipText}>cel {waterGoal} · {glassMl} ml</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Water — SKURCZONY, zbity widget (2026-08-24, user: "ten widget wody zrob
+            ładniejszy i mniejszy bardziej zbity tylko z dodaj , a po kliknięciu otwiera sie
+            z edycja cupsize lub cofnij dodanie") — dawny widget miał duży 158px gauge +
+            osobne przyciski minus/plus + osobną pigułkę "cel". Teraz: mały gauge (52px, BEZ
+            wewnętrznego tekstu — `showText={false}`, liczby już obok w `waterCompactVal`),
+            JEDEN wyraźny przycisk "Dodaj" (jedyna widoczna akcja — user: "tylko z dodaj").
+            Nagłówek (ikona/etykieta/chip "z zegarka") jest OSOBNYM `TouchableOpacity`,
+            SIBLING względem przycisku Dodaj (NIE zagnieżdżony) — otwiera ten sam
+            `waterCfgOpen` co wcześniej, który dostał nowy przycisk "Cofnij" (patrz niżej) —
+            zagnieżdżanie Touchable-w-Touchable w tym pliku już wymagało `stopPropagation`
+            gdzie indziej (index.tsx, przycisk pomodoro w wierszu zadania), więc bezpieczniej
+            trzymać je jako rodzeństwo niż ryzykować że "Dodaj" też otworzy config. */}
+        <GlassCard padding={spacing[3]} style={styles.tealCard}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => { haptic.tap(); setWaterGoalInput(String(waterGoal)); setGlassMlInput(String(glassMl)); setWaterCfgOpen(true); }}>
+            <View style={styles.cardRow}>
+              <Droplets size={13} color="#46B0DE" />
+              <Text style={styles.cardLabel}>NAWODNIENIE</Text>
+              <View style={{ flex: 1 }} />
+              {waterFromWatch && (
+                <View style={styles.watchChip}><Activity size={9} color={T.accent} /><Text style={styles.watchChipText}>z zegarka</Text></View>
+              )}
+              <ChevronRight size={13} color={colors.text.muted} style={{ marginLeft: 4 }} />
+            </View>
+          </TouchableOpacity>
 
-          <View style={styles.waterBody}>
-            <PressableScale onPress={() => bumpWater(-1)} style={styles.weightBtn} disabled={water <= 0}>
-              <Minus size={18} color={water <= 0 ? colors.border.default : colors.text.muted} />
-            </PressableScale>
+          <View style={styles.waterCompactBody}>
             <WaterGauge
               ml={water * glassMl} goalMl={waterGoal * glassMl}
-              accent="#46B0DE" muted={colors.text.muted} textColor={colors.text.primary} size={158}
+              accent="#46B0DE" muted={colors.text.muted} textColor={colors.text.primary} size={52} showText={false}
             />
-            <PressableScale onPress={() => bumpWater(1)} style={styles.weightBtn}>
-              <Plus size={18} color={colors.text.muted} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.waterCompactVal}>{water}/{waterGoal} szklanek</Text>
+              <Text style={styles.waterCompactSub}>
+                {water > 0 ? `${(Math.round(water * glassMl / 10) / 100).toString().replace('.', ',')} l` : `cel ${(waterGoal * glassMl / 1000).toFixed(1).replace('.', ',')} l`}
+              </Text>
+            </View>
+            <PressableScale onPress={() => bumpWater(1)} style={styles.waterAddBtn}>
+              <Plus size={16} color="#0B0E1A" />
+              <Text style={styles.waterAddBtnText}>Dodaj</Text>
             </PressableScale>
           </View>
-          <Text style={[styles.waterSub, { textAlign: 'center', marginTop: spacing[3] }]}>
-            {water}/{waterGoal} szklanek{water > 0 ? ` · ${(Math.round(water * glassMl / 10) / 100).toString().replace('.', ',')} l` : ''} · dzielone z nawykiem „Woda"
-          </Text>
         </GlassCard>
 
         {/* Steps hero */}
@@ -1221,6 +1249,22 @@ export default function HealthScreen() {
               <Text style={wm.saveBtnText}>Zapisz</Text>
             </TouchableOpacity>
 
+            {/* Cofnij ostatnie dodanie (2026-08-24, user: "a po kliknięciu otwiera sie z
+                edycja cupsize lub cofnij dodanie") — zastępuje dawny stały przycisk minus
+                obok gauge'a (usunięty, patrz komentarz przy kompaktowym widgecie wyżej) —
+                dostępne TU, w tym samym sheet'cie co edycja rozmiaru kubka, zamiast osobnego
+                stałego przycisku na głównym ekranie. Ukryte gdy `water<=0` — nie ma czego
+                cofać. */}
+            {water > 0 && (
+              <TouchableOpacity
+                style={wm.undoBtn}
+                activeOpacity={0.8}
+                onPress={() => { bumpWater(-1); setWaterCfgOpen(false); }}
+              >
+                <Text style={wm.undoBtnText}>Cofnij ostatnie dodanie (-1 szklanka)</Text>
+              </TouchableOpacity>
+            )}
+
             {/* Definitive check: is there ANY hydration data in Health Connect, and who
                 wrote it? Tells Samsung-side gaps apart from our read side. */}
             <TouchableOpacity
@@ -1568,7 +1612,8 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   hcVal: { fontSize: 17, fontWeight: '800', color: c.text.primary },
   hcUnit: { fontSize: 10, fontWeight: '600', color: c.text.muted },
   hcLabel: { fontSize: 10, color: c.text.muted },
-  syncFallback: { fontSize: 11, color: c.text.muted, textAlign: 'center', textDecorationLine: 'underline', marginTop: -spacing[1] },
+  syncHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: -spacing[1] },
+  syncFallback: { fontSize: 11, color: c.text.muted, textAlign: 'center', textDecorationLine: 'underline' },
 
   card: { gap: spacing[3] },
   tealCard: { gap: spacing[3], backgroundColor: t.card, borderColor: t.cardBorder },
@@ -1786,7 +1831,6 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
     borderColor: c.border.default, alignItems: 'center', justifyContent: 'center',
   },
   waterNum: { fontSize: 26, fontWeight: '800', color: c.text.primary, letterSpacing: -0.5 },
-  waterSub: { fontSize: 12, fontWeight: '400', color: c.text.muted },
 
   // Weight
   energyTag: { fontSize: 9, fontWeight: '700', color: c.text.muted, letterSpacing: 0.4, fontStyle: 'italic' },
@@ -1819,14 +1863,14 @@ const makeStyles = (c: any, t: any) => StyleSheet.create({
   bodyCompTile: { flexBasis: '47%', flexGrow: 1, gap: 2, paddingVertical: spacing[2], paddingHorizontal: spacing[3], backgroundColor: c.border.subtle, borderRadius: radius.md },
   bodyCompVal: { fontSize: 18, fontWeight: '800', color: c.text.primary },
   bodyCompLabel: { fontSize: 10, color: c.text.muted },
-  waterBody: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[4], marginTop: spacing[2] },
+  // Skurczony widget wody (2026-08-24) — zastępuje dawne `waterBody`/`weightBtn` (osobne
+  // przyciski minus/plus wokół 158px gauge'a) — patrz komentarz przy JSX wyżej.
+  waterCompactBody: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[2] },
+  waterCompactVal: { fontSize: 15, fontWeight: '800', color: c.text.primary },
+  waterCompactSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
+  waterAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#46B0DE', borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: 9 },
+  waterAddBtnText: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
   weightRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
-  weightBtn: {
-    width: 36, height: 36, borderRadius: radius.md,
-    backgroundColor: c.fill.medium,
-    borderWidth: 1, borderColor: c.border.default,
-    alignItems: 'center', justifyContent: 'center',
-  },
   weightBtnSm: {
     paddingHorizontal: spacing[2], paddingVertical: 7,
     borderRadius: radius.sm,
@@ -1883,6 +1927,12 @@ const makeWm = (c: any, t: any) => StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnText: { fontSize: 16, fontWeight: '700', color: t.accent },
+  undoBtn: {
+    width: '100%', paddingVertical: spacing[3],
+    borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  undoBtnText: { fontSize: 13.5, fontWeight: '700', color: c.text.secondary },
   diagBtn: { width: '100%', paddingVertical: spacing[3], marginTop: spacing[2], alignItems: 'center' },
   diagBtnText: { fontSize: 13, fontWeight: '600', color: c.text.muted, textDecorationLine: 'underline' },
 });

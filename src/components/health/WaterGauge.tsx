@@ -2,10 +2,13 @@ import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, Path, Defs, ClipPath, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
 
 // Circular water gauge: a progress ring + a wave-fill that rises with intake.
+// `showText` (2026-08-24) — kompaktowy widget nawodnienia (health.tsx) chce sam pierścień
+// bez nakładki L/% (liczby już pokazane obok, osobnym tekstem) — domyślnie true, żeby
+// istniejące (jedyne na razie) wywołanie w pełnym rozmiarze zostało bez zmian.
 export default function WaterGauge({
-  ml, goalMl, accent, muted, textColor, size = 168,
+  ml, goalMl, accent, muted, textColor, size = 168, showText = true,
 }: {
-  ml: number; goalMl: number; accent: string; muted: string; textColor: string; size?: number;
+  ml: number; goalMl: number; accent: string; muted: string; textColor: string; size?: number; showText?: boolean;
 }) {
   const pct = goalMl > 0 ? Math.max(0, Math.min(1, ml / goalMl)) : 0;
   const cx = size / 2, cy = size / 2;
@@ -55,14 +58,16 @@ export default function WaterGauge({
         />
       </Svg>
 
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 32, fontWeight: '800', color: textColor, letterSpacing: -1 }}>
-            {liters}<Text style={{ fontSize: 14, fontWeight: '700', color: muted }}> L</Text>
-          </Text>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: muted }}>{Math.round(pct * 100)}%</Text>
+      {showText && (
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 32, fontWeight: '800', color: textColor, letterSpacing: -1 }}>
+              {liters}<Text style={{ fontSize: 14, fontWeight: '700', color: muted }}> L</Text>
+            </Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: muted }}>{Math.round(pct * 100)}%</Text>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
