@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  saveMerchant, recordMerchantAccept, merchantFor, loadMerchantMemory,
+  saveMerchant, saveMerchantTags, recordMerchantAccept, merchantFor, loadMerchantMemory,
   merchantIsAuto, setMerchantAuto, guessCategory, AUTO_THRESHOLD,
 } from '@/utils/merchantMemory';
 
@@ -50,6 +50,46 @@ describe('merchantMemory — saveMerchant (zapis BEZ ruszania liczników zaufani
     const mem = await loadMerchantMemory();
     expect(mem['lidl'].category).toBe('other');
     expect(mem['lidl'].cleanAccepts).toBe(2);
+  });
+});
+
+describe('merchantMemory — saveMerchantTags (auto-tagowanie rozpoznanych płatności)', () => {
+  test('pierwszy zapis (nowy sprzedawca) tworzy wpis z tagami i zgadniętą kategorią', async () => {
+    await saveMerchantTags('P4', ['internet'], 'P4 Sp. o.o. Warszawa');
+    const mem = await loadMerchantMemory();
+    expect(mem['p4'].tags).toEqual(['internet']);
+    expect(mem['p4'].category).toBe(guessCategory('P4 Sp. o.o. Warszawa'));
+  });
+
+  test('NIE rusza kategorii ani liczników zaufania już nauczonego sprzedawcy', async () => {
+    for (let i = 0; i < AUTO_THRESHOLD; i++) {
+      await recordMerchantAccept('Lidl', { category: 'groceries', corrected: false });
+    }
+    await saveMerchantTags('Lidl', ['przekąski']);
+    const mem = await loadMerchantMemory();
+    expect(mem['lidl'].category).toBe('groceries');
+    expect(mem['lidl'].auto).toBe(true);
+    expect(mem['lidl'].cleanAccepts).toBe(AUTO_THRESHOLD);
+    expect(mem['lidl'].tags).toEqual(['przekąski']);
+  });
+
+  test('kolejny zapis NADPISUJE tagi (nie dokleja) — usunięcie taga w edytorze też się zapamiętuje', async () => {
+    await saveMerchantTags('P4', ['internet'], 'P4 Sp. o.o. Warszawa');
+    await saveMerchantTags('P4', [], 'P4 Sp. o.o. Warszawa');
+    const mem = await loadMerchantMemory();
+    expect(mem['p4'].tags).toEqual([]);
+  });
+
+  test('pusty storeKey → nic nie zapisuje', async () => {
+    await saveMerchantTags('   ', ['internet'], 'P4 Sp. o.o. Warszawa');
+    const mem = await loadMerchantMemory();
+    expect(Object.keys(mem).length).toBe(0);
+  });
+
+  test('nowy sprzedawca bez podanej nazwy → nic do zgadnięcia kategorii, nic nie zapisuje', async () => {
+    await saveMerchantTags('nieznany', ['tag']);
+    const mem = await loadMerchantMemory();
+    expect(Object.keys(mem).length).toBe(0);
   });
 });
 

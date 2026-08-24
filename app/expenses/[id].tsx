@@ -19,7 +19,7 @@ import Chip from '@/components/ui/Chip';
 import DatePickerField from '@/components/ui/DatePickerField';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useExpensesStore } from '@/store/expensesStore';
-import { saveMerchant } from '@/utils/merchantMemory';
+import { saveMerchant, saveMerchantTags } from '@/utils/merchantMemory';
 import { expensesService } from '@/services/expensesService';
 import { toast } from '@/store/toastStore';
 import { ExpenseCategory, IncomeCategory, TransactionType, ReceiptItem, PaymentMethod, Vehicle } from '@/types';
@@ -496,6 +496,15 @@ export default function ExpenseDetailScreen() {
       if (!editIsIncome && expense.storeName && expCat !== expense.category) {
         const storeKey = expense.storeName.trim().split(/\s+/)[0]?.toLowerCase();
         if (storeKey) saveMerchant(storeKey, { category: expCat, name: expense.storeName }).catch(() => {});
+      }
+      // Ucz auto-łapacza tagów (2026-08-24, user: "chciałbym móc jej nadać że to jest
+      // opłata za internet, żeby mi łapało jak z wypłatą") — gdy dotkniesz tagów na
+      // wydatku z rozpoznanym sprzedawcą, kolejne auto-złapane płatności od tego samego
+      // odbiorcy dostają te same tagi automatycznie (ingestBankNotification →
+      // merchantFor().tags), bez osobnego potwierdzania za każdym razem.
+      if (!editIsIncome && expense.storeName && JSON.stringify(tags) !== JSON.stringify(expense.tags ?? [])) {
+        const storeKey = expense.storeName.trim().split(/\s+/)[0]?.toLowerCase();
+        if (storeKey) saveMerchantTags(storeKey, tags, expense.storeName).catch(() => {});
       }
       await expensesService.update(id!, updates);
       haptic.success();

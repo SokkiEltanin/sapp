@@ -20,6 +20,7 @@ export interface MerchantInfo {
   name?: string;
   cleanAccepts?: number; // consecutive accepts where the suggested category was kept
   auto?: boolean;        // graduated → log automatically without manual review
+  tags?: string[];       // tags to auto-apply to future bank payments from this merchant
 }
 export type MerchantMemory = Record<string, MerchantInfo>; // storeKey (lowercased) → info
 
@@ -73,6 +74,23 @@ export async function recordMerchantAccept(
 
 export function merchantFor(storeKey: string, mem: MerchantMemory): MerchantInfo | undefined {
   return mem[norm(storeKey)];
+}
+
+// Remember which tags this merchant's payments should carry from now on (2026-08-24,
+// user: "jak mi dodało autopłatność z banku to chciałbym móc jej nadać że to jest opłata
+// za internet, żeby mi łapało jak z wypłatą" — a bank auto-payment from a recognised
+// recipient should auto-tag itself, the way the merchant's CATEGORY already does).
+// Unlike category trust (`cleanAccepts`/`auto`, earned over 5 clean accepts), this is an
+// explicit one-time choice on the expense screen — applies to the very next matching
+// payment, no graduation period. Doesn't touch the category trust counters.
+export async function saveMerchantTags(storeKey: string, tags: string[], name?: string): Promise<void> {
+  const key = norm(storeKey);
+  if (!key) return;
+  const mem = await loadMerchantMemory();
+  const prev = mem[key] ?? { category: guessCategory(name ?? key) };
+  if (!mem[key] && !name) return; // nothing to guess a category from — nothing to save
+  mem[key] = { ...prev, tags, ...(name ? { name } : {}) };
+  await writeMemory(mem);
 }
 
 // Is this shop trusted enough to log automatically? (async form for headless ingest)
