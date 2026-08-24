@@ -182,10 +182,22 @@ export function useHabits() {
     const target = habit.weeklyTarget && habit.weeklyTarget < 7 ? habit.weeklyTarget : null;
 
     if (!target) {
-      // Daily streak: consecutive done-OR-FROZEN days (zamrożenie ratuje pominięty dzień)
+      // Daily streak: consecutive done-OR-FROZEN days (zamrożenie ratuje pominięty dzień).
+      //
+      // BUG FIX (2026-08-24, user ze screenshotem: "jak wchodzę jest napisane 30 dni a na
+      // kafelku wczoraj tez było 30, a dzisiaj jest 29") — dolna granica pętli była STAŁA
+      // (`-29`), niezależna od `start`. Gdy dziś jeszcze nie zaliczone, `start` przesuwa się
+      // na -1 (dziś celowo NIE liczy się do serii, dopóki nie zaliczone), ale pętla dalej
+      // kończyła na -29 — czyli sprawdzała TYLKO 29 dni (-1..-29) zamiast 30 (kiedy `start=0`
+      // pętla sprawdzała 0..-29, czyli realnie 30 dni). Realna, nieprzerwana 30-dniowa seria
+      // (wczoraj wstecz) traciła jeden dzień z ogona i wcięcie zgłaszało 29 zamiast 30 —
+      // dokładnie do momentu zaliczenia dzisiejszego dnia, kiedy `start` wracał na 0 i
+      // liczba "cudownie" rosła z powrotem. Fix: dolna granica WZGLĘDNA do `start`
+      // (`start - 29`), więc pętla ZAWSZE sprawdza dokładnie 30 kalendarzowych dni,
+      // niezależnie czy dziś już zaliczone czy nie.
       let streak = 0;
       const start = isDoneOrFrozen(habit, today) ? 0 : -1;
-      for (let i = start; i >= -29; i--) {
+      for (let i = start; i >= start - 29; i--) {
         const d = offsetDate(today, i);
         if (isDoneOrFrozen(habit, d)) streak++; else break;
       }

@@ -1446,6 +1446,17 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       zaokrąglona — zaokrąglenie ma sens tylko tam gdzie wypełnienie styka się z zaokrąglonym
       lewym kapslem `missionBarTrack`), więc naprawia problem przy KAŻDEJ szerokości, nie tylko
       przy małym postępie.
+    - **Fix: kotek wystawał za dużo poza pasek (2026-08-24)** — user ze screenshotem: "kotek
+      musi być bardziej w tym pasku... wystaje za dużo". Pasek (`missionBarTrack`) miał tylko
+      30px wysokości dla 26px kotka — realnie wyrenderowana sylwetka SVG (naturalny "oddech"
+      wokół właściwego kształtu w viewBoxie) wizualnie przekraczała krawędzie przy tak małym
+      marginesie. Rozwiązanie: powiększony pasek (nowa stała `MISSION_BAR_HEIGHT=34`) zamiast
+      pomniejszenia kotka z powrotem — user WCZEŚNIEJ explicit prosił o większego kotka (Runda
+      7 wyżej), więc cofnięcie tamtej zmiany byłoby sprzeczne z jego własną prośbą; więcej
+      miejsca w pasku daje oddech obu stronom naraz. `missionBarCatWrap`'s `top`/`marginLeft`
+      przepisane z zaszytych liczb na FORMUŁĘ (`(MISSION_BAR_HEIGHT - MISSION_CAT_SIZE) / 2`
+      / `-MISSION_CAT_SIZE / 2`) — przeżyje kolejną zmianę rozmiaru bez ręcznego przeliczania
+      magicznych liczb, ten sam wzorzec co inne stałe-sterowane style w tym pliku.
   - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
     user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
     obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +
@@ -1702,6 +1713,24 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   frozen=ICE; licznik „bez X": dzień czysto=zielony, wpadka (kupiłeś)=czerwony (z paragonów przez
   `matchesAvoid`). Seria licznika liczona OD DZIŚ; nawyku jak `getStreak` (od wczoraj gdy dziś
   jeszcze nie zrobione). Wejścia: kafle „Twoje serie" (dashboard) + ikona siatki w `/counters`.
+  - **BUG: `getStreak()` (dashboard, `useHabits.ts`) tracił 1 dzień z ogona serii, gdy dziś
+    jeszcze nie zaliczone (2026-08-24)** — user ze screenshotem: "jak wchodzę [w habit-year]
+    jest napisane 30 dni a na kafelku [dashboard] wczoraj tez było 30, a dzisiaj jest 29".
+    Pętla liczyła `for (i = start; i >= -29; i--)` — dolna granica `-29` była STAŁA, nie
+    zależną od `start`. Gdy dziś zaliczone, `start=0`, pętla sprawdza `0..-29` = 30 dni
+    (poprawnie). Gdy dziś JESZCZE nie zaliczone (celowo `start=-1` — dziś nie liczy się do
+    serii dopóki nie zrobione), pętla dalej kończyła na `-29`, czyli sprawdzała TYLKO
+    `-1..-29` = 29 dni — realna, nieprzerwana 30-dniowa seria (licząc wstecz od wczoraj)
+    traciła jeden dzień z ogona i undercountowała do 29, dokładnie do momentu zaliczenia
+    dzisiejszego dnia (kiedy `start` wracał na 0 i seria "cudownie" odzyskiwała 30).
+    `app/habit-year.tsx` liczy TĘ SAMĄ serię NIEZALEŻNIE, bez analogicznego capu (idzie po
+    pełnej sekwencji `seq`, bez sztywnej dolnej granicy) — stąd rozjazd 30 (habit-year,
+    poprawnie) vs 29 (dashboard, buggy) TEGO SAMEGO dnia, nie tylko spadek dzień-do-dnia.
+    Fix: dolna granica pętli WZGLĘDNA do `start` (`start - 29`) zamiast bezwzględnej `-29` —
+    pętla ZAWSZE sprawdza dokładnie 30 kalendarzowych dni niezależnie od tego czy dziś już
+    zaliczone. Throwaway-symulacją w node zweryfikowane: stary kod dawał 29 na dokładnym
+    scenariuszu usera (30 dni z rzędu kończących się wczoraj, dziś jeszcze puste), nowy
+    poprawnie daje 30.
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 - **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/

@@ -9,6 +9,22 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🐛 Fix: dashboard undercountował serie nawyków o 1 dzień, gdy dziś jeszcze nie zaliczone — NIEsprawdzone (2026-08-24)
+
+User ze screenshotem: "jak wchodzę [w habit-year] jest napisane 30 dni a na kafelku [dashboard]
+wczoraj tez było 30, a dzisiaj jest 29 xddd". Prawdziwy off-by-one w `getStreak()` (`useHabits.
+ts`) — pętla miała stałą dolną granicę (`-29`) niezależną od tego czy dziś już zaliczone; gdy
+NIE, tracił 1 dzień z ogona (sprawdzał tylko 29 dni zamiast 30). `habit-year.tsx` liczy tę samą
+serię inaczej (bez capu), stąd rozjazd 30 vs 29 tego samego dnia. Fix: dolna granica względna
+do punktu startu, zawsze dokładnie 30 dni. Throwaway-symulacją w node zweryfikowane na
+dokładnym scenariuszu usera (stary kod → 29, nowy → 30). Pełny opis w ARCHITECTURE.md, sekcja
+"Nawyki/liczniki" (nowy sub-punkt "BUG: getStreak()..."). `tsc`/`jest` zielone (709/709 — brak
+istniejącego testu dla `getStreak` bo żyje w hooku bez infrastruktury do testowania hooków w
+tym repo; poprawność zweryfikowana throwaway-symulacją, nie nowym testem jednostkowym).
+**Priorytet testu na urządzeniu**: znajdź nawyk/serię blisko okrągłej liczby (np. 7/14/30 dni)
+z dniem dzisiejszym JESZCZE nie zaliczonym — sprawdź czy kafelek "Twoje serie" na dashboardzie
+pokazuje TĘ SAMĄ liczbę co ekran szczegółów serii (habit-year), bez spadku o 1.
+
 ## 🆕 TopPill: rotacja luźnej puli + pupil na misji/energia bossów — NIEsprawdzone (2026-08-23)
 
 User: "żeby nie pokazywało się miesiąc ten sam że mam jedno zadanie tylko żeby trochę tego
