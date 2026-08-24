@@ -128,22 +128,22 @@ liczniki "dni bez", w tym "bez słodyczy") był w grupie edytora "Nastrój i lic
 "Zadania i nawyki" (`SECTION_GROUP` w dashboardLayout.ts) — ta sama rodzina co `habits-today`/
 `daily-rings`.
 
-**"Twoje serie" sklejone z kaflem pupila (2026-08-24)** — user: "zróbmy te ilość seri jako
+**Seria logowań sklejona z kaflem pupila (2026-08-24)** — user: "zróbmy te ilość seri jako
 łączny kafelek z pupilem po prostu po prawej stronie oke??" (screenshot: karta "Twoje serie"
-tuż nad kaflem pupila na dashboardzie). Sekcja `streak-wall` USUNIĘTA jako osobna, przesuwalna
-sekcja edytora dashboardu (wpis skasowany z `DEFAULT_DASHBOARD_SECTIONS`/`SECTION_TITLES`/
-`SECTION_DESC`/`SECTION_GROUP` w dashboardLayout.ts — `effectiveOrder()` sama odfiltruje
-zapisany, nieistniejący już id ze starych `order`/`hidden`, bez migracji). `StreakWallCard.tsx`
-przepisany: dawniej pełna, samodzielna karta (nagłówek "Twoje serie" + licznik + freeze-chip +
-siatka 2×N kafli WSZYSTKICH serii) → teraz wąska kolumna BEZ własnego tła/obwódki (host = kafel
-pupila), pokazuje TYLKO najdłuższą serię (reszta pod plakietką "+N" w rogu), stuknięcie
-prowadzi do `/habits`. Celebracja progu (toast 7/14/30/60/100 dni, AsyncStorage
-`streak_tiers_v1`) BEZ ZMIAN — liczy się po wszystkich seriach, nie tylko widocznej. `darken()`
-wyeksportowany z tego pliku (był lokalny) do reużycia. `index.tsx nodes['pet']`: gdy jest
-≥1 aktywna seria — jeden kafel (`s.petCombined`) z dwiema SIOSTRZANYMI (nie zagnieżdżonymi)
-`TouchableOpacity`: lewa = `<PetTile bare />` (nowy prop, zwraca sam wiersz kot+tekst bez
-własnej ramki/chevronu) → `/pet`, prawa = `<StreakWallCard>` → `/habits`. Gdy zero aktywnych
-serii: stary, samodzielny `<PetTile />` (bez `bare`) — nie ma czego dokleić.
+tuż nad kaflem pupila). PIERWSZA próba omyłkowo dokleiła `streakWall` (ogólne serie
+nawyków/liczników, np. "bez wody") zamiast serii LOGOWAŃ do pupila — user: "ty zjebałeś,
+miałeś mi serię logowań pupila z nim połączyć a połączyłeś serię picia wody itp??". Naprawione:
+sekcja `streak-wall`/`StreakWallCard.tsx` w CAŁOŚCI przywrócone do stanu sprzed tej zmiany
+(osobna, przesuwalna karta dashboardu — nietknięta). Zamiast tego kafel pupila (`index.tsx
+nodes['pet']`) łączy się z `petLoginStreak` (`usePetStore(s => s.loginStreak)`) — dawniej pasek
+`loginStrip` POD kaflem pupila (`loginStrip`/`loginStripTxt`/`loginStripNext` — style USUNIĘTE,
+zastąpione przez `petLoginTile`/`petLoginFlame`/`petLoginNum`/`petLoginLabel`/`petLoginNext`).
+Gdy `petLoginStreak > 0`: JEDNA `TouchableOpacity` (`s.petCombined`) → `/pet` (bez podziału na
+dwie połówki jak w pierwszej, błędnej wersji — seria logowań i pupil to ta sama rzecz, więc
+jeden wspólny tap-target wystarczy), lewa strona = `<PetTile bare />` (prop zostaje — nadal
+użyteczny), prawa = mały kafelek z `StreakFlameGlow`, liczbą dni i "jutro +N" (ta sama
+informacja co dawny pasek, tylko przeniesiona do kolumny). Gdy `petLoginStreak === 0`: stary,
+samodzielny `<PetTile />` (bez `bare`) — nie ma czego dokleić.
 
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 

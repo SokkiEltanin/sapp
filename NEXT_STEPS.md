@@ -29,25 +29,27 @@ zmieniły się przez samo dodanie taga,
 (d) usuń tag z wydatku i zapisz — sprawdź czy kolejna płatność od tego sprzedawcy PRZESTAJE
 dostawać ten tag (nadpisanie pustą listą, nie tylko dodawanie).
 
-## 🆕 "Twoje serie" sklejone z kaflem pupila — NIEsprawdzone (2026-08-24)
+## 🆕 Seria logowań sklejona z kaflem pupila (poprawka po błędnej wersji) — NIEsprawdzone (2026-08-24)
 
 User: "zróbmy te ilość seri jako łączny kafelek z pupilem po prostu po prawej stronie oke??"
-(screenshot: osobna karta "Twoje serie" nad kaflem pupila). Sekcja `streak-wall` zniknęła jako
-osobna, przesuwalna sekcja edytora dashboardu — teraz to prawa kolumna WEWNĄTRZ kafla pupila,
-pokazuje tylko najdłuższą serię (reszta pod "+N"). Pełny opis w ARCHITECTURE.md §4 (nowy
-sub-punkt "Twoje serie sklejone z kaflem pupila"). `tsc`/`jest` zielone (57/701, bez zmian w
-testach). **Priorytet testu na urządzeniu**:
-(a) na dashboardzie sprawdź czy kafel pupila (kotek + imię/lvl) ma teraz DOKLEJONY z prawej
-strony mały kafelek z płomieniem i liczbą dni najdłuższej serii, w JEDNEJ wspólnej ramce,
-(b) stuknij w LEWĄ część (kotek) — powinno otworzyć `/pet`,
-(c) stuknij w PRAWĄ część (kafelek serii) — powinno otworzyć `/habits`, NIE `/pet` (sprawdź że
-nie ma przypadkowego przebicia zdarzenia między dwoma dotykalnymi obszarami),
-(d) jeśli masz więcej niż jedną aktywną serię, sprawdź czy w rogu kafelka jest plakietka "+N",
-(e) jeśli masz banki freeze (❄️), sprawdź czy liczba freeze nadal widoczna na kafelku,
-(f) w edytorze dashboardu sprawdź że "Twoje serie" ZNIKNĘŁO z listy osobnych sekcji (nie da się
-już go ukryć/przesunąć niezależnie od kafla pupila),
-(g) jeśli masz ZERO aktywnych serii (świeże konto) — kafel pupila powinien wyglądać jak dawniej
-(bez doklejonej kolumny, z powrotem samodzielny chevron).
+— PIERWSZA wersja omyłkowo dokleiła ogólne "Twoje serie" (streakWall — nawyki/liczniki typu
+"bez wody") zamiast serii LOGOWAŃ pupila. User złapał błąd: "ty zjebałeś, miałeś mi serię
+logowań pupila z nim połączyć a połączyłeś serię picia wody itp??". Naprawione: "Twoje serie"
+w CAŁOŚCI z powrotem osobną, przesuwalną sekcją dashboardu (bez zmian względem stanu sprzed tej
+sesji) — zamiast niej kafel pupila łączy się z `petLoginStreak` (dawny pasek "Seria logowań"
+POD kaflem, teraz kolumna PO PRAWEJ WEWNĄTRZ tej samej ramki). Pełny opis w ARCHITECTURE.md §4
+(sub-punkt "Seria logowań sklejona z kaflem pupila"). `tsc`/`jest` zielone (57/706, bez zmian
+w testach). **Priorytet testu na urządzeniu**:
+(a) na dashboardzie sprawdź czy "Twoje serie" jest z powrotem osobną kartą (nie wewnątrz kafla
+pupila) — powinna wyglądać dokładnie jak przed tą sesją,
+(b) sprawdź czy kafel pupila (kotek + imię/lvl) ma teraz DOKLEJONY z prawej strony mały
+kafelek z płomieniem, liczbą dni serii LOGOWAŃ i podpisem "jutro +N", w JEDNEJ wspólnej ramce,
+(c) stuknij GDZIEKOLWIEK na tej połączonej karcie (lewa LUB prawa strona) — całość powinna
+otworzyć `/pet`,
+(d) w edytorze dashboardu sprawdź że "Twoje serie" jest z powrotem na liście osobnych sekcji,
+da się ją ukryć/przesunąć niezależnie od kafla pupila,
+(e) jeśli akurat seria logowań spadła do zera (nie logowałeś się dziś) — kafel pupila powinien
+wyglądać jak dawniej (bez doklejonej kolumny, z powrotem samodzielny chevron).
 
 ## 🆕 "Rok w pikselach": zmiana roku strzałkami — NIEsprawdzone (2026-08-24)
 
