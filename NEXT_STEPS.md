@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Zdrowie: odkrywalny sync + kolorowe kafelki + zbity widget wody — NIEsprawdzone (2026-08-24)
+
+User: (1) "dodaj ze tam ukryty jest ten przeciągnij w dół aby zsynchronizować", (2) "te małe
+kafelki dodaj im tło odpowiadające ikonie, ikony daj wypełnione", (3) "ten widget wody zrob
+ładniejszy i mniejszy bardziej zbity tylko z dodaj, a po kliknięciu otwiera sie z edycja
+cupsize lub cofnij dodanie". Trzy niezależne zmiany na `app/(tabs)/health.tsx` — pełny opis w
+ARCHITECTURE.md, sekcja 8 (nowy sub-punkt "Odkrywalność sync..."). `tsc`/`jest` zielone
+(57/701 suites — brak nowych testów, czysto UI/interakcja bez logiki liczbowej wartej testu
+jednostkowego). **Priorytet testu na urządzeniu**:
+(a) zakładka Zdrowie → sprawdź czy pod headerem widać wyraźniejszą wskazówkę "pociągnij w dół"
+z ikonką strzałki, i czy pociągnięcie w dół faktycznie synchronizuje (bez zmian funkcjonalnie,
+tylko wizualnie),
+(b) sprawdź czy 5 małych kafelków (kroki/sen/tętno/kcal/waga) ma teraz kolorowe tło pod kolor
+własnej ikony, i czy ikony wyglądają na wypełnione (nie tylko obrys),
+(c) widget "NAWODNIENIE" powinien być mniejszy/bardziej zbity, z jednym wyraźnym przyciskiem
+"Dodaj" — stuknij Dodaj kilka razy, sprawdź czy liczba szklanek realnie rośnie,
+(d) stuknij w NAGŁÓWEK widgetu wody (nie przycisk Dodaj) — powinien otworzyć się sheet z
+edycją celu/rozmiaru kubka ORAZ (jeśli water>0) nowym przyciskiem "Cofnij ostatnie dodanie" —
+sprawdź czy cofnięcie faktycznie zmniejsza liczbę szklanek o 1 i zamyka sheet.
+
 ## 🆕 Dashboard: usunięty "Zaoszczędzone", przeniesione "Twoje serie", nowy widget "Rok w pikselach" — NIEsprawdzone (2026-08-24)
 
 User: (1) "widget oszczędzone z tych lidlowskich usuń mi... i możesz posprzątać po nim bo nie
