@@ -116,7 +116,7 @@ import { getLastBackup } from '@/services/backupService';
 import { loadMerchantMemory } from '@/utils/merchantMemory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WalkProgress from '@/components/counters/WalkProgress';
-import StreakFlame, { streakColor, streakTier } from '@/components/counters/StreakFlame';
+import StreakFlame, { StreakFlameGlow, streakColor, streakTier } from '@/components/counters/StreakFlame';
 import StreakCard from '@/components/counters/StreakCard';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
 // persisted screen instead of expo-router's blank production fallback.
@@ -2754,24 +2754,42 @@ export default function DashboardScreen() {
                 );
               })();
 
-              nodes['pet'] = (
-                <View style={{ gap: spacing[2] }}>
-                  <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }}>
-                    <PetTile name={petName} pet={petState} level={petLevel} claimable={petClaimable + (dailyBoxReady ? 1 : 0)} />
-                  </TouchableOpacity>
-                  {/* Seria logowań — PRZENIESIONA (2026-08-21) z pet-shop.tsx na główny pulpit,
-                      obok kafla pupila (bonus jest przyznawany tutaj, przy wejściu na pulpit —
-                      user: "serię logowan przenieśmy na główny pulpit"). */}
-                  {petLoginStreak > 0 && (
-                    <View style={s.loginStrip}>
-                      <Flame size={14} color="#FB923C" />
-                      <Text style={s.loginStripTxt}>Seria logowań: {petLoginStreak} {petLoginStreak === 1 ? 'dzień' : 'dni'}</Text>
-                      <View style={{ flex: 1 }} />
-                      <Text style={s.loginStripNext}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
-                    </View>
-                  )}
-                </View>
-              );
+              nodes['pet'] = (() => {
+                const claimTotal = petClaimable + (dailyBoxReady ? 1 : 0);
+                const hasStreaks = streakWall.some(x => x.days > 0);
+                return (
+                  <View style={{ gap: spacing[2] }}>
+                    {/* Kolumna serii DOKLEJONA do kafla pupila (2026-08-24, user: "zróbmy te
+                        ilość seri jako łączny kafelek z pupilem po prostu po prawej stronie") —
+                        dawniej osobna, przesuwalna sekcja `streak-wall` nad tym kaflem (patrz
+                        screenshot usera). Bez aktywnych serii: stary, samodzielny kafel pupila
+                        z własną ramką/chevronem (nie ma czego dokleić). */}
+                    {hasStreaks ? (
+                      <View style={[s.petCombined, { backgroundColor: colors.bg.card, borderColor: colors.border.default }]}>
+                        <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }} style={s.petCombinedLeft}>
+                          <PetTile name={petName} pet={petState} level={petLevel} claimable={claimTotal} bare />
+                        </TouchableOpacity>
+                        <StreakWallCard streaks={streakWall} />
+                      </View>
+                    ) : (
+                      <TouchableOpacity activeOpacity={0.85} onPress={() => { haptic.tap(); router.navigate('/pet' as any); }}>
+                        <PetTile name={petName} pet={petState} level={petLevel} claimable={claimTotal} />
+                      </TouchableOpacity>
+                    )}
+                    {/* Seria logowań — PRZENIESIONA (2026-08-21) z pet-shop.tsx na główny pulpit,
+                        obok kafla pupila (bonus jest przyznawany tutaj, przy wejściu na pulpit —
+                        user: "serię logowan przenieśmy na główny pulpit"). */}
+                    {petLoginStreak > 0 && (
+                      <View style={s.loginStrip}>
+                        <Flame size={14} color="#FB923C" />
+                        <Text style={s.loginStripTxt}>Seria logowań: {petLoginStreak} {petLoginStreak === 1 ? 'dzień' : 'dni'}</Text>
+                        <View style={{ flex: 1 }} />
+                        <Text style={s.loginStripNext}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })();
 
               nodes['month-summary'] = featuredCard && (
                 <MonthWrappedCard card={featuredCard} compact pace={monthPace} onPress={() => router.navigate('/month-cards' as any)} />
@@ -3189,7 +3207,6 @@ export default function DashboardScreen() {
               </View>
             );
 
-            nodes['streak-wall'] = streakWall.some(x => x.days > 0) && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
             nodes['personal-records'] = records.length > 0 && <PersonalRecordsCard records={records} cardBg={cardBgDark} />;
             nodes['trivia'] = <TriviaCard cardBg={cardBgDark} />;
             nodes['reflections'] = <ReflectionCard cardBg={cardBgDark} />;
@@ -4801,6 +4818,10 @@ const buildStyles = (c: any) => StyleSheet.create({
   loginStrip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.md, borderWidth: 1, borderColor: '#FB923C3A', backgroundColor: '#FB923C12' },
   loginStripTxt: { fontSize: 12, fontWeight: '800', color: c.text.primary },
   loginStripNext: { fontSize: 11, fontWeight: '800', color: '#FB923C' },
+
+  // ── Kafel pupila + kolumna serii, sklejone w jedną ramkę (2026-08-24) ───────
+  petCombined: { flexDirection: 'row', alignItems: 'stretch', gap: 10, borderRadius: 18, borderWidth: 1, padding: 12 },
+  petCombinedLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
 
   // ── Budget warning card ───────────────────────────────────────────────────
   budgetWarnCard: {
