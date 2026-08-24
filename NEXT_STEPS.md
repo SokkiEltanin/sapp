@@ -9,6 +9,25 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 "Rok w pikselach": zmiana roku strzałkami — NIEsprawdzone (2026-08-24)
+
+User: "w ustawieniach w personalizacji nie dałeś mi możliwości zmiany roku xdd" — kafelek
+"Rok w pikselach" (dodany chwilę wcześniej, patrz wpis niżej) pokazywał na sztywno bieżący
+rok, picker przy tworzeniu wybierał tylko metrykę. `CustomTile.year?: number` (nowe pole,
+opcjonalne, brak = bieżący rok). W `app/(tabs)/index.tsx` strzałki ‹/› przy podpisie
+"Rok {year}" wołają `updateCustomTile(t.id, { year: year ± 1 })`, w przód zablokowane na
+bieżącym roku. Pełny opis w ARCHITECTURE.md §5 (nowy sub-punkt "Zmiana roku na kafelku").
+`tsc`/`jest` zielone (57/701, bez zmian w testach — czysto UI). **Priorytet testu na
+urządzeniu**:
+(a) na istniejącym kafelku "Rok w pikselach" sprawdź czy obok napisu "Rok 2026" widać teraz
+strzałki w lewo/prawo,
+(b) stuknij strzałkę w lewo — siatka powinna przeładować się na dane z 2025 roku (mniej/inne
+zapełnione kwadraciki niż 2026),
+(c) sprawdź że strzałka w prawo jest wyszarzona/nieaktywna gdy jesteś na bieżącym roku
+(nie da się "zobaczyć przyszłości"),
+(d) zmień rok, zamknij i otwórz apkę ponownie — sprawdź czy wybrany rok został zapamiętany
+(persist).
+
 ## 🆕 Zdrowie: odkrywalny sync + kolorowe kafelki + zbity widget wody — NIEsprawdzone (2026-08-24)
 
 User: (1) "dodaj ze tam ukryty jest ten przeciągnij w dół aby zsynchronizować", (2) "te małe

@@ -368,6 +368,7 @@ export default function DashboardScreen() {
   const setSectionOrder = useDashboardLayout(s => s.setOrder);
   const toggleHiddenSection = useDashboardLayout(s => s.toggleHidden);
   const addCustomTile  = useDashboardLayout(s => s.addCustomTile);
+  const updateCustomTile = useDashboardLayout(s => s.updateCustomTile);
   const removeCustomTile = useDashboardLayout(s => s.removeCustomTile);
   const [confirmRemoveTile, setConfirmRemoveTile] = useState<{ id: string; title: string } | null>(null);
   const resetLayout    = useDashboardLayout(s => s.reset);
@@ -1150,7 +1151,18 @@ export default function DashboardScreen() {
     // metric's daily value. Checked FIRST so a 'weight'/'mood' pixels tile isn't
     // swallowed by the weight/number branches below.
     if (viz === 'pixels') {
-      const year = new Date().getFullYear();
+      // Zmiana roku (2026-08-24, user: "w ustawieniach w personalizacji nie dałeś mi
+      // możliwości zmiany roku xdd") — dawniej `year` był na sztywno bieżącym rokiem, bez
+      // żadnego sposobu podejrzenia poprzednich lat. `t.year` (nowe, opcjonalne pole
+      // CustomTile) trzyma wybór PER KAFELEK; brak = bieżący rok, więc istniejące kafelki
+      // (bez tego pola) zachowują się dokładnie jak wcześniej. Strzałki NIŻEJ wołają
+      // `updateCustomTile` — PIERWSZE realne użycie tej akcji w index.tsx (dotąd
+      // `period`/`target`/itd. dawały się ustawić TYLKO przy tworzeniu kafelka, nie
+      // edytować później) — celowo NIE osobny ekran ustawień, tylko strzałki wprost na
+      // widgecie (dane i tak są per-dzień, `dailyValue()` nie zakłada "bieżącego roku").
+      // Prawa strzałka zablokowana na bieżącym roku (nie ma sensu podglądać przyszłości).
+      const currentYear = new Date().getFullYear();
+      const year = t.year ?? currentYear;
       const mood = isMoodPixelMetric(t.metric!);
       const valueFor = (d: string) => dailyValue(t.metric!, statCtx, d);
       const tiers = pixelTiers(t.metric!);
@@ -1163,7 +1175,15 @@ export default function DashboardScreen() {
           {header}
           <YearPixels year={year} valueFor={valueFor} mood={mood} accent={accentColor} tiers={tiers} />
           <View style={s.pxLegendRow}>
-            <Text style={s.statSub}>Rok {year}{tierHint ? ` · ${tierHint}` : ''}</Text>
+            <View style={s.pxYearRow}>
+              <TouchableOpacity onPress={() => { haptic.tap(); updateCustomTile(t.id, { year: year - 1 }); }} hitSlop={8}>
+                <ChevronLeft size={13} color={colors.text.muted} />
+              </TouchableOpacity>
+              <Text style={s.statSub}>Rok {year}{tierHint ? ` · ${tierHint}` : ''}</Text>
+              <TouchableOpacity onPress={() => { if (year >= currentYear) return; haptic.tap(); updateCustomTile(t.id, { year: year + 1 }); }} hitSlop={8} disabled={year >= currentYear}>
+                <ChevronRight size={13} color={year >= currentYear ? colors.border.default : colors.text.muted} />
+              </TouchableOpacity>
+            </View>
             {!mood && (
               <View style={s.pxLegend}>
                 <Text style={[s.statSub, { fontSize: 10 }]}>mniej</Text>
@@ -5047,6 +5067,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   statListRow2: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 6 },
   statSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
   pxLegendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[2] },
+  pxYearRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pxLegend: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   statTargetTrack: { height: 6, borderRadius: 3, backgroundColor: c.border.subtle, marginTop: 8, overflow: 'hidden' },
   statTargetFill: { height: 6, borderRadius: 3 },
