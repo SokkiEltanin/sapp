@@ -1951,6 +1951,37 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   `notificationsService.refreshPaydayReminder` (nudguje tylko w oknie, potem następny miesiąc).
 - **Backup**: `backupService.ts` — chunkowane snapshoty do Firestore + restore z Ustawień
   (reinstall-proof po zalogowaniu Google).
+- **Zustand persist THROTTLED (`utils/throttledStorage.ts`, 2026-08-25)** — user: "a okiem
+  specjalisty co byś jeszcze zoptymalizował?" → "zapisz wszystko i wszystko rob". Zustand's
+  `persist` woła `storage.setItem()` przy KAŻDEJ zmianie stanu — dla store'a z dużym/często
+  mutowanym slice'em (wydatki, kalendarz, walki pupila — kilka `set()` na rundę) to pełny
+  JSON.stringify + zapis AsyncStorage przy KAŻDEJ pojedynczej akcji, nie tylko na starcie apki
+  (inna klasa hotspotu niż wcześniej naprawione bugi memo). Fix: `throttledAsyncStorage()`
+  (drop-in zamiennik `AsyncStorage` w `createJSONStorage(() => ...)`, wszystkie 18 store'ów w
+  `src/store/`) koalescuje zapisy do TEGO SAMEGO klucza — przeżywa tylko OSTATNIA wartość po
+  ~600ms bez kolejnego zapisu do tego klucza; różne store'y (różne klucze) throttlują
+  niezależnie. Trade-off: do 600ms najnowszego LOKALNEGO zapisu może przepaść przy force-kill
+  apki — ograniczone dwoma zabezpieczeniami: (1) `backupService.gatherSnapshot()` woła
+  `await flushThrottledStorage()` ZANIM czyta surowe klucze `AsyncStorage.getAllKeys()/
+  multiGet()` (backup NIGDY nie zobaczy nieaktualnej wartości), (2) `_layout.tsx` flushuje przy
+  KAŻDYM przejściu `AppState` w background/inactive (nie tylko force-kill — normalne wyjście z
+  apki też nie zostawia zaległego zapisu). Testy: `__tests__/throttledStorage.test.ts`.
+- **Cold-start perf log (`utils/perfLog.ts`, 2026-08-25)** — ten sam wątek co wyżej: bez
+  zdalnego profilera (Flipper) na urządzeniu, więc zamiast zgadywać dalsze optymalizacje "na
+  oko", to REALNE liczby z telefonu usera, porównywalne build-do-buildu. `JS_START` = czas
+  ewaluacji modułu (import jako PIERWSZY w `_layout.tsx`, żeby był jak najbliżej realnego
+  startu apki — nie łapie natywnego czasu ładowania bundla sprzed JS, ale to i tak jedyne co
+  widać z tej strony). `markDashboardFirstFrame()` (index.tsx, `useEffect` bez zależności —
+  najbliższy JS-owy odpowiednik "first paint") i `recordDashboardReady()` (w tym samym
+  `InteractionManager.runAfterInteractions` co `deferredReady`, patrz §4 "Staged render") razem
+  dają `msToFirstFrame`/`msToReady` jednego wpisu, bufor 20 ostatnich w AsyncStorage. WAŻNE:
+  `recordDashboardReady()` samo w sobie NIE jest one-shot (proste, zawsze-dopisuje, łatwe do
+  testowania) — politykę "tylko raz na sesję JS, ignoruj ponowne mounty przy przełączaniu
+  zakładek" pilnuje WOŁAJĄCY (`index.tsx`'s modułowa flaga `dashboardPerfLogged`, obok
+  `DEFERRED_SECTIONS`), bo inaczej każdy powrót na dashboard zalogowałby myląco duży czas
+  (liczony od stałego, dawnego `JS_START`). Odczyt: Ustawienia → Diagnostyka → "Wydajność
+  startu apki" (ostatni start + średnia + historia, opcja wyczyszczenia). Testy:
+  `__tests__/perfLog.test.ts`.
 - **Wrapped/kolekcje**: `monthCards.ts`/`yearCards.ts` + `MonthWrappedCard`/`YearWrappedCard`
   (BEZ emotek — „wyglądało tanio"). `YearPixels` = rok w pikselach (viz `pixels`).
 - **Nawyki/liczniki**: `utils/habits.ts` + `useHabits`, `countersStore` (dni bez / odliczania).
@@ -2033,8 +2064,10 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
 **Nowa metryka customowa**: dopisz do `WIDGET_METRICS` (statWidgets.ts) + obsłuż jej `id`
 w `bucketValue`/`metricList`. Wtedy działa w kreatorze i we wszystkich viz.
 
-**Nowy store**: `src/store/xxx.ts` (Zustand + persist AsyncStorage). Jeśli dane mają
-przetrwać reinstall — dopisz do backupu (`backupService.ts` CLOUD_COLS / local snapshot).
+**Nowy store**: `src/store/xxx.ts` (Zustand + persist, `storage: createJSONStorage(() =>
+throttledAsyncStorage())` — patrz §10 "Zustand persist THROTTLED", WSZYSTKIE store'y tak mają,
+nie goły `AsyncStorage`). Jeśli dane mają przetrwać reinstall — dopisz do backupu
+(`backupService.ts` CLOUD_COLS / local snapshot).
 
 **Nowy serwis Firestore**: wzór z `expensesService.ts` — ZAWSZE `strip()` undefined przed
 zapisem; dopisz kolekcję do backupu.

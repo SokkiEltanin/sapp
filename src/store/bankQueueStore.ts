@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 import { ParsedBankTx } from '@/utils/bankNotification';
 import { ExpenseCategory } from '@/types';
 
@@ -58,6 +58,6 @@ export const useBankQueue = create<BankQueueState>()(
       remove: (id) => set((s) => ({ pending: s.pending.filter(p => p.id !== id) })),
       clear: () => set({ pending: [] }),
     }),
-    { name: 'bank-queue-v1', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'bank-queue-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
   ),
 );

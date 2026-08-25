@@ -1,3 +1,7 @@
+// Import FIRST — its module-eval time is the `JS_START` reference for the cold-start perf
+// log (perfLog.ts) that Diagnostyka reads back. Must stay the very first import so it evals
+// as close to real app launch as this JS bundle can observe.
+import '@/utils/perfLog';
 import { useEffect, useState, Component, ReactNode } from 'react';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +28,7 @@ import { notificationsService } from '@/services/notificationsService';
 import { maybeAutoBackup, getLastBackup, restoreBackup } from '@/services/backupService';
 import { autoSyncHealth } from '@/services/healthAutoSync';
 import { drainBankNotifications } from '@/services/bankNotificationDrain';
+import { flushThrottledStorage } from '@/utils/throttledStorage';
 import { flushPendingExpenseWrites } from '@/services/expenseSync';
 import { useExpensesStore } from '@/store/expensesStore';
 import { migrateBalanceModel } from '@/utils/accountBalance';
@@ -360,6 +365,18 @@ export default function RootLayout() {
       if (state === 'active') flushPendingExpenseWrites().catch(() => {});
     });
     return () => { clearTimeout(t); sub.remove(); };
+  }, []);
+
+  // Zustand stores persist to AsyncStorage THROTTLED now (2026-08-25 perf pass, see
+  // throttledStorage.ts — coalesces rapid writes, e.g. every round of a boss fight, into one
+  // write per ~600ms instead of one per action). `gatherSnapshot()` already flushes before a
+  // backup reads raw keys, but the narrower risk is a force-kill shortly after the LAST edit
+  // before backgrounding — flush here too so leaving the app never leaves a write pending.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') flushThrottledStorage().catch(() => {});
+    });
+    return () => sub.remove();
   }, []);
 
   // After signing into a pre-existing Google account (e.g. on a fresh install),

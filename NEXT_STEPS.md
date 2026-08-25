@@ -9,6 +9,44 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Optymalizacja: throttled zapis Zustand→AsyncStorage (18 store'ów) — NIEsprawdzone (2026-08-25)
+
+User: "a okiem specjalisty co byś jeszcze zoptymalizował?" → dałem 3 rzeczy → "zapisz wszystko
+i wszystko rob". Pierwsza (i najbardziej konkretna): `persist` Zustanda zapisywał do
+AsyncStorage przy KAŻDEJ zmianie stanu (pełny JSON.stringify + zapis), nie tylko na starcie —
+np. podczas walki z bossem/raidem to kilka zapisów na rundę. Naprawione: wszystkie 18 store'ów
+(`src/store/*.ts`) przez nowy `throttledAsyncStorage()` (`utils/throttledStorage.ts`) —
+koalescuje zapisy do tego samego klucza, przeżywa tylko ostatnia wartość po ~600ms ciszy.
+Zabezpieczone dwiema stronami: backup (`backupService.gatherSnapshot`) flushuje PRZED
+odczytem surowych kluczy, `_layout.tsx` flushuje przy każdym wyjściu apki w tło. Pełny opis w
+ARCHITECTURE.md §10. `tsc`/`jest` zielone (60/730, +6 nowych testów `throttledStorage.test.ts`
+symulujących fake timers). **Priorytet testu na urządzeniu** (to jest zmiana infrastrukturalna,
+subtelny bug tu byłby UTRATĄ DANYCH, więc test jest ważny):
+(a) normalne używanie apki (dodaj wydatek, zaznacz nawyk, zmień coś w ustawieniach) — czy
+WSZYSTKO nadal się zapisuje i przeżywa zamknięcie+ponowne otwarcie apki (nie tylko przełączenie
+zakładki — realne zamknięcie),
+(b) zrób coś, poczekaj WYRAŹNIE ponad sekundę, dopiero wtedy zamknij apkę (swipe z listy
+ostatnich) — sprawdź że ta zmiana przetrwała,
+(c) zrób backup (Ustawienia → kopia zapasowa) zaraz po jakiejś zmianie — sprawdź że backup ma
+najświeższe dane, nie sprzed chwili,
+(d) walka z bossem/raidem — subiektywnie: czy w trakcie walki czuje się płynniej niż wcześniej
+(to był główny cel tej zmiany — dużo zapisów na rundę).
+
+## 🆕 Optymalizacja: log wydajności startu apki (Diagnostyka) — NIEsprawdzone (2026-08-25)
+
+Druga z trzech rzeczy z tej samej rozmowy o dalszej optymalizacji — zamiast zdalnego profilera
+(niedostępny tutaj), prosty licznik czasu startu na SAMYM urządzeniu, żeby dało się porównać
+build-do-buildu czy zmiany faktycznie coś dają, zamiast zgadywać. Nowy `utils/perfLog.ts`
+loguje `msToFirstFrame`/`msToReady` (czas od startu JS do pierwszej klatki dashboardu / do
+pełnego załadowania ze wszystkimi widgetami) przy KAŻDYM cold-starcie, bufor ostatnich 20.
+Odczyt: Ustawienia → Diagnostyka → "Wydajność startu apki". Pełny opis w ARCHITECTURE.md §10.
+`tsc`/`jest` zielone (+6 nowych testów `perfLog.test.ts`). **Priorytet testu na urządzeniu**:
+(a) otwórz apkę od zera (nie przełącz zakładkę) kilka razy w różnych sytuacjach (np. zaraz po
+restarcie telefonu vs. apka już "rozgrzana" w tle systemu) — sprawdź w Diagnostyce że liczby
+się zapisują i wyglądają sensownie (nie zera, nie absurdalnie duże),
+(b) PO TYM jak zbierzesz kilka realnych startów — prześlij mi zrzut z Diagnostyki (albo po
+prostu liczby) żebym miał punkt odniesienia do dalszych optymalizacji zamiast zgadywać.
+
 ## 🆕 Kafel pupila: kolor serii + większa głowa kotka (opiera się o krawędź) — NIEsprawdzone (2026-08-25)
 
 User ze screenshotem (kafel "Fafik lvl 8" + kolumna serii logowań): "popraw kolory bo sa

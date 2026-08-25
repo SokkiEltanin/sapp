@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 import { Expense, ExpenseFilters } from '@/types';
 
 interface ExpensesState {
@@ -84,7 +84,7 @@ export const useExpensesStore = create<ExpensesState>()(
     }),
     {
       name: 'expenses-store-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       partialize: (state) => ({ expenses: state.expenses, pendingSync: state.pendingSync }),
     },
   ),

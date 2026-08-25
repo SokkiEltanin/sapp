@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 // Szybkie ZAPISKI / refleksje — jedna myśl na raz, podpisana i datowana automatycznie
 // ("— Sokki · 02.08.2026"). Dziennik impulsów/uczuć (np. „czułem znudzenie, chciałem
@@ -30,7 +30,7 @@ export const useReflections = create<ReflectionsState>()(
       remove: (id) => set((s) => ({ reflections: s.reflections.filter(r => r.id !== id) })),
       setAuthor: (name) => set({ author: name.trim() || 'Sokki' }),
     }),
-    { name: 'reflections-v1', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'reflections-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
   ),
 );
 

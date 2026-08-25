@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 // "Whose data" the statistics show. The user's own money (balance, spending sum)
 // always counts only THEIR transactions; this scope additionally lets the
@@ -61,7 +61,7 @@ export const useStatsScope = create<StatsScopeState>()(
     }),
     {
       name: 'stats-scope-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
     },
   ),
 );

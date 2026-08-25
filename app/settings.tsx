@@ -40,6 +40,7 @@ import { ExpenseCategory, DEFAULT_WORK_SETTINGS } from '@/types';
 import { toast } from '@/store/toastStore';
 import { usePetStore } from '@/store/petStore';
 import { buildBossProgressReport } from '@/utils/bossProgressReport';
+import { getPerfLog, clearPerfLog } from '@/utils/perfLog';
 import { haptic } from '@/utils/haptics';
 import { runSelfTest } from '@/utils/selfTest';
 import { getPaydayConfig, setPaydayConfig } from '@/utils/payday';
@@ -1594,6 +1595,31 @@ export default function SettingsScreen() {
                 `${c.message}\n\n${(c.stack || c.component || '').slice(0, 1200)}`,
                 [{ text: 'Wyczyść', onPress: () => AsyncStorage.removeItem('last_crash').catch(() => {}) }, { text: 'OK' }]);
             } catch { Alert.alert('Ostatni błąd', raw.slice(0, 1400)); }
+          } },
+        },
+        {
+          id: 'diag-perf-log', title: 'Wydajność startu apki', subtitle: 'Czas do pierwszej klatki i pełnego załadowania dashboardu — ostatnie starty',
+          icon: LucideIcons.Gauge, accentColor: '#46B0DE',
+          keywords: ['wydajność', 'lag', 'laguje', 'szybkość', 'start', 'optymalizacja', 'dashboard'],
+          control: { kind: 'link', onPress: async () => {
+            haptic.tap();
+            // Poor-man's cold-start profiler (perfLog.ts) — nie ma tu zdalnego Flipper/
+            // profilera na urządzeniu, więc zamiast zgadywać dalsze optymalizacje "na oko",
+            // to są REALNE liczby z tego telefonu, do porównania build-do-buildu.
+            const log = await getPerfLog();
+            if (log.length === 0) {
+              Alert.alert('Wydajność startu apki', 'Brak zapisanych startów jeszcze — wróć tu po ponownym otwarciu apki od zera (nie przełączeniu zakładki).');
+              return;
+            }
+            const last = log[log.length - 1];
+            const avg = (key: 'msToFirstFrame' | 'msToReady') => Math.round(log.reduce((s, e) => s + e[key], 0) / log.length);
+            const lines = log.slice().reverse().map(e =>
+              `${new Date(e.at).toLocaleString('pl-PL')}: 1. klatka ${e.msToFirstFrame}ms, gotowy ${e.msToReady}ms`);
+            Alert.alert(
+              `Ostatni start: ${last.msToFirstFrame}ms / ${last.msToReady}ms`,
+              `1. klatka / w pełni gotowy (ze wszystkimi widgetami). Średnia z ${log.length}: ${avg('msToFirstFrame')}ms / ${avg('msToReady')}ms.\n\nHistoria (najnowsze u góry):\n${lines.join('\n')}`,
+              [{ text: 'Wyczyść historię', onPress: () => clearPerfLog() }, { text: 'OK' }],
+            );
           } },
         },
         {

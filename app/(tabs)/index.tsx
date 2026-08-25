@@ -129,6 +129,7 @@ import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTI
 import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers, PIXEL_METRICS } from '@/utils/statWidgets';
 import YearPixels from '@/components/dashboard/YearPixels';
 import { getDailyCached, setDailyCached } from '@/utils/dailyTileCache';
+import { markDashboardFirstFrame, recordDashboardReady } from '@/utils/perfLog';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -274,6 +275,13 @@ const DEFERRED_SECTIONS = new Set<string>([
   'fixed-variable', 'spend-by-day', 'work-hours', 'top-products', 'fun-facts',
   'correlations', 'insights-web', 'mood-cal', 'mood-wave', 'month-tasks',
 ]);
+
+// Cold-start perf log (perfLog.ts) musi zalogować się TYLKO RAZ na sesję JS — dashboard
+// odmontowuje/montuje się przy każdym przełączeniu zakładki, a taki "ciepły" powrót to zupełnie
+// inna, dużo szybsza rzecz niż realny cold start; zalogowanie go dałoby mylące liczby. Flaga
+// modułowa (nie `useRef`/`useState` — te resetują się przy każdym NOWYM mouncie, a chodzi
+// dokładnie o to żeby PRZETRWAŁA między mountami w obrębie jednej sesji JS).
+let dashboardPerfLogged = false;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -984,9 +992,15 @@ export default function DashboardScreen() {
   // milisekundy później, rozkładając robotę JS na dwie klatki zamiast jednej.
   const [deferredReady, setDeferredReady] = useState(false);
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => setDeferredReady(true));
+    const task = InteractionManager.runAfterInteractions(() => {
+      setDeferredReady(true);
+      if (!dashboardPerfLogged) { dashboardPerfLogged = true; recordDashboardReady(); }
+    });
     return () => task.cancel();
   }, []);
+  // "Pierwsza klatka" dashboardu — najbliższy JS-owy odpowiednik "first paint" bez natywnego
+  // API do pomiaru (patrz perfLog.ts). Jeden strzał na sesję, ignoruje ponowne montowania.
+  useEffect(() => { markDashboardFirstFrame(); }, []);
 
   // "Rok w pikselach" — ciężkie do policzenia (365× dailyValue(), każde wywołanie skanuje
   // CAŁĄ historię expenses/tasks dla jednego dnia) więc liczone RAZ DZIENNIE w tle, nie na

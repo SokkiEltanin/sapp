@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 import { CalendarEvent, Task } from '@/types';
 import { todayISO } from '@/utils/date';
 
@@ -63,7 +63,7 @@ export const useCalendarStore = create<CalendarState>()(
     }),
     {
       name: 'calendar-store-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       partialize: (state) => ({ events: state.events, tasks: state.tasks }),
     },
   ),
