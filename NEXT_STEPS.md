@@ -9,6 +9,19 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Kafel pupila: głowa kotka powiększona ~1.8× — NIEsprawdzone (2026-08-25)
+
+User przesłał screenshot dashboardu z odręcznym szkicem (narysowanym NA screenshocie) znacznie
+większej, bardziej "chudnej"/wypełniającej kafel głowy kotka obok imienia: "o tak o chciałem
+ten kafelek". Poprzednia wersja (patrz wpis PR #84 wyżej w historii) miała kadr `CROP_W×CROP_H
+= 54×78` — teraz powiększone do `97×140` (~1.8× liniowo), te same proporcje/matematyka kadru
+(uszy→łapki), tylko większe okno. Pełny opis w ARCHITECTURE.md §4 (sekcja "Kolor kafla serii +
+głowa kotka powiększona"). `tsc`/`jest` zielone (czysto wizualna zmiana). **Priorytet testu na
+urządzeniu**: kafel pupila na dashboardzie — czy rozmiar kotka TERAZ pasuje do tego co
+narysowałeś (znacznie większy, bardziej dominujący w kaflu)? Jeśli dalej za mały/za duży albo
+zły kadr — powiedz w którą stronę, to znowu tylko cztery liczby (`CROP_SIZE`/`CROP_W`/
+`CROP_H`/`CROP_TOP`/`CROP_LEFT` w `PetTile.tsx`) do doregulowania, szybka poprawka.
+
 ## 🆕 Misja: przygaszony kotek na scenie + prompt "zawalcz" (widoczność) — NIEsprawdzone (2026-08-25)
 
 User: "chciałbym żeby to że muszę zawalczyć było bardziej widoczne żeby zakończyć misję" →

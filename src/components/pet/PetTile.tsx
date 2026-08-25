@@ -24,12 +24,16 @@ import { useColors } from '@/theme/useColors';
 // ląduje na y≈436 (`Ear`, wariant R, spoczynek/rotate=0) → górna krawędź okna na y=430 z
 // małym marginesem; łapki — `Paw` rysuje elipsę cy=1541 ry=48 → dół na y=1589 (dokładnie na
 // dole okna, więc łapki "leżą" na krawędzi kafelka). Szerokość okna z bounding boxu
-// głowa+uszy (x≈560–1340, symetrycznie wokół środka głowy x≈953). Jeśli po teście na
-// urządzeniu trzeba doregulować kadr — to tylko te cztery stałe.
-const CROP_SIZE = 135;          // pełny render CatArt (viewBox 2000 → 135px, czyli unit≈0.0675)
-const CROP_W = 54, CROP_H = 78; // widoczne okno (kontener z overflow:hidden)
-const CROP_TOP = -29;           // viewBox y=430 (czubek uszu) → góra okna
-const CROP_LEFT = -38;          // viewBox x=560 (lewe ucho) → lewa okna
+// głowa+uszy (x≈560–1340, symetrycznie wokół środka głowy x≈953).
+// Powiększone ~1.8× (2026-08-25, user przesłał screenshot z odręcznym szkicem znacznie
+// większej głowy na kaflu: "o tak o chciałem ten kafelek") — te same proporcje/kadr co wyżej
+// (uszy→łapki, ta sama matematyka), tylko skala okna większa (`CROP_H` 78→140, reszta
+// przeliczona z zachowaniem tych samych stosunków). Jeśli po teście na urządzeniu trzeba
+// doregulować kadr (mniej/bardziej) — to tylko te cztery stałe.
+const CROP_SIZE = 242;            // pełny render CatArt (viewBox 2000 → 242px)
+const CROP_W = 97, CROP_H = 140;  // widoczne okno (kontener z overflow:hidden)
+const CROP_TOP = -52;             // viewBox y=430 (czubek uszu) → góra okna
+const CROP_LEFT = -68;            // viewBox x=560 (lewe ucho) → lewa okna
 export default function PetTile({ name, pet, level, claimable = 0, bare = false }: { name: string; pet: PetState; level: number; claimable?: number; bare?: boolean }) {
   const c = useColors();
   // wear the coat you actually bought — the tile used to always show the default blue

@@ -200,6 +200,11 @@ kafelka". Dwa fixy:
    jeśli kadr jest za ciasny/za luźny, to tylko cztery stałe `CROP_*` na górze `PetTile.tsx`.
    Dotyczy WYŁĄCZNIE `PetTile.tsx` (jedyne miejsce użycia — `index.tsx` dashboard, oba warianty
    `bare`/pełny) — pełny ekran `/pet` ma własny, dużo większy `CatArt` i tego nie dotyczy.
+   **Powiększone ~1.8× (2026-08-25)** — user przesłał screenshot z odręcznym szkicem
+   (narysowanym NA screenshocie) znacznie większej głowy na kaflu: "o tak o chciałem ten
+   kafelek". `CROP_H` 78→140 (reszta stałych przeliczona z zachowaniem tych samych proporcji/
+   kadru — uszy→łapki, ta sama matematyka co wyżej, tylko większe okno). BEZ wizualnej
+   weryfikacji na urządzeniu jeszcze — jeśli nadal za małe/za duże, to znowu tylko `CROP_*`.
 
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 
