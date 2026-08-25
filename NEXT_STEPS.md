@@ -9,6 +9,19 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Rozbicie index.tsx: krok 2/wiele — CountdownsCard wyciągnięte — NIEsprawdzone (2026-08-25)
+
+Kontynuacja kroku 1 (niżej) po "dawaj dalej". Ten sam wzorzec, druga sekcja:
+`nodes['countdowns']` → `CountdownsCard.tsx`. Guard `.length > 0 &&` znów zostawiony w
+`index.tsx`. Pełny opis w ARCHITECTURE.md §4. `tsc`/`jest` zielone (60/730). **Priorytet testu
+na urządzeniu** (razem z krokiem 1 — nie trzeba osobno potwierdzać, jeśli oba wyglądają dobrze
+naraz, to jeden komunikat wystarczy):
+(a) kafel "Odliczania" na dashboardzie (jeśli masz jakieś aktywne liczniki/odliczania) wygląda
+identycznie jak przed zmianą — nazwa, "za N dni"/"dziś!"/"jutro!"/"koniec za..." dla
+wydarzeń w trakcie, pasek postępu (WalkProgress) z emoji,
+(b) edytor dashboardu: bez aktywnych odliczań sekcja pokazuje "brak danych" (ten sam gotcha co
+przy kroku 1).
+
 ## 🆕 Rozbicie index.tsx: krok 1/wiele — PinnedNotesCard wyciągnięte — NIEsprawdzone (2026-08-25)
 
 Trzecia (i najbardziej ryzykowna) z trzech rzeczy z "co byś jeszcze zoptymalizował?" →

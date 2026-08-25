@@ -81,6 +81,7 @@ import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
+import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -109,14 +110,13 @@ import { loadSubConfirms, removeSubConfirm, advanceBillingDate, PendingSubConfir
 import { fixedVariableMonths, fixedBreakdown } from '@/utils/fixedVariable';
 import { buildAchCtx, evaluateAchievements, syncEarned, getEarned } from '@/utils/achievements';
 import { useCelebration } from '@/store/celebrationStore';
-import { useCounters, daysUntil, untilProgress, daysSince, autoDaysWithout, isDuringEvent, daysUntilEnd, isOver, eventProgress } from '@/store/countersStore';
+import { useCounters, daysUntil, daysSince, autoDaysWithout, isDuringEvent, isOver } from '@/store/countersStore';
 import { useUiActions } from '@/store/uiActions';
 import { useBankQueue } from '@/store/bankQueueStore';
 import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import { getLastBackup } from '@/services/backupService';
 import { loadMerchantMemory } from '@/utils/merchantMemory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import WalkProgress from '@/components/counters/WalkProgress';
 import StreakFlame, { StreakFlameGlow, streakColor, streakTier } from '@/components/counters/StreakFlame';
 import StreakCard from '@/components/counters/StreakCard';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
@@ -3122,35 +3122,10 @@ export default function DashboardScreen() {
             // Gablota → dashboard header, Skupienie/Pomodoro → tasks header) and the
             // per-tab action buttons (Nawyki, Notatki).
 
+            // Wyciągnięte do CountdownsCard.tsx (2026-08-25) — guard `.length > 0 &&` ZOSTAJE
+            // tutaj, patrz komentarz przy `nodes['pinned-notes']` wyżej / ARCHITECTURE.md §4.
             nodes['countdowns'] = activeCountdowns.length > 0 && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <CalendarClock size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Odliczania</Text>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
-                    <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ gap: spacing[3], marginTop: spacing[2] }}>
-                  {activeCountdowns.slice(0, 3).map(cn => {
-                    const during = isDuringEvent(cn);
-                    const left = daysUntil(cn);
-                    const endLeft = daysUntilEnd(cn);
-                    const label = during
-                      ? (endLeft <= 0 ? 'ostatni dzień!' : endLeft === 1 ? 'koniec jutro' : `koniec za ${endLeft} dni`)
-                      : (left === 0 ? 'dziś!' : left === 1 ? 'jutro!' : `za ${left} dni`);
-                    return (
-                      <TouchableOpacity key={cn.id} onPress={() => { haptic.tap(); router.push(`/counters/${cn.id}` as any); }} activeOpacity={0.7}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 1 }}>
-                          <Text style={s.cdName} numberOfLines={1}>{cn.name}</Text>
-                          <Text style={[s.cdDays, during && { color: '#2AC68F' }]}>{label}</Text>
-                        </View>
-                        <WalkProgress progress={during ? eventProgress(cn) : untilProgress(cn)} color={during ? '#2AC68F' : accentColor} mode={during ? 'drive' : 'walk'} emoji={cn.emoji} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
+              <CountdownsCard countdowns={activeCountdowns} cardBg={cardBgDark} accentColor={accentColor} />
             );
 
             // Sleep — total-minutes bars only, no phase breakdown: readHealthRange() (which
@@ -4998,7 +4973,8 @@ const buildStyles = (c: any) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   toolLabel: { fontSize: 10, fontWeight: '700', color: c.text.secondary, letterSpacing: 0.3 },
-  cdName: { flex: 1, fontSize: 13, fontWeight: '700', color: c.text.primary },
+  // cdName PRZENIESIONE do CountdownsCard.tsx (2026-08-25) — cdDays zostaje, wciąż używane
+  // przez sleep-chart w tym pliku.
   cdDays: { fontSize: 12, fontWeight: '800', color: c.tabs?.day ?? '#46B0DE' },
   sinceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
   sinceTile: { width: '31.5%', flexGrow: 1, backgroundColor: c.fill.subtle, borderRadius: radius.md, paddingVertical: spacing[3], paddingHorizontal: spacing[2], alignItems: 'center' },
