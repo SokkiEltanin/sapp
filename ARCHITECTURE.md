@@ -625,6 +625,47 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       połączenie pul, nie o zmianę ich wielkości, więc gracz grający regularnie w OBA (raid +
       wydarzenie) będzie miał łącznie mniej prób dziennie niż wcześniej (dawniej dwie osobne
       pule, teraz jedna dzielona). Do obserwacji po świeżym teście — patrz NEXT_STEPS.md.
+    - **Raid: DRUGI redesign — prawdziwa walka wobec REALNEJ puli zamiast sesji-proxy
+      (2026-08-25)** — user zagrał sesyjny model wyżej realnie i zgłosił: "realnie zagrałem i
+      mi mimo połowy ponad HP przerwało". Sesja-proxy DZIAŁAŁA jak zaprojektowano (kończyła się
+      po ~`RAID_SESSION_HITS`=6 ciosach niezależnie od realnej wielkości pozostałej puli), ale
+      to zaprojektowanie nie pasowało do zamiaru usera: "chciałem żeby RAIDY... miały dużo hp
+      względem poziomu kotka (resetuje się co tydzień)... kotek walczy do końca, tyle ile mu
+      zostawi tyle zostawi, ale kotek nawet jak przegra to HP bossa zostaje tyle ile po
+      ostatnim ciosie". Rozwiązanie PROBLEMU U ŹRÓDŁA (nie kolejny hack sesji): `Boss.
+      counterHp?: number` (nowe, opcjonalne pole w `bosses.ts`) — `counterDamage()` woła
+      `boss.counterHp ?? boss.hp` zamiast zawsze `boss.hp`, ROZDZIELAJĄC "ile HP ma boss" (do
+      zbijania, win-condition) od "jaka skala % liczy kontratak" (dawniej ten sam argument
+      wymuszał sesję-proxy, żeby surowa, wielotysięczna pula nie zabijała kotka jednym
+      kontratakiem). `raidAsBoss(raid, hp, counterHp)` (nowa sygnatura, trzeci argument) —
+      `hp` = `raidRemaining` WPROST (realna pula, nie proxy), `counterHp` =
+      `raidCounterHpFor()` (przemianowane z `raidSessionHpFor` — ta sama formuła `atkPower ×
+      RAID_COUNTER_HITS`, już nie "sesja"). Efekt: walka realnie zbija prawdziwy pasek rajdu
+      KAŻDĄ rundą (`liveBossHp` w `boss-fight.tsx` to teraz WPROST `round.bossHpAfter`, ŻADNEGO
+      przeliczania sesja→realna skala — usunięty cały `raidRealHp`/`realDead` hack, który
+      wcześniej istniał specjalnie po to, żeby ucinać "fikcyjne" rundy sesji po realnym
+      zabiciu), kończy się naturalnie przez `simulateFight`'s `if (bossHp<=0 || catHp<=0)
+      break` (jak kampania), NIE przez sztywny limit rund. `raidAttack()` w `finish()` woła się
+      TERAZ ZAWSZE (win/loss/wyczerpanie sufitu rund) z realną deltą
+      (`raidRealStart - result.bossHpLeft`) — w `petStore.ts` `raidAttack()` po prostu odejmuje
+      realne obrażenia od `raidHp`, niezależnie od wyniku, więc PRZEGRANA NIE ZERUJE POSTĘPU
+      (w odróżnieniu od kampanii, gdzie przegrana resetuje HP bossa do pełna). Raid dostał
+      PIERWSZY RAZ realny stan porażki: `defeatTarget` (dawniej pomijał `kind==='raid'`
+      całkowicie — modal przegranej otwierałby się kompletnie PUSTY, `defeatTarget &&`
+      warunkuje całą wewnętrzną treść) teraz go zawiera; komunikat przegranej dla raidu jest
+      INNY niż reszta trybów ("obrażenia zostają, pasek nie wraca do pełna" zamiast "HP
+      resetuje się") — świadoma rozbieżność z resztą UI, bo semantyka faktycznie inna. Koszt
+      energii podniesiony do `RAID_ENERGY_COST=2` (było 1, user: "zmieńmy licznik czerwonej
+      energii na 2 zamiast 1" — dłuższa, prawdziwa walka niż dawna krótka sesja), stała
+      wyeksportowana z `raid.ts` i zaimportowana w `petStore.ts`/`boss-fight.tsx`/`bosses.tsx`
+      (mini-karta rajdu: przycisk WALCZ wyszarzony już przy `eventEnergy < 2`, nie dopiero przy
+      `<= 0`). **Nemesis (event `kind==='menace'`) ŚWIADOMIE NIE DOSTAŁ tego samego fixu** —
+      ma identyczną architekturę (`menaceSessionHpFor`/`menaceAsBoss`, ten sam problem z
+      `counterDamage()` od surowego hp), ale user zgłosił problem tylko dla raidu; ten sam
+      `counterHp`-wzorzec da się powielić 1:1 gdyby zgłosił analogiczny problem tam. Testy:
+      `__tests__/raid.test.ts` przepisany pod nowe API — w tym test że mała, prawie wyczerpana
+      pula da się realnie dobić do zera w JEDNEJ próbie (dawniej niemożliwe do sensownego
+      przetestowania, bo sesja nigdy nie widziała realnej puli).
   - **Kampania: gate "1 nowy boss dziennie" — WPROWADZONY 2026-08-17, ZASTĄPIONY 2026-08-18**
     (patrz "Energia kampanii/MAD — regeneracja w czasie" niżej dla aktualnego mechanizmu) —
     user przysłał pełny eksport z czystego resetu (3/3 bossów w ~4 minuty, "zdecydowanie za

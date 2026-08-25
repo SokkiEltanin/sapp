@@ -7,6 +7,7 @@ import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
+import { RAID_ENERGY_COST } from '@/utils/raid';
 import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses, gearSellValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
@@ -714,8 +715,11 @@ export const usePetStore = create<PetState>()(
       raidEnsure: (weekKey, hp) => set((s) => (s.raidWeek === weekKey ? s : { raidWeek: weekKey, raidHp: hp })),
       raidAttack: (damage) => {
         const s = get();
+        // ZAWSZE bankuje realny postęp, wygrana LUB przegrana (2026-08-25, user: "kotek
+        // walczy do końca... nawet jak przegra to HP bossa zostaje tyle ile po ostatnim
+        // ciosie") — w odróżnieniu od kampanii, gdzie przegrana resetuje HP bossa do pełna.
         const remaining = Math.max(0, s.raidHp - damage);
-        set({ eventEnergy: Math.max(0, s.eventEnergy - 1), raidHp: remaining });
+        set({ eventEnergy: Math.max(0, s.eventEnergy - RAID_ENERGY_COST), raidHp: remaining });
         return { remaining, defeated: remaining <= 0 };
       },
       raidClaim: (weekKey, coins, xp, name, level, fight) => set((s) => (s.raidWon.includes(weekKey) ? s : {

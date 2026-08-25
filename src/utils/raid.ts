@@ -72,31 +72,43 @@ export function raidHpFor(level: number, weekKey: string): number {
 export const raidCoins = (level: number) => 60 + Math.max(0, level) * 6;
 export const raidXp = (level: number) => 400 + Math.max(0, level) * 40;
 
-// Sesja rundowa PER PRÓBA (2026-08-17, user: "miała być zwykła [walka], tylko taka która nie
-// restartuje jego HP jak z tym drugim [event]") — raid dostaje TERAZ pełną, animowaną walkę
-// rundową (simulateFight, jak kampania), ale prawdziwa pula `raidHpFor` jest z założenia
-// OGROMNA (ma wystarczyć na cały tydzień wielu prób) — nie da się jej użyć bezpośrednio jako
-// `boss.hp` w simulateFight, bo `counterDamage()` liczy % od `boss.hp` wprost (bosses.ts, od
-// 2026-08-20 zawsze STAŁY % maksimum, nie tylko na starcie walki — patrz komentarz przy
-// COUNTER_PCT): przy hp rzędu tysięcy jeden kontratak zabijałby kotka natychmiast (dokładnie problem, który
-// stary model omijał liczeniem kontrataku od `catMax`, nie od `raidMaxHp` — patrz historyczny
-// komentarz w app/boss-fight.tsx). Rozwiązanie: każda próba to osobna, MAŁA "sesja" wg
-// DOKŁADNIE tego samego, już zwalidowanego wzorca co questBossHpFor/madBossHpFor (`atkPower ×
-// mała stała`) — realny postęp (sesyjne hp przed minus po) dopisuje się do PRAWDZIWEJ, trwałej
-// puli (`raidHp` w petStore) osobnym wywołaniem `raidAttack()` PO zakończeniu sesji. Bo sesja
-// jest już bezpiecznie skalowana (ten sam sprawdzony kształt formuły co kampania), NIE trzeba
-// osobnego capu rund — walka kończy się naturalnie po ~RAID_SESSION_HITS ciosach, tak jak
-// wczesne bossy kampanii kończą się dużo przed MAX_FIGHT_ROUNDS.
-export const RAID_SESSION_HITS = 6;
-export function raidSessionHpFor(atkStatBonus: number, level: number, bonuses: Bonuses): number {
-  return Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * RAID_SESSION_HITS);
+// 2 zamiast 1 (2026-08-25, user: "zmieńmy licznik czerwonej energii na 2 zamiast 1") — teraz
+// że raid to prawdziwa, pełna walka (nie krótka sesja), kosztuje więcej niż zwykły event.
+export const RAID_ENERGY_COST = 2;
+
+// HISTORIA (2026-08-17 → 2026-08-25) — pierwsza wersja "pełnej walki rundowej" (user: "miała
+// być zwykła [walka], tylko taka która nie restartuje jego HP jak z tym drugim [event]")
+// walczyła wobec MAŁEJ, sesyjnej "podstawki" (`raidSessionHpFor`, ~RAID_SESSION_HITS ciosów),
+// NIE wobec surowej `raidHpFor` — bo `counterDamage()` liczy % wprost od `boss.hp` (patrz
+// COUNTER_PCT w bosses.ts), więc hp rzędu tysięcy zabijałoby kotka jednym kontratakiem.
+// Realny postęp sesji dopisywał się do trwałej puli PO zakończeniu małej sesji.
+//
+// PROBLEM (2026-08-25, user zagrał realnie: "mimo połowy ponad HP przerwało") — sesja
+// KOŃCZYŁA SIĘ po ~6 ciosach niezależnie od tego ile REALNIE zostało bossowi (pasek rajdu
+// ledwo drgał), co wyglądało jak przerwana walka, nie normalne starcie. Doprecyzowanie usera:
+// "kotek walczy do końca, tyle ile mu zostawi tyle zostawi, ale kotek nawet jak przegra to HP
+// bossa zostaje tyle ile po ostatnim ciosie" — czyli PRAWDZIWA, ciągła walka wobec REALNEJ,
+// pozostałej puli (nie sesja-proxy), idąca aż ktoś padnie, z realnym stanem porażki — ALE
+// nawet przegrana bankuje faktycznie zadane obrażenia (nie zeruje/nie cofa postępu jak w
+// kampanii). Rozwiązanie problemu z counterDamage() BEZ powrotu do sesji-proxy: `Boss.
+// counterHp` (bosses.ts, nowe pole) — ODDZIELNE źródło % kontrataku od `boss.hp`. `boss.hp`
+// = PRAWDZIWA, pozostała pula (`raidRemaining` w boss-fight.tsx) — walka faktycznie ją zbija
+// i pasek w arenie pokazuje ją WPROST, bez żadnego przeliczania sesja→realna skala. `boss.
+// counterHp` = ta sama, bezpiecznie skalowana wartość co dawna "sesja" (`atkPower × stała`,
+// nazwa zmieniona żeby nie sugerować już sesji) — kontratak zostaje rozsądny NIEZALEŻNIE od
+// tego jak wielka jest realna pula. Efekt: kotek realnie "wytrzymuje" mniej więcej tyle rund
+// ile dawniej trwała sesja, ale KAŻDA runda zbija PRAWDZIWE HP bossa, więc pasek realnie się
+// rusza, a przegrana i tak zostawia trwały ślad zamiast znikać bez śladu.
+export const RAID_COUNTER_HITS = 6;
+export function raidCounterHpFor(atkStatBonus: number, level: number, bonuses: Bonuses): number {
+  return Math.round(atkPower(atkStatBonus, Math.max(0, level), bonuses) * RAID_COUNTER_HITS);
 }
 
 const RAID_PLACEHOLDER_LOOT: BossLoot = { id: 'raid_placeholder', name: '', emoji: '', desc: '', bonus: {} };
-export function raidAsBoss(raid: Raid, sessionHp: number): Boss {
+export function raidAsBoss(raid: Raid, hp: number, counterHp: number): Boss {
   return {
     id: raid.id, name: raid.name, emoji: raid.emoji,
-    order: 0, unlockLevel: 0, hp: sessionHp,
+    order: 0, unlockLevel: 0, hp, counterHp,
     weakness: raid.weakness, weaknessLabel: raid.weaknessLabel,
     loot: RAID_PLACEHOLDER_LOOT, coins: 0, xp: 0, taunt: raid.taunt,
     attackKind: raid.attackKind,
