@@ -2854,6 +2854,10 @@ export default function DashboardScreen() {
               nodes['pet'] = (() => {
                 const claimTotal = petClaimable + (dailyBoxReady ? 1 : 0);
                 const hasLoginStreak = petLoginStreak > 0;
+                // Ten sam schemat kolorów progu co StreakFlameGlow/StreakWallCard (2026-08-25
+                // fix, patrz komentarz przy `petLoginTile` niżej) — tło/ramka/liczba kafla
+                // muszą zgadzać się z kolorem płomienia, nie być na sztywno pomarańczowe.
+                const loginStreakColor = streakColor(petLoginStreak);
                 // Seria LOGOWAŃ (nie ogólna "Twoje serie" — ta zostaje osobną sekcją, patrz
                 // nodes['streak-wall']) DOKLEJONA do kafla pupila (2026-08-24, user: "miałeś
                 // mi serię logowań pupila z nim połączyć a połączyłeś serię picia wody" — fix
@@ -2870,11 +2874,11 @@ export default function DashboardScreen() {
                         <View style={s.petCombinedLeft}>
                           <PetTile name={petName} pet={petState} level={petLevel} claimable={claimTotal} bare />
                         </View>
-                        <View style={s.petLoginTile}>
+                        <View style={[s.petLoginTile, { backgroundColor: loginStreakColor + '1E', borderColor: loginStreakColor + '3A' }]}>
                           <View style={s.petLoginFlame} pointerEvents="none">
                             <StreakFlameGlow days={petLoginStreak} size={44} />
                           </View>
-                          <Text style={s.petLoginNum}>{petLoginStreak}</Text>
+                          <Text style={[s.petLoginNum, { color: loginStreakColor }]}>{petLoginStreak}</Text>
                           <Text style={s.petLoginLabel} numberOfLines={1}>{petLoginStreak === 1 ? 'dzień logowań' : 'dni logowań'}</Text>
                           <Text style={s.petLoginNext} numberOfLines={1}>jutro +{loginBonusCoins(petLoginStreak + 1)}</Text>
                         </View>
@@ -4917,13 +4921,18 @@ const buildStyles = (c: any) => StyleSheet.create({
   // ── Kafel pupila + seria logowań, sklejone w jedną ramkę (2026-08-24) ───────
   petCombined: { flexDirection: 'row', alignItems: 'stretch', gap: 10, borderRadius: 18, borderWidth: 1, padding: 12 },
   petCombinedLeft: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' },
+  // Kolor tła/ramki/liczby DOKLEJANY inline w miejscu użycia (streakColor(petLoginStreak)) —
+  // nie stały pomarańcz (2026-08-25, user: "kolory sa pierdolniete na tym streaku" — kafel
+  // był na sztywno pomarańczowy niezależnie od realnego koloru progu serii, np. przy 3 dniach
+  // płomień StreakFlameGlow poprawnie rysował się bordo, ale tło/liczba i tak świeciły
+  // pomarańczem — ten sam schemat kolorów progu co StreakWallCard, patrz STREAK_TIERS w
+  // StreakFlame.tsx). Tu zostają tylko właściwości NIE-kolorowe (layout).
   petLoginTile: {
-    width: 92, borderRadius: radius.lg, padding: spacing[2],
-    backgroundColor: '#FB923C1E', borderWidth: 1, borderColor: '#FB923C3A',
+    width: 92, borderRadius: radius.lg, padding: spacing[2], borderWidth: 1,
     overflow: 'hidden', position: 'relative', justifyContent: 'flex-end',
   },
   petLoginFlame: { position: 'absolute', right: -10, bottom: -8 },
-  petLoginNum: { fontFamily: fonts.display, fontSize: 20, letterSpacing: -0.5, lineHeight: 22, color: '#FB923C' },
+  petLoginNum: { fontFamily: fonts.display, fontSize: 20, letterSpacing: -0.5, lineHeight: 22 },
   petLoginLabel: { fontFamily: fonts.label, fontSize: 8.5, fontWeight: '800', letterSpacing: 0.2, textTransform: 'uppercase', marginTop: 1, color: c.text.secondary },
   petLoginNext: { fontSize: 9.5, fontWeight: '700', color: c.text.muted, marginTop: 2 },
 
