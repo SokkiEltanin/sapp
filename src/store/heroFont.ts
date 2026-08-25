@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 // The dashboard greeting ("DZIEŃ DOBRY") font. We use system font families
 // (no bundled files) so each option renders on-device; sizes/heights are tuned
@@ -67,6 +67,6 @@ export const useHeroFont = create<HeroFontState>()(
       setOffsetY: (v) => set({ offsetY: clamp(Math.round(v), -30, 40) }),
       setCustomFamily: (customFamily, customLabel) => set({ customFamily, customLabel }),
     }),
-    { name: 'hero-font-v1', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'hero-font-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
   ),
 );

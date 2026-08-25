@@ -17,6 +17,7 @@ import { debtsService } from './debtsService';
 import { buildDerivedAnalysis } from '@/utils/exportAnalysis';
 import { loadNameAliases } from '@/utils/productMemory';
 import { getHealthHistory } from '@/utils/healthHistory';
+import { flushThrottledStorage } from '@/utils/throttledStorage';
 
 // ─── Cloud backup ─────────────────────────────────────────────────────────────
 // A backup is ONE snapshot of everything the app owns: all local config/data in
@@ -62,6 +63,11 @@ interface Snapshot {
 const CLOUD_COLS = ['expenses', 'mood', 'events', 'tasks', 'subscriptions', 'expenseTemplates', 'workShifts', 'vehicles', 'maintenanceItems', 'debts'] as const;
 
 async function gatherSnapshot(appBuild?: number): Promise<Snapshot> {
+  // Zustand stores now write to AsyncStorage THROTTLED (2026-08-25 perf pass, see
+  // throttledStorage.ts) — a store's latest change can sit in memory for up to ~600ms before
+  // it actually lands on disk. A backup reading raw AsyncStorage keys must never observe that
+  // stale window, so force every pending throttled write out FIRST, before anything is read.
+  await flushThrottledStorage();
   // Local: every AsyncStorage key except Firebase auth + our own throttle marker.
   const keys = (await AsyncStorage.getAllKeys()).filter(
     k => !k.startsWith('firebase:') && k !== LAST_AUTO_KEY,

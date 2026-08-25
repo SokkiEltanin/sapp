@@ -9,6 +9,65 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Rozbicie index.tsx: krok 1/wiele — PinnedNotesCard wyciągnięte — NIEsprawdzone (2026-08-25)
+
+Trzecia (i najbardziej ryzykowna) z trzech rzeczy z "co byś jeszcze zoptymalizował?" →
+"zapisz wszystko i wszystko rob". `index.tsx` (~5400 linii) rozbijane na mniejsze komponenty —
+większy potencjalny zysk niż pozostałe dwie zmiany, ale też największe ryzyko: bez testów
+renderu komponentów w tym projekcie, subtelna regresja wizualna przejdzie przez `tsc`/`jest`
+bezobjawowo. Dlatego **celowo mały, pojedynczy krok**, nie hurtowy refaktor: `nodes['pinned-
+notes']` wyciągnięte 1:1 do `PinnedNotesCard.tsx`, guard `.length > 0 &&` ZOSTAŁ w `index.tsx`
+(złapany PRZED shipowaniem realny gotcha: edytor dashboardu czyta `nodes[id]`'s truthiness
+żeby oznaczyć "brak danych" — pełny opis w ARCHITECTURE.md §4). `tsc`/`jest` zielone, ale to
+NIE dowodzi że wygląda tak samo — **priorytet testu na urządzeniu, i to zanim pójdę dalej z
+kolejnymi sekcjami**:
+(a) kafel "Przypięte notatki" na dashboardzie wygląda DOKŁADNIE tak samo jak przed zmianą
+(odstępy, kolory, tap na notatkę → `/notes?noteId=`, "Wszystkie notatki →" na dole),
+(b) edytor dashboardu (ołówek): usuń wszystkie przypięte notatki, wejdź w edytor — sekcja
+"Przypięte notatki" powinna pokazać "brak danych" tak jak inne puste sekcje (to konkretnie ten
+gotcha, który złapałem przed wysłaniem — ale warto potwierdzić na żywo),
+(c) jeśli (a) i (b) są OK — daj znać, to zielone światło żeby kontynuować rozbijanie kolejnych
+sekcji tym samym wzorcem (opisanym w ARCHITECTURE.md, do powielenia); jeśli coś nie gra, lepiej
+się dowiedzieć teraz, na JEDNEJ małej sekcji, niż po rozbiciu dziesięciu.
+
+## 🆕 Optymalizacja: throttled zapis Zustand→AsyncStorage (18 store'ów) — NIEsprawdzone (2026-08-25)
+
+User: "a okiem specjalisty co byś jeszcze zoptymalizował?" → dałem 3 rzeczy → "zapisz wszystko
+i wszystko rob". Pierwsza (i najbardziej konkretna): `persist` Zustanda zapisywał do
+AsyncStorage przy KAŻDEJ zmianie stanu (pełny JSON.stringify + zapis), nie tylko na starcie —
+np. podczas walki z bossem/raidem to kilka zapisów na rundę. Naprawione: wszystkie 18 store'ów
+(`src/store/*.ts`) przez nowy `throttledAsyncStorage()` (`utils/throttledStorage.ts`) —
+koalescuje zapisy do tego samego klucza, przeżywa tylko ostatnia wartość po ~600ms ciszy.
+Zabezpieczone dwiema stronami: backup (`backupService.gatherSnapshot`) flushuje PRZED
+odczytem surowych kluczy, `_layout.tsx` flushuje przy każdym wyjściu apki w tło. Pełny opis w
+ARCHITECTURE.md §10. `tsc`/`jest` zielone (60/730, +6 nowych testów `throttledStorage.test.ts`
+symulujących fake timers). **Priorytet testu na urządzeniu** (to jest zmiana infrastrukturalna,
+subtelny bug tu byłby UTRATĄ DANYCH, więc test jest ważny):
+(a) normalne używanie apki (dodaj wydatek, zaznacz nawyk, zmień coś w ustawieniach) — czy
+WSZYSTKO nadal się zapisuje i przeżywa zamknięcie+ponowne otwarcie apki (nie tylko przełączenie
+zakładki — realne zamknięcie),
+(b) zrób coś, poczekaj WYRAŹNIE ponad sekundę, dopiero wtedy zamknij apkę (swipe z listy
+ostatnich) — sprawdź że ta zmiana przetrwała,
+(c) zrób backup (Ustawienia → kopia zapasowa) zaraz po jakiejś zmianie — sprawdź że backup ma
+najświeższe dane, nie sprzed chwili,
+(d) walka z bossem/raidem — subiektywnie: czy w trakcie walki czuje się płynniej niż wcześniej
+(to był główny cel tej zmiany — dużo zapisów na rundę).
+
+## 🆕 Optymalizacja: log wydajności startu apki (Diagnostyka) — NIEsprawdzone (2026-08-25)
+
+Druga z trzech rzeczy z tej samej rozmowy o dalszej optymalizacji — zamiast zdalnego profilera
+(niedostępny tutaj), prosty licznik czasu startu na SAMYM urządzeniu, żeby dało się porównać
+build-do-buildu czy zmiany faktycznie coś dają, zamiast zgadywać. Nowy `utils/perfLog.ts`
+loguje `msToFirstFrame`/`msToReady` (czas od startu JS do pierwszej klatki dashboardu / do
+pełnego załadowania ze wszystkimi widgetami) przy KAŻDYM cold-starcie, bufor ostatnich 20.
+Odczyt: Ustawienia → Diagnostyka → "Wydajność startu apki". Pełny opis w ARCHITECTURE.md §10.
+`tsc`/`jest` zielone (+6 nowych testów `perfLog.test.ts`). **Priorytet testu na urządzeniu**:
+(a) otwórz apkę od zera (nie przełącz zakładkę) kilka razy w różnych sytuacjach (np. zaraz po
+restarcie telefonu vs. apka już "rozgrzana" w tle systemu) — sprawdź w Diagnostyce że liczby
+się zapisują i wyglądają sensownie (nie zera, nie absurdalnie duże),
+(b) PO TYM jak zbierzesz kilka realnych startów — prześlij mi zrzut z Diagnostyki (albo po
+prostu liczby) żebym miał punkt odniesienia do dalszych optymalizacji zamiast zgadywać.
+
 ## 🆕 Kafel pupila: kolor serii + większa głowa kotka (opiera się o krawędź) — NIEsprawdzone (2026-08-25)
 
 User ze screenshotem (kafel "Fafik lvl 8" + kolumna serii logowań): "popraw kolory bo sa

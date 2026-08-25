@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 // Osobowa personalizacja (Ustawienia → Personalizacja) — wiek liczony z daty urodzenia,
 // płeć, poziom treningowy. Karmi trudność pupilowych questów treningowych (src/utils/
@@ -32,7 +32,7 @@ export const useProfileStore = create<ProfileState>()(
     }),
     {
       name: 'profile-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

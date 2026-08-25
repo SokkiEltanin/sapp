@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 import { MoodEntry } from '@/types';
 import { notificationsService } from '@/services/notificationsService';
 
@@ -60,7 +60,7 @@ export const useMoodStore = create<MoodState>()(
     }),
     {
       name: 'mood-store-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       partialize: (state) => ({ entries: state.entries }),
       onRehydrateStorage: () => (state) => {
         if (state) {

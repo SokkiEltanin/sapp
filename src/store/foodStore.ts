@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 import { normalizeProductName } from '@/utils/productMemory';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,7 +454,7 @@ export const useFoodStore = create<FoodState>()(
     }),
     {
       name: 'food-store-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       partialize: (s) => ({
         products: s.products, meals: s.meals, presets: s.presets, goalMode: s.goalMode, manualGoal: s.manualGoal,
       }),

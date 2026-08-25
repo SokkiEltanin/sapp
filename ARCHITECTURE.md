@@ -96,6 +96,31 @@ Ogromny komponent renderujący sekcje w kolejności z układu użytkownika.
 **Render:** budowany jest obiekt `nodes: Record<id, ReactNode|false>`; pętla
 `orderedSections.map(id => nodes[id])` renderuje je (pomijając hidden + przypięte
 payday/bill/bank-queue). Node ustawiony na `false` (gdy brak danych) = nic się nie renderuje.
+**`nodes[id]`'s truthiness NIE jest tylko o renderze** — edytor dashboardu (drag-to-reorder)
+czyta ją WPROST (`empty={!nodes[id]}`, `{!nodes[id] ? '  · brak danych' : ''}`) żeby oznaczyć
+puste sekcje. Więc gdy sekcja wyciągnięta jest do osobnego komponentu (patrz "Rozbicie
+index.tsx" niżej), guard `pinnedNotes.length > 0 &&` (czy jakikolwiek inny warunek "czy jest co
+pokazać") MUSI zostać w `index.tsx`, na zewnątrz komponentu — jeśli komponent sam połyka pusty
+stan (`if (empty) return null`) i `nodes[id]` dostaje zawsze-prawdziwy element JSX, edytor
+przestaje poprawnie oznaczać "brak danych", cicho i bez błędu kompilacji/testu (2026-08-25,
+złapane PRZED shipowaniem przy pierwszym wyciąganiu sekcji — patrz niżej).
+
+**Rozbicie `index.tsx` na mniejsze komponenty (2026-08-25, w toku)** — user: "a okiem
+specjalisty co byś jeszcze zoptymalizował?" → trzecia, najbardziej ryzykowna z trzech rzeczy
+(większy render = mniejsze granice re-renderu, ale bez testów renderu komponentów w tym
+projekcie łatwo coś cicho zepsuć). Krok 1 (mały, celowo): `nodes['pinned-notes']` wyciągnięte
+1:1 do `src/components/dashboard/PinnedNotesCard.tsx` (mechaniczne przeniesienie JSX + style
+`pinNoteRow`/`Title`/`Tags`/`More` skopiowane tam, `pinNoteBody` zostaje w `index.tsx` bo wciąż
+używane przez detal kafla custom "note"; `card`/`cardHeader`/`cardTitle` skopiowane verbatim,
+nie wyciągnięte współdzielone — te dwie rzeczy to osobna, większa zmiana). Guard
+`pinnedNotes.length > 0 &&` ZOSTAŁ w `index.tsx` (patrz akapit wyżej — inaczej edytor by się
+zepsuł). Wzorzec do powielenia dla kolejnych sekcji: (1) sprawdź czy sekcja ma `nodes[id] =
+warunek && (...)` — jeśli tak, warunek zostaje NA ZEWNĄTRZ nowego komponentu, (2) sprawdź czy
+używane style są dzielone z innymi sekcjami (`grep 's\.xxx'` w całym pliku) — dzielone zostają
+verbatim-skopiowane (duplikat), nie-dzielone przenoszą się w całości, (3) `tsc`/`jest` jako
+bar (nie łapią regresji WIZUALNYCH — stąd **każdy krok wymaga potwierdzenia na urządzeniu**
+zanim kolejny krok, nie robić hurtowo naraz). `tsc`/`jest` zielone (60/730, bez nowych testów —
+to czysto strukturalna zmiana pliku, nie logiki).
 
 **Snapshot statystyk (WYDAJNOŚĆ — pamiętaj o tym):** widgety czytają lokalny snapshot
 `expenses` (`useState`), **nie** żywy store `liveExpenses`. Snapshot odświeża się TYLKO na
@@ -1951,6 +1976,37 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   `notificationsService.refreshPaydayReminder` (nudguje tylko w oknie, potem następny miesiąc).
 - **Backup**: `backupService.ts` — chunkowane snapshoty do Firestore + restore z Ustawień
   (reinstall-proof po zalogowaniu Google).
+- **Zustand persist THROTTLED (`utils/throttledStorage.ts`, 2026-08-25)** — user: "a okiem
+  specjalisty co byś jeszcze zoptymalizował?" → "zapisz wszystko i wszystko rob". Zustand's
+  `persist` woła `storage.setItem()` przy KAŻDEJ zmianie stanu — dla store'a z dużym/często
+  mutowanym slice'em (wydatki, kalendarz, walki pupila — kilka `set()` na rundę) to pełny
+  JSON.stringify + zapis AsyncStorage przy KAŻDEJ pojedynczej akcji, nie tylko na starcie apki
+  (inna klasa hotspotu niż wcześniej naprawione bugi memo). Fix: `throttledAsyncStorage()`
+  (drop-in zamiennik `AsyncStorage` w `createJSONStorage(() => ...)`, wszystkie 18 store'ów w
+  `src/store/`) koalescuje zapisy do TEGO SAMEGO klucza — przeżywa tylko OSTATNIA wartość po
+  ~600ms bez kolejnego zapisu do tego klucza; różne store'y (różne klucze) throttlują
+  niezależnie. Trade-off: do 600ms najnowszego LOKALNEGO zapisu może przepaść przy force-kill
+  apki — ograniczone dwoma zabezpieczeniami: (1) `backupService.gatherSnapshot()` woła
+  `await flushThrottledStorage()` ZANIM czyta surowe klucze `AsyncStorage.getAllKeys()/
+  multiGet()` (backup NIGDY nie zobaczy nieaktualnej wartości), (2) `_layout.tsx` flushuje przy
+  KAŻDYM przejściu `AppState` w background/inactive (nie tylko force-kill — normalne wyjście z
+  apki też nie zostawia zaległego zapisu). Testy: `__tests__/throttledStorage.test.ts`.
+- **Cold-start perf log (`utils/perfLog.ts`, 2026-08-25)** — ten sam wątek co wyżej: bez
+  zdalnego profilera (Flipper) na urządzeniu, więc zamiast zgadywać dalsze optymalizacje "na
+  oko", to REALNE liczby z telefonu usera, porównywalne build-do-buildu. `JS_START` = czas
+  ewaluacji modułu (import jako PIERWSZY w `_layout.tsx`, żeby był jak najbliżej realnego
+  startu apki — nie łapie natywnego czasu ładowania bundla sprzed JS, ale to i tak jedyne co
+  widać z tej strony). `markDashboardFirstFrame()` (index.tsx, `useEffect` bez zależności —
+  najbliższy JS-owy odpowiednik "first paint") i `recordDashboardReady()` (w tym samym
+  `InteractionManager.runAfterInteractions` co `deferredReady`, patrz §4 "Staged render") razem
+  dają `msToFirstFrame`/`msToReady` jednego wpisu, bufor 20 ostatnich w AsyncStorage. WAŻNE:
+  `recordDashboardReady()` samo w sobie NIE jest one-shot (proste, zawsze-dopisuje, łatwe do
+  testowania) — politykę "tylko raz na sesję JS, ignoruj ponowne mounty przy przełączaniu
+  zakładek" pilnuje WOŁAJĄCY (`index.tsx`'s modułowa flaga `dashboardPerfLogged`, obok
+  `DEFERRED_SECTIONS`), bo inaczej każdy powrót na dashboard zalogowałby myląco duży czas
+  (liczony od stałego, dawnego `JS_START`). Odczyt: Ustawienia → Diagnostyka → "Wydajność
+  startu apki" (ostatni start + średnia + historia, opcja wyczyszczenia). Testy:
+  `__tests__/perfLog.test.ts`.
 - **Wrapped/kolekcje**: `monthCards.ts`/`yearCards.ts` + `MonthWrappedCard`/`YearWrappedCard`
   (BEZ emotek — „wyglądało tanio"). `YearPixels` = rok w pikselach (viz `pixels`).
 - **Nawyki/liczniki**: `utils/habits.ts` + `useHabits`, `countersStore` (dni bez / odliczania).
@@ -2033,8 +2089,10 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
 **Nowa metryka customowa**: dopisz do `WIDGET_METRICS` (statWidgets.ts) + obsłuż jej `id`
 w `bucketValue`/`metricList`. Wtedy działa w kreatorze i we wszystkich viz.
 
-**Nowy store**: `src/store/xxx.ts` (Zustand + persist AsyncStorage). Jeśli dane mają
-przetrwać reinstall — dopisz do backupu (`backupService.ts` CLOUD_COLS / local snapshot).
+**Nowy store**: `src/store/xxx.ts` (Zustand + persist, `storage: createJSONStorage(() =>
+throttledAsyncStorage())` — patrz §10 "Zustand persist THROTTLED", WSZYSTKIE store'y tak mają,
+nie goły `AsyncStorage`). Jeśli dane mają przetrwać reinstall — dopisz do backupu
+(`backupService.ts` CLOUD_COLS / local snapshot).
 
 **Nowy serwis Firestore**: wzór z `expensesService.ts` — ZAWSZE `strip()` undefined przed
 zapisem; dopisz kolekcję do backupu.

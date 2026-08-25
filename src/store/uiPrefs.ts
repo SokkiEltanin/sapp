@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 // Opt-in UI preferences that need to be reactive across screens.
 interface UiPrefs {
@@ -22,7 +22,7 @@ export const useUiPrefs = create<UiPrefs>()(
     }),
     {
       name: 'ui-prefs-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),

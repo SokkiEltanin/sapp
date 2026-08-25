@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 export type CounterKind = 'until' | 'since';
 
@@ -44,7 +44,7 @@ export const useCounters = create<CountersState>()(
       remove: (id) => set((s) => ({ counters: s.counters.filter(c => c.id !== id) })),
       resetSince: (id) => set((s) => ({ counters: s.counters.map(c => c.id === id ? { ...c, date: todayStr() } : c) })),
     }),
-    { name: 'counters-v1', storage: createJSONStorage(() => AsyncStorage) },
+    { name: 'counters-v1', storage: createJSONStorage(() => throttledAsyncStorage()) },
   ),
 );
 

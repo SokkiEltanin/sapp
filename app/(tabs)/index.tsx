@@ -80,6 +80,7 @@ import MoodMiniCal from '@/components/dashboard/MoodMiniCal';
 import GradientGreeting from '@/components/dashboard/GradientGreeting';
 import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
+import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -129,6 +130,7 @@ import { useDashboardLayout, effectiveOrder, SECTION_TITLES, SECTION_DESC, SECTI
 import { StatCtx, metricById, metricNumber, metricSeries, metricList, isSelfTransfer, dailyValue, isMoodPixelMetric, pixelTiers, PIXEL_METRICS } from '@/utils/statWidgets';
 import YearPixels from '@/components/dashboard/YearPixels';
 import { getDailyCached, setDailyCached } from '@/utils/dailyTileCache';
+import { markDashboardFirstFrame, recordDashboardReady } from '@/utils/perfLog';
 import WeeklyBoard, { WeeklyNote } from '@/components/dashboard/WeeklyBoard';
 import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -274,6 +276,13 @@ const DEFERRED_SECTIONS = new Set<string>([
   'fixed-variable', 'spend-by-day', 'work-hours', 'top-products', 'fun-facts',
   'correlations', 'insights-web', 'mood-cal', 'mood-wave', 'month-tasks',
 ]);
+
+// Cold-start perf log (perfLog.ts) musi zalogować się TYLKO RAZ na sesję JS — dashboard
+// odmontowuje/montuje się przy każdym przełączeniu zakładki, a taki "ciepły" powrót to zupełnie
+// inna, dużo szybsza rzecz niż realny cold start; zalogowanie go dałoby mylące liczby. Flaga
+// modułowa (nie `useRef`/`useState` — te resetują się przy każdym NOWYM mouncie, a chodzi
+// dokładnie o to żeby PRZETRWAŁA między mountami w obrębie jednej sesji JS).
+let dashboardPerfLogged = false;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -984,9 +993,15 @@ export default function DashboardScreen() {
   // milisekundy później, rozkładając robotę JS na dwie klatki zamiast jednej.
   const [deferredReady, setDeferredReady] = useState(false);
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => setDeferredReady(true));
+    const task = InteractionManager.runAfterInteractions(() => {
+      setDeferredReady(true);
+      if (!dashboardPerfLogged) { dashboardPerfLogged = true; recordDashboardReady(); }
+    });
     return () => task.cancel();
   }, []);
+  // "Pierwsza klatka" dashboardu — najbliższy JS-owy odpowiednik "first paint" bez natywnego
+  // API do pomiaru (patrz perfLog.ts). Jeden strzał na sesję, ignoruje ponowne montowania.
+  useEffect(() => { markDashboardFirstFrame(); }, []);
 
   // "Rok w pikselach" — ciężkie do policzenia (365× dailyValue(), każde wywołanie skanuje
   // CAŁĄ historię expenses/tasks dla jednego dnia) więc liczone RAZ DZIENNIE w tle, nie na
@@ -2950,33 +2965,12 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             );
 
+            // Wyciągnięte do PinnedNotesCard.tsx (2026-08-25, pierwszy krok rozbicia
+            // index.tsx — patrz NEXT_STEPS.md). Guard `.length > 0 &&` ZOSTAJE tutaj (nie w
+            // komponencie!) — `nodes[id]`'s truthiness czyta edytor dashboardu (`empty={!nodes[id]}`
+            // / "· brak danych" niżej), więc komponent nie może sam połykać pustego stanu.
             nodes['pinned-notes'] = pinnedNotes.length > 0 && (
-              <View style={[s.card, { backgroundColor: cardBgDark, gap: spacing[2] }]}>
-                <View style={s.cardHeader}>
-                  <Pin size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Przypięte notatki</Text>
-                </View>
-                {pinnedNotes.slice(0, 4).map(n => (
-                  <TouchableOpacity
-                    key={n.id}
-                    style={s.pinNoteRow}
-                    onPress={() => { haptic.tap(); router.navigate(`/notes?noteId=${n.id}` as any); }}
-                    activeOpacity={0.8}
-                  >
-                    <FileText size={13} color={accentColor} style={{ marginTop: 1 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.pinNoteTitle} numberOfLines={1}>{n.title || 'Bez tytułu'}</Text>
-                      {!!n.body?.trim() && <Text style={s.pinNoteBody} numberOfLines={2}>{n.body.trim()}</Text>}
-                      {(n.tags ?? []).length > 0 && (
-                        <Text style={s.pinNoteTags} numberOfLines={1}>{n.tags.map(t => `#${t}`).join(' ')}</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/notes' as any); }} activeOpacity={0.7}>
-                  <Text style={[s.pinNoteMore, { color: accentColor }]}>Wszystkie notatki →</Text>
-                </TouchableOpacity>
-              </View>
+              <PinnedNotesCard notes={pinnedNotes} cardBg={cardBgDark} accentColor={accentColor} />
             );
 
             nodes['tasks-work-row'] = (
@@ -5167,8 +5161,8 @@ const buildStyles = (c: any) => StyleSheet.create({
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
   forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },
   forecastNote: { fontSize: 10.5, color: c.text.muted, lineHeight: 14, fontStyle: 'italic' },
-  pinNoteRow: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start', paddingVertical: 4 },
-  pinNoteTitle: { fontSize: 13, fontWeight: '700', color: c.text.primary },
+  // pinNoteRow/Title/Tags/More PRZENIESIONE do PinnedNotesCard.tsx (2026-08-25) — pinNoteBody
+  // zostaje TU, wciąż używane przez detal kafla custom "note" (`nodes[t.id]` wyżej w pliku).
   pinNoteBody: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, marginTop: 1 },
   fvHint: { fontSize: 10, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 'auto' },
   fvRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
@@ -5190,9 +5184,6 @@ const buildStyles = (c: any) => StyleSheet.create({
   fvTrend: { flexDirection: 'row', alignItems: 'flex-end', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: c.border.subtle },
   fvMonthLbl: { fontSize: 9.5, color: c.text.muted, fontWeight: '600' },
   fvAvg: { fontSize: 10.5, color: c.text.muted, fontWeight: '600', marginTop: spacing[2], textAlign: 'center' },
-  pinNoteTags: { fontSize: 10, color: c.text.muted, marginTop: 2 },
-  pinNoteMore: { fontSize: 11, fontWeight: '700', marginTop: 2 },
-
   // ── Stat widgets ──
   statBig: { fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 2 },
   statNumRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },

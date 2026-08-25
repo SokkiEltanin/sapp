@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { throttledAsyncStorage } from '@/utils/throttledStorage';
 
 // „Zamrożenie serii" (streak freeze) — jak w Duolingo. Masz zapas zamrożeń (kupujesz za
 // monety pupila). Gdy pominiesz dzień nawyku z serią, apka AUTOMATYCZNIE zużywa jedno
@@ -38,7 +38,7 @@ export const useStreakFreezeStore = create<StreakFreezeState>()(
     }),
     {
       name: 'streak-freeze-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => throttledAsyncStorage()),
       onRehydrateStorage: () => (state) => { if (state) state._hydrated = true; },
     },
   ),
