@@ -25,6 +25,10 @@ function offsetDate(from: string, days: number): string {
   return dateStr(d);
 }
 
+// Bezpiecznik dla getStreak() (2026-08-25) — NIE realny limit serii, tylko granica przed
+// nieskończoną pętlą wstecz w razie zepsutych/brakujących danych. 10 lat.
+const MAX_STREAK_LOOKBACK_DAYS = 3650;
+
 function goalFor(habit: Habit): number {
   if (!habit.type || habit.type === 'check') return 1;
   return habit.dailyGoal ?? 1;
@@ -184,20 +188,25 @@ export function useHabits() {
     if (!target) {
       // Daily streak: consecutive done-OR-FROZEN days (zamrożenie ratuje pominięty dzień).
       //
-      // BUG FIX (2026-08-24, user ze screenshotem: "jak wchodzę jest napisane 30 dni a na
+      // BUG FIX #1 (2026-08-24, user ze screenshotem: "jak wchodzę jest napisane 30 dni a na
       // kafelku wczoraj tez było 30, a dzisiaj jest 29") — dolna granica pętli była STAŁA
-      // (`-29`), niezależna od `start`. Gdy dziś jeszcze nie zaliczone, `start` przesuwa się
-      // na -1 (dziś celowo NIE liczy się do serii, dopóki nie zaliczone), ale pętla dalej
-      // kończyła na -29 — czyli sprawdzała TYLKO 29 dni (-1..-29) zamiast 30 (kiedy `start=0`
-      // pętla sprawdzała 0..-29, czyli realnie 30 dni). Realna, nieprzerwana 30-dniowa seria
-      // (wczoraj wstecz) traciła jeden dzień z ogona i wcięcie zgłaszało 29 zamiast 30 —
-      // dokładnie do momentu zaliczenia dzisiejszego dnia, kiedy `start` wracał na 0 i
-      // liczba "cudownie" rosła z powrotem. Fix: dolna granica WZGLĘDNA do `start`
-      // (`start - 29`), więc pętla ZAWSZE sprawdza dokładnie 30 kalendarzowych dni,
-      // niezależnie czy dziś już zaliczone czy nie.
+      // (`-29`), niezależna od `start`. Fix wtedy: dolna granica WZGLĘDNA do `start`
+      // (`start - 29`) — ale to wciąż TWARDY LIMIT 30 dni, tylko z poprawną krawędzią.
+      //
+      // BUG FIX #2 (2026-08-25, user: "wiem czym problem — na dashboardzie 29, na
+      // habit-year 31, bo tam liczy bez streak freeze" — hipoteza usera błędna, OBIE funkcje
+      // liczą freeze przez `isDoneOrFrozen`/`frozen[...]`, ale objaw realny: `habit-year.tsx`
+      // (`stats.current`, linia z komentarzem "jak dashboard getStreak") liczy BEZ SZTYWNEGO
+      // LIMITU — cofa się przez CAŁĄ widoczną sekwencję (35 dni widok miesiąca / 365 widok
+      // roku), podczas gdy TA funkcja wciąż twardo kończyła po dokładnie 30 dniach (fix #1
+      // poprawił TYLKO krawędź w obrębie limitu, nie sam limit). Realna, nieprzerwana seria
+      // >30 dni (tu: 31) była więc ZAWSZE ucinana do 30 na dashboardzie, niezależnie od
+      // freezów. Fix: bez sztywnego limitu — pętla idzie wstecz aż do pierwszego zerwanego
+      // dnia, tak jak habit-year.tsx. `MAX_STREAK_LOOKBACK_DAYS` to tylko bezpiecznik przed
+      // nieskończoną pętlą w razie zepsutych danych, nie realny limit serii (10 lat).
       let streak = 0;
       const start = isDoneOrFrozen(habit, today) ? 0 : -1;
-      for (let i = start; i >= start - 29; i--) {
+      for (let i = start; i >= start - MAX_STREAK_LOOKBACK_DAYS; i--) {
         const d = offsetDate(today, i);
         if (isDoneOrFrozen(habit, d)) streak++; else break;
       }
