@@ -121,6 +121,14 @@ verbatim-skopiowane (duplikat), nie-dzielone przenoszą się w całości, (3) `t
 bar (nie łapią regresji WIZUALNYCH — stąd **każdy krok wymaga potwierdzenia na urządzeniu**
 zanim kolejny krok, nie robić hurtowo naraz). `tsc`/`jest` zielone (60/730, bez nowych testów —
 to czysto strukturalna zmiana pliku, nie logiki).
+**Krok 2**: `nodes['countdowns']` → `CountdownsCard.tsx`, ten sam wzorzec. Tu dodatkowo: `cn`
+helpery (`isDuringEvent`/`daysUntil`/`daysUntilEnd`/`eventProgress`/`untilProgress`) to CZYSTE
+funkcje z `countersStore.ts`, nie domknięcia komponentu — bezpieczne do importu wprost w nowym
+pliku. Styl `cdName` był używany TYLKO w tej sekcji (sprawdzone `grep`iem) → przeniesiony w
+CAŁOŚCI, nie duplikowany jak `card`/`cardHeader`/`cardTitle`/`workToggleText`/`cdDays`
+(współdzielone gdzie indziej, zostają w `index.tsx`). Martwe importy po ekstrakcji usunięte
+(`daysUntilEnd`/`eventProgress`/`untilProgress`/`WalkProgress` — zweryfikowane `grep`iem że
+liczba wystąpień spadła do 1, czyli tylko sam import, przed usunięciem).
 
 **Snapshot statystyk (WYDAJNOŚĆ — pamiętaj o tym):** widgety czytają lokalny snapshot
 `expenses` (`useState`), **nie** żywy store `liveExpenses`. Snapshot odświeża się TYLKO na
