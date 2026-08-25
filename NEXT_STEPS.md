@@ -9,6 +9,27 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Rozbicie index.tsx: krok 1/wiele — PinnedNotesCard wyciągnięte — NIEsprawdzone (2026-08-25)
+
+Trzecia (i najbardziej ryzykowna) z trzech rzeczy z "co byś jeszcze zoptymalizował?" →
+"zapisz wszystko i wszystko rob". `index.tsx` (~5400 linii) rozbijane na mniejsze komponenty —
+większy potencjalny zysk niż pozostałe dwie zmiany, ale też największe ryzyko: bez testów
+renderu komponentów w tym projekcie, subtelna regresja wizualna przejdzie przez `tsc`/`jest`
+bezobjawowo. Dlatego **celowo mały, pojedynczy krok**, nie hurtowy refaktor: `nodes['pinned-
+notes']` wyciągnięte 1:1 do `PinnedNotesCard.tsx`, guard `.length > 0 &&` ZOSTAŁ w `index.tsx`
+(złapany PRZED shipowaniem realny gotcha: edytor dashboardu czyta `nodes[id]`'s truthiness
+żeby oznaczyć "brak danych" — pełny opis w ARCHITECTURE.md §4). `tsc`/`jest` zielone, ale to
+NIE dowodzi że wygląda tak samo — **priorytet testu na urządzeniu, i to zanim pójdę dalej z
+kolejnymi sekcjami**:
+(a) kafel "Przypięte notatki" na dashboardzie wygląda DOKŁADNIE tak samo jak przed zmianą
+(odstępy, kolory, tap na notatkę → `/notes?noteId=`, "Wszystkie notatki →" na dole),
+(b) edytor dashboardu (ołówek): usuń wszystkie przypięte notatki, wejdź w edytor — sekcja
+"Przypięte notatki" powinna pokazać "brak danych" tak jak inne puste sekcje (to konkretnie ten
+gotcha, który złapałem przed wysłaniem — ale warto potwierdzić na żywo),
+(c) jeśli (a) i (b) są OK — daj znać, to zielone światło żeby kontynuować rozbijanie kolejnych
+sekcji tym samym wzorcem (opisanym w ARCHITECTURE.md, do powielenia); jeśli coś nie gra, lepiej
+się dowiedzieć teraz, na JEDNEJ małej sekcji, niż po rozbiciu dziesięciu.
+
 ## 🆕 Optymalizacja: throttled zapis Zustand→AsyncStorage (18 store'ów) — NIEsprawdzone (2026-08-25)
 
 User: "a okiem specjalisty co byś jeszcze zoptymalizował?" → dałem 3 rzeczy → "zapisz wszystko

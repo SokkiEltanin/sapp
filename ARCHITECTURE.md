@@ -96,6 +96,31 @@ Ogromny komponent renderujący sekcje w kolejności z układu użytkownika.
 **Render:** budowany jest obiekt `nodes: Record<id, ReactNode|false>`; pętla
 `orderedSections.map(id => nodes[id])` renderuje je (pomijając hidden + przypięte
 payday/bill/bank-queue). Node ustawiony na `false` (gdy brak danych) = nic się nie renderuje.
+**`nodes[id]`'s truthiness NIE jest tylko o renderze** — edytor dashboardu (drag-to-reorder)
+czyta ją WPROST (`empty={!nodes[id]}`, `{!nodes[id] ? '  · brak danych' : ''}`) żeby oznaczyć
+puste sekcje. Więc gdy sekcja wyciągnięta jest do osobnego komponentu (patrz "Rozbicie
+index.tsx" niżej), guard `pinnedNotes.length > 0 &&` (czy jakikolwiek inny warunek "czy jest co
+pokazać") MUSI zostać w `index.tsx`, na zewnątrz komponentu — jeśli komponent sam połyka pusty
+stan (`if (empty) return null`) i `nodes[id]` dostaje zawsze-prawdziwy element JSX, edytor
+przestaje poprawnie oznaczać "brak danych", cicho i bez błędu kompilacji/testu (2026-08-25,
+złapane PRZED shipowaniem przy pierwszym wyciąganiu sekcji — patrz niżej).
+
+**Rozbicie `index.tsx` na mniejsze komponenty (2026-08-25, w toku)** — user: "a okiem
+specjalisty co byś jeszcze zoptymalizował?" → trzecia, najbardziej ryzykowna z trzech rzeczy
+(większy render = mniejsze granice re-renderu, ale bez testów renderu komponentów w tym
+projekcie łatwo coś cicho zepsuć). Krok 1 (mały, celowo): `nodes['pinned-notes']` wyciągnięte
+1:1 do `src/components/dashboard/PinnedNotesCard.tsx` (mechaniczne przeniesienie JSX + style
+`pinNoteRow`/`Title`/`Tags`/`More` skopiowane tam, `pinNoteBody` zostaje w `index.tsx` bo wciąż
+używane przez detal kafla custom "note"; `card`/`cardHeader`/`cardTitle` skopiowane verbatim,
+nie wyciągnięte współdzielone — te dwie rzeczy to osobna, większa zmiana). Guard
+`pinnedNotes.length > 0 &&` ZOSTAŁ w `index.tsx` (patrz akapit wyżej — inaczej edytor by się
+zepsuł). Wzorzec do powielenia dla kolejnych sekcji: (1) sprawdź czy sekcja ma `nodes[id] =
+warunek && (...)` — jeśli tak, warunek zostaje NA ZEWNĄTRZ nowego komponentu, (2) sprawdź czy
+używane style są dzielone z innymi sekcjami (`grep 's\.xxx'` w całym pliku) — dzielone zostają
+verbatim-skopiowane (duplikat), nie-dzielone przenoszą się w całości, (3) `tsc`/`jest` jako
+bar (nie łapią regresji WIZUALNYCH — stąd **każdy krok wymaga potwierdzenia na urządzeniu**
+zanim kolejny krok, nie robić hurtowo naraz). `tsc`/`jest` zielone (60/730, bez nowych testów —
+to czysto strukturalna zmiana pliku, nie logiki).
 
 **Snapshot statystyk (WYDAJNOŚĆ — pamiętaj o tym):** widgety czytają lokalny snapshot
 `expenses` (`useState`), **nie** żywy store `liveExpenses`. Snapshot odświeża się TYLKO na
