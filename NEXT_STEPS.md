@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Misja: przygaszony kotek na scenie + prompt "zawalcz" (widoczność) — NIEsprawdzone (2026-08-25)
+
+User: "chciałbym żeby to że muszę zawalczyć było bardziej widoczne żeby zakończyć misję" →
+doprecyzował konkretny pomysł ("kotek WRACA do NORMALNEGO ROZMIARU ale cały jest w CIENIU (jak
+nieznane bossy) z napisem NACIŚNIJ ABY ZAWALCZYĆ") — zaimplementowane dokładnie tak. Po
+ukończeniu misji (`missionReady`) kotek na scenie `/pet` wraca do normalnego rozmiaru,
+przygaszony (`opacity: 0.3`) + pulsujący napis "Naciśnij, aby zawalczyć i zakończyć misję" nad
+nim, cały blok jest jednym tap-targetem do walki (dodatkowy do istniejącego przycisku "Walcz" w
+kaflu misji, ten drugi zostaje bez zmian). Pełny opis w ARCHITECTURE.md §9 (sekcja "Misja
+pupila"). `tsc`/`jest` zielone (to czysto wizualna zmiana, bez nowych testów jednostkowych).
+**Priorytet testu na urządzeniu**:
+(a) wyślij pupila na krótką misję (albo poczekaj aż zakończy trwającą) — po powrocie kotek na
+scenie powinien być normalnego rozmiaru, ale wyraźnie przygaszony, z pulsującym napisem nad nim,
+(b) stuknij w przygaszonego kotka (gdziekolwiek na nim) — powinno przenieść do walki z
+minibossem misji (`/boss-fight?kind=mission`), tak samo jak przycisk "Walcz" w kaflu niżej,
+(c) subiektywnie: czy TERAZ jest wystarczająco widoczne że trzeba zawalczyć, czy nadal łatwo
+przegapić? Jeśli nadal za mało widoczne — na stole jest jeszcze pomysł dopisania gotowej misji
+do licznika "X nagród do odbioru" na kaflu pupila na DASHBOARDZIE (widoczne bez wchodzenia w
+`/pet` w ogóle) — zaproponowany, nie zrobiony, powiedz jeśli chcesz żebym to dodał.
+
 ## 🆕 Rozbicie index.tsx: krok 2/wiele — CountdownsCard wyciągnięte — NIEsprawdzone (2026-08-25)
 
 Kontynuacja kroku 1 (niżej) po "dawaj dalej". Ten sam wzorzec, druga sekcja:

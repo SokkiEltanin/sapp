@@ -1131,6 +1131,32 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
         "Wróć natychmiast" + `Alert.alert` potwierdzenie (user: "JEŻELI CHCESZ ANULOWAĆ NIE
         OTRZYMASZ NAGRODY ZA MISJĘ", `style:'destructive'`, ten sam wzorzec co reset postępu
         pupila w `settings.tsx`).
+      - **`missionReady`: kotek na scenie przygaszony + pulsujący prompt "zawalcz" (2026-08-25)**
+        — user: "chciałbym żeby to że muszę zawalczyć było bardziej widoczne żeby zakończyć
+        misję" → doprecyzował konkretny pomysł: "po tym jak pasek znika i pojawia się przycisk
+        walcz w kafelku misji, DODAĆ na tym kocie że on WRACA do NORMALNEGO ROZMIARU ale cały
+        jest w CIENIU (jak nieznane bossy) z napisem NACIŚNIJ ABY ZAWALCZYĆ W CELU ZAKOŃCZENIA
+        MISJI". Wcześniej (patrz akapit wyżej, "`missionReady` CELOWO nie liczy się jako away")
+        po ukończeniu misji scena po prostu wracała do zwykłego, w pełni kolorowego kotka —
+        jedyny sygnał że trzeba jeszcze zawalczyć to mały przycisk "Walcz" w kaflu misji w
+        gridzie niżej, łatwy do przegapienia (brak jakiegokolwiek sygnału PUSH-notification-
+        poziomu w samej scenie). Trzeci branch w warunku sceny (`missionEndsAt && !missionReady`
+        / `missionReady` / normalny stan) — zwykły `<CatArt>` w `STAGE_SIZE[stage]+90` (ten sam
+        rozmiar co stan normalny — user explicit "wraca do normalnego rozmiaru"), owinięty w
+        `<View style={{opacity:0.3}}>` (przygaszenie — CAŁY czas, nie migające, żeby nie
+        wyglądało jak błąd renderu) + `Swords` ikona i napis "Naciśnij, aby zawalczyć i
+        zakończyć misję" NAD kotkiem (`position:absolute`, `pointerEvents:'none'`), którego
+        TYLKO opacity pulsuje (`missionReadyPulse`, 0.7↔1, 900ms, ten sam `Easing.inOut(Easing.
+        sin)` co inne animacje misji w tym pliku) — pulsuje sam prompt, żeby przyciągał wzrok,
+        nie cały kotek. Cały blok to JEDEN `TouchableOpacity` → `onFightMission()` (ta sama
+        akcja co istniejący przycisk "Walcz" w kaflu misji — DODATKOWY, nie zastępczy,
+        tap-target, kafel niżej zostaje bez zmian). Prawdziwej maski/sylwetki SVG (dokładnego
+        kształtu kotka jak "nieznane bossy" mogłyby sugerować) świadomie NIE zrobiono — `CatArt`
+        to wielowarstwowy SVG (patrz `CatArt.tsx`), prosta `opacity` na całym renderze daje ten
+        sam czytelny efekt "przygaszenia" dużo mniejszym kosztem/ryzykiem niż maskowanie
+        kształtu. Dashboardowy licznik "X nagród do odbioru" (kafel pupila, `index.tsx`) NIE
+        liczy jeszcze gotowej misji — zaproponowane jako osobny, dodatkowy krok widoczności,
+        NIE zaakceptowane/zrobione jeszcze, patrz NEXT_STEPS.md.
     - **Misja blokuje pozostałe tory walki** (2026-08-18, user: "wtedy nie może walczyć w
       innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dotąd
       misja była całkiem niezależna od kampanii/raidu/eventu/questów/MAD (osobna pula, osobny

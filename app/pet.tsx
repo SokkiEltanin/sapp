@@ -133,6 +133,24 @@ export default function Pet() {
   }, [missionEndsAt, missionReady]);
   const missionWaveX = missionWave.interpolate({ inputRange: [0, 1], outputRange: [-70, 280] });
   const missionMb = missionStartedAt ? minibossForMission(missionStartedAt) : null;
+  // Misja ukończona — kotek na scenie wraca do normalnego rozmiaru, ale przygaszony ("w
+  // cieniu") + napis wzywający do walki, PULSUJĄCY (2026-08-25, user: "żeby to że muszę
+  // zawalczyć było bardziej widoczne" — dawniej po zakończeniu misji pasek po prostu znikał i
+  // kotek wracał do zwykłego, w pełni kolorowego stanu, jedyny sygnał to mały przycisk "Walcz"
+  // w kaflu misji w gridzie niżej, łatwy do przegapienia). Pulsowanie tylko opacity napisu/
+  // ikony (nie samego kotka — jego przygaszenie ma być STAŁE, nie migające, żeby nie
+  // wyglądało jak błąd renderu).
+  const missionReadyPulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!missionReady) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(missionReadyPulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(missionReadyPulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [missionReady]);
+  const missionReadyOpacity = missionReadyPulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
   // Potwierdzenie anulowania misji przez WŁASNY `ConfirmDialog`, nie `Alert.alert` (2026-08-20,
   // user: "komunikat wróć natychmiast z potwierdzeniem nie ma designu" — `Alert.alert`
   // renderuje gołą, systemową skrzynkę bez motywu aplikacji, dokładnie ten sam problem który
@@ -386,6 +404,21 @@ export default function Pet() {
                   <Text style={s.stageMissionCancel}>Wróć natychmiast</Text>
                 </TouchableOpacity>
               </View>
+            ) : missionReady ? (
+              // Misja ukończona, jeszcze nie odebrana — kotek wraca na scenę w normalnym
+              // rozmiarze, ale PRZYGASZONY ("w cieniu") + pulsujący napis wzywający do walki
+              // (patrz komentarz przy `missionReadyPulse` wyżej). Cały blok jest jednym
+              // tap-targetem → ta sama akcja co przycisk "Walcz" w kaflu misji niżej.
+              <TouchableOpacity activeOpacity={0.85} onPress={onFightMission} style={s.missionReadyWrap}>
+                <View style={{ opacity: 0.3 }}>
+                  <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} animate={false} palette={palette} stripes={catStripes}
+                    eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                </View>
+                <Animated.View style={[s.missionReadyPromptWrap, { opacity: missionReadyOpacity }]} pointerEvents="none">
+                  <Swords size={22} color="#2AC68F" />
+                  <Text style={s.missionReadyPrompt}>Naciśnij, aby zawalczyć{'\n'}i zakończyć misję</Text>
+                </Animated.View>
+              </TouchableOpacity>
             ) : (
               <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
                 eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
@@ -633,6 +666,12 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // scenie + mały na pasku naraz, patrz `missionEnter` przy hookach wyżej w pliku).
   stageMissionWrap: { alignItems: 'center', gap: spacing[2], width: '84%' },
   stageMissionCancel: { fontSize: 11, fontWeight: '700', color: c.text.muted, textDecorationLine: 'underline', marginTop: 2 },
+  missionReadyWrap: { alignItems: 'center', justifyContent: 'center' },
+  missionReadyPromptWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[5] },
+  missionReadyPrompt: {
+    fontSize: 13, fontWeight: '800', color: '#2AC68F', textAlign: 'center',
+    marginTop: 6, letterSpacing: 0.3, textTransform: 'uppercase', lineHeight: 18,
+  },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },
   // Nazwa/status skurczone (2026-08-16, user: "nazwę zbić, nad pupilem zajmuje w pizdu
