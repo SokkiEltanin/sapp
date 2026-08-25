@@ -180,21 +180,28 @@ kroki) — sprawdź czy kafelek się tworzy, pokazuje siatkę 365 kwadracików k
 wartości dnia, i czy tapnięcie w niego otwiera sensowny szczegółowy widok (tydzień/miesiąc),
 (d) sprawdź czy kafelek pikseli przetrwa przełączenie zakładek i restart apki (persist).
 
-## 🐛 Fix: dashboard undercountował serie nawyków o 1 dzień, gdy dziś jeszcze nie zaliczone — NIEsprawdzone (2026-08-24)
+## 🐛 Fix ×2: dashboard undercountował serie nawyków (off-by-one, POTEM sztywny limit 30 dni) — NIEsprawdzone (2026-08-24 → 25)
 
-User ze screenshotem: "jak wchodzę [w habit-year] jest napisane 30 dni a na kafelku [dashboard]
-wczoraj tez było 30, a dzisiaj jest 29 xddd". Prawdziwy off-by-one w `getStreak()` (`useHabits.
-ts`) — pętla miała stałą dolną granicę (`-29`) niezależną od tego czy dziś już zaliczone; gdy
-NIE, tracił 1 dzień z ogona (sprawdzał tylko 29 dni zamiast 30). `habit-year.tsx` liczy tę samą
-serię inaczej (bez capu), stąd rozjazd 30 vs 29 tego samego dnia. Fix: dolna granica względna
-do punktu startu, zawsze dokładnie 30 dni. Throwaway-symulacją w node zweryfikowane na
-dokładnym scenariuszu usera (stary kod → 29, nowy → 30). Pełny opis w ARCHITECTURE.md, sekcja
-"Nawyki/liczniki" (nowy sub-punkt "BUG: getStreak()..."). `tsc`/`jest` zielone (709/709 — brak
-istniejącego testu dla `getStreak` bo żyje w hooku bez infrastruktury do testowania hooków w
-tym repo; poprawność zweryfikowana throwaway-symulacją, nie nowym testem jednostkowym).
-**Priorytet testu na urządzeniu**: znajdź nawyk/serię blisko okrągłej liczby (np. 7/14/30 dni)
-z dniem dzisiejszym JESZCZE nie zaliczonym — sprawdź czy kafelek "Twoje serie" na dashboardzie
-pokazuje TĘ SAMĄ liczbę co ekran szczegółów serii (habit-year), bez spadku o 1.
+User ze screenshotem (2026-08-24): "jak wchodzę [w habit-year] jest napisane 30 dni a na
+kafelku [dashboard] wczoraj tez było 30, a dzisiaj jest 29 xddd". Fix #1: off-by-one w
+`getStreak()` (`useHabits.ts`) — pętla miała stałą dolną granicę (`-29`) niezależną od tego
+czy dziś już zaliczone. Wydawało się skończone, ALE user wrócił nazajutrz (2026-08-25) z
+kolejnym screenshotem: "wiem czym problem — na dashboardzie 29, na habit-year 31, bo tam
+liczy bez streak freeze" — hipoteza usera o freezach błędna (obie funkcje je liczą), ale
+objaw realny: fix #1 poprawił TYLKO krawędź w obrębie 30-dniowego okna, nie sam fakt że okno
+było sztywno 30-dniowe. Każda realna seria >30 dni była ucinana, niezależnie od freezów. Fix
+#2: `MAX_STREAK_LOOKBACK_DAYS = 3650` (10 lat, bezpiecznik przed nieskończoną pętlą, NIE
+realny limit) zamiast sztywnego `29`. Throwaway-symulacją w node zweryfikowane oba razy (fix
+#1: stary→29, nowy→30 na 30-dniowym scenariuszu; fix #2: stary→30 ucięte, nowy→31 na
+31-dniowym scenariuszu). Pełny opis w ARCHITECTURE.md, sekcja "Nawyki/liczniki" (dwa
+sub-punkty "BUG #1"/"BUG #2" pod `getStreak()`). `tsc`/`jest` zielone (711/711 — brak
+dedykowanego testu, `getStreak` żyje w hooku bez infrastruktury do testowania hooków w tym
+repo; poprawność zweryfikowana throwaway-symulacją oba razy, nie testem jednostkowym).
+**Priorytet testu na urządzeniu** (KLUCZOWE — poprzedni fix już raz wyglądał na gotowy a nie
+był): znajdź nawyk/serię DŁUŻSZĄ niż 30 dni (jak "Woda" na screenshocie, 31 dni) — sprawdź
+czy kafelek "Twoje serie" na dashboardzie pokazuje TĘ SAMĄ liczbę co ekran szczegółów serii
+(habit-year), włącznie z seriami znacznie dłuższymi niż 31 (np. 40-60+ dni, jeśli masz taki
+nawyk) — nie tylko blisko granicy 30/31.
 
 ## 🆕 TopPill: rotacja luźnej puli + pupil na misji/energia bossów — NIEsprawdzone (2026-08-23)
 

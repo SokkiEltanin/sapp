@@ -1898,6 +1898,19 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     zaliczone. Throwaway-symulacją w node zweryfikowane: stary kod dawał 29 na dokładnym
     scenariuszu usera (30 dni z rzędu kończących się wczoraj, dziś jeszcze puste), nowy
     poprawnie daje 30.
+  - **BUG #2, TA SAMA funkcja: sztywny limit 30 dni, nie tylko zła krawędź (2026-08-25)** —
+    user: "wiem czym problem — na dashboardzie 29, na habit-year 31, bo tam liczy bez streak
+    freeze" (screenshot habit-year: 31 dni z rzędu, kilka zamrożonych). Hipoteza usera
+    BŁĘDNA — obie funkcje liczą freeze (`isDoneOrFrozen`/`frozen[...]`) — ale objaw realny:
+    fix #1 wyżej poprawił TYLKO krawędź pętli w obrębie 30-dniowego okna, nie sam fakt że
+    okno jest sztywno 30-dniowe (`i >= start - 29`). `habit-year.tsx`'s `stats.current` liczy
+    BEZ takiego limitu — cofa się przez CAŁĄ widoczną sekwencję (35 dni widok miesiąca / 365
+    widok roku). Każda realna, nieprzerwana seria >30 dni była więc ZAWSZE ucinana do
+    (co najwyżej) 30 na dashboardzie — niezależnie od freezów, sama długość serii to
+    przekraczała. Fix: `MAX_STREAK_LOOKBACK_DAYS = 3650` (10 lat) zamiast sztywnego `29` —
+    to bezpiecznik przed nieskończoną pętlą przy zepsutych danych, NIE realny limit serii.
+    Throwaway-symulacją zweryfikowane: 31-dniowa nieprzerwana seria (dziś jeszcze nie
+    zrobione) — stary kod daje 30 (ucięte), nowy poprawnie daje 31.
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 - **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/
