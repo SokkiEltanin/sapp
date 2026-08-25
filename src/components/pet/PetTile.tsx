@@ -13,6 +13,23 @@ import { useColors } from '@/theme/useColors';
 // `nodes['pet']`), własna karta/obwódka/chevron by dublowały ramkę hosta — `bare` zwraca sam
 // wiersz treści (kot + tekst), bez opakowania. Domyślne `bare=false` = stary, samodzielny
 // wygląd, używany gdy nie ma żadnej aktywnej serii do pokazania obok.
+//
+// Głowa kotka, powiększona + przycięta (2026-08-25, user: "zeby ten pupil jakby był w kafelku
+// większy praktycznie sama głowa i tak dorobić mu łapki zeby lekko wyglądały jakby sie opierał
+// o krawędź kafelka"). CatArt renderuje CAŁEGO kota w stałym `viewBox 0 0 2000 2000` (patrz
+// CatArt.tsx) — nie da się wyciągnąć "samej głowy" bez rozbierania SVG na części, więc zamiast
+// tego: render W WIĘKSZYM rozmiarze niż widoczny kontener (który ma `overflow:hidden`),
+// przesunięty tak żeby okno łapało dokładnie od czubka uszu do dołu łapek. Liczby wyliczone
+// z geometrii CatArt (nie zgadywane): uszy — apex trójkąta ucha po transformacie macierzy
+// ląduje na y≈436 (`Ear`, wariant R, spoczynek/rotate=0) → górna krawędź okna na y=430 z
+// małym marginesem; łapki — `Paw` rysuje elipsę cy=1541 ry=48 → dół na y=1589 (dokładnie na
+// dole okna, więc łapki "leżą" na krawędzi kafelka). Szerokość okna z bounding boxu
+// głowa+uszy (x≈560–1340, symetrycznie wokół środka głowy x≈953). Jeśli po teście na
+// urządzeniu trzeba doregulować kadr — to tylko te cztery stałe.
+const CROP_SIZE = 135;          // pełny render CatArt (viewBox 2000 → 135px, czyli unit≈0.0675)
+const CROP_W = 54, CROP_H = 78; // widoczne okno (kontener z overflow:hidden)
+const CROP_TOP = -29;           // viewBox y=430 (czubek uszu) → góra okna
+const CROP_LEFT = -38;          // viewBox x=560 (lewe ucho) → lewa okna
 export default function PetTile({ name, pet, level, claimable = 0, bare = false }: { name: string; pet: PetState; level: number; claimable?: number; bare?: boolean }) {
   const c = useColors();
   // wear the coat you actually bought — the tile used to always show the default blue
@@ -24,8 +41,12 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
   const catLegStripes = usePetStore(s => s.catLegStripes);
   const row = (
     <>
-      <CatArt expression={pet.expression} size={70} animate={false} palette={paletteById(catColor)} stripes={catStripes}
-        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+      <View style={st.headCrop}>
+        <View style={st.headCropInner}>
+          <CatArt expression={pet.expression} size={CROP_SIZE} animate={false} palette={paletteById(catColor)} stripes={catStripes}
+            eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+        </View>
+      </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>
           <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>
@@ -50,6 +71,8 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
 const st = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, borderWidth: 1, padding: 12, paddingRight: 10 },
   bareRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  headCrop: { width: CROP_W, height: CROP_H, overflow: 'hidden' },
+  headCropInner: { position: 'absolute', top: CROP_TOP, left: CROP_LEFT, width: CROP_SIZE, height: CROP_SIZE },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 16, fontWeight: '800', flexShrink: 1 },
   lvl: { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 1 },

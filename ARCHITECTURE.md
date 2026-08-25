@@ -145,6 +145,29 @@ użyteczny), prawa = mały kafelek z `StreakFlameGlow`, liczbą dni i "jutro +N"
 informacja co dawny pasek, tylko przeniesiona do kolumny). Gdy `petLoginStreak === 0`: stary,
 samodzielny `<PetTile />` (bez `bare`) — nie ma czego dokleić.
 
+**Kolor kafla serii + głowa kotka powiększona (2026-08-25)** — user ze screenshotem: "popraw
+kolory bo sa pierdolniete na tym streaku" + "zeby ten pupil jakby był w kafelku większy
+praktycznie sama głowa i tak dorobić mu łapki zeby lekko wyglądały jakby sie opierał o krawędź
+kafelka". Dwa fixy:
+1. `petLoginTile`/`petLoginNum` (`index.tsx`) miały NA SZTYWNO pomarańcz (`#FB923C`) niezależnie
+   od realnego progu serii — przy np. 3 dniach `StreakFlameGlow` poprawnie rysował płomień w
+   kolorze "Bordo" (patrz `STREAK_TIERS`/`streakColor()` w `StreakFlame.tsx`), ale tło/liczba
+   kafla i tak świeciły pomarańczem, więc kolory się gryzły. Naprawione: tło/ramka/liczba teraz
+   liczone z `streakColor(petLoginStreak)` inline w miejscu użycia (`loginStreakColor + '1E'`/
+   `'3A'` alpha-suffix, ten sam wzorzec co reszta apki), stylesheet trzyma tylko layout.
+2. `PetTile.tsx`: kotek renderowany jako "wystawiona głowa" zamiast pełnej sylwetki. `CatArt`
+   rysuje CAŁEGO kota w stałym `viewBox 0 0 2000 2000` (patrz sekcja CatArt w tym pliku / komentarz
+   na górze `CatArt.tsx`) — nie da się wyrenderować samej głowy bez rozbierania SVG, więc
+   zamiast tego: `CatArt` renderowany W WIĘKSZYM rozmiarze (`CROP_SIZE=135`) niż widoczny
+   kontener (`CROP_W×CROP_H = 54×78`, `overflow:'hidden'`), przesunięty (`CROP_TOP`/`CROP_LEFT`)
+   tak żeby okno łapało dokładnie od czubka uszu (viewBox y≈430, wyliczone z transformu
+   macierzy `Ear` R) do dołu łapek (`Paw` cy=1541 ry=48 → y=1589) — łapki lądują dokładnie na
+   dole kontenera = "opierają się o krawędź". Liczby wyliczone z geometrii SVG (macierze
+   transformacji w `CatArt.tsx`), nie zgadywane, ale BEZ wizualnej weryfikacji na urządzeniu —
+   jeśli kadr jest za ciasny/za luźny, to tylko cztery stałe `CROP_*` na górze `PetTile.tsx`.
+   Dotyczy WYŁĄCZNIE `PetTile.tsx` (jedyne miejsce użycia — `index.tsx` dashboard, oba warianty
+   `bare`/pełny) — pełny ekran `/pet` ma własny, dużo większy `CatArt` i tego nie dotyczy.
+
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 
 - **`WIDGET_METRICS`**: lista `{ id, label, group, unit, viz[], periodic, needsTag? }`.

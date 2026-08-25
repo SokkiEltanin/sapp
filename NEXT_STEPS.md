@@ -9,6 +9,31 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Kafel pupila: kolor serii + większa głowa kotka (opiera się o krawędź) — NIEsprawdzone (2026-08-25)
+
+User ze screenshotem (kafel "Fafik lvl 8" + kolumna serii logowań): "popraw kolory bo sa
+pierdolniete na tym streaku" + "zeby ten pupil jakby był w kafelku większy praktycznie sama
+głowa i tak dorobić mu łapki zeby lekko wyglądały jakby sie opierał o krawędź kafelka". Dwa
+fixy, pełny opis w ARCHITECTURE.md (sekcja "Kolor kafla serii + głowa kotka powiększona"):
+(1) kolor kafla serii logowań (tło/ramka/liczba) był na sztywno pomarańczowy niezależnie od
+realnego progu serii — teraz liczony z `streakColor()`, tak jak płomień obok niego już był;
+(2) kotek w kaflu pupila (`PetTile.tsx`) renderowany jako powiększona, przycięta "wystawiona
+głowa" (czubek uszu do dołu łapek) zamiast pełnej małej sylwetki — liczby kadru wyliczone z
+geometrii SVG (macierze transformacji w `CatArt.tsx`), ale **BEZ wizualnej weryfikacji na
+urządzeniu** (nie da się tu wyrenderować RN-SVG żeby zobaczyć wynik). `tsc`/`jest` zielone
+(nie testuje wyglądu — to zmiana czysto wizualna). **Priorytet testu na urządzeniu** (to
+najważniejszy test tej zmiany):
+(a) kafel pupila na dashboardzie (ten z kolumną serii logowań po prawej) — sprawdź czy KOLOR
+tła/liczby kafla serii teraz PASUJE do koloru płomienia obok (oba powinny być tym samym
+odcieniem progu, np. bordo przy niskiej serii),
+(b) sprawdź kadr kotka po lewej: czy widać wyraźnie głowę + uszy u góry i łapki na dole,
+skadrowane sensownie (nie ucięte za mocno/za słabo, nie puste marginesy po bokach) — jeśli
+kadr jest zły, powiedz W KTÓRĄ STRONĘ (za dużo pustego u góry? uszy ucięte? łapki nie widać?)
+— to jednolinijkowa poprawka jednej z czterech stałych `CROP_SIZE`/`CROP_W`/`CROP_H`/
+`CROP_TOP`/`CROP_LEFT` na górze `PetTile.tsx`,
+(c) sprawdź że reszta kafla (imię/poziom/status/nagrody) nie rozjechała się przez węższy
+kontener kotka (54px zamiast dawnych 70px).
+
 ## 🆕 Optymalizacja: bestMoodWeek (rekordy życiowe) O(n²)→O(n) — NIEsprawdzone (2026-08-25)
 
 Kontynuacja optymalizacji wejścia do apki po "okej tylko teraz optymalizuj dalej". Audyt
