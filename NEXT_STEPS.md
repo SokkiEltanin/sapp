@@ -56,25 +56,54 @@ można skrócić okno cache'u lub wymusić odświeżenie przy pull-to-refresh),
 (d) subiektywnie: czy wejście na dashboard (szczególnie z kilkoma kaflami "Rok w pikselach")
 czuje się szybsze niż wcześniej?
 
-## 🐛 Raid: walka czasem się przerywa przedwcześnie — ZGŁOSZONE, NIEZBADANE (2026-08-24)
+## 🆕 Raid przebudowany: prawdziwa walka wobec REALNEJ puli, nie krótka sesja — NIEsprawdzone (2026-08-25)
 
-User (bez fixa, wprost: "zapisz sobie") — screenshot ekranu Raid: "ten rajd co jest to on się
-buguje czasami i walkę przerywa a miało być do końca HP kotka jakby jak zwykła walka tylko HP
-rajdu restartuje się co tydzień nie co walkę". Zamierzone zachowanie TO DOKŁADNIE to co jest w
-kodzie (potwierdzone, nie mylić z bugiem): `raidSessionHpFor()` (`src/utils/raid.ts:91`) daje
-KAŻDEJ próbie małą, animowaną "sesję" (~`RAID_SESSION_HITS`=6 ciosów, ten sam sprawdzony wzorzec
-co questBossHpFor/madBossHpFor) — realny postęp tej sesji dopisuje się do PRAWDZIWEJ, trwałej
-puli tygodniowej (`raidHp` w petStore, resetowanej co tydzień wg `weekKeyOf()`) osobnym
-wywołaniem `raidAttack()` (`app/boss-fight.tsx:395`) PO zakończeniu sesji — więc walka MA
-kończyć się szybciej niż "do zera kotka", to nie jest to zgłoszenie. Prawdziwy problem — walka
-PRZERYWA SIĘ w trakcie, niekompletnie/buggy, nie normalne dojście sesji do końca — NIE ZBADANE.
-Podejrzane miejsca do sprawdzenia jako pierwsze: `app/boss-fight.tsx:227`
-(`liveBossHp ?? raidRemaining` — wyświetlana hp PRZED walką, możliwy konflikt z sesyjną hp po
-starcie), `:519` (`raidRealHp` liczone z `raidRealStart - (raidSessionHp - round.bossHpAfter)` —
-możliwy błąd znaku/kolejności przy niskim `raidRemaining` blisko wyczerpania tygodniowej puli).
-**Priorytet: odtworzyć bug na urządzeniu** (jak dokładnie "przerywa" — crash, biały ekran,
-zamrożenie, czy walka kończy się natychmiast po 1 rundzie?) zanim cokolwiek naprawiać —
-za mało informacji od usera żeby zgadywać fix na ślepo.
+Kontynuacja poprzedniego zgłoszenia ("walka czasem się przerywa przedwcześnie"). User zagrał
+realnie i sprecyzował: "realnie zagrałem i mi mimo połowy ponad HP przerwało" — dawny design
+(`raidSessionHpFor`, ~6-ciosowa "sesja" wobec MAŁEJ podstawki, realny postęp dopisywany do
+prawdziwej puli DOPIERO po sesji) faktycznie DZIAŁAŁ jak zaprojektowano, ale to zaprojektowanie
+nie pasowało do tego czego user chciał: "chciałem żeby RAIDY... miały dużo hp względem poziomu
+kotka (resetuje się co tydzień)... kotek walczy do końca, tyle ile mu zostawi tyle zostawi, ale
+kotek nawet jak przegra to HP bossa zostaje tyle ile po ostatnim ciosie". Czyli: prawdziwa,
+ciągła walka wobec REALNEJ, pozostałej puli (nie proxy), z prawdziwym stanem porażki, ale BEZ
+resetu postępu na przegranej (w odróżnieniu od kampanii). Przy okazji: "zmieńmy licznik czerwonej
+energii na 2 zamiast 1" — koszt próby podniesiony.
+
+**Zmiana architektury**: `Boss.counterHp?: number` (nowe, opcjonalne pole w `bosses.ts`) —
+`counterDamage()` woła TERAZ `boss.counterHp ?? boss.hp` zamiast zawsze `boss.hp`. To
+ROZDZIELIŁO "ile HP ma boss" (do zbijania / win-condition) od "jaka skala % liczy kontratak" —
+dawniej te dwie role dzielił jeden argument, co wymuszało sesję-proxy żeby uniknąć zabicia kotka
+jednym kontratakiem od surowej, wielotysięcznej puli. `raidAsBoss(raid, hp, counterHp)` (nowa
+sygnatura, trzeci argument) — `hp` = `raidRemaining` WPROST (realna pula), `counterHp` =
+`raidCounterHpFor()` (przemianowane z `raidSessionHpFor`, ta sama formuła `atkPower × stała`,
+tylko już nie "sesja"). Efekt: walka realnie zbija prawdziwy pasek rajdu każdą rundą, kończy się
+naturalnie przez `simulateFight`'s `if (bossHp<=0 || catHp<=0) break` (jak kampania), NIE przez
+sztuczny limit rund. `raidAttack()` w `finish()` (boss-fight.tsx) woła się TERAZ zawsze (win,
+loss, wyczerpanie sufitu rund) z realną deltą (`raidRealStart - result.bossHpLeft`) — przegrana
+NIE zeruje postępu (w petStore `raidAttack` po prostu odejmuje realne obrażenia od `raidHp`,
+niezależnie od wyniku). Nowy stan porażki dla raidu (`defeat.fainted`) z osobnym komunikatem
+("obrażenia zostają, pasek nie wraca do pełna") — inny niż reszta trybów (tam HP bossa faktycznie
+resetuje się na przegranej). `defeatTarget` (dawniej pomijał `kind==='raid'` całkowicie — modal
+przegranej otwierałby się PUSTY) teraz go zawiera. Koszt energii: `RAID_ENERGY_COST=2` (było 1,
+zaimportowane w `petStore.ts`/`boss-fight.tsx`/`bosses.tsx`, przycisk WALCZ na mini-karcie rajdu
+wyszarzony już przy `eventEnergy < 2`, nie dopiero przy 0). Nemesis (event kind='menace') MA TĘ
+SAMĄ, starą sesję-proxy — user zgłosił problem tylko dla raidu, świadomie NIE dotknięte (ten sam
+wzorzec `counterHp` da się powielić, gdyby okazało się że nemesis ma identyczny problem).
+Testy: `__tests__/raid.test.ts` przepisany pod nowe API (`raidCounterHpFor`/`raidAsBoss(raid, hp,
+counterHp)`/`RAID_ENERGY_COST`), w tym test że mała, prawie wyczerpana pula da się realnie dobić
+do zera w JEDNEJ próbie. Pełny opis w ARCHITECTURE.md (sekcja bossów/rajdu, sub-punkt "Raid:
+prawdziwa walka..."). `tsc`/`jest` zielone (58/713).
+**Priorytet testu na urządzeniu** (WAŻNE — to zmiana balansu bojowego, warto sprawdzić realnie):
+(a) walka z rajdem powinna teraz trwać WIELE rund (nie kończyć się po ~6 ciosach) i pasek HP
+Krakena/etc. w arenie powinien realnie, widocznie spadać z każdym trafieniem,
+(b) jeśli kotek zemdleje w trakcie — powinien pokazać się ekran PRZEGRANEJ (nowość — dawniej
+raid nigdy nie pokazywał przegranej), z komunikatem że obrażenia i tak zostały zapisane,
+(c) po przegranej wróć na ekran Raid — pasek HP powinien być NIŻSZY niż przed walką (postęp
+zbankowany), NIE zresetowany do pełna,
+(d) sprawdź że jedna próba zużywa TERAZ 2 ⚡ (czerwonej energii), nie 1 — przycisk WALCZ na
+mini-karcie rajdu powinien być wyszarzony już przy dokładnie 1 energii,
+(e) jeśli pozostała pula jest już mała (np. blisko końca tygodnia) — sprawdź czy da się ją
+realnie dobić do zera w jednej próbie i dostać nagrodę (ekran zwycięstwa, medal).
 
 ## 🆕 Auto-tagowanie rozpoznanych sprzedawców z banku — NIEsprawdzone (2026-08-24)
 

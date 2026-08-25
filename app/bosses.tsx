@@ -10,7 +10,7 @@ import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { BOSSES, bossBonuses, dailyAttempts, eventDailyAttempts, mysteryBossName } from '@/utils/bosses';
 import { gearCombatBonuses } from '@/utils/gear';
-import { raidForWeek, raidHpFor } from '@/utils/raid';
+import { raidForWeek, raidHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventBossFromKey, eventDaysLeft, menaceHpFor } from '@/utils/seasonalEvents';
 import { raidIcon, eventIcon } from '@/utils/bossUiIcons';
@@ -262,7 +262,11 @@ export default function Bosses() {
               <Text style={s.miniDoneTxt}>Pokonany ✓ · nowy w pon.</Text>
             ) : raidUnlocked ? (
               <PressableScale onPress={() => { haptic.tap(); router.push('/boss-fight?kind=raid' as any); }}>
-                <View style={[s.miniBtn, eventEnergy <= 0 && { opacity: 0.5 }]}>
+                {/* eventEnergy < RAID_ENERGY_COST (nie <= 0) — raid kosztuje 2, nie 1
+                    (2026-08-25) — przycisk musi wyglądać na wyszarzony już przy 1 energii,
+                    nie dopiero przy 0, inaczej wyglądałby na aktywny mimo że próba i tak
+                    odbije się o "Brak prób ataku" w boss-fight.tsx. */}
+                <View style={[s.miniBtn, eventEnergy < RAID_ENERGY_COST && { opacity: 0.5 }]}>
                   <Text style={s.miniBtnTxt}>WALCZ</Text>
                 </View>
               </PressableScale>

@@ -74,6 +74,14 @@ export interface Boss {
                          // brak = ×1 (zwykłe bossy). Osobny od `guard` (który TNIE kontratak
                          // o połowę) — oba mogą działać naraz, guard i tak zniknął z MAD
                          // (madBossFor go czyści), ale mechanizm zostaje ogólny, nie MAD-specific.
+  counterHp?: number; // 2026-08-25 (raid, patrz raidAsBoss w raid.ts) — źródło % dla
+                       // counterDamage() ZAMIAST `hp`, gdy podane. Bez tego pola raid nie mógł
+                       // być prawdziwą, ciągłą walką: `hp` dla raida to PRAWDZIWA, tygodniowa
+                       // pula (tysiące), a counterDamage() liczy % od STAŁEGO hp (nie malejącego,
+                       // patrz komentarz przy COUNTER_PCT) — użyta wprost zabijałaby kotka
+                       // natychmiast. `counterHp` = mała, bezpiecznie skalowana wartość
+                       // (`raidSessionHpFor`), więc kontratak zostaje rozsądny, a `hp` może być
+                       // prawdziwą pulą bez żadnego hacku z sesjami/tłumaczeniem skali w UI.
 }
 
 // BALANCE REVIEW (2026-08-13, patrz memory boss_design.md „balance review") — `hp` wartości
@@ -593,7 +601,7 @@ export function simulateFight(
         // 'mindcontrol' — szansa, że boss w ogóle nie kontratakuje tej rundy
         const controlled = has('mindcontrol') && Math.random() < MIND_CONTROL_CHANCE;
         if (!controlled) {
-          counterDmg = counterDamage(boss.hp, bonuses.dodge, guarded, boss.counterMult ?? 1);
+          counterDmg = counterDamage(boss.counterHp ?? boss.hp, bonuses.dodge, guarded, boss.counterMult ?? 1);
           // 'dodge' — całkowity unik kontrataku
           if (counterDmg > 0 && has('dodge') && Math.random() < dodgeChanceAt(levelOf('dodge'))) counterDmg = 0;
           // 'reflect' — szansa odbić kontratak na bossa zamiast na kotka

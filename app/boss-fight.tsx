@@ -12,7 +12,7 @@ import BossArt from '@/components/bosses/BossArt';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
-import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidSessionHpFor } from '@/utils/raid';
+import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidCounterHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft, menaceHpFor, menaceSessionHpFor, menaceAsBoss, menaceCoins, menaceXp } from '@/utils/seasonalEvents';
 import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from '@/utils/minibosses';
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
@@ -48,21 +48,21 @@ type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins:
 //   3 próby/dzień (dailyAttempts), wydarzenie WŁASNĄ, słabiej skalującą pulę
 //   (`eventDailyAttempts` w bosses.ts) — HP/DMG wydarzenia PRZEBALANSOWANE pod ten model,
 //   patrz eventHpFor w seasonalEvents.ts.
-// — RAID (2026-08-17, user: "miała być zwykła walka tylko taka która nie restartuje jego HP
-//   jak z tym drugim [event]... ale tamta jest jakaś za łatwa" — poprzednio RAID był jedynym
-//   trybem BEZ pełnej animacji, jedna prosta wymiana na próbę, `attackSimple()`, USUNIĘTA):
-//   HP bossa zostaje TRWAŁE przez cały tydzień (NIE resetuje się co próbę — to CELOWO
-//   zachowane, żeby dało się odrabiać po trochu, w przeciwieństwie do eventu). Ale każda próba
-//   to teraz PEŁNA rundowa walka jak kampania — wobec MAŁEJ "sesji" (`raidSessionHpFor` w
-//   raid.ts, ten sam bezpieczny wzorzec co questBossHpFor/madBossHpFor: `atkPower × mała
-//   stała`), NIE wobec surowej `raidHpFor` (za duża, `counterDamage()` liczony wprost od
-//   `boss.hp` — od 2026-08-20 zawsze stały procent maksimum — zabiłby kotka jednym kontratakiem).
-//   Realny postęp sesji (`raidAsBoss` hp przed
-//   minus po) dopisuje się do PRAWDZIWEJ, trwałej puli osobnym wywołaniem `raidAttack()` —
-//   `targetRemaining`/pasek HP w arenie ZAWSZE pokazuje PRAWDZIWĄ skalę tygodniową, `liveBossHp`
-//   podczas animacji jest przeliczany z sesyjnej skali na prawdziwą (patrz w attackRoundBased).
-//   Wciąż BEZ stanu porażki — user o to nie prosił, raid dalej nie da się "przegrać"
-//   (finish() dla raid ignoruje result.won/catFainted, liczy się tylko realny postęp puli).
+// — RAID (2026-08-17 → 2026-08-25, patrz pełna historia w raid.ts nad raidAsBoss): HP bossa
+//   zostaje TRWAŁE przez cały tydzień (NIE resetuje się co próbę — CELOWO, żeby dało się
+//   odrabiać po trochu). Każda próba to PRAWDZIWA, ciągła walka WOBEC REALNEJ, pozostałej puli
+//   (`raidRemaining` jako `boss.hp` — nie żadna sesja-proxy), idąca aż ktoś padnie, dokładnie
+//   jak kampania. `counterDamage()` (liczy % wprost od `boss.hp`, patrz COUNTER_PCT w
+//   bosses.ts) dostaje ODDZIELNE źródło skali (`Boss.counterHp`, bezpiecznie mała wartość z
+//   `raidCounterHpFor`) — inaczej realna, tysiące-hp pula zabiłaby kotka jednym kontratakiem.
+//   `liveBossHp` podczas animacji to WPROST `round.bossHpAfter` (już na realnej skali, żadnego
+//   przeliczania sesja→realna jak dawniej). Realny postęp (`raidRemaining` przed minus po)
+//   dopisuje się do trwałej puli przez `raidAttack()` — ZAWSZE, niezależnie od wyniku (user:
+//   "kotek walczy do końca... nawet jak przegra to HP bossa zostaje tyle ile po ostatnim
+//   ciosie"). Raid MA TERAZ stan porażki (przegrana się pokazuje, feedback że kotek padł), ale
+//   w odróżnieniu od kampanii przegrana NIE zeruje postępu — tylko kampania resetuje HP bossa
+//   do pełna na przegranej, raid zostawia trwały ślad. 2 energii (eventEnergy) za próbę,
+//   nie 1 — dłuższa, prawdziwa walka niż dawna krótka sesja.
 export default function BossFight() {
   const { kind: kindParam, questId, questCoins, questXp, questLabel } = useLocalSearchParams<{
     kind?: string; questId?: string; questCoins?: string; questXp?: string; questLabel?: string;
@@ -231,7 +231,10 @@ export default function BossFight() {
   const headerTitle = kind === 'raid' ? 'Raid' : kind === 'event' ? (isMenace ? 'Nemesis' : 'Wydarzenie') : kind === 'quest' ? (questLabel ?? 'Walka questowa') : kind === 'mad' ? 'MAD Boss' : kind === 'mission' ? 'Misja' : 'Walka';
   // Do modala przegranej — kampania/wydarzenie/quest/MAD/misja mogą przegrać (raid nie ma kontrataku).
   // Wspólny kształt {id,emoji,name} wystarczy modalowi, nie potrzeba pełnego Boss.
-  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : kind === 'mad' ? madBoss : kind === 'mission' ? missionBoss : null;
+  // `raid` dołączony 2026-08-25 razem z realnym stanem porażki dla rajdu (patrz finish() i
+  // komentarz na górze pliku) — bez tego wpisu modal przegranej otwierałby się PUSTY dla
+  // rajdu (defeatTarget=null gasi całą wewnętrzną treść modala, patrz warunek renderu niżej).
+  const defeatTarget = kind === 'campaign' ? campaignBoss : kind === 'raid' ? raid : kind === 'event' ? eventBoss : kind === 'quest' ? questBoss : kind === 'mad' ? madBoss : kind === 'mission' ? missionBoss : null;
 
   useEffect(() => { resetCatHp(); }, [kind]);
 
@@ -341,18 +344,21 @@ export default function BossFight() {
   const attackRoundBased = () => {
     if (!target || !target.unlocked || fighting || fightingRef.current) return;
     if (kind !== 'mission' && missionAway) { haptic.error(); toast.info('Pupil jest w trakcie misji — wróć jak dotrze.'); return; }
-    // Raid (2026-08-17): sesja rundowa wobec MAŁEGO, bezpiecznie skalowanego celu
-    // (raidSessionHpFor — ten sam wzorzec co questBossHpFor/madBossHpFor), NIE wobec surowej
-    // trwałej puli tygodniowej — patrz pełny komentarz na górze pliku i w raid.ts.
-    const raidSessionHp = kind === 'raid' ? raidSessionHpFor(atkStatBonus, level, bonuses) : 0;
+    // Raid (2026-08-17 → 2026-08-25): PRAWDZIWA, ciągła walka wobec REALNEJ, pozostałej puli
+    // tygodniowej (`raidRemaining` jako `boss.hp` wprost) — `counterHp` osobno, bezpiecznie
+    // skalowane, żeby kontratak nie zabijał kotka od realnej, wielotysięcznej puli. Patrz pełny
+    // komentarz na górze pliku i w raid.ts nad raidAsBoss.
+    const raidCounterHp = kind === 'raid' ? raidCounterHpFor(atkStatBonus, level, bonuses) : 0;
     const raidRealStart = kind === 'raid' ? raidRemaining : 0;
-    // Nemesis (2026-08-18): TA SAMA sesja-wobec-trwałej-puli sztuczka co raid — patrz komentarz
-    // przy menaceHpFor w seasonalEvents.ts (surowa menaceHpFor jest za duża dla counterDamage%).
+    // Nemesis (2026-08-18): dawna sesja-wobec-trwałej-puli sztuczka co raid MIAŁ — patrz
+    // komentarz przy menaceHpFor w seasonalEvents.ts (surowa menaceHpFor jest za duża dla
+    // counterDamage%). Nemesis świadomie NIE dostał tego samego fixu co raid 2026-08-25 —
+    // user zgłosił problem tylko dla raidu, ten sam wzorzec do powielenia gdyby zgłosił i tu.
     const menaceSessionHp = kind === 'event' && isMenace ? menaceSessionHpFor(atkStatBonus, level, bonuses) : 0;
     const menaceRealStart = kind === 'event' && isMenace ? menaceRemaining : 0;
     const roundBoss: Boss | null =
       kind === 'campaign' ? campaignBoss :
-      kind === 'raid' ? raidAsBoss(raid, raidSessionHp) :
+      kind === 'raid' ? raidAsBoss(raid, raidRealStart, raidCounterHp) :
       kind === 'event' && eventBoss && isMenace ? menaceAsBoss(eventBoss, menaceSessionHp) :
       kind === 'event' && eventBoss ? eventAsBoss(eventBoss, level) :
       kind === 'quest' ? questBoss :
@@ -363,11 +369,14 @@ export default function BossFight() {
     // Quest/misja: bez puli prób — quest już wykonany realnie / misja już odczekana realnie,
     // przegrana = darmowy retry. MAD dzieli pulę energii z kampanią (to jej rozszerzenie, nie
     // osobny tor jak raid/event). Raid dzieli pulę z event (2026-08-22, patrz komentarz przy
-    // raidWeek w petStore.ts). Nemesis (2026-08-18): NIELIMITOWANE próby (user: "nielimitowany
-    // czas i próby podejścia") — bez sprawdzania puli, tak jak quest/misja.
+    // raidWeek w petStore.ts), ale kosztuje 2 zamiast 1 (2026-08-25, user: "zmieńmy licznik
+    // czerwonej energii na 2 zamiast 1" — dłuższa, prawdziwa walka niż dawna krótka sesja).
+    // Nemesis (2026-08-18): NIELIMITOWANE próby (user: "nielimitowany czas i próby podejścia")
+    // — bez sprawdzania puli, tak jak quest/misja.
     if (kind !== 'quest' && kind !== 'mission' && !(kind === 'event' && isMenace)) {
       const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
-      if (pool <= 0) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
+      const cost = kind === 'raid' ? RAID_ENERGY_COST : 1;
+      if (pool < cost) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
     }
     resetCatHp();
     const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
@@ -383,16 +392,17 @@ export default function BossFight() {
       catMaxHpAtFight: catMax,
       rounds: result.rounds.map(r => ({ p: r.playerDmg, c: r.counterDmg, bhp: r.bossHpAfter, chp: r.catHpAfter })),
     };
-    // Raid: JEDNO wywołanie raidAttack (nie per rundę) — dopisuje realny postęp tej sesji
-    // (sesyjne hp przed minus po) do prawdziwej, trwałej puli tygodniowej i zużywa DOKŁADNIE
-    // 1 punkt eventEnergy (2026-08-22: wspólna pula z wydarzeniami, dawniej własna raidEnergy;
-    // 1 próba = 1 atak, tak jak reszta trybów), niezależnie od liczby rund w środku sesji.
+    // Raid: JEDNO wywołanie raidAttack (nie per rundę) — dopisuje REALNY postęp tej walki
+    // (raidRealStart przed minus po, już na prawdziwej skali — roundBoss.hp = raidRealStart)
+    // do trwałej puli tygodniowej, ZAWSZE (win/loss/wyczerpanie rund, patrz komentarz na
+    // górze pliku), i zużywa RAID_ENERGY_COST eventEnergy (2026-08-22: wspólna pula z
+    // wydarzeniami; 2026-08-25: 2 zamiast 1, patrz komentarz przy RAID_ENERGY_COST w raid.ts).
     let raidOutcome: { remaining: number; defeated: boolean } | null = null;
     let menaceOutcome: { remaining: number; defeated: boolean } | null = null;
     if (kind === 'campaign' || kind === 'mad') spendEnergy();
     else if (kind === 'event' && isMenace) menaceOutcome = menaceAttack(menaceSessionHp - result.bossHpLeft);
     else if (kind === 'event') spendEventEnergy();
-    else if (kind === 'raid') raidOutcome = raidAttack(raidSessionHp - result.bossHpLeft);
+    else if (kind === 'raid') raidOutcome = raidAttack(raidRealStart - result.bossHpLeft);
     fightingRef.current = true;
     setFighting(true);
     setLiveBossHp(kind === 'raid' ? raidRealStart : kind === 'event' && isMenace ? menaceRealStart : roundBoss.hp);
@@ -405,18 +415,23 @@ export default function BossFight() {
       if (!alive.current) return;
       setFighting(false);
       setLiveBossHp(null);
-      // Raid dalej BEZ stanu porażki (user o to nie prosił) — liczy się TYLKO czy prawdziwy,
-      // trwały bank spadł do zera (raidOutcome.defeated), NIE wynik tej jednej małej sesji
-      // (result.won dotyczy sesyjnej puli, nie prawdziwego tygodniowego bossa).
+      // Raid MA TERAZ stan porażki (2026-08-25, user: "kotek walczy do końca... nawet jak
+      // przegra to HP bossa zostaje tyle ile po ostatnim ciosie") — w odróżnieniu od kampanii,
+      // przegrana NIE zeruje postępu: `raidAttack()` wyżej już zbankował REALNE obrażenia
+      // niezależnie od wyniku, więc pasek rajdu zostaje tam gdzie walka go zostawiła.
       if (kind === 'raid') {
         if (raidOutcome?.defeated) {
           haptic.success();
           const coinsWon = Math.round(raidCoins(level) * coinsMult);
           raidClaim(weekKey, coinsWon, raidXp(level), raid.name, level, fightDetail);
           setVictory({ kind: 'raid', id: raid.id, name: raid.name, emoji: raid.emoji, coins: coinsWon, xp: raidXp(level) });
+        } else if (result.catFainted) {
+          haptic.error();
+          setDefeat({ fainted: true });
+          logFightAttempt('raid', raid.id, raid.name, level, fightDetail);
         } else {
-          // Sesja nie domknęła tygodniowej puli — bez nagrody, ale próba i tak realnie się
-          // odbyła (patrz komentarz przy fightDetail), więc dostaje wpis do historii.
+          // Wyczerpanie sufitu rund bez rozstrzygnięcia (rzadkie, patrz MAX_FIGHT_ROUNDS) —
+          // bez nagrody i bez ekranu przegranej, ale próba i tak realnie się odbyła.
           logFightAttempt('raid', raid.id, raid.name, level, fightDetail);
         }
         return;
@@ -514,23 +529,22 @@ export default function BossFight() {
         setLastHit({ dmg: round.playerDmg, crit: round.playerCrit, guarded: result.guarded, healed: round.healed, thornDmg: round.thornDmg });
         playBossHitFx(round.playerCrit);
         setAttackPulse(n => n + 1);
-        // Raid: przelicz sesyjny postęp (mała, bezpiecznie skalowana pula) na PRAWDZIWĄ skalę
-        // tygodniową — arena zawsze pokazuje prawdziwy pasek, nie sesyjny (patrz targetRemaining).
-        const raidRealHp = kind === 'raid' ? Math.max(0, raidRealStart - (raidSessionHp - round.bossHpAfter)) : null;
+        // Raid (2026-08-25): `roundBoss.hp` to TERAZ wprost realna, pozostała pula
+        // (`raidAsBoss(raid, raidRealStart, ...)` wyżej) — `round.bossHpAfter` jest więc już
+        // na realnej skali, żadnego przeliczania. Nemesis NADAL liczy wobec małej, bezpiecznie
+        // skalowanej sesji (nie dostał tego samego fixu co raid, patrz komentarz przy
+        // menaceSessionHp wyżej) — przelicz TYLKO jej postęp na prawdziwą skalę tygodniową.
         const menaceRealHp = kind === 'event' && isMenace ? Math.max(0, menaceRealStart - (menaceSessionHp - round.bossHpAfter)) : null;
-        setLiveBossHp(raidRealHp ?? menaceRealHp ?? round.bossHpAfter);
+        setLiveBossHp(menaceRealHp ?? round.bossHpAfter);
         // BUG FIX (2026-08-19, user: "kotek atakuje 2 raz jakby czasami nawet jak przeciwnik
-        // ma zero HP") — sesja raid/nemesis ZAWSZE animuje się w pełnej długości (result.rounds
-        // liczone wobec MAŁEGO, bezpiecznie skalowanego celu sesji, patrz komentarz na górze
-        // pliku), ale PRAWDZIWA pula (raidRealStart/menaceRealStart) mogła mieć MNIEJ HP niż
-        // cała sesja — jeśli tak, przeliczona wyżej realna skala dochodzi do 0 w środku sesji,
-        // a animacja mimo to grała dalej wszystkie pozostałe rundy (dodatkowe, w rzeczywistości
-        // fikcyjne ciosy w już martwego bossa). Prawdziwy wynik (raidOutcome/menaceOutcome) jest
-        // już policzony RAZ, PRZED animacją (raidAttack/menaceAttack wyżej) — gdy realna skala
-        // spadnie do 0, przechodzimy prosto do finish() zamiast kontynuować fikcyjne rundy;
-        // pomijamy też kontratak TEJ rundy (martwy boss nie kontratakuje, tak samo jak w
-        // simulateFight — `if (bossHp > 0)` przed liczeniem kontrataku).
-        const realDead = raidRealHp === 0 || menaceRealHp === 0;
+        // ma zero HP") — dotyczy TYLKO nemesis: jej sesja ZAWSZE animuje się w pełnej długości
+        // (result.rounds liczone wobec małego, bezpiecznie skalowanego celu sesji), ale
+        // PRAWDZIWA pula (menaceRealStart) mogła mieć MNIEJ HP niż cała sesja — jeśli tak,
+        // przeliczona wyżej realna skala dochodzi do 0 w środku sesji, a animacja mimo to
+        // grałaby dalej fikcyjne ciosy w już martwego bossa bez tego skoku do finish(). Raid
+        // NIE potrzebuje już tego hacku — jego `bossHp` w simulateFight JEST realną pulą,
+        // więc pętla tam (`if (bossHp <= 0) break`) sama kończy walkę we właściwym miejscu.
+        const realDead = menaceRealHp === 0;
         roundTimer.current = setTimeout(realDead ? finish : counterBeat, realDead ? 550 : 480);
       }, THROW_MS);
     };
@@ -811,7 +825,12 @@ export default function BossFight() {
               <Text style={s.vName}>{defeatTarget.name} przetrwał</Text>
               <Text style={s.vDefeatSub}>
                 {defeat.fainted
-                  ? 'Kotek zemdlał — HP resetuje się, spróbuj ponownie, kiedy będziesz gotowy.'
+                  ? (kind === 'raid'
+                    // Raid NIE resetuje HP na przegranej (2026-08-25, user: "nawet jak
+                    // przegra to HP bossa zostaje tyle ile po ostatnim ciosie") — inny
+                    // komunikat niż reszta trybów, żeby nie sugerować fałszywie reset.
+                    ? 'Kotek zemdlał — ale zadane obrażenia zostają, pasek rajdu nie wraca do pełna. Spróbuj ponownie, kiedy będziesz gotowy.'
+                    : 'Kotek zemdlał — HP resetuje się, spróbuj ponownie, kiedy będziesz gotowy.')
                   : 'Przeciwnik zbyt szybko się leczy/broni — wróć mocniejszy (staty, poziom, łup) i spróbuj znów.'}
               </Text>
             </View>
