@@ -48,6 +48,12 @@ function longestSweetless(expenses: Expense[]): number {
 }
 
 // Best 7-day rolling average mood (needs at least 4 logged days in the window).
+// Two-pointer sliding window over the sorted distinct-day list — O(n) instead of the
+// previous O(n²) (re-filtering the whole `days` array for every single day). Correct
+// because `days` is sorted ascending and the 6-day window only ever grows forward, so
+// the left edge never needs to step backward once advanced (2026-08-25, perf pass —
+// this ran on every dashboard render via `records`/`buildRecords`, and scales with the
+// SQUARE of how many days of mood history exist, so a year+ of logging made it real work).
 function bestMoodWeek(moodEntries: MoodEntry[]): number {
   const byDay = new Map<string, number[]>();
   for (const e of moodEntries) {
@@ -58,14 +64,18 @@ function bestMoodWeek(moodEntries: MoodEntry[]): number {
   const days = [...byDay.keys()].sort();
   if (days.length < 4) return 0;
   const avgOf = (d: string) => { const a = byDay.get(d)!; return a.reduce((s, v) => s + v, 0) / a.length; };
+  const avgs = days.map(avgOf);
   let best = 0;
-  for (let i = 0; i < days.length; i++) {
-    const end = days[i];
-    const start = new Date(new Date(end + 'T00:00:00').getTime() - 6 * MS_DAY);
-    const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
-    const win = days.filter(d => d >= startStr && d <= end);
-    if (win.length < 4) continue;
-    best = Math.max(best, win.reduce((s, d) => s + avgOf(d), 0) / win.length);
+  let left = 0;
+  let windowSum = 0;
+  for (let right = 0; right < days.length; right++) {
+    windowSum += avgs[right];
+    while (dayDiff(days[right], days[left]) > 6) {
+      windowSum -= avgs[left];
+      left++;
+    }
+    const windowLen = right - left + 1;
+    if (windowLen >= 4) best = Math.max(best, windowSum / windowLen);
   }
   return best;
 }

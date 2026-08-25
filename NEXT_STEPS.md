@@ -9,6 +9,26 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Optymalizacja: bestMoodWeek (rekordy życiowe) O(n²)→O(n) — NIEsprawdzone (2026-08-25)
+
+Kontynuacja optymalizacji wejścia do apki po "okej tylko teraz optymalizuj dalej". Audyt
+pozostałych ~15 `useMemo` karmiących sekcje z `DEFERRED_SECTIONS` (funFacts/correlations/
+weightFacts/yearAgo/insightLinks/foodBreakdown/topProducts/shopsCollection) — wszystkie to
+pojedynczy przebieg O(n) po `expenses` (setki-tysiące pozycji, nie 365×historia jak dawny bug
+pikseli), więc NIE są realnym hotspotem i celowo zostawione bez zmian (dalsze "gate za
+`deferredReady`" tych ~15 miejsc byłoby rozproszonym ryzykiem podobnym do odrzuconego pomysłu
+"jeden wielki useMemo" — bez korzyści proporcjonalnej do ryzyka niewidocznego bez profilowania
+na urządzeniu). Znaleziony realny hotspot: `bestMoodWeek()` w `personalRecords.ts` (karmi kafel
+"Rekordy życiowe") była O(n²) — dla KAŻDEGO zalogowanego dnia nastroju filtrowała CAŁĄ listę dni
+od nowa. Dla usera z rokiem+ codziennych wpisów nastroju to ~500k+ operacji, licząc się na
+KAŻDYM renderze dashboardu (memo zależne od `moodEntries`, które zmienia się często). Przepisane
+na dwuwskaźnikowe okno przesuwne — O(n). Poprawność zweryfikowana testami porównującymi z
+naiwną referencyjną implementacją (gęste dni, dni z lukami >6 dni, 15× losowe zestawy).
+`tsc`/`jest` zielone (58/716, +3 nowe testy w `personalRecords.test.ts`). **Priorytet testu na
+urządzeniu**: kafel "Rekordy życiowe" na dashboardzie pokazuje IDENTYCZNĄ wartość "najlepszego
+tygodnia nastroju" co przed zmianą (liczba, nie tylko że się pokazuje) — to czysto algorytmiczna
+zmiana, wynik nie powinien się różnić.
+
 ## 🆕 Optymalizacja: "nieistotne" sekcje dashboardu doskakują w drugiej klatce — NIEsprawdzone (2026-08-24)
 
 User: "ogólnie na wejście apki laguje" → doprecyzował: EVENTY/KALENDARZ/ZADANIA/PUPIL/NAWYKI/

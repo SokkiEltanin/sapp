@@ -237,6 +237,21 @@ samodzielny `<PetTile />` (bez `bare`) — nie ma czego dokleić.
     zachowania renderu ekranu, nie logiki w `utils/` (ten sam wzorzec co inne zmiany
     layoutu w tej sesji: pełny `tsc`/`jest` jako bar, bez component-render testów, których
     ten projekt w ogóle nie ma).
+  - **bestMoodWeek O(n²)→O(n) (2026-08-25)** — dalszy ciąg optymalizacji ("okej tylko teraz
+    optymalizuj dalej"). Audyt pozostałych ~15 `useMemo` karmiących sekcje z
+    `DEFERRED_SECTIONS` (funFacts/correlations/weightFacts/yearAgo/insightLinks/
+    foodBreakdown/topProducts/shopsCollection) — wszystkie to pojedynczy przebieg O(n) po
+    `expenses`, nie hotspot (celowo bez zmian, patrz NEXT_STEPS.md dla pełnego uzasadnienia).
+    Realny hotspot: `bestMoodWeek()` w `src/utils/personalRecords.ts` (karmi `records` →
+    kafel "Rekordy życiowe", sekcja `personal-records`) — dla KAŻDEGO zalogowanego dnia
+    nastroju od nowa filtrowała CAŁĄ posortowaną listę dni (`days.filter(...)` w pętli po
+    `days`), czyli O(n²); dla roku+ codziennych wpisów to setki tysięcy operacji, na
+    KAŻDYM renderze dashboardu (memo zależy od `moodEntries`). Przepisane na dwuwskaźnikowe
+    okno przesuwne (`left`/`right` po posortowanej liście, `windowSum` przyrostowo) — O(n),
+    poprawne bo `days` jest posortowane rosnąco więc lewa krawędź 7-dniowego okna nigdy nie
+    musi się cofać. Testy: `__tests__/personalRecords.test.ts` porównują wynik z naiwną
+    referencyjną implementacją oryginalnej logiki (gęste dni, dni z lukami >6 dni, 15×
+    losowe zestawy) — pilnują że algorytm daje TEN SAM wynik, nie tylko że działa.
 - `isSelfTransfer(e)` (statWidgets) = przelew własny (kategoria `transfer` lub tag
   oszczednosci/przelew/revolut) — wykluczany ze spend I z przychodów, liczony w metryce
   `savings` ("Odłożone (przelewy własne)" — TO NIE TO SAMO co usunięty dashboardowy kafel
