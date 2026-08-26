@@ -45,8 +45,14 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
   const catLegStripes = usePetStore(s => s.catLegStripes);
   const row = (
     <>
-      <View style={st.headCrop}>
-        <View style={st.headCropInner}>
+      {/* collapsable={false} (2026-08-26, user screenshot: kotek renderował się CAŁY, bez
+          przycięcia, mimo poprawnej matematyki kadru) — Android potrafi "spłaszczyć"
+          (collapsable) zwykły `View` który istnieje tylko dla stylu (tu: `overflow:'hidden'`),
+          i spłaszczony widok cichoTraci przycinanie. To znany RN/Android gotcha, nie błąd w
+          liczbach kadru — wymusza pozostanie prawdziwym natywnym widokiem, żeby `overflow:
+          'hidden'` faktycznie zadziałało. */}
+      <View style={st.headCrop} collapsable={false}>
+        <View style={st.headCropInner} collapsable={false}>
           <CatArt expression={pet.expression} size={CROP_SIZE} animate={false} palette={paletteById(catColor)} stripes={catStripes}
             eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
         </View>
