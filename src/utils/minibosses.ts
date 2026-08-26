@@ -28,8 +28,9 @@ export interface MiniBoss {
 }
 
 // Tylko zwierzęta z jednoznacznym pazur/szpon w charakterze dostają `attackKind: 'claw'`
-// (harpia szpony, teraz też wilk i grizzly) — reszta rosteru zostaje na fallback pięści, ta
-// sama zasada co w bosses.ts/raid.ts.
+// (harpia szpony, wilk/grizzly/ary/wąż — 2026-08-26, user: "ta pięść jest zdecydowanie za
+// często... ara bo ma pazury... wąż możemy też pazury") — reszta rosteru zostaje na fallback
+// pięści, ta sama zasada co w bosses.ts/raid.ts.
 //
 // 2026-08-26 (user: "chciałem ich jako bossów więcej do questów żeby nie były takie stałe że
 // koza jest, koza wywalamy, wieloryba też chyba") — koza (`mb_goat`) i wieloryb (`mb_whale`)
@@ -43,8 +44,8 @@ export const MINIBOSSES: MiniBoss[] = [
   { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…', destination: 'Kałuża za Płotem' },
   { id: 'mb_shark', name: 'Rekinek Fali', emoji: '🦈', taunt: 'Ledwo mokro, po co ten wysiłek…', destination: 'Rafa Przypływu' },
   { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw', destination: 'Wichrowy Szczyt' },
-  { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…', destination: 'Szmaragdowa Dżungla' },
-  { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…', destination: 'Piaszczysta Ścieżka' },
+  { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…', attackKind: 'claw', destination: 'Szmaragdowa Dżungla' },
+  { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…', attackKind: 'claw', destination: 'Piaszczysta Ścieżka' },
   { id: 'mb_wilk', name: 'Wilk Głodu', emoji: '🐺', taunt: 'Zjesz jutro, dziś odpuść…', attackKind: 'claw', destination: 'Mroźna Ostoja' },
   { id: 'mb_grizzly', name: 'Grizzly Ospałości', emoji: '🐻', taunt: 'Prześpij to, nic się nie stanie…', attackKind: 'claw', destination: 'Niedźwiedzia Gawra' },
   { id: 'mb_osa', name: 'Osa Rozproszenia', emoji: '🐝', taunt: 'Ciągle coś Cię rozprasza, i tak dobrze…', destination: 'Osie Gniazdo' },

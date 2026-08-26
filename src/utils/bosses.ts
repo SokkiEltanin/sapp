@@ -46,10 +46,17 @@ export interface BossLoot {
 // którzy nie mają to pięść"). Derywowane wprost z istniejącej konwencji nazewnictwa plików w
 // bossIcons.ts (BOSS_<atak>_<nazwa>.png — sam user tak je nazwał, patrz komentarz tam) —
 // TYLKO bossy z jednoznacznym pazur/magia/miecz atakiem w nazwie pliku dostają wpis, reszta
-// (hand/bite/fire/axe/club/bone/scythe/soundwave — nie pasują jednoznacznie do żadnej z 3
-// kategorii) zostaje `undefined` → fallback pięść w BossArt/boss-fight.tsx, zgodnie z
-// dokładnym życzeniem "ci którzy nie mają to mamy pięść".
-export type AttackKind = 'claw' | 'magic' | 'sword';
+// zostaje `undefined` → fallback pięść w BossArt/boss-fight.tsx.
+//
+// 2026-08-26 (user: "ta pięść jest zdecydowanie za często") — DWIE zmiany: (1) kontratak
+// każdego typu (włącznie z fallbackową pięścią) renderuje się teraz jako PRAWDZIWY PNG z
+// `assets/ikonybosów/BOSSATTACK_*.png` zamiast generycznej kolorowanej ikony lucide (patrz
+// `ATTACK_PNG`/`FIST_PNG` w `bossIcons.ts`, te assety leżały w repo od 13.08 nieużywane —
+// user: "nie wiem czy to wykorzystujesz"), (2) dodany CZWARTY typ `'fire'` specjalnie dla
+// smoka (`BOSSATTACK_FIRE.png`, user: "SMOK niech ogniem lub kulą ognia rzuca") — reszta
+// rosteru z ogniem/wybuchem w nazwie pliku (hades/piratecapitan blade zostaje sword, bomba
+// nieużywana) NIE dostała `fire` automatycznie, tylko smok explicite.
+export type AttackKind = 'claw' | 'magic' | 'sword' | 'fire';
 
 export interface Boss {
   id: string;
@@ -157,12 +164,14 @@ export const BOSSES: Boss[] = [
     weakness: 'habits', weaknessLabel: 'nawyki',
     loot: { id: 'loot_snakefig', name: 'Figurka Węża', emoji: '🐍', desc: '+5% szansy na cios krytyczny', bonus: { crit: 0.05 } },
     coins: 18, xp: 160, taunt: 'Odpuść dziś nawyki…',
+    attackKind: 'claw', // atakukąszenie_snake.png — user (2026-08-26): "wąż możemy też pazury"
   },
   {
     id: 'dragon', name: 'Smok Chaosu', emoji: '🐲', order: 4, unlockLevel: 9, hp: 700,
     weakness: 'mood', weaknessLabel: 'wpisy nastroju',
     loot: { id: 'loot_dragon', name: 'Łuska Chaosu', emoji: '🐲', desc: '+2% uniku, +3% siły ataku', bonus: { dodge: 0.02, atk: 0.03 } },
     coins: 30, xp: 300, taunt: 'Nie zapisuj dziś nastroju…', regenPct: 0.03,
+    attackKind: 'fire', // fireattack_dragon.png — user (2026-08-26): "SMOK niech ogniem lub kulą ognia rzuca"
   },
   {
     id: 'scroll', name: 'Złodziej Czasu', emoji: '📱', order: 5, unlockLevel: 12, hp: 769,
