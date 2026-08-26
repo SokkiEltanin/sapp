@@ -10,7 +10,6 @@ import { useExpensesStore } from '@/store/expensesStore';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
-const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 
 // Wydzielone z app/pet-quests.tsx (2026-08-22) — TA SAMA logika questCtx/quests/missed
 // potrzebna teraz w DWÓCH miejscach: pełnym ekranie Zadań I małym "ping" badge'u na
@@ -26,7 +25,7 @@ export function usePetQuests() {
   } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const lvl = levelFromXp(xp);
-  const { health, waterGoal, waterToday, yData, cardsCollected } = usePetHealthSync();
+  const { health, waterGoal, waterToday, recentDays, cardsCollected } = usePetHealthSync();
   const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -82,20 +81,25 @@ export function usePetQuests() {
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],
   );
 
+  // Zaległe questy z KAŻDEGO z ostatnich `RECENT_DAYS_BACK` dni, nie tylko wczoraj
+  // (2026-08-27, user: "problem z odbiorem questów nieodebranych z dnia wcześniejszego") —
+  // dawniej przerwa dłuższa niż doba w otwieraniu apki bezpowrotnie gubiła nagrody. Dni bez
+  // żadnych danych po prostu nie wygenerują wpisów (każdy `done()` w quests.ts sam odrzuca
+  // zerowy/pusty dzień), więc pętla po całym oknie jest bezpieczna bez dodatkowego filtra.
   const missed = useMemo(() => {
-    if (!yData) return [];
-    const y = yesterdayISO();
-    const yCtx: QuestCtx = {
-      stepsToday: yData.steps,
-      moodLoggedToday: moodEntries.some(e => e.date === y),
-      habitsDone: habitsDoneOn(habits, completions, y).length,
-      habitsTotal: habits.length,
-      sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0, trainingStreak: 0,
-      waterToday: yData.water, waterGoal,
-      sleepMinutes: yData.sleep,
-    };
-    return buildMissedDaily(yCtx, dayClaims, y, lvl.level);
-  }, [yData, moodEntries, habits, completions, waterGoal, dayClaims, lvl.level]);
+    return recentDays.flatMap(rd => {
+      const ctx: QuestCtx = {
+        stepsToday: rd.steps,
+        moodLoggedToday: moodEntries.some(e => e.date === rd.date),
+        habitsDone: habitsDoneOn(habits, completions, rd.date).length,
+        habitsTotal: habits.length,
+        sweetlessDays: 0, bestStepDay: 0, habitBestStreak: 0, cardsCollected: 0, trainingStreak: 0,
+        waterToday: rd.water, waterGoal,
+        sleepMinutes: rd.sleep,
+      };
+      return buildMissedDaily(ctx, dayClaims, rd.date, lvl.level);
+    });
+  }, [recentDays, moodEntries, habits, completions, waterGoal, dayClaims, lvl.level]);
 
   return { questCtx, quests, missed, lvl, personalTargets, todaysPool };
 }

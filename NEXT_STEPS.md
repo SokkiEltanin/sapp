@@ -3,6 +3,39 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 "Nieodebrane z wczoraj" rozszerzone na kilka dni wstecz — NIEsprawdzone (2026-08-27)
+
+User: "problem z odbiorem questów nieodebranych z dnia wcześniejszego jakby czy co tam".
+Znaleziony realny gap: catch-up questów sięgał TYLKO jeden dzień wstecz (wczoraj) — przerwa
+dłuższa niż doba w otwieraniu apki bezpowrotnie gubiła zapracowane nagrody. Teraz sięga 6 dni
+wstecz (`RECENT_DAYS_BACK` w `usePetHealthSync.ts`). Pełny opis w ARCHITECTURE.md (sekcja
+`"Nieodebrane z wczoraj" → wielodniowy catch-up`). Nowy test w `quests.test.ts`. `tsc`/`jest`
+zielone (63/750). **Priorytet testu na urządzeniu**: zakładka Zadania — jeśli masz zaległy
+quest sprzed >1 dnia (np. nie otwierałeś apki 2-3 dni), powinien pojawić się w "Nieodebrane z
+poprzednich dni" z etykietą "N dni temu", nie tylko wczorajsze.
+
+## 🔴 NIEROZWIĄZANE: woda z zegarka czasem nie liczy się do questu — czeka na diagnostykę usera (2026-08-27)
+
+User: "problem z tymi questami od kotka, że woda sie nie ładuje mimo ze na zegarku mam 2l juz
+ogarniete". Zbadane: `waterToday`/`getWaterGlasses()` NIE czyta bezpośrednio z zegarka — czyta
+z lokalnego habitu "Woda", który jest KARMIONY z Health Connect (`feedWaterHabit`, w
+`healthAutoSync.ts`) TYLKO jeśli Health Connect ma rekordy typu `Hydration` (albo, jako
+fallback, `Nutrition`). Komentarz w `healthAutoSync.ts` (sprzed tej sesji) już to
+dokumentował: "Watch dostarcza wodę tylko jeśli logujesz ją w Samsung Health — bez tego nie ma
+czego leczyć". To może NIE być bug w tej apce, tylko upstream ograniczenie Health Connect/
+Samsung Health (nie każdy sposób logowania wody na zegarku faktycznie eksportuje `Hydration`
+do Health Connect). Apka ma już GOTOWE narzędzie diagnostyczne dokładnie pod ten problem:
+Zdrowie → stuknij licznik wody → "Diagnostyka wody z zegarka" (`probeHydration`,
+`app/(tabs)/health.tsx`) — sprawdza permission + realne rekordy Hydration/Nutrition i daje
+konkretny werdykt (brak dostępu / dane są ale w Nutrition nie Hydration / Samsung w ogóle nie
+eksportuje). User poproszony o odpalenie tego i przesłanie wyniku — DOPIERO wtedy da się
+wiedzieć czy jest coś do naprawienia w kodzie, i co dokładnie (np. jeśli dane siedzą w
+Nutrition, trzeba podłączyć czytanie stamtąd — kod diagnostyczny już to przewiduje w
+komentarzu werdyktu). "Problem z zaczynaniem apki" (user) niezweryfikowany — może być tym samym
+(pierwszy render przed dociągnięciem synchronizacji pokazuje stary/pusty stan, ale
+`usePetHealthSync.reload()` i tak re-czyta po zakończeniu `autoSyncHealth` — brak dowodu że to
+osobny bug, na razie zakładamy że to ten sam efekt braku danych Hydration).
+
 ## 🆕 Kafel pupila: NOWY dedykowany komponent (PetTileCat) zamiast crop-hacka — NIEsprawdzone (2026-08-27)
 
 User: "kafelek nadal nie jest dobrze nadal jest za duzy wróć go do tego jaki był... kotka

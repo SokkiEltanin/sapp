@@ -1105,6 +1105,27 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       kodzie — te dwie ścieżki już istniały). Talizmany (gwiazda/księżyc/piórko/nieskończoność)
       z tego samego screenshota usera NIE zostały jeszcze wrzucone — nieblokujące, do zrobienia
       kiedy wygodnie.
+    - **"Nieodebrane z wczoraj" → wielodniowy catch-up (2026-08-27)** — user: "problem z
+      odbiorem questów nieodebranych z dnia wcześniejszego jakby czy co tam". `missed`
+      liczyło się TYLKO z jednego dnia wstecz (`yData` w `usePetHealthSync.ts` — pojedynczy
+      snapshot "wczoraj") — przerwa dłuższa niż doba w otwieraniu apki bezpowrotnie gubiła
+      nagrody za dni starsze niż wczoraj, mimo że komentarz nad `buildMissedDaily`
+      (`quests.ts`) od początku ostrzegał dokładnie przed tym scenariuszem. `yData` zastąpione
+      `recentDays: RecentDay[]` (`{date, steps, sleep, water}[]`, nowa stała
+      `RECENT_DAYS_BACK=6` — tydzień razem z dziś, bufor bez nieograniczonego wstecznego
+      przeliczania), budowane RÓWNOLEGLE (`Promise.all` po `getWaterGlasses` na 6 dni, kroki/
+      sen z już i tak wczytanej `getHealthHistory(200)` mapy — zero dodatkowych odczytów poza
+      wodą). `usePetQuests.missed` woła teraz `buildMissedDaily` RAZ NA KAŻDY dzień okna i
+      spłaszcza wyniki (`flatMap`) zamiast raz dla samego wczoraj. `DailyQuestState` dostało
+      opcjonalne pole `date` (ustawiane TYLKO przez `buildMissedDaily`) — bez niego UI nie
+      wiedziałoby za KTÓRY dzień klaimować (`claimDailyFor(id, date, …)` w `petStore.ts` już
+      brało dowolną datę — jedynym ograniczeniem był hardkodowany `yesterdayISO()` w
+      `pet-quests.tsx`, nie sam store). `pet-quests.tsx`: `key={q.id}` → `key={`${q.id}:
+      ${q.date}`}` (ten sam quest zaległy z DWÓCH różnych dni ma teraz różne klucze —
+      wcześniej kolidowałyby), każdy wiersz dostał etykietę względnego dnia (`relDayLabel` —
+      "wczoraj"/"N dni temu") żeby dwa te same questy z różnych dni nie wyglądały jak
+      duplikat, nagłówek sekcji zmieniony z "Nieodebrane z wczoraj" na "Nieodebrane z
+      poprzednich dni".
   - **MAD bossy** (2026-08-15, `utils/madBosses.ts`) — PIĄTY tor, `?kind=mad` w
     `boss-fight.tsx`. User: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną krzywą
     HP w nieskończoność (dokładnie problem raidu wyżej), druga fala TYCH SAMYCH 22 bossów
