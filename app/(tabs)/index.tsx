@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Modal, Alert,
+  View, Text, StyleSheet, ScrollView, Modal,
   RefreshControl, TouchableOpacity, Animated, AppState, AccessibilityInfo,
   TextInput, KeyboardAvoidingView, Platform, Image, Pressable, InteractionManager,
 } from 'react-native';
@@ -19,7 +19,7 @@ import {
   ShoppingCart, Candy, Store, Package, Sparkles, Scale, Pin, Wrench, Link2,
   ChevronDown, Trash2, Pencil, RotateCcw, X,
   Cloud, CloudDrizzle, CloudRain, Snowflake, Trophy, Hourglass, CalendarClock, Layers,
-  PiggyBank, Utensils, Coins, Apple, ListChecks, Search, Grid3x3,
+  PiggyBank, Utensils, Coins, Apple, ListChecks, Grid3x3,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -84,6 +84,7 @@ import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import GCalCard from '@/components/dashboard/GCalCard';
+import SleepChartCard from '@/components/dashboard/SleepChartCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -3143,90 +3144,20 @@ export default function DashboardScreen() {
             const sleepMaxMin = Math.max(...sleepDays30.map(d => d.sleepMinutes), 1);
             const sleepNights = sleepDays30.filter(d => d.sleepMinutes > 0);
             const sleepAvgMin = sleepNights.length ? Math.round(sleepNights.reduce((sum, d) => sum + d.sleepMinutes, 0) / sleepNights.length) : 0;
-            const SLEEP_DOW = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
-
-            // Pusto (0 nocy w 30-dniowym oknie) renderuje TERAZ własną kartę zamiast znikać
-            // całkiem — user zgłaszał puste dane 4× z rzędu, a milczące `&& null` znaczyło
-            // że nie było nawet gdzie stuknąć "sprawdź dlaczego" (przycisk był schowany w
-            // Zdrowiu). Diagnostyka to ten sam probeSleep()/sleepProbeVerdict() co tam,
-            // patrz memory sleep_widget_investigation.md.
-            nodes['sleep-chart'] = sleepNights.length > 0 ? (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Moon size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Sen</Text>
-                  <Text style={[s.cdDays, { marginLeft: 4 }]}>śr. {(sleepAvgMin / 60).toFixed(1).replace('.0', '')}h</Text>
-                  <View style={{ flex: 1 }} />
-                  <TouchableOpacity onPress={() => { haptic.tap(); setSleepDashRange(r => r === 7 ? 30 : 7); }} style={s.workToggle} activeOpacity={0.8}>
-                    <Text style={[s.workToggleText, { color: accentColor }]}>{sleepDashRange === 7 ? 'Tydzień' : 'Miesiąc'}</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: sleepDashRange === 7 ? 4 : 1.5, height: 56, marginTop: spacing[3] }}>
-                  {sleepDaysShown.map(d => {
-                    const h = d.sleepMinutes > 0 ? Math.max(3, (d.sleepMinutes / sleepMaxMin) * 56) : 2;
-                    return (
-                      <View key={d.date} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 56 }}>
-                        <View style={{
-                          width: '100%', height: h, borderRadius: 2, minHeight: 2,
-                          backgroundColor: d.sleepMinutes === 0 ? colors.border.subtle : d.sleepMinutes >= 420 ? accentColor : colors.text.muted,
-                          opacity: d.sleepMinutes === 0 ? 0.5 : 0.85,
-                        }} />
-                      </View>
-                    );
-                  })}
-                </View>
-                {sleepDashRange === 7 && (
-                  <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
-                    {sleepDaysShown.map(d => (
-                      <Text key={d.date} style={[s.cdDays, { flex: 1, textAlign: 'center', fontSize: 9, fontWeight: '600', color: colors.text.muted }]}>
-                        {SLEEP_DOW[new Date(d.date + 'T00:00:00').getDay()]}
-                      </Text>
-                    ))}
-                  </View>
-                )}
-                {/* Rzadkie dane (mniej niż tydzień realnych nocy w 30-dniowym oknie) —
-                    zamiast milcząco pustego wykresu, jasny powód + akcja. Automatyczny sync
-                    przy starcie apki dobija tylko do 30 dni wstecz OD TERAZ, więc nie ma jak
-                    magicznie wypełnić starszej historii — jedyny sposób to ręczny "Zsynchronizuj
-                    z zegarka" w Zdrowiu (force=true, pełne okno), patrz memory backlog_2026-08-07. */}
-                {sleepNights.length < 7 && (
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/health' as any); }} activeOpacity={0.7} style={{ marginTop: 6 }}>
-                    <Text style={[s.cdDays, { fontSize: 10, color: colors.text.muted }]}>
-                      Tylko {sleepNights.length} {sleepNights.length === 1 ? 'noc' : 'nocy'} z danymi — otwórz Zdrowie i „Zsynchronizuj z zegarka" po więcej historii
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              // Puste, ale nie gołe (2026-08-14, user: "nie ma danych na nim brakuje mi
-              // wyglądowo") — ikona-bąbelek zamiast małego tekstowego linku, wypełniony
-              // przycisk zamiast szarego chipa, żeby karta nie wyglądała jak coś zepsutego
-              // pośród reszty dashboardu. Diagnostyka pod spodem BEZ ZMIAN (patrz
-              // NEXT_STEPS.md „Diagnostyka faz snu" — czy dane w ogóle da się zdobyć z tego
-              // zegarka, to osobne pytanie od tego jak wygląda pusty stan).
-              <View style={[s.card, { backgroundColor: cardBgDark, alignItems: 'center', paddingVertical: spacing[5] }]}>
-                <View style={[s.sleepEmptyIcon, { backgroundColor: accentColor + '18' }]}>
-                  <Moon size={22} color={accentColor} />
-                </View>
-                <Text style={s.sleepEmptyTitle}>Brak danych o śnie</Text>
-                <Text style={[s.factText, { textAlign: 'center', marginTop: 2 }]}>
-                  Ostatnie 30 dni bez ani jednej nocy z zegarka.
-                </Text>
-                <TouchableOpacity
-                  onPress={async () => {
-                    haptic.tap();
-                    const { probeSleep, sleepProbeVerdict } = await import('@/services/healthConnectService');
-                    const p = await probeSleep(7);
-                    const { lines, verdict } = sleepProbeVerdict(p);
-                    Alert.alert('Diagnostyka faz snu', lines.join('\n\n') + '\n\n' + verdict);
-                  }}
-                  activeOpacity={0.85}
-                  style={[s.sleepEmptyBtn, { backgroundColor: accentColor }]}
-                >
-                  <Search size={14} color={colors.bg.primary} />
-                  <Text style={[s.sleepEmptyBtnText, { color: colors.bg.primary }]}>Sprawdź dlaczego</Text>
-                </TouchableOpacity>
-              </View>
+            // Wyciągnięte do SleepChartCard.tsx (2026-08-26) — ternary, nie `warunek && (...)`,
+            // więc BRAK guardu do zostawienia tutaj (node zawsze prawdziwy, patrz komentarz
+            // w nowym pliku). `sleepDashRange` zostaje jako stan w index.tsx.
+            nodes['sleep-chart'] = (
+              <SleepChartCard
+                sleepNights={sleepNights}
+                sleepDaysShown={sleepDaysShown}
+                sleepMaxMin={sleepMaxMin}
+                sleepAvgMin={sleepAvgMin}
+                sleepDashRange={sleepDashRange}
+                onToggleRange={() => setSleepDashRange(r => r === 7 ? 30 : 7)}
+                cardBg={cardBgDark}
+                accentColor={accentColor}
+              />
             );
 
             nodes['bank-queue'] = bankPendingCount > 0 && (
@@ -5073,11 +5004,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   // „Pro" hierarchia: etykiety sekcji STONOWANE (secondary), a DANE/liczby jasne (primary).
   cardTitle: { fontFamily: fonts.label, fontSize: 11, color: c.text.secondary, textTransform: 'uppercase', letterSpacing: 0.9, flexShrink: 1 },
 
-  // ── Pusty stan karty Sen (bąbelek-ikona + wypełniony CTA, nie goły tekst) ──────────
-  sleepEmptyIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  sleepEmptyTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary, marginTop: spacing[3] },
-  sleepEmptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: radius.full, paddingHorizontal: spacing[4], paddingVertical: 9, marginTop: spacing[3] },
-  sleepEmptyBtnText: { fontSize: 12.5, fontWeight: '800' },
+  // sleepEmptyIcon/Title/Btn/BtnText PRZENIESIONE do SleepChartCard.tsx (2026-08-26).
   statIconChip: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   forecastChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.full, backgroundColor: '#FBBF241E', borderWidth: 1, borderColor: '#FBBF2455' },
   forecastChipTxt: { fontSize: 9.5, fontWeight: '900', color: '#FBBF24', letterSpacing: 0.6 },

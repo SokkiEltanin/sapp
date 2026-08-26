@@ -146,6 +146,19 @@ zostają — wciąż używane gdzie indziej w pliku).
 `GCalEvent` się nie eksportuje — `fetchEvents()` zwraca już zmapowane `CalendarEvent[]`).
 Martwy import `CalendarDays` (ikona) usunięty z dużego bloku importów lucide na górze pliku.
 
+**Krok 5**: `nodes['sleep-chart']` → `SleepChartCard.tsx`. RÓŻNI SIĘ od kroków 1-4: to
+`warunek ? (...) : (...)` (ternary), nie `warunek && (...)` — więc `nodes['sleep-chart']`
+NIGDY nie było `false` (zawsze wykres ALBO pusty stan), więc guard NIE zostaje w `index.tsx`
+— cała logika (oba branche) przeniesiona do komponentu, wołany bezwarunkowo. Sekcja "Sen" jest
+ESENCJALNA (nie w `DEFERRED_SECTIONS`), bez zmian w tym zakresie. Stan `sleepDashRange`
+(toggle Tydzień/Miesiąc) ZOSTAJE w `index.tsx` (jedyny stan tej sekcji, przekazany jako
+`sleepDashRange` + callback `onToggleRange`, nie surowy setState). Style `card`/`cardHeader`/
+`cardTitle`/`cdDays`/`workToggle`/`workToggleText`/`factText` skopiowane verbatim (WSZYSTKIE
+zweryfikowane `grep`iem że mają usage GDZIE INDZIEJ w `index.tsx`, np. `workToggle`/
+`workToggleText` też w sekcji finanse/praca); `sleepEmptyIcon`/`sleepEmptyTitle`/
+`sleepEmptyBtn`/`sleepEmptyBtnText` używane TYLKO tu → przeniesione w całości. Martwe importy
+usunięte: `Alert` (react-native) i `Search` (lucide) — oba miały już zero innych usage w pliku.
+
 **Snapshot statystyk (WYDAJNOŚĆ — pamiętaj o tym):** widgety czytają lokalny snapshot
 `expenses` (`useState`), **nie** żywy store `liveExpenses`. Snapshot odświeża się TYLKO na
 triggerach, każdy odroczony przez `InteractionManager.runAfterInteractions`: (A) wejście na
