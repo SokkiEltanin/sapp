@@ -243,10 +243,27 @@ kafelka". Dwa fixy:
    zwykły `View` istniejący tylko dla stylu bywa "spłaszczany" (view flattening, optymalizacja
    natywna) i traci wtedy `overflow:'hidden'`. Fix: `collapsable={false}` na OBU `View`ach
    kadru (`headCrop`/`headCropInner`) — wymusza pozostanie prawdziwym natywnym widokiem.
-   **Hipoteza, NIE potwierdzona jeszcze na urządzeniu** — jeśli to NIE pomoże, kolejny krok to
-   porzucenie techniki "przytnij przez overflow:hidden" na rzecz zwykłego, nieprzyciętego (ale
-   większego) `<CatArt>` — gwarantowanie działający wzorzec używany wszędzie indziej w apce
-   (scena `/pet`, pasek misji), kosztem rezygnacji z efektu "sama głowa wystaje nad krawędź".
+   **Hipoteza NIE pomogła — technika crop porzucona całkowicie, nowy dedykowany komponent
+   (2026-08-27)** — user: "kafelek nadal nie jest dobrze nadal jest za duzy wróć go do tego
+   jaki był... kotka możesz zrobic wersje osobna... po prostu głowa lekko tułów dwie łapki
+   trzymające krawędź kafelka jakby jak pokazywałem i animacje samych oczu zrobimy i uszka i
+   tyle". Dokładnie fallback przewidziany wyżej, tylko lepszy niż "zwykły większy CatArt" —
+   zamiast crop-hacka ALBO rezygnacji z pozy "łapki na krawędzi", nowy
+   `src/components/pet/PetTileCat.tsx`: osobny, celowo prosty komponent z WŁASNYM małym
+   viewBoxem (220×250, nie 2000×2000 CatArt) — głowa (dominujący element) + tułów-hint +
+   dwie łapy schodzące do owalnych łapek na SAMYM DOLE viewBoxu (dolna krawędź komponentu =
+   krawędź kafelka, bez żadnej matematyki kadru/przycinania). Ta sama personalizacja co
+   CatArt (`palette`/`eyeColor`/`noseColor`/`whiskers`/`legStripes`; `stripes` przyjęte dla
+   spójności API ale nieużywane — w CatArt renderuje się tylko na ogonie, którego tu nie ma).
+   Animacja WYŁĄCZNIE oczu (`blink` — state toggle otwarte/zamknięte, ta sama technika co
+   CatArt, nie tweenowanie SVG-prop) i uszu (mała `Animated.View` nakładka z rotacją wokół
+   podstawy ucha, ten sam wzorzec co `Ear` w CatArt.tsx, przeliczony na własny viewBox) — ŻADNE
+   z reszty aparatu CatArt (głaskanie/pazur/ogon/mruganie-z-podwójnym-mrugnięciem) nie zostało
+   przeniesione, user wyraźnie chciał tylko te dwa efekty. `PetTile.tsx` renderuje
+   `<PetTileCat size={72} .../>` bezpośrednio w wierszu (bez `overflow:hidden`, bez
+   `collapsable={false}`, bez `headCrop`/`headCropInner` — CAŁY crop-aparat usunięty), `size=72`
+   ≈ rozmiar sprzed całej serii eksperymentów z kadrowaniem (oryginalne `size={70}` pełnego
+   CatArt, commit 584d86d).
 
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 
@@ -1639,6 +1656,13 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       z góry znanego, konkretnego itemu do pokazania. Formatowanie statów (`GEAR_STAT_LABEL`/
       `fmtGearStat`) WYDZIELONE z `GearPanel.tsx` (dawniej lokalne `STAT_LABEL`/`fmtStat`,
       jedyny konsument) do `utils/gear.ts` — jedna definicja dla obu ekranów zamiast kopii.
+      `fmtGearStat` ZAWSZE pokazywał 0.1% precyzję (`.toFixed(1)`), ale AGREGATY na ekranie
+      Pupila (Unik/Kryt/energyMult z sumy założonego ekwipunku, `pet.tsx`) zaokrąglały do
+      pełnego procenta (`Math.round(...*100)`) — po zsumowaniu kilku itemów z ułamkowymi
+      statami suma mogła nie zgadzać się z tym co widać per-item. Naprawione (2026-08-26,
+      user: "te statystyki jak atak unik itp musimy pokazywać 0.1 dokladnosci") — te same
+      3 miejsca w `pet.tsx` (dodge/crit/energyMult) i `bossProgressReport.ts` (tekstowy
+      raport diagnostyczny) przepisane na `.toFixed(1)`.
     - **BUG: zakup posiadanego itemu zabierał monety i nic nie dawał (2026-08-26)** — user:
       "kupiłem item który już miałem przez co zniknęły mi pieniądze i nic nie dostałem".
       `petStore.buyDailyGear()` ZAWSZE odejmowało `cost` i zużywało dzienny slot zakupu
