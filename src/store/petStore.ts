@@ -869,16 +869,25 @@ export const usePetStore = create<PetState>()(
         set({ ownedGear: nextOwned, equippedGear: nextEquipped, coins: s.coins + coinsEarned });
         return coinsEarned;
       },
+      // BUG (2026-08-26, user: "kupiłem item który już miałem przez co zniknęły mi pieniądze
+      // i nic nie dostałem") — dawniej ZAWSZE pobierało `cost` i ZUŻYWAŁO dzienny slot
+      // zakupu, nawet gdy `cur` (posiadana rzadkość) była już równa/lepsza od oferowanej —
+      // `better` wtedy tylko pomijał AKTUALIZACJĘ `ownedGear` (słusznie, nie chcemy
+      // DOWNGRADE'u), ale monety i tak znikały za nic. Teraz: `alreadyHave` blokuje CAŁY
+      // zakup wcześniej (return false, PRZED odjęciem monet/zużyciem slotu) — UI
+      // (`pet-shop.tsx`) i tak nie powinien nawet pokazać przycisku "Kup" w tym stanie, ale
+      // ten guard jest tu, na poziomie store'u, jako prawdziwe źródło prawdy (nie tylko UI).
       buyDailyGear: (dayKey, itemId, rarity, cost) => {
         const s = get();
         if (s.dayClaims[dayKey]) return false;
-        if (s.coins < cost) return false;
         const cur = s.ownedGear[itemId];
-        const better = cur && RARITY_MULT[cur] >= RARITY_MULT[rarity];
+        const alreadyHave = cur && RARITY_MULT[cur] >= RARITY_MULT[rarity];
+        if (alreadyHave) return false;
+        if (s.coins < cost) return false;
         set({
           coins: s.coins - cost,
           dayClaims: { ...s.dayClaims, [dayKey]: true },
-          ...(better ? {} : { ownedGear: { ...s.ownedGear, [itemId]: rarity } }),
+          ownedGear: { ...s.ownedGear, [itemId]: rarity },
         });
         return true;
       },

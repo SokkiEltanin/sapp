@@ -14,7 +14,7 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS, TIER_META, CosmeticTier } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { STARTUPS, startupById, ANIM_LABEL, Startup } from '@/utils/petStartups';
-import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, gearStatValue, GearSlot, GearRarity } from '@/utils/gear';
+import { dailyShopSlots, DailyShopSlot, RARITY_META, RARITY_MULT, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, gearStatValue, GearSlot, GearRarity } from '@/utils/gear';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
@@ -136,10 +136,20 @@ export default function PetShop() {
   // Sklep dnia — 3 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
   // co dzień o 6:00 rano (dailyShopSlots w gear.ts, deterministycznie po `shopDayKey`).
   const dailySlots = useMemo(() => dailyShopSlots(shopDayKey(), petLevel), [petLevel]);
+  // Posiadasz już ten item w tej rzadkości LUB lepszej? (2026-08-26, user: "kupiłem item który
+  // już miałem przez co zniknęły mi pieniądze i nic nie dostałem" — dawniej ani lista, ani
+  // podgląd nie sprawdzały tego wprost, więc user nie miał jak się zorientować przed
+  // zakupem; prawdziwa blokada zakupu jest w `petStore.buyDailyGear`, to tu jest tylko UI
+  // pokazujące ten sam stan WCZEŚNIEJ, żeby nie trzeba było w ogóle próbować kupować).
+  const alreadyOwnGear = (itemId: string, rarity: GearRarity) => {
+    const cur = ownedGear[itemId];
+    return !!cur && RARITY_MULT[cur] >= RARITY_MULT[rarity];
+  };
   const onBuyDaily = (itemId: string, rarity: ReturnType<typeof dailyShopSlots>[number]['rarity'], cost: number, name: string) => {
     haptic.tap();
     const dayKey = `gearDaily:${shopDayKey()}:${itemId}`;
     if (dayClaims[dayKey]) return;
+    if (alreadyOwnGear(itemId, rarity)) { haptic.error(); toast.error('Masz już ten przedmiot (lub lepszy)'); return; }
     if (coins < cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${cost}`); return; }
     confirmBuy(name, cost, () => {
       if (buyDailyGear(dayKey, itemId, rarity, cost)) { haptic.success(); toast.success(`Kupione: ${name}`); }
@@ -267,6 +277,7 @@ export default function PetShop() {
               const { item, rarity, cost } = slot;
               const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
               const bought = !!dayClaims[dayKey];
+              const owned = alreadyOwnGear(item.id, rarity);
               const meta = RARITY_META[rarity];
               const afford = coins >= cost;
               return (
@@ -279,7 +290,7 @@ export default function PetShop() {
                       <Text style={s.cellName}>{item.name}</Text>
                       <Text style={[s.cellState, { color: meta.color }]}>{meta.label} · {SLOT_META[item.slot].label}</Text>
                     </View>
-                    {bought
+                    {bought || owned
                       ? <Check size={18} color={meta.color} />
                       : <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text></View>}
                   </View>
@@ -405,6 +416,12 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
   const delta = val - equippedVal;
   const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
   const bought = !!dayClaims[dayKey];
+  // Posiadasz już to (lub lepsze)? Osobny stan od `bought` (2026-08-26 fix) — `bought` jest
+  // TYLKO o dzisiejszym zakupie tego konkretnego slotu, więc item posiadany z KRZYŻA innego
+  // dnia albo ze skrzynki wcześniej pokazywał tu mylący przycisk "Kup", mimo że kupno by nic
+  // nie dało (patrz `buyDailyGear` w petStore.ts — teraz i tak by odrzuciło zakup).
+  const ownedRarity = ownedGear[item.id];
+  const alreadyHave = !!ownedRarity && RARITY_MULT[ownedRarity] >= RARITY_MULT[rarity];
   const afford = coins >= cost;
 
   return (
@@ -433,6 +450,8 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
           </View>
           {bought ? (
             <View style={s.previewBoughtRow}><Check size={16} color={meta.color} /><Text style={[s.previewBoughtTxt, { color: meta.color }]}>Już kupione dziś</Text></View>
+          ) : alreadyHave ? (
+            <View style={s.previewBoughtRow}><Check size={16} color={meta.color} /><Text style={[s.previewBoughtTxt, { color: meta.color }]}>Posiadasz ten przedmiot</Text></View>
           ) : (
             <TouchableOpacity
               style={[s.previewBuyBtn, !afford && { opacity: 0.5 }]}

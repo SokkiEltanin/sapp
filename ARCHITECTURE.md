@@ -1577,6 +1577,27 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       z góry znanego, konkretnego itemu do pokazania. Formatowanie statów (`GEAR_STAT_LABEL`/
       `fmtGearStat`) WYDZIELONE z `GearPanel.tsx` (dawniej lokalne `STAT_LABEL`/`fmtStat`,
       jedyny konsument) do `utils/gear.ts` — jedna definicja dla obu ekranów zamiast kopii.
+    - **BUG: zakup posiadanego itemu zabierał monety i nic nie dawał (2026-08-26)** — user:
+      "kupiłem item który już miałem przez co zniknęły mi pieniądze i nic nie dostałem".
+      `petStore.buyDailyGear()` ZAWSZE odejmowało `cost` i zużywało dzienny slot zakupu
+      (`dayClaims[dayKey]`), nawet gdy posiadana rzadkość była już równa/lepsza od oferowanej
+      — `better`/`alreadyHave` wtedy tylko pomijało AKTUALIZACJĘ `ownedGear` (słusznie, żeby
+      nie zdegradować lepszego itemu), ale monety i tak znikały za literalnie nic. Fix w
+      store: `alreadyHave` teraz odrzuca CAŁY zakup PRZED jakąkolwiek zmianą stanu (`return
+      false`), analogicznie do istniejącego guardu na `dayClaims[dayKey]`/`coins < cost`.
+      Drugi fix, UI (`pet-shop.tsx`): `bought` (czy KONKRETNIE dziś kupiony ten slot) i
+      `alreadyHave`/`owned` (czy w ogóle POSIADANY, niezależnie od dnia — z crate'a, z
+      wcześniejszego dnia sklepu) to były dwa OSOBNE, nigdzie wcześniej nie sprawdzane stany —
+      lista "Sklep dnia" i `GearPreviewModal` sprawdzały tylko `bought`, więc posiadany z
+      wcześniej item pokazywał się jako normalny, kupowalny "Kup za X" (myląco, skoro zakup
+      by faktycznie nic nie dał). Teraz oba miejsca liczą `alreadyHave`
+      (`RARITY_MULT[ownedGear[item.id]] >= RARITY_MULT[rarity]`) osobno: lista pokazuje
+      ✓ zamiast przycisku "Kup" (tak samo jak dla `bought`), a `GearPreviewModal` rozróżnia
+      trzy stany tekstem: "Już kupione dziś" / "Posiadasz ten przedmiot" / przycisk "Kup za
+      X". `onBuyDaily()` też odrzuca wcześniej (przed nawet otwarciem `ConfirmDialog`) z
+      dedykowanym toastem "Masz już ten przedmiot (lub lepszy)". Testy:
+      `__tests__/buyDailyGear.test.ts` (nowy plik — pierwsze testy bezpośrednio wołające
+      `usePetStore.getState()`'s akcje, nie tylko czyste funkcje z `utils/`).
   - **Krok 8 (OSTATNI z planu) — wpięcie gear w realne formuły walki/ekonomii, SYSTEM
     KOMPLETNY** (2026-08-19). PRZED wpięciem: rebalans `GEAR_ITEMS` baseValue w gear.ts —
     pierwsze przejście dałoby mythic T5 do 45-90% z JEDNEGO itemu, node-owe policzenie
