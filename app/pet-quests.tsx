@@ -20,7 +20,15 @@ import { toast } from '@/store/toastStore';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
-const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
+
+// "wczoraj" / "N dni temu" dla listy zaległych questów (2026-08-27) — odkąd `missed` sięga
+// kilka dni wstecz, nie tylko wczoraj, każdy wiersz pokazuje SKĄD jest, żeby dwa te same
+// questy z różnych dni (np. "Wypij wodę" zaległe za wtorek I środę naraz) nie wyglądały jak
+// duplikat.
+function relDayLabel(date: string): string {
+  const diffDays = Math.round((new Date(todayISO()).getTime() - new Date(date).getTime()) / 86400000);
+  return diffDays === 1 ? 'wczoraj' : `${diffDays} dni temu`;
+}
 
 // Wydzielone z app/pet.tsx (2026-08-19, restrukturyzacja nawigacji — user: "reszta zadań
 // będzie w osobnej zakładce"). questCtx/quests/missed od 2026-08-22 żyją w `usePetQuests()`
@@ -42,16 +50,19 @@ export default function PetQuests() {
   // (żeby pigułka pokazywała DOKŁADNIE tyle ile realnie dostaniesz, nie samą bazową stawkę).
   const finalQuestCoins = (baseCoins: number) => Math.round(questFightCoins(baseCoins) * coinsMult);
 
-  const claimMissed = (q: { id: string; label: string; coins: number; xp: number }) => {
-    if (claimDailyFor(q.id, yesterdayISO(), q.coins, q.xp)) {
+  // `q.date` zawsze ustawione tutaj (każdy wpis w `missed` pochodzi z `buildMissedDaily`,
+  // które teraz zawsze wypełnia `date` — patrz komentarz w quests.ts) — fallback na dziś
+  // czysto dla typów (DailyQuestState.date jest opcjonalne bo dzisiejsze questy go nie mają).
+  const claimMissed = (q: { id: string; label: string; coins: number; xp: number; date?: string }) => {
+    const date = q.date ?? todayISO();
+    if (claimDailyFor(q.id, date, q.coins, q.xp)) {
       haptic.success();
-      toast.success(`Odebrano z wczoraj: ${q.label} +${q.coins}🪙`);
+      toast.success(`Odebrano (${relDayLabel(date)}): ${q.label} +${q.coins}🪙`);
     }
   };
   const claimAllMissed = () => {
-    const y = yesterdayISO();
     let coins = 0;
-    missed.forEach(q => { if (claimDailyFor(q.id, y, q.coins, q.xp)) coins += q.coins; });
+    missed.forEach(q => { if (claimDailyFor(q.id, q.date ?? todayISO(), q.coins, q.xp)) coins += q.coins; });
     if (coins > 0) { haptic.success(); toast.success(`Odebrano zaległe nagrody +${coins}🪙`); }
   };
   const onClaimTier = (id: string, c2: number, x: number) => {
@@ -98,16 +109,16 @@ export default function PetQuests() {
         {missed.length > 0 && (
           <>
             <View style={s.qHead}>
-              <Text style={s.section}>Nieodebrane z wczoraj</Text>
+              <Text style={s.section}>Nieodebrane z poprzednich dni</Text>
               <PressableScale onPress={claimAllMissed}>
                 <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>Odbierz wszystko</Text></View>
               </PressableScale>
             </View>
             <View style={[s.qCard, s.missedCard]}>
               {missed.map((q, i) => (
-                <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                <View key={`${q.id}:${q.date}`} style={[s.qRow, i > 0 && s.qRowBorder]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
+                    <Text style={s.qLabel} numberOfLines={1}>{q.label} · {relDayLabel(q.date!)}</Text>
                     {q.note && <Text style={s.qNote}>{q.note}</Text>}
                   </View>
                   <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{q.coins}</Text></View>

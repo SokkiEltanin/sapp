@@ -75,7 +75,10 @@ const DAILY: DailyDef[] = [
   { id: 'd_pet',     label: 'Pogłaszcz pupila do pełna', coins: 2, xp: 5, done: c => !!c.affectionFull, note: c => c.affectionFull ? 'zrobione' : 'stuknij kota' },
 ];
 
-export interface DailyQuestState { id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string; progress?: number }
+export interface DailyQuestState {
+  id: string; label: string; coins: number; xp: number; done: boolean; claimed: boolean; note?: string; progress?: number;
+  date?: string;   // YYYY-MM-DD ustawiane TYLKO przez `buildMissedDaily` (zaległy quest z konkretnego dnia) — daily/bonus dzisiejsze go nie mają
+}
 
 // ─── Milestone quests ───────────────────────────────────────────────────────
 interface Tier { at: number; coins: number }
@@ -241,16 +244,21 @@ export function buildQuests(ctx: QuestCtx, claim: ClaimState, level: number = 1)
   return { daily, bonusDaily, weekly, milestones, monthly, claimableCount: claimable };
 }
 
-// ─── Missed dailies (yesterday's unclaimed rewards) ─────────────────────────
-// If you didn't open the app yesterday you'd silently lose rewards you'd actually
+// ─── Missed dailies (unclaimed rewards from recent past days) ───────────────
+// If you didn't open the app that day you'd silently lose rewards you'd actually
 // earned. These are the dailies whose "done" state can be RECONSTRUCTED from stored
-// history, so they can still be claimed the next day. Excluded on purpose:
+// history, so they can still be claimed later. Excluded on purpose:
 //  • d_pet      — affection isn't recorded per-day, so it can't be reconstructed
 //  • b_stepbeat — its target adapts to your CURRENT form, so it'd be judged unfairly
 const RETRO_DAILY_IDS = ['d_mood', 'd_steps10', 'd_steps20', 'd_habits', 'b_water', 'b_sleep'];
 
 // Build the list of rewards earned on `date` but never claimed for it. `ctx` must be
-// filled with THAT DAY's values (steps/sleep/water/mood/habits), not today's.
+// filled with THAT DAY's values (steps/sleep/water/mood/habits), not today's. Every entry
+// carries `date` (2026-08-27, user: "problem z odbiorem questów nieodebranych z dnia
+// wcześniejszego") — caller (`usePetQuests.missed`) calls this once PER recent day (not
+// just yesterday any more) and concatenates the results, so each missed quest needs its
+// own date to claim against (`claimDailyFor(id, date, …)` in petStore.ts already took an
+// arbitrary date — only the single-yesterday caller was the limit, not the store).
 //
 // `dayClaims` is keyed `${questId}:${YYYY-MM-DD}` — NOT the old dailyClaims map. That map
 // holds one date per quest, so claiming yesterday's catch-up overwrote today's claim (and
@@ -265,12 +273,12 @@ export function buildMissedDaily(ctx: QuestCtx, dayClaims: Record<string, true>,
   for (const d of DAILY) {
     if (!RETRO_DAILY_IDS.includes(d.id)) continue;
     if (!d.done(ctx) || claimed(d.id)) continue;
-    out.push({ id: d.id, label: d.label, coins: scaleCoins(d.coins), xp: scaleXp(d.xp), done: true, claimed: false, note: d.note?.(ctx) });
+    out.push({ id: d.id, label: d.label, coins: scaleCoins(d.coins), xp: scaleXp(d.xp), done: true, claimed: false, note: d.note?.(ctx), date });
   }
   for (const b of BONUS) {
     if (!RETRO_DAILY_IDS.includes(b.id) || !b.available(ctx)) continue;
     if (!b.done(ctx) || claimed(b.id)) continue;
-    out.push({ id: b.id, label: b.label(ctx), coins: scaleCoins(b.coins), xp: scaleXp(b.xp), done: true, claimed: false, note: b.note?.(ctx) });
+    out.push({ id: b.id, label: b.label(ctx), coins: scaleCoins(b.coins), xp: scaleXp(b.xp), done: true, claimed: false, note: b.note?.(ctx), date });
   }
   return out;
 }

@@ -117,6 +117,17 @@ describe('buildMissedDaily — odrabianie wczorajszych questów (anti-farming)',
     const out = buildMissedDaily(ctx, {}, '2026-08-14');
     expect(out.find(q => q.id === 'd_mood')).toBeUndefined();
   });
+
+  // 2026-08-27, user: "problem z odbiorem questów nieodebranych z dnia wcześniejszego" —
+  // `usePetQuests.missed` woła teraz `buildMissedDaily` RAZ NA KAŻDY z kilku ostatnich dni
+  // (nie tylko wczoraj), więc każdy wpis musi nieść WŁASNĄ datę, inaczej UI (pet-quests.tsx)
+  // nie wie za który dzień klaimować, a ten sam quest zaległy z dwóch różnych dni kolidowałby
+  // kluczem `id` w liście.
+  test('każdy zwrócony wpis niesie datę przekazaną do buildMissedDaily (multi-day catch-up)', () => {
+    const ctx = baseCtx({ moodLoggedToday: true });
+    const out = buildMissedDaily(ctx, {}, '2026-08-12');
+    expect(out.find(q => q.id === 'd_mood')?.date).toBe('2026-08-12');
+  });
 });
 
 describe('sweetlessDaysFrom', () => {

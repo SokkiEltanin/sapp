@@ -10,12 +10,20 @@ import { weekKeyOf } from '@/utils/quests';
 
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
-const yesterdayISO = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymdOf(d); };
 
 export interface PetHealth {
   steps: number; sleep: number; bestStepDay: number; stepTarget: number;
   stepsThisMonth: number; stepsThisWeek: number; cyclingMinutesToday: number;
 }
+
+export interface RecentDay { date: string; steps: number; sleep: number; water: number }
+
+// Ile dni wstecz (nie licząc dziś) sprawdzamy pod kątem zaległych questów dziennych
+// (2026-08-27, user: "problem z odbiorem questów nieodebranych z dnia wcześniejszego") —
+// dawniej TYLKO wczoraj (`yData` = jeden dzień), więc przerwa dłuższa niż doba w otwieraniu
+// apki bezpowrotnie gubiła nagrody za dni starsze niż wczoraj. 6 dni = tydzień razem z
+// dzisiaj, rozsądny bufor bez nieograniczonego wstecznego przeliczania.
+const RECENT_DAYS_BACK = 6;
 
 // Wyciągnięte z app/pet.tsx (2026-08-19, restrukturyzacja nawigacji — questy dostały
 // własną zakładkę `/pet-quests`, ale ICH questCtx potrzebuje DOKŁADNIE tych samych
@@ -29,9 +37,9 @@ export function usePetHealthSync() {
   const [waterGoal, setWaterGoal] = useState(8);
   const [budgets, setBudgets] = useState<Record<string, number>>({});
   const [waterToday, setWaterToday] = useState(0);
-  // Yesterday's numbers, so rewards you earned but never opened the app to collect
-  // can still be claimed today (see `missed` w pet-quests.tsx).
-  const [yData, setYData] = useState<{ steps: number; sleep: number; water: number } | null>(null);
+  // Ostatnich `RECENT_DAYS_BACK` dni (nie licząc dziś), żeby nagrody wypracowane w dni gdy
+  // apka nie była otwarta dało się odebrać z opóźnieniem (patrz `missed` w usePetQuests.ts).
+  const [recentDays, setRecentDays] = useState<RecentDay[]>([]);
   const [cardsCollected, setCardsCollected] = useState(0);
 
   const readHealth = useCallback(() => {
@@ -51,9 +59,12 @@ export function usePetHealthSync() {
       const stepTarget = avg > 0 ? Math.max(8000, Math.ceil(avg * 1.1 / 500) * 500) : 0;
       const cyclingMinutesToday = h[t]?.cyclingMinutes ?? 0;
       setHealth({ steps, sleep, bestStepDay, stepTarget, stepsThisMonth, stepsThisWeek, cyclingMinutesToday });
-      const y = yesterdayISO();
-      getWaterGlasses(y)
-        .then(water => setYData({ steps: h[y]?.steps ?? 0, sleep: h[y]?.sleepMinutes ?? 0, water }))
+      const days: string[] = [];
+      for (let i = 1; i <= RECENT_DAYS_BACK; i++) {
+        const d = new Date(); d.setDate(d.getDate() - i); days.push(ymdOf(d));
+      }
+      Promise.all(days.map(d => getWaterGlasses(d).catch(() => 0)))
+        .then(waters => setRecentDays(days.map((d, i) => ({ date: d, steps: h[d]?.steps ?? 0, sleep: h[d]?.sleepMinutes ?? 0, water: waters[i] }))))
         .catch(() => {});
     }).catch(() => {});
     getHealthGoals().then(g => { setStepGoal(g.stepGoal || 10000); setWaterGoal(g.waterGoal || 8); }).catch(() => {});
@@ -88,5 +99,5 @@ export function usePetHealthSync() {
     return () => clearInterval(iv);
   }, [reload]);
 
-  return { health, stepGoal, waterGoal, budgets, waterToday, yData, cardsCollected, reload };
+  return { health, stepGoal, waterGoal, budgets, waterToday, recentDays, cardsCollected, reload };
 }
