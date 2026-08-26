@@ -1836,6 +1836,30 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       przepisane z zaszytych liczb na FORMUŁĘ (`(MISSION_BAR_HEIGHT - MISSION_CAT_SIZE) / 2`
       / `-MISSION_CAT_SIZE / 2`) — przeżyje kolejną zmianę rozmiaru bez ręcznego przeliczania
       magicznych liczb, ten sam wzorzec co inne stałe-sterowane style w tym pliku.
+    - **ODWRÓCONE: kotek stoi w miejscu tam gdzie był timer, pasek dostaje dokładny licznik
+      M:SS** (2026-08-26, user: "zróbmy na odwrót jego spacerujacego w miejscu tam gdzie jest
+      czas teraz, i on będzie miał te animacje tyle że w miejscu, a zamiast niego w pasku będzie
+      dokładny czas w minutach i sekundach jakiś ładny licznik"). `missionBarCatWrap` (kotek
+      jeżdżący `left: {progress}%` po pasku) USUNIĘTY — kotek przeniesiony do `missionHeadRow`
+      (prawa strona, tam gdzie dawniej siedział statyczny `missionTimerTxt`, teraz USUNIĘTY),
+      nowy `missionHeadCatWrap` (stały rozmiar `MISSION_CAT_SIZE`, bez `left`-owej matematyki).
+      Zachowane BEZ ZMIAN te same dwie animacje co dawniej na pasku: `missionEnter` (wejście
+      duży→mały) i `missionSway` (translateX+rotate = "chód w miejscu", nigdy nie zależał od
+      pozycji na pasku, więc przeniósł się 1:1). `missionEnterY` outputRange zmniejszony z -90
+      na -40 — krótszy dystans wejścia, bo cel (`missionHeadRow`) leży bliżej góry
+      `stageMissionWrap` niż dawny pasek. `missionCatHalo` (jasna otoczka na ciemnym futrze)
+      zostaje, po prostu renderowana w nowym miejscu. Sam pasek (`missionBarTrack`) NIE stracił
+      wizualizacji postępu — wypełnienie + fala `missionBarWave` zostają BEZ ZMIAN, tylko
+      centralnie na całym pasku doszedł nowy `missionBarCountdownWrap`/`missionBarCountdownTxt`:
+      biały tekst z cieniem (czytelny i na ciemnym torze, i na niebieskim wypełnieniu),
+      `fontVariant:['tabular-nums']` żeby cyfry nie "skakały" szerokością co sekundę. Nowa
+      funkcja `fmtMissionCountdown(ms)` w `missions.ts` (M:SS / H:MM:SS, zaokrągla do pełnej
+      sekundy) — CELOWO osobna od `fmtMissionDuration` (ta zaokrągla do minut, używana tam gdzie
+      licznik NIE tyka co sekundę: staty pod spodem, `boss-fight.tsx`, `TopPill`). Żeby licznik
+      faktycznie miał sekundy, `missionTick`'s `setInterval` przyspieszony z 30s na 1s (był
+      wystarczający gdy pokazywał tylko minuty) — z nowym auto-stopem: interval sam się czyści
+      w momencie gdy `missionEndsAt` mija (misja staje się gotowa), więc nie tyka bez sensu co
+      sekundę w nieskończoność, dopóki user nie wróci stoczyć walki.
   - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
     user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
     obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +

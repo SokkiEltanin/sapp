@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Pasek misji ODWRÓCONY: kotek w miejscu, dokładny licznik M:SS na pasku — NIEsprawdzone (2026-08-26)
+
+User: "zróbmy na odwrót jego spacerujacego w miejscu tam gdzie jest czas teraz, i on będzie
+miał te animacje tyle że w miejscu, a zamiast niego w pasku będzie dokładny czas w minutach i
+sekundach jakiś ładny licznik". Kotek przestał jeździć po pasku (`left: progress%`) — teraz stoi
+w `missionHeadRow` (prawa strona, gdzie dawniej był statyczny tekstowy timer), z tymi samymi
+animacjami wejścia (`missionEnter`) i chodu-w-miejscu (`missionSway`). Pasek pokazuje nowy
+`fmtMissionCountdown` (M:SS/H:MM:SS, tyka co sekundę — `missionTick`'s interval przyspieszony z
+30s na 1s, z auto-stopem po ready). Pełny opis w ARCHITECTURE.md (sekcja "ODWRÓCONE: kotek stoi
+w miejscu..."). Nowy test `__tests__/fmtMissionCountdown.test.ts` (+5). `tsc`/`jest` zielone
+(62/744). **Priorytet testu na urządzeniu**: pupil w trakcie misji — (a) kotek w prawym rogu
+nad paskiem powinien "chodzić w miejscu" (przechył + krok w bok, ta sama animacja co dawniej),
+NIE jeździć po pasku, (b) na samym pasku licznik powinien realnie tykać co sekundę (M:SS, a przy
+misjach >1h w formacie H:MM:SS), (c) wypełnienie paska + fala "ładowania" nadal wizualizują
+postęp jak wcześniej.
+
 ## 🆕 BUG: "NAJCZĘŚCIEJ KUPOWANE" liczyło linie paragonu, nie sztuki — NIEsprawdzone (2026-08-26)
 
 User: "wydaje mi się ze liczy ile razy coś kupiłem ale nie bierze pod uwagę ile sztuk na
