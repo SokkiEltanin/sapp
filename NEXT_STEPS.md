@@ -9,6 +9,15 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Rozbicie index.tsx: krok 4/wiele — GCalCard wyciągnięte — NIEsprawdzone (2026-08-26)
+
+Kontynuacja tym samym wzorcem: `nodes['gcal']` → `GCalCard.tsx`. Pełny opis w
+ARCHITECTURE.md §4. `tsc`/`jest` zielone (60/730). **Priorytet testu na urządzeniu** (razem z
+krokami 1-3 — jeden komunikat wystarczy jeśli wszystkie wyglądają dobrze): kafel "Google
+Kalendarz" na dashboardzie (jeśli masz połączone konto Google) wygląda identycznie jak przed
+zmianą — sekcje "Dziś"/"Jutro" z kropką koloru wydarzenia, godziną, tytułem; w edytorze
+dashboardu, bez wydarzeń, sekcja pokazuje "brak danych".
+
 ## 🆕 Rozbicie index.tsx: krok 3/wiele — SinceCountersCard wyciągnięte — NIEsprawdzone (2026-08-26)
 
 Kontynuacja po "możesz dalej optymalizować". Ten sam wzorzec co kroki 1-2:

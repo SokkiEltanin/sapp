@@ -140,6 +140,12 @@ Martwe importy usunięte: `StreakCard` (całość), `StreakFlame` (domyślny) i 
 `@/components/counters/StreakFlame` (`streakColor`/`StreakFlameGlow` z tego samego modułu
 zostają — wciąż używane gdzie indziej w pliku).
 
+**Krok 4**: `nodes['gcal']` → `GCalCard.tsx`, ten sam wzorzec. `gcalDayLabel`/`gcalRow`/
+`gcalDot`/`gcalTime`/`gcalTitle` używane TYLKO tu → przeniesione w całości. Typ zdarzeń
+(`CalendarEvent`) importowany z `@/types`, nie z `googleCalendarService.ts` (tam prywatny
+`GCalEvent` się nie eksportuje — `fetchEvents()` zwraca już zmapowane `CalendarEvent[]`).
+Martwy import `CalendarDays` (ikona) usunięty z dużego bloku importów lucide na górze pliku.
+
 **Snapshot statystyk (WYDAJNOŚĆ — pamiętaj o tym):** widgety czytają lokalny snapshot
 `expenses` (`useState`), **nie** żywy store `liveExpenses`. Snapshot odświeża się TYLKO na
 triggerach, każdy odroczony przez `InteractionManager.runAfterInteractions`: (A) wejście na

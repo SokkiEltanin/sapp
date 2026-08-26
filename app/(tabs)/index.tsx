@@ -12,7 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import {
   CheckCircle2, ChevronRight, ChevronLeft, Ban,
   TrendingUp, TrendingDown, Flame, Smile, Zap, Mail,
-  CalendarDays, Wallet,
+  Wallet,
   Briefcase, CreditCard, Check, Plus,
   Timer, CloudSun, Thermometer, FileText, BarChart2, Activity,
   Droplets, Dumbbell, BookOpen, Moon, Heart, Sun, Bike, Footprints, CheckSquare,
@@ -83,6 +83,7 @@ import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCar
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
 import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
+import GCalCard from '@/components/dashboard/GCalCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -3835,37 +3836,10 @@ export default function DashboardScreen() {
               );
             })();
 
+            // Wyciągnięte do GCalCard.tsx (2026-08-26) — guard `.length > 0 ||` ZOSTAJE tutaj,
+            // patrz komentarz przy `nodes['pinned-notes']` wyżej.
             nodes['gcal'] = (gcalToday.length > 0 || gcalTomorrow.length > 0) && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <CalendarDays size={13} color={colors.text.muted} />
-                  <Text style={s.cardTitle}>Google Kalendarz</Text>
-                </View>
-                {gcalToday.length > 0 && (
-                  <>
-                    <Text style={s.gcalDayLabel}>Dziś</Text>
-                    {gcalToday.map(e => (
-                      <View key={e.id} style={s.gcalRow}>
-                        <View style={[s.gcalDot, { backgroundColor: e.color ?? colors.brand.gcal }]} />
-                        {e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
-                        <Text style={s.gcalTitle} numberOfLines={1}>{e.title}</Text>
-                      </View>
-                    ))}
-                  </>
-                )}
-                {gcalTomorrow.length > 0 && (
-                  <>
-                    <Text style={[s.gcalDayLabel, { marginTop: gcalToday.length > 0 ? spacing[2] : 0 }]}>Jutro</Text>
-                    {gcalTomorrow.map(e => (
-                      <View key={e.id} style={s.gcalRow}>
-                        <View style={[s.gcalDot, { backgroundColor: e.color ?? colors.brand.gcal }]} />
-                        {e.startTime ? <Text style={s.gcalTime}>{e.startTime}</Text> : null}
-                        <Text style={s.gcalTitle} numberOfLines={1}>{e.title}</Text>
-                      </View>
-                    ))}
-                  </>
-                )}
-              </View>
+              <GCalCard today={gcalToday} tomorrow={gcalTomorrow} cardBg={cardBgDark} />
             );
 
               // custom user tiles
@@ -5361,12 +5335,7 @@ const buildStyles = (c: any) => StyleSheet.create({
   waveDelta: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginTop: 1 },
   wDot: { position: 'absolute', width: 34, marginLeft: -17, textAlign: 'center', fontSize: 8.5, fontWeight: '700', color: c.text.muted },
 
-  // ── Google Calendar ────────────────────────────────────────────────────────
-  gcalDayLabel: { fontSize: 9, fontWeight: '700', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  gcalRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: 3 },
-  gcalDot:      { width: 6, height: 6, borderRadius: 3 },
-  gcalTime:     { fontSize: 10, color: c.text.muted, width: 36, fontWeight: '600' },
-  gcalTitle:    { flex: 1, fontSize: 13, color: c.text.secondary },
+  // ── Google Calendar — gcal* PRZENIESIONE do GCalCard.tsx (2026-08-26) ───────
 
   // ── Today tasks strip ─────────────────────────────────────────────────────
   todayCard: {
