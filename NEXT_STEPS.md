@@ -9,6 +9,31 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 BUG: zakup posiadanego itemu w Sklepie dnia zabierał monety za nic — NIEsprawdzone (2026-08-26)
+
+User: "kupiłem item w sklepie który już miałem przez co zniknęły mi pieniądze i nic nie
+dostałem" + "powinno pokazywać że mam i po naciśnięciu powinny byc staty itemu porównanie z
+innymi i pod spodem przycisk kup, lub jak mam posiadasz ten przedmiot". Znaleziony realny bug:
+`petStore.buyDailyGear()` zawsze pobierało monety i zużywało dzienny slot zakupu nawet gdy
+gracz JUŻ posiadał ten item w tej samej lub lepszej rzadkości (aktualizacja `ownedGear` była
+wtedy pomijana, ale zapłata NIE). Podgląd statów+porównania+przycisku kup w `GearPreviewModal`
+JUŻ ISTNIAŁ (dodany 2026-08-22) — ale nie sprawdzał ogólnego posiadania, tylko "czy kupione
+DZIŚ", więc item posiadany z wcześniejszego dnia/skrzynki wyglądał jak normalny do kupienia.
+Fix: (1) `buyDailyGear` odrzuca zakup PRZED zmianą stanu gdy `alreadyHave`, (2) lista + modal
+pokazują ✓/"Posiadasz ten przedmiot" zamiast przycisku "Kup" w tym stanie. Pełny opis w
+ARCHITECTURE.md (sekcja "BUG: zakup posiadanego itemu..."). `tsc`/`jest` zielone (61/736, +6
+nowych testów `buyDailyGear.test.ts` — bezpośrednio na akcji store'u, nie tylko czystej
+logice). **Priorytet testu na urządzeniu**:
+(a) sklep pupila → Sklep dnia — jeśli któryś z 3 dzisiejszych itemów już posiadasz (z wcześniej
+albo ze skrzynki), powinien pokazywać ✓ zamiast przycisku "Kup" na liście,
+(b) stuknij w taki posiadany item — podgląd powinien pokazać "Posiadasz ten przedmiot" zamiast
+przycisku "Kup za X",
+(c) spróbuj kupić coś co NIE jest posiadane — normalny zakup dalej powinien działać (monety
+znikają, item się pojawia w ekwipunku),
+(d) jeśli masz jakiś stary zapis gdzie monety już zniknęły przez ten bug — przepraszam, nie da
+się tego cofnąć retroaktywnie (nie wiadomo ile razy/kiedy to się stało), ale od teraz nie
+powinno się już powtórzyć.
+
 ## 🆕 Rozbicie index.tsx: krok 4/wiele — GCalCard wyciągnięte — NIEsprawdzone (2026-08-26)
 
 Kontynuacja tym samym wzorcem: `nodes['gcal']` → `GCalCard.tsx`. Pełny opis w
