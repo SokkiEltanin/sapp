@@ -9,6 +9,18 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Rozbicie index.tsx: krok 3/wiele — SinceCountersCard wyciągnięte — NIEsprawdzone (2026-08-26)
+
+Kontynuacja po "możesz dalej optymalizować". Ten sam wzorzec co kroki 1-2:
+`nodes['counters-since']` → `SinceCountersCard.tsx`. Przy okazji usunięty pre-istniejący,
+niezwiązany martwy styl `sinceTileDays` (nigdzie się nie renderował nawet przed tą zmianą).
+Pełny opis w ARCHITECTURE.md §4. `tsc`/`jest` zielone (60/730). **Priorytet testu na
+urządzeniu** (razem z krokami 1-2 — jeden komunikat wystarczy jeśli wszystkie 3 wyglądają
+dobrze): kafel "Liczniki" na dashboardzie (jeśli masz jakieś liczniki typu "bez X") wygląda
+identycznie jak przed zmianą — największa seria jako bogata karta (płomień + pasek Pn-Nd),
+reszta jako siatka mniejszych kafelków z płomieniem; w edytorze dashboardu, bez liczników,
+sekcja pokazuje "brak danych".
+
 ## 🆕 BUG: przycinanie kotka na kaflu pupila NIE DZIAŁAŁO — próba fixu, NIEpotwierdzona (2026-08-26)
 
 User na buildzie #842 (potwierdzone: najnowszy build, nie stary) zgłosił że kotek na kaflu
