@@ -205,6 +205,19 @@ kafelka". Dwa fixy:
    kafelek". `CROP_H` 78→140 (reszta stałych przeliczona z zachowaniem tych samych proporcji/
    kadru — uszy→łapki, ta sama matematyka co wyżej, tylko większe okno). BEZ wizualnej
    weryfikacji na urządzeniu jeszcze — jeśli nadal za małe/za duże, to znowu tylko `CROP_*`.
+   **BUG: przycinanie w ogóle nie działało — kotek renderował się CAŁY (2026-08-26)** — user
+   ze screenshotem na buildzie #842 (potwierdzone najnowszy, nie stary build): pełna sylwetka
+   siedzącego kotka Z OGONEM, nie przycięta głowa+łapki. Matematyka kadru (viewBox→px)
+   zweryfikowana DWUKROTNIE, poprawna — a mimo to OGON (który leży daleko poza oknem x:560–
+   1340) był widoczny, co jest silnym dowodem że `overflow:'hidden'` na `headCrop`
+   NIE PRZYCINAŁ WCALE, niezależnie od liczb w oknie. Podejrzenie: znany Android/RN gotcha —
+   zwykły `View` istniejący tylko dla stylu bywa "spłaszczany" (view flattening, optymalizacja
+   natywna) i traci wtedy `overflow:'hidden'`. Fix: `collapsable={false}` na OBU `View`ach
+   kadru (`headCrop`/`headCropInner`) — wymusza pozostanie prawdziwym natywnym widokiem.
+   **Hipoteza, NIE potwierdzona jeszcze na urządzeniu** — jeśli to NIE pomoże, kolejny krok to
+   porzucenie techniki "przytnij przez overflow:hidden" na rzecz zwykłego, nieprzyciętego (ale
+   większego) `<CatArt>` — gwarantowanie działający wzorzec używany wszędzie indziej w apce
+   (scena `/pet`, pasek misji), kosztem rezygnacji z efektu "sama głowa wystaje nad krawędź".
 
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 

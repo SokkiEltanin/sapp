@@ -9,6 +9,27 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 BUG: przycinanie kotka na kaflu pupila NIE DZIAŁAŁO — próba fixu, NIEpotwierdzona (2026-08-26)
+
+User na buildzie #842 (potwierdzone: najnowszy build, nie stary) zgłosił że kotek na kaflu
+pupila renderuje się jako PEŁNA sylwetka (z ogonem!), nie przycięta głowa+łapki — mimo że
+poprzedni wpis (niżej, "Powiększone ~1.8×") miał poprawną matematykę kadru. Ogon leżący daleko
+poza zamierzonym oknem był mocnym dowodem że `overflow:'hidden'` na kontenerze przycinającym
+w ogóle nie działał — nie błąd w liczbach, tylko w mechanizmie przycinania. Prawdopodobna
+przyczyna: znany Android/RN gotcha — zwykły `View` tylko-do-stylu bywa "spłaszczany" przez
+natywną optymalizację i traci wtedy `overflow:hidden`. Fix: `collapsable={false}` na obu
+`View`ach kadru w `PetTile.tsx`. Pełny opis w ARCHITECTURE.md §4. **To hipoteza, NIE
+potwierdzona jeszcze na urządzeniu** — `tsc`/`jest` nie może tego zweryfikować (czysto
+natywny problem renderowania). **Priorytet testu na urządzeniu** (kluczowe, to DRUGA
+nieudana próba z rzędu):
+(a) kafel pupila na dashboardzie — czy TERAZ kotek jest faktycznie przycięty do
+głowy+uszu+łapek (bez ogona, bez pełnego ciała), czy nadal renderuje się cały,
+(b) jeśli TO DALEJ NIE DZIAŁA — nie próbuję trzeciej blindowej poprawki tej samej techniki.
+Następny krok to porzucenie "przytnij przez overflow:hidden" na rzecz zwykłego,
+nieprzyciętego (ale większego) kotka — gwarantowanie działający wzorzec używany wszędzie
+indziej w apce, kosztem rezygnacji z efektu "sama głowa nad krawędzią". Powiedz jeśli tak
+wolisz zamiast dalszego dłubania w przycinaniu.
+
 ## 🆕 Kafel pupila: głowa kotka powiększona ~1.8× — NIEsprawdzone (2026-08-25)
 
 User przesłał screenshot dashboardu z odręcznym szkicem (narysowanym NA screenshocie) znacznie
