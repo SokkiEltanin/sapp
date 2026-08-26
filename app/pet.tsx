@@ -483,7 +483,7 @@ export default function Pet() {
             <Zap size={18} color="#38BDF8" />
             <Text style={s.statVal}>{attempts}</Text>
             <Text style={s.statLabel}>Prób dziennie</Text>
-            <Text style={s.statSub}>{bonuses.energyMult > 0 ? `+${Math.round(bonuses.energyMult * 100)}% z łupu` : 'baza 3'}</Text>
+            <Text style={s.statSub}>{bonuses.energyMult > 0 ? `+${(bonuses.energyMult * 100).toFixed(1)}% z łupu` : 'baza 3'}</Text>
           </View>
           {/* Kafel misji (2026-08-20) — zastępuje dawną kartę "Doświadczenie" (XP/Lv ma teraz
               TYLKO powiększony pasek w nagłówku, patrz `topRight`/`miniBarRow` niżej). Trzy
@@ -520,11 +520,16 @@ export default function Pet() {
           {/* Unik/kryt jako kafelki, nie tekst (2026-08-21, user: "tam te statystyki unik+
               kryt dodaj jako kafelki pod spodem bo dziwnie wyglądają jako tekst") — dawny
               wspólny `s.blurb` string zamieniony na 2 osobne statCard, ten sam wzorzec co
-              reszta gridu (dorabiają nowy wiersz dzięki flexWrap na `s.statGrid`, width 48%). */}
+              reszta gridu (dorabiają nowy wiersz dzięki flexWrap na `s.statGrid`, width 48%).
+              Precyzja 0.1% (2026-08-26, user: "te statystyki jak atak unik itp musimy
+              pokazywać 0.1 dokladnosci") — `Math.round(...*100)` zaokrąglał do pełnego
+              procenta, przez co suma kilku itemów ekwipunku (każdy pokazuje 0.1% precyzję w
+              `fmtGearStat`, gear.ts) potrafiła nie zgadzać się z tym, co widać tutaj po
+              zsumowaniu. Ten sam fix na `energyMult` wyżej i w `bossProgressReport.ts`. */}
           {bonuses.dodge > 0 && (
             <View style={[s.statCard, { borderColor: '#22D3EE44', backgroundColor: '#22D3EE12' }]}>
               <Wind size={18} color="#22D3EE" />
-              <Text style={s.statVal}>+{Math.round(bonuses.dodge * 100)}%</Text>
+              <Text style={s.statVal}>+{(bonuses.dodge * 100).toFixed(1)}%</Text>
               <Text style={s.statLabel}>Unik</Text>
               <Text style={s.statSub}>z łupu bossów</Text>
             </View>
@@ -532,7 +537,7 @@ export default function Pet() {
           {bonuses.crit > 0 && (
             <View style={[s.statCard, { borderColor: '#C084FC44', backgroundColor: '#C084FC12' }]}>
               <Target size={18} color="#C084FC" />
-              <Text style={s.statVal}>+{Math.round(bonuses.crit * 100)}%</Text>
+              <Text style={s.statVal}>+{(bonuses.crit * 100).toFixed(1)}%</Text>
               <Text style={s.statLabel}>Kryt</Text>
               <Text style={s.statSub}>z łupu bossów</Text>
             </View>

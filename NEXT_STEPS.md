@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kafel pupila: NOWY dedykowany komponent (PetTileCat) zamiast crop-hacka — NIEsprawdzone (2026-08-27)
+
+User: "kafelek nadal nie jest dobrze nadal jest za duzy wróć go do tego jaki był... kotka
+możesz zrobic wersje osobna... po prostu głowa lekko tułów dwie łapki trzymające krawędź
+kafelka jakby jak pokazywałem i animacje samych oczu zrobimy i uszka i tyle". Cała technika
+"przytnij pełny CatArt przez overflow:hidden" (PR #84/#88/#89) PORZUCONA — Android
+view-flattening gubił przycinanie mimo `collapsable={false}`, a nawet gdyby działało, wynik
+był za duży. Nowy `src/components/pet/PetTileCat.tsx` — osobny, prosty komponent z WŁASNYM
+małym viewBoxem (nie crop 2000×2000 CatArt), głowa+tułów+łapy na krawędzi, animowane TYLKO oczy
+(mrugnięcie) i uszy (delikatny ruch), reszta CatArt (głaskanie/pazur/ogon) świadomie pominięta.
+`PetTile.tsx` renderuje `<PetTileCat size={72} .../>` bez żadnego `overflow:hidden`/
+`collapsable`. Pełny opis w ARCHITECTURE.md. `tsc`/`jest` zielone (brak testów komponentów w
+tym projekcie — nie da się przetestować renderu automatycznie). **Priorytet testu na
+urządzeniu** (wysoki — to już TRZECIA próba tego kafla): dashboard → kafel pupila —
+(a) rozmiar rozsądny, nie dominuje wiersza obok tekstu, (b) widać głowę+łapki na krawędzi (nie
+crop-artefakty jak poprzednio), (c) oczy mrugają, uszy od czasu do czasu drgają.
+
+## 🆕 Precyzja 0.1% na statach bojowych (unik/kryt/energyMult) — NIEsprawdzone (2026-08-26)
+
+User: "te statystyki jak atak unik itp musimy pokazywać 0.1 dokladnosci". `pet.tsx` (Unik/Kryt/
+Prób dziennie z łupu) i `bossProgressReport.ts` zaokrąglały do pełnego procenta mimo że
+`fmtGearStat` (per-item w GearPanel/podglądzie) już pokazywał 0.1% — teraz spójne wszędzie.
+`tsc`/`jest` zielone.
+
 ## 🆕 Miniboss roster odświeżony: koza/wieloryb→wilk/grizzly/osa — NIEsprawdzone (2026-08-26)
 
 Koza/wieloryb usunięte z `MINIBOSSES` (user chciał świeżości w rotacji questowej — "koza jest,

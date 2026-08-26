@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { ChevronRight, Gift } from 'lucide-react-native';
-import CatArt from '@/components/pet/CatArt';
+import PetTileCat from '@/components/pet/PetTileCat';
 import { PetState } from '@/utils/petState';
 import { usePetStore } from '@/store/petStore';
 import { paletteById } from '@/utils/catPalettes';
@@ -14,26 +14,16 @@ import { useColors } from '@/theme/useColors';
 // wiersz treści (kot + tekst), bez opakowania. Domyślne `bare=false` = stary, samodzielny
 // wygląd, używany gdy nie ma żadnej aktywnej serii do pokazania obok.
 //
-// Głowa kotka, powiększona + przycięta (2026-08-25, user: "zeby ten pupil jakby był w kafelku
-// większy praktycznie sama głowa i tak dorobić mu łapki zeby lekko wyglądały jakby sie opierał
-// o krawędź kafelka"). CatArt renderuje CAŁEGO kota w stałym `viewBox 0 0 2000 2000` (patrz
-// CatArt.tsx) — nie da się wyciągnąć "samej głowy" bez rozbierania SVG na części, więc zamiast
-// tego: render W WIĘKSZYM rozmiarze niż widoczny kontener (który ma `overflow:hidden`),
-// przesunięty tak żeby okno łapało dokładnie od czubka uszu do dołu łapek. Liczby wyliczone
-// z geometrii CatArt (nie zgadywane): uszy — apex trójkąta ucha po transformacie macierzy
-// ląduje na y≈436 (`Ear`, wariant R, spoczynek/rotate=0) → górna krawędź okna na y=430 z
-// małym marginesem; łapki — `Paw` rysuje elipsę cy=1541 ry=48 → dół na y=1589 (dokładnie na
-// dole okna, więc łapki "leżą" na krawędzi kafelka). Szerokość okna z bounding boxu
-// głowa+uszy (x≈560–1340, symetrycznie wokół środka głowy x≈953).
-// Powiększone ~1.8× (2026-08-25, user przesłał screenshot z odręcznym szkicem znacznie
-// większej głowy na kaflu: "o tak o chciałem ten kafelek") — te same proporcje/kadr co wyżej
-// (uszy→łapki, ta sama matematyka), tylko skala okna większa (`CROP_H` 78→140, reszta
-// przeliczona z zachowaniem tych samych stosunków). Jeśli po teście na urządzeniu trzeba
-// doregulować kadr (mniej/bardziej) — to tylko te cztery stałe.
-const CROP_SIZE = 242;            // pełny render CatArt (viewBox 2000 → 242px)
-const CROP_W = 97, CROP_H = 140;  // widoczne okno (kontener z overflow:hidden)
-const CROP_TOP = -52;             // viewBox y=430 (czubek uszu) → góra okna
-const CROP_LEFT = -68;            // viewBox x=560 (lewe ucho) → lewa okna
+// Głowa kotka — DRUGIE PODEJŚCIE (2026-08-27, user: "kafelek nadal nie jest dobrze nadal jest
+// za duzy... kotka możesz zrobic wersje osobna... po prostu głowa lekko tułów dwie łapki
+// trzymające krawędź kafelka"). Pierwsze podejście (do #89, patrz git history) próbowało
+// PRZYCIĄĆ pełny `CatArt` (viewBox 2000×2000) przez `overflow:hidden` — kruche na Androidzie
+// (view-flattening gubił przycinanie mimo `collapsable={false}`) i finalnie DALEJ za duże.
+// Teraz `PetTileCat` — osobny, celowo prosty komponent z WŁASNYM małym viewBoxem (nie crop
+// czegokolwiek), animujący TYLKO oczy (mrugnięcie) i uszy (delikatny ruch), jak user prosił
+// — żadnego głaskania/ogona/łapki-lizanej z pełnego CatArt, które i tak nigdy nie było
+// widoczne w tym kaflu. `size=72` ≈ rozmiar sprzed CAŁEJ serii eksperymentów z kadrowaniem
+// (oryginalne `size={70}` pełnego CatArt, patrz commit 584d86d).
 export default function PetTile({ name, pet, level, claimable = 0, bare = false }: { name: string; pet: PetState; level: number; claimable?: number; bare?: boolean }) {
   const c = useColors();
   // wear the coat you actually bought — the tile used to always show the default blue
@@ -45,18 +35,8 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
   const catLegStripes = usePetStore(s => s.catLegStripes);
   const row = (
     <>
-      {/* collapsable={false} (2026-08-26, user screenshot: kotek renderował się CAŁY, bez
-          przycięcia, mimo poprawnej matematyki kadru) — Android potrafi "spłaszczyć"
-          (collapsable) zwykły `View` który istnieje tylko dla stylu (tu: `overflow:'hidden'`),
-          i spłaszczony widok cichoTraci przycinanie. To znany RN/Android gotcha, nie błąd w
-          liczbach kadru — wymusza pozostanie prawdziwym natywnym widokiem, żeby `overflow:
-          'hidden'` faktycznie zadziałało. */}
-      <View style={st.headCrop} collapsable={false}>
-        <View style={st.headCropInner} collapsable={false}>
-          <CatArt expression={pet.expression} size={CROP_SIZE} animate={false} palette={paletteById(catColor)} stripes={catStripes}
-            eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
-        </View>
-      </View>
+      <PetTileCat size={72} palette={paletteById(catColor)} stripes={catStripes}
+        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>
           <Text style={[st.name, { color: c.text.primary }]} numberOfLines={1}>{name}</Text>
@@ -81,8 +61,6 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
 const st = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, borderWidth: 1, padding: 12, paddingRight: 10 },
   bareRow: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  headCrop: { width: CROP_W, height: CROP_H, overflow: 'hidden' },
-  headCropInner: { position: 'absolute', top: CROP_TOP, left: CROP_LEFT, width: CROP_SIZE, height: CROP_SIZE },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 16, fontWeight: '800', flexShrink: 1 },
   lvl: { borderRadius: 20, paddingHorizontal: 7, paddingVertical: 1 },

@@ -55,10 +55,13 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
   lines.push(`Monety: ${s.coins}`);
   lines.push(`ATK: baza ${BASE_ATK} + kupione ${s.atkStatBonus} = ${Math.round(power)} realnej mocy (×${mult.toFixed(2)} mnożnik z poziomu+łupu)`);
   lines.push(`HP kotka: ${maxHp} (baza ${CAT_BASE_MAX_HP} + kupione ${s.catMaxHpBonus})`);
-  lines.push(`Próby ataku/dzień: ${attempts}${bonuses.energyMult > 0 ? ` (+${Math.round(bonuses.energyMult * 100)}% z łupu)` : ''}`);
+  // 0.1% precyzja (2026-08-26, user: "te statystyki jak atak unik itp musimy pokazywać 0.1
+  // dokladnosci") — ta sama zmiana co w pet.tsx, żeby raport zgadzał się z tym co user widzi
+  // na ekranie Pupila.
+  lines.push(`Próby ataku/dzień: ${attempts}${bonuses.energyMult > 0 ? ` (+${(bonuses.energyMult * 100).toFixed(1)}% z łupu)` : ''}`);
   lines.push(`Sloty na itemy bojowe: ${slots}`);
   if (bonuses.dodge > 0 || bonuses.crit > 0) {
-    lines.push(`Bonusy z łupu bossów: +${Math.round(bonuses.dodge * 100)}% unik, +${Math.round(bonuses.crit * 100)}% kryt`);
+    lines.push(`Bonusy z łupu bossów: +${(bonuses.dodge * 100).toFixed(1)}% unik, +${(bonuses.crit * 100).toFixed(1)}% kryt`);
   }
   lines.push('');
 
