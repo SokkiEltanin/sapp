@@ -9,6 +9,17 @@ Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/cod
 znów przestanie działać, punkt startowy diagnozy: github.com → avatar → Settings →
 Applications → Installed GitHub Apps → apka Claude/Anthropic → Configure → Repository access.
 
+## 🆕 Rozbicie index.tsx: krok 5/wiele — SleepChartCard wyciągnięte — NIEsprawdzone (2026-08-26)
+
+Kontynuacja po "dawaj dalej optymalizować". Różni się od kroków 1-4: `nodes['sleep-chart']`
+było ternary (`warunek ? x : y`), nie `warunek && (...)`, więc NIGDY nie było `false` —
+guard NIE zostaje w `index.tsx`, cała logika (wykres + pusty stan) przeniesiona do
+`SleepChartCard.tsx`, wołana bezwarunkowo. Stan `sleepDashRange` (toggle Tydzień/Miesiąc)
+zostaje w `index.tsx`. Pełny opis w ARCHITECTURE.md §4. `tsc`/`jest` zielone (61/736).
+**Priorytet testu na urządzeniu** (razem z krokami 1-4): karta "Sen" na dashboardzie —
+wykres słupkowy (przełącznik Tydzień/Miesiąc działa), oraz pusty stan (jeśli akurat brak
+danych o śnie z zegarka) wyglądają identycznie jak przed zmianą.
+
 ## 🆕 BUG: zakup posiadanego itemu w Sklepie dnia zabierał monety za nic — NIEsprawdzone (2026-08-26)
 
 User: "kupiłem item w sklepie który już miałem przez co zniknęły mi pieniądze i nic nie
