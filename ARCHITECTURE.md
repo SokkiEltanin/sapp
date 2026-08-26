@@ -130,6 +130,16 @@ CAŁOŚCI, nie duplikowany jak `card`/`cardHeader`/`cardTitle`/`workToggleText`/
 (`daysUntilEnd`/`eventProgress`/`untilProgress`/`WalkProgress` — zweryfikowane `grep`iem że
 liczba wystąpień spadła do 1, czyli tylko sam import, przed usunięciem).
 
+**Krok 3**: `nodes['counters-since']` → `SinceCountersCard.tsx`, ten sam wzorzec.
+`sinceGrid`/`sinceTile`/`sinceTileUnit`/`sinceTileName` używane TYLKO tu → przeniesione w
+całości; `card`/`cardHeader`/`cardTitle`/`workToggleText` (współdzielone) skopiowane verbatim.
+Przy okazji usunięty `sinceTileDays` — był martwy JUŻ PRZED tą zmianą (`grep`iem
+potwierdzone że nigdzie się nie renderował — `StreakFlame` sam pokazuje liczbę dni w środku
+płomienia, nie dotyczy tej ekstrakcji, ale trafił się przy okazji sąsiadujących linijek).
+Martwe importy usunięte: `StreakCard` (całość), `StreakFlame` (domyślny) i `streakTier` z
+`@/components/counters/StreakFlame` (`streakColor`/`StreakFlameGlow` z tego samego modułu
+zostają — wciąż używane gdzie indziej w pliku).
+
 **Snapshot statystyk (WYDAJNOŚĆ — pamiętaj o tym):** widgety czytają lokalny snapshot
 `expenses` (`useState`), **nie** żywy store `liveExpenses`. Snapshot odświeża się TYLKO na
 triggerach, każdy odroczony przez `InteractionManager.runAfterInteractions`: (A) wejście na

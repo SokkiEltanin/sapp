@@ -82,6 +82,7 @@ import Confetti from '@/components/achievements/Confetti';
 import StreakWallCard, { StreakItem } from '@/components/dashboard/StreakWallCard';
 import PinnedNotesCard from '@/components/dashboard/PinnedNotesCard';
 import CountdownsCard from '@/components/dashboard/CountdownsCard';
+import SinceCountersCard from '@/components/dashboard/SinceCountersCard';
 import TriviaCard from '@/components/dashboard/TriviaCard';
 import ReflectionCard from '@/components/dashboard/ReflectionCard';
 import SweetsVsFoodSection, { WeekOv } from '@/components/dashboard/SweetsVsFoodSection';
@@ -117,8 +118,7 @@ import { processAutoBankQueue } from '@/services/bankAutoProcess';
 import { getLastBackup } from '@/services/backupService';
 import { loadMerchantMemory } from '@/utils/merchantMemory';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import StreakFlame, { StreakFlameGlow, streakColor, streakTier } from '@/components/counters/StreakFlame';
-import StreakCard from '@/components/counters/StreakCard';
+import { StreakFlameGlow, streakColor } from '@/components/counters/StreakFlame';
 // Route-level crash boundary — catches a dashboard render crash as a recoverable,
 // persisted screen instead of expo-router's blank production fallback.
 export { ErrorBoundary } from '@/components/RouteErrorBoundary';
@@ -3242,37 +3242,10 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             );
 
+            // Wyciągnięte do SinceCountersCard.tsx (2026-08-26) — guard `.length > 0 &&`
+            // ZOSTAJE tutaj, patrz komentarz przy `nodes['pinned-notes']` wyżej.
             nodes['counters-since'] = dashSince.length > 0 && (
-              <View style={[s.card, { backgroundColor: cardBgDark }]}>
-                <View style={s.cardHeader}>
-                  <Hourglass size={13} color={accentColor} />
-                  <Text style={s.cardTitle}>Liczniki</Text>
-                  <TouchableOpacity onPress={() => { haptic.tap(); router.navigate('/counters' as any); }} style={{ marginLeft: 'auto' }} activeOpacity={0.7}>
-                    <Text style={[s.workToggleText, { color: accentColor }]}>Wszystkie</Text>
-                  </TouchableOpacity>
-                </View>
-                {/* The longest streak gets the rich card (flame + Mon–Sun strip); the
-                    rest stay in the compact flame grid below it. */}
-                {(() => {
-                  const top = dashSince[0];
-                  const topName = top.cn.mode === 'auto' ? `bez ${top.cn.name}` : top.cn.name;
-                  return <StreakCard name={topName} days={top.days} />;
-                })()}
-                {dashSince.length > 1 && (
-                  <View style={[s.sinceGrid, { marginTop: spacing[3] }]}>
-                    {dashSince.slice(1, 7).map(({ cn, days }) => {
-                      const tc = streakTier(days).color;
-                      return (
-                      <View key={cn.id} style={[s.sinceTile, { backgroundColor: tc + '1A', borderWidth: 1, borderColor: tc + '3A' }]}>
-                        <StreakFlame days={days} size={46} />
-                        <Text style={s.sinceTileUnit}>{days === 1 ? 'dzień' : 'dni'}</Text>
-                        <Text style={s.sinceTileName} numberOfLines={1}>{cn.mode === 'auto' ? `bez ${cn.name}` : cn.name}</Text>
-                      </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
+              <SinceCountersCard since={dashSince} cardBg={cardBgDark} accentColor={accentColor} />
             );
 
             nodes['streak-wall'] = streakWall.some(x => x.days > 0) && <StreakWallCard streaks={streakWall} cardBg={cardBgDark} />;
@@ -4976,11 +4949,9 @@ const buildStyles = (c: any) => StyleSheet.create({
   // cdName PRZENIESIONE do CountdownsCard.tsx (2026-08-25) — cdDays zostaje, wciąż używane
   // przez sleep-chart w tym pliku.
   cdDays: { fontSize: 12, fontWeight: '800', color: c.tabs?.day ?? '#46B0DE' },
-  sinceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: spacing[2] },
-  sinceTile: { width: '31.5%', flexGrow: 1, backgroundColor: c.fill.subtle, borderRadius: radius.md, paddingVertical: spacing[3], paddingHorizontal: spacing[2], alignItems: 'center' },
-  sinceTileDays: { fontSize: 26, fontWeight: '900', color: c.text.primary, letterSpacing: -1 },
-  sinceTileUnit: { fontSize: 10, fontWeight: '700', color: c.text.muted, marginTop: -2 },
-  sinceTileName: { fontSize: 11, fontWeight: '600', color: c.text.secondary, marginTop: 3, textAlign: 'center', maxWidth: '100%' },
+  // sinceGrid/Tile/TileUnit/TileName PRZENIESIONE do SinceCountersCard.tsx (2026-08-26).
+  // sinceTileDays było już martwe PRZED tą zmianą (StreakFlame pokazuje liczbę dni sam,
+  // ten styl nie był nigdzie używany) — usunięte przy okazji.
   toolSub: { fontSize: 11, fontWeight: '800', letterSpacing: -0.3 },
 
   // ── Evening habits nudge ──────────────────────────────────────────────────
