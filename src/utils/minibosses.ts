@@ -27,17 +27,27 @@ export interface MiniBoss {
   destination: string;
 }
 
-// Tylko harpia dostaje jednoznaczny wpis (szpony/talony = claw) — reszta rosteru to zwierzęta
-// bez pazur/miecza/magii w charakterze, zostają na fallback pięści.
+// Tylko zwierzęta z jednoznacznym pazur/szpon w charakterze dostają `attackKind: 'claw'`
+// (harpia szpony, teraz też wilk i grizzly) — reszta rosteru zostaje na fallback pięści, ta
+// sama zasada co w bosses.ts/raid.ts.
+//
+// 2026-08-26 (user: "chciałem ich jako bossów więcej do questów żeby nie były takie stałe że
+// koza jest, koza wywalamy, wieloryba też chyba") — koza (`mb_goat`) i wieloryb (`mb_whale`)
+// USUNIĘTE (za często losowani, user chciał świeżości w rotacji), zastąpione wilkiem, grizzly
+// i osą — user dostarczył WŁASNY art (`BOSS_atakpazury_wilk.png`/`BOSS_atakpazury_grizly.png`,
+// ta sama konwencja co pazurzaste bossy kampanii). Osa dostała plik bez jednoznacznego typu
+// ataku w nazwie (`osa_BOSSYuntitled.png`) — user nie sprecyzował attackKind, więc zgodnie z
+// domyślną zasadą (niejednoznaczny atak = pięść) zostaje bez wpisu, tak jak reszta rosteru.
 export const MINIBOSSES: MiniBoss[] = [
   { id: 'mb_capybara', name: 'Kapibara Chillu', emoji: '🦫', taunt: 'Po co się wysilać, i tak jest się chill…', destination: 'Leniwe Bajoro' },
   { id: 'mb_duck', name: 'Kaczka Kałuży', emoji: '🦆', taunt: 'Ta kałuża w pełni wystarczy…', destination: 'Kałuża za Płotem' },
   { id: 'mb_shark', name: 'Rekinek Fali', emoji: '🦈', taunt: 'Ledwo mokro, po co ten wysiłek…', destination: 'Rafa Przypływu' },
-  { id: 'mb_whale', name: 'Wieloryb Głębin', emoji: '🐳', taunt: 'Jedna rzecz nic nie zmieni…', destination: 'Otchłań Oceanu' },
-  { id: 'mb_goat', name: 'Koza Uparta', emoji: '🐐', taunt: 'Po co iść dalej, tu jest wygodnie…', destination: 'Kozia Przełęcz' },
   { id: 'mb_harpy', name: 'Harpia Wichru', emoji: '🦅', taunt: 'To się nie liczy jako osiągnięcie…', attackKind: 'claw', destination: 'Wichrowy Szczyt' },
   { id: 'mb_macaws', name: 'Ary Dżungli', emoji: '🦜', taunt: 'Zostań na gałęzi, tu jest bezpiecznie…', destination: 'Szmaragdowa Dżungla' },
   { id: 'mb_snake', name: 'Wąż Ścieżki', emoji: '🐍', taunt: 'Po co się starać, można się czołgać…', destination: 'Piaszczysta Ścieżka' },
+  { id: 'mb_wilk', name: 'Wilk Głodu', emoji: '🐺', taunt: 'Zjesz jutro, dziś odpuść…', attackKind: 'claw', destination: 'Mroźna Ostoja' },
+  { id: 'mb_grizzly', name: 'Grizzly Ospałości', emoji: '🐻', taunt: 'Prześpij to, nic się nie stanie…', attackKind: 'claw', destination: 'Niedźwiedzia Gawra' },
+  { id: 'mb_osa', name: 'Osa Rozproszenia', emoji: '🐝', taunt: 'Ciągle coś Cię rozprasza, i tak dobrze…', destination: 'Osie Gniazdo' },
 ];
 
 function hashOf(s: string, mul: number): number {

@@ -3,6 +3,34 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Miniboss roster odświeżony: koza/wieloryb→wilk/grizzly/osa — NIEsprawdzone (2026-08-26)
+
+Koza/wieloryb usunięte z `MINIBOSSES` (user chciał świeżości w rotacji questowej — "koza jest,
+koza wywalamy"), wilk (`mb_wilk`) i grizzly (`mb_grizzly`) dodane z `attackKind:'claw'` (naprawia
+fallbackową czerwoną pięść `HandFist` o którą user pytał osobno), osa (`mb_osa`) dodana bez
+attackKind (plik bez jednoznacznego typu ataku, user nie sprecyzował). User wrzucił własny art
+bezpośrednio na branch (GitHub web upload) do `assets/ikonybosów/` — `bossIcons.ts` wskazuje
+tam, NIE na `assets/minibosses/` jak reszta minibossów. Tym samym uploadem podmienił
+`helm_slomiany.png`/`helm_skorzany.png` na nowy art (bez zmian w kodzie, te ścieżki już
+istniały). `tsc`/`jest` zielone (+2 testy na roster). **Priorytet testu na urządzeniu**: quest
+dzienny "Walcz" i misja pupila — wilk/grizzly/osa powinny się teraz pojawiać w rotacji zamiast
+kozy/wieloryba, wilk i grizzly powinny mieć w kontrataku ikonę pazura (`HandGrab`), nie
+czerwoną pięść.
+
+Talizmany (gwiazda/księżyc/piórko/nieskończoność) z tego samego screenshota usera NIE zostały
+jeszcze wrzucone — nieblokujące, tylko PODMIENIAJĄ już istniejące pliki w
+`assets/ekwipunek/talizman/`, do zrobienia kiedy wygodnie (⚠️ `talizman_nieskonczonosci.png` →
+zmień na `talizman_nieskonczonosc.png`, bez "i" na końcu, kod czyta dokładnie tę nazwę).
+
+## 🆕 User chce przejrzeć/dodać unikatowe ataki (attackKind) dla WIĘCEJ bossów (2026-08-26)
+
+User: "musimy ataki zrobić inne bossów" — po naprawieniu wilka/grizzly (wyżej) user zapowiedział
+że napisze listę bossów i jakie ataki (claw/magic/sword) im dodać/zmienić. Reszta rosteru BEZ
+`attackKind` (kampania: sugar/scroll/stress/junk/burnout/insomnia/compare/drought/procrast/
+devourer; raid: behemoth/wyrm/siren; sezonowe: wszystkie 4; minibossy: capybara/duck/shark/
+snake/macaws/osa) dalej dostaje fallbackową pięść — czeka na konkretną listę od usera (jaki typ
+ataku + czy ma nowy art, czy tylko przypisujemy istniejący `attackKind` bez nowego pliku PNG).
+
 ## 🆕 Pasek misji ODWRÓCONY: kotek w miejscu, dokładny licznik M:SS na pasku — NIEsprawdzone (2026-08-26)
 
 User: "zróbmy na odwrót jego spacerujacego w miejscu tam gdzie jest czas teraz, i on będzie
