@@ -22,14 +22,26 @@ jeszcze wrzucone — nieblokujące, tylko PODMIENIAJĄ już istniejące pliki w
 `assets/ekwipunek/talizman/`, do zrobienia kiedy wygodnie (⚠️ `talizman_nieskonczonosci.png` →
 zmień na `talizman_nieskonczonosc.png`, bez "i" na końcu, kod czyta dokładnie tę nazwę).
 
-## 🆕 User chce przejrzeć/dodać unikatowe ataki (attackKind) dla WIĘCEJ bossów (2026-08-26)
+## 🆕 Kontratak: prawdziwe PNG zamiast lucide + nowy typ 'fire' + więcej pazurów — NIEsprawdzone (2026-08-26)
 
-User: "musimy ataki zrobić inne bossów" — po naprawieniu wilka/grizzly (wyżej) user zapowiedział
-że napisze listę bossów i jakie ataki (claw/magic/sword) im dodać/zmienić. Reszta rosteru BEZ
-`attackKind` (kampania: sugar/scroll/stress/junk/burnout/insomnia/compare/drought/procrast/
-devourer; raid: behemoth/wyrm/siren; sezonowe: wszystkie 4; minibossy: capybara/duck/shark/
-snake/macaws/osa) dalej dostaje fallbackową pięść — czeka na konkretną listę od usera (jaki typ
-ataku + czy ma nowy art, czy tylko przypisujemy istniejący `attackKind` bez nowego pliku PNG).
+User odpowiedział na listę bossów: "ta pięść jest zdecydowanie za często" + konkretne
+przypisania. Zrobione: (1) `assets/ikonybosów/BOSSATTACK_*.png` (leżały nieużywane od 13.08)
+podłączone jako PRAWDZIWY kontratak zamiast generycznych, kolorowanych ikon lucide — nowy
+`attackPng()`/`ATTACK_PNG`/`FIST_PNG` w `bossIcons.ts`, `boss-fight.tsx` renderuje `<Image>`
+zamiast `HandFist`/`HandGrab`/`Sparkles`/`Sword`; (2) nowy 4. `AttackKind = 'fire'`
+(`BOSSATTACK_FIRE.png`) — TYLKO smok (`dragon`); (3) `claw` dodane do węża kampanii (`snake`),
+ary (`mb_macaws`) i węża questowego (`mb_snake`); sword (pirat+samuraj) dzieli JEDEN plik
+`BOSSATTACK_priateattack_blade.png`, zgodnie z sugestią usera. Pełny opis w ARCHITECTURE.md
+(sekcja "PNG zamiast generycznych ikon lucide..."). Nowe testy (+3: `bosses.test.ts` wąż/smok,
+`minibosses.test.ts` ara/wąż). `tsc`/`jest` zielone (63/749). **Priorytet testu na urządzeniu**:
+walka z wężem/smokiem/arą (kampania/miniboss) — kontratak powinien pokazywać RYSOWANĄ grafikę
+(pazury/ognista kula), nie kolorową ikonę-kreskę; smoczy kontratak lecący jako pocisk (fire NIE
+jest wyjątkiem jak claw, więc leci tak jak magia/miecz/pięść, nie pojawia się burstem na kotku).
+
+User zapowiedział, że resztę rosteru (kampania: sugar/scroll/stress/junk/burnout/insomnia/
+compare/drought/procrast/devourer; raid: behemoth/wyrm/siren; sezonowe: wszystkie 8;
+pozostałe minibossy: capybara/duck/shark/osa) będzie dorzucał STOPNIOWO w kolejnych turach —
+minibossy poza wilkiem/grizzly/osą uważa za TYMCZASOWE i sam je podmieni własnym artem.
 
 ## 🆕 Pasek misji ODWRÓCONY: kotek w miejscu, dokładny licznik M:SS na pasku — NIEsprawdzone (2026-08-26)
 

@@ -254,6 +254,15 @@ describe('bosses — BOSSES roster balance (2026-08-13, patrz memory boss_design
   });
 });
 
+describe('bosses — attackKind (2026-08-26, user: "ta pięść jest zdecydowanie za często")', () => {
+  test('wąż ma claw ("wąż możemy też pazury")', () => {
+    expect(BOSSES.find(b => b.id === 'snake')?.attackKind).toBe('claw');
+  });
+  test('smok ma fire ("SMOK niech ogniem lub kulą ognia rzuca")', () => {
+    expect(BOSSES.find(b => b.id === 'dragon')?.attackKind).toBe('fire');
+  });
+});
+
 describe('bosses — simulateFight (silnik rund)', () => {
   test('miażdżąca przewaga staty → wygrana, kotek bez zadrapania', () => {
     const b = boss({ hp: 10 }); // trywialnie mało HP

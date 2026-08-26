@@ -705,6 +705,27 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `boltOp`/`boltScale`) błyska bezpośrednio NA portrecie kotka, mirror `attackFx` (burst
       na bossie przy Twoim ciosie), tylko po drugiej stronie areny. Magia/miecz/pięść nadal
       lecą jak wcześniej.
+    - **PNG zamiast generycznych ikon lucide + 4. typ `'fire'` + więcej bossów z pazurami**
+      (2026-08-26, user: "ta pięść jest zdecydowanie za często... atak pięścią nie rób
+      własnej masz tam w BOSSATTACK... to te pazury co masz zrobić bo nie wiem czy to
+      wykorzystujesz... tutaj masz customowe typowo pod pirata, ale można też pod samuraja").
+      `assets/ikonybosów/BOSSATTACK_*.png` (fist/claw-marks/magicspell/pirateattack_blade/
+      FIRE) leżały w repo od 13.08 NIEUŻYWANE — kontratak renderował zamiast nich generyczne,
+      kolorowane ikony lucide (`HandFist`/`HandGrab`/`Sparkles`/`Sword`, `COUNTER_ICON`/
+      `COUNTER_COLOR` w `boss-fight.tsx`). Nowy `ATTACK_PNG`/`FIST_PNG`/`attackPng()` w
+      `bossIcons.ts` (ten sam plik/wzorzec co `BOSS_PNG` dla portretów, PNG require() —
+      screen-only, nigdy importowane przez testy) — `boss-fight.tsx` renderuje teraz
+      `<Image source={attackPng(target?.attackKind)} .../>` w OBU miejscach (latający pocisk
+      i burst pazurów na portrecie kotka), `COUNTER_ICON`/`COUNTER_COLOR`/`CounterIcon`/
+      `counterColor` i importy `HandFist`/`HandGrab`/`Sparkles`/`Sword` z lucide USUNIĘTE
+      całkowicie — bez tintowania kolorem, PNG to już gotowa, narysowana grafika. Sword
+      (jedyni dwaj bossy: piratecapitan/samurai) dzieli JEDEN plik
+      `BOSSATTACK_priateattack_blade.png`, zgodnie z sugestią usera. Nowy CZWARTY
+      `AttackKind` = `'fire'` (`BOSSATTACK_FIRE.png`) — TYLKO smok (`dragon`, user: "SMOK
+      niech ogniem lub kulą ognia rzuca"), reszta rosteru NIE dostała fire automatycznie.
+      Dodatkowo przypisane `claw` tam gdzie wcześniej była fallbackowa pięść: wąż kampanii
+      (`snake`), ara (`mb_macaws`) i wąż questowy (`mb_snake`) w minibossach — user explicite
+      wymienił te dwa zwierzaki po komentarzu że pięść wypada za często.
   - **Raid dostał pełną rundową walkę** (2026-08-17, user: "ten eventowy [na pozycji raidu —
     patrz niżej] jakby kafelek jest zbudowany a nie zwykła walka... miała być zwykła tylko
     taka która nie restartuje jego HP jak z tym drugim [event]") — raid był JEDYNYM trybem bez

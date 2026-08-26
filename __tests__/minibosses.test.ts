@@ -61,6 +61,12 @@ describe('minibosses — roster (2026-08-26, user: "koza wywalamy, wieloryba te�
     expect(ids).not.toContain('mb_whale');
   });
 
+  test('ara i wąż dostają claw ("ta pięść jest zdecydowanie za często", 2026-08-26)', () => {
+    const byId = Object.fromEntries(MINIBOSSES.map(m => [m.id, m]));
+    expect(byId.mb_macaws?.attackKind).toBe('claw');
+    expect(byId.mb_snake?.attackKind).toBe('claw');
+  });
+
   test('wilk/grizzly/osa dodane, wilk i grizzly mają attackKind claw (własny art z pazurami)', () => {
     const byId = Object.fromEntries(MINIBOSSES.map(m => [m.id, m]));
     expect(byId.mb_wilk?.attackKind).toBe('claw');

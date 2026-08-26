@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, HandFist, HandGrab, Sparkles, Sword, Trophy, Compass } from 'lucide-react-native';
+import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Trophy, Compass } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
+import { attackPng } from '@/utils/bossIcons';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
@@ -581,11 +582,11 @@ export default function BossFight() {
   const boltOp = boltTravel.interpolate({ inputRange: [0, 0.08, 0.85, 1], outputRange: [0, 1, 1, 0] });
   const boltScale = boltTravel.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.8, 1.15, 0.8] });
   // Unikatowy kontratak per typ bossa (2026-08-17) — patrz komentarz przy render'ze pocisku
-  // niżej. Brak attackKind (większość rosteru) = ta sama czerwona pięść co dotąd.
-  const COUNTER_ICON: Record<AttackKind, typeof HandFist> = { claw: HandGrab, magic: Sparkles, sword: Sword };
-  const COUNTER_COLOR: Record<AttackKind, string> = { claw: '#F87171', magic: '#A78BFA', sword: '#94A3B8' };
-  const CounterIcon = target?.attackKind ? COUNTER_ICON[target.attackKind] : HandFist;
-  const counterColor = target?.attackKind ? COUNTER_COLOR[target.attackKind] : '#F87171';
+  // niżej. Brak attackKind (większość rosteru) = ta sama pięść co dotąd. 2026-08-26 (user:
+  // "ta pięść jest zdecydowanie za często... nie rób własnej ikony, masz gotowe PNG") —
+  // prawdziwy narysowany PNG (`attackPng`, bossIcons.ts) zamiast generycznej kolorowanej
+  // ikony lucide.
+  const counterPng = attackPng(target?.attackKind);
 
   const closeVictory = () => { setVictory(null); router.back(); };
   const closeDefeat = () => { setDefeat(null); router.back(); };
@@ -654,7 +655,7 @@ export default function BossFight() {
                       lot pocisku dla pozostałych typów. */}
                   {boltFlying && target?.attackKind === 'claw' && (
                     <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
-                      <HandGrab size={90} color={counterColor} />
+                      <Image source={counterPng} style={{ width: 90, height: 90 }} resizeMode="contain" />
                     </Animated.View>
                   )}
                   {catHit && !!catHit.dmg && (
@@ -719,7 +720,7 @@ export default function BossFight() {
                 inne miejsce renderu. */}
             {boltFlying && target?.attackKind !== 'claw' && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
-                <CounterIcon size={28} color={counterColor} fill={counterColor} />
+                <Image source={counterPng} style={{ width: 28, height: 28 }} resizeMode="contain" />
               </Animated.View>
             )}
             </View>

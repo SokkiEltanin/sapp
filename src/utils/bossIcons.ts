@@ -1,4 +1,5 @@
 import { ImageSourcePropType } from 'react-native';
+import { AttackKind } from '@/utils/bosses';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom boss artwork (assets/ikonybosów, flat-vector PNG, each already drawn
@@ -88,4 +89,26 @@ export function poweredBossPng(id: string): ImageSourcePropType | undefined {
 // aura trick as raid above) — strip the prefix instead of duplicating all 22 require() lines.
 export function bossPng(id: string): ImageSourcePropType | undefined {
   return BOSS_PNG[id] ?? (id.startsWith('mad_') ? BOSS_PNG[id.slice(4)] : undefined);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ikony KONTRATAKU bossa w boss-fight.tsx (pocisk lecący między kafelkami + burst pazurów NA
+// portrecie kotka) — 2026-08-26, user: "ta pięść jest zdecydowanie za często... atak pięścią
+// nie rób własnej masz tam w BOSSATTACK... tak jak inne [magicspell]... to te pazury co masz
+// zrobić bo nie wiem czy to wykorzystujesz... tutaj masz customowe typowo pod pirata". Te
+// pliki (`BOSSATTACK_*.png`) leżały w `assets/ikonybosów/` od 13.08 NIEUŻYWANE — boss-fight.tsx
+// renderował zamiast nich generyczne, kolorowane ikony lucide (HandFist/HandGrab/Sparkles/
+// Sword). Teraz KAŻDY `AttackKind` (i fallbackowa pięść) ma swój prawdziwy PNG zamiast
+// wektorowej ikony.
+export const ATTACK_PNG: Record<AttackKind, ImageSourcePropType> = {
+  claw:  require('../../assets/ikonybosów/BOSSATTACK_zadrapaniepazury_claw-marks.png'),
+  magic: require('../../assets/ikonybosów/BOSSATTACK_magicspell.png'),
+  // "customowe typowo pod pirata, ale można też pod samuraja" — jedyni dwaj bossy ze
+  // sword (piratecapitan/samurai) dzielą TEN SAM plik, tak jak user zasugerował.
+  sword: require('../../assets/ikonybosów/BOSSATTACK_priateattack_blade.png'),
+  fire:  require('../../assets/ikonybosów/BOSSATTACK_FIRE.png'),
+};
+export const FIST_PNG: ImageSourcePropType = require('../../assets/ikonybosów/BOSSATTACK_handattack_fist.png');
+export function attackPng(kind: AttackKind | undefined): ImageSourcePropType {
+  return kind ? ATTACK_PNG[kind] : FIST_PNG;
 }
