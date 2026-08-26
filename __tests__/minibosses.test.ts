@@ -54,6 +54,21 @@ describe('minibosses — balans (rośnie z poziomem, nagroda > standardowy claim
   });
 });
 
+describe('minibosses — roster (2026-08-26, user: "koza wywalamy, wieloryba też")', () => {
+  test('koza i wieloryb usunięte z rosteru', () => {
+    const ids = MINIBOSSES.map(m => m.id);
+    expect(ids).not.toContain('mb_goat');
+    expect(ids).not.toContain('mb_whale');
+  });
+
+  test('wilk/grizzly/osa dodane, wilk i grizzly mają attackKind claw (własny art z pazurami)', () => {
+    const byId = Object.fromEntries(MINIBOSSES.map(m => [m.id, m]));
+    expect(byId.mb_wilk?.attackKind).toBe('claw');
+    expect(byId.mb_grizzly?.attackKind).toBe('claw');
+    expect(byId.mb_osa).toBeTruthy();
+  });
+});
+
 describe('minibosses — minibossAsBoss (kształt gotowy do simulateFight)', () => {
   test('HP w Boss-obiekcie zgodne z questBossHpFor na danych argumentach', () => {
     const mb = MINIBOSSES[0];

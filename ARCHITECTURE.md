@@ -1045,6 +1045,28 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       Logika questCtx/quests/missed WYDZIELONA do nowego `src/hooks/usePetQuests.ts` (ten sam
       wzorzec co `usePetHealthSync`) — jedno źródło prawdy zamiast duplikowania obliczeń
       między pełnym ekranem Zadań a badge'em w navbarze.
+    - **Roster odświeżony: koza/wieloryb usunięte, wilk/grizzly/osa dodane** (2026-08-26, user:
+      "chciałem ich jako bossów więcej do questów żeby nie były takie stałe że koza jest, koza
+      wywalamy, wieloryba też" — plus screenshot z gotowym artem: `BOSS_atakpazury_wilk.png`,
+      `BOSS_atakpazury_grizly.png`, `osa_BOSSYuntitled.png`). `mb_goat`/`mb_whale` USUNIĘTE z
+      `MINIBOSSES` (`minibosses.ts`) i z `BOSS_PNG` (`bossIcons.ts`) — czyste skasowanie, bez
+      martwych `require()`. Wilk (`mb_wilk`, "Wilk Głodu") i grizzly (`mb_grizzly`, "Grizzly
+      Ospałości") dostają `attackKind: 'claw'` — user narysował ich art w TEJ SAMEJ konwencji
+      co pazurzaste bossy kampanii (`BOSS_atakpazury_<zwierzę>.png`, patrz komentarz nad
+      `AttackKind` w `bosses.ts` — to właśnie ten atak eliminuje fallbackową czerwoną pięść
+      `HandFist` z `boss-fight.tsx`, o którą user pytał osobno: "czemu ten czerwona ręka
+      dziwna"). Osa (`mb_osa`, "Osa Rozproszenia") zostaje BEZ `attackKind` — plik dostarczony
+      bez jednoznacznego typu ataku w nazwie, user nie sprecyzował gdy dopytany, więc zgodnie
+      ze standardową zasadą (niejednoznaczny atak = pięść) zostaje na fallbacku, tak jak reszta
+      rosteru bez pazur/miecza/magii w charakterze. Pliki wrzucone przez usera bezpośrednio na
+      branch (GitHub web upload) do `assets/ikonybosów/` (NIE `assets/minibosses/` jak reszta
+      minibossów — require() nie wymaga jednolitego folderu, ważne że ścieżka się zgadza;
+      `osa_BOSSYuntitled.png` zostaje pod dokładnie tą nazwą) — `bossIcons.ts` dostosowany do
+      RZECZYWISTYCH ścieżek zamiast planowanych `assets/minibosses/...`. Tego samego uploadu:
+      nowy art `helm_slomiany.png`/`helm_skorzany.png` (podmienił stare pliki 1:1, bez zmian w
+      kodzie — te dwie ścieżki już istniały). Talizmany (gwiazda/księżyc/piórko/nieskończoność)
+      z tego samego screenshota usera NIE zostały jeszcze wrzucone — nieblokujące, do zrobienia
+      kiedy wygodnie.
   - **MAD bossy** (2026-08-15, `utils/madBosses.ts`) — PIĄTY tor, `?kind=mad` w
     `boss-fight.tsx`. User: "trzeba przemyśleć hp bossów" → zamiast rozciągać jedną krzywą
     HP w nieskończoność (dokładnie problem raidu wyżej), druga fala TYCH SAMYCH 22 bossów

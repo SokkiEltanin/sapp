@@ -42,11 +42,18 @@ export const BOSS_PNG: Record<string, ImageSourcePropType> = {
   mb_capybara: require('../../assets/minibosses/MINIBOSS_capybara.png'),
   mb_duck:     require('../../assets/minibosses/MINIBOSS_duck.png'),
   mb_shark:    require('../../assets/minibosses/MINIBOSS_shark.png'),
-  mb_whale:    require('../../assets/minibosses/MINIBOSS_whale.png'),
-  mb_goat:     require('../../assets/minibosses/MINIBOSS_goat.png'),
   mb_harpy:    require('../../assets/minibosses/MINIBOSS_harpy-eagle.png'),
   mb_macaws:   require('../../assets/minibosses/MINIBOSS_macaws.png'),
   mb_snake:    require('../../assets/minibosses/MINIBOSS_snake.png'),
+  // mb_goat/mb_whale USUNIĘTE z minibosses.ts (2026-08-26, user chciał świeżości w rotacji) —
+  // wpisy tu też skasowane, żeby nie zostawić martwych require() do plików, które nic już nie
+  // czyta. Zastąpione wilkiem/grizzly/osą — user dostarczył WŁASNY art i wrzucił go do
+  // `assets/ikonybosów/` (nie `assets/minibosses/` jak reszta minibossów — require() nie
+  // wymaga jednolitego folderu/konwencji nazw, wystarczy że plik istnieje pod tą ścieżką;
+  // `osa_BOSSYuntitled.png` zostaje pod DOKŁADNIE tą nazwą, tak jak user go wrzucił).
+  mb_wilk:     require('../../assets/ikonybosów/BOSS_atakpazury_wilk.png'),
+  mb_grizzly:  require('../../assets/ikonybosów/BOSS_atakpazury_grizly.png'),
+  mb_osa:      require('../../assets/ikonybosów/osa_BOSSYuntitled.png'),
   // ── raid (2026-08-15) — 6 rajdowych bossów zaczynały bez własnego artu (placeholder/
   // emoji), tymczasowo pożyczały PNG z kampanii + programowa czerwona aura (`powered` prop
   // w BossArt). User dorysował WŁASNY dedykowany art dla 3 z nich (golem/kraken/upior=
