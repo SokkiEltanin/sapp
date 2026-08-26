@@ -33,6 +33,20 @@ export function fmtMissionDuration(minutes: number): string {
   return h > 0 ? `${h}h ${m}min` : `${m}min`;
 }
 
+// Precyzyjny licznik M:SS (lub H:MM:SS) — dla żywego countdownu na pasku misji
+// (2026-08-26, user: "zamiast niego w pasku będzie dokładny czas w minutach i sekundach").
+// `fmtMissionDuration` wyżej celowo zaokrągla do minut (dobre dla statycznych statów), ale nie
+// nadaje się do licznika, który ma faktycznie tykać co sekundę.
+export function fmtMissionCountdown(ms: number): string {
+  const totalSec = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const sec = totalSec % 60;
+  const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
+  const ss = String(sec).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 // Nagroda BAZOWA wyraźnie wyższa niż typowy daily quest (2-6 monet/5-15 xp) — user: "trochę
 // więcej xp i coinow jak za daily questa".
 //

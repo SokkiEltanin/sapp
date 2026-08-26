@@ -31,7 +31,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { missionMinutesFor, missionRewardFor, minibossForMission, fmtMissionDuration, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
+import { missionMinutesFor, missionRewardFor, minibossForMission, fmtMissionDuration, fmtMissionCountdown, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
 
 const ITEM_IDS = Object.keys(COMBAT_ITEMS) as CombatItemId[];
 const HP_UPGRADE_AMOUNT = 20;
@@ -65,14 +65,18 @@ export default function Pet() {
     equippedGear, ownedGear } = usePetStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
-  // Misja (utils/missions.ts, 2026-08-15) — czas trwania to godziny, nie sekundy, więc tik co
-  // 30s (nie co 1s jak TrainingSessionModal) wystarczy żeby licznik czuł się "żywy" bez
-  // zbędnego re-renderu ekranu co sekundę. `missionTick` sam w sobie nieużywany — wymusza
-  // tylko przeliczenie missionRemainingMs poniżej.
+  // Misja (utils/missions.ts, 2026-08-15) — tik co 1s (było 30s) żeby napędzić dokładny
+  // licznik M:SS na pasku (2026-08-26, user: "zamiast niego w pasku będzie dokładny czas w
+  // minutach i sekundach"). Interval sam się zatrzymuje gdy misja staje się gotowa (remaining
+  // <=0) — nie ma sensu dalej tykać co sekundę, skoro pasek/licznik i tak znika z tego widoku.
+  // `missionTick` sam w sobie nieużywany — wymusza tylko przeliczenie missionRemainingMs niżej.
   const [missionTick, setMissionTick] = useState(0);
   useEffect(() => {
     if (!missionEndsAt) return;
-    const iv = setInterval(() => setMissionTick(t => t + 1), 30000);
+    const iv = setInterval(() => {
+      setMissionTick(t => t + 1);
+      if (new Date(missionEndsAt).getTime() <= Date.now()) clearInterval(iv);
+    }, 1000);
     return () => clearInterval(iv);
   }, [missionEndsAt]);
   const missionRemainingMs = missionEndsAt ? new Date(missionEndsAt).getTime() - Date.now() : 0;
@@ -104,14 +108,16 @@ export default function Pet() {
   }, [missionEndsAt, missionReady]);
   const missionSwayRotate = missionSway.interpolate({ inputRange: [-1, 1], outputRange: ['-4deg', '4deg'] });
   const missionSwayX = missionSway.interpolate({ inputRange: [-1, 1], outputRange: [-3, 3] });
-  // Animacja WEJŚCIA na pasek (2026-08-20, user: "kotek jest podwojony chce tylko animacje jak
-  // on wchodzi na pasek zmniejsza sie w trakcie wchodzenia i sobie tak idzie z paskiem" —
-  // dawniej DWA kotki naraz: duży skurczony na scenie + mały na pasku, wyglądało jak duplikat.
-  // Teraz JEDEN kotek: startuje duży (`outputRange` scale 3.2) i wysoko (translateY -90, tam
-  // gdzie siedział normalny portret), potem kurczy się i opada DOKŁADNIE na pasek w jednej,
-  // płynnej animacji. Odtwarza się przy KAŻDYM zamontowaniu ekranu w trakcie misji (nie tylko
-  // raz przy starcie) — prościej niż śledzenie "czy user już to widział", i nieszkodliwe
-  // (user i tak wraca na ten ekran raz na jakiś czas, nie w pętli).
+  // Animacja WEJŚCIA (2026-08-20, user: "kotek jest podwojony chce tylko animacje jak on
+  // wchodzi na pasek zmniejsza sie w trakcie wchodzenia i sobie tak idzie z paskiem" — dawniej
+  // DWA kotki naraz: duży skurczony na scenie + mały na pasku, wyglądało jak duplikat. Teraz
+  // JEDEN kotek: startuje duży (`outputRange` scale 3.2) i lekko wyżej, potem kurczy się i
+  // opada DOKŁADNIE w miejsce docelowe w jednej, płynnej animacji. translateY zmniejszony do
+  // -40 (było -90, gdy celem był niżej położony pasek) — 2026-08-26: kotek nie jeździ już po
+  // pasku, tylko stoi w `missionHeadRow` bliżej góry, więc dystans wejścia jest krótszy.
+  // Odtwarza się przy KAŻDYM zamontowaniu ekranu w trakcie misji (nie tylko raz przy starcie) —
+  // prościej niż śledzenie "czy user już to widział", i nieszkodliwe (user i tak wraca na ten
+  // ekran raz na jakiś czas, nie w pętli).
   const missionEnter = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!missionEndsAt || missionReady) return;
@@ -119,7 +125,7 @@ export default function Pet() {
     Animated.timing(missionEnter, { toValue: 1, duration: 550, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [missionEndsAt, missionReady]);
   const missionEnterScale = missionEnter.interpolate({ inputRange: [0, 1], outputRange: [3.2, 1] });
-  const missionEnterY = missionEnter.interpolate({ inputRange: [0, 1], outputRange: [-90, 0] });
+  const missionEnterY = missionEnter.interpolate({ inputRange: [0, 1], outputRange: [-40, 0] });
   // Fala "ładowania" przesuwająca się po wypełnionej części paska (2026-08-20, user: "za nim
   // taka ładująca się fala") — jasny pasek skośnie przecinający wypełnienie, zapętlony,
   // przycięty przez `overflow:hidden` na `missionBarFillWrap` do aktualnej szerokości
@@ -373,24 +379,19 @@ export default function Pet() {
           <GearPanel>
             {/* Kotek W MISJI — JEDEN kotek, nie dwa (2026-08-20, user: "kotek jest podwojony" —
                 dawniej duży skurczony portret NA scenie + osobny mały na pasku renderowały się
-                RAZEM, wyglądało jak duplikat). Teraz tylko ten na pasku istnieje — "wchodzi"
-                na niego jednorazową animacją `missionEnter` (duży i wysoko → mały i na pasku),
-                potem jeździ wzdłuż wypełnienia z tym samym bounce/sway co dawniej. Nad paskiem
-                nazwa miejsca (`missionMb.destination`, `minibossForMission` — DETERMINISTYCZNIE
-                ten sam zwierzak/miejsce co dostanie do walki `boss-fight.tsx` po powrocie, patrz
-                minibosses.ts) i odliczanie po przeciwnej stronie. */}
+                RAZEM, wyglądało jak duplikat). ODWRÓCONE 2026-08-26 (user: "zróbmy na odwrót
+                jego spacerujacego w miejscu tam gdzie jest czas teraz, i on będzie miał te
+                animacje tyle że w miejscu, a zamiast niego w pasku będzie dokładny czas") —
+                dawniej kotek JEŹDZIŁ po pasku (`left: progress%`), teraz stoi w miejscu tam
+                gdzie dawniej był tekstowy timer (prawa strona `missionHeadRow`), zachowując te
+                same animacje (`missionEnter` wejście + `missionSway` chód-w-miejscu). Sam pasek
+                pokazuje teraz dokładny licznik M:SS/H:MM:SS (`fmtMissionCountdown`) zamiast
+                kotka — wypełnienie/fala nadal wizualizują postęp w tle. */}
             {missionEndsAt && !missionReady ? (
               <View style={s.stageMissionWrap}>
                 <View style={s.missionHeadRow}>
                   <Text style={s.missionDestTxt} numberOfLines={1}>{missionMb ? missionMb.destination : 'W drodze…'}</Text>
-                  <Text style={s.missionTimerTxt}>{fmtMissionDuration(missionRemainingMs / 60000)}</Text>
-                </View>
-                <View style={s.missionBarTrack}>
-                  <View style={[s.missionBarFillWrap, { width: `${Math.round(missionProgress * 100)}%` }]}>
-                    <LinearGradient colors={['#2AA9E0', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-                    <Animated.View style={[s.missionBarWave, { transform: [{ translateX: missionWaveX }, { rotate: '18deg' }] }]} />
-                  </View>
-                  <View style={[s.missionBarCatWrap, { left: `${Math.round(missionProgress * 100)}%` }]}>
+                  <View style={s.missionHeadCatWrap}>
                     {catCoatIsDark && <View style={s.missionCatHalo} pointerEvents="none" />}
                     <Animated.View style={{ transform: [{ translateY: missionEnterY }, { scale: missionEnterScale }] }}>
                       <Animated.View style={{ transform: [{ translateX: missionSwayX }, { rotate: missionSwayRotate }] }}>
@@ -398,6 +399,15 @@ export default function Pet() {
                           eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                       </Animated.View>
                     </Animated.View>
+                  </View>
+                </View>
+                <View style={s.missionBarTrack}>
+                  <View style={[s.missionBarFillWrap, { width: `${Math.round(missionProgress * 100)}%` }]}>
+                    <LinearGradient colors={['#2AA9E0', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+                    <Animated.View style={[s.missionBarWave, { transform: [{ translateX: missionWaveX }, { rotate: '18deg' }] }]} />
+                  </View>
+                  <View style={s.missionBarCountdownWrap} pointerEvents="none">
+                    <Text style={s.missionBarCountdownTxt}>{fmtMissionCountdown(missionRemainingMs)}</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={onCancelMission} hitSlop={8}>
@@ -723,16 +733,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   missionTitle: { fontSize: 13.5, fontWeight: '800', color: c.text.primary },
   missionSub: { fontSize: 11.5, color: c.text.muted, marginTop: 1 },
-  // Nazwa miejsca (lewo) / odliczanie (prawo) NAD paskiem (2026-08-20, user: "nad paskiem
-  // nazwa a naprzeciwko timer ile zostało").
+  // Nazwa miejsca (lewo) / kotek spacerujący W MIEJSCU (prawo) NAD paskiem (2026-08-20, user:
+  // "nad paskiem nazwa a naprzeciwko timer ile zostało"; ODWRÓCONE 2026-08-26 — prawa strona
+  // miała tekstowy timer, teraz stoi tam kotek z tymi samymi animacjami chodu co dawniej na
+  // pasku, patrz komentarz przy `missionEnter`/`missionSway` wyżej w pliku).
   missionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   missionDestTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.primary, flexShrink: 1, marginRight: spacing[2] },
-  missionTimerTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted },
+  missionHeadCatWrap: { width: MISSION_CAT_SIZE, height: MISSION_CAT_SIZE, alignItems: 'center', justifyContent: 'center' },
   // Pasek GRUBSZY i SZERSZY niż dawny cienki 4px (2026-08-20, user: "ten pasek troszeczkę
   // tłuszczy i o wiele szerszy") — pełna szerokość dostępnej kolumny (`catCol` w GearPanel),
   // pigułka (borderRadius = połowa wysokości). `missionBarFillWrap` ma `overflow:'hidden'`
-  // żeby fala (`missionBarWave`) i gradient nie wystawały poza aktualną szerokość wypełnienia
-  // — `missionBarTrack` sam NIE przycina, bo kotek musi wystawać NAD/PONAD cienką krawędzią.
+  // żeby fala (`missionBarWave`) i gradient nie wystawały poza aktualną szerokość wypełnienia.
   //
   // TYLKO lewe rogi zaokrąglone (2026-08-21, user: "ładujący sie fluid jest w postaci kwadratu
   // a sam pasek [jest] zaokrąglone") — dawne jednolite `borderRadius:15` na WSZYSTKICH 4 rogach
@@ -744,10 +755,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   missionBarTrack: { position: 'relative', width: '100%', height: MISSION_BAR_HEIGHT, borderRadius: MISSION_BAR_HEIGHT / 2, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
   missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: MISSION_BAR_HEIGHT / 2, borderBottomLeftRadius: MISSION_BAR_HEIGHT / 2, overflow: 'hidden' },
   missionBarWave: { position: 'absolute', top: -10, bottom: -10, width: 34, backgroundColor: 'rgba(255,255,255,0.32)' },
-  // top = wyśrodkowanie MISSION_CAT_SIZE w MISSION_BAR_HEIGHT (formuła, nie magiczna liczba —
-  // przeżyje kolejną zmianę rozmiaru paska/kotka bez ręcznego przeliczania). marginLeft =
-  // -połowa MISSION_CAT_SIZE (centrowanie poziome na punkcie postępu).
-  missionBarCatWrap: { position: 'absolute', top: (MISSION_BAR_HEIGHT - MISSION_CAT_SIZE) / 2, marginLeft: -MISSION_CAT_SIZE / 2 },
+  // Licznik M:SS WYŚRODKOWANY na całym pasku, NAD wypełnieniem (2026-08-26) — kotek już tu nie
+  // jeździ, więc miejsce po nim zajmuje dokładny odliczający czas. Cień tekstu zamiast osobnego
+  // tła pod spodem — czytelny i na ciemnym torze, i na jasnym niebieskim wypełnieniu.
+  missionBarCountdownWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  missionBarCountdownTxt: {
+    fontSize: 12.5, fontWeight: '800', color: '#fff', letterSpacing: 0.4, fontVariant: ['tabular-nums'],
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
   // Jasna otoczka za ciemnym kotkiem (2026-08-21, patrz `catCoatIsDark` wyżej) — okrąg 10px
   // większy niż kotek, wyśrodkowany na tym samym punkcie (`top`/`left` = -połowa różnicy).
   missionCatHalo: { position: 'absolute', width: MISSION_CAT_SIZE + 10, height: MISSION_CAT_SIZE + 10, borderRadius: (MISSION_CAT_SIZE + 10) / 2, top: -5, left: -5, backgroundColor: 'rgba(255,255,255,0.55)' },
