@@ -373,6 +373,12 @@ kafelka". Dwa fixy:
 - Grupowanie produktów: `productMemory.ts` — `canonicalProductName` + `productGroupKey` +
   `productGroupLabel` (warianty typu „serek wiejski *" łączą się w „serek"). Ceny:
   `PriceStat {n,mean,min,max,last}` (`product_price_memory`).
+- **Liczenie „ile razy kupione" MUSI sumować `it.quantity`, nie +1 za linię paragonu**
+  (2026-08-26, user: „liczy ile razy coś kupiłem ale nie bierze pod uwagę ile sztuk na
+  paragonie" — realny bug w 3 miejscach jednocześnie: dashboardowe `topProducts`
+  w `app/(tabs)/index.tsx`, `metricList('topProducts'|'favSweets')` w `statWidgets.ts`
+  i katalog `app/products.tsx`. Poprawny wzorzec już istniał w `exportAnalysis.ts`:
+  `Math.max(1, Math.round(it.quantity || 1))`. Test regresji: `topProductsQuantity.test.ts`.
 - **Saldo = JEDNA liczba** „NA KARCIE" = `balanceOffset + all income − all spending`
   (2026-07-20: cash/gotówka WYCIĘTE — user nie używa; usunięto pigułki Gotówka/Razem G+K
   z hero i pola gotówki z Ustawień `getCashOffset`/`setCashOffset`; `paymentMethod` na

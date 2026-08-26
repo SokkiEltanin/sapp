@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: "NAJCZĘŚCIEJ KUPOWANE" liczyło linie paragonu, nie sztuki — NIEsprawdzone (2026-08-26)
+
+User: "wydaje mi się ze liczy ile razy coś kupiłem ale nie bierze pod uwagę ile sztuk na
+każdym paragonie tego kupilem". Potwierdzony bug — `count[key] += 1` za każdą linię
+`receiptItems`, ignorując `it.quantity`. Kupno 5 mlek na jednym paragonie liczyło się jako 1,
+nie 5. Naprawiony wzorzec (już istniejący w `exportAnalysis.ts`, teraz też tu):
+`Math.max(1, Math.round(it.quantity || 1))`. Naprawione w 3 miejscach: dashboardowe
+`topProducts` (`app/(tabs)/index.tsx`, karta "Najczęściej kupowane"), `metricList` w
+`statWidgets.ts` (widget "Top produkty"/"Ulubione słodycze" w kreatorze statystyk) i katalog
+`app/products.tsx`. Nowy test regresji `__tests__/topProductsQuantity.test.ts` (+3). `tsc`/
+`jest` zielone (62/739). **Priorytet testu na urządzeniu**: dashboard → karta "Najczęściej
+kupowane" — jeśli kupujesz np. 3-5 sztuk tego samego produktu na jednym paragonie, licznik
+powinien teraz pokazywać sumę sztuk ze wszystkich paragonów, nie liczbę paragonów na których
+się pojawił.
+
 ## ✅ Setup zdalnego dostępu (claude.ai/code z telefonu) — DZIAŁA
 
 Ta sesja jest dowodem że dostęp działa (repo `sapp` dostępne z claude.ai/code). Jeśli kiedyś

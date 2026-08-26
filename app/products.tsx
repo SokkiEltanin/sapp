@@ -87,7 +87,7 @@ export default function ProductsScreen() {
         const name = canonicalProductName(it.name, aliases);
         const key = normalizeProductName(name);
         const cur = map.get(key) ?? { name, key, count: 0, category: it.category, tags: it.tags ?? [] };
-        cur.count += 1;
+        cur.count += Math.max(1, Math.round(it.quantity || 1));
         map.set(key, cur);
       }
     }
