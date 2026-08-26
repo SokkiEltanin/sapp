@@ -2648,6 +2648,9 @@ export default function DashboardScreen() {
     return { rows, total: rows.length, fav: rows[0] ?? null, newest: newest ? { name: newest[0], date: newest[1] } : null };
   }, [expenses, nonShopVer]);
 
+  // BUG FIX (2026-08-26, user: "wydaje mi się że liczy ile razy coś kupiłem ale nie bierze
+  // pod uwagę ile sztuk na każdym paragonie") — count musi sumować `it.quantity`, nie +1 za
+  // każdą linię paragonu. Ten sam wzorzec co `exportAnalysis.ts`'s topProducts.
   const topProducts = useMemo(() => {
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
@@ -2662,10 +2665,11 @@ export default function DashboardScreen() {
         const canon = canonicalProductName(name, nameAliases);
         const key = productGroupKey(canon);   // coarse group (serek wiejski* → "serek")
         if (!key) continue;
-        count[key] = (count[key] ?? 0) + 1;
+        const qty = Math.max(1, Math.round(it.quantity || 1));
+        count[key] = (count[key] ?? 0) + qty;
         spent[key] = (spent[key] ?? 0) + (it.price ?? 0);
         (names[key] ??= []).push(canon);
-        (variants[key] ??= {})[canon] = (variants[key][canon] ?? 0) + 1;
+        (variants[key] ??= {})[canon] = (variants[key][canon] ?? 0) + qty;
       }
     }
     return Object.entries(count)

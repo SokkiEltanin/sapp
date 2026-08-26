@@ -390,7 +390,7 @@ export function metricList(metric: string, ctx: StatCtx, limit = 5): ListRow[] {
       const canon = canonicalProductName(name, ctx.nameAliases);
       const key = productGroupKey(canon);
       if (!key) continue;
-      count[key] = (count[key] ?? 0) + 1;
+      count[key] = (count[key] ?? 0) + Math.max(1, Math.round(it.quantity || 1));
       (names[key] ??= []).push(canon);
     }
   }
