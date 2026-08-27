@@ -668,7 +668,19 @@ function isDepositName(s: string): boolean {
 
 const SUSPECT_NAME_RE = /^(total|suma|razem|price\s*in\s*pln|ptu|taxed|none|do\s*zap|reszta|sprzeda|p[łl]atno|got[óo]wk|karta|kwota|vat|paragon|niefiskal|fiskaln)/i;
 
-export function parseReceiptText(text: string): ParsedReceipt {
+// Kaufland app "Receipt copy" prefixes some words with a print-style code glued
+// directly on (bold/size markers, e.g. "&1Kaufland Polska..."), no separating
+// space — that broke \b-anchored store detection on a short paste (2026-08-27,
+// debugging the parser below: the store name only had ONE glued "&1Kaufland"
+// occurrence and no other bare "Kaufland" mention, so `storeKeyFromText` silently
+// fell through to the generic parser). Stripped globally up front since no other
+// store's OCR/copy text uses this markup — a no-op everywhere else.
+function stripPrintMarkup(text: string): string {
+  return text.replace(/&\d/g, '');
+}
+
+export function parseReceiptText(rawText: string): ParsedReceipt {
+  const text = stripPrintMarkup(rawText);
   let r: ParsedReceipt;
   switch (storeKeyFromText(text)) {
     case 'kaufland':  r = parseKaufland(text); break;
@@ -683,7 +695,114 @@ export function parseReceiptText(text: string): ParsedReceipt {
   return r;
 }
 
-// ─── Kaufland ─────────────────────────────────────────────────────────────────
+// ─── Kaufland — app "Receipt copy" (digital, byte-exact) ───────────────────────
+// Distinct source from the OCR layout below: this is text pasted straight out of
+// the Kaufland app's paragon → "Receipt copy" screen (2026-08-27, user: "mamy że
+// wykrywa Kaufland to niech łapie taki paragon" + a screenshot of that screen), so
+// it's exact, not OCR noise — a dedicated parser pays off instead of forcing it
+// through the tolerant OCR one below. Detected by the "Cena PLN" column header,
+// unique to this layout. Structure: category-path headers ("Beauty / Zdrowie /
+// Dziecko", joined by "/") interleave with items between "Cena PLN" and "Suma
+// cząstkowa"; each item is either "NAME ... PRICE LETTER" on one line, or NAME
+// alone followed on the next line by "qty * unitPrice ... finalPrice LETTER"
+// (multi-buy) or "weight KG ... finalPrice LETTER" (loose/weighed goods, "Lada z
+// obsługą" / ".luz." items). A header line is told apart from a multi-line item
+// name by lookahead: only a line whose NEXT line is a bare continuation (qty*price
+// or weight — nothing else on the line) is a pending name; anything else
+// (including a category header followed by a full one-line item) is skipped.
+// Checkout-level promos ("Kup 2 płać za 1 -11,97" + "Pozycje:3,4") apply to
+// several items at once via index references too fragile to map onto specific
+// products, so they're summed into `totalDiscount` only — `subtotal` (parsed
+// straight off "Suma cząstkowa") minus that equals `total` (the paid amount).
+
+const KFL_COPY_HEADER_RE = /^Cena\s+PLN$/i;
+const KFL_COPY_SUBTOTAL_RE = /^Suma\s*cz[ąa]stkowa\s+(\d+[.,]\d{2})$/i;
+const KFL_COPY_VAT_TABLE_RE = /^Vat\s*%/i;
+const KFL_COPY_ITEM_QTY_RE = /^(.+?)\s+(\d+)\s*\*\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s*[A-E]$/;
+const KFL_COPY_CONT_QTY_RE = /^(\d+)\s*\*\s*(\d+[.,]\d{2})\s+(\d+[.,]\d{2})\s*[A-E]$/;
+const KFL_COPY_CONT_WEIGHT_RE = /^(\d+[.,]\d+)\s*KG\s+(\d+[.,]\d{2})\s*[A-E]$/i;
+const KFL_COPY_ITEM_PRICE_RE = /^(.+?)\s+(\d+[.,]\d{2})\s*[A-E]$/;
+const KFL_COPY_DISCOUNT_RE = /-(\d+[.,]\d{2})\s*$/;
+
+function isKauflandReceiptCopy(text: string): boolean {
+  return text.split('\n').some(l => KFL_COPY_HEADER_RE.test(l.trim()));
+}
+
+function parseKauflandReceiptCopy(text: string): ParsedReceipt {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const products: ReceiptProduct[] = [];
+
+  const emit = (name: string, quantity: number, unitPrice: number, finalPrice: number) => {
+    if (finalPrice <= 0 || finalPrice > 5000) return;
+    if (isDepositName(name)) {
+      products.push({ name: 'Kaucja (butelka)', quantity: 1, unitPrice: finalPrice, finalPrice, category: 'groceries', kind: 'deposit' });
+      return;
+    }
+    const clean = cleanName(name);
+    if (clean.length < 2) return;
+    products.push({ name: clean, quantity, unitPrice, finalPrice, category: categorize(clean) });
+  };
+
+  const startIdx = lines.findIndex(l => KFL_COPY_HEADER_RE.test(l));
+  const endIdx = lines.findIndex(l => KFL_COPY_SUBTOTAL_RE.test(l));
+  const itemLines = startIdx >= 0 && endIdx > startIdx ? lines.slice(startIdx + 1, endIdx) : [];
+
+  let pendingName: string | null = null;
+  for (let i = 0; i < itemLines.length; i++) {
+    const raw = itemLines[i];
+
+    if (pendingName) {
+      const cq = raw.match(KFL_COPY_CONT_QTY_RE);
+      if (cq) { emit(pendingName, parseInt(cq[1], 10), parsePrice(cq[2]), parsePrice(cq[3])); pendingName = null; continue; }
+      const cw = raw.match(KFL_COPY_CONT_WEIGHT_RE);
+      if (cw) {
+        const weight = parseFloat(cw[1].replace(',', '.'));
+        const finalPrice = parsePrice(cw[2]);
+        const unitPrice = weight > 0 ? Math.round((finalPrice / weight) * 100) / 100 : 0;
+        emit(pendingName, weight, unitPrice, finalPrice);
+        pendingName = null; continue;
+      }
+      pendingName = null;   // no continuation followed → drop, re-classify this line fresh below
+    }
+
+    const iq = raw.match(KFL_COPY_ITEM_QTY_RE);
+    if (iq) { emit(iq[1], parseInt(iq[2], 10), parsePrice(iq[3]), parsePrice(iq[4])); continue; }
+
+    const ip = raw.match(KFL_COPY_ITEM_PRICE_RE);
+    if (ip) { emit(ip[1], 1, parsePrice(ip[2]), parsePrice(ip[2])); continue; }
+
+    // No price on this line at all — a category-path header, or a name whose
+    // price continues on the next line. Only the latter has a NEXT line that is
+    // a BARE continuation (nothing but qty*price or weight, no name prefix).
+    const next = itemLines[i + 1];
+    if (next && (KFL_COPY_CONT_QTY_RE.test(next) || KFL_COPY_CONT_WEIGHT_RE.test(next))) {
+      pendingName = raw;
+    }
+  }
+
+  // Checkout-level promos live between "Suma cząstkowa" and the "Vat %" table —
+  // every line ending in "-N,NN" in that band is a discount amount.
+  const vatIdx = lines.findIndex((l, idx) => idx > endIdx && KFL_COPY_VAT_TABLE_RE.test(l));
+  const promoBand = endIdx >= 0 ? lines.slice(endIdx + 1, vatIdx >= 0 ? vatIdx : undefined) : [];
+  let totalDiscount = 0;
+  for (const l of promoBand) {
+    const m = l.match(KFL_COPY_DISCOUNT_RE);
+    if (m) totalDiscount += parsePrice(m[1]);
+  }
+
+  const subtotalMatch = endIdx >= 0 ? lines[endIdx].match(KFL_COPY_SUBTOTAL_RE) : null;
+  const subtotal = subtotalMatch ? parsePrice(subtotalMatch[1]) : products.reduce((s, p) => s + p.finalPrice, 0);
+  const total = detectTotal(text);
+
+  return {
+    storeName: detectStoreName(text, lines) ?? 'Kaufland',
+    date: detectDate(text),
+    paymentMethod: detectPaymentMethod(text),
+    products, subtotal, totalDiscount, total: total || (subtotal - totalDiscount), raw: text,
+  };
+}
+
+// ─── Kaufland — OCR photo scan ─────────────────────────────────────────────────
 // OCR layout: product NAME on one line, PRICE on the next. Bottle deposits show
 // as `butelkaPET` + `0,50`. Column jumble sometimes drops a price before its
 // name, so a small stray-price buffer recovers the trailing item.
@@ -691,6 +810,7 @@ export function parseReceiptText(text: string): ParsedReceipt {
 const KFL_PRICE_RE = /^\d+\s*[.,]\s*\d{2}$/;
 
 function parseKaufland(text: string): ParsedReceipt {
+  if (isKauflandReceiptCopy(text)) return parseKauflandReceiptCopy(text);
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const products: ReceiptProduct[] = [];
   let totalDiscount = 0;
