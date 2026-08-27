@@ -417,12 +417,21 @@ export default function Pet() {
             ) : missionReady ? (
               // Misja ukończona, jeszcze nie odebrana — kotek wraca na scenę w normalnym
               // rozmiarze, ale PRZYGASZONY ("w cieniu") + pulsujący napis wzywający do walki
-              // (patrz komentarz przy `missionReadyPulse` wyżej). Cały blok jest jednym
-              // tap-targetem → ta sama akcja co przycisk "Walcz" w kaflu misji niżej.
+              // (patrz komentarz przy `missionReadyPulse` wyżej). Cały blok MIAŁ być jednym
+              // tap-targetem → ta sama akcja co przycisk "Walcz" w kaflu misji niżej, ale
+              // `CatArt` OPAKOWUJE SIĘ WEWNĘTRZNIE we własny `<Pressable>` (patrz CatArt.tsx) —
+              // ZAWSZE, niezależnie od tego czy dostał `onPress` z zewnątrz, więc przechwytywał
+              // dotyk i nie puszczał go wyżej do tej `TouchableOpacity` (2026-08-27, user:
+              // "jak klikam to tylko go głaska... trzeba kliknąć walcz w kafelku misji"). Fix:
+              // `onPress={onFightMission}` WPROST na `CatArt` — dotyk kotka teraz sam wywołuje
+              // walkę (mała reakcja "pogłaskania" w CatArt przy okazji nie szkodzi, ekran i tak
+              // natychmiast nawiguje dalej). Outer `TouchableOpacity` zostaje jako dodatkowy,
+              // szerszy tap-target wokół kotka (tekst/padding), na wypadek pudła.
               <TouchableOpacity activeOpacity={0.85} onPress={onFightMission} style={s.missionReadyWrap}>
                 <View style={{ opacity: 0.3 }}>
                   <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} animate={false} palette={palette} stripes={catStripes}
-                    eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                    eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
+                    onPress={onFightMission} />
                 </View>
                 <Animated.View style={[s.missionReadyPromptWrap, { opacity: missionReadyOpacity }]} pointerEvents="none">
                   <Swords size={22} color="#2AC68F" />
