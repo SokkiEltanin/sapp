@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: wypełnienie paska misji wystawało poza zaokrąglony kształt — NIEsprawdzone (2026-08-27)
+
+User ze screenshotem: "pasek misji w trakcie wychodzi poza [ramkę], dziwnie się rozciąga
+zamiast wypełniać". Wypełnienie liczone w % przy małym progresie (świeżo zaczęta/długa misja)
+przeliczało się na węższą szerokość niż promień lewego zaokrąglonego kapsla (17px) — Android
+nie przycinał tego poprawnie, cienki kwadratowy pasek gradientu wystawał poza zaokrąglony
+kształt. Fix: nowa `missionBarFillPx()` (`missions.ts`) liczy wypełnienie w PX z twardym
+minimum `MISSION_BAR_HEIGHT`, `missionBarTrack` mierzy się przez `onLayout`. Pełny opis w
+ARCHITECTURE.md. Nowe testy w `fmtMissionCountdown.test.ts`. `tsc`/`jest` zielone (63/759).
+**Priorytet testu na urządzeniu**: pupil w trakcie świeżo zaczętej (albo bardzo długiej,
+niedawno wysłanej) misji — pasek powinien mieć czysty, zaokrąglony lewy kapsel bez cienkiego
+paska wystającego poza krawędź, nawet przy minimalnym progresie.
+
 ## 🆕 BUG: dotyk kotka po powrocie z misji tylko głaskał, nie zaczynał walki — NIEsprawdzone (2026-08-27)
 
 User: "jak pupil wraca z misji to musisz zrobić zeby wtedy kliknięcie na kotka rzeczywiście

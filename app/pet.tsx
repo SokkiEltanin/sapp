@@ -31,7 +31,7 @@ import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
-import { missionMinutesFor, missionRewardFor, minibossForMission, fmtMissionDuration, fmtMissionCountdown, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
+import { missionMinutesFor, missionRewardFor, minibossForMission, fmtMissionDuration, fmtMissionCountdown, missionBarFillPx, MissionProfile, MISSION_PROFILE_ORDER, MISSION_PROFILE_LABEL } from '@/utils/missions';
 
 const ITEM_IDS = Object.keys(COMBAT_ITEMS) as CombatItemId[];
 const HP_UPGRADE_AMOUNT = 20;
@@ -89,6 +89,21 @@ export default function Pet() {
     ? new Date(missionEndsAt).getTime() - new Date(missionStartedAt).getTime() : 0;
   const missionProgress = missionTotalMs > 0
     ? Math.min(1, Math.max(0, 1 - missionRemainingMs / missionTotalMs)) : 0;
+  // Szerokość paska w px, zmierzona `onLayout` (2026-08-27, user ze screenshotem: "pasek
+  // misji w trakcie wychodzi poza [ramkę]") — przy świeżo zaczętej/długiej misji `missionProgress`
+  // bywa bardzo mały (ułamek procenta), a `missionBarFillWrap`'s `borderTopLeftRadius`/
+  // `borderBottomLeftRadius` = `MISSION_BAR_HEIGHT/2` = 17px. Gdy wypełnienie w procentach
+  // przelicza się na WĘŻSZĄ szerokość niż promień zaokrąglenia, Android potrafi nie przyciąć
+  // tego poprawnie (znany gotcha z tej samej rodziny co crop kotka na kaflu, patrz historia w
+  // ARCHITECTURE.md) — kwadratowy gradient wystaje cienkim paskiem POZA zaokrąglony kształt
+  // paska zamiast ładnie go wypełniać. Fix: wypełnienie w PX (nie %), z twardym minimum
+  // `MISSION_BAR_HEIGHT` (dokładnie tyle, ile trzeba żeby lewy zaokrąglony kapsel zmieścił się
+  // bez artefaktu) — TYLKO gdy progres > 0 (przy realnym zerze pasek zostaje pusty, żeby nie
+  // sugerować postępu którego nie ma).
+  const [missionBarWidthPx, setMissionBarWidthPx] = useState(0);
+  const missionBarFillWidthPx = missionBarWidthPx > 0
+    ? missionBarFillPx(missionProgress, missionBarWidthPx, MISSION_BAR_HEIGHT)
+    : undefined; // przed pierwszym onLayout — fallback na % niżej
   // Kotek na pasku misji ma IŚĆ, nie skakać (2026-08-21, user: "kotka skaczące lekko na boki
   // jakby szedł na prawdę a nie skakał") — dawny PIONOWY `missionBounce` (hop w górę/dół co
   // 320ms) czytał się jak podskakiwanie, nie chód, USUNIĘTY CAŁKOWICIE. Chód to teraz JEDEN
@@ -401,8 +416,8 @@ export default function Pet() {
                     </Animated.View>
                   </View>
                 </View>
-                <View style={s.missionBarTrack}>
-                  <View style={[s.missionBarFillWrap, { width: `${Math.round(missionProgress * 100)}%` }]}>
+                <View style={s.missionBarTrack} onLayout={e => setMissionBarWidthPx(e.nativeEvent.layout.width)}>
+                  <View style={[s.missionBarFillWrap, { width: missionBarFillWidthPx ?? `${Math.round(missionProgress * 100)}%` }]}>
                     <LinearGradient colors={['#2AA9E0', '#38BDF8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
                     <Animated.View style={[s.missionBarWave, { transform: [{ translateX: missionWaveX }, { rotate: '18deg' }] }]} />
                   </View>
