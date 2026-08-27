@@ -483,13 +483,19 @@ export default function Pet() {
         {/* ── Siła bojowa (scalone z pet-stats.tsx, 2026-08-19) ── */}
         <Text style={s.section}>Siła bojowa</Text>
         <View style={s.statGrid}>
+          {/* "+5"/"+20" na przyciskach ulepszeń dostają kolor stata, nie żółty (2026-08-27,
+              user: "+5 na ataku niech będzie czerwone, +20 przy zdrowiu na zielono, resztę
+              czyli ilość coinów zostawiamy żółtą") — `s.buyPillTxt` domyślnie jest żółty (tak
+              samo jak koszt w monetach), ikona obok była już poprawnie czerwona/zielona, ale
+              tekst "+N" dziedziczył kolor moneta niezależnie od kontekstu. Cena w monetach
+              (druga ikona+tekst w tym samym przycisku) ZOSTAJE żółta bez zmian. */}
           <View style={[s.statCard, { borderColor: '#F8717144', backgroundColor: '#F8717112' }]}>
             <Swords size={18} color="#F87171" />
             <Text style={s.statVal}>{Math.round(power)}</Text>
             <Text style={s.statLabel}>Moc ataku</Text>
             <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
             <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
-              <Swords size={10} color="#F87171" /><Text style={s.buyPillTxt}>+{ATK_UPGRADE_AMOUNT}</Text>
+              <Swords size={10} color="#F87171" /><Text style={[s.buyPillTxt, { color: '#F87171' }]}>+{ATK_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{atkCost}</Text>
             </TouchableOpacity>
           </View>
@@ -499,7 +505,7 @@ export default function Pet() {
             <Text style={s.statLabel}>Max HP kotka</Text>
             <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}{gearFlatHp(equippedGear, ownedGear) > 0 ? ` + ${Math.round(gearFlatHp(equippedGear, ownedGear))} (ekwipunek)` : ''}</Text>
             <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
-              <Heart size={10} color="#2AC68F" /><Text style={s.buyPillTxt}>+{HP_UPGRADE_AMOUNT}</Text>
+              <Heart size={10} color="#2AC68F" /><Text style={[s.buyPillTxt, { color: '#2AC68F' }]}>+{HP_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text>
             </TouchableOpacity>
           </View>

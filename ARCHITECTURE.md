@@ -1681,6 +1681,17 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       rarity, cost)` — reużywa ISTNIEJĄCY `dayClaims` (ten sam mechanizm co odbiór
       questów) z kluczem `gearDaily:${date}:${itemId}`, żeby nie dało się kupić tego
       samego slotu dwa razy tego samego dnia — zero nowego pola w store potrzebne.
+    - **Skrzynki + Sklep dnia SCALONE w jedną zakładkę "Rynek" (2026-08-27)** — user: "w
+      sklepie połączmy SKLEP DNIA oraz SKRZYNKI, nazywając to ogólnie RYNEK LUB BAZAR... ja
+      moze zrobię grafikę pod ten bazarek potem, ale to potem — na razie połączmy [je] żeby
+      były razem jak jedna zakładka". `Cat` (typ zakładek) `'boxes'|'daily'|'startups'|
+      'owned'` → `'market'|'startups'|'owned'` — zawartość obu (skrzynki gacha + sklep dnia)
+      renderuje się jedna pod drugą w JEDNYM `{cat === 'market' && (...)}` bloku, każda pod
+      własnym mini-nagłówkiem (`s.subSection`, ten sam styl co już istniał dla nagłówków
+      rzadkości w `startups`) — "Skrzynki" / "Sklep dnia". Ikona zakładki: `Store` (neutralna,
+      user planuje własną grafikę bazarku później, nie przesądzamy motywu teraz). Żadna
+      logika zakupu/renderowania wewnątrz obu sekcji NIE zmieniona — czysto połączenie dwóch
+      zakładek w jedną, `Sparkles` (dawna ikona "Sklep dnia") usunięta z importów jako martwa.
   - **`GearPanel.tsx` — 6 slotów przy kotku + porównanie itemów** (krok 7). Rząd 6
     przycisków (`GEAR_SLOTS`) wstawiony w `app/pet.tsx` między sceną kotka a kartą Misji.
     Tap w slot → `GearSlotModal` (bottom sheet): lista POSIADANYCH itemów danego slotu z
@@ -1732,6 +1743,19 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       dedykowanym toastem "Masz już ten przedmiot (lub lepszy)". Testy:
       `__tests__/buyDailyGear.test.ts` (nowy plik — pierwsze testy bezpośrednio wołające
       `usePetStore.getState()`'s akcje, nie tylko czyste funkcje z `utils/`).
+    - **Sloty powiększone (2026-08-27)** — user: "te sloty na itemy musimy powiększyć bo sa
+      za malutkie przy kotku". `s.slot` 40×40 → 50×50 (+25%), `slotImg` 26→34, ikona kategorii
+      (pusty slot) 18→22, `slotDot` (kropka "posiadasz, nie założone") 7→8px, `flankCol`
+      (kolumna 3 slotów po jednej stronie kotka) 46→56 szerokości żeby sloty się nie stykały.
+    - **Kolor "+N" na przyciskach ulepszeń dopasowany do stata, nie żółty (2026-08-27)** —
+      user: "+5 na ataku niech będzie czerwone, +20 przy zdrowiu na zielono, resztę czyli
+      ilość coinów zostawiamy żółtą". `s.buyPillTxt` (`app/pet.tsx`, karty "Siła bojowa") ma
+      domyślnie żółty kolor (tak samo jak cena w monetach obok) — ikona `Swords`/`Heart` na
+      przycisku ulepszenia była już poprawnie czerwona/zielona, ale sam tekst "+5"/"+20"
+      dziedziczył żółty niezależnie od kontekstu. Fix: inline override `{color:'#F87171'}`/
+      `{color:'#2AC68F'}` na "+N" (ten sam wzorzec co istniejący `Walcz` przycisk niżej w tym
+      samym pliku, który już nadpisywał `buyPillTxt` na zielono). Cena w monetach (druga
+      ikona+tekst w TYM SAMYM przycisku) BEZ ZMIAN — zostaje żółta.
   - **Krok 8 (OSTATNI z planu) — wpięcie gear w realne formuły walki/ekonomii, SYSTEM
     KOMPLETNY** (2026-08-19). PRZED wpięciem: rebalans `GEAR_ITEMS` baseValue w gear.ts —
     pierwsze przejście dałoby mythic T5 do 45-90% z JEDNEGO itemu, node-owe policzenie

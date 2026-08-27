@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Trzy drobne poprawki: sloty ekwipunku, "Rynek" scalony, kolory +N — NIEsprawdzone (2026-08-27)
+
+Trzy niezależne prośby usera w jednej wiadomości:
+1. **Sloty ekwipunku powiększone** ("za malutkie przy kotku") — 40×40→50×50 (+25%),
+   `GearPanel.tsx`.
+2. **"Skrzynki"+"Sklep dnia" scalone w jedną zakładkę "Rynek"** ("połączmy... nazywając to
+   ogólnie RYNEK LUB BAZAR, ja moze zrobię grafikę pod ten bazarek potem") — na razie tylko
+   scalenie zakładek (ikona `Store`, neutralna), bez własnej grafiki — user zapowiedział że
+   dorzuci grafikę bazarku osobno później.
+3. **Kolor "+5"/"+20" na przyciskach ulepszeń** dopasowany do stata (czerwony/zielony) zamiast
+   domyślnego żółtego — cena w monetach zostaje żółta.
+
+Pełny opis w ARCHITECTURE.md. `tsc`/`jest` zielone (63/759, bez nowych testów — trzy czysto
+UI-owe zmiany, nic do przetestowania jednostkowo). **Priorytet testu na urządzeniu**: ekran
+Pupila (sloty większe, kolory +5/+20) i Sklep → zakładka "Rynek" (skrzynki + sklep dnia razem,
+sprawdź że oba działają jak wcześniej — zakup skrzynki i zakup z dziennego sklepu).
+
 ## 🆕 BUG: wypełnienie paska misji wystawało poza zaokrąglony kształt — NIEsprawdzone (2026-08-27)
 
 User ze screenshotem: "pasek misji w trakcie wychodzi poza [ramkę], dziwnie się rozciąga
