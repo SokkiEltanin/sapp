@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Habit } from '@/types';
-import { getHabits, saveHabits, getCounts, setCounts, stepFor } from '@/utils/habits';
+import { getHabits, saveHabits, getCounts, getCountsRange, setCounts, stepFor } from '@/utils/habits';
 import { useHabitsSync } from '@/store/habitsSync';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { notificationsService } from '@/services/notificationsService';
@@ -28,6 +28,18 @@ function offsetDate(from: string, days: number): string {
 // Bezpiecznik dla getStreak() (2026-08-25) — NIE realny limit serii, tylko granica przed
 // nieskończoną pętlą wstecz w razie zepsutych/brakujących danych. 10 lat.
 const MAX_STREAK_LOOKBACK_DAYS = 3650;
+
+// Ile dni `completions` wczytujemy do pamięci (2026-08-27, user ze screenshotem: "dashboard
+// pokazuje 29 mimo że mam 33 jak wejdę [w habit-year]") — BUG FIX #3, TA SAMA rodzina co #1/#2
+// wyżej, ale w innym miejscu: pętla `getStreak()` faktycznie NIE ma już sztywnego limitu (#2
+// to naprawił), ale i tak nie widziała danych starszych niż `LOAD_WINDOW_DAYS` dni, bo `load()`
+// niżej wczytywało do `completions` TYLKO ostatnie 30 dni — dla dowolnego dnia starszego
+// `completions[d]` było `undefined`, więc `isDoneOrFrozen` fałszywie zwracał false i pętla
+// urywała serię na granicy okna, NIEZALEŻNIE od realnych, zapisanych w AsyncStorage danych.
+// `habit-year.tsx` (WINDOW=371) wczytuje znacznie szerzej i dlatego widziało prawdziwą, dłuższą
+// serię — to była różnica w DANYCH, nie w logice liczenia (obie funkcje liczą freeze tak samo).
+// 371 = ten sam rok co habit-year.tsx, żeby te dwa miejsca fizycznie nie mogły się rozjechać.
+const LOAD_WINDOW_DAYS = 371;
 
 function goalFor(habit: Habit): number {
   if (!habit.type || habit.type === 'check') return 1;
@@ -90,10 +102,10 @@ export function useHabits() {
     try {
       setIsLoading(true);
       const list  = await getHabits();
-      const dates = Array.from({ length: 30 }, (_, i) => offsetDate(today, -i));
-      const cols  = await Promise.all(dates.map((d) => getCounts(d)));
-      const map: Record<string, Record<string, number>> = {};
-      dates.forEach((d, i) => { map[d] = cols[i]; });
+      const dates = Array.from({ length: LOAD_WINDOW_DAYS }, (_, i) => offsetDate(today, -i));
+      // multiGet-batched (getCountsRange), nie 371 pojedynczych getCounts() — patrz komentarz
+      // przy LOAD_WINDOW_DAYS wyżej.
+      const map    = await getCountsRange(dates);
       setHabits(list);
       setComp(map);
     } finally {

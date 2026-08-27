@@ -49,6 +49,38 @@ export async function setCounts(date: string, counts: Record<string, number>): P
   await AsyncStorage.setItem(cntKey(date), JSON.stringify(counts));
 }
 
+// Batched `getCounts` for many dates at once (2026-08-27) — `useHabits.ts`'s `load()` widened
+// from 30 to 371 days (BUG FIX #3, patrz komentarz tam: streak-owi realnie brakowało DANYCH,
+// nie tylko szerszej pętli), które przez 371 sekwencyjnych `getCounts()` (dwa `getItem` każdy w
+// najgorszym razie) byłoby wolne. `AsyncStorage.multiGet` batchuje w JEDNO wywołanie natywne;
+// druga runda `multiGet` po legacy klucze tylko dla dni bez nowego formatu (zwykle 0, bo
+// migracja jest stara) — ten sam fallback co `getCounts`, tylko wsadowo zamiast dzień po dniu.
+export async function getCountsRange(dates: string[]): Promise<Record<string, Record<string, number>>> {
+  const out: Record<string, Record<string, number>> = {};
+  if (!dates.length) return out;
+  const pairs = await AsyncStorage.multiGet(dates.map(cntKey));
+  const missing: string[] = [];
+  pairs.forEach(([, raw], i) => {
+    const d = dates[i];
+    if (!raw) { missing.push(d); return; }
+    try { out[d] = JSON.parse(raw); } catch { missing.push(d); }
+  });
+  if (missing.length) {
+    const legacyPairs = await AsyncStorage.multiGet(missing.map(legacyKey));
+    legacyPairs.forEach(([, raw], i) => {
+      const d = missing[i];
+      if (!raw) return;
+      try {
+        const ids: string[] = JSON.parse(raw);
+        const counts: Record<string, number> = {};
+        ids.forEach((id) => { counts[id] = 1; });
+        out[d] = counts;
+      } catch {}
+    });
+  }
+  return out;
+}
+
 // The single water habit fed by Health Connect hydration: the kind:'water' one,
 // or (fallback for habits created before the merge) a count habit named "Woda".
 export async function getWaterHabit(): Promise<Habit | null> {

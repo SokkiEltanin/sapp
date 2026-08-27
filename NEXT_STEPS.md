@@ -3,6 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Kafel pupila: PetTileCat PORZUCONY, wrócony do zwykłego CatArt — NIEsprawdzone (2026-08-27)
+
+User ze screenshotem: "co ty z tym pupilem odjebałem teraz jak pulpet wygląda ja pierdółek".
+`PetTileCat.tsx` (nowy dedykowany komponent z ręcznie rysowanym SVG, wprowadzony ten sam dzień
+wcześniej) wyglądał źle — ręcznie wymyślone współrzędne bez prawdziwego artu jako punktu
+wyjścia nigdy nie miały prawa dać dobrego rezultatu na poziomie detalu "twarz maskotki". Plik
+USUNIĘTY, `PetTile.tsx` wrócony do DOKŁADNIE oryginalnego renderu sprzed CAŁEJ serii
+eksperymentów (PR #84→#88→#89→#98): zwykły pełny `<CatArt size={70} animate={false} .../>`.
+Pełny opis w ARCHITECTURE.md. **Priorytet testu na urządzeniu**: dashboard → kafel pupila
+wygląda jak przed 2026-08-25 (mały, pełna sylwetka kota, nie przycięty). Jeśli user kiedyś
+zechce wrócić do pomysłu "łapki na krawędzi kafelka" — potrzebny realny art/screenshot jako
+referencja, nie kolejna próba rysowania SVG od zera.
+
+## 🆕 Streak BUG FIX #3: dashboard 29 vs habit-year 33 — NIEsprawdzone (2026-08-27)
+
+User ze screenshotem: "streak znowu odwala gówno, pokazuje mi na dashboardzie 29 dni mimo że
+mam 33 jak wejdę". TRZECI fix w tej samej rodzinie bugów (patrz ARCHITECTURE.md "BUG:
+`getStreak()`..." #1/#2/#3) — tym razem `getStreak()`'s pętla była już poprawna (bez sztywnego
+limitu, fix #2), ale `useHabits.ts`'s `load()` wczytywało do pamięci TYLKO 30 dni danych, więc
+seria dłuższa niż 30 dni fizycznie nie miała skąd się wziąć. Fix: `LOAD_WINDOW_DAYS=371`
+(ten sam rok co `habit-year.tsx`) + nowy batchowany `getCountsRange()` (jeden `AsyncStorage.
+multiGet` zamiast 371 pojedynczych odczytów, żeby szersze okno nie kosztowało wydajnościowo).
+Nowe testy w `habits.test.ts`. `tsc`/`jest` zielone. **Priorytet testu na urządzeniu** (wysoki
+— to już TRZECIA naprawa tego samego bugu): dashboard "Twoje serie" → "Woda" powinno pokazywać
+DOKŁADNIE tę samą liczbę co ekran szczegółów nawyku (habit-year), nawet dla serii >30 dni.
+
 ## 🆕 "Nieodebrane z wczoraj" rozszerzone na kilka dni wstecz — NIEsprawdzone (2026-08-27)
 
 User: "problem z odbiorem questów nieodebranych z dnia wcześniejszego jakby czy co tam".
