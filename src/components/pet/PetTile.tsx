@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { ChevronRight, Gift } from 'lucide-react-native';
-import PetTileCat from '@/components/pet/PetTileCat';
+import CatArt from '@/components/pet/CatArt';
 import { PetState } from '@/utils/petState';
 import { usePetStore } from '@/store/petStore';
 import { paletteById } from '@/utils/catPalettes';
@@ -14,16 +14,17 @@ import { useColors } from '@/theme/useColors';
 // wiersz treści (kot + tekst), bez opakowania. Domyślne `bare=false` = stary, samodzielny
 // wygląd, używany gdy nie ma żadnej aktywnej serii do pokazania obok.
 //
-// Głowa kotka — DRUGIE PODEJŚCIE (2026-08-27, user: "kafelek nadal nie jest dobrze nadal jest
-// za duzy... kotka możesz zrobic wersje osobna... po prostu głowa lekko tułów dwie łapki
-// trzymające krawędź kafelka"). Pierwsze podejście (do #89, patrz git history) próbowało
-// PRZYCIĄĆ pełny `CatArt` (viewBox 2000×2000) przez `overflow:hidden` — kruche na Androidzie
-// (view-flattening gubił przycinanie mimo `collapsable={false}`) i finalnie DALEJ za duże.
-// Teraz `PetTileCat` — osobny, celowo prosty komponent z WŁASNYM małym viewBoxem (nie crop
-// czegokolwiek), animujący TYLKO oczy (mrugnięcie) i uszy (delikatny ruch), jak user prosił
-// — żadnego głaskania/ogona/łapki-lizanej z pełnego CatArt, które i tak nigdy nie było
-// widoczne w tym kaflu. `size=72` ≈ rozmiar sprzed CAŁEJ serii eksperymentów z kadrowaniem
-// (oryginalne `size={70}` pełnego CatArt, patrz commit 584d86d).
+// PORZUCONE CAŁKOWICIE: "wystająca głowa" (2026-08-27, user ze screenshotem: "co ty z tym
+// pupilem odjebałem teraz jak pulpet wygląda ja pierdółek") — od PR #84 przez #88/#89 do #98
+// (patrz git history) czterokrotnie: crop pełnego CatArt (kruche na Androidzie, ostatecznie
+// dalej za duże), potem dedykowany osobny `PetTileCat` z ręcznie rysowanym SVG — wynik wizualnie
+// nie do przyjęcia (bez prawdziwego artu/referencji nie da się ręcznie dopieścić twarzy kota w
+// surowych ścieżkach SVG na tym poziomie detalu). WRÓCONE do DOKŁADNIE oryginalnego,
+// sprawdzonego renderu: zwykły, mały, PEŁNY `CatArt` (`size=70`, `animate=false`) — ten sam
+// komponent i te same proporcje co w commitcie 584d86d, sprzed całej serii eksperymentów.
+// `PetTileCat.tsx` USUNIĘTY CAŁKOWICIE — dead code po nieudanym eksperymencie, nie zostawiany
+// "na później". Jeśli user kiedyś dostarczy realny art/referencję do tej pozy, to osobna,
+// świeża robota — nie odgrzebywanie tego pliku.
 export default function PetTile({ name, pet, level, claimable = 0, bare = false }: { name: string; pet: PetState; level: number; claimable?: number; bare?: boolean }) {
   const c = useColors();
   // wear the coat you actually bought — the tile used to always show the default blue
@@ -35,7 +36,7 @@ export default function PetTile({ name, pet, level, claimable = 0, bare = false 
   const catLegStripes = usePetStore(s => s.catLegStripes);
   const row = (
     <>
-      <PetTileCat size={72} palette={paletteById(catColor)} stripes={catStripes}
+      <CatArt expression={pet.expression} size={70} animate={false} palette={paletteById(catColor)} stripes={catStripes}
         eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={st.top}>

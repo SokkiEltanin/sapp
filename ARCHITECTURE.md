@@ -264,6 +264,19 @@ kafelka". Dwa fixy:
    `collapsable={false}`, bez `headCrop`/`headCropInner` — CAŁY crop-aparat usunięty), `size=72`
    ≈ rozmiar sprzed całej serii eksperymentów z kadrowaniem (oryginalne `size={70}` pełnego
    CatArt, commit 584d86d).
+   **`PetTileCat` PORZUCONY CAŁKOWICIE, plik USUNIĘTY (2026-08-27, ten sam dzień)** — user ze
+   screenshotem: "co ty z tym pupilem odjebałem teraz jak pulpet wygląda ja pierdółek".
+   Ręcznie rysowane ścieżki SVG (głowa/uszy/łapy/oczy, bez żadnego prawdziwego artu/referencji
+   jako podkładu — czysto wymyślone współrzędne) wizualnie nie do przyjęcia — mała, płaska,
+   nieczytelna bryła zamiast rozpoznawalnego kota. Wniosek: hand-coded SVG od zera na tym
+   poziomie detalu (twarz maskotki) nie działa bez prawdziwego rysunku jako punktu wyjścia —
+   `CatArt.tsx` sam siebie opisuje jako "1:1 port zatwierdzonego designu z HTML lab", nie coś
+   wymyślonego w locie, więc TA metoda nigdy nie miała działać. `PetTile.tsx` WRÓCONY do
+   DOKŁADNIE oryginalnego renderu sprzed CAŁEJ serii eksperymentów (PR #84→#88→#89→#98): zwykły
+   pełny `<CatArt expression={pet.expression} size={70} animate={false} .../>`, te same
+   proporcje co commit 584d86d. `PetTileCat.tsx` skasowany całkowicie (dead code po nieudanym
+   eksperymencie, nie zostawiony "na potem"). Jeśli temat wróci, potrzebny realny art/screenshot
+   jako referencja — nie kolejna próba zgadywania SVG.
 
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 
@@ -2266,6 +2279,23 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     to bezpiecznik przed nieskończoną pętlą przy zepsutych danych, NIE realny limit serii.
     Throwaway-symulacją zweryfikowane: 31-dniowa nieprzerwana seria (dziś jeszcze nie
     zrobione) — stary kod daje 30 (ucięte), nowy poprawnie daje 31.
+  - **BUG #3, TA SAMA rodzina, INNE miejsce: pętla bez limitu, ale DANE dalej ucięte na 30
+    dni (2026-08-27)** — user ze screenshotem: "dashboard pokazuje 29 mimo że mam 33 jak
+    wejdę [w habit-year]". Fix #2 wyżej naprawił pętlę `getStreak()` (już bez sztywnego
+    limitu), ale `useHabits.ts`'s `load()` wczytywało do stanu `completions` TYLKO ostatnie
+    30 dni (`Array.from({length:30}, ...)`) — dla KAŻDEGO dnia starszego `completions[d]`
+    było `undefined`, więc `isDoneOrFrozen` fałszywie zwracał `false` i pętla urywała się na
+    granicy 30 dni, NIEZALEŻNIE od tego że sama logika liczenia już nie miała limitu. To była
+    różnica w DANYCH wczytanych do pamięci, nie w logice liczenia — `habit-year.tsx` (WINDOW=
+    371, czyta bezpośrednio z AsyncStorage przez `multiGet`) widziało prawdziwą, dłuższą
+    serię, bo miało do niej dostęp. Fix: nowa stała `LOAD_WINDOW_DAYS=371` w `useHabits.ts`
+    (ten sam rok co `habit-year.tsx`'s `WINDOW`, żeby te dwa miejsca fizycznie nie mogły się
+    już rozjechać) + nowy `getCountsRange(dates)` w `habits.ts` — batchowany
+    `AsyncStorage.multiGet` (jedno wywołanie natywne zamiast 371 pojedynczych `getCounts()`,
+    z drugą rundą `multiGet` po legacy klucze TYLKO dla dni bez nowego formatu) zamiast
+    `Promise.all(dates.map(getCounts))`, żeby szersze okno nie kosztowało 371 sekwencyjnych
+    odczytów AsyncStorage przy każdym mouncie hooka. Testy w `habits.test.ts`
+    (`getCountsRange`) pokrywają batch/legacy-fallback/okno >30 dni.
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 - **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/

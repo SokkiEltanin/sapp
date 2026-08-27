@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  stepFor, getHabits, saveHabits, getCounts, setCounts,
+  stepFor, getHabits, saveHabits, getCounts, setCounts, getCountsRange,
   getWaterHabit, feedWaterHabit, getStepsHabit, feedStepsHabit, getWaterGlasses,
 } from '@/utils/habits';
 import { Habit } from '@/types';
@@ -44,6 +44,47 @@ describe('habits — getCounts / setCounts (z migracją starego formatu)', () =>
 
   test('brak jakichkolwiek danych na dany dzień → pusty obiekt', async () => {
     expect(await getCounts('2026-01-01')).toEqual({});
+  });
+});
+
+// 2026-08-27, user ze screenshotem: "dashboard pokazuje 29 mimo że mam 33 jak wejdę [w
+// habit-year]" — useHabits.ts's load() wczytywało do `completions` TYLKO 30 dni, więc
+// getStreak() (nieograniczona pętla od BUG FIX #2) i tak nie widziała danych starszych — okno
+// rozszerzone do 371 dni (LOAD_WINDOW_DAYS), efektywnie przez ten nowy multiGet-batchowany
+// odczyt zamiast 371 pojedynczych getCounts().
+describe('habits — getCountsRange (batchowany odczyt wielu dni, 2026-08-27)', () => {
+  test('zwraca dane dla dat z nowym formatem', async () => {
+    await setCounts('2026-08-01', { h1: 2 });
+    await setCounts('2026-08-02', { h1: 3 });
+    const out = await getCountsRange(['2026-08-01', '2026-08-02']);
+    expect(out['2026-08-01']).toEqual({ h1: 2 });
+    expect(out['2026-08-02']).toEqual({ h1: 3 });
+  });
+
+  test('dzień bez żadnych danych po prostu nie ma wpisu (nie {})', async () => {
+    const out = await getCountsRange(['2026-08-01', '2026-08-02']);
+    expect(out['2026-08-01']).toBeUndefined();
+  });
+
+  test('legacy format (string[]) migrowany tak samo jak w getCounts, batchowo', async () => {
+    await AsyncStorage.setItem('habits_done_2026-08-01', JSON.stringify(['h1', 'h2']));
+    await setCounts('2026-08-02', { h1: 5 });
+    const out = await getCountsRange(['2026-08-01', '2026-08-02']);
+    expect(out['2026-08-01']).toEqual({ h1: 1, h2: 1 });
+    expect(out['2026-08-02']).toEqual({ h1: 5 });
+  });
+
+  test('okno 33+ dni (regresja na "dashboard 29 vs habit-year 33") — wszystkie dni czytelne, nie tylko pierwsze 30', async () => {
+    const dates: string[] = [];
+    for (let i = 0; i < 35; i++) {
+      const d = `2026-07-${String(i + 1).padStart(2, '0')}`;
+      dates.push(d);
+      await setCounts(d, { h1: 1 });
+    }
+    const out = await getCountsRange(dates);
+    expect(Object.keys(out).length).toBe(35);
+    expect(out['2026-07-01']).toEqual({ h1: 1 });
+    expect(out['2026-07-31']).toEqual({ h1: 1 }); // dzień #31 — poza starym 30-dniowym oknem
   });
 });
 
