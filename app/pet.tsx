@@ -443,7 +443,15 @@ export default function Pet() {
               // natychmiast nawiguje dalej). Outer `TouchableOpacity` zostaje jako dodatkowy,
               // szerszy tap-target wokół kotka (tekst/padding), na wypadek pudła.
               <TouchableOpacity activeOpacity={0.85} onPress={onFightMission} style={s.missionReadyWrap}>
-                <View style={{ opacity: 0.3 }}>
+                {/* needsOffscreenAlphaCompositing (2026-08-27, user: "pupil dziwnie wygląda...
+                    prześwity na czole") — bez tego Android renderuje uszy (osobne overlaye
+                    z CatArt.tsx, nachodzące na krąg głowy) i głowę jako NIEZALEŻNE
+                    półprzezroczyste warstwy zamiast jednej scalonej, więc miejsca zachodzenia
+                    dostają PODWÓJNĄ przezroczystość i świecą jaśniej niż reszta futra —
+                    dokładnie ten sam rodzaj Androidowego bugu z flattening/kompozycją co przy
+                    PetTileCat (patrz ARCHITECTURE.md). Ta property wymusza render do bufora
+                    off-screen PRZED nałożeniem opacity, więc zachodzenie zostaje niewidoczne. */}
+                <View style={{ opacity: 0.3 }} needsOffscreenAlphaCompositing>
                   <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} animate={false} palette={palette} stripes={catStripes}
                     eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
                     onPress={onFightMission} />
