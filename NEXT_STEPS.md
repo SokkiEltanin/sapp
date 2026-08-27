@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Skaner paragonów łapie teraz Kaufland app "Receipt copy" — NIEsprawdzone (2026-08-27)
+
+User: "mamy że wykrywa Kaufland to niech łapie taki paragon z parteru" + wklejony tekst z
+ekranu Kaufland app (paragon → "..." → "Receipt copy") — inny, byte-exact format niż stary
+OCR-ze-zdjęcia parser obsługiwał (kategorie-nagłówki, "NAZWA ... CENA LITERA" w jednej linii
+lub NAZWA + kontynuacja "ilość*cena"/"waga KG" w następnej, promocje na kasie z referencjami
+"Pozycje:N,M"). Nowa gałąź `parseKauflandReceiptCopy()` w `receiptParser.ts`, wykrywana po
+nagłówku "Cena PLN". Przy okazji fix ogólniejszego bugu: apka wstawia kody drukarki sklejone
+bez spacji przed nazwą sklepu ("&1Kaufland..."), co na krótszej wklejce potrafiło całkiem
+zgubić wykrycie sklepu (`\bkaufland\b` bez granicy słowa) — teraz `stripPrintMarkup()` ścina
+to na wejściu do `parseReceiptText()`, no-op dla innych sklepów/formatów. Pełny opis w
+ARCHITECTURE.md. `tsc`/`jest` zielone (63/766, +7 nowych testów na fixture z realnego
+paragonu Kaufland usera). **Priorytet testu na urządzeniu**: Wydatki → Skanuj/wklej paragon
+→ wklej tekst z Kaufland app "Receipt copy" (dowolny paragon Kaufland z tej apki, nie tylko
+ten konkretny) — sprawdź że sklep, wszystkie pozycje i suma łapią się poprawnie, w tym
+multi-buy i towar na wagę.
+
 ## 🆕 BUG: "prześwity" na czole przygaszonego kotka po misji — NIEsprawdzone (2026-08-27)
 
 User ze screenshotem: "pupil dziwnie wygląda jak ma tą misję jakby miał jakieś prześwity na

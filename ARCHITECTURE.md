@@ -476,6 +476,30 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   (`detectTotal`/`parseGeneric`), z fallbackiem do starych wzorców gdy nie znajdzie linii
   "Płatność" (np. wyblakły/nietypowy paragon). Testy: `__tests__/receiptParser.test.ts`
   (pełny tekst realnego paragonu Lidl usera jako fixture).
+- **Kaufland app "Receipt copy" — DRUGI, osobny format obok OCR-ze-zdjęcia (2026-08-27,
+  user: "mamy że wykrywa Kaufland to niech łapie taki paragon" + wklejony tekst z ekranu
+  Kaufland app paragon → "..." → "Receipt copy").** Byte-exact tekst z apki, NIE OCR — inny
+  layout niż stary `parseKaufland` (tam: NAZWA w linii, CENA w następnej). Tu: nagłówki
+  kategorii ("Beauty / Zdrowie / Dziecko", "Lada z obsługą") przeplatają się z pozycjami;
+  pozycja to "NAZWA ... CENA LITERA" w jednej linii, albo NAZWA osobno + "ilość * cena ...
+  suma LITERA" (multi-buy) / "waga KG ... suma LITERA" (towar luzem) w następnej linii —
+  odróżnione od nagłówka kategorii przez lookahead (nagłówek nigdy nie ma po sobie samej
+  kontynuacji ceny). Nowa gałąź `parseKauflandReceiptCopy()`, wykrywana po unikalnym
+  nagłówku kolumny "Cena PLN" (`isKauflandReceiptCopy()`), wywoływana z góry `parseKaufland()`
+  — stary OCR-owy branch zostaje nietknięty jako fallback. Promocje na kasie ("Kup 2 płać za 1
+  -11,97" + "Pozycje:3,4") dotyczą kilku pozycji naraz przez referencje indeksów — zbyt
+  kruche żeby mapować 1:1 na produkt, więc lądują sumarycznie w `totalDiscount` (subtotal z
+  "Suma cząstkowa" minus totalDiscount = total z "Płatność kartą").
+  - **BUG PRZY OKAZJI: wykrywanie sklepu potrafiło w ogóle nie złapać "Kaufland"** — apka
+    wstawia własne kody drukarki sklejone BEZ SPACJI wprost przed nazwą ("&1Kaufland Polska
+    Markety..."), co psuje granicę słowa `\bkaufland\b` (cyfra "1" i litera "K" to oba znaki
+    "słowa" — bez separatora `\b` między nimi nie ma). Na pełnym paragonie zwykle i tak
+    wychodziło na swoje (inne, poprawnie oddzielone wystąpienia "Kaufland" niżej w tekście —
+    "Kaufland Card XTRA", stopka), ale na krótszej wklejce (np. bez stopki) zawodziło całkiem,
+    cicho lądując w `parseGeneric`. Fix: nowa `stripPrintMarkup()` ścina WSZYSTKIE `&N` na
+    samym wejściu do `parseReceiptText()`, przed routingiem — no-op dla każdego innego
+    formatu/sklepu (nikt inny tej notacji nie używa). Testy: `__tests__/receiptParser.test.ts`
+    (pełny tekst realnego paragonu Kaufland usera jako fixture, 7 nowych testów).
 
 ## 8. Zdrowie / Health Connect
 
