@@ -47,6 +47,18 @@ export function fmtMissionCountdown(ms: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+// Szerokość wypełnienia paska misji w PX, z twardym minimum (2026-08-27, user ze screenshotem:
+// "pasek misji w trakcie wychodzi poza [ramkę]") — przy świeżo zaczętej/długiej misji `progress`
+// bywa ułamkiem procenta, a lewy zaokrąglony kapsel paska (`borderTopLeftRadius`/
+// `borderBottomLeftRadius`) potrzebuje co najmniej `minPx` szerokości żeby się poprawnie
+// wyrenderować — węższe wypełnienie w % potrafi na Androidzie NIE przyciąć się poprawnie i
+// wystawać poza zaokrąglony kształt paska. `progress<=0` zwraca 0 (pusty pasek, nie sugerujemy
+// postępu którego nie ma) — dopiero realny progres dostaje podłogę `minPx`.
+export function missionBarFillPx(progress: number, trackWidthPx: number, minPx: number): number {
+  if (progress <= 0 || trackWidthPx <= 0) return 0;
+  return Math.max(minPx, Math.round(progress * trackWidthPx));
+}
+
 // Nagroda BAZOWA wyraźnie wyższa niż typowy daily quest (2-6 monet/5-15 xp) — user: "trochę
 // więcej xp i coinow jak za daily questa".
 //

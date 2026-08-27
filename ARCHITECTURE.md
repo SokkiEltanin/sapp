@@ -1975,6 +1975,24 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       wystarczający gdy pokazywał tylko minuty) — z nowym auto-stopem: interval sam się czyści
       w momencie gdy `missionEndsAt` mija (misja staje się gotowa), więc nie tyka bez sensu co
       sekundę w nieskończoność, dopóki user nie wróci stoczyć walki.
+    - **BUG: wypełnienie paska wychodziło poza zaokrąglony kształt przy małym progresie
+      (2026-08-27)** — user ze screenshotem: "pasek misji w trakcie wychodzi poza [ramkę],
+      dziwnie się rozciąga zamiast wypełniać". Przyczyna: `missionBarFillWrap`'s wypełnienie
+      liczone w PROCENTACH (`width: {progress*100}%`), a lewy zaokrąglony kapsel paska
+      (`borderTopLeftRadius`/`borderBottomLeftRadius = MISSION_BAR_HEIGHT/2` = 17px) potrzebuje
+      co najmniej 17px szerokości żeby poprawnie się wyrenderować. Przy świeżo zaczętej/długiej
+      misji `missionProgress` bywa ułamkiem procenta — przeliczony na px dawał węższe
+      wypełnienie niż promień zaokrąglenia, a Android nie przycinał tego poprawnie (ta sama
+      rodzina co dawny bug z przycinaniem kotka na kaflu dashboardu — `overflow:hidden` +
+      geometria mniejsza niż promień, gdzieś się gubi). Cienki, kwadratowy pasek gradientu
+      wystawał poza zaokrąglony kształt zamiast być w nim zamknięty. Fix: nowa
+      `missionBarFillPx(progress, trackWidthPx, minPx)` w `missions.ts` — liczy wypełnienie w
+      PX (nie %) z twardym minimum `MISSION_BAR_HEIGHT`, dokładnie tyle ile trzeba żeby lewy
+      kapsel zawsze miał miejsce na poprawne zaokrąglenie; `progress<=0` daje 0 (pusty pasek,
+      żeby nie sugerować fałszywego postępu — podłoga działa TYLKO gdy progres realnie > 0).
+      `missionBarTrack` dostał `onLayout` mierzący jego rzeczywistą szerokość w px
+      (`missionBarWidthPx` state) — przed pierwszym layoutem fallback na starą wersję
+      procentową (jedna klatka, nieszkodliwe). Test regresji w `fmtMissionCountdown.test.ts`.
   - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
     user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
     obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +
