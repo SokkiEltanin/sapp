@@ -1318,6 +1318,21 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
           reakcja "pogłaskania" (hop/iskra) leci przy okazji, nieszkodliwie, bo ekran i tak
           natychmiast nawiguje do `boss-fight.tsx`. Zewnętrzna `TouchableOpacity` zostaje jako
           dodatkowy, szerszy tap-target.
+        - **BUG: "prześwity" na czole przygaszonego kotka (2026-08-27)** — user ze
+          screenshotem: "pupil dziwnie wygląda jak ma tą misję jakby miał jakieś prześwity na
+          czole". Przyczyna: TA SAMA rodzina Androidowych bugów co saga PetTileCat (patrz
+          §4/8.x wyżej) — `opacity:0.3` na `<View>` wokół `<CatArt>` renderuje na Androidzie
+          nachodzące na siebie warstwy (główna głowa w `<Svg>` + osobne `<Ear/>` overlaye —
+          patrz "ears are drawn as separate animated overlays" w `CatArt.tsx` — nachodzące na
+          krąg głowy przy nasadzie) jako NIEZALEŻNE półprzezroczyste elementy zamiast jednej
+          scalonej warstwy, więc miejsce zachodzenia dostaje PODWÓJNĄ przezroczystość i świeci
+          jaśniej niż reszta futra — czyta się jako pasek/zygzak "prześwitu" na czole. Fix:
+          `needsOffscreenAlphaCompositing` na tym konkretnym `<View>` — natywny prop RN dokładnie
+          na ten przypadek ("Use this if your view contains overlapping semi-transparent children
+          which produce artifacts when composited normally"), wymusza render dzieci do bufora
+          off-screen jako JEDNA warstwa PRZED nałożeniem `opacity`. Zero zmian w `CatArt.tsx`
+          samym — dużo tańszy/bezpieczniejszy fix niż kolejna próba maskowania kształtu (patrz
+          ostrzeżenie o PetTileCat: nie zgaduj wizualnie bez realnego zrozumienia przyczyny).
     - **Misja blokuje pozostałe tory walki** (2026-08-18, user: "wtedy nie może walczyć w
       innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dotąd
       misja była całkiem niezależna od kampanii/raidu/eventu/questów/MAD (osobna pula, osobny

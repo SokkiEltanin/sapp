@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: "prześwity" na czole przygaszonego kotka po misji — NIEsprawdzone (2026-08-27)
+
+User ze screenshotem: "pupil dziwnie wygląda jak ma tą misję jakby miał jakieś prześwity na
+czole". Ta sama rodzina Androidowych bugów co saga PetTileCat — `opacity:0.3` na `<View>`
+wokół `<CatArt>` (ekran misji ukończonej, "NACIŚNIJ ABY ZAWALCZYĆ") renderował na Androidzie
+nachodzące na siebie warstwy (głowa + osobne `<Ear/>` overlaye z `CatArt.tsx`) jako niezależne
+półprzezroczyste elementy zamiast jednej scalonej warstwy — miejsce zachodzenia świeciło
+jaśniej niż reszta futra. Fix: `needsOffscreenAlphaCompositing` na tym `<View>` (`app/pet.tsx`)
+— natywny RN prop dokładnie na ten przypadek, zero zmian w `CatArt.tsx`. Pełny opis w
+ARCHITECTURE.md. `tsc`/`jest` zielone (63/759, bez nowych testów — czysto renderowy fix
+propa). **Priorytet testu na urządzeniu**: pupil po powrocie z misji, jeszcze nieodebranej
+("NACIŚNIJ ABY ZAWALCZYĆ") — czoło przygaszonego kotka powinno być jednolicie przyciemnione,
+bez jaśniejszego paska/zygzaka.
+
 ## 🆕 Trzy drobne poprawki: sloty ekwipunku, "Rynek" scalony, kolory +N — NIEsprawdzone (2026-08-27)
 
 Trzy niezależne prośby usera w jednej wiadomości:
