@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Backpack, Sparkles, X } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Backpack, Store, X } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -60,10 +60,16 @@ function fmtShopRefresh(): string {
 // czysto "co kupić za gold": skrzynki (gacha), sklep dnia (3 konkretne itemy ekwipunku,
 // gwarantowany zakup, roluje się co dzień), startupy (kosmetyk ekranu ładowania — TO
 // zostaje tu, to nie "kotek"), posiadane (startupy).
-type Cat = 'boxes' | 'daily' | 'startups' | 'owned';
+// `boxes`+`daily` SCALONE w JEDNĄ zakładkę `market` (2026-08-27, user: "w sklepie połączmy
+// SKLEP DNIA oraz SKRZYNKI, nazywając to ogólnie RYNEK LUB BAZAR... ja moze zrobię grafikę pod
+// ten bazarek potem, ale to potem — na razie połączmy [je] żeby były razem jak jedna
+// zakładka"). Treść obu (skrzynki gacha + sklep dnia z gwarantowanymi itemami) renderuje się
+// jedna pod drugą pod wspólnym nagłówkiem `s.subSection`, żadna logika zakupu nie zmieniona —
+// czysto łączenie dwóch zakładek w jedną. `Store` = neutralna ikona "rynku", nie przesądza na
+// razie żadnego motywu (user planuje własną grafikę pod bazarek później).
+type Cat = 'market' | 'startups' | 'owned';
 const CATS: { id: Cat; label: string; Icon: any }[] = [
-  { id: 'boxes',    label: 'Skrzynki',   Icon: Gift },
-  { id: 'daily',    label: 'Sklep dnia', Icon: Sparkles },
+  { id: 'market',   label: 'Rynek',      Icon: Store },
   { id: 'startups', label: 'Startupy',   Icon: Rocket },
   { id: 'owned',    label: 'Posiadane',  Icon: Backpack },
 ];
@@ -78,7 +84,7 @@ export default function PetShop() {
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
-  const [cat, setCat] = useState<Cat>('boxes');
+  const [cat, setCat] = useState<Cat>('market');
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
   const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);
   // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
@@ -240,63 +246,65 @@ export default function PetShop() {
           })}
         </View>
 
-        {/* ── SKRZYNKI ─────────────────────────────────────────────── */}
-        {cat === 'boxes' && (
-          <View style={{ gap: spacing[2] }}>
-            <Text style={s.blurbTop}>Losujesz ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
-            {LOOT_BOXES.map(box => {
-              const afford = coins >= box.cost;
-              return (
-                <PressableScale key={box.id} onPress={() => onBuyBox(box)}>
-                  <View style={[s.boxRow, { borderColor: box.color + '55' }]}>
-                    <View style={[s.boxIcon, { backgroundColor: box.color + '1E', borderColor: box.color + '55' }]}>
-                      <Text style={s.boxEmoji}>{box.emoji}</Text>
+        {/* ── RYNEK — skrzynki (gacha) + sklep dnia (gwarantowane itemy), scalone w jedną
+            zakładkę (2026-08-27, patrz komentarz przy `CATS` wyżej) ── */}
+        {cat === 'market' && (
+          <View style={{ gap: spacing[3] }}>
+            <View style={{ gap: spacing[2] }}>
+              <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
+              <Text style={s.blurbTop}>Losujesz ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
+              {LOOT_BOXES.map(box => {
+                const afford = coins >= box.cost;
+                return (
+                  <PressableScale key={box.id} onPress={() => onBuyBox(box)}>
+                    <View style={[s.boxRow, { borderColor: box.color + '55' }]}>
+                      <View style={[s.boxIcon, { backgroundColor: box.color + '1E', borderColor: box.color + '55' }]}>
+                        <Text style={s.boxEmoji}>{box.emoji}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.cellName}>{box.name}</Text>
+                        <Text style={s.cellState}>{box.blurb}</Text>
+                        <Text style={s.oddsTxt}>ekwipunek {Math.round(box.gearChance * 100)}% · kolor {Math.round(box.colorChance * 100)}% · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
+                      </View>
+                      <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.cellName}>{box.name}</Text>
-                      <Text style={s.cellState}>{box.blurb}</Text>
-                      <Text style={s.oddsTxt}>ekwipunek {Math.round(box.gearChance * 100)}% · kolor {Math.round(box.colorChance * 100)}% · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
-                    </View>
-                    <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
-                  </View>
-                </PressableScale>
-              );
-            })}
-          </View>
-        )}
+                  </PressableScale>
+                );
+              })}
+            </View>
 
-        {/* ── SKLEP DNIA — gwarantowane itemy ekwipunku, roluje się codziennie o 6:00 ── */}
-        {cat === 'daily' && (
-          <View style={{ gap: spacing[2] }}>
-            <Text style={s.blurbTop}>3 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
-            <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
-            {dailySlots.length === 0 && (
-              <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
-            )}
-            {dailySlots.map(slot => {
-              const { item, rarity, cost } = slot;
-              const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
-              const bought = !!dayClaims[dayKey];
-              const owned = alreadyOwnGear(item.id, rarity);
-              const meta = RARITY_META[rarity];
-              const afford = coins >= cost;
-              return (
-                <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }}>
-                  <View style={[s.boxRow, { borderColor: meta.color + '55' }]}>
-                    <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55' }]}>
-                      <Image source={item.icon} style={s.boxImg} resizeMode="contain" />
+            <View style={{ gap: spacing[2] }}>
+              <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
+              <Text style={s.blurbTop}>3 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
+              <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
+              {dailySlots.length === 0 && (
+                <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
+              )}
+              {dailySlots.map(slot => {
+                const { item, rarity, cost } = slot;
+                const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
+                const bought = !!dayClaims[dayKey];
+                const owned = alreadyOwnGear(item.id, rarity);
+                const meta = RARITY_META[rarity];
+                const afford = coins >= cost;
+                return (
+                  <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }}>
+                    <View style={[s.boxRow, { borderColor: meta.color + '55' }]}>
+                      <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55' }]}>
+                        <Image source={item.icon} style={s.boxImg} resizeMode="contain" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.cellName}>{item.name}</Text>
+                        <Text style={[s.cellState, { color: meta.color }]}>{meta.label} · {SLOT_META[item.slot].label}</Text>
+                      </View>
+                      {bought || owned
+                        ? <Check size={18} color={meta.color} />
+                        : <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text></View>}
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.cellName}>{item.name}</Text>
-                      <Text style={[s.cellState, { color: meta.color }]}>{meta.label} · {SLOT_META[item.slot].label}</Text>
-                    </View>
-                    {bought || owned
-                      ? <Check size={18} color={meta.color} />
-                      : <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text></View>}
-                  </View>
-                </PressableScale>
-              );
-            })}
+                  </PressableScale>
+                );
+              })}
+            </View>
           </View>
         )}
 

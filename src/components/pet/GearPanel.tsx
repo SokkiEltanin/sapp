@@ -57,7 +57,7 @@ export default function GearPanel({ children }: { children: ReactNode }) {
           {equippedItem ? (
             <Image source={equippedItem.icon} style={s.slotImg} resizeMode="contain" />
           ) : (
-            <Icon size={18} color={c.text.muted} strokeWidth={1.6} />
+            <Icon size={22} color={c.text.muted} strokeWidth={1.6} />
           )}
           {ownedCount > 0 && !equippedId && <View style={s.slotDot} />}
         </View>
@@ -173,11 +173,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // nie ściskać kotka gdy jest mało itemów; ikony bez etykiet (dawny `slotLabel` z nazwą itemu
   // nie mieścił się obok kotka i zachodził na inne karty — szczegóły itemu są w modalu).
   flankRow: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: spacing[2] },
-  flankCol: { width: 46, gap: spacing[2], alignItems: 'center' },
+  // Sloty powiększone (2026-08-27, user: "te sloty na itemy musimy powiększyć bo sa za
+  // malutkie przy kotku") — 40→50 (+25%), ikona/obrazek itemu i kropka "posiadasz" przeskalowane
+  // razem z nim, kolumna odpowiednio szersza żeby sloty nie stykały się krawędziami.
+  flankCol: { width: 56, gap: spacing[2], alignItems: 'center' },
   catCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  slot: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
-  slotImg: { width: 26, height: 26 },
-  slotDot: { position: 'absolute', top: 3, right: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: '#FBBF24' },
+  slot: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, borderWidth: 1, position: 'relative' },
+  slotImg: { width: 34, height: 34 },
+  slotDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FBBF24' },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },
   sheet: { width: '100%', maxWidth: 480, backgroundColor: c.bg.primary, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing[4], gap: spacing[2] },
