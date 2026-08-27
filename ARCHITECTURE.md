@@ -1304,6 +1304,20 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
         kształtu. Dashboardowy licznik "X nagród do odbioru" (kafel pupila, `index.tsx`) NIE
         liczy jeszcze gotowej misji — zaproponowane jako osobny, dodatkowy krok widoczności,
         NIE zaakceptowane/zrobione jeszcze, patrz NEXT_STEPS.md.
+        - **BUG: dotyk kotka NIE wywoływał walki — tylko głaskanie (2026-08-27)** — user: "jak
+          klikam to tylko go głaska... trzeba kliknąć walcz w kafelku misji". Przyczyna: "cały
+          blok to JEDEN TouchableOpacity" wyżej to NIE cała prawda — `CatArt` opakowuje SIĘ
+          WEWNĘTRZNIE we własny `<Pressable onPress={onTap} onLongPress={doCuddle} .../>`
+          (patrz `CatArt.tsx`) BEZWARUNKOWO, niezależnie od tego czy dostał `onPress` z
+          zewnątrz — `onTap` zawsze robi swoje (haptyka, hop, cząsteczki) i dopiero na końcu
+          warunkowo woła `onPress?.()`. Ten wewnętrzny `Pressable` PRZECHWYTUJE dotyk, zanim
+          zdąży wybąblować do zewnętrznej `TouchableOpacity` — więc w praktyce cały widoczny
+          obszar kotka był "martwy" dla `onFightMission`, działał tylko wąski margines wokół
+          (tekst ma `pointerEvents:'none'`, więc i tak nic tam nie łapał). Fix: `CatArt` w tym
+          konkretnym miejscu dostaje `onPress={onFightMission}` WPROST — `onTap`'s wewnętrzna
+          reakcja "pogłaskania" (hop/iskra) leci przy okazji, nieszkodliwie, bo ekran i tak
+          natychmiast nawiguje do `boss-fight.tsx`. Zewnętrzna `TouchableOpacity` zostaje jako
+          dodatkowy, szerszy tap-target.
     - **Misja blokuje pozostałe tory walki** (2026-08-18, user: "wtedy nie może walczyć w
       innych z bossem zanim nie wróci a zamiast niego jest napis w trakcie misji") — dotąd
       misja była całkiem niezależna od kampanii/raidu/eventu/questów/MAD (osobna pula, osobny

@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: dotyk kotka po powrocie z misji tylko głaskał, nie zaczynał walki — NIEsprawdzone (2026-08-27)
+
+User: "jak pupil wraca z misji to musisz zrobić zeby wtedy kliknięcie na kotka rzeczywiście
+przenosilo do walki bo teraz i tak trzeba kliknąć walcz w kafelku misji". Przyczyna: `CatArt`
+opakowuje się wewnętrznie we własny `Pressable`, który ZAWSZE przechwytywał dotyk, zanim zdążył
+wybąblować do zewnętrznej `TouchableOpacity` z `onFightMission` — więc w praktyce cały widoczny
+obszar kotka był dla tego martwy. Fix: `onPress={onFightMission}` wprost na `CatArt` w tym
+miejscu. Pełny opis w ARCHITECTURE.md ("BUG: dotyk kotka NIE wywoływał walki"). `tsc`/`jest`
+zielone (63/754, bez nowych testów — czysto UI-owy fix wiązania dotyku, nic do przetestowania
+jednostkowo w tym projekcie). **Priorytet testu na urządzeniu**: dokończ misję pupila, wróć na
+ekran Pupil (przygaszony kotek + pulsujący napis "Naciśnij, aby zawalczyć") — dotknięcie
+BEZPOŚREDNIO kotka powinno teraz przenosić od razu do walki, bez konieczności scrollowania do
+przycisku "Walcz" w kaflu misji niżej.
+
 ## 🆕 Kafel pupila: PetTileCat PORZUCONY, wrócony do zwykłego CatArt — NIEsprawdzone (2026-08-27)
 
 User ze screenshotem: "co ty z tym pupilem odjebałem teraz jak pulpet wygląda ja pierdółek".
