@@ -956,6 +956,23 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `__tests__/raid.test.ts` przepisany pod nowe API — w tym test że mała, prawie wyczerpana
       pula da się realnie dobić do zera w JEDNEJ próbie (dawniej niemożliwe do sensownego
       przetestowania, bo sesja nigdy nie widziała realnej puli).
+      - **BUG: pełny ekran walki (`boss-fight.tsx`) NIE dostał tego samego fixu co mini-karta
+        wyżej (2026-08-28, user ze screenshotem: "mimo że mam energię nie mogę zawalczyć" —
+        pigułka u góry pokazywała "1", przycisk WALCZ! wyglądał w pełni aktywny).** `attack()`
+        już POPRAWNIE blokował próbę (`pool < cost`, `cost = RAID_ENERGY_COST` dla raidu) i
+        pokazywał toast — ale wyłącznie mini-karta w `bosses.tsx` dostała wizualny fix z
+        akapitu wyżej; sam ekran walki nadal liczył `target.energy <= 0` zarówno na przycisku
+        (`disabled`/`opacity`) JAK I na pigułce energii w headerze — czyli z 1⚡ (< kosztu 2)
+        WALCZ! wyglądał normalnie klikalny, a po kliknięciu nic się nie działo poza łatwym-do-
+        przegapienia toastem. Fix: `Target` (unia typu w `boss-fight.tsx` opisująca cel walki
+        niezależnie od trybu) dostał nowe pole `energyCost` (1 domyślnie, `RAID_ENERGY_COST`
+        dla raidu) — JEDNO źródło prawdy używane w trzech miejscach: `attack()`'s `cost`
+        (usuwa zduplikowane `kind === 'raid' ? RAID_ENERGY_COST : 1`), przycisk WALCZ!
+        (`disabled`/`opacity` na `energy < energyCost`, nie `<= 0`), i pigułka energii w
+        headerze (pokazuje "1/2" zamiast samego "1" gdy koszt > 1). Dodatkowo nowy tekst pod
+        przyciskiem ("Potrzeba 2⚡, masz 1") i doprecyzowany toast przy próbie ataku z
+        niewystarczającą (ale niezerową) energią — zamiast mylącego "brak prób, wróć jutro"
+        (które sugerowało zero, nie "za mało na TĘ walkę").
   - **Kampania: gate "1 nowy boss dziennie" — WPROWADZONY 2026-08-17, ZASTĄPIONY 2026-08-18**
     (patrz "Energia kampanii/MAD — regeneracja w czasie" niżej dla aktualnego mechanizmu) —
     user przysłał pełny eksport z czystego resetu (3/3 bossów w ~4 minuty, "zdecydowanie za

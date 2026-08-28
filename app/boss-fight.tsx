@@ -199,25 +199,34 @@ export default function BossFight() {
     ? Math.min(1, Math.max(0, 1 - missionRemainingMs / missionTotalMs)) : 0;
 
   // ── jeden ujednolicony cel, niezależnie od trybu — cała reszta ekranu czyta TYLKO to ──
-  type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind };
+  // `energyCost` (2026-08-28, user ze screenshotem: "mimo że mam energię nie mogę
+  // zawalczyć" — miał 1⚡ na pigułce, ale Raid kosztuje RAID_ENERGY_COST=2, więc
+  // `attack()` poprawnie blokował próbę (patrz `pool < cost` niżej), ale przycisk
+  // WALCZ! wyglądał w pełni aktywny (tylko `energy <= 0` go wygaszało) i pigułka
+  // energii pokazywała samo "1" bez żadnej wzmianki że potrzeba 2 — user nie miał
+  // jak się domyślić DLACZEGO nic się nie dzieje po kliknięciu poza łatwym-do-
+  // przegapienia toastem. Teraz część `Target`, jedno źródło prawdy dla pigułki,
+  // przycisku I `attack()` (usuwa duplikat `kind === 'raid' ? RAID_ENERGY_COST : 1`
+  // który tam był osobno).
+  type Target = { id: string; name: string; taunt: string; weakness: string; weaknessLabel: string; emoji: string; maxHp: number; energy: number; energyCost: number; unlocked: boolean; unlockLevel: number; done: boolean; attackKind?: AttackKind };
   let target: Target | null = null;
   if (kind === 'campaign' && campaignBoss) {
     // Odblokowanie kampanii = samo pokonanie poprzedniego bossa, NIE poziom (2026-08-17,
     // patrz identyczny komentarz przy `current`/`unlocked` w app/bosses.tsx) — campaignBoss
     // tutaj jest już z definicji "pierwszy niepokonany", więc zawsze dostępny do walki.
-    target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, unlocked: true, unlockLevel: campaignBoss.unlockLevel, done: false, attackKind: campaignBoss.attackKind };
+    target = { id: campaignBoss.id, name: campaignBoss.name, taunt: campaignBoss.taunt, weakness: campaignBoss.weakness, weaknessLabel: campaignBoss.weaknessLabel, emoji: campaignBoss.emoji, maxHp: campaignBoss.hp, energy, energyCost: 1, unlocked: true, unlockLevel: campaignBoss.unlockLevel, done: false, attackKind: campaignBoss.attackKind };
   } else if (kind === 'raid') {
-    target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: eventEnergy, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
+    target = { id: raid.id, name: raid.name, taunt: raid.taunt, weakness: raid.weakness, weaknessLabel: raid.weaknessLabel, emoji: raid.emoji, maxHp: raidMaxHp, energy: eventEnergy, energyCost: RAID_ENERGY_COST, unlocked: level >= 3, unlockLevel: 3, done: raidDone, attackKind: raid.attackKind };
   } else if (kind === 'event' && eventBoss && eventKey) {
     // Nemesis (2026-08-18): maxHp = TRWAŁA pula (menaceMaxHp, jak raid), energy = stała 1
     // (zawsze "ma próbę" — nielimitowane ataki, patrz komentarz przy `pool` w attackRoundBased).
-    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: isMenace ? menaceMaxHp : eventMaxHp, energy: isMenace ? 1 : eventEnergy, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
+    target = { id: eventBoss.id, name: eventBoss.name, taunt: eventBoss.taunt, weakness: eventBoss.weakness, weaknessLabel: eventBoss.weaknessLabel, emoji: eventBoss.emoji, maxHp: isMenace ? menaceMaxHp : eventMaxHp, energy: isMenace ? 1 : eventEnergy, energyCost: 1, unlocked: level >= 2, unlockLevel: 2, done: eventDone, attackKind: eventBoss.attackKind };
   } else if (kind === 'quest' && questBoss) {
-    target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed, attackKind: questBoss.attackKind };
+    target = { id: questBoss.id, name: questBoss.name, taunt: questBoss.taunt, weakness: questBoss.weakness, weaknessLabel: '', emoji: questBoss.emoji, maxHp: questBoss.hp, energy: 1, energyCost: 1, unlocked: true, unlockLevel: 0, done: questAlreadyClaimed, attackKind: questBoss.attackKind };
   } else if (kind === 'mad' && madBoss && madBase) {
-    target = { id: madBoss.id, name: madBoss.name, taunt: madBoss.taunt, weakness: madBoss.weakness, weaknessLabel: madBoss.weaknessLabel, emoji: madBoss.emoji, maxHp: madBoss.hp, energy, unlocked: level >= MAD_UNLOCK_LEVEL, unlockLevel: MAD_UNLOCK_LEVEL, done: false, attackKind: madBoss.attackKind };
+    target = { id: madBoss.id, name: madBoss.name, taunt: madBoss.taunt, weakness: madBoss.weakness, weaknessLabel: madBoss.weaknessLabel, emoji: madBoss.emoji, maxHp: madBoss.hp, energy, energyCost: 1, unlocked: level >= MAD_UNLOCK_LEVEL, unlockLevel: MAD_UNLOCK_LEVEL, done: false, attackKind: madBoss.attackKind };
   } else if (kind === 'mission' && missionBoss) {
-    target = { id: missionBoss.id, name: missionBoss.name, taunt: missionBoss.taunt, weakness: missionBoss.weakness, weaknessLabel: '', emoji: missionBoss.emoji, maxHp: missionBoss.hp, energy: 1, unlocked: true, unlockLevel: 0, done: false, attackKind: missionBoss.attackKind };
+    target = { id: missionBoss.id, name: missionBoss.name, taunt: missionBoss.taunt, weakness: missionBoss.weakness, weaknessLabel: '', emoji: missionBoss.emoji, maxHp: missionBoss.hp, energy: 1, energyCost: 1, unlocked: true, unlockLevel: 0, done: false, attackKind: missionBoss.attackKind };
   }
   // Kampania/wydarzenie/quest/MAD/misja resetują HP do pełna co próbę (liveBossHp podczas
   // walki, inaczej pełne maxHp). Raid ma trwały bank (raidRemaining) — ale (2026-08-17)
@@ -376,8 +385,18 @@ export default function BossFight() {
     // — bez sprawdzania puli, tak jak quest/misja.
     if (kind !== 'quest' && kind !== 'mission' && !(kind === 'event' && isMenace)) {
       const pool = kind === 'campaign' || kind === 'mad' ? energy : eventEnergy;
-      const cost = kind === 'raid' ? RAID_ENERGY_COST : 1;
-      if (pool < cost) { haptic.error(); toast.info('Brak prób ataku na dziś — wróć jutro po nowe.'); return; }
+      const cost = target?.energyCost ?? 1;
+      if (pool < cost) {
+        haptic.error();
+        // Raid kosztuje więcej niż 1⚡ (RAID_ENERGY_COST) — jeśli user MA jakąś energię,
+        // tylko za mało na TĘ konkretną walkę, "brak prób, wróć jutro" jest mylące (2026-08-28,
+        // user ze screenshotem: "mimo że mam energię nie mogę zawalczyć" — miał 1⚡, raid
+        // potrzebuje 2⚡, komunikat nie mówił dlaczego).
+        toast.info(pool > 0 && cost > 1
+          ? `Raid kosztuje ${cost}⚡, masz tylko ${pool} — wróć jutro po więcej.`
+          : 'Brak prób ataku na dziś — wróć jutro po nowe.');
+        return;
+      }
     }
     resetCatHp();
     const result = simulateFight(atkStatBonus, level, bonuses, roundBoss, catMax, MAX_FIGHT_ROUNDS, equippedItems);
@@ -602,7 +621,12 @@ export default function BossFight() {
             (żeby tytuł został wyśrodkowany tak jak w pozostałych trybach). */}
         {kind === 'quest' || kind === 'mission'
           ? <View style={{ width: 40 }} />
-          : <View style={s.energyPill}><Zap size={13} color="#38BDF8" /><Text style={s.energyTxt}>{target?.energy ?? 0}</Text></View>}
+          // Pigułka pokazuje "masz/koszt" (np. "1/2") gdy koszt > 1 (raid) — samo "1" nie
+          // tłumaczyło DLACZEGO WALCZ! nic nie robi, gdy raid kosztuje 2⚡ (2026-08-28, user
+          // ze screenshotem: "mimo że mam energię nie mogę zawalczyć").
+          : <View style={s.energyPill}><Zap size={13} color="#38BDF8" />
+              <Text style={s.energyTxt}>{target?.energy ?? 0}{(target?.energyCost ?? 1) > 1 ? `/${target?.energyCost}` : ''}</Text>
+            </View>}
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -758,12 +782,20 @@ export default function BossFight() {
             {target.done ? (
               <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : kind === 'event' && isMenace ? 'nemesis rozwiązany' : 'wróć w kolejnym okresie'}</Text>
             ) : (
-              <PressableScale onPress={attack} disabled={target.energy <= 0 || fighting} style={{ width: '100%' }}>
-                <View style={[s.attackBtn, (target.energy <= 0 || fighting) && { opacity: 0.5 }]}>
-                  <Swords size={18} color="#fff" />
-                  <Text style={s.attackTxt}>{fighting ? 'Walka trwa…' : 'WALCZ!'}</Text>
-                </View>
-              </PressableScale>
+              <>
+                <PressableScale onPress={attack} disabled={target.energy < target.energyCost || fighting} style={{ width: '100%' }}>
+                  <View style={[s.attackBtn, (target.energy < target.energyCost || fighting) && { opacity: 0.5 }]}>
+                    <Swords size={18} color="#fff" />
+                    <Text style={s.attackTxt}>{fighting ? 'Walka trwa…' : 'WALCZ!'}</Text>
+                  </View>
+                </PressableScale>
+                {/* Raid kosztuje >1⚡ — jeśli masz za mało (ale nie zero), powiedz wprost ILE
+                    potrzeba, zamiast wygaszonego przycisku bez wyjaśnienia (2026-08-28, user
+                    ze screenshotem: "mimo że mam energię nie mogę zawalczyć"). */}
+                {target.energy > 0 && target.energy < target.energyCost && (
+                  <Text style={s.energyShortTxt}>Potrzeba {target.energyCost}⚡, masz {target.energy}</Text>
+                )}
+              </>
             )}
             {/* "Pomiń walkę" (2026-08-20, user: "możesz dodać przycisk jak walka jakakoliwek
                 pomiń walke?") — wynik jest już rozstrzygnięty w momencie WALCZ!, ten przycisk
@@ -917,6 +949,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   doneInlineTxt: { fontSize: 13, fontWeight: '800', color: '#2AC68F', textAlign: 'center', marginTop: spacing[4] },
   attackBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#EF4444', borderRadius: radius.lg, paddingVertical: 16, marginTop: spacing[4], width: '100%' },
   attackTxt: { fontSize: 17, fontWeight: '900', color: '#fff' },
+  energyShortTxt: { fontSize: 12, fontWeight: '700', color: '#F87171', textAlign: 'center', marginTop: spacing[2] },
   skipFightTxt: { fontSize: 12, fontWeight: '700', color: c.text.muted, textAlign: 'center', textDecorationLine: 'underline' },
   lockBox: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[6], paddingHorizontal: spacing[3] },
   lockTxt: { flex: 1, fontSize: 12.5, color: c.text.muted, lineHeight: 17 },
