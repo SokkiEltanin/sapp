@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView, Platform,
@@ -67,7 +67,10 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
     item.weightKg && item.weightKg > 0 ? String(Math.round((item.weightKg / piecesOf(item.quantity)) * 1000)) : '',
   );
   const [category, setCategory] = useState<ExpenseCategory>(item.category);
-  const [tags, setTags]         = useState<string[]>(item.tags ?? []);
+  // `[...new Set(...)]` (2026-08-28, user ze screenshotem: "jak dodaje wlasny tag na
+  // paragonie to on sie duplikuje") — cleans up any duplicate already saved by the bug
+  // fixed below, the moment this item is opened again, without needing manual re-editing.
+  const [tags, setTags]         = useState<string[]>([...new Set(item.tags ?? [])]);
   const [eaters, setEaters]     = useState<string[]>(item.eaters ?? []);
   const [customTag, setCustomTag] = useState('');
   const [payers, setPayers]     = useState<string[]>([]);
@@ -77,10 +80,22 @@ function ItemEditor({ item, onSave, onCancel }: ItemEditorProps) {
     setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   const toggleEater = (p: string) =>
     setEaters(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  // BUG (2026-08-28, user: "jak dodaje wlasny tag na paragonie to on sie duplikuje") — the
+  // TextInput below has BOTH `onSubmitEditing` and `onBlur` wired to `addCustomTag`.
+  // Pressing "gotowe" fires `onSubmitEditing`, and the keyboard dismissing right after
+  // fires `onBlur` — both close over the SAME not-yet-cleared `customTag` text (React
+  // hasn't re-rendered with `setCustomTag('')` from the first call yet), so both call
+  // `setTags(prev => [...prev, t])` with the identical tag → added twice. `addingRef`
+  // collapses any same-tick double-fire into one add. Same fix as `TagPicker` in
+  // `app/expenses/scan.tsx` (the pre-save review screen — this is the post-save one).
+  const addingRef = useRef(false);
   const addCustomTag = () => {
     const t = customTag.trim().toLowerCase();
-    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
     setCustomTag('');
+    if (!t || tags.includes(t) || addingRef.current) return;
+    addingRef.current = true;
+    setTags(prev => [...prev, t]);
+    setTimeout(() => { addingRef.current = false; }, 0);
   };
 
   const handleSave = () => {
@@ -333,7 +348,7 @@ export default function ExpenseDetailScreen() {
   const [txType, setTxType]     = useState<TransactionType>(expense?.type ?? 'expense');
   const [expCat, setExpCat]     = useState<ExpenseCategory>((isInc ? 'other' : expense?.category ?? 'other') as ExpenseCategory);
   const [incCat, setIncCat]     = useState<IncomeCategory>((isInc ? expense?.category ?? 'salary' : 'salary') as IncomeCategory);
-  const [tags, setTags]         = useState<string[]>(expense?.tags ?? []);
+  const [tags, setTags]         = useState<string[]>([...new Set(expense?.tags ?? [])]);
   const [customTag, setCustomTag] = useState('');
   const [saving, setSaving]     = useState(false);
   const [payer, setPayer]       = useState<string>(expense?.payer ?? '');
@@ -359,6 +374,11 @@ export default function ExpenseDetailScreen() {
   // hookiem. Render z `expense` a render bez `expense` wołały różną liczbę hooków =
   // dokładnie ten błąd. Guard musi być OSTATNIĄ rzeczą przed hookami, nigdy pomiędzy.
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Guards `addCustomTag` below against a double-fire — see the identical `ItemEditor`
+  // fix above (2026-08-28) for why this class of bug happens; this input only has
+  // `onSubmitEditing` + a separate tap button (no `onBlur`), lower risk, but the same
+  // cheap guard closes the gap if both ever land in the same tick.
+  const addingTagRef = useRef(false);
 
   if (!expense) {
     return (
@@ -388,8 +408,11 @@ export default function ExpenseDetailScreen() {
 
   const addCustomTag = () => {
     const t = customTag.trim().toLowerCase();
-    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
     setCustomTag('');
+    if (!t || tags.includes(t) || addingTagRef.current) return;
+    addingTagRef.current = true;
+    setTags(prev => [...prev, t]);
+    setTimeout(() => { addingTagRef.current = false; }, 0);
   };
 
   const handleItemSave = async (idx: number, updated: ReceiptItem) => {
@@ -693,7 +716,10 @@ export default function ExpenseDetailScreen() {
                         </Text>
                         {it.tags?.length > 0 && (
                           <View style={s.itemTagsRow}>
-                            {it.tags.map(tag => (
+                            {/* [...new Set(...)] (2026-08-28) — displays cleanly even for an
+                                item saved with the duplicate-tag bug (fixed in ItemEditor
+                                above) before this fix, without needing a manual re-edit. */}
+                            {[...new Set(it.tags)].map(tag => (
                               <View key={tag} style={s.itemTagBadge}>
                                 <Text style={s.itemTagText}>{tag}</Text>
                               </View>

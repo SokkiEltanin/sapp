@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: własny tag na paragonie się duplikował + nie był od razu wybieralny gdzie indziej — NIEsprawdzone (2026-08-28)
+
+User ze screenshotem ekranu "Wydatek": "jak dodaje wlasny tag na paragonie ie to om soe
+duplikuje nie wiem czemu i nie mam opcji oddania go na stałe, żebym mógł sobie dodac tag na
+inne kategorie". Dwie rzeczy w jednej wiadomości:
+1. **Duplikat naprawiony** — `TextInput` do własnego tagu (w `scan.tsx`'s `TagPicker` I w
+   `app/expenses/[id].tsx`'s `ItemEditor`, ta sama para komponentów co zwykle) miał
+   `onSubmitEditing` I `onBlur` spięte z tą samą funkcją dodającą — oba potrafiły odpalić się
+   dla jednego "gotowe" i dodać ten sam tag dwa razy. Nowy `addingRef` blokuje drugie
+   wywołanie w tym samym ticku. Istniejące już zduplikowane dane (jak na screenshocie usera)
+   czyszczą się same przy ponownym otwarciu (bez ręcznej edycji).
+2. **"Na stałe" — było już trwałe, ale niewidoczne w tej samej sesji** — nowy tag zapisywał
+   się poprawnie (`saveTagMemory` przy zapisie paragonu) i STAWAŁ się wybieralny dla innych
+   produktów... dopiero przy NASTĘPNYM otwarciu skanera. Teraz pojawia się jako opcja dla
+   WSZYSTKICH pozostałych produktów natychmiast, w tej samej sesji skanowania.
+
+Pełny opis w ARCHITECTURE.md §7b. `tsc`/`jest` zielone (64/779, bez nowych testów — czysto
+UI-owy fix w komponentach ekranów, logika bez wydzielonych czystych funkcji do
+przetestowania). **Priorytet testu na urządzeniu**: Wydatki → skanuj paragon → dodaj własny
+tag na produkcie (spróbuj i "gotowe" na klawiaturze, i stuknięcie gdzie indziej) — sprawdź że
+pojawia się RAZ, nie dwa razy, i że jest od razu wybieralny w pickerze INNEGO produktu na tym
+samym ekranie. Sprawdź też edycję już zapisanego wydatku (ekran "Wydatek" → dotknij pozycję)
+tym samym sposobem.
+
 ## 🆕 BUG: WALCZ! na raidzie nic nie robił mimo widocznej energii — NIEsprawdzone (2026-08-28)
 
 User ze screenshotem ekranu Raid (Kraken Chaosu): "mimo że mam energię nie mogę zawalczyć o

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -106,6 +106,12 @@ export default function ScanReceiptModal() {
   const confirmSync = useExpensesStore(s => s.confirmSync);
 
   useEffect(() => { getTagFrequency().then(setTagFreq).catch(() => {}); }, []);
+  // A brand-new custom tag typed on ONE product should be pickable for every OTHER product in
+  // THIS SAME scanning session too, not just after the next app open (2026-08-28, user: "nie
+  // mam opcji oddania go na stałe, żebym mógł sobie dodac tag na inne kategorie" — it was
+  // already persisted for future receipts via `saveTagMemory` on save, but `tagFreq` only ever
+  // loaded once at mount, so it stayed invisible to other products until next time).
+  const onNewCustomTag = (tag: string) => setTagFreq(prev => ({ ...prev, [tag]: (prev[tag] ?? 0) + 1 }));
   useEffect(() => { getPayers().then(setPayers).catch(() => {}); }, []);
   useEffect(() => { loadWeightMemory().then(setWeightMemory).catch(() => {}); }, []);
   useEffect(() => { loadPriceMemory().then(setPriceMemory).catch(() => {}); }, []);
@@ -721,6 +727,7 @@ export default function ScanReceiptModal() {
                         tagPickerOpen={tagPickerFor === i}
                         onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
                         tagFreq={tagFreq}
+                        onNewCustomTag={onNewCustomTag}
                         excluded={!!editedExcluded[i]}
                         onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
                         weighable={isWeighable(i)}
@@ -760,6 +767,7 @@ export default function ScanReceiptModal() {
                   tagPickerOpen={tagPickerFor === i}
                   onTagPickerPress={() => { setTagPickerFor(tagPickerFor === i ? null : i); setCatPickerFor(null); setCustomCatPickerFor(null); setCustomTagPickerFor(null); }}
                   tagFreq={tagFreq}
+                  onNewCustomTag={onNewCustomTag}
                   excluded={!!editedExcluded[i]}
                   onToggleExcluded={() => setEditedExcluded(prev => ({ ...prev, [i]: !prev[i] }))}
                   weighable={isWeighable(i)}
@@ -798,6 +806,7 @@ export default function ScanReceiptModal() {
                 onTagPickerPress={() => { setCustomTagPickerFor(customTagPickerFor === idx ? null : idx); setCustomCatPickerFor(null); setCatPickerFor(null); setTagPickerFor(null); }}
                 onTagsChange={tags => setCustomProducts(prev => prev.map((p, i) => i === idx ? { ...p, tags } : p))}
                 tagFreq={tagFreq}
+                onNewCustomTag={onNewCustomTag}
               />
             ))}
 
@@ -917,10 +926,11 @@ function CategoryPicker({ current, onSelect }: {
 
 // ─── TagPicker ────────────────────────────────────────────────────────────────
 
-function TagPicker({ activeTags, onToggle, freq = {} }: {
+function TagPicker({ activeTags, onToggle, freq = {}, onNewCustomTag }: {
   activeTags: string[];
   onToggle: (tag: string) => void;
   freq?: Record<string, number>;
+  onNewCustomTag?: (tag: string) => void;   // bump global tagFreq so it shows up for OTHER products right away
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -930,10 +940,30 @@ function TagPicker({ activeTags, onToggle, freq = {} }: {
     return [...all].sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0));
   }, [freq, activeTags]);
   const [custom, setCustom] = useState('');
+  // BUG (2026-08-28, user: "jak dodaje wlasny tag na paragonie to on sie duplikuje") — the
+  // TextInput had BOTH `onSubmitEditing` and `onBlur` wired to `addCustom`. Pressing "gotowe"
+  // on the keyboard fires `onSubmitEditing` AND then dismisses the keyboard, which fires
+  // `onBlur` right after — both handlers close over the SAME not-yet-cleared `custom` text
+  // (React hasn't re-rendered with the `setCustom('')` from the first call yet), so BOTH
+  // call `onToggle(t)` with the identical tag → added twice. `addingRef` collapses any
+  // same-tick double-fire into a single add, whichever handler(s) actually trigger on a given
+  // platform — kept BOTH handlers (not just one) since which one fires reliably differs by
+  // OS/keyboard type.
+  const addingRef = useRef(false);
   const addCustom = () => {
     const t = custom.trim().toLowerCase();
-    if (t && !activeTags.includes(t)) onToggle(t);
     setCustom('');
+    if (!t || activeTags.includes(t) || addingRef.current) return;
+    addingRef.current = true;
+    onToggle(t);
+    // A genuinely NEW tag (not a built-in, not already known from a previous receipt) —
+    // notify the parent so its shared `tagFreq` grows immediately, making the tag pickable
+    // for every OTHER product in THIS session too, not just on the next app open (2026-08-28,
+    // user: "nie mam opcji oddania go na stałe, żebym mógł sobie dodac tag na inne
+    // kategorie" — it WAS already persisted for future receipts via `saveTagMemory` on save,
+    // but only became visible in the picker on the next mount; this closes that gap).
+    if (!ITEM_TAGS.includes(t) && !(t in freq)) onNewCustomTag?.(t);
+    setTimeout(() => { addingRef.current = false; }, 0);
   };
   return (
     <ScrollView
@@ -980,7 +1010,7 @@ function ProductRow({
   catPickerOpen, onCategoryPress, onCategoryChange,
   priceValue, onPriceChange, priceFlag, productName, onNameChange,
   mergeSuggestion, onMerge, onDismissMerge,
-  productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq,
+  productTags, onTagsChange, tagPickerOpen, onTagPickerPress, tagFreq, onNewCustomTag,
   excluded, onToggleExcluded, weighable, weight, onWeightChange,
   quantity, onQuantityChange,
   payers, eaters, onEatersChange,
@@ -1005,6 +1035,7 @@ function ProductRow({
   tagPickerOpen: boolean;
   onTagPickerPress: () => void;
   tagFreq?: Record<string, number>;
+  onNewCustomTag?: (tag: string) => void;
   excluded?: boolean;
   onToggleExcluded?: () => void;
   weighable?: boolean;
@@ -1202,6 +1233,7 @@ function ProductRow({
         <TagPicker
           activeTags={productTags}
           freq={tagFreq}
+          onNewCustomTag={onNewCustomTag}
           onToggle={tag => {
             const next = productTags.includes(tag)
               ? productTags.filter(t => t !== tag)
@@ -1218,7 +1250,7 @@ function ProductRow({
 
 function CustomProductRow({
   product, onRemove, onNameChange, onPriceChange, onQuantityChange, onCategoryChange,
-  catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange, tagFreq,
+  catPickerOpen, onCategoryPress, tagPickerOpen, onTagPickerPress, onTagsChange, tagFreq, onNewCustomTag,
 }: {
   product: { name: string; price: string; quantity: string; category: ExpenseCategory; tags: string[] };
   onRemove: () => void;
@@ -1232,6 +1264,7 @@ function CustomProductRow({
   onTagPickerPress: () => void;
   onTagsChange: (tags: string[]) => void;
   tagFreq?: Record<string, number>;
+  onNewCustomTag?: (tag: string) => void;
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -1321,6 +1354,7 @@ function CustomProductRow({
         <TagPicker
           activeTags={product.tags}
           freq={tagFreq}
+          onNewCustomTag={onNewCustomTag}
           onToggle={tag => {
             const next = product.tags.includes(tag)
               ? product.tags.filter(t => t !== tag)
