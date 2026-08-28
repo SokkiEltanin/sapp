@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: WALCZ! na raidzie nic nie robił mimo widocznej energii — NIEsprawdzone (2026-08-28)
+
+User ze screenshotem ekranu Raid (Kraken Chaosu): "mimo że mam energię nie mogę zawalczyć o
+co chodzi?" — pigułka u góry pokazywała "1", przycisk WALCZ! wyglądał normalnie aktywny.
+Przyczyna: raid kosztuje `RAID_ENERGY_COST=2` (nie 1), a `attack()` w `boss-fight.tsx`
+POPRAWNIE blokował próbę z komunikatem-toastem — ale sam PRZYCISK (i pigułka energii w
+headerze) liczyły tylko `energy <= 0`, nie `energy < energyCost`. Mini-karta rajdu w
+`bosses.tsx` dostała ten fix już 2026-08-25, pełny ekran walki (osiągany zarówno z tej karty
+jak i bezpośrednio) — nie. Fix: nowe pole `energyCost` na `Target` (1 domyślnie,
+`RAID_ENERGY_COST` dla raidu), jedno źródło prawdy dla przycisku/pigułki/`attack()`. Pigułka
+teraz pokazuje "1/2" zamiast samego "1" gdy koszt > 1, pod przyciskiem nowy tekst "Potrzeba
+2⚡, masz 1", toast doprecyzowany (nie mylące "brak prób, wróć jutro" gdy user MA jakąś
+energię, tylko za mało na TĘ walkę). Pełny opis w ARCHITECTURE.md. `tsc`/`jest` zielone
+(64/779, bez nowych testów — czysto UI-owy fix widoczności/komunikatu, logika blokady już
+była poprawna i przetestowana). **Priorytet testu na urządzeniu**: ekran Raid z energią < 2
+(np. 1⚡ jak na screenshocie usera) — przycisk WALCZ! powinien być wygaszony, pigułka
+pokazywać "1/2", i widoczny tekst tłumaczący ile brakuje.
+
+**Znaleziony przy okazji, celowo NIE naprawiony (ten sam gap co u usera, ale nikt go nie
+zgłosił)**: Nemesis (event `kind==='menace'`) ma identyczną architekturę co raid przed
+fixem z 2026-08-25 — user zgłosił problem tylko dla raidu wtedy. Nemesis ma jednak zawsze
+`energy=1`/`energyCost=1` (nielimitowane próby, patrz komentarz w kodzie), więc TEN
+konkretny bug (koszt > energia mimo widocznej energii) go nie dotyczy — nic do zrobienia.
+
 ## 🆕 BUG: kalendarz pracy przestawał się synchronizować NA ZAWSZE — NIEsprawdzone (2026-08-28)
 
 User ze screenshotami (kafelek dashboardu vs realny Google Kalendarz): "juz minęło kilka
