@@ -62,7 +62,7 @@ import { foodAmountOf, isFoodItem, foodSubcat, FOOD_SUBCAT_META, addNonFood, loa
 import { isUserNonShop, addNonShop, loadNonShop } from '@/utils/shopExclude';
 import { useFoodStore, targetIntake, isRecipeProduct } from '@/store/foodStore';
 import { useTimeCapsule } from '@/store/timeCapsuleStore';
-import { shiftHours, isWorkEvent, shiftClockRange } from '@/utils/workEvents';
+import { shiftHours, isWorkEvent, shiftClockRange, elapsedShiftHours } from '@/utils/workEvents';
 import { getAllNotes, Note } from '@/utils/notesStorage';
 import { getHealthHistory, saveTodayWeight } from '@/utils/healthHistory';
 import { getHealthGoals, bmrMifflin, ACTIVITY_FACTOR } from '@/utils/healthGoals';
@@ -166,10 +166,19 @@ const HABIT_ICON_MAP: Record<string, React.ComponentType<any>> = {
   sun:         Sun,
   bike:        Bike,
 };
-// SINGLE app accent = MONOCHROME (user: „akcent czarno-biały, kolory tylko dodatki").
-// Emfaza przez biel+waga+kontrast, nie kolor. Kolory zostają tylko punktowo (i w kalendarzu).
-// Jedno miejsce do zmiany, docelowo rozlać na resztę.
-const WORK_ACCENT = colors.text.primary;
+// Reszta appki: SINGLE app accent = MONOCHROME (user: „akcent czarno-biały, kolory tylko
+// dodatki"). Praca jest TU jawnym wyjątkiem od tej zasady (2026-08-28, user: "tamtej
+// zakladce chaos troche możesz więcej kolorów tam użyć" — WORK_ACCENT = plain
+// `colors.text.primary` czytało się jako zupełnie płaskie/monochromatyczne, zero
+// wizualnego rozróżnienia między "już przepracowane" a "zaplanowane" a "stawka/pieniądze",
+// mimo że karta ma sporo różnych typów danych). Trzy role kolorów w Pracy, WYŁĄCZNIE tam:
+// niebieski (WORK_ACCENT, tożsamość karty + "jeszcze przed nami"/upcoming), zielony
+// (WORK_WORKED, godziny już przepracowane/zarabiane — pasuje do istniejącej zielonej kropki
+// "NA ŻYWO"), złoty (WORK_MONEY, stawka/zarobek — ten sam kolor co reszta apki używa na
+// pieniądze, np. budżet dnia). Reszta dashboardu zostaje monochromatyczna.
+const WORK_ACCENT = '#38BDF8';
+const WORK_WORKED = '#34D399';
+const WORK_MONEY  = '#FBBF24';
 const WEEKS_BACK  = 8;
 
 // Per-metric icon for custom stat tiles, so each widget's preview is glanceable at a
@@ -599,16 +608,19 @@ export default function DashboardScreen() {
     hydrateSunTimes().then(() => fetchWeather()).then(w => { if (w) setWeather(w); });
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
-    googleCalendarService.getStoredToken().then(token => {
-      if (token) {
-        // Fetch a WIDE window (≈2.5 months back) — this overwrites the shared
-        // gcalEvents store, and Settings derives monthly work hours from it.
-        // A narrow window here was silently undercounting work shifts.
-        googleCalendarService.fetchEvents().then(evs => setGcalEvents(evs)).catch(() => {});
-      } else {
-        setGcalEvents([]);  // clear any cached events from a previous session
-      }
-    });
+    // Fetch a WIDE window (≈2.5 months back) — this overwrites the shared gcalEvents
+    // store, and Settings derives monthly work hours from it. A narrow window here
+    // was silently undercounting work shifts. Called UNCONDITIONALLY (2026-08-28,
+    // user: "juz minęło kilka minut i nadal nie dodały mi sie eventy z kalendarza z
+    // pracy do aplikacji nawet jak odświeżam" — this used to gate the whole fetch
+    // behind `getStoredToken()` truthiness first; the moment that cached token was
+    // ever cleared (e.g. one earlier failed silent refresh), EVERY future load —
+    // including this one, the resume hook below, and the calendar tab's own refresh
+    // — permanently no-op'd, since `fetchEvents()`'s OWN "no token → try a fresh
+    // GoogleSignin refresh, only THEN give up" fallback never even got a chance to
+    // run. `fetchEvents()` already handles "genuinely no linked account" by
+    // returning `[]`, so this needs no `else` branch either).
+    googleCalendarService.fetchEvents().then(evs => setGcalEvents(evs)).catch(() => {});
   }, []);
 
   // ── Subscription check ────────────────────────────────────────────────────
@@ -889,7 +901,7 @@ export default function DashboardScreen() {
   // włączeniu apki" instead of showing yesterday's state.
   const refreshOnResume = useCallback(() => {
     import('@/services/calendarService').then(({ calendarService }) => calendarService.getAllEvents().then(setEvents).catch(() => {})).catch(() => {});
-    googleCalendarService.getStoredToken().then(token => { if (token) googleCalendarService.fetchEvents().then(setGcalEvents).catch(() => {}); }).catch(() => {});
+    googleCalendarService.fetchEvents().then(setGcalEvents).catch(() => {});
     workService.getSettings().then(setWorkSettings).catch(() => {});
     workService.getShifts(todayStr(), todayStr()).then(setWorkShifts).catch(() => {});
     reloadHealth(true);   // returning to the app = entry → force fresh watch data
@@ -1876,11 +1888,25 @@ export default function DashboardScreen() {
     let workedH = 0, plannedH = 0;
     const dayset = new Set<string>();
     const planset = new Set<string>();   // distinct FUTURE work days left this month
+    // TODAY's shift: count only the ELAPSED portion via `elapsedShiftHours`, not the
+    // whole day (2026-08-28, user: "jak dzisiaj mam pracę i jest przed pracą to jest
+    // jeszcze nie przepracowane") — `day <= today` used to dump a shift entirely
+    // into `workedH` the instant its date matched today, even hours before it
+    // started.
     for (const e of allEvents) {
       if (!isWork(e) || (e.date ?? '').slice(0, 7) !== ymCur) continue;
       const h = dur(e); const day = (e.date ?? '').slice(0, 10);
-      if (day <= today) { workedH += h; if (h > 0) dayset.add(day); }
-      else { plannedH += h; if (h > 0) planset.add(day); }
+      if (day < today) {
+        workedH += h; if (h > 0) dayset.add(day);
+      } else if (day === today) {
+        const elapsedH = elapsedShiftHours(e, now);
+        workedH += elapsedH;
+        plannedH += Math.max(0, h - elapsedH);
+        if (elapsedH > 0) dayset.add(day);
+        if (h - elapsedH > 0) planset.add(day);
+      } else {
+        plannedH += h; if (h > 0) planset.add(day);
+      }
     }
     const currentHours = months[5].hours;
     const projectedH = workedH + plannedH;
@@ -3629,12 +3655,13 @@ export default function DashboardScreen() {
                     <>
                       <View style={s.workHeroRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.workHoursBig, { color: colors.text.primary }]}>
+                          <Text style={[s.workHoursBig, { color: WORK_WORKED }]}>
                             {wm.workedH.toFixed(0)}
                             <Text style={s.workHoursUnit}> h</Text>
                           </Text>
                           <Text style={s.workHoursSub}>
-                            przepracowane w tym miesiącu{hasRate ? `  ·  ≈ ${wm.workedEarnings.toLocaleString('pl-PL')} zł` : ''}
+                            przepracowane w tym miesiącu
+                            {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_MONEY, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text></> : null}
                           </Text>
                         </View>
                       </View>
@@ -3642,12 +3669,13 @@ export default function DashboardScreen() {
                       {wm.plannedH > 0 && (
                         <View style={{ marginTop: spacing[3] }}>
                           <View style={s.workSplitBar}>
-                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_ACCENT }} />
-                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT + '40' }} />
+                            <View style={{ flex: Math.max(wm.workedH, 0.001), backgroundColor: WORK_WORKED }} />
+                            <View style={{ flex: Math.max(wm.plannedH, 0.001), backgroundColor: WORK_ACCENT }} />
                           </View>
                           <Text style={s.workSplitText}>
-                            <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
-                            {`  ·  zaplanowane +${wm.plannedH.toFixed(0)} h`}
+                            <Text style={{ color: WORK_WORKED, fontWeight: '700' }}>{wm.workedH.toFixed(0)} h do teraz</Text>
+                            {'  ·  '}
+                            <Text style={{ color: WORK_ACCENT, fontWeight: '700' }}>zaplanowane +{wm.plannedH.toFixed(0)} h</Text>
                           </Text>
                         </View>
                       )}
@@ -3959,7 +3987,7 @@ export default function DashboardScreen() {
                         <View style={s.wpLiveDot} />
                         <Text style={s.wpLiveTag}>NA ŻYWO W PRACY{workEarnings.activeEventTitle ? ` · ${workEarnings.activeEventTitle}` : ''}</Text>
                       </View>
-                      <Text style={s.wpLiveBig}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></Text>
+                      <Text style={[s.wpLiveBig, { color: WORK_WORKED }]}>{workEarnings.totalEarned.toFixed(2)}<Text style={s.wpLiveUnit}> zł</Text></Text>
                       <Text style={s.wpLiveSub}>
                         +{(workEarnings.perSecond * 100).toFixed(2)} gr/s
                         {workEarnings.perSecond > 0 ? `  ·  ${Math.round(workEarnings.perSecond * 3600).toLocaleString('pl-PL')} zł/h` : ''}
@@ -3979,10 +4007,10 @@ export default function DashboardScreen() {
                   )}
                   {/* ── Ten miesiąc: fakt = godziny z kalendarza [JD] ── */}
                   <View style={{ marginTop: spacing[2] }}>
-                    <Text style={s.wpBig}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
+                    <Text style={[s.wpBig, { color: WORK_WORKED }]}>{wm.workedH.toFixed(0)}<Text style={s.wpUnit}> h</Text></Text>
                     <Text style={s.wpSub}>
                       przepracowane w tym miesiącu
-                      {hasRate ? `  ·  ≈ ${wm.workedEarnings.toLocaleString('pl-PL')} zł do teraz` : ''}
+                      {hasRate ? <>{'  ·  ≈ '}<Text style={{ color: WORK_MONEY, fontWeight: '700' }}>{wm.workedEarnings.toLocaleString('pl-PL')} zł</Text>{' do teraz'}</> : null}
                     </Text>
                   </View>
 
@@ -3990,19 +4018,19 @@ export default function DashboardScreen() {
                   {(wm.plannedDays > 0 || wm.plannedH > 0) && (
                     <View style={s.wpLeftCard}>
                       <View style={s.wpLeftItem}>
-                        <Text style={s.wpLeftVal}>{wm.plannedDays}</Text>
+                        <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.plannedDays}</Text>
                         <Text style={s.wpLeftLbl}>dni zostało</Text>
                       </View>
                       <View style={s.wpLeftDivider} />
                       <View style={s.wpLeftItem}>
-                        <Text style={s.wpLeftVal}>{wm.plannedH.toFixed(0)}<Text style={s.wpLeftUnit}> h</Text></Text>
+                        <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.plannedH.toFixed(0)}<Text style={s.wpLeftUnit}> h</Text></Text>
                         <Text style={s.wpLeftLbl}>do przepracowania</Text>
                       </View>
                       {hasRate && (
                         <>
                           <View style={s.wpLeftDivider} />
                           <View style={s.wpLeftItem}>
-                            <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
+                            <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{wm.projectedEarnings.toLocaleString('pl-PL')}</Text>
                             <Text style={s.wpLeftLbl}>zł prognoza mies.</Text>
                           </View>
                         </>
@@ -4032,8 +4060,8 @@ export default function DashboardScreen() {
                   {/* ── Średnie z przeszłości ── */}
                   {wm.avgHours > 0 && (
                     <Text style={s.wpAvgLine}>
-                      Średnio <Text style={s.wpAvgB}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={s.wpAvgB}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
-                      {wm.projectedH > 0 ? <> · w tym mies. plan <Text style={s.wpAvgB}>{wm.projectedH.toFixed(0)} h</Text></> : null}
+                      Średnio <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.avgHours.toFixed(0)} h</Text>/mies{hasRate ? <> · <Text style={[s.wpAvgB, { color: WORK_MONEY }]}>{wm.avgEarnings.toLocaleString('pl-PL')} zł</Text></> : null} (poprz. miesiące)
+                      {wm.projectedH > 0 ? <> · w tym mies. plan <Text style={[s.wpAvgB, { color: WORK_ACCENT }]}>{wm.projectedH.toFixed(0)} h</Text></> : null}
                     </Text>
                   )}
 
@@ -4047,11 +4075,39 @@ export default function DashboardScreen() {
                       : (workAvg.includedCount <= 1 && lp && lp.hours > 0
                           ? `${Math.round(lp.amount).toLocaleString('pl-PL')} zł (za ${MONTH_SHORT[Number(lp.month.slice(5, 7)) - 1]}) ÷ ${Math.round(lp.hours)} h`
                           : `średnia z ${workAvg.includedCount} ${workAvg.includedCount === 1 ? 'wypłaty' : 'wypłat'} · Σ zł ÷ Σ godzin`);
+                    // Ogólnie vs ostatni miesiąc, BEZ zaokrąglenia do zera miejsc po przecinku
+                    // jak reszta karty (2026-08-28, user: "ile średnio na godzinę ogólnie ile
+                    // średnio ze ostatniego miesiąca, bez zaokrąglone") — `wm.rate` wyżej to
+                    // JEDNA, już-wybrana liczba (ręczna nadpisanie > wypłaty > potwierdzone
+                    // miesiące > kalendarz, patrz useWorkEarnings), tu obok niej stawiamy OBA
+                    // składowe rozbite osobno: `workAvg.avgRate` (Σzł ÷ Σh po wszystkich
+                    // uwzględnionych miesiącach, ten sam wzór co `hint` wyżej) i realna stawka
+                    // z NAJNOWSZEJ wypłaty (`workPayMonths[0]`), obie do 2 miejsc po przecinku.
+                    const lastRate = lp && lp.hours > 0 ? lp.amount / lp.hours : null;
                     return (
-                      <View style={s.wpRateCard}>
-                        <Text style={s.wpRateVal}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
-                        <Text style={s.wpRateHint}>{hint}</Text>
-                      </View>
+                      <>
+                        <View style={s.wpRateCard}>
+                          <Text style={[s.wpRateVal, { color: WORK_MONEY }]}>{wm.rate.toFixed(2)}<Text style={s.wpRateUnit}> zł/h</Text></Text>
+                          <Text style={s.wpRateHint}>{hint}</Text>
+                        </View>
+                        {(workAvg.avgRate != null || lastRate != null) && (
+                          <View style={s.wpLeftCard}>
+                            {workAvg.avgRate != null && (
+                              <View style={s.wpLeftItem}>
+                                <Text style={[s.wpLeftVal, { color: WORK_ACCENT }]}>{workAvg.avgRate.toFixed(2)}</Text>
+                                <Text style={s.wpLeftLbl}>zł/h ogółem</Text>
+                              </View>
+                            )}
+                            {workAvg.avgRate != null && lastRate != null && <View style={s.wpLeftDivider} />}
+                            {lastRate != null && (
+                              <View style={s.wpLeftItem}>
+                                <Text style={[s.wpLeftVal, { color: WORK_MONEY }]}>{lastRate.toFixed(2)}</Text>
+                                <Text style={s.wpLeftLbl}>zł/h · {MONTH_SHORT[Number(lp!.month.slice(5, 7)) - 1]} {lp!.month.slice(2, 4)}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </>
                     );
                   })() : (
                     <Text style={[s.factText, { marginTop: spacing[2] }]}>Dodaj wypłatę oznaczoną „{workSettings.workPrefix || '[JD]'}", aby policzyć stawkę zł/h.</Text>
@@ -4068,7 +4124,7 @@ export default function DashboardScreen() {
                           <View key={r.month} style={s.wmRow}>
                             <Text style={[s.wmMonth, !inAvg && { color: colors.text.muted }]} numberOfLines={1}>{MONTH_SHORT[Number(r.month.slice(5, 7)) - 1]} {r.month.slice(2, 4)}{r.excluded ? ' · poza śr.' : (r.count > 1 ? ` · ${r.count}×` : '')}</Text>
                             <Text style={s.wmH} numberOfLines={1}>{Math.round(r.amount).toLocaleString('pl-PL')} zł · {r.hours > 0 ? `${Math.round(r.hours)} h` : 'brak h'}</Text>
-                            <Text style={[s.wmZl, { color: inAvg ? WORK_ACCENT : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)}` : '—'}</Text>
+                            <Text style={[s.wmZl, { color: inAvg ? WORK_MONEY : colors.text.muted }]}>{rate != null ? `${rate.toFixed(1)}` : '—'}</Text>
                           </View>
                         );
                       })}
@@ -4078,7 +4134,7 @@ export default function DashboardScreen() {
                         return jdTotal > 0 ? (
                           <View style={s.wpTotalRow}>
                             <Text style={s.wpTotalLabel}>Łącznie{workSettings.workPrefix ? ` (${workSettings.workPrefix})` : ''} · {paychecks.length} wypł.</Text>
-                            <Text style={[s.wpTotalVal, { color: WORK_ACCENT }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
+                            <Text style={[s.wpTotalVal, { color: WORK_MONEY }]}>{Math.round(jdTotal).toLocaleString('pl-PL')} zł</Text>
                           </View>
                         ) : null;
                       })()}

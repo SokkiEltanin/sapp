@@ -3,6 +3,46 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: kalendarz pracy przestawał się synchronizować NA ZAWSZE — NIEsprawdzone (2026-08-28)
+
+User ze screenshotami (kafelek dashboardu vs realny Google Kalendarz): "juz minęło kilka
+minut i nadal nie dodały mi sie eventy z kalendarza z pracy do aplikacji nawet jak
+odświeżam". Trzy miejsca (dashboard mount, dashboard `refreshOnResume`, zakładka Kalendarz)
+gate'owały fetch Google Calendar za `getStoredToken()` PRZED wywołaniem `fetchEvents()` —
+gdy token raz zostanie skasowany (np. po jednym nieudanym cichym odświeżeniu), KAŻDE
+kolejne odświeżenie w całej appce staje się trwałym, cichym no-opem, bez żadnego komunikatu.
+Fix: wszystkie trzy miejsca wołają `fetchEvents()` bezwarunkowo — funkcja MA WŁASNY fallback
+(spróbuj tokena → cichy refresh → dopiero wtedy `[]`), zewnętrzny gate tylko go blokował.
+Pełny opis w ARCHITECTURE.md §4b. `tsc` czysty (logika bez nowych czystych funkcji do
+testowania — czysto sieciowy fix). **Priorytet testu na urządzeniu**: dashboard + zakładka
+Kalendarz po dłuższej przerwie w używaniu appki (token miał szansę wygasnąć) — sprawdź że
+eventy z kalendarza pracy (np. dzisiejsza/jutrzejsza zmiana) faktycznie się pojawiają po
+otwarciu appki, bez ręcznego grzebania w Ustawieniach.
+
+## 🆕 Praca: naprawiona logika "przed zmianą" + więcej kolorów + stawka ogółem/ost. miesiąc — NIEsprawdzone (2026-08-28)
+
+User: "ile przepracowałem juz w miesiącu względem tyle ile muszę przepracować (tylko niech
+sprawdza np jak dzisiaj mam pracę i jest przed pracą to jest jeszcze nie przepracowane jakby
+nie?)" + "ile średnio na godzinę ogólnie ile średnio ze ostatniego miesiąca, bez
+zaokrąglone" + "teraz nawet tamtej zakladce chaos troche możesz więcej kolorów tam użyć".
+Trzy części:
+1. **BUG naprawiony**: dzisiejsza zmiana liczyła się jako w CAŁOŚCI przepracowana od
+   północy, nawet przed jej rozpoczęciem. Nowa `elapsedShiftHours()` (`workEvents.ts`,
+   testowana) liczy tylko faktycznie miniony fragment zmiany.
+2. **Nowe liczby**: "zł/h ogółem" (Σzł ÷ Σh po wszystkich uwzględnionych miesiącach) i
+   "zł/h ostatni miesiąc" (z najnowszej wypłaty) obok siebie, do 2 miejsc po przecinku, bez
+   zaokrąglania do całości jak reszta karty.
+3. **Kolory**: Praca to teraz jawny, LOKALNY wyjątek od monochromatycznego akcentu appki —
+   zielony (przepracowane), niebieski (zaplanowane/nadchodzące), złoty (stawka/pieniądze),
+   zamiast wszystkiego w jednym płaskim, białym `WORK_ACCENT`.
+
+Pełny opis w ARCHITECTURE.md §4b. `tsc`/`jest` zielone (64/779, +6 nowych testów
+`elapsedShiftHours` w `__tests__/workEvents.test.ts`). **Priorytet testu na urządzeniu**:
+kafelek Praca na dashboardzie I panel po kliknięciu weń — sprawdź że kolory się czytają
+dobrze (jasny i ciemny motyw), że "przepracowane dziś" NIE liczy godzin przed rozpoczęciem
+dzisiejszej zmiany (najlepiej sprawdzić rano, przed pracą), i że nowe "zł/h ogółem"/"zł/h
+ostatni miesiąc" pokazują sensowne liczby.
+
 ## 🆕 BUG: dropnięty duplikat ekwipunku ze skrzynki znikał bez kompensaty — NIEsprawdzone (2026-08-27)
 
 User: "jak w skrzynce daily wydropiłem to mi zniknął po prostu nic nie dostałem bo chyba

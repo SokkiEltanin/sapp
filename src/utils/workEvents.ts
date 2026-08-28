@@ -73,6 +73,32 @@ export function shiftHours(ev: Pick<CalendarEvent, 'title' | 'startTime' | 'endT
   return shiftMinutes(ev) / 60;
 }
 
+// For a shift dated TODAY, how many of its hours have already elapsed as of `now`?
+// (2026-08-28, user: "jak dzisiaj mam pracę i jest przed pracą to jest jeszcze nie
+// przepracowane" — the dashboard's "worked this month" figure used to count a
+// shift as fully worked the instant its date matched today, even hours before it
+// started.) Clamped to [0, duration] — 0 before the shift starts, the full
+// duration once it's over, proportional while in progress. A shift with no
+// parseable clock range can't be judged this way, so it counts fully (same as
+// before this fix — see `workMonthly` in app/(tabs)/index.tsx, the only caller).
+//
+// PRECONDITION: `now` is still on the SAME calendar day the shift started (true
+// for every real caller — `day === today` gates this in `workMonthly`). An
+// overnight shift's end is pushed past midnight (mirrors `titleTimeRange`) so a
+// shift like "22:00 - 06:00" checked at 23:30 reads as 1.5h elapsed, not 0 —
+// but `now` itself is never assumed to already be past midnight.
+export function elapsedShiftHours(ev: Pick<CalendarEvent, 'title' | 'startTime' | 'endTime'>, now: Date): number {
+  const total = shiftHours(ev);
+  const range = shiftClockRange(ev);
+  if (!range) return total;
+  const startMins = hhmmToMin(range.start);
+  let endMins = hhmmToMin(range.end);
+  if (endMins <= startMins) endMins += 24 * 60;   // overnight shift
+  const shiftDurMin = endMins - startMins;
+  const nowMins = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  return Math.max(0, Math.min(nowMins - startMins, shiftDurMin)) / 60;
+}
+
 // Does this calendar event count as a work shift for the given settings?
 export function isWorkEvent(
   ev: Pick<CalendarEvent, 'title' | 'startTime' | 'endTime' | 'color'>,
