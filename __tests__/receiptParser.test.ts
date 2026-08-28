@@ -122,11 +122,17 @@ describe('parseReceiptText — Kaufland app "Receipt copy" (2026-08-27)', () => 
     expect(r.total).toBe(159.97);
   });
 
-  test('subtotal (Suma cząstkowa) i totalDiscount zgadzają się z total', () => {
+  // 2026-08-28, user ze screenshotem ekranu skanowania: "źle mi złapało produkty" — banner
+  // "Suma produktów (197,94 zł) > kwota na paragonie — brakuje rabatów lub produktów".
+  // Root cause: subtotal był liczony PRZED rozdzieleniem rabatów na produkty (patrz
+  // `parseKauflandReceiptCopy` w receiptParser.ts) — scan.tsx nie zna `totalDiscount`, tylko
+  // sumuje `products[].finalPrice` i porównuje z `total`, więc subtotal MUSI już mieć rabaty
+  // wliczone w poszczególne pozycje (tak samo jak zwrot kaucji na Lidlu, patrz test niżej).
+  test('subtotal (suma finalPrice PO alokacji rabatów) zgadza się z total — nie 197,94 przed rabatami', () => {
     const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
-    expect(r.subtotal).toBe(197.94);
+    expect(r.subtotal).toBeCloseTo(159.97, 2);
+    expect(r.subtotal).toBeCloseTo(r.total, 2);
     expect(r.totalDiscount).toBeCloseTo(37.97, 2);
-    expect(r.subtotal - r.totalDiscount).toBeCloseTo(r.total, 2);
   });
 
   test('łapie wszystkie 10 pozycji, pomijając nagłówki kategorii ("Lada z obsługą" itd.)', () => {
@@ -135,35 +141,62 @@ describe('parseReceiptText — Kaufland app "Receipt copy" (2026-08-27)', () => 
     expect(r.products.some(p => /lada z obs/i.test(p.name) || /beauty/i.test(p.name) || /owoce/i.test(p.name))).toBe(false);
   });
 
-  test('multi-buy na dwóch liniach ("teczka a4 pastel" + "4 * 3,99 ... 15,96")', () => {
+  test('multi-buy na dwóch liniach ("teczka a4 pastel" + "4 * 3,99 ... 15,96") — qty/unitPrice z paragonu, finalPrice PO rabacie "Kup 2 płać za 1"', () => {
     const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
     const p = r.products.find(x => /teczka a4 pastel/i.test(x.name));
     expect(p).toBeDefined();
     expect(p!.quantity).toBe(4);
     expect(p!.unitPrice).toBe(3.99);
-    expect(p!.finalPrice).toBe(15.96);
+    expect(p!.finalPrice).toBe(7.98); // 15,96 − 7,98 (jego udział w -11,97 z Pozycje:3,4)
+    expect(p!.promotion).toBe('Kup 2 płać za 1');
   });
 
-  test('multi-buy w jednej linii ("Teczka A4        2 * 3,99         7,98 A")', () => {
+  test('multi-buy w jednej linii ("Teczka A4        2 * 3,99         7,98 A") — finalPrice PO tym samym rabacie', () => {
     const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
     const p = r.products.find(x => /^Teczka a4$/i.test(x.name));
     expect(p).toBeDefined();
     expect(p!.quantity).toBe(2);
-    expect(p!.finalPrice).toBe(7.98);
+    expect(p!.finalPrice).toBe(3.99); // 7,98 − 3,99, reszta rabatu -11,97 proporcjonalnie do ceny
   });
 
-  test('towar luzem na wagę ("MakrelaWędz.luz." + "0,204 KG ... 6,10")', () => {
+  test('towar luzem na wagę ("MakrelaWędz.luz." + "0,204 KG ... 6,10") — bez rabatu, nikt się do niego nie odwołuje', () => {
     const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
     const p = r.products.find(x => /makrela/i.test(x.name));
     expect(p).toBeDefined();
     expect(p!.quantity).toBeCloseTo(0.204, 3);
     expect(p!.finalPrice).toBe(6.10);
+    expect(p!.promotion).toBeUndefined();
   });
 
-  test('proste pozycje "nazwa ... cena litera" w jednej linii', () => {
+  test('proste pozycje "nazwa ... cena litera" w jednej linii, bez rabatu (Bevola, Somat)', () => {
     const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
-    expect(r.products.find(p => /papier ksero/i.test(p.name))?.finalPrice).toBe(19.99);
-    expect(r.products.find(p => /cifspray435/i.test(p.name))?.finalPrice).toBe(19.99);
+    expect(r.products.find(p => /bevolapomadka/i.test(p.name))?.finalPrice).toBe(4.99);
+    expect(r.products.find(p => /somat/i.test(p.name))?.finalPrice).toBe(44.99);
+  });
+
+  test('rabat na JEDNEJ pozycji ("Rabat -12,00" → Pozycje:2, "Papier ksero")', () => {
+    const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
+    const p = r.products.find(x => /papier ksero/i.test(x.name));
+    expect(p).toBeDefined();
+    expect(p!.finalPrice).toBe(7.99); // 19,99 − 12,00
+    expect(p!.discount).toBe(12);
+    expect(p!.promotion).toBe('Rabat');
+  });
+
+  test('rabat rozłożony na DWIE pozycje po równo ("Cena z kartą -12,00" → Pozycje:7,8, ceny równe → po 6,00)', () => {
+    const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
+    const a = r.products.find(x => /cifspray435/i.test(x.name));
+    const b = r.products.find(x => /cifspraytłuszcz/i.test(x.name));
+    expect(a?.finalPrice).toBe(13.99);
+    expect(b?.finalPrice).toBe(13.99);
+    expect((a?.discount ?? 0) + (b?.discount ?? 0)).toBeCloseTo(12, 2);
+  });
+
+  test('kupon na pojedynczej pozycji ("Kupon XTRA -2,00" → Pozycje:10, "Kiwi szt")', () => {
+    const r = parseReceiptText(KAUFLAND_RECEIPT_COPY);
+    const p = r.products.find(x => /kiwi/i.test(x.name));
+    expect(p?.finalPrice).toBe(5.96); // 7,96 − 2,00
+    expect(p?.promotion).toBe('Kupon XTRA');
   });
 });
 

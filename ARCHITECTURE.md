@@ -487,9 +487,10 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   kontynuacji ceny). Nowa gałąź `parseKauflandReceiptCopy()`, wykrywana po unikalnym
   nagłówku kolumny "Cena PLN" (`isKauflandReceiptCopy()`), wywoływana z góry `parseKaufland()`
   — stary OCR-owy branch zostaje nietknięty jako fallback. Promocje na kasie ("Kup 2 płać za 1
-  -11,97" + "Pozycje:3,4") dotyczą kilku pozycji naraz przez referencje indeksów — zbyt
-  kruche żeby mapować 1:1 na produkt, więc lądują sumarycznie w `totalDiscount` (subtotal z
-  "Suma cząstkowa" minus totalDiscount = total z "Płatność kartą").
+  -11,97" + "Pozycje:3,4") dotyczą kilku pozycji naraz przez referencje indeksów (1-indexed,
+  kolejność na paragonie) — rozdzielane proporcjonalnie do BIEŻĄCEJ ceny na produkty, które
+  wskazują (patrz bug niżej, 2026-08-28, dlaczego to MUSI trafiać na konkretne pozycje a nie
+  do osobnego pola).
   - **BUG PRZY OKAZJI: wykrywanie sklepu potrafiło w ogóle nie złapać "Kaufland"** — apka
     wstawia własne kody drukarki sklejone BEZ SPACJI wprost przed nazwą ("&1Kaufland Polska
     Markety..."), co psuje granicę słowa `\bkaufland\b` (cyfra "1" i litera "K" to oba znaki
@@ -500,6 +501,28 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     samym wejściu do `parseReceiptText()`, przed routingiem — no-op dla każdego innego
     formatu/sklepu (nikt inny tej notacji nie używa). Testy: `__tests__/receiptParser.test.ts`
     (pełny tekst realnego paragonu Kaufland usera jako fixture, 7 nowych testów).
+  - **BUG DRUGI, dzień później: "źle mi złapało produkty" (2026-08-28, user ze screenshotem
+    ekranu skanowania)** — banner "Suma produktów (197,94 zł) > kwota na paragonie — brakuje
+    rabatów lub produktów", mimo że WSZYSTKIE 10 pozycji i `total` (159,97) były poprawne.
+    Przyczyna: pierwsza wersja tego parsera (wpis wyżej) liczyła `subtotal` wprost z "Suma
+    cząstkowa" (197,94, PRZED rabatami) i sumowała promocje TYLKO do osobnego pola
+    `totalDiscount` (37,97) — ale `app/expenses/scan.tsx` (mismatch banner ORAZ live suma
+    "Zaznaczone" na dole ekranu) nie zna `totalDiscount` w ogóle, tylko sumuje
+    `products[].finalPrice` i porównuje z `total` — DOKŁADNIE tak samo jak reszta parserów w
+    tym pliku (`parseGeneric` odejmuje rabat WPROST od `lastProduct.finalPrice`, nigdy do
+    osobnego pola — patrz też zwrot kaucji na Lidlu, ten sam wzorzec: `subtotal` MUSI już mieć
+    korekty wliczone w poszczególne pozycje). Fix: nowa pętla po "Pozycje:N,M" — każdą
+    promocję rozdziela PROPORCJONALNIE do BIEŻĄCEJ ceny referowanych produktów (ważne przy
+    kilku promocjach na tym samym produkcie — kolejne liczą się od ceny PO poprzedniej), z
+    resztą zaokrąglenia (grosze) dokładaną do OSTATNIEJ referowanej pozycji żeby suma była
+    zawsze dokładna; ustawia `finalPrice`/`discount`/`promotion` per-produkt (ten sam kształt
+    co `parseGeneric`). `subtotal` liczony TERAZ z sumy (już poobniżanych) `finalPrice`,
+    matematycznie równy `total`. Na fixture usera: "Rabat -12,00"→Pozycje:2 (Papier ksero,
+    pojedyncza pozycja, cała kwota) / "Cena z kartą -12,00"→Pozycje:7,8 (dwa CifSpray o równej
+    cenie, po 6,00) / "Kup 2 płać za 1 -11,97"→Pozycje:3,4 (teczki w proporcji 2:1 wg ceny,
+    7,98/3,99) / "Kupon XTRA -2,00"→Pozycje:10 (Kiwi, cała kwota) — sumuje się dokładnie do
+    159,97. Testy rozszerzone o osobne przypadki dla alokacji 1-do-1 i rozłożonej na kilka
+    pozycji (`__tests__/receiptParser.test.ts`, 16 testów w tym pliku łącznie teraz).
 
 ## 8. Zdrowie / Health Connect
 
