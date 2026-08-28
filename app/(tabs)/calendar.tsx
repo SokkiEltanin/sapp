@@ -297,12 +297,10 @@ export default function CalendarScreen() {
     } finally {
       setLoading(false);
     }
-    // Also load Google Calendar events (non-blocking)
-    googleCalendarService.getStoredToken().then(token => {
-      if (token) {
-        googleCalendarService.fetchEvents().then(setGcalEvents).catch(() => {});
-      }
-    });
+    // Also load Google Calendar events (non-blocking) — called UNCONDITIONALLY, see
+    // the matching fix + comment in app/(tabs)/index.tsx for why gating this behind
+    // `getStoredToken()` truthiness first could permanently break sync (2026-08-28).
+    googleCalendarService.fetchEvents().then(setGcalEvents).catch(() => {});
   };
 
 

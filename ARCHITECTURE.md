@@ -278,6 +278,74 @@ kafelka". Dwa fixy:
    eksperymencie, nie zostawiony "na potem"). Jeśli temat wróci, potrzebny realny art/screenshot
    jako referencja — nie kolejna próba zgadywania SVG.
 
+## 4b. Google Calendar sync + Praca (`googleCalendarService.ts`, `workEvents.ts`, `useWorkEarnings.ts`)
+
+- **BUG: eventy z kalendarza pracy przestawały się synchronizować NA ZAWSZE, ciche, bez
+  żadnego feedbacku (2026-08-28, user ze screenshotami: "juz minęło kilka minut i nadal nie
+  dodały mi sie eventy z kalendarza z pracy do aplikacji nawet jak odświeżam").** Trzy osobne
+  miejsca (dashboard mount, dashboard `refreshOnResume` — główny hook odświeżający po
+  powrocie appki na pierwszy plan, I zakładka Kalendarz własny `load()`/przycisk odśwież)
+  gate'owały CAŁY fetch Google Calendar za `googleCalendarService.getStoredToken()`:
+  `if (token) { fetchEvents()... }`. Problem: `fetchEvents()` MA WŁASNY fallback ("brak
+  tokena w AsyncStorage → spróbuj cichego `GoogleSignin.getTokens()` → dopiero wtedy się
+  poddaj") — ale zewnętrzny `if (token)` w tych trzech miejscach nigdy nie DAWAŁ mu szansy
+  się uruchomić, bo w ogóle nie wołał `fetchEvents()` gdy `getStoredToken()` zwróciło `null`.
+  Skoro raz (np. przez chwilowy problem sieciowy) `fetchEvents()`'s WEWNĘTRZNA obsługa 401
+  (`refreshToken()` → jeśli i to zawiedzie, `clearToken()`) skasowała zapisany token — KAŻDE
+  kolejne odświeżenie w CAŁEJ appce (dashboard przy starcie, dashboard przy powrocie z tła,
+  zakładka Kalendarz) stawało się TRWAŁYM no-opem, bez żadnego komunikatu — jedyny sposób
+  naprawy to nieoczywiste ponowne zalogowanie przez Google w Ustawieniach. Fix: wszystkie
+  trzy miejsca wołają teraz `googleCalendarService.fetchEvents()` BEZWARUNKOWO — sama funkcja
+  poprawnie obsługuje "brak tokena" (próbuje cichego odświeżenia, potem po prostu zwraca `[]`
+  gdy naprawdę nie ma zalogowanego konta), więc zewnętrzny gate był czystą, szkodliwą
+  duplikacją logiki którą sama funkcja już miała.
+- **Praca — panel (`workPanel` modal) i kompaktowy kafelek dashboardu**: liczby (godziny/
+  zarobek/stawka) liczone w `workMonthly` (`useMemo` w `index.tsx`) z `allEvents` (kalendarz
+  lokalny + gcal), filtrowanych `isWorkEvent()` (kolor LUB prefiks tytułu, `workEvents.ts`).
+  Osobno: `workPayMonths` (`computePayMonths`, `workSummary.ts`) — realne wypłaty (`Expense`
+  typu `income` z tagiem/notatką prefiksu) połączone z godzinami kalendarza tego miesiąca,
+  jedna wypłata = jeden miesiąc, wykluczalne w Ustawieniach → Praca.
+  - **BUG: dzisiejsza zmiana liczyła się jako w CAŁOŚCI przepracowana od PÓŁNOCY, nawet
+    godziny przed jej rozpoczęciem (2026-08-28, user: "jak dzisiaj mam pracę i jest przed
+    pracą to jest jeszcze nie przepracowane jakby nie?")** — `workMonthly`'s pętla dzieląca
+    `workedH`/`plannedH` sprawdzała tylko `day <= today` (data zmiany ≤ dzisiaj), bez
+    względu na AKTUALNY czas zegarowy — zmiana "13:00-21:00" datowana dziś wpadała CAŁA do
+    `workedH` już o 00:01, mimo że jeszcze się nie zaczęła. Fix: nowa `elapsedShiftHours(ev,
+    now)` w `workEvents.ts` (czysta, testowana funkcja) — dla zmiany datowanej DOKŁADNIE
+    dzisiaj liczy TYLKO część która faktycznie minęła (`clamp(now - start, 0, duration)`,
+    ta sama matematyka co licznik "NA ŻYWO W PRACY" w `useWorkEarnings`, tylko podsumowana
+    na cały dzień zamiast jednej aktywnej zmiany), zamiast całej długości. Dni PRZED dziś
+    nadal liczą się w całości (bezpieczne — to przeszłość), dni PO dziś nadal w całości do
+    `plannedH` (bez zmian). Obsługuje nocne zmiany (koniec przepychany za północ, jak
+    `titleTimeRange`) — PRECONDITION: `now` musi być tego samego dnia kalendarzowego co
+    start zmiany (zawsze prawda dla jedynego wołającego, `day === today` gate wyżej). Zmiana
+    bez parsowalnego zakresu godzin w tytule (ani "HH:MM-HH:MM", ani znacznika "(Nh)") nie
+    pozwala ocenić postępu → liczy się w całości (stare zachowanie, bezpieczny fallback).
+    Testy: `__tests__/workEvents.test.ts`.
+  - **Kolory — Praca to JAWNY wyjątek od monochromatycznego akcentu appki (2026-08-28,
+    user: "teraz nawet tamtej zakladce chaos troche możesz więcej kolorów tam użyć")** —
+    `WORK_ACCENT` był dawniej dosłownie `colors.text.primary` (czyli NIE kolor, tylko zwykły
+    biały tekst) — cała karta (kafelek + duży panel) czytała się płasko, bez wizualnego
+    rozróżnienia między "już przepracowane" / "zaplanowane" / "stawka". Reszta dashboardu
+    ZOSTAJE monochromatyczna (świadoma decyzja usera z wcześniejszej sesji, komentarz przy
+    stałej) — to WYŁĄCZNIE lokalny wyjątek dla Pracy. Trzy stałe, TYLKO w sekcjach Pracy:
+    `WORK_ACCENT` (niebieski `#38BDF8`, tożsamość karty + "jeszcze przed nami"),
+    `WORK_WORKED` (zielony `#34D399`, godziny już przepracowane/zarabiane — pasuje do
+    istniejącej zielonej kropki "NA ŻYWO"), `WORK_MONEY` (złoty `#FBBF24`, stawka/zarobek —
+    ten sam kolor co reszta appki na pieniądze, np. budżet dnia). Podział paska
+    `workSplitBar` w kompaktowym kafelku: zielony = przepracowane, niebieski (PEŁNY kolor,
+    nie wyblakła wersja tego samego odcienia jak wcześniej) = zaplanowane.
+  - **Nowość: "zł/h ogółem" vs "zł/h ostatni miesiąc", BEZ zaokrąglenia (2026-08-28, user:
+    "ile średnio na godzinę ogólnie ile średnio ze ostatniego miesiąca, bez zaokrąglone")**
+    — `wm.rate` (główna liczba w `wpRateCard`) to JEDNA już-wybrana stawka (priorytet: ręczne
+    nadpisanie > wypłaty > potwierdzone miesiące > kalendarz, patrz `useWorkEarnings`), user
+    chciał zobaczyć OBA składowe osobno. Nowy wiersz pod `wpRateCard` (reużywa styl
+    `wpLeftCard`/`wpLeftItem` z sekcji "ile zostało" — bez nowych styli w StyleSheet):
+    `workAvg.avgRate` (Σzł ÷ Σh po wszystkich uwzględnionych miesiącach, `payMonthsSummary`
+    w `workSummary.ts`, JUŻ było liczone, tylko nigdzie nie wyświetlane wprost) i realna
+    stawka z NAJNOWSZEJ wypłaty (`workPayMonths[0].amount / .hours`) — obie do 2 miejsc po
+    przecinku (`.toFixed(2)`, nie zaokrąglone do całości jak reszta karty).
+
 ## 5. Customowe widgety / metryki — `src/utils/statWidgets.ts`
 
 - **`WIDGET_METRICS`**: lista `{ id, label, group, unit, viz[], periodic, needsTag? }`.

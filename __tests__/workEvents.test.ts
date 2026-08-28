@@ -1,4 +1,4 @@
-import { titleTimeRange, shiftClockRange, shiftMinutes, shiftHours, isWorkEvent } from '@/utils/workEvents';
+import { titleTimeRange, shiftClockRange, shiftMinutes, shiftHours, isWorkEvent, elapsedShiftHours } from '@/utils/workEvents';
 
 describe('workEvents — titleTimeRange (parsowanie zakresu godzin z tytułu)', () => {
   test('pełny zakres HH:MM - HH:MM', () => {
@@ -73,5 +73,31 @@ describe('workEvents — isWorkEvent (kolor LUB prefiks, ale TYLKO gdy jest jaka
   });
   test('znacznik (Nh) w tytule sam w sobie liczy się jako "ma czas" nawet bez zakresu godzin', () => {
     expect(isWorkEvent({ title: '[JD] zmiana (8h)' }, opts)).toBe(true);
+  });
+});
+
+// 2026-08-28: user: "jak dzisiaj mam pracę i jest przed pracą to jest jeszcze nie
+// przepracowane jakby nie?" — dashboard liczył dzisiejszą zmianę jako w CAŁOŚCI
+// przepracowaną od razu o północy, nawet godziny przed jej rozpoczęciem.
+describe('workEvents — elapsedShiftHours (ile z DZISIEJSZEJ zmiany już minęło)', () => {
+  const shift = { title: '[JD] 13:00 - 21:00. (8h)' };
+
+  test('PRZED rozpoczęciem zmiany → 0 (jeszcze nie przepracowane)', () => {
+    expect(elapsedShiftHours(shift, new Date(2026, 0, 1, 9, 0, 0))).toBe(0);
+  });
+  test('W TRAKCIE zmiany → tylko część która minęła (4h z 8h)', () => {
+    expect(elapsedShiftHours(shift, new Date(2026, 0, 1, 17, 0, 0))).toBe(4);
+  });
+  test('PO zakończeniu zmiany → cała (8h), nie więcej', () => {
+    expect(elapsedShiftHours(shift, new Date(2026, 0, 1, 23, 0, 0))).toBe(8);
+  });
+  test('DOKŁADNIE w momencie rozpoczęcia → 0', () => {
+    expect(elapsedShiftHours(shift, new Date(2026, 0, 1, 13, 0, 0))).toBe(0);
+  });
+  test('nocna zmiana (22:00-06:00), sprawdzona O 23:30 tego samego dnia → 1.5h, nie 0', () => {
+    expect(elapsedShiftHours({ title: '22:00 - 06:00' }, new Date(2026, 0, 1, 23, 30, 0))).toBe(1.5);
+  });
+  test('brak parsowalnego zakresu godzin (tylko znacznik (Nh)) → licz w całości, nie da się ocenić postępu', () => {
+    expect(elapsedShiftHours({ title: '[JD] zmiana (6h)' }, new Date(2026, 0, 1, 0, 0, 0))).toBe(6);
   });
 });
