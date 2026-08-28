@@ -1782,6 +1782,31 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       dedykowanym toastem "Masz już ten przedmiot (lub lepszy)". Testy:
       `__tests__/buyDailyGear.test.ts` (nowy plik — pierwsze testy bezpośrednio wołające
       `usePetStore.getState()`'s akcje, nie tylko czyste funkcje z `utils/`).
+    - **BUG DRUGI, w SKRZYNKACH (nie w sklepie dnia) — dropnięty duplikat po prostu znikał
+      (2026-08-27, user: "jak w skrzynce daily wydropiłem to mi zniknął po prostu nic nie
+      dostałem bo chyba miałem podobny albo wgle zniknął").** Powyższy fix (26-go) dotyczył
+      TYLKO `buyDailyGear` (gwarantowany zakup w Sklepie dnia); `grantGear` (wołane przez
+      `onBuyBox`/`onDailyBox` w `pet-shop.tsx` I `pet.tsx` po wylosowaniu nagrody ze skrzynki)
+      miało DOKŁADNIE tę samą klasę buga, nietkniętą — cichy no-op gdy duplikat (item już
+      posiadany w ≥ tej rzadkości), ale `BoxRevealModal` i tak POKAZYWAŁ kartę "EKWIPUNEK!
+      &lt;nazwa&gt;" jakby user właśnie dostał nową kopię, mimo że `ownedGear` się nie
+      zmieniało — realnie dostawał nic, wyglądało jak zjadło drop. Fix: `grantGear` teraz
+      KOMPENSUJE duplikat monetami (`gearSellValue`, ta sama stawka co ręczna sprzedaż w
+      `sellGear` — spójna wewnętrzna wartość itemu) zamiast wyrzucać go w próżnię, i zwraca
+      skompensowaną kwotę (`number`, 0 = normalny przyznany item, sygnatura w store zmieniona
+      z `void`). Wszystkie TRZY miejsca wołające (`onBuyBox`/`onDailyBox` w `pet-shop.tsx`,
+      `onDailyBox` w `pet.tsx`) przekazują tę kwotę do nowego propa `BoxRevealModal`'s
+      `dupeCoins` — modal wtedy pokazuje UCZCIWĄ kartę ("MASZ JUŻ TEN PRZEDMIOT" + monety
+      zamiast ikony/nazwy itemu, cząstki 🪙 zamiast ✨) zamiast udawać że gracz dostał nową
+      kopię czegoś czego nie ma. `sklep dnia` (gwarantowany zakup, nie dotyczy tego buga —
+      tam duplikat całkiem BLOKUJE zakup, bo user sam wybiera co kupić, patrz wyżej) i
+      skrzynki (losowe, user nie ma kontroli co wypadnie) świadomie różne traktowanie:
+      zablokowany zakup vs. kompensata, bo w skrzynce zablokowanie nie ma sensu (nie było
+      wyboru co się wylosuje). Testy: `__tests__/grantGear.test.ts` (nowy plik, analogiczny do
+      `buyDailyGear.test.ts`). **Podobny gap, NIEnaprawiony, celowo poza zakresem tej zmiany**:
+      `grantCombatItem` (itemy bojowe, `combatItems.ts`) ma dokładnie tę samą klasę no-opa na
+      duplikacie ze skrzynki — inny system, inna decyzja projektowa potrzebna (auto-upgrade
+      poziomu zamiast kompensaty monetami?), patrz NEXT_STEPS.md.
     - **Sloty powiększone (2026-08-27)** — user: "te sloty na itemy musimy powiększyć bo sa
       za malutkie przy kotku". `s.slot` 40×40 → 50×50 (+25%), `slotImg` 26→34, ikona kategorii
       (pusty slot) 18→22, `slotDot` (kropka "posiadasz, nie założone") 7→8px, `flankCol`

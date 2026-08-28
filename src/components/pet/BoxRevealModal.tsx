@@ -23,8 +23,16 @@ function Fly({ sx, sy, ex, ey, emoji, size }: { sx: number; sy: number; ex: numb
 
 // Odsłona nagrody ze skrzynki. Nagroda jest JUŻ wylosowana i przyznana — tu tylko
 // celebracja: stuknij → skrzynka się trzęsie → wybuch + cząstki + karta z nagrodą.
-export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, onClose }: {
-  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; onClose: () => void;
+//
+// `dupeCoins` (2026-08-27, user: "jak w skrzynce daily wydropiłem to mi zniknął po prostu
+// nic nie dostałem") — gdy wylosowany gear to duplikat (już posiadany w ≥ tej rzadkości),
+// `petStore.grantGear` go NIE przyznaje, tylko kompensuje monetami (patrz komentarz tam).
+// Pokazywanie zwykłej karty "EKWIPUNEK! <nazwa>" w tej sytuacji byłoby kłamstwem — user
+// widziałby że "dostał" item, którego naprawdę nie ma w ekwipunku. Ten prop przełącza kartę
+// na uczciwą wersję: monety zamiast ikony/nazwy itemu, ta sama logika cząstek co przy
+// zwykłej wygranej monet.
+export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, dupeCoins, onClose }: {
+  visible: boolean; reward: BoxReward | null; boxColor: string; boxEmoji: string; dupeCoins?: number; onClose: () => void;
 }) {
   const [phase, setPhase] = useState<'closed' | 'revealed'>('closed');
   const [flies, setFlies] = useState<{ id: number; sx: number; sy: number; ex: number; ey: number; emoji: string; size: number }[]>([]);
@@ -73,8 +81,9 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
             ex: (Math.random() - 0.5) * 40, ey: -20 + (Math.random() - 0.5) * 40, emoji: '❄️', size: 20 + Math.random() * 12 };
         }));
       } else {
+        const isDupe = reward.type === 'gear' && !!dupeCoins;
         const n = (reward.rarity === 'legendary' || reward.rarity === 'mythic') ? 18 : reward.rarity === 'epic' ? 13 : 9;
-        const em = reward.type === 'coins' ? '🪙' : '✨';
+        const em = (reward.type === 'coins' || isDupe) ? '🪙' : '✨';
         setFlies(Array.from({ length: n }).map((_, i) => ({ id: i,
           sx: 0, sy: 0, ex: (Math.random() - 0.5) * 300, ey: -(50 + Math.random() * 230),
           emoji: i % 3 === 0 ? '✨' : em, size: 24 })));
@@ -88,7 +97,8 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
   const glowOp = burst.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.5, 0.28] });
   const cardScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
-  const rewardTitle = reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'startup' ? 'NOWY STARTUP!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : reward?.type === 'gear' ? 'EKWIPUNEK!' : 'MONETY';
+  const isDupe = reward?.type === 'gear' && !!dupeCoins;
+  const rewardTitle = isDupe ? 'MASZ JUŻ TEN PRZEDMIOT' : reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'startup' ? 'NOWY STARTUP!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : reward?.type === 'gear' ? 'EKWIPUNEK!' : 'MONETY';
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -127,6 +137,11 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, on
                     <>
                       <Snowflake size={40} color="#7DD3FC" />
                       <Text style={st.rewardName}>+{reward.count} zamrożenie</Text>
+                    </>
+                  ) : reward?.type === 'gear' && isDupe ? (
+                    <>
+                      <Text style={st.coins}>+{dupeCoins} 🪙</Text>
+                      <Text style={st.rewardName}>{reward.name} (już masz)</Text>
                     </>
                   ) : reward?.type === 'gear' ? (
                     <>

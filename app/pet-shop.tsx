@@ -85,7 +85,7 @@ export default function PetShop() {
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
   const [cat, setCat] = useState<Cat>('market');
-  const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
   const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);
   // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
   // żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem założonym") — dawniej
@@ -114,13 +114,14 @@ export default function PetShop() {
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
       const reward = rollBox(box, SHOP_COLORS, ownedItems, petLevel);
+      let dupeCoins: number | undefined;
       if (reward.type === 'color') buyItem(reward.colorId, 0);
       else if (reward.type === 'startup') grantStartup(reward.startupId);
       else if (reward.type === 'coins') addCoins(reward.coins);
       else if (reward.type === 'freeze') addFreezes(reward.count);
-      else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity);
+      else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
       haptic.success();
-      setReveal({ box, reward });
+      setReveal({ box, reward, dupeCoins });
     }, 'Otwórz');
   };
 
@@ -130,13 +131,14 @@ export default function PetShop() {
     haptic.tap();
     if (!dailyReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
     const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, petLevel);
+    let dupeCoins: number | undefined;
     if (reward.type === 'color') buyItem(reward.colorId, 0);
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
-    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity);
+    else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
     haptic.success();
-    setReveal({ box: DAILY_BOX, reward });
+    setReveal({ box: DAILY_BOX, reward, dupeCoins });
   };
 
   // Sklep dnia — 3 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
@@ -370,6 +372,7 @@ export default function PetShop() {
         reward={reveal?.reward ?? null}
         boxColor={reveal?.box.color ?? '#9AA6B2'}
         boxEmoji={reveal?.box.emoji ?? '🎁'}
+        dupeCoins={reveal?.dupeCoins}
         onClose={() => setReveal(null)}
       />
 
