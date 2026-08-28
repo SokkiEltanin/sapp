@@ -25,7 +25,7 @@ duplikacie ze skrzynki — inny system (levels/upgrade zamiast rarity), więc po
 decyzja projektowa (auto-upgrade poziomu zamiast kompensaty monetami? sama kompensata?) zanim
 to naprawić — celowo NIE tknięte w tej zmianie.
 
-## 🆕 Skaner paragonów łapie teraz Kaufland app "Receipt copy" — NIEsprawdzone (2026-08-27)
+## 🆕 Skaner paragonów łapie teraz Kaufland app "Receipt copy" — NIEsprawdzone (2026-08-27, poprawione 2026-08-28)
 
 User: "mamy że wykrywa Kaufland to niech łapie taki paragon z parteru" + wklejony tekst z
 ekranu Kaufland app (paragon → "..." → "Receipt copy") — inny, byte-exact format niż stary
@@ -35,12 +35,20 @@ lub NAZWA + kontynuacja "ilość*cena"/"waga KG" w następnej, promocje na kasie
 nagłówku "Cena PLN". Przy okazji fix ogólniejszego bugu: apka wstawia kody drukarki sklejone
 bez spacji przed nazwą sklepu ("&1Kaufland..."), co na krótszej wklejce potrafiło całkiem
 zgubić wykrycie sklepu (`\bkaufland\b` bez granicy słowa) — teraz `stripPrintMarkup()` ścina
-to na wejściu do `parseReceiptText()`, no-op dla innych sklepów/formatów. Pełny opis w
-ARCHITECTURE.md. `tsc`/`jest` zielone (63/766, +7 nowych testów na fixture z realnego
-paragonu Kaufland usera). **Priorytet testu na urządzeniu**: Wydatki → Skanuj/wklej paragon
-→ wklej tekst z Kaufland app "Receipt copy" (dowolny paragon Kaufland z tej apki, nie tylko
-ten konkretny) — sprawdź że sklep, wszystkie pozycje i suma łapią się poprawnie, w tym
-multi-buy i towar na wagę.
+to na wejściu do `parseReceiptText()`, no-op dla innych sklepów/formatów.
+
+**DZIEŃ PÓŹNIEJ user ze screenshotem: "źle mi złapało produkty"** — banner "Suma produktów
+(197,94 zł) > kwota na paragonie" mimo że total i wszystkie 10 pozycji były poprawne.
+Pierwsza wersja liczyła `subtotal` PRZED rabatami i sumowała promocje TYLKO do osobnego pola
+`totalDiscount`, ale `scan.tsx` tego pola nie zna — sumuje wprost `products[].finalPrice`.
+Fix: promocje ("Pozycje:N,M") rozdzielane proporcjonalnie na KONKRETNE produkty (`finalPrice`/
+`discount`/`promotion` per pozycja, ten sam wzorzec co reszta parserów w pliku), `subtotal`
+liczony z sumy już-poobniżanych cen. Pełny opis obu bugów w ARCHITECTURE.md. `tsc`/`jest`
+zielone (64/773, 16 testów łącznie na fixture z realnego paragonu Kaufland usera).
+**Priorytet testu na urządzeniu**: Wydatki → Skanuj/wklej paragon → wklej tekst z Kaufland
+app "Receipt copy" (dowolny paragon Kaufland z tej apki, nie tylko ten konkretny) — sprawdź
+że sklep, wszystkie pozycje i suma łapią się poprawnie, W TYM że banner "brakuje rabatów" się
+NIE pojawia gdy paragon ma promocje na kasie (nie tylko multi-buy/waga jak poprzednio).
 
 ## 🆕 BUG: "prześwity" na czole przygaszonego kotka po misji — NIEsprawdzone (2026-08-27)
 

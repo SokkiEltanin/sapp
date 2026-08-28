@@ -710,10 +710,11 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
 // name by lookahead: only a line whose NEXT line is a bare continuation (qty*price
 // or weight — nothing else on the line) is a pending name; anything else
 // (including a category header followed by a full one-line item) is skipped.
-// Checkout-level promos ("Kup 2 płać za 1 -11,97" + "Pozycje:3,4") apply to
-// several items at once via index references too fragile to map onto specific
-// products, so they're summed into `totalDiscount` only — `subtotal` (parsed
-// straight off "Suma cząstkowa") minus that equals `total` (the paid amount).
+// Checkout-level promos ("Kup 2 płać za 1 -11,97" + "Pozycje:3,4") reference the
+// products they apply to by 1-indexed position — allocated proportionally onto
+// those products' finalPrice (see the loop below), the same "discount lives on
+// the product, not a side field" convention `parseGeneric` uses elsewhere in
+// this file, so `subtotal` (sum of finalPrice) matches `total` directly.
 
 const KFL_COPY_HEADER_RE = /^Cena\s+PLN$/i;
 const KFL_COPY_SUBTOTAL_RE = /^Suma\s*cz[ąa]stkowa\s+(\d+[.,]\d{2})$/i;
@@ -780,25 +781,66 @@ function parseKauflandReceiptCopy(text: string): ParsedReceipt {
     }
   }
 
-  // Checkout-level promos live between "Suma cząstkowa" and the "Vat %" table —
-  // every line ending in "-N,NN" in that band is a discount amount.
+  // Checkout-level promos live between "Suma cząstkowa" and the "Vat %" table, each as a
+  // "<nazwa>  -N,NN" line followed by "Pozycje:N,M" (1-indexed positions in receipt order,
+  // possibly SEVERAL items at once — e.g. "Kup 2 płać za 1" spans both units of a multi-buy).
+  //
+  // BUG (2026-08-28, user: "źle mi złapało produkty" + screenshot of the mismatch banner) —
+  // this used to just SUM every promo into `totalDiscount` and leave every product at its
+  // face price, with `subtotal` read straight off "Suma cząstkowa" (197,94). But the scan
+  // screen (`app/expenses/scan.tsx`) doesn't know about `totalDiscount` at all — its mismatch
+  // banner AND the live "Zaznaczone" checked-sum both just add up `products[].finalPrice`
+  // directly and compare to `total`, exactly like every other parser in this file (see
+  // `parseGeneric`'s discount handling below: it subtracts `disc` from `lastProduct.
+  // finalPrice` directly, never a separate aggregate). So leaving products at face value
+  // guaranteed a permanent false "brakuje rabatów" alert for the FULL discount amount, even
+  // though `total` itself was correct.
+  //
+  // Fix: allocate each promo onto the products its "Pozycje:" line names, proportionally to
+  // their CURRENT price (so an earlier promo touching the same item compounds correctly),
+  // mirroring `parseGeneric`'s per-product `discount`/`promotion` fields. Rounding remainder
+  // (pennies) goes to the LAST referenced item so the allocated total is always exact — a
+  // proportional split alone can leave the sum a cent or two short after two decimal
+  // roundings. `subtotal` is then the sum of (now-discounted) `finalPrice`, matching `total`
+  // just like the Lidl deposit-return case (`__tests__/receiptParser.test.ts`).
   const vatIdx = lines.findIndex((l, idx) => idx > endIdx && KFL_COPY_VAT_TABLE_RE.test(l));
   const promoBand = endIdx >= 0 ? lines.slice(endIdx + 1, vatIdx >= 0 ? vatIdx : undefined) : [];
+  const posRe = /^Pozycje:\s*([\d,\s]+)$/i;
   let totalDiscount = 0;
-  for (const l of promoBand) {
-    const m = l.match(KFL_COPY_DISCOUNT_RE);
-    if (m) totalDiscount += parsePrice(m[1]);
+  for (let i = 0; i < promoBand.length; i++) {
+    const dm = promoBand[i].match(KFL_COPY_DISCOUNT_RE);
+    if (!dm) continue;
+    const amount = parsePrice(dm[1]);
+    totalDiscount += amount;
+
+    const pm = promoBand[i + 1]?.match(posRe);
+    if (!pm) continue;
+    const indices = [...new Set(pm[1].split(',').map(n => parseInt(n.trim(), 10)))]
+      .filter(n => n >= 1 && n <= products.length);
+    if (!indices.length) continue;
+    const promoName = promoBand[i].replace(KFL_COPY_DISCOUNT_RE, '').trim();
+    const weightSum = indices.reduce((s, idx) => s + products[idx - 1].finalPrice, 0);
+    if (weightSum <= 0) continue;
+    let allocated = 0;
+    indices.forEach((idx, j) => {
+      const p = products[idx - 1];
+      const isLast = j === indices.length - 1;
+      const share = isLast ? Math.round((amount - allocated) * 100) / 100 : Math.round((p.finalPrice / weightSum) * amount * 100) / 100;
+      allocated += share;
+      p.discount = Math.round(((p.discount ?? 0) + share) * 100) / 100;
+      p.finalPrice = Math.max(0, Math.round((p.finalPrice - share) * 100) / 100);
+      p.promotion = p.promotion ?? promoName;
+    });
   }
 
-  const subtotalMatch = endIdx >= 0 ? lines[endIdx].match(KFL_COPY_SUBTOTAL_RE) : null;
-  const subtotal = subtotalMatch ? parsePrice(subtotalMatch[1]) : products.reduce((s, p) => s + p.finalPrice, 0);
+  const subtotal = products.reduce((s, p) => s + p.finalPrice, 0);
   const total = detectTotal(text);
 
   return {
     storeName: detectStoreName(text, lines) ?? 'Kaufland',
     date: detectDate(text),
     paymentMethod: detectPaymentMethod(text),
-    products, subtotal, totalDiscount, total: total || (subtotal - totalDiscount), raw: text,
+    products, subtotal, totalDiscount, total: total || subtotal, raw: text,
   };
 }
 
