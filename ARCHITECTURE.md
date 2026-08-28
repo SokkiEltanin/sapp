@@ -592,6 +592,45 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     159,97. Testy rozszerzone o osobne przypadki dla alokacji 1-do-1 i rozłożonej na kilka
     pozycji (`__tests__/receiptParser.test.ts`, 16 testów w tym pliku łącznie teraz).
 
+- **Tagi produktów — pamięć per-nazwa + wspólna częstość (`productMemory.ts`: `loadTagMemory`/
+  `saveTagMemory`/`getTagFrequency`).** `TagMemory` = `Record<nazwa produktu, tags[]>` — po
+  zapisaniu paragonu tagi każdego produktu zapamiętują się POD JEGO NAZWĄ (`saveTagMemory`),
+  więc następnym razem ten sam produkt ("Papier ksero") dostaje swoje tagi automatycznie
+  (`applyTagMemory`, przy wczytaniu nowego paragonu). `getTagFrequency()` liczy Σ wystąpień
+  KAŻDEGO tagu po całej pamięci (nie per-produkt) → to właśnie ten zbiór, posortowany po
+  częstości, wypełnia listę do wyboru w `TagPicker` (obok wbudowanych `ITEM_TAGS`) — czyli
+  własny tag użyty RAZ na jakimkolwiek produkcie staje się wybieralny dla KAŻDEGO innego
+  produktu przy KOLEJNYM skanowaniu.
+  - **BUG: własny tag się duplikował (2026-08-28, user ze screenshotem "Wydatek": "art.
+    biurowe" x2 na jednej pozycji — "jak dodaje wlasny tag na paragonie to on sie duplikuje
+    nie wiem czemu").** Ten sam bug w DWÓCH osobnych implementacjach — `TagPicker` w
+    `scan.tsx` (ekran PRZED zapisem) i `ItemEditor` w `app/expenses/[id].tsx` (edycja
+    pozycji PO zapisie, ekran ze screenshota) — obie miały `TextInput` z `onSubmitEditing`
+    ORAZ `onBlur` spiętymi z tą samą funkcją dodającą tag. Naciśnięcie "gotowe" odpala
+    `onSubmitEditing`, a zamknięcie klawiatury zaraz po tym odpala `onBlur` — OBA domykają
+    się nad TĄ SAMĄ, jeszcze nie wyczyszczoną wartością pola (React nie zdążył jeszcze
+    przerenderować z `setCustom('')` z pierwszego wywołania), więc oba wołają dodanie tego
+    samego tagu → dublet. Fix: `addingRef` (ref, nie state — musi być SYNCHRONICZNY w
+    obrębie jednego ticka) blokuje drugie wywołanie w tej samej "turze"; reset przez
+    `setTimeout(...,0)` na następny tick, żeby kolejny, GENUINE nowy tag dało się dodać
+    normalnie. Zastosowane w OBU miejscach (dwa niezależne komponenty, nie da się
+    wydzielić bez większego refaktoru UI). Dodatkowo, żeby istniejące już zduplikowane dane
+    (jak na screenshocie usera) wyglądały czysto BEZ ręcznej edycji: stan `tags` w
+    `ItemEditor`/edytorze całego wydatku inicjalizowany przez `[...new Set(...)]`, a
+    read-only lista tagów produktu w `[id].tsx` (`it.tags.map`) renderowana przez
+    `[...new Set(it.tags)].map`.
+  - **Druga część tej samej wiadomości: "nie mam opcji oddania go na stałe, żebym mógł sobie
+    dodac tag na inne kategorie"** — nowy własny tag BYŁ już trwale zapisywany (przez
+    `saveTagMemory` przy zapisie paragonu), ale `tagFreq` w `scan.tsx` ładował się TYLKO RAZ
+    przy montowaniu ekranu (`useEffect(() => { getTagFrequency().then(setTagFreq) }, [])`) —
+    więc nowy tag dodany do produktu A w TRAKCIE tego samego skanowania nie pojawiał się
+    jako opcja dla produktu B na TYM SAMYM ekranie, dopiero po ponownym otwarciu skanera.
+    Fix: nowy callback `onNewCustomTag` przekazywany w dół przez `ProductRow`/
+    `CustomProductRow` do `TagPicker` — gdy `addCustom()` doda GENUINE nowy tag (nie
+    wbudowany, jeszcze nie w `freq`), od razu dopisuje go do `tagFreq` w rodzicu
+    (`setTagFreq(prev => ({...prev, [tag]: (prev[tag]??0)+1}))`), więc staje się wybieralny
+    dla wszystkich pozostałych produktów NATYCHMIAST, w tej samej sesji skanowania.
+
 ## 8. Zdrowie / Health Connect
 
 - `healthConnectService.ts` (natywny odczyt), `healthAutoSync.ts` (`autoSyncHealth(days,
