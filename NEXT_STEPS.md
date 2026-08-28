@@ -3,6 +3,28 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG: dropnięty duplikat ekwipunku ze skrzynki znikał bez kompensaty — NIEsprawdzone (2026-08-27)
+
+User: "jak w skrzynce daily wydropiłem to mi zniknął po prostu nic nie dostałem bo chyba
+miałem podobny albo wgle zniknął". Ten sam bug co fix z 2026-08-26 (kupno w Sklepie dnia
+itemu który już masz) — ale w SKRZYNKACH (`grantGear`, wołane po `onBuyBox`/`onDailyBox` w
+`pet-shop.tsx` i `pet.tsx`), gdzie nikt tego nie naprawił przy okazji tamtego fixa. Duplikat
+(już posiadany w ≥ tej rzadkości) był cichym no-opem — `BoxRevealModal` i tak pokazywał
+"wygraną" kartę, ale `ownedGear` się nie zmieniało, user dostawał faktycznie nic. Fix:
+`grantGear` kompensuje duplikat monetami (`gearSellValue`, jak ręczna sprzedaż) zamiast
+wyrzucać w próżnię, zwraca skompensowaną kwotę; `BoxRevealModal` dostał nowy prop `dupeCoins`
+— pokazuje wtedy uczciwą kartę "MASZ JUŻ TEN PRZEDMIOT" + monety zamiast udawanej nowej
+kopii itemu. Pełny opis w ARCHITECTURE.md. `tsc`/`jest` zielone (64/770, +4 nowe testy w
+`__tests__/grantGear.test.ts`). **Priorytet testu na urządzeniu**: Sklep → otwórz skrzynkę
+(albo skrzynkę dnia) aż wypadnie duplikat itemu który już masz — sprawdź że dostajesz monety
+i modal wyraźnie mówi że to duplikat, zamiast pokazywać zwykłą kartę "EKWIPUNEK!".
+
+**Znaleziony przy okazji, NIEnaprawiony gap tej samej klasy**: `grantCombatItem` (itemy
+bojowe, `src/utils/combatItems.ts` + `petStore.ts`) ma dokładnie ten sam cichy no-op na
+duplikacie ze skrzynki — inny system (levels/upgrade zamiast rarity), więc potrzebna osobna
+decyzja projektowa (auto-upgrade poziomu zamiast kompensaty monetami? sama kompensata?) zanim
+to naprawić — celowo NIE tknięte w tej zmianie.
+
 ## 🆕 Skaner paragonów łapie teraz Kaufland app "Receipt copy" — NIEsprawdzone (2026-08-27)
 
 User: "mamy że wykrywa Kaufland to niech łapie taki paragon z parteru" + wklejony tekst z

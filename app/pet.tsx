@@ -179,20 +179,21 @@ export default function Pet() {
   // to konkretne miejsce zostało przeoczone przy dodawaniu misji).
   const [cancelMissionConfirm, setCancelMissionConfirm] = useState(false);
   const onCancelMission = () => { haptic.tap(); setCancelMissionConfirm(true); };
-  const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward } | null>(null);
+  const [boxReveal, setBoxReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
   // Skrzynka dnia PRZY KOCIE (nie tylko w sklepie — tam user o niej zapominał). Ta sama gacza.
   const dailyBoxReady = !dayClaims[`dailybox:${todayISO()}`];
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
     const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, lvl.level);
+    let dupeCoins: number | undefined;
     if (reward.type === 'color') buyItem(reward.colorId, 0);
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
-    else if (reward.type === 'gear') grantGear(reward.itemId, reward.rarity);
+    else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
     haptic.success();
-    setBoxReveal({ box: DAILY_BOX, reward });
+    setBoxReveal({ box: DAILY_BOX, reward, dupeCoins });
   };
   const [celebrate, setCelebrate] = useState(0);
   const [crateOpen, setCrateOpen] = useState(false);
@@ -653,6 +654,7 @@ export default function Pet() {
         reward={boxReveal?.reward ?? null}
         boxColor={boxReveal?.box.color ?? '#FBBF24'}
         boxEmoji={boxReveal?.box.emoji ?? '🎁'}
+        dupeCoins={boxReveal?.dupeCoins}
         onClose={() => setBoxReveal(null)}
       />
       <PetCustomizeModal

@@ -332,7 +332,7 @@ interface PetState {
   upgradeCombatItem: (id: CombatItemId, cost: number, maxLevel: number) => boolean; // +1 poziom za monety, cap maxLevel
   equipCombatItem: (id: CombatItemId) => boolean;                               // false = brak slotu lub nieposiadany
   unequipCombatItem: (id: CombatItemId) => void;
-  grantGear: (itemId: string, rarity: GearRarity) => void;   // ze skrzynki/daily shopu — no-op jeśli już masz ≥ tę rzadkość
+  grantGear: (itemId: string, rarity: GearRarity) => number;   // ze skrzynki/daily shopu; zwraca 0 gdy przyznano item, kwotę monet gdy duplikat (≥ tę rzadkość) skompensowano monetami zamiast go wyrzucić
   equipGear: (itemId: string) => boolean;                     // false = nieposiadany lub poziom za niski
   unequipGear: (slot: GearSlot) => void;
   sellGear: (itemId: string) => number;   // sprzedaje POSIADANY item za monety (auto-unequip jeśli założony); zwraca zarobione monety, 0 = nieposiadany
@@ -835,11 +835,29 @@ export const usePetStore = create<PetState>()(
         return true;
       },
       unequipCombatItem: (id) => set((s) => ({ equippedCombatItems: s.equippedCombatItems.filter(x => x !== id) })),
-      grantGear: (itemId, rarity) => set((s) => {
+      // BUG (2026-08-27, user: "jak w skrzynce daily wydropiłem to mi zniknął po prostu nic
+      // nie dostałem bo chyba miałem podobny albo wgle zniknął") — skrzynki (`onBuyBox`/
+      // `onDailyBox` w pet-shop.tsx i pet.tsx) wołały `grantGear` i OD RAZU pokazywały
+      // `BoxRevealModal` z "wygraną" kartą, ale gdy trafił się duplikat (item już posiadany w
+      // ≥ tej rzadkości) `grantGear` był CICHYM no-opem — ekwipunek się nie zmieniał, user nie
+      // dostawał NIC w zamian, mimo że modal właśnie pokazał mu "EKWIPUNEK! <nazwa>". Fix:
+      // duplikat teraz KOMPENSOWANY monetami (`gearSellValue`, ta sama stawka co ręczna
+      // sprzedaż w `sellGear` — spójna wewnętrzna wartość itemu) zamiast wyrzucany w próżnię;
+      // zwraca skompensowaną kwotę (0 = normalny przyznany item) żeby wołające UI mogło
+      // pokazać to uczciwie zamiast udawać że gracz dostał nową kopię (patrz `BoxRevealModal`
+      // prop `dupeCoins`).
+      grantGear: (itemId, rarity) => {
+        const s = get();
         const cur = s.ownedGear[itemId];
-        if (cur && RARITY_MULT[cur] >= RARITY_MULT[rarity]) return s;
-        return { ownedGear: { ...s.ownedGear, [itemId]: rarity } };
-      }),
+        if (cur && RARITY_MULT[cur] >= RARITY_MULT[rarity]) {
+          const item = gearById(itemId);
+          const coins = item ? gearSellValue(item, rarity) : 0;
+          if (coins > 0) set({ coins: s.coins + coins });
+          return coins;
+        }
+        set({ ownedGear: { ...s.ownedGear, [itemId]: rarity } });
+        return 0;
+      },
       equipGear: (itemId) => {
         const s = get();
         const item = gearById(itemId);
