@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   stepFor, getHabits, saveHabits, getCounts, setCounts, getCountsRange,
   getWaterHabit, feedWaterHabit, getStepsHabit, feedStepsHabit, getWaterGlasses,
+  computeAvoidCounts,
 } from '@/utils/habits';
 import { Habit } from '@/types';
 
@@ -178,5 +179,60 @@ describe('habits — getWaterGlasses', () => {
     await saveHabits([habit({ id: 'w', title: 'Woda', type: 'count' })]);
     await setCounts('2026-08-15', { w: 6 });
     expect(await getWaterGlasses('2026-08-15')).toBe(6);
+  });
+});
+
+// 2026-08-29, user: "żeby w nawyku dodać że chcę nie jeść słodyczy" — auto-tracked jak w
+// Odliczaniu (matchesAvoid), ale jako nawyk ze streakiem/kalendarzem zamiast osobnego licznika.
+describe('habits — computeAvoidCounts (kind="avoid", auto z dziennika jedzenia)', () => {
+  const avoidHabit = habit({ id: 'sweets', title: 'Bez słodyczy', kind: 'avoid', avoidKeyword: 'słodycz|czekolad' });
+  const meal = (date: string, name: string) => ({ date, items: [{ name }] });
+
+  test('dzień bez pasującego jedzenia → 1 (done)', () => {
+    const { merged, changed } = computeAvoidCounts([avoidHabit], [], ['2026-08-15'], {});
+    expect(merged['2026-08-15']).toEqual({ sweets: 1 });
+    expect(changed).toEqual([['2026-08-15', { sweets: 1 }]]);
+  });
+
+  // 0 (broke) == the implicit default for a day absent from storage entirely, so a fresh
+  // broken day with no prior `existing` entry needs no write — assert via the same `?? 0`
+  // fallback every reader (useHabits.ts, habit-year.tsx) already applies, not the raw shape.
+  test('dzień z zjedzonym pasującym jedzeniem → 0 (broke)', () => {
+    const meals = [meal('2026-08-15', 'Czekolada mleczna')];
+    const { merged } = computeAvoidCounts([avoidHabit], meals, ['2026-08-15'], {});
+    expect(merged['2026-08-15']?.sweets ?? 0).toBe(0);
+  });
+
+  test('dopasowanie w zagnieżdżonych "parts" (składniki posiłku), nie tylko w nazwie dania', () => {
+    const meals = [{ date: '2026-08-15', items: [{ name: 'Deser', parts: [{ name: 'Czekoladki belgijskie' }] }] }];
+    const { merged } = computeAvoidCounts([avoidHabit], meals, ['2026-08-15'], {});
+    expect(merged['2026-08-15']?.sweets ?? 0).toBe(0);
+  });
+
+  test('dzień "broke" NADPISUJE istniejący done=1 na 0 (streak realnie pęka)', () => {
+    const meals = [meal('2026-08-15', 'Czekolada mleczna')];
+    const existing = { '2026-08-15': { sweets: 1 } };
+    const { merged, changed } = computeAvoidCounts([avoidHabit], meals, ['2026-08-15'], existing);
+    expect(merged['2026-08-15']).toEqual({ sweets: 0 });
+    expect(changed).toEqual([['2026-08-15', { sweets: 0 }]]);
+  });
+
+  test('nie nadpisuje wartości INNYCH nawyków tego samego dnia', () => {
+    const existing = { '2026-08-15': { other: 1 } };
+    const { merged } = computeAvoidCounts([avoidHabit], [], ['2026-08-15'], existing);
+    expect(merged['2026-08-15']).toEqual({ other: 1, sweets: 1 });
+  });
+
+  test('wartość już poprawna → dzień NIE trafia do changed (brak zbędnego zapisu)', () => {
+    const existing = { '2026-08-15': { sweets: 1 } };
+    const { changed } = computeAvoidCounts([avoidHabit], [], ['2026-08-15'], existing);
+    expect(changed).toEqual([]);
+  });
+
+  test('brak nawyków kind="avoid" → merged to dokładnie existing (ta sama referencja), changed puste', () => {
+    const existing = { '2026-08-15': { other: 1 } };
+    const { merged, changed } = computeAvoidCounts([habit({ id: 'h', kind: undefined })], [], ['2026-08-15'], existing);
+    expect(merged).toBe(existing);
+    expect(changed).toEqual([]);
   });
 });
