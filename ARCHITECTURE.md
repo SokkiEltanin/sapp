@@ -764,7 +764,8 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
 - **Sklep (`app/pet-shop.tsx`):** zamrożenie serii PRZYPIĘTE na górze; reszta w kategoriach
   (chipy Skrzynki/Kolory/Dodatki), kolory grupowane wg rzadkości. **Skrzynki (gacha)** =
   `petBoxes.ts` (`LOOT_BOXES` + `rollBox`): losują kolor (ważony rzadkością, tylko nieposiadane) /
-  zamrożenie / monety; droższa = lepsze szanse. Odsłona `components/pet/BoxRevealModal.tsx`
+  zamrożenie / ekwipunek / perki bossów (najrzadsze, patrz "Przemianowane na perki..." niżej w
+  tej sekcji) / monety (50-300% kosztu skrzynki); droższa = lepsze szanse. Odsłona `components/pet/BoxRevealModal.tsx`
   (❄ zamrożenia lecą z boków). Reużywa `spendCoins`/`buyItem(id,0)`/`addCoins`/`addFreezes` — bez zmian w petStore.
 - **Ograniczenie RN:** animować tylko transformy wrappera `Animated.View` (native driver);
   animacja propów SVG stutteruje. RN nie ma transform-origin → piwot = translate→rotate→translate.
@@ -1791,6 +1792,50 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `combatItemUpgradeCost`), nie zastępuje go, oba prowadzą do tego samego capu.
     - **`CrateModal.tsx`** — nowy napis "⬆️ {nazwa} +1 poziom (LvN)!" obok istniejącego "🎁
       Nowy item bojowy", zależnie od tego która gałąź trafiła.
+  - **Przemianowane na "perki"/"UMIEJĘTNOŚCI" + drop ze skrzynek SKLEPOWYCH, nie tylko
+    darmowej skrzynki głaskania (2026-08-29)** — user: "te itemy bossów co miały być te
+    pierwsze pierwsze co są w assets/itemybossy to wgle ich nie da się dropnąć... to są
+    perki... które ogólnie nie są itemami tylko bardziej UMIEJĘTNOŚCIAMI więc tak bym je
+    nazwał. te kupowane skrzynki zrobiłbym tak że można dropnąć BASIC ITEMY > STREAK FREEZE
+    > COINY 50-300% skrzynki > i TE ITEMY BOSSÓW". Do tej pory `openCrate()` (petCat
+    głaskanie) i `menaceClaim()` (pokonanie nemesis) już dropowały te itemy — ale
+    `petBoxes.ts`'s `rollBox()` (skrzynki KUPOWANE w sklepie: drewniana/srebrna/złota +
+    darmowa skrzynka dnia) w OGÓLE nie miał gałęzi dla nich, dokładnie ta luka co user
+    zgłosił. Nowe `LootBox.combatItemChance` (opcjonalne, brak/0 = niedostępne — tak zostaje
+    dla `DAILY_BOX`, koszt 0 nie da się przełożyć na "% kosztu skrzynki") — NAJRZADSZA z
+    czterech kategorii w każdej z 3 płatnych skrzynek: sardine 0.02, silver 0.05, gold 0.08,
+    każda CELOWO < `freezeChance` tej samej skrzynki (0.05/0.10/0.10) i rzecz jasna
+    dużo < `gearChance` (0.15/0.28/0.38) — realizuje żądaną kolejność BASIC ITEMY (gear) >
+    STREAK FREEZE > ... > PERKI wprost przez WIELKOŚĆ progu, nie kolejność sprawdzania (ta
+    ostatnia i tak by nie wystarczyła — patrz jak `coins` jest fallbackiem na końcu funkcji,
+    a mimo to najczęstszy realny wynik po wyczerpaniu kosmetyk). Gałąź w `rollBox()` (nowy,
+    opcjonalny 5. parametr `ownedCombatItems`) kopiuje wzorzec `openCrate()`: `sardine`/
+    `silver` dają TYLKO nowy nieposiadany perk na poziomie 1, `gold` PREFERUJE darmowy
+    level-up już posiadanego (nie na max), nowy perk to tam fallback. Gdy nic nie da się
+    przyznać (wszystko posiadane i na maksie) branch nic nie zwraca i spada do monet — bez
+    potrzeby systemu kompensacji dubli jak przy gearze (nigdy nie "marnuje" rzutu na coś już
+    posiadanego skoro upgrade zawsze jest realną korzyścią). Nowa akcja w petStore
+    `grantOrLevelCombatItem(id, level)` — bezwarunkowy setter (w przeciwieństwie do
+    `grantCombatItem`, no-op na duplikat), bo `rollBox()` już podjął decyzję nowy-vs-upgrade
+    na snapshocie w momencie losowania. `BoxReward` ma nowy wariant `{ type: 'combatItem' }`;
+    `BoxRevealModal.tsx` renderuje ikonę z `COMBAT_ITEMS[id].icons[level-1]`, napis "NOWY
+    PERK BOSSA!"/"PERK ULEPSZONY!" zależnie od `isUpgrade`. **Monety kupowanych skrzynek**
+    (sardine/silver/gold — NIE `DAILY_BOX`) zmienione z płaskich zakresów (były 3-12/10-30/
+    25-70, realnie 8-34% kosztu) na DOKŁADNIE 50%-300% WŁASNEGO `cost` skrzynki jak
+    zażądano (18-105/45-270/100-600) — czysto zmiana DANYCH w `LOOT_BOXES`, `rollBox()`'s
+    logika monet się nie zmienia, dalej czyta te same pola `coins.min/max`. UI: sekcja w
+    `app/pet.tsx` przemianowana z "Ekwipunek bojowy" na "Umiejętności bossów", napis w
+    victory modalu bossów (`boss-fight.tsx`, drop z nemesis) z "Nowy item bojowy" na "Nowa
+    umiejętność" — `combatItems.ts`'s wewnętrzny typ `CombatItemId`/nazwa pliku NIE
+    zmienione (zbyt szeroki refaktor na samą kosmetykę nazewnictwa UI). **Świadomie NIE
+    zrobione w tym PR**: drop z walki ze zwykłymi bossami kampanii/eventowymi (poza już
+    istniejącym `menaceClaim()` dla nemesis) — user wspomniał to tylko luźno ("czy coś
+    tam"), w przeciwieństwie do w pełni wyspecyfikowanej hierarchii skrzynek; wymaga osobnej
+    decyzji o stałych drop-rate i czy dotyczy WSZYSTKICH bossów kampanii (24) czy tylko
+    eventowych — flagowane w NEXT_STEPS.md do potwierdzenia zamiast zgadywania zakresu.
+    Testy: `petBoxes.test.ts` (5 nowych — strefa perków dla sardine/gold, preferUpgrade z
+    fallbackiem gdy nic do ulepszenia, brak-nic-do-przyznania spada do monet, domyślny
+    piąty parametr).
   - **SYSTEM EKWIPUNKU — `src/utils/gear.ts` (2026-08-19, W TRAKCIE, pełny plan +
     checklista kroków w `NEXT_STEPS.md` "SYSTEM EKWIPUNKU")** — TRZECI, osobny system
     itemów obok loot kampanii (`ownedItems`) i itemów bojowych (`combatItems.ts` powyżej):

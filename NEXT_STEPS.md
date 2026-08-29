@@ -3,6 +3,42 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 FEATURE: perki bossów (dawniej "itemy bojowe") dropowalne ze skrzynek sklepowych — NIEsprawdzone (2026-08-29)
+
+Część 2 tej samej wiadomości usera co nawyk auto-śledzony "Bez słodyczy" (patrz osobny PR/
+osobny wpis, ta sama wiadomość usera, ale zupełnie inna część kodu — brak nakładania się
+plików, oddzielone celowo na dwa PR-y): "te itemy bossów co miały
+być te pierwsze pierwsze co są w assets/itemybossy to wgle ich nie da się dropnąć... to są
+perki... które ogólnie nie są itemami tylko bardziej UMIEJĘTNOŚCIAMI więc tak bym je nazwał.
+te kupowane skrzynki zrobiłbym tak że można dropnąć BASIC ITEMY > STREAK FREEZE > COINY
+50-300%skrzynki > i TE ITEMY BOSSÓW". Pełny opis mechanizmu w ARCHITECTURE.md §9 ("Przemianowane
+na perki..."). W skrócie: `petBoxes.ts`'s `rollBox()` (skrzynki KUPOWANE w sklepie — drewniana/
+srebrna/złota + darmowa skrzynka dnia) w ogóle nie miał gałęzi na te itemy, mimo że dwie INNE,
+niezależne ścieżki (`openCrate()` z głaskania kotka, `menaceClaim()` z pokonania nemesis) już
+je dropowały — to dokładnie ta luka co user zgłosił. Nowe `combatItemChance` per skrzynka
+(sardine 0.02/silver 0.05/gold 0.08 — każde < `freezeChance` tej samej skrzynki), monety
+zmienione z płaskich zakresów na 50-300% kosztu skrzynki (18-105/45-270/100-600 zamiast starych
+3-12/10-30/25-70). UI: sekcja w `/pet` przemianowana z "Ekwipunek bojowy" na "Umiejętności
+bossów", napis w victory modalu bossów z "Nowy item bojowy" na "Nowa umiejętność". `tsc`/`jest`
+zielone (64/791 — 5 nowych testów strefy perków w `petBoxes.test.ts`). **Priorytet testu na
+urządzeniu**: Sklep → kup dowolną skrzynkę kilka razy (zwłaszcza złotą, ma najwyższy
+`combatItemChance`) — sprawdź że da się wylosować perk bossa (modal "NOWY PERK BOSSA!"/"PERK
+ULEPSZONY!"), i że pojawia się w `/pet` pod "Umiejętności bossów". Sprawdź też że kwoty monet
+ze skrzynek realnie mieszczą się w nowym, dużo wyższym zakresie (50-300% ceny skrzynki), nie w
+starym niskim.
+
+**Świadomie NIE zrobione — flagowane do potwierdzenia, nie zgadywane**: user wspomniał drop
+perków z walki ze zwykłymi bossami kampanii/eventowymi tylko luźno ("czy coś tam"), w
+przeciwieństwie do w pełni wyspecyfikowanej hierarchii skrzynek. Nemesis (`menaceClaim()`) już
+to ma od dawna (`MENACE_ITEM_DROP_CHANCE=0.08` w `seasonalEvents.ts`, niezmienione w tym PR) —
+ale zwykłe bossy kampanii (`claimQuestFight`, 22 bossów) i literalne "eventy" (`eventClaim`,
+`seasonalEvents.ts`) NIE dropują perków wcale. Zanim to dodać, trzeba ustalić z userem: czy
+dotyczy WSZYSTKICH bossów kampanii czy tylko trudniejszych/końcowych, jaki drop-rate (brak
+liczb od usera, jak przy dodge/mindcontrol/shield/thorn), i czy potrzebny osobny UI w
+`boss-fight.tsx`'s victory modalu dla tej ścieżki (dziś ten modal ma napis TYLKO dla
+`victory.itemDropped`, czyli nemesis) — realny, ale osobny kawałek pracy, nie doklejać
+milcząco do tego PR.
+
 ## 🆕 FEATURE: nawyk "Bez słodyczy" (i innych `AVOID_PRESETS`) — auto-śledzony w Nawykach — NIEsprawdzone (2026-08-29)
 
 User: "żeby w nawyku dodać że chcę nie jeść słodyczy (bo było w odliczaniu nie wiem czy
@@ -24,12 +60,9 @@ NIE zaliczony (czerwony/przerwana seria) BEZ ręcznego dotykania. Sprawdź też 
 "bez słodyczy" w Odliczaniu (jeśli user go ma) dalej działa niezależnie — to jest DODATKOWA
 ścieżka, nie migracja/usunięcie starej.
 
-**Część 2 tej samej wiadomości usera (osobny PR, w toku)**: itemy bossów z `assets/itemybossy`
-mają stać się dropowalnymi "perkami"/"umiejętnościami" — ze skrzynek sklepowych
-(drewniana/srebrna/złota) wg hierarchii BASIC ITEMY > STREAK FREEZE > COINY 50-300% kosztu
-skrzynki > PERKI BOSSÓW (najrzadsze), plus (user wspomniał tylko luźno, "czy coś tam") ewentualnie
-z walki z bossem/bossami eventowymi. Nie zaczęte w tym wpisie — patrz kolejny wpis w tym pliku
-gdy powstanie.
+**Część 2 tej samej wiadomości usera** — itemy bossów jako dropowalne "perki"/"umiejętności"
+ze skrzynek sklepowych — patrz osobny wpis "🆕 FEATURE: perki bossów..." wyżej (osobny PR,
+`claude/boss-perks-crates`, żeby nie mieszać dwóch niezależnych zmian w jednym PR).
 
 ## 🆕 BUG: własny tag na paragonie się duplikował + nie był od razu wybieralny gdzie indziej — NIEsprawdzone (2026-08-28)
 

@@ -1,10 +1,12 @@
 import { ImageSourcePropType } from 'react-native';
 
-// Katalog itemów bojowych (v4.1 — patrz memory boss_design.md „ITEMY BOJOWE"). Ikony
-// w assets/itemybossy/ (user dodał 2026-08-06). CZYSTO DEKLARATYWNY plik — nic z tego
-// jeszcze nie działa w walce (simulateFight), to osobny, kolejny krok integracji:
-// (1) ekwipunek w petStore (co gracz posiada/ma założone), (2) drop ze skrzynek,
-// (3) wpięcie efektów w pętlę rund. Na razie same dane + formuły, testowalne.
+// Katalog "perków"/"umiejętności" bossów (v4.1 — patrz memory boss_design.md „ITEMY
+// BOJOWE"; user 2026-08-29: "to ogólnie nie są itemy tylko bardziej UMIEJĘTNOŚCI"). Ikony
+// w assets/itemybossy/ (user dodał 2026-08-06). W PEŁNI WPIĘTE (ten komentarz był NIEAKTUALNY
+// aż do 2026-08-29 — twierdził że nic tu nie działa): (1) ekwipunek w petStore
+// (ownedCombatItems/equippedCombatItems), (2) drop ze skrzynek (openCrate() w petStore.ts,
+// menaceClaim() tamże, rollBox() w petBoxes.ts), (3) efekty wpięte w simulateFight (bosses.ts,
+// przez nazwane stałe/funkcje niżej — HEADSHOT_CHANCE, dodgeChanceAt() itd.).
 
 export type CombatItemId =
   | 'headshot' | 'heal' | 'dodge' | 'fire' | 'execute' | 'reflect' | 'mindcontrol' | 'shield' | 'thorn';

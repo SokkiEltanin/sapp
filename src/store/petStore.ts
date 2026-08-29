@@ -330,6 +330,7 @@ interface PetState {
   // ekwipunek itemów bojowych
   grantCombatItem: (id: CombatItemId) => void;                                  // z dropu skrzynki — poziom 1 (no-op jeśli już posiadany)
   upgradeCombatItem: (id: CombatItemId, cost: number, maxLevel: number) => boolean; // +1 poziom za monety, cap maxLevel
+  grantOrLevelCombatItem: (id: CombatItemId, level: number) => void;            // ze skrzynek sklepowych (rollBox 'combatItem') — bezwarunkowo ustawia poziom, decyzję nowy/upgrade podjął już rollBox()
   equipCombatItem: (id: CombatItemId) => boolean;                               // false = brak slotu lub nieposiadany
   unequipCombatItem: (id: CombatItemId) => void;
   grantGear: (itemId: string, rarity: GearRarity) => number;   // ze skrzynki/daily shopu; zwraca 0 gdy przyznano item, kwotę monet gdy duplikat (≥ tę rzadkość) skompensowano monetami zamiast go wyrzucić
@@ -817,6 +818,12 @@ export const usePetStore = create<PetState>()(
       },
       resetCatHp: () => set((s) => ({ catHp: CAT_BASE_MAX_HP + s.catMaxHpBonus + gearFlatHp(s.equippedGear, s.ownedGear) })),
       grantCombatItem: (id) => set((s) => s.ownedCombatItems[id] ? s : { ownedCombatItems: { ...s.ownedCombatItems, [id]: 1 } }),
+      // Skrzynki sklepowe (2026-08-29, patrz komentarz przy `combatItemChance` w petBoxes.ts)
+      // — `rollBox()` już zdecydował, na podstawie snapshotu `ownedCombatItems` w momencie
+      // losowania, czy to NOWY perk (level=1) czy ULEPSZENIE (level=obecny+1); tu tylko
+      // bezwarunkowo zapisujemy wynik, bez ponownego sprawdzania warunków — w przeciwieństwie
+      // do `grantCombatItem` (no-op na duplikat) to musi umieć nadpisać już posiadany poziom.
+      grantOrLevelCombatItem: (id, level) => set((s) => ({ ownedCombatItems: { ...s.ownedCombatItems, [id]: level } })),
       upgradeCombatItem: (id, cost, maxLevel) => {
         const s = get();
         if (!s._hydrated) return false;

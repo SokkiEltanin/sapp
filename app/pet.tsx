@@ -61,7 +61,7 @@ export default function Pet() {
   const { name, xp, coins, careTick, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes, petCat, affection, affectionDay, pendingCrates, ownedItems, claimDailyBox, dayClaims, buyItem, grantStartup, grantGear, addCoins, onboarded,
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
-    ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem,
+    ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem, grantOrLevelCombatItem,
     equippedGear, ownedGear } = usePetStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
@@ -185,13 +185,14 @@ export default function Pet() {
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyBoxReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, lvl.level);
+    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, lvl.level, ownedCombatItems);
     let dupeCoins: number | undefined;
     if (reward.type === 'color') buyItem(reward.colorId, 0);
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
     else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
+    else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     haptic.success();
     setBoxReveal({ box: DAILY_BOX, reward, dupeCoins });
   };
@@ -583,9 +584,11 @@ export default function Pet() {
           )}
         </View>
 
-        {/* ── Ekwipunek bojowy (scalone z pet-stats.tsx, 2026-08-19) ── */}
-        <Text style={s.section}>Ekwipunek bojowy ({equippedCombatItems.length}/{itemSlots} założone)</Text>
-        <Text style={s.blurb}>Losowany ze skrzynek z głaskania. Załóż do {itemSlots} naraz (rośnie z poziomem, max 6) — działają w każdej walce kampanii.</Text>
+        {/* ── Umiejętności bossów (scalone z pet-stats.tsx, 2026-08-19; przemianowane z
+            "ekwipunku bojowego" 2026-08-29, user: "te itemy bossów... ogólnie nie są itemami
+            tylko bardziej UMIEJĘTNOŚCIAMI więc tak bym je nazwał") ── */}
+        <Text style={s.section}>Umiejętności bossów ({equippedCombatItems.length}/{itemSlots} założone)</Text>
+        <Text style={s.blurb}>Najrzadszy łup ze skrzynek (głaskanie i sklep) oraz pokonania nemesis. Załóż do {itemSlots} naraz (rośnie z poziomem, max 6) — działają w każdej walce kampanii.</Text>
         <View style={{ gap: spacing[2], marginTop: spacing[2], width: '100%' }}>
           {sortedItemIds.map(id => {
             const def = COMBAT_ITEMS[id];

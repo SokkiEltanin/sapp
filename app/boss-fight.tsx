@@ -839,7 +839,7 @@ export default function BossFight() {
                 <Coins size={16} color="#FDE047" /><Text style={s.vReward}>{victory.coins} · +{victory.xp} XP</Text>
               </View>
               {victory.itemDropped && (
-                <Text style={s.vItemDrop}>🎁 Nowy item bojowy: {COMBAT_ITEMS[victory.itemDropped].name}!</Text>
+                <Text style={s.vItemDrop}>🎁 Nowa umiejętność: {COMBAT_ITEMS[victory.itemDropped].name}!</Text>
               )}
             </View>
           )}
