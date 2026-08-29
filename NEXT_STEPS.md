@@ -3,6 +3,34 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 FEATURE: nawyk "Bez słodyczy" (i innych `AVOID_PRESETS`) — auto-śledzony w Nawykach — NIEsprawdzone (2026-08-29)
+
+User: "żeby w nawyku dodać że chcę nie jeść słodyczy (bo było w odliczaniu nie wiem czy
+przeniosłeś bo nie dałeś znać a prosiłem)". Zapytany czy ma to być zwykły ręczny nawyk czy
+auto-śledzony jak licznik w Odliczaniu — wybrał **auto-śledzony**. Nowy `Habit.kind='avoid'` +
+`avoidKeyword` (ten sam format co `Counter.keyword`); dzień = done chyba że w dzienniku
+jedzenia (`useFoodStore.meals`) tego dnia jest pozycja pasująca do `matchesAvoid` (nazwa dania
+LUB nazwa składnika/`parts`) — wtedy broke, seria pęka, dokładnie jak licznik „bez X". Presety
+w formularzu tworzenia nawyku: "Bez słodyczy/fast foodów/alkoholu/energetyków" (z
+`AVOID_PRESETS` w `countersStore.ts` — te SAME cztery co w Odliczaniu, więc user dostaje od
+razu wszystkie cztery, nie tylko słodycze). W liście nawyków taki wpis jest NIEklikalny
+(kropkowany checkbox + odznaka "auto") — ręczne odznaczenie i tak zostałoby nadpisane przy
+najbliższym auto-sync (po każdej zmianie `meals`, natychmiast, nie dopiero przy wejściu na
+ekran). Pełny opis mechanizmu w ARCHITECTURE.md (sekcja "Nawyki/liczniki"). `tsc`/`jest`
+zielone (64/786 — 7 nowych testów `computeAvoidCounts` w `habits.test.ts`). **Priorytet testu
+na urządzeniu**: Nawyki → dodaj → wybierz preset "Bez słodyczy" → zjedz i zaloguj coś
+pasującego (np. "czekolada") w Co zjadłem → wróć do Nawyków, dzień powinien pokazać się jako
+NIE zaliczony (czerwony/przerwana seria) BEZ ręcznego dotykania. Sprawdź też że stary licznik
+"bez słodyczy" w Odliczaniu (jeśli user go ma) dalej działa niezależnie — to jest DODATKOWA
+ścieżka, nie migracja/usunięcie starej.
+
+**Część 2 tej samej wiadomości usera (osobny PR, w toku)**: itemy bossów z `assets/itemybossy`
+mają stać się dropowalnymi "perkami"/"umiejętnościami" — ze skrzynek sklepowych
+(drewniana/srebrna/złota) wg hierarchii BASIC ITEMY > STREAK FREEZE > COINY 50-300% kosztu
+skrzynki > PERKI BOSSÓW (najrzadsze), plus (user wspomniał tylko luźno, "czy coś tam") ewentualnie
+z walki z bossem/bossami eventowymi. Nie zaczęte w tym wpisie — patrz kolejny wpis w tym pliku
+gdy powstanie.
+
 ## 🆕 BUG: własny tag na paragonie się duplikował + nie był od razu wybieralny gdzie indziej — NIEsprawdzone (2026-08-28)
 
 User ze screenshotem ekranu "Wydatek": "jak dodaje wlasny tag na paragonie ie to om soe

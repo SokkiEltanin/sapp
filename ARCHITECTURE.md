@@ -2563,6 +2563,30 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     `Promise.all(dates.map(getCounts))`, żeby szersze okno nie kosztowało 371 sekwencyjnych
     odczytów AsyncStorage przy każdym mouncie hooka. Testy w `habits.test.ts`
     (`getCountsRange`) pokrywają batch/legacy-fallback/okno >30 dni.
+  - **Nawyk `kind: 'avoid'` — auto-śledzony z dziennika jedzenia, jak licznik „bez X" ale ze
+    streakiem/kalendarzem (2026-08-29)** — user: "żeby w nawyku dodać że chcę nie jeść
+    słodyczy (bo było w odliczaniu... a prosiłem)". Zamiast osobnej ścieżki liczenia (co
+    znaczyłoby dotykanie `getStreak`/`isDoneOrFrozen`/`dayState` — 3x już pękały, patrz bugi
+    wyżej), feature jest CAŁKOWICIE PRZEZROCZYSTY dla istniejącej logiki: po prostu zapisuje
+    poprawną wartość do TEGO SAMEGO storage (`habits_cnt_<date>`) co każdy inny nawyk, więc
+    streak/freeze/tygodniowy cel/`habit-year.tsx` (czyta AsyncStorage bezpośrednio, nie przez
+    hook) działają bez ŻADNEJ zmiany. `Habit.kind='avoid'` + `avoidKeyword` (ten sam format co
+    `Counter.keyword`, `AVOID_PRESETS` w `countersStore.ts`) → `computeAvoidCounts` (PURE,
+    `habits.ts`) liczy dla każdego dnia w oknie: dzień = done(1) chyba że w `foodStore.meals`
+    tego dnia jest pozycja pasująca do `matchesAvoid` (nazwa dania LUB nazwa `parts` —
+    składnika) → wtedy broke(0), CZYLI dzień staje się nieodznaczony/przerywa serię, dokładnie
+    jak licznik „bez X" w Odliczaniu. `persistAvoidCounts` zapisuje TYLKO dni, które faktycznie
+    się zmieniły (nie całe okno na każdy render) przez batchowy `AsyncStorage.multiSet`.
+    `useHabits.ts`'s `load()` woła to po każdym odczycie `getCountsRange`, i cały efekt jest
+    keyowany na `meals` z `useFoodStore` — więc zalogowanie/edycja/usunięcie posiłku odświeża
+    nawyk NATYCHMIAST, nie dopiero przy następnym wejściu na ekran. `app/habits.tsx`: preset
+    „Bez {słodyczy/fast foodów/...}" w formularzu tworzenia (z `AVOID_PRESETS`), typ zawsze
+    wymuszony na `check` (avoid nie ma sensu jako licznik), notatka zamiast przełącznika
+    Tak/Nie↔Licznik ("Śledzone automatycznie..."); w liście `HabitRow` avoid-nawyk renderuje
+    kropkowany, NIEklikalny checkbox + odznakę "auto" zamiast normalnego tap-to-toggle — ręczne
+    odznaczenie i tak zostałoby nadpisane przy następnym auto-sync. Testy: `habits.test.ts`
+    (`computeAvoidCounts` — done/broke/parts-match/nie nadpisuje innych nawyków/no-op gdy
+    wartość już poprawna).
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 - **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/
