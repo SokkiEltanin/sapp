@@ -90,3 +90,44 @@ describe('petBoxes — rollBox (kaskada stref prawdopodobieństwa)', () => {
     expect(spy).toHaveBeenCalledTimes(2); // nie 3 — ternary pomija rzut o kwotę przy jackpocie
   });
 });
+
+// 2026-08-29, user: "te itemy bossów... to są bardziej UMIEJĘTNOŚCI... BASIC ITEMY > STREAK
+// FREEZE > COINY 50-300% > TE ITEMY BOSSÓW" — nowa, najrzadsza strefa `combatItemChance`.
+// Progi: sardine combatItemCut=0.42 (gearCut 0.40 + 0.02), gold combatItemCut=1.04 (gearCut
+// 0.96 + 0.08, w praktyce do 1.0 bo Math.random()<1).
+describe('petBoxes — rollBox strefa PERKÓW BOSSÓW (combatItemChance, 2026-08-29)', () => {
+  afterEach(() => jest.restoreAllMocks());
+  const sardine = boxById('sardine');
+  const gold = boxById('gold');
+
+  test('sardine/silver (preferUpgrade=false): zawsze NOWY nieposiadany perk na poziomie 1', () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.41).mockReturnValueOnce(0); // sardine: [0.40, 0.42)
+    const reward = rollBox(sardine, [], [], 1, {});
+    expect(reward).toEqual({ type: 'combatItem', itemId: 'headshot', name: 'Strzał w Łeb', level: 1, isUpgrade: false, rarity: 'rare' });
+  });
+
+  test('gold (preferUpgrade=true): PREFERUJE ulepszenie już posiadanego nieMAXowanego perku', () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.97).mockReturnValueOnce(0); // gold: [0.96, 1.04)
+    const reward = rollBox(gold, [], [], 1, { dodge: 1 }); // dodge maxLevel=4, więc jest upgradowalny
+    expect(reward).toEqual({ type: 'combatItem', itemId: 'dodge', name: 'Unik', level: 2, isUpgrade: true, rarity: 'legendary' });
+  });
+
+  test('gold, brak upgradowalnych (jedyny posiadany już na maksie) → fallback do NOWEGO nieposiadanego perku', () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.97).mockReturnValueOnce(0);
+    const reward = rollBox(gold, [], [], 1, { headshot: 1 }); // headshot maxLevel=1 — nic do ulepszenia
+    expect(reward).toEqual({ type: 'combatItem', itemId: 'heal', name: 'Uzdrowienie', level: 1, isUpgrade: false, rarity: 'legendary' });
+  });
+
+  test('wszystko posiadane NA MAKSIE → strefa nic nie daje, spada do monet (jak strefa ekwipunku w analogicznej sytuacji)', () => {
+    const allMaxed = { headshot: 1, heal: 1, dodge: 4, fire: 3, execute: 3, reflect: 4, mindcontrol: 1, shield: 1, thorn: 1 };
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.41).mockReturnValueOnce(0.99).mockReturnValueOnce(0); // sardine: strefa perków, potem coins (bez jackpota, min)
+    const reward = rollBox(sardine, [], [], 1, allMaxed);
+    expect(reward).toEqual({ type: 'coins', coins: sardine.coins.min, rarity: 'basic' });
+  });
+
+  test('brak przekazanego ownedCombatItems (domyślne {}) — działa tak samo jak pusty obiekt', () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.41).mockReturnValueOnce(0);
+    const reward = rollBox(sardine, [], [], 1); // 5. argument pominięty
+    expect(reward.type).toBe('combatItem');
+  });
+});

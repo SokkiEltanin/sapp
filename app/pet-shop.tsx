@@ -79,7 +79,8 @@ export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup,
-    claimDailyBox, dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear } = usePetStore();
+    claimDailyBox, dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
+    ownedCombatItems, grantOrLevelCombatItem } = usePetStore();
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
@@ -113,13 +114,14 @@ export default function PetShop() {
     if (coins < box.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${box.cost}`); return; }
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
-      const reward = rollBox(box, SHOP_COLORS, ownedItems, petLevel);
+      const reward = rollBox(box, SHOP_COLORS, ownedItems, petLevel, ownedCombatItems);
       let dupeCoins: number | undefined;
       if (reward.type === 'color') buyItem(reward.colorId, 0);
       else if (reward.type === 'startup') grantStartup(reward.startupId);
       else if (reward.type === 'coins') addCoins(reward.coins);
       else if (reward.type === 'freeze') addFreezes(reward.count);
       else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
+      else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
       haptic.success();
       setReveal({ box, reward, dupeCoins });
     }, 'Otwórz');
@@ -130,13 +132,14 @@ export default function PetShop() {
   const onDailyBox = () => {
     haptic.tap();
     if (!dailyReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, petLevel);
+    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, petLevel, ownedCombatItems);
     let dupeCoins: number | undefined;
     if (reward.type === 'color') buyItem(reward.colorId, 0);
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
     else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
+    else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     haptic.success();
     setReveal({ box: DAILY_BOX, reward, dupeCoins });
   };

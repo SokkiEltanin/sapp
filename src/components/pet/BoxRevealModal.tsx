@@ -4,6 +4,7 @@ import { Snowflake } from 'lucide-react-native';
 import { CRATE_META } from '@/utils/crates';
 import { BoxReward } from '@/utils/petBoxes';
 import { RARITY_META, gearById } from '@/utils/gear';
+import { itemById } from '@/utils/combatItems';
 import { haptic } from '@/utils/haptics';
 
 // Cząstka lecąca od (sx,sy) do (ex,ey) — monety/iskry na zewnątrz, ❄ z boków do środka.
@@ -98,7 +99,13 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
   const cardScale = burst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
   const isDupe = reward?.type === 'gear' && !!dupeCoins;
-  const rewardTitle = isDupe ? 'MASZ JUŻ TEN PRZEDMIOT' : reward?.type === 'color' ? 'NOWY KOLOR!' : reward?.type === 'startup' ? 'NOWY STARTUP!' : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII' : reward?.type === 'gear' ? 'EKWIPUNEK!' : 'MONETY';
+  const rewardTitle = isDupe ? 'MASZ JUŻ TEN PRZEDMIOT'
+    : reward?.type === 'color' ? 'NOWY KOLOR!'
+    : reward?.type === 'startup' ? 'NOWY STARTUP!'
+    : reward?.type === 'freeze' ? 'ZAMROŻENIE SERII'
+    : reward?.type === 'gear' ? 'EKWIPUNEK!'
+    : reward?.type === 'combatItem' ? (reward.isUpgrade ? 'PERK ULEPSZONY!' : 'NOWY PERK BOSSA!')
+    : 'MONETY';
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
@@ -149,6 +156,12 @@ export default function BoxRevealModal({ visible, reward, boxColor, boxEmoji, du
                         ? <Image source={g.icon} style={[st.gearImg, { borderColor: meta.color }]} resizeMode="contain" />
                         : <Text style={{ fontSize: 40 }}>🎁</Text>; })()}
                       <Text style={st.rewardName}>{reward.name}</Text>
+                    </>
+                  ) : reward?.type === 'combatItem' ? (
+                    <>
+                      <Image source={itemById(reward.itemId).icons[Math.min(reward.level, itemById(reward.itemId).icons.length) - 1]}
+                        style={[st.gearImg, { borderColor: meta.color }]} resizeMode="contain" />
+                      <Text style={st.rewardName}>{reward.name} {reward.isUpgrade ? `Lv.${reward.level}` : ''}</Text>
                     </>
                   ) : (
                     <Text style={st.coins}>+{reward?.coins} 🪙</Text>
