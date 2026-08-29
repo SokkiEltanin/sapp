@@ -8,7 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft, Plus, Minus, Droplets, Dumbbell, BookOpen,
   Moon, Zap, Heart, Sun, Bike, Check, Trash2, Flame,
-  CalendarDays, Bell, ChevronUp, ChevronDown, LayoutGrid,
+  CalendarDays, Bell, ChevronUp, ChevronDown, LayoutGrid, Cookie, UtensilsCrossed,
 } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -17,6 +17,7 @@ import { useHabits, DayState } from '@/hooks/useHabits';
 
 const ICE = '#7DD3FC';   // dzień uratowany zamrożeniem serii = niebieski
 import { stepFor } from '@/utils/habits';
+import { AVOID_PRESETS } from '@/store/countersStore';
 import { HABIT_COLORS, HABIT_ICONS, Habit, HabitType } from '@/types';
 import { colors, spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -35,6 +36,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   heart:       Heart,
   sun:         Sun,
   bike:        Bike,
+  cookie:      Cookie,   // 'avoid' presets (2026-08-29) — not in HABIT_ICONS (icon picker
+                          // grid stays the curated 8), only used by the auto-tracked presets.
 };
 
 function HabitIcon({ name, size, color }: { name: string; size: number; color: string }) {
@@ -135,6 +138,11 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
               <Text style={hr.reminderText}>{habit.reminderTime}</Text>
             </View>
           )}
+          {habit.kind === 'avoid' && (
+            <View style={hr.autoBadge}>
+              <Text style={hr.autoBadgeText}>auto</Text>
+            </View>
+          )}
         </View>
 
         {/* Progress bar for count habits — a taller, blue "water level" for water */}
@@ -165,7 +173,14 @@ function HabitRow({ habit, done, count, streak, last7, onToggle, onIncrement, on
         <Trash2 size={13} color={colors.text.muted} />
       </TouchableOpacity>
 
-      {isCount ? (
+      {habit.kind === 'avoid' ? (
+        <View style={[hr.check, hr.autoCheck, done && { backgroundColor: habit.color + '22', borderColor: habit.color + '55' }]}>
+          {done
+            ? <Check size={14} color={habit.color} strokeWidth={3} />
+            : <View style={[hr.checkInner, { borderColor: colors.accent.red + '60' }]} />
+          }
+        </View>
+      ) : isCount ? (
         <View style={hr.countControls}>
           <PressableScale onPress={onIncrement} style={[hr.countBtn, step > 1 && hr.countBtnWide, { borderColor: habit.color + '60' }]}>
             {step > 1
@@ -224,6 +239,13 @@ const makeHr = (c: any) => StyleSheet.create({
   },
   reminderText: { fontSize: 9, fontWeight: '600', color: c.accent.purple },
 
+  autoBadge: {
+    backgroundColor: c.border.subtle,
+    borderRadius: radius.full, paddingHorizontal: 5, paddingVertical: 2,
+    borderWidth: 1, borderColor: c.border.default,
+  },
+  autoBadgeText: { fontSize: 9, fontWeight: '600', color: c.text.muted },
+
   progressWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   progressTrack: {
     flex: 1, height: 8, borderRadius: 4,
@@ -241,6 +263,7 @@ const makeHr = (c: any) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   checkInner: { width: 18, height: 18, borderRadius: 9, borderWidth: 2 },
+  autoCheck: { borderStyle: 'dashed' },
 
   countControls: { alignItems: 'center', gap: 2 },
   countBtn: {
@@ -346,18 +369,28 @@ const FREQ_OPTIONS: { label: string; value: number }[] = [
 
 const HABIT_PRESETS: Array<{
   title: string; type: HabitType; icon: string; color: string;
-  dailyGoal?: number; unit?: string; reminderHour?: number; reminderMin?: number; kind?: 'water';
+  dailyGoal?: number; unit?: string; reminderHour?: number; reminderMin?: number;
+  kind?: 'water' | 'avoid'; avoidKeyword?: string;
 }> = [
   { title: 'Woda',       type: 'count', icon: 'droplets',  color: '#60A5FA', dailyGoal: 8, unit: 'szkl.', kind: 'water' },
   { title: 'Ruch',       type: 'check', icon: 'dumbbell',  color: '#34D399' },
   { title: 'Czytanie',   type: 'check', icon: 'book-open', color: '#FBBF24' },
   { title: 'Sen',        type: 'check', icon: 'moon',      color: '#C084FC', reminderHour: 22, reminderMin: 0 },
   { title: 'Medytacja',  type: 'check', icon: 'heart',     color: '#F472B6' },
+  // 'avoid' — auto-tracked z "Co zjadłem", nie ręcznie odznaczane (2026-08-29, user: "żeby w
+  // nawyku dodać że chcę nie jeść słodyczy", bo dotąd to była TYLKO opcja w Odliczaniu).
+  // Ten sam katalog słów-kluczy co counters.tsx (AVOID_PRESETS) — jedna definicja "co to jest
+  // słodycz" dla obu ekranów, żeby się nie rozjechały.
+  ...AVOID_PRESETS.map(p => ({
+    title: `Bez ${p.label}`, type: 'check' as HabitType, icon: 'cookie', color: '#F87171',
+    kind: 'avoid' as const, avoidKeyword: p.keyword,
+  })),
 ];
 
 interface HabitFormData {
   title: string; color: string; icon: string; reminderTime?: string;
-  type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number; kind?: 'water';
+  type: HabitType; dailyGoal?: number; unit?: string; weeklyTarget?: number;
+  kind?: 'water' | 'avoid'; avoidKeyword?: string;
 }
 
 function HabitFormModal({ visible, onClose, onSave, editing }: {
@@ -380,7 +413,8 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
   const [reminderHour, setRemH]       = useState(20);
   const [reminderMin, setRemM]        = useState(0);
   const [weeklyTarget, setWeeklyTarget] = useState(7);
-  const [kind, setKind]               = useState<'water' | undefined>(undefined);
+  const [kind, setKind]               = useState<'water' | 'avoid' | undefined>(undefined);
+  const [avoidKeyword, setAvoidKeyword] = useState<string | undefined>(undefined);
 
   const applyPreset = (p: typeof HABIT_PRESETS[number]) => {
     haptic.tap();
@@ -389,6 +423,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     setSelIcon(p.icon);
     setSelColor(p.color);
     setKind(p.kind);
+    setAvoidKeyword(p.avoidKeyword);
     if (p.type === 'count') {
       setGoal(String(p.dailyGoal ?? 8));
       setUnit(p.unit ?? 'szkl.');
@@ -418,6 +453,7 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     }
     setWeeklyTarget(editing?.weeklyTarget ?? 7);
     setKind(editing?.kind);
+    setAvoidKeyword(editing?.avoidKeyword);
     const rt = editing?.reminderTime;
     if (rt) {
       const [h, m] = rt.split(':').map(Number);
@@ -431,9 +467,13 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
     if (!title.trim()) return;
     haptic.success();
     const rt = reminderOn ? `${pad2(reminderHour)}:${pad2(reminderMin)}` : undefined;
-    const goalN = type === 'count' ? (parseInt(goal) || 1) : undefined;
-    const unitVal = type === 'count' ? (unitCustom ? customUnit.trim() : unit) : undefined;
-    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined, kind });
+    // 'avoid' habits are always binary done/broke (computeAvoidCounts writes 0 or 1) — force
+    // type:'check' regardless of the toggle above, so a stray "Licznik" + goal>1 combo can
+    // never make the streak unreachable (want=1 would never hit a dailyGoal>1).
+    const effType = kind === 'avoid' ? 'check' : type;
+    const goalN = effType === 'count' ? (parseInt(goal) || 1) : undefined;
+    const unitVal = effType === 'count' ? (unitCustom ? customUnit.trim() : unit) : undefined;
+    onSave({ title: title.trim(), color: selColor, icon: selIcon, reminderTime: rt, type: effType, dailyGoal: goalN, unit: unitVal || undefined, weeklyTarget: weeklyTarget < 7 ? weeklyTarget : undefined, kind, avoidKeyword });
     onClose();
   };
 
@@ -469,18 +509,28 @@ function HabitFormModal({ visible, onClose, onSave, editing }: {
           style={am.input} autoFocus returnKeyType="done" onSubmitEditing={handleSave}
         />
 
-        {/* Type */}
-        <Text style={am.sectionLabel}>Typ śledzenia</Text>
-        <View style={am.typeRow}>
-          <PressableScale onPress={() => setType('check')} style={[am.typePill, type === 'check' && am.typePillActive]}>
-            <Check size={13} color={type === 'check' ? colors.bg.primary : colors.text.muted} />
-            <Text style={[am.typePillText, type === 'check' && am.typePillTextActive]}>Tak / Nie</Text>
-          </PressableScale>
-          <PressableScale onPress={() => setType('count')} style={[am.typePill, type === 'count' && am.typePillActive]}>
-            <Droplets size={13} color={type === 'count' ? colors.bg.primary : colors.text.muted} />
-            <Text style={[am.typePillText, type === 'count' && am.typePillTextActive]}>Licznik</Text>
-          </PressableScale>
-        </View>
+        {/* Type — hidden dla 'avoid': zawsze binarny done/broke, liczony automatycznie
+            z "Co zjadłem" (patrz handleSave), pokazanie "Licznik" tylko by myliło. */}
+        {kind === 'avoid' ? (
+          <View style={am.avoidNote}>
+            <UtensilsCrossed size={13} color={colors.text.muted} />
+            <Text style={am.avoidNoteText}>Śledzone automatycznie z „Co zjadłem" — bez ręcznego odznaczania.</Text>
+          </View>
+        ) : (
+          <>
+            <Text style={am.sectionLabel}>Typ śledzenia</Text>
+            <View style={am.typeRow}>
+              <PressableScale onPress={() => setType('check')} style={[am.typePill, type === 'check' && am.typePillActive]}>
+                <Check size={13} color={type === 'check' ? colors.bg.primary : colors.text.muted} />
+                <Text style={[am.typePillText, type === 'check' && am.typePillTextActive]}>Tak / Nie</Text>
+              </PressableScale>
+              <PressableScale onPress={() => setType('count')} style={[am.typePill, type === 'count' && am.typePillActive]}>
+                <Droplets size={13} color={type === 'count' ? colors.bg.primary : colors.text.muted} />
+                <Text style={[am.typePillText, type === 'count' && am.typePillTextActive]}>Licznik</Text>
+              </PressableScale>
+            </View>
+          </>
+        )}
 
         {/* Count settings */}
         {type === 'count' && (
@@ -608,6 +658,8 @@ const makeAm = (c: any) => StyleSheet.create({
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: c.border.subtle, alignSelf: 'center', marginBottom: spacing[1] },
   heading: { fontSize: 18, fontWeight: '800', color: c.text.primary, marginBottom: spacing[1] },
   sectionLabel: { fontSize: 10, fontWeight: '600', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: spacing[1] },
+  avoidNote: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], marginTop: spacing[1] },
+  avoidNoteText: { flex: 1, fontSize: 12, color: c.text.muted, lineHeight: 16 },
   input: {
     backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default,
     paddingHorizontal: spacing[4], paddingVertical: spacing[3], fontSize: 15, color: c.text.primary,

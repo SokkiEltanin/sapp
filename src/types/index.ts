@@ -382,7 +382,14 @@ export interface Habit {
   color: string;
   icon: HabitIcon | string;
   type?: HabitType;        // default 'check'
-  kind?: 'water';          // special habit fed by Health Connect hydration
+  kind?: 'water' | 'avoid'; // 'water' = fed by Health Connect; 'avoid' = auto-tracked from
+                            // "Co zjadłem" (see avoidKeyword) — day counts as done unless a
+                            // matching food was logged, exactly like the auto counters in
+                            // countersStore.ts (2026-08-29, user: "żeby w nawyku dodać że
+                            // chcę nie jeść słodyczy" — same avoid-tracking, but as a habit
+                            // with a streak/calendar instead of a standalone counter).
+  avoidKeyword?: string;   // 'avoid' only: '|'-separated keywords, same format/matcher as
+                            // Counter.keyword (matchesAvoid in countersStore.ts)
   dailyGoal?: number;      // for count type (e.g. 8 glasses)
   step?: number;           // amount added per tap (e.g. 250 for a glass of water); default 1
   unit?: string;           // e.g. 'szkl.', 'ml', 'min'

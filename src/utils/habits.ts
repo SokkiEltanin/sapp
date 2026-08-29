@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '@/types';
+import { matchesAvoid } from '@/store/countersStore';
 
 const HABITS_KEY = 'habits_list';
 const cntKey    = (date: string) => `habits_cnt_${date}`;
@@ -79,6 +80,80 @@ export async function getCountsRange(dates: string[]): Promise<Record<string, Re
     });
   }
   return out;
+}
+
+// Batched counterpart to `getCountsRange` — writes many days in one native call
+// (AsyncStorage.multiSet) instead of N sequential `setCounts`. Used by `persistAvoidCounts`
+// below, which can touch many days at once the first time an 'avoid' habit is added (backfill
+// across the whole loaded window) or none at all on a normal day.
+async function setCountsRange(entries: [date: string, counts: Record<string, number>][]): Promise<void> {
+  if (!entries.length) return;
+  try {
+    await AsyncStorage.multiSet(entries.map(([date, counts]) => [cntKey(date), JSON.stringify(counts)]));
+  } catch {}
+}
+
+// ── 'avoid' habits — auto-tracked from the food log, no manual taps ────────────
+// (2026-08-29, user: "żeby w nawyku dodać że chcę nie jeść słodyczy" — the SAME auto
+// "days without X" tracking the counters screen already has (`matchesAvoid` in
+// countersStore.ts), but living as a HABIT with its own streak/calendar instead of a
+// standalone counter.) A day counts as done UNLESS a matching food was logged that day —
+// mirrors habit-year.tsx's counter branch (`matchDays.has(ds) ? 'broke' : 'done'`), so a day
+// with nothing logged yet (including today, still in progress) reads as clean until proven
+// otherwise, exactly like the counter it's modeled on.
+type MatchMeal = { date?: string; items?: { name?: string; parts?: { name?: string }[] }[] };
+
+function brokenDaysFor(keyword: string, meals: MatchMeal[]): Set<string> {
+  const set = new Set<string>();
+  for (const m of meals) {
+    const day = (m.date ?? '').slice(0, 10);
+    if (!day) continue;
+    const names = (m.items ?? [])
+      .flatMap((it) => [it?.name, ...((it?.parts ?? []).map((p) => p?.name))])
+      .filter(Boolean).join(' ');
+    if (matchesAvoid(names, keyword)) set.add(day);
+  }
+  return set;
+}
+
+// PURE (no I/O, easily testable) — given the ALREADY-LOADED `existing` counts for `dates`
+// (whatever useHabits.ts's own getCountsRange call returned, reused rather than re-fetched),
+// computes the correct value for every 'avoid' habit on every date and returns BOTH the full
+// merged map (for immediate React state) and just the days that actually changed (so the
+// caller only persists what's new — usually 0 days, or all of them the very first time an
+// 'avoid' habit is added).
+export function computeAvoidCounts(
+  habits: Habit[],
+  meals: MatchMeal[],
+  dates: string[],
+  existing: Record<string, Record<string, number>>,
+): { merged: Record<string, Record<string, number>>; changed: [string, Record<string, number>][] } {
+  const avoidHabits = habits.filter((h) => h.kind === 'avoid' && h.avoidKeyword);
+  if (avoidHabits.length === 0) return { merged: existing, changed: [] };
+  const brokenByKeyword = new Map<string, Set<string>>();
+  for (const h of avoidHabits) {
+    if (!brokenByKeyword.has(h.avoidKeyword!)) brokenByKeyword.set(h.avoidKeyword!, brokenDaysFor(h.avoidKeyword!, meals));
+  }
+  const merged: Record<string, Record<string, number>> = { ...existing };
+  const changed: [string, Record<string, number>][] = [];
+  for (const date of dates) {
+    const dayCounts = { ...(existing[date] ?? {}) };
+    let dirty = false;
+    for (const h of avoidHabits) {
+      const broke = brokenByKeyword.get(h.avoidKeyword!)!.has(date);
+      const want = broke ? 0 : 1;
+      if ((dayCounts[h.id] ?? 0) !== want) { dayCounts[h.id] = want; dirty = true; }
+    }
+    if (dirty) { merged[date] = dayCounts; changed.push([date, dayCounts]); }
+  }
+  return { merged, changed };
+}
+
+// Thin I/O wrapper — persists whatever `computeAvoidCounts` flagged as changed, so the same
+// `habits_cnt_<date>` storage every other habit uses stays correct for OTHER readers too
+// (habit-year.tsx reads it directly, not through useHabits.ts).
+export async function persistAvoidCounts(changed: [string, Record<string, number>][]): Promise<void> {
+  await setCountsRange(changed);
 }
 
 // The single water habit fed by Health Connect hydration: the kind:'water' one,

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Habit } from '@/types';
-import { getHabits, saveHabits, getCounts, getCountsRange, setCounts, stepFor } from '@/utils/habits';
+import { getHabits, saveHabits, getCounts, getCountsRange, setCounts, stepFor, computeAvoidCounts, persistAvoidCounts } from '@/utils/habits';
 import { useHabitsSync } from '@/store/habitsSync';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
+import { useFoodStore } from '@/store/foodStore';
 import { notificationsService } from '@/services/notificationsService';
 
 function applyReminder(habit: Habit) {
@@ -82,6 +83,10 @@ export function useHabits() {
   const today = todayStr();
   const syncVersion = useHabitsSync((s) => s.version);
   const bump = useHabitsSync((s) => s.bump);
+  // 'avoid' habits (auto-tracked from "Co zjadłem", see computeAvoidCounts) need the food
+  // log to compute — re-syncing whenever it changes keeps e.g. "nie jem słodyczy" current the
+  // moment a sweet gets logged, not just on next screen mount.
+  const meals = useFoodStore((s) => s.meals);
 
   // Zamrożenia serii — dzień zamrożony liczy się jako zaliczony.
   const frozen      = useStreakFreezeStore((s) => s.frozen);
@@ -106,14 +111,22 @@ export function useHabits() {
       // multiGet-batched (getCountsRange), nie 371 pojedynczych getCounts() — patrz komentarz
       // przy LOAD_WINDOW_DAYS wyżej.
       const map    = await getCountsRange(dates);
+      // 'avoid' habits recompute their own days from the food log — reuses the SAME `map`
+      // just read above (no second storage round-trip), overrides only the habit(s) that are
+      // kind:'avoid' (no-op fast path when there are none), and persists only what changed.
+      const { merged, changed } = computeAvoidCounts(list, meals, dates, map);
       setHabits(list);
-      setComp(map);
+      setComp(merged);
+      if (changed.length) persistAvoidCounts(changed).catch(() => {});
     } finally {
       setIsLoading(false);
     }
-  }, [today]);
+  }, [today, meals]);
 
-  useEffect(() => { load(); }, []);
+  // Loads on mount AND re-syncs whenever the food log changes (a meal logged/edited/
+  // deleted), so an 'avoid' habit reflects it immediately — not just on next screen mount.
+  // `load()` is cheap/idempotent, so covering both triggers with one effect is safe.
+  useEffect(() => { load(); }, [meals]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Another instance mutated → re-read the list + today's counts (cheap) so a
   // deleted habit disappears everywhere, not just on the screen that deleted it.
