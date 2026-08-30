@@ -59,7 +59,7 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
   // dokladnosci") — ta sama zmiana co w pet.tsx, żeby raport zgadzał się z tym co user widzi
   // na ekranie Pupila.
   lines.push(`Próby ataku/dzień: ${attempts}${bonuses.energyMult > 0 ? ` (+${(bonuses.energyMult * 100).toFixed(1)}% z łupu)` : ''}`);
-  lines.push(`Sloty na itemy bojowe: ${slots}`);
+  lines.push(`Sloty na umiejętności bossów: ${slots}`);
   if (bonuses.dodge > 0 || bonuses.crit > 0) {
     lines.push(`Bonusy z łupu bossów: +${(bonuses.dodge * 100).toFixed(1)}% unik, +${(bonuses.crit * 100).toFixed(1)}% kryt`);
   }
@@ -90,7 +90,7 @@ export function buildBossProgressReport(s: ProgressReportInput, logLimit = 30): 
   lines.push('');
 
   const ownedCombatIds = (Object.keys(s.ownedCombatItems) as CombatItemId[]).filter(id => s.ownedCombatItems[id]);
-  lines.push(`ITEMY BOJOWE (${ownedCombatIds.length} posiadanych):`);
+  lines.push(`UMIEJĘTNOŚCI BOSSÓW (${ownedCombatIds.length} posiadanych):`);
   if (ownedCombatIds.length === 0) lines.push('  (brak)');
   for (const id of ownedCombatIds) {
     const def = COMBAT_ITEMS[id];

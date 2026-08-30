@@ -3,6 +3,45 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 POLISH: nemesis (`menaceClaim`) dostał fallback-na-upgrade jak reszta systemu perków — NIEsprawdzone (2026-08-29)
+
+User: "dokończmy te perki (co były itemybossow) żeby były doszlifowane" — zapytany czy
+rozszerzyć drop na zwykłych/eventowych bossów kampanii, wybrał **zostaw jak jest** (tylko
+skrzynki + nemesis, bez zmian zakresu). Zamiast tego doszlifowana ISTNIEJĄCA ścieżka: pokonanie
+nemesis (`menaceClaim()`, `MENACE_ITEM_DROP_CHANCE=8%`) miało TYLKO gałąź "nowy nieposiadany
+perk" — po skompletowaniu wszystkich 9 perków (nawet na poziomie 1) ta szansa była TRWALE
+martwa, mimo że nemesis to powtarzalny boss (nie jednorazowy jak kampania). Teraz fallback na
+darmowy +1 poziom już posiadanego, nie-na-maksie perku — ten sam wzorzec co `openCrate()`
+(skrzynka z głaskania) już miał. Zmieniony kontrakt `menaceClaim()` (zwraca teraz
+`{itemDropped, itemLeveledUp} | null` zamiast samego `CombatItemId | null`), victory modal
+bossów dostał napis "⬆️ {nazwa} +1 poziom" obok "🎁 Nowa umiejętność". Przy okazji doczyszczone
+przeoczone miejsca z rename na "perki"/"umiejętności" (poprzedni PR #112 nie złapał wszystkiego):
+`CrateModal.tsx` (reveal darmowej skrzynki) i `bossProgressReport.ts` (eksportowalny raport
+stanu) dalej mówiły "item(y) bojowy/e". Pełny opis w ARCHITECTURE.md §9. `tsc`/`jest` zielone
+(64/791, bez nowych testów — `menaceClaim`/`openCrate` to store actions, w tym repo testowane
+tylko wydzielone czyste funkcje, ten sam brak pokrycia co reszta zestawu). **Priorytet testu na
+urządzeniu**: jeśli masz już wszystkie 9 perków (albo da się to szybko osiągnąć w dev/testowym
+stanie) — pokonaj nemesis kilka razy, sprawdź że czasem pokazuje się "⬆️ ... +1 poziom" zamiast
+zawsze braku nagrody bonusowej.
+
+**Przy okazji zweryfikowane (user pytał, czy działa) — zaległe questy z poprzednich dni**:
+`usePetQuests().missed` (fix z 2026-08-27) jest w pełni podpięte: renderuje się w
+`app/pet-quests.tsx` (osobna sekcja z żółtą ramką, `missed.length > 0`), da się odebrać
+(`claimDailyFor(q.id, q.date, ...)`), i zasila "ping" badge na `PupilNavbar.tsx`
+(`hasClaimable = quests.claimableCount > 0 || missed.length > 0`) na wszystkich 4 zakładkach
+Pupila, nie tylko na ekranie Zadań. Sięga 6 dni wstecz (`RECENT_DAYS_BACK` w
+`usePetHealthSync.ts`), więc dłuższa przerwa w otwieraniu apki nie gubi bezpowrotnie nagród.
+Dane (`health.steps` itd.) odświeżają się przy każdym wejściu na ekran (`useFocusEffect`),
+powrocie z tła (`AppState` listener) I co 60s gdy ekran zostaje aktywny przez północ (3 osobno
+udokumentowane, wcześniej naprawione dziury odświeżania — patrz komentarze w
+`usePetHealthSync.ts`) — więc claim "za kroki z wczoraj" widoczny rano to ZAMIERZONY
+mechanizm nadrabiania zaległości, nie bug. User zapytany o prawdziwe odświeżanie W TLE (nawet
+przy zabitej apce) wybrał **zostaw jak jest** — true background execution na iOS
+(`BGTaskScheduler`) jest oportunistyczne i mocno tłumione przez system (brak gwarancji
+kiedy/czy się odpali), wymagałoby customowego dev clienta (nie Expo Go) i nowego natywnego
+builda za cenę niepewnej korzyści, skoro istniejący system (focus/AppState/interval +
+catch-up zaległych questów) już nic nie gubi.
+
 ## 🆕 FEATURE: perki bossów (dawniej "itemy bojowe") dropowalne ze skrzynek sklepowych — NIEsprawdzone (2026-08-29)
 
 Część 2 tej samej wiadomości usera co nawyk auto-śledzony "Bez słodyczy" (patrz osobny PR/

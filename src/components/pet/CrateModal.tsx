@@ -113,7 +113,7 @@ export default function CrateModal({ visible, onClose, onOpened }: { visible: bo
                   <Text style={st.coins}>+{shown} 🪙</Text>
                   <Text style={st.fish2}>🐟</Text>
                   {result?.itemDropped && (
-                    <Text style={st.itemDrop}>🎁 Nowy item bojowy: {COMBAT_ITEMS[result.itemDropped].name}!</Text>
+                    <Text style={st.itemDrop}>🎁 Nowa umiejętność: {COMBAT_ITEMS[result.itemDropped].name}!</Text>
                   )}
                   {result?.itemLeveledUp && (
                     <Text style={st.itemDrop}>⬆️ {COMBAT_ITEMS[result.itemLeveledUp.id].name} +1 poziom (Lv{result.itemLeveledUp.level})!</Text>
