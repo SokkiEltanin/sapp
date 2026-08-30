@@ -3,6 +3,44 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 PERF/UX: walki lagują — statyczny kotek, mniej animacji na trafienie, stabilny WALCZ! — NIEsprawdzone (2026-08-30)
+
+User: "laguja mi walki i te z questów i te z bossem" — trzy konkretne fixy na `boss-fight.tsx`
+(quest/misja fightują na TYM SAMYM ekranie co kampania/raid/event/mad, jeden fix łapie oba
+zgłoszenia):
+1. **Kotek statyczny w walce** — `<CatArt animate={false} .../>` wyłącza idle-pętle (oddech/
+   mruganie/spojrzenia/uszy/auto-liźnięcie łapki), które dotąd biegły PEŁNE, tak jak na `/pet`.
+   Atak (swat kotka co rundę) dalej działa — `CatArt.tsx`'s efekt ataku już NIE jest zagated
+   pod `animate`, tylko pod `asleep`. User sugerował export do PNG, ale zostało jako
+   wektorowa `animate={false}` (żeby nie stracić personalizacji koloru/pręg/oczu w walce —
+   PNG per paleta byłby niewykonalny).
+2. **Czerwone kółka-flash usunięte** — zastąpione statycznym `RadialGlow` (już istniejący
+   komponent, `components/ui/RadialGlow.tsx`) za ikoną ataku (łapka/pięść/pazur), dziedziczy
+   animację z TEGO SAMEGO `Animated.Value` co ikona — zero nowych animowanych obiektów.
+3. **Przycisk WALCZ! nie skacze już** — 4 reaktywne linijki mechaniki (osłona/regen/
+   uzdrowienie/cierń) przeniesione POD przycisk (i pod "Pomiń walkę") zamiast MIĘDZY "Motyw"
+   a przyciskiem — ich pojawianie/znikanie już nic nad sobą nie przesuwa. Sama mechanika
+   (zróżnicowani bossy: kryt/pancerz) ZOSTAJE — user explicite to lubi, chciał tylko naprawić
+   skaczący przycisk, nie usuwać mechaniki.
+
+**NIE znalezione w kodzie, mimo przeszukania**: user wspomniał "redukuje obrażenia bo sen<7"
+jako coś do wywalenia — sprawdziłem `boss-fight.tsx`, `bosses.ts` i cały `src/`, nie ma
+mechaniki "mało snu → mniejsze obrażenia w walce" nigdzie w repo. Możliwe że to coś ustalone
+w rozmowie/pamięci, do której nie mam tu dostępu, albo pomyłka z inną funkcją (np. quest
+"Prześpij 7 godzin", niezwiązany z walką). **Nietknięte — potrzeba wskazania GDZIE dokładnie
+user to widzi**, zanim cokolwiek usunę (żeby nie wyciąć czegoś innego przez pomyłkę).
+
+**Odłożone przez samego usera ("z czasem")**: tła wypraw/lochów kampanii.
+
+Pełny opis w ARCHITECTURE.md (sekcja Bossy, "Wydajność ekranu walki"). `tsc`/`jest` zielone
+(64/791, bez regresji — czysto UI/wydajnościowy fix, brak nowych czystych funkcji do
+przetestowania). **Priorytet testu na urządzeniu**: wejdź w dowolną walkę — kotek powinien
+stać spokojnie (bez oddechu/mrugania/lizania) poza momentem własnego ataku, trafienia powinny
+mieć czerwoną poświatę zamiast pełnego kółka, i WALCZ! nie powinien się przesuwać niezależnie
+od tego czy pojawia się info o osłonie/regeneracji/uzdrowieniu/cierniu. Zwróć uwagę czy walka
+realnie mniej laguje niż wcześniej — jeśli nie, to znaczy że lag ma INNE źródło niż animacje
+kotka/flash, i trzeba będzie profilować głębiej (Flipper/React DevTools) zamiast dalej zgadywać.
+
 ## 🆕 POLISH: nemesis (`menaceClaim`) dostał fallback-na-upgrade jak reszta systemu perków — NIEsprawdzone (2026-08-29)
 
 User: "dokończmy te perki (co były itemybossow) żeby były doszlifowane" — zapytany czy
