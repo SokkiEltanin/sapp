@@ -1918,6 +1918,35 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     powinien stać nieruchomo poza momentem ataku (bez oddechu/mrugania/lizania), trafienia
     powinny pokazywać ikonę z czerwonym poświatą zamiast pełnego kółka, a przycisk WALCZ!
     NIE powinien się przesuwać niezależnie od tego jakie napisy mechaniki się pojawiają.
+  - **Większe portrety areny + eksport szablonu SVG pod przyszłe tła wypraw/lochów
+    (2026-08-30, user: "boss i pupil był większy bo są tacy malutcy tutaj... przygotujmy
+    to pod customowe grafiki, jak mi wyeksportujesz identyczną templatkę w SVG to ja
+    przygotuje tło")** — `PORTRAIT_SIZE` (nowa, JEDNA stała u góry `boss-fight.tsx`) 104→130
+    dla `CatArt`/`BossArt` w arenie (TYLKO tam — portrety w modalu wygranej/porażki, size=78,
+    nietknięte, user o nich nie mówił). Żeby portret zmieścił się bez wychodzenia poza
+    kafelek: `arena` padding spacing[4]→[3] (16→12), `vsRow` gap spacing[3]→[2] (12→8),
+    `tile` padding spacing[3]→[2] (12→8) — odzyskane w ten sposób ~24dp szerokości idzie
+    wprost na portret. `tilePortrait.height` = `PORTRAIT_SIZE + 18` (zamiast osobnej stałej
+    116) — jeden punkt prawdy, zmiana `PORTRAIT_SIZE` automatycznie przelicza wysokość
+    kafelka. `s.projectile`'s `top` (pozycja pionowa lecącej łapki/pięści między kafelkami,
+    NIEZALEŻNA geometria od `tilePortrait` — inny rodzic) przeliczony 96→108 czystą DELTĄ
+    `(nowy_padding - stary_padding) + (nowa_wysokość - stara_wysokość)/2 = (8-12)+(148-116)/2
+    = 12`, żeby pocisk dalej leciał przez wizualny środek portretu, a nie przez pasek HP nad
+    nim — nie zweryfikowane na żywym urządzeniu (obliczone z geometrii stylów, nie z
+    faktycznych zmierzonych wysokości linii tekstu RN, więc może wymagać drobnej korekty).
+    **Szablon SVG** (`arena-template.svg`, wysłany userowi, NIE w repo — to zewnętrzny plik
+    referencyjny dla narzędzia graficznego, nie asset apki) — dokładna geometria karty areny
+    w dp (1 SVG unit = 1dp): karta 328×243 (radius 24), dwa kafelki 148×219 (radius 16, gap
+    8) z oznaczonymi strefami: etykieta/pasek HP (muszą zostać czytelne nad dowolnym tłem) i
+    okrąg Ø130 = bezpieczna strefa portretu kotka/bossa (nie zasłaniać). Świadomie NIE
+    zawiera toru lotu pocisku (nieistotne dla tła, ryzyko niedokładności z powodu przybliżonych
+    wysokości linii). **Ważne ograniczenie NIE rozwiązane w tym PR**: `tile`
+    (`c.bg.elevated`) i `arena` (`c.bg.card`) mają dziś NIEPRZEZROCZYSTE tła — podpięcie
+    faktycznego obrazka tła (np. `ImageBackground` za całą areną) pokazałoby się TYLKO w
+    12dp marginesie areny i 8dp szczelinie między kafelkami, nie jako pełna "scena" za
+    portretami. Żeby tło realnie działało jak scena wyprawy/lochu, `tile`/`arena`
+    background trzeba będzie zmienić na półprzezroczyste RÓWNOLEGLE z wpięciem obrazka —
+    świadomie odłożone (user: "to z czasem"), flagowane w NEXT_STEPS.md.
   - **SYSTEM EKWIPUNKU — `src/utils/gear.ts` (2026-08-19, W TRAKCIE, pełny plan +
     checklista kroków w `NEXT_STEPS.md` "SYSTEM EKWIPUNKU")** — TRZECI, osobny system
     itemów obok loot kampanii (`ownedItems`) i itemów bojowych (`combatItems.ts` powyżej):
