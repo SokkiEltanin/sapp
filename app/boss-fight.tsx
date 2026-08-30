@@ -37,6 +37,13 @@ const WEAK_COLOR: Record<string, string> = {
   steps: '#46B0DE', sweetless: '#F472B6', habits: '#2AC68F', mood: '#A78BFA', sleep: '#5B7BE3', water: '#38BDF8',
 };
 
+// Portrety Pupil/Boss w arenie — powiększone (2026-08-30, user: "boss i pupil był większy
+// bo są tacy malutcy tutaj"), było 104. Jedna stała (nie osobne magiczne liczby w JSX i w
+// stylach niżej) — `tilePortrait.height`/`s.projectile`'s `top` w `makeS()` poniżej ZALEŻĄ
+// od tej wartości (patrz komentarze tam), żeby zmiana rozmiaru w jednym miejscu nie
+// rozjeżdżała reszty geometrii areny.
+const PORTRAIT_SIZE = 130;
+
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
 
@@ -670,7 +677,7 @@ export default function BossFight() {
                         (oddech/mruganie/spojrzenie/uszy/auto-liźnięcie, patrz CatArt.tsx),
                         cios (`attack={attackPulse}`) dalej działa — CatArt.tsx celowo NIE
                         blokuje efektu ataku pod `!animate`, tylko pod `asleep`. */}
-                    <CatArt size={104} expression="content" animate={false} attack={attackPulse} palette={palette} stripes={catStripes}
+                    <CatArt size={PORTRAIT_SIZE} expression="content" animate={false} attack={attackPulse} palette={palette} stripes={catStripes}
                       eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                   </Animated.View>
                   {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
@@ -712,7 +719,7 @@ export default function BossFight() {
                       przy `bFlash`/`playBossHitFx` wyżej) — "hit" niesie teraz ikona ataku ze
                       statycznym `RadialGlow` za sobą, nie osobny animowany obiekt na portrecie. */}
                   <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
-                    <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
+                    <BossArt id={target.id} emoji={target.emoji} size={PORTRAIT_SIZE} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
                   </Animated.View>
                   {lastHit && (
                     <Animated.Text style={[s.dmgFloat, { opacity: bFloatOp, transform: [{ translateY: bFloatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
@@ -951,15 +958,20 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   done: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[8] },
   doneTxt: { fontSize: 13, color: c.text.muted, textAlign: 'center', maxWidth: 260 },
 
-  arena: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[4] },
+  // Powiększone portrety (2026-08-30, patrz `PORTRAIT_SIZE` u góry pliku) — padding areny/
+  // odstęp wierszy/padding kafelka lekko ścieśnione (16→12 / 12→8 / 12→8), żeby oddać
+  // portretowi więcej miejsca bez rozsadzania szerokości ekranu; `tilePortrait.height`
+  // wprost z `PORTRAIT_SIZE` (+18 na oddech wokół, kotek/ogon bywa odrobinę szerszy niż
+  // nominalny `size`) zamiast osobnej magicznej liczby.
+  arena: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
 
-  vsRow: { flexDirection: 'row', gap: spacing[3], width: '100%' },
-  tile: { flex: 1, minWidth: 0, alignItems: 'center', backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3], gap: 6 },
+  vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%' },
+  tile: { flex: 1, minWidth: 0, alignItems: 'center', backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[2], gap: 6 },
   tileLabel: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
   tileHpTrack: { width: '100%', height: 8, borderRadius: 4, backgroundColor: c.bg.primary, overflow: 'hidden' },
   tileHpFill: { height: '100%', borderRadius: 4, backgroundColor: '#EF4444' },
   tileHpTxt: { fontSize: 10, fontWeight: '700', color: c.text.muted },
-  tilePortrait: { height: 116, width: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  tilePortrait: { height: PORTRAIT_SIZE + 18, width: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },
   bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: spacing[3], textAlign: 'center' },
@@ -1006,5 +1018,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
   clawFx: { position: 'absolute', width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
-  projectile: { position: 'absolute', top: 96, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // top przeliczony (96→108, 2026-08-30) — portret przesunął się w dół o (tile padding
+  // 12→8) + (tilePortrait +32/2) = 12dp wraz z powiększeniem portretów, żeby lecący
+  // pocisk dalej trafiał w wizualny środek portretu, a nie w pasek HP nad nim.
+  projectile: { position: 'absolute', top: 108, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));

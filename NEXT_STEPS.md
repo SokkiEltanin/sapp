@@ -3,6 +3,29 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 UI: portrety areny powiększone + wysłany szablon SVG pod przyszłe tła — NIEsprawdzone (2026-08-30)
+
+User: "boss i pupil był większy bo są tacy malutcy tutaj" (ze screenshotem ekranu walki) +
+"musimy przygotować je pod customowe grafiki... jak mi wyeksportujesz identyczną templatkę w
+svg... to ja przygotuje tło (tak samo jak przy sklep/rynek)". Zrobione: `PORTRAIT_SIZE`
+104→130 dla `CatArt`/`BossArt` w arenie walki, plus ścieśnione paddingi areny/kafelków żeby
+portret zmieścił się bez wychodzenia poza kartę (pełny opis geometrii w ARCHITECTURE.md).
+Wysłany plik `arena-template.svg` — dokładna geometria karty areny w dp (kafelki/pasek HP/
+bezpieczna strefa portretu Ø130), do zaimportowania w narzędziu graficznym.
+
+**NIE zweryfikowane na urządzeniu**: pozycja pionowa lecącego pocisku (łapka/pięść) między
+kafelkami (`s.projectile`'s `top`, 96→108) przeliczona MATEMATYCZNIE z delty paddingów/
+wysokości, nie zmierzona na żywym renderze — sprawdź czy pocisk faktycznie leci przez środek
+portretu, nie przez pasek HP nad nim; jeśli nie, drobna korekta `top` w `boss-fight.tsx`.
+
+**Świadomie NIE zrobione w tym PR (odłożone przez usera, "z czasem")**: samo wpięcie
+obrazka tła. `tile`/`arena` mają dziś nieprzezroczyste tła (`c.bg.elevated`/`c.bg.card`) —
+obrazek za całą areną pokazałby się TYLKO w wąskim marginesie/szczelinie między kafelkami,
+nie jako pełna scena za portretami kotka/bossa. Żeby tło realnie robiło wrażenie "wyprawy/
+lochu", trzeba będzie RÓWNOLEGLE z wpięciem gotowej grafiki zmienić `tile`/`arena` na
+półprzezroczyste — nie robić tego teraz, czekać aż user dostarczy gotową grafikę i poprosi
+o wpięcie.
+
 ## 🆕 PERF/UX: walki lagują — statyczny kotek, mniej animacji na trafienie, stabilny WALCZ! — NIEsprawdzone (2026-08-30)
 
 User: "laguja mi walki i te z questów i te z bossem" — trzy konkretne fixy na `boss-fight.tsx`
