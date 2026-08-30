@@ -7,6 +7,7 @@ import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Tr
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
+import RadialGlow from '@/components/ui/RadialGlow';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import { attackPng } from '@/utils/bossIcons';
@@ -285,22 +286,23 @@ export default function BossFight() {
   const fightingRef = useRef(false);
 
   // ── boss-side hit fx (Twój cios na bossie) — wspólne dla WSZYSTKICH trybów ──
+  // `bFlash` (czerwone/żółte KÓŁKO flash na portrecie) USUNIĘTE (2026-08-30, user: "jak są
+  // obrażenia te takie kółka czerwone je wypierdalamy niech ataki jak łapka pięść itp będą
+  // miały po prostu z tyłu cień czerwony gradient i tyle będzie mniej do animowania i mniej
+  // obiektów") — był to TRZECI równoległy Animated.Value tylko na potrzeby jednego flasha;
+  // "hit" feedback teraz niesie WYŁĄCZNIE ikona ataku (łapka/pięść/pazur) ze statycznym
+  // (nieanimowanym) `RadialGlow` za sobą, patrz JSX niżej. Shake + liczba obrażeń zostają.
   const bShake = useRef(new Animated.Value(0)).current;
   const bDmgY = useRef(new Animated.Value(0)).current;
-  const bFlash = useRef(new Animated.Value(0)).current;
   const [lastHit, setLastHit] = useState<{ dmg: number; crit: boolean; guarded: boolean; healed: number; thornDmg: number } | null>(null);
   const playBossHitFx = (crit: boolean) => {
-    bShake.setValue(0); bDmgY.setValue(0); bFlash.setValue(0);
+    bShake.setValue(0); bDmgY.setValue(0);
     Animated.parallel([
       Animated.sequence([
         Animated.timing(bShake, { toValue: 1, duration: 50, useNativeDriver: true }),
         Animated.timing(bShake, { toValue: -1, duration: 50, useNativeDriver: true }),
         Animated.timing(bShake, { toValue: crit ? 1 : 0.5, duration: 50, useNativeDriver: true }),
         Animated.timing(bShake, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(bFlash, { toValue: 1, duration: 60, useNativeDriver: true }),
-        Animated.timing(bFlash, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]),
       // Skrócone z 800→600ms (2026-08-14, patrz komentarz przy shake wyżej) — przy 480ms
       // odstępie do następnej rundy liczba dawniej jeszcze dogasała, gdy leciał już kolejny
@@ -313,20 +315,15 @@ export default function BossFight() {
   // ── cat-side hit fx (kontratak bossa) — TYLKO kampania, raid/wydarzenie nie mają kontrataku ──
   const kShake = useRef(new Animated.Value(0)).current;
   const kDmgY = useRef(new Animated.Value(0)).current;
-  const kFlash = useRef(new Animated.Value(0)).current;
   const [catHit, setCatHit] = useState<{ dmg: number; healed: number } | null>(null);
   const playCatHitFx = () => {
-    kShake.setValue(0); kDmgY.setValue(0); kFlash.setValue(0);
+    kShake.setValue(0); kDmgY.setValue(0);
     Animated.parallel([
       Animated.sequence([
         Animated.timing(kShake, { toValue: 1, duration: 50, useNativeDriver: true }),
         Animated.timing(kShake, { toValue: -1, duration: 50, useNativeDriver: true }),
         Animated.timing(kShake, { toValue: 0.5, duration: 50, useNativeDriver: true }),
         Animated.timing(kShake, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(kFlash, { toValue: 1, duration: 60, useNativeDriver: true }),
-        Animated.timing(kFlash, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]),
       Animated.timing(kDmgY, { toValue: 1, duration: 600, easing: Easing.out(Easing.quad), useNativeDriver: true }),   // skrócone, patrz komentarz przy bDmgY
     ]).start();
@@ -588,11 +585,9 @@ export default function BossFight() {
   const attack = attackRoundBased;
 
   const bShakeX = bShake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] });
-  const bFlashOp = bFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.8] });
   const bFloatY = bDmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -46] });
   const bFloatOp = bDmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
   const kShakeX = kShake.interpolate({ inputRange: [-1, 1], outputRange: [-8, 8] });
-  const kFlashOp = kFlash.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] });
   const kFloatY = kDmgY.interpolate({ inputRange: [0, 1], outputRange: [0, -46] });
   const kFloatOp = kDmgY.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] });
   const pawX = pawTravel.interpolate({ inputRange: [0, 1], outputRange: ['16%', '84%'] });
@@ -669,17 +664,26 @@ export default function BossFight() {
                 <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
                 <View style={s.tilePortrait}>
                   <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
-                    <CatArt size={104} expression="content" attack={attackPulse} palette={palette} stripes={catStripes}
+                    {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
+                        statyczny bez animacji, bo teraz jest w pełni z głaskaniem
+                        animacjami lizania co pewnie laguje") — wyłącza WSZYSTKIE idle-pętle
+                        (oddech/mruganie/spojrzenie/uszy/auto-liźnięcie, patrz CatArt.tsx),
+                        cios (`attack={attackPulse}`) dalej działa — CatArt.tsx celowo NIE
+                        blokuje efektu ataku pod `!animate`, tylko pod `asleep`. */}
+                    <CatArt size={104} expression="content" animate={false} attack={attackPulse} palette={palette} stripes={catStripes}
                       eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
                   </Animated.View>
-                  <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: kFlashOp, backgroundColor: '#F87171' }]} />
                   {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
                       pojawiać się na pupila") — atak w zwarciu, nie rzut: zamiast
                       podróżującego pocisku (boltFlying niżej, suppressed dla claw), burst
                       ikony wprost NA portrecie kotka, wyzwalany tym samym `boltTravel` co
-                      lot pocisku dla pozostałych typów. */}
+                      lot pocisku dla pozostałych typów. `RadialGlow` statyczny (bez własnego
+                      Animated.Value — dziedziczy opacity/scale z tego samego wrappera co
+                      ikona, patrz komentarz przy usunięciu `tileFlash` wyżej) zastępuje
+                      dawne czerwone kółko-flash jako "hit" feedback. */}
                   {boltFlying && target?.attackKind === 'claw' && (
                     <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
+                      <RadialGlow size={130} color="#F87171" opacity={0.55} />
                       <Image source={counterPng} style={{ width: 90, height: 90 }} resizeMode="contain" />
                     </Animated.View>
                   )}
@@ -702,13 +706,14 @@ export default function BossFight() {
                       wywalmy je wgle" — statyczny obrazek scale+fade czytał się jako płaski
                       "scan i zniknięcie", nie realny cios; działające wzorce to WYŁĄCZNIE
                       podróżujący pocisk (łapka/magia) i burst-na-celu (pazury), oba już tu są).
-                      Zostaje tylko flash+shake+liczba obrażeń — ten sam, spójny język co
-                      raid/event/quest/mad/misja miały od zawsze (one nigdy nie dostały
-                      attackFx). */}
+                      Zostaje shake+liczba obrażeń — ten sam, spójny język co raid/event/
+                      quest/mad/misja miały od zawsze (one nigdy nie dostały attackFx).
+                      Czerwone kółko-flash (`tileFlash`) USUNIĘTE (2026-08-30, patrz komentarz
+                      przy `bFlash`/`playBossHitFx` wyżej) — "hit" niesie teraz ikona ataku ze
+                      statycznym `RadialGlow` za sobą, nie osobny animowany obiekt na portrecie. */}
                   <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
                     <BossArt id={target.id} emoji={target.emoji} size={104} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
                   </Animated.View>
-                  <Animated.View pointerEvents="none" style={[s.tileFlash, { opacity: bFlashOp, backgroundColor: lastHit?.crit ? '#FDE047' : '#F87171' }]} />
                   {lastHit && (
                     <Animated.Text style={[s.dmgFloat, { opacity: bFloatOp, transform: [{ translateY: bFloatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
                       -{lastHit.dmg}{lastHit.crit ? ' KRYT!' : ''}
@@ -727,15 +732,18 @@ export default function BossFight() {
                     Solidne wypełnienie (fill), żeby czytało się jednoznacznie jako łapka nawet przy
                     28px i szybkim locie. Kolor = `palette.coat` (2026-08-16, user: "kotek w walkach
                     niech rzuca swoją łapką zależną od koloru") — ta sama paleta co portret kota na
-                    tym samym ekranie (patrz `palette` wyżej), więc łapka wygląda jak NAPRAWDĘ jego. */}
+                    tym samym ekranie (patrz `palette` wyżej), więc łapka wygląda jak NAPRAWDĘ jego.
+                    `RadialGlow` statyczny za ikoną (2026-08-30, patrz komentarz przy usunięciu
+                    `tileFlash`) — dziedziczy opacity/scale animowanego wrappera, zero nowego
+                    Animated.Value. */}
+                <RadialGlow size={46} color="#F87171" opacity={0.5} />
                 <PawPrint size={30} color={palette.coat} fill={palette.coat} />
               </Animated.View>
             )}
             {/* Kontratak bossa — user (2026-08-12): poprzednio leciał tu ten sam per-bossowy
                 burst (fire/bomb/magicspell/…) co przy Twoim trafieniu, i wyglądało to jak
                 rakieta/bomba lecąca w kotka, nie jak cios — dlatego uniwersalna pięść (per-bossowy
-                burst przy Twoim ciosie USUNIĘTY permanentnie 2026-08-18, patrz komentarz przy
-                `tileFlash` bossa wyżej). 2026-08-17 (user: "bossy miały unikatowe ataki —
+                burst przy Twoim ciosie USUNIĘTY permanentnie 2026-08-18). 2026-08-17 (user: "bossy miały unikatowe ataki —
                 drapieżniki drapnięcie pazurami, magowie kulę magiczną, miecze slash mieczem, ci
                 którzy nie mają to pięść") — dalej PROSTY kształt (jedna ikona lecąca po prostej),
                 tylko dobrana po `target.attackKind` zamiast zawsze tej samej pięści; brak
@@ -745,6 +753,7 @@ export default function BossFight() {
                 inne miejsce renderu. */}
             {boltFlying && target?.attackKind !== 'claw' && (
               <Animated.View pointerEvents="none" style={[s.projectile, { left: boltX, opacity: boltOp, transform: [{ scale: boltScale }, { translateX: -14 }] }]}>
+                <RadialGlow size={46} color="#F87171" opacity={0.5} />
                 <Image source={counterPng} style={{ width: 28, height: 28 }} resizeMode="contain" />
               </Animated.View>
             )}
@@ -767,19 +776,6 @@ export default function BossFight() {
                 {eventDaysLeftN <= 0 ? 'Kończy się dziś' : `Kończy się za ${eventDaysLeftN} ${eventDaysLeftN === 1 ? 'dzień' : 'dni'}`}
               </Text>
             )}
-            {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
-            {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
-            {!!catHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></View>}
-            {/* Item "Cierń" liczył się już wcześniej w silniku, ale bez własnego pola w
-                FightRound UI nie miało jak pokazać że w ogóle coś zrobił — user (2026-08-11):
-                "nie widzę żeby był aktywny jakoś podczas walki realnie". */}
-            {!!lastHit?.thornDmg && (
-              <View style={s.mechRow}>
-                <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} resizeMode="contain" />
-                <Text style={[s.mechNoteHeal, { color: '#4ADE80' }]}>Cierń: dodatkowe -{lastHit.thornDmg} bossowi</Text>
-              </View>
-            )}
-
             {target.done ? (
               <Text style={s.doneInlineTxt}>Pokonany ✓ · {kind === 'raid' ? 'nowy w poniedziałek' : kind === 'quest' ? 'nagroda odebrana dziś' : kind === 'event' && isMenace ? 'nemesis rozwiązany' : 'wróć w kolejnym okresie'}</Text>
             ) : (
@@ -806,6 +802,30 @@ export default function BossFight() {
               <PressableScale onPress={skipFight} style={{ marginTop: spacing[2] }}>
                 <Text style={s.skipFightTxt}>Pomiń walkę</Text>
               </PressableScale>
+            )}
+            {/* Reaktywne linijki mechaniki (co WŁAŚNIE się stało w tej rundzie) — PRZENIESIONE
+                pod przycisk WALCZ! (2026-08-30, user: "po kliknięciu walcz przycisk się
+                przesuwa bo pojawiają się napisy że boss ma osłonę i redukuje obrażenia...
+                czy nie lepiej było by zrobić żeby kampania miała statyczny UiUx"). Dawniej
+                renderowały się MIĘDZY "Motyw" a przyciskiem — 0 do 4 z nich mogą pojawić się
+                LUB zniknąć na dowolnej rundzie (guarded/regen/heal/cierń są niezależne od
+                siebie), więc wszystko PONIŻEJ nich (czyli przycisk) fizycznie skakało w górę/
+                dół przy każdym trafieniu. User explicite chce ZATRZYMAĆ pomysł (boss ma
+                osłonę/kryt/pancerz) — usunąć miał tylko SKUTEK (skaczący przycisk), nie samą
+                mechanikę. Tu, POD przyciskiem (i pod "Pomiń walkę"), ich pojawienie/zniknięcie
+                już nic nie przesuwa — przycisk ma stałą pozycję niezależnie od tego ile linijek
+                feedbacku akurat jest widocznych. */}
+            {lastHit?.guarded && <View style={s.mechRow}><Shield size={13} color="#F4B740" /><Text style={s.mechNote}>Osłona: ten boss redukuje ciosy ×0.5</Text></View>}
+            {!!lastHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#7DD3FC" /><Text style={s.mechNoteHeal}>Boss zregenerował +{lastHit.healed} (wrodzona regeneracja)</Text></View>}
+            {!!catHit?.healed && <View style={s.mechRow}><HeartPulse size={13} color="#2AC68F" /><Text style={[s.mechNoteHeal, { color: '#2AC68F' }]}>Uzdrowienie: kotek odzyskał +{catHit.healed} HP</Text></View>}
+            {/* Item "Cierń" liczył się już wcześniej w silniku, ale bez własnego pola w
+                FightRound UI nie miało jak pokazać że w ogóle coś zrobił — user (2026-08-11):
+                "nie widzę żeby był aktywny jakoś podczas walki realnie". */}
+            {!!lastHit?.thornDmg && (
+              <View style={s.mechRow}>
+                <Image source={COMBAT_ITEMS.thorn.icons[0]} style={{ width: 13, height: 13 }} resizeMode="contain" />
+                <Text style={[s.mechNoteHeal, { color: '#4ADE80' }]}>Cierń: dodatkowe -{lastHit.thornDmg} bossowi</Text>
+              </View>
             )}
           </View>
         )}
@@ -940,7 +960,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   tileHpFill: { height: '100%', borderRadius: 4, backgroundColor: '#EF4444' },
   tileHpTxt: { fontSize: 10, fontWeight: '700', color: c.text.muted },
   tilePortrait: { height: 116, width: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
-  tileFlash: { position: 'absolute', width: 96, height: 96, borderRadius: 48 },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },
   bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: spacing[3], textAlign: 'center' },

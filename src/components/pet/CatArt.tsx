@@ -246,10 +246,18 @@ export default function CatArt({
   // `angry`/`doSwat` above, just without the halo or the anger STATE (no onAngry callback,
   // no 3s cooldown, no interaction with the pet-page tap-counter) so a fight screen can
   // trigger it freely every round without fighting the petting-anger mechanic.
+  //
+  // Deliberately NOT gated on `animate` (2026-08-30, user: "kotek pupil był tam [w walce]
+  // statyczny bez animacji... bo teraz jest w pełni z głaskaniem animacjami lizania co
+  // pewnie laguje") — `animate={false}` on the fight screen kills the decorative IDLE loops
+  // (breathe/blink/glance/ear-flutter/periodic auto-lick, all below) that were the real lag
+  // source, but the attack swat is a deliberate per-round SIGNAL from the fight screen, not
+  // idle decoration — it must keep working under `animate={false}` or a static fight cat
+  // would never show a hit. `asleep` alone still guards it (a sleeping cat doesn't swat).
   const firstAttack = useRef(true);
   useEffect(() => {
     if (firstAttack.current) { firstAttack.current = false; return; }
-    if (!animate || asleep) return;
+    if (asleep) return;
     setBattleFace(true);
     doSwat(false);
     setTimeout(() => setBattleFace(false), 260);

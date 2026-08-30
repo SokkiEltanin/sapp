@@ -1859,6 +1859,65 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     nowego testu — `openCrate()` (identyczny kształt fallbacku) też nie ma bezpośredniego
     testu w tym repo (store actions nietestowane wprost, tylko wydzielone czyste funkcje —
     ten sam brak pokrycia, nie nowy).
+  - **Wydajność ekranu walki (`boss-fight.tsx`) — statyczny kotek + mniej animowanych
+    obiektów + stabilny layout (2026-08-30, user: "laguja mi walki i te z questów i te z
+    bossem")** — quest/misja-minibossy fightują się na TYM SAMYM `boss-fight.tsx` (`?kind=
+    quest|mission`) co kampania/raid/event/mad, więc jeden zestaw fixów łapie "walki
+    questów" i "walki z bossem" naraz, dokładnie jak user zgłosił oba naraz.
+    - **Statyczny kotek**: `<CatArt animate={false} attack={attackPulse} .../>` zamiast
+      domyślnego `animate=true`. Bez tego portret kotka w walce uruchamiał WSZYSTKIE idle
+      pętle z `/pet` (oddech co 2.1s, mruganie, losowe spojrzenia, strzepywanie uszu, i
+      okresowe auto-liźnięcie łapki co 12-22s — pełny Animated.sequence z rotacją ramienia,
+      językiem, chowaniem/pokazywaniem nogi) — user: "kotek żeby był tam statyczny... bo
+      teraz jest w pełni z głaskaniem animacjami lizania co pewnie laguje". User sugerował
+      export do PNG, ale kotek jest wektorowy i BIERZE `palette`/kolory/pręgi/oczy usera
+      (CatArt.tsx nie ma storu, ale jest w pełni parametryzowany) — osobny PNG per paleta
+      byłby niewykonalny (i utraciłby personalizację w walce). Zamiast tego: `CatArt.tsx`'s
+      istniejący `animate` prop już wyłącza dokładnie te pętle (patrz komentarze przy każdym
+      `useEffect` tam) — tylko boss-fight.tsx go nie ustawiał. JEDYNA pułapka: atak
+      (`attack` prop, +1 co rundę, wywołuje swat+battleFace) był PRZYPADKOWO zagated pod tym
+      samym `!animate` co idle-pętle — `animate={false}` wyłączyłby więc TEŻ wizualny cios
+      kotka, czego user nie chciał (skarżył się tylko na petting/lizanie, nie na atak).
+      Fix: ten `useEffect` (attack) już NIE sprawdza `animate`, tylko `asleep` — atak działa
+      niezależnie od stanu idle-animacji.
+    - **Czerwone kółka-flash USUNIĘTE, zastąpione statycznym `RadialGlow` za ikoną ataku**
+      (user: "jak są obrażenia te takie kółka czerwone je wypierdalamy niech ataki jak łapka
+      pięść itp będą miały po prostu z tyłu cień czerwony gradient... mniej do animowania i
+      mniej obiektów") — `tileFlash` (osobny `Animated.Value` `bFlash`/`kFlash`, płaskie
+      czerwone/żółte koło 96×96 pulsujące NA PORTRECIE trafionego, TRZECI równoległy
+      animowany obiekt obok shake+liczby obrażeń) całkowicie usunięty z obu stron (kot i
+      boss) — mniej Animated.Value na trafienie, jak user chciał. `RadialGlow.tsx`
+      (`components/ui/RadialGlow.tsx`, już istniał — używany w `BossArt`/`BadgeCelebration`/
+      `TabBar`) dodany jako STATYCZNE (bez własnego `Animated.Value`) SVG dziecko WEWNĄTRZ
+      już-animowanych wrapperów pocisku (łapka/pięść lecąca między kafelkami) i burstu
+      pazurów na portrecie — dziedziczy opacity/scale/pozycję z TEGO SAMEGO
+      `Animated.Value` co ikona (`pawTravel`/`boltTravel`), więc "hit" wciąż czytelnie się
+      podświetla, ale zero NOWYCH animowanych obiektów.
+    - **Stabilny layout przycisku WALCZ! (2026-08-30)** — user: "po kliknięciu walcz
+      przycisk się przesuwa bo pojawiają się napisy że boss ma osłonę... czy nie lepiej
+      było by zrobić żeby kampania miała statyczny UiUx (wgle mieliśmy to wywalić, ale
+      pomysł że niektóre bossy mają kryta, niektóre więcej pancerza ma sens i to mi się
+      podoba)". Cztery reaktywne linijki mechaniki (`lastHit?.guarded`/`lastHit?.healed`/
+      `catHit?.healed`/`lastHit?.thornDmg` — osłona/regen bossa/uzdrowienie kotka/cierń), 0
+      do 4 z nich niezależnie widoczne per runda, renderowały się MIĘDZY "Motyw" a
+      przyciskiem — każde pojawienie/zniknięcie fizycznie przesuwało WSZYSTKO poniżej,
+      łącznie z przyciskiem. User explicite chce ZATRZYMAĆ samą mechanikę (zróżnicowani
+      bossy — kryt/pancerz), tylko nie chce SKUTKU (skaczący przycisk) — więc to NIE
+      usunięcie mechaniki, tylko przeniesienie tych 4 linijek POD przycisk WALCZ! (i pod
+      "Pomiń walkę"), gdzie ich pojawienie/zniknięcie już nic nie przesuwa nad sobą.
+      Uwaga: user wspomniał też "redukuje obrażenia bo sen&lt;7" jako coś do usunięcia —
+      przeszukane `boss-fight.tsx`, `bosses.ts` i cały `src/` pod kątem mechaniki "mało snu
+      → mniejsze obrażenia", NIE znaleziono takiej w kodzie (jedyna istniejąca mechanika
+      zależna od snu to inne, niezwiązane z walką miejsca — np. quest "Prześpij 7 godzin").
+      Nietknięte — nie ma czego usuwać bez wskazania przez usera GDZIE dokładnie to widzi.
+    - **Odłożone na później (user: "z czasem")**: tła wypraw/lochów kampanii — user chce to
+      dodać, ale wyraźnie nie teraz, nie w tym PR.
+    Bez nowych testów — czysto UI/wydajnościowy fix bez wydzielonych czystych funkcji
+    (`tsc`/`jest` zielone, bez regresji w istniejących 791). **Priorytet testu na
+    urządzeniu**: wejdź w dowolną walkę (kampania/raid/event/quest/mad/misja) — kotek
+    powinien stać nieruchomo poza momentem ataku (bez oddechu/mrugania/lizania), trafienia
+    powinny pokazywać ikonę z czerwonym poświatą zamiast pełnego kółka, a przycisk WALCZ!
+    NIE powinien się przesuwać niezależnie od tego jakie napisy mechaniki się pojawiają.
   - **SYSTEM EKWIPUNKU — `src/utils/gear.ts` (2026-08-19, W TRAKCIE, pełny plan +
     checklista kroków w `NEXT_STEPS.md` "SYSTEM EKWIPUNKU")** — TRZECI, osobny system
     itemów obok loot kampanii (`ownedItems`) i itemów bojowych (`combatItems.ts` powyżej):
