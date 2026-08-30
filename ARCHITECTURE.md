@@ -1836,6 +1836,29 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     Testy: `petBoxes.test.ts` (5 nowych — strefa perków dla sardine/gold, preferUpgrade z
     fallbackiem gdy nic do ulepszenia, brak-nic-do-przyznania spada do monet, domyślny
     piąty parametr).
+  - **Doszlifowanie: `menaceClaim()` (nemesis) dostał ten sam fallback-na-upgrade co
+    `openCrate()`/`rollBox()` (2026-08-29, user: "dokończmy te perki żeby były
+    doszlifowane" — po pytaniu o rozszerzenie źródeł dropu user wybrał "zostaw jak jest",
+    więc to NIE nowe źródło, tylko naprawa istniejącego)** — `menaceClaim()` (pokonanie
+    nemesis, `MENACE_ITEM_DROP_CHANCE=0.08`) miał TYLKO gałąź "nowy nieposiadany perk",
+    bez upgrade'u. Gdy gracz posiada już WSZYSTKIE 9 perków (nawet na poziomie 1),
+    `candidates` (nieposiadane) jest zawsze puste — cała 8% szansa staje się TRWALE martwa
+    w późnej grze, mimo że nemesis to POWTARZALNY, regularny boss (nie jednorazowy jak
+    kampania). Fix: gdy nie ma nic nowego do przyznania, losuje jeszcze-nie-maksowy
+    posiadany perk i ulepsza go o +1 — dokładnie ten sam `upgradeable`-filter co
+    `openCrate()` już miał. Zmieniony kontrakt `menaceClaim()`: było `CombatItemId | null`
+    (sam dropnięty item), teraz `{ itemDropped, itemLeveledUp } | null` (`null` = już
+    odebrane wcześniej dla tego klucza; oba pola mogą być `null` razem = trafienie bez
+    czego przyznać, np. roll poniżej szansy). `boss-fight.tsx`'s `VictoryInfo` dostał
+    `itemLeveledUp?`, victory modal renderuje "⬆️ {nazwa} +1 poziom (LvN)!" obok
+    istniejącego "🎁 Nowa umiejętność" — ten sam wzorzec tekstu co `CrateModal.tsx`.
+    Przy okazji doczyszczone przeoczone miejsca z rename na "perki"/"umiejętności":
+    `CrateModal.tsx` (reveal darmowej skrzynki z głaskania — dalej mówił "Nowy item
+    bojowy"), `bossProgressReport.ts` (eksportowalny raport stanu — "Sloty na itemy
+    bojowe"/"ITEMY BOJOWE" → "Sloty na umiejętności bossów"/"UMIEJĘTNOŚCI BOSSÓW"). Brak
+    nowego testu — `openCrate()` (identyczny kształt fallbacku) też nie ma bezpośredniego
+    testu w tym repo (store actions nietestowane wprost, tylko wydzielone czyste funkcje —
+    ten sam brak pokrycia, nie nowy).
   - **SYSTEM EKWIPUNKU — `src/utils/gear.ts` (2026-08-19, W TRAKCIE, pełny plan +
     checklista kroków w `NEXT_STEPS.md` "SYSTEM EKWIPUNKU")** — TRZECI, osobny system
     itemów obok loot kampanii (`ownedItems`) i itemów bojowych (`combatItems.ts` powyżej):

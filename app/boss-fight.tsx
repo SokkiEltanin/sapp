@@ -37,7 +37,7 @@ const WEAK_COLOR: Record<string, string> = {
 };
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
-type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; isMenace?: boolean };
+type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
 
 // Ekran WALKI (S&F-style, 2026-08-09/10 — patrz memory boss_design.md), wydzielony z listy
 // (app/bosses.tsx). Sześć TRYBÓW przez ?kind= (campaign domyślnie/raid/event/quest/mad/
@@ -462,8 +462,9 @@ export default function BossFight() {
         if (menaceOutcome?.defeated && eventBoss && eventKey) {
           haptic.success();
           const coinsWon = Math.round(menaceCoins(level) * coinsMult);
-          const itemDropped = menaceClaim(eventKey, coinsWon, menaceXp(level), eventBoss.name, level, fightDetail);
-          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: coinsWon, xp: menaceXp(level), itemDropped: itemDropped ?? undefined, isMenace: true });
+          const claimResult = menaceClaim(eventKey, coinsWon, menaceXp(level), eventBoss.name, level, fightDetail);
+          setVictory({ kind: 'event', id: eventBoss.id, name: eventBoss.name, emoji: eventBoss.emoji, coins: coinsWon, xp: menaceXp(level),
+            itemDropped: claimResult?.itemDropped ?? undefined, itemLeveledUp: claimResult?.itemLeveledUp ?? undefined, isMenace: true });
         } else if (eventBoss && eventKey) {
           logFightAttempt('event', eventKey, eventBoss.name, level, fightDetail);
         }
@@ -840,6 +841,9 @@ export default function BossFight() {
               </View>
               {victory.itemDropped && (
                 <Text style={s.vItemDrop}>🎁 Nowa umiejętność: {COMBAT_ITEMS[victory.itemDropped].name}!</Text>
+              )}
+              {victory.itemLeveledUp && (
+                <Text style={s.vItemDrop}>⬆️ {COMBAT_ITEMS[victory.itemLeveledUp.id].name} +1 poziom (Lv{victory.itemLeveledUp.level})!</Text>
               )}
             </View>
           )}

@@ -310,7 +310,7 @@ interface PetState {
   // nemesis — bez energii (nielimitowane próby), trwały bank jak raid
   menaceEnsure: (menaceId: string, hp: number) => void;
   menaceAttack: (damage: number) => { remaining: number; defeated: boolean };
-  menaceClaim: (menaceKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => CombatItemId | null; // zwraca dropnięty item (albo null)
+  menaceClaim: (menaceKey: string, coins: number, xp: number, name: string, level: number, fight: BossFightDetail) => { itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null } | null; // null = już odebrane wcześniej; inaczej dropnięty/ulepszony perk (oba mogą być null razem = trafienie bez czego przyznać)
   // Questy jako walki (2026-08-14 v2, patrz src/utils/minibosses.ts) — wygrana walka z
   // minibossem PRZYPISANYM do danego questu zastępuje zwykły claim. Ten sam day-guard co
   // claimDaily (dailyClaims+dayClaims, żeby buildQuests widział quest jako odebrany
@@ -759,20 +759,41 @@ export const usePetStore = create<PetState>()(
       // Nagroda za pokonanie nemesis: coins/xp jak zwykle + szansa na przedmiot bojowy
       // (user: "szansa na item kilka prc") — ten sam losowy-spośród-nieposiadanych wzorzec co
       // openCrate wyżej, tylko osobna, wyższa stała (MENACE_ITEM_DROP_CHANCE).
+      //
+      // FALLBACK NA UPGRADE (2026-08-29, "dokończmy te perki żeby były doszlifowane") — dotąd
+      // ta gałąź MIAŁA TYLKO nowy-nieposiadany-item, bez upgrade'u jak openCrate()/rollBox()
+      // (petBoxes.ts) już mają. Efekt: gdy posiadasz WSZYSTKIE 9 perków (nawet na poziomie 1),
+      // `candidates` zawsze puste i cała 8% szansa na coś z pokonania nemesis staje się TRWALE
+      // martwa — powtarzalny, regularny boss przestaje mieć czym nagradzać w późnej grze.
+      // Fix: gdy nie ma nic nowego do przyznania, spróbuj ulepszyć losowy jeszcze-nie-maksowy
+      // perk zamiast marnować roll (coins/xp i tak zawsze się liczą niezależnie — to tylko
+      // dodatkowy bonus, nigdy jedyna nagroda).
       menaceClaim: (menaceKey, coins, xp, name, level, fight) => {
         const s = get();
         if (s.eventWon.includes(menaceKey)) return null;
         let itemDropped: CombatItemId | null = null;
+        let itemLeveledUp: { id: CombatItemId; level: number } | null = null;
+        // (return type below carries both — `null` here is the "already claimed" no-op path)
         if (Math.random() < MENACE_ITEM_DROP_CHANCE) {
           const candidates = (Object.keys(COMBAT_ITEMS) as CombatItemId[]).filter(id => !s.ownedCombatItems[id]);
-          if (candidates.length > 0) itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
+          if (candidates.length > 0) {
+            itemDropped = candidates[Math.floor(Math.random() * candidates.length)];
+          } else {
+            const upgradeable = (Object.keys(s.ownedCombatItems) as CombatItemId[])
+              .filter(id => (s.ownedCombatItems[id] ?? 0) < COMBAT_ITEMS[id].maxLevel);
+            if (upgradeable.length > 0) {
+              const id = upgradeable[Math.floor(Math.random() * upgradeable.length)];
+              itemLeveledUp = { id, level: (s.ownedCombatItems[id] ?? 0) + 1 };
+            }
+          }
         }
         set({
           eventWon: [...s.eventWon, menaceKey], coins: s.coins + coins, xp: s.xp + xp,
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
+          ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
           bossLog: [...s.bossLog, { kind: 'event', id: menaceKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         });
-        return itemDropped;
+        return { itemDropped, itemLeveledUp };
       },
       claimQuestFight: (questId, coins, xp, name, level, fight) => {
         const t = todayISO();
