@@ -2141,6 +2141,48 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `{color:'#2AC68F'}` na "+N" (ten sam wzorzec co istniejący `Walcz` przycisk niżej w tym
       samym pliku, który już nadpisywał `buyPillTxt` na zielono). Cena w monetach (druga
       ikona+tekst w TYM SAMYM przycisku) BEZ ZMIAN — zostaje żółta.
+    - **Roll wartości statu w przedziale zamiast stałej wartości na rzadkość (2026-08-31)** —
+      user (Sklep dnia, część B tej samej wiadomości co "3→4 itemy" wyżej): "itemy od teraz
+      mogą dropić w przedziałach czyli od 0.5-2% dmg dodatkowego i się losują itp ogarniesz
+      to?". Duża zmiana ekonomii/kształtu danych, więc PRZED implementacją 3 pytania
+      doprecyzowujące (AskUserQuestion), user wybrał rekomendowane za każdym razem: (1) roll
+      Sklepu dnia zostaje DETERMINISTYCZNY per dzień (spójne z "gwarantowany zakup, nie
+      loteria" — patrz komentarz przy `dailyShopSlots`), (2) lepszy roll w TEJ SAMEJ rzadkości
+      liczy się jako realny upgrade (ARPG-style min-maxing), (3) mechanika dotyczy WSZYSTKICH
+      6 slotów, nie tylko obroży/atkPct, dla spójności.
+      `GEAR_ROLL_SPREAD: [0.7, 1.3]` (gear.ts) — ±30% wokół ISTNIEJĄCEGO `gearStatValue`
+      (baseValue × RARITY_MULT), który zostaje ŚRODKIEM nowego przedziału — cały dotychczasowy,
+      ręcznie tuningowany balans (komentarz przy `GEAR_ITEMS` o mitycznym T5 ~20-30% loot
+      totalu) przechodzi bez zmian, roluje się TYLKO rozstrzał wokół niego.
+      `gearValueRange(item, rarity)` → `[min, max]`; `rollGearValue(item, rarity, rand =
+      Math.random)` → wartość w tym przedziale, `rand` wstrzykiwalny — Sklep dnia woła z
+      `pseudoRandom01(date + item.id + '|value')` (NOWY seed suffix, osobny od istniejącego
+      `'|rarity'` — dwa rollе nie kolidują), skrzynki (`petBoxes.ts`'s `rollBox`, `petStore.ts`'s
+      `openCrate`) wołają BEZ seeda (`Math.random` domyślny) — prawdziwa loteria, spójne z tym
+      że skrzynki nigdy nie obiecywały determinizmu.
+      `OwnedGear { rarity, value }` ZASTĘPUJE samą `GearRarity` jako typ wartości w
+      `petStore.ownedGear` (był `Partial<Record<string, GearRarity>>`, jest
+      `Partial<Record<string, OwnedGear>>`) — WSZYSCY konsumenci zaktualizowani:
+      `gearCombatBonuses`/`gearFlatHp`/`gearCoinsMult` czytają `.value` BEZPOŚREDNIO (już nie
+      wołają `gearStatValue` — ten roll JEST już policzoną wartością, nie trzeba przeliczać z
+      rzadkości); `grantGear`/`buyDailyGear` przyjmują nowy argument `value: number` (kolejno 3.
+      i 5.); `sellGear` czyta `owned.rarity` (sprzedaż zostaje CELOWO rarity-only, nie
+      value-aware — "cena skupu" to nieprecyzyjna wewnętrzna abstrakcja, nie potrzebuje
+      granularności per-roll, poza zakresem tej zmiany).
+      `isGearUpgrade(next: OwnedGear, cur: OwnedGear | undefined): boolean` (gear.ts) —
+      JEDYNE źródło prawdy "czy to ulepszenie" wszędzie (`openCrate`, `grantGear`,
+      `buyDailyGear`, `alreadyOwnGear`/`GearPreviewModal` w pet-shop.tsx) ZASTĘPUJE dawne
+      porównanie `RARITY_MULT[a] >= RARITY_MULT[b]`: rzadkość wygrywa najpierw, przy REMISIE
+      rzadkości wygrywa wyższy `value` (odpowiedź user #2 wyżej).
+      **Migracja** (`onRehydrateStorage` w petStore.ts) — stare zapisy mają `ownedGear[id]`
+      jako SAM string rzadkości; backfill do `{rarity, value}` liczy `value` STARYM
+      deterministycznym `gearStatValue` (środek dzisiejszego przedziału) — gracz zachowuje
+      DOKŁADNIE tę samą moc co przed migracją, żaden roll nic nie odbiera/dodaje z zaskoczenia
+      przy update'cie apki. Brakujący `gearById` (item usunięty z katalogu) pomija wpis zamiast
+      crashować migrację.
+      Testy zaktualizowane pod nowy kształt (`gear.test.ts`, `grantGear.test.ts`,
+      `buyDailyGear.test.ts`, `petBoxes.test.ts`) + nowy test explicit na "lepszy roll w TEJ
+      SAMEJ rzadkości = upgrade" w obu `grantGear.test.ts` i `buyDailyGear.test.ts`.
   - **Krok 8 (OSTATNI z planu) — wpięcie gear w realne formuły walki/ekonomii, SYSTEM
     KOMPLETNY** (2026-08-19). PRZED wpięciem: rebalans `GEAR_ITEMS` baseValue w gear.ts —
     pierwsze przejście dałoby mythic T5 do 45-90% z JEDNEGO itemu, node-owe policzenie

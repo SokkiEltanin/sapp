@@ -148,7 +148,8 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
   });
 
   test('gearCombatBonuses: jeden założony item dokłada się do właściwego statu', () => {
-    const b = gearCombatBonuses({ helm: 'helm_slomiany' }, { helm_slomiany: 'common' });
+    const helmSlomiany = gearById('helm_slomiany')!;
+    const b = gearCombatBonuses({ helm: 'helm_slomiany' }, { helm_slomiany: { rarity: 'common', value: gearStatValue(helmSlomiany, 'common') } });
     expect(b).toEqual({ atk: 0, dodge: 0, crit: 0.0015, energyMult: 0 });
   });
 
@@ -159,8 +160,12 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
   // gear.ts, to sygnał że ktoś przypadkiem złamał tę kalibrację, nie "false positive".
   test('pełny mityczny T5 loadout (wszystkie 4 sloty walki) zostaje WYRAŹNIE poniżej sumy bonusów z całej kampanii', () => {
     const equipped = { helm: 'helm_koronaBurzy', buty: 'buty_kometa', obroza: 'obroza_tytan', talizman: 'talizman_nieskonczonosc' };
-    const owned = { helm_koronaBurzy: 'mythic', buty_kometa: 'mythic', obroza_tytan: 'mythic', talizman_nieskonczonosc: 'mythic' } as const;
-    const b = gearCombatBonuses(equipped as any, owned as any);
+    const mythicOwned = (itemId: string) => ({ rarity: 'mythic' as const, value: gearStatValue(gearById(itemId)!, 'mythic') });
+    const owned = {
+      helm_koronaBurzy: mythicOwned('helm_koronaBurzy'), buty_kometa: mythicOwned('buty_kometa'),
+      obroza_tytan: mythicOwned('obroza_tytan'), talizman_nieskonczonosc: mythicOwned('talizman_nieskonczonosc'),
+    };
+    const b = gearCombatBonuses(equipped as any, owned);
     const CAMPAIGN_SUM = { atk: 0.92, dodge: 0.72, crit: 0.36, energyMult: 0.75 };
     expect(b.crit).toBeLessThan(CAMPAIGN_SUM.crit);
     expect(b.dodge).toBeLessThan(CAMPAIGN_SUM.dodge);
@@ -174,7 +179,8 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
   });
 
   test('gearFlatHp: mityczna T5 zbroja zostaje wyraźnie poniżej CAT_BASE_MAX_HP (100)', () => {
-    const hp = gearFlatHp({ zbroja: 'zbroja_aegis' }, { zbroja_aegis: 'mythic' });
+    const zbrojaAegis = gearById('zbroja_aegis')!;
+    const hp = gearFlatHp({ zbroja: 'zbroja_aegis' }, { zbroja_aegis: { rarity: 'mythic', value: gearStatValue(zbrojaAegis, 'mythic') } });
     expect(hp).toBeLessThan(100);
     expect(hp).toBeGreaterThan(0);
   });
@@ -186,15 +192,21 @@ describe('gear — wpięcie w walkę/ekonomię (krok 8)', () => {
     expect(gearCoinsMult({}, {})).toBe(1);
   });
   test('gearCoinsMult: mityczne T5 kolczyki dają rozsądny, nie absurdalny bonus', () => {
-    const mult = gearCoinsMult({ kolczyki: 'kolczyki_krezus' }, { kolczyki_krezus: 'mythic' });
+    const kolczykiKrezus = gearById('kolczyki_krezus')!;
+    const mult = gearCoinsMult({ kolczyki: 'kolczyki_krezus' }, { kolczyki_krezus: { rarity: 'mythic', value: gearStatValue(kolczykiKrezus, 'mythic') } });
     expect(mult).toBeGreaterThan(1);
     expect(mult).toBeLessThan(1.5); // +50% złota z jednego itemu byłoby już za dużo
   });
 
   test('gearCombatBonuses ignoruje sloty bez odpowiednika w Bonuses (zbroja/kolczyki)', () => {
+    const zbrojaSzmaciana = gearById('zbroja_szmaciana')!;
+    const kolczykiDrewniane = gearById('kolczyki_drewniane')!;
     const b = gearCombatBonuses(
       { zbroja: 'zbroja_szmaciana', kolczyki: 'kolczyki_drewniane' },
-      { zbroja_szmaciana: 'common', kolczyki_drewniane: 'common' },
+      {
+        zbroja_szmaciana: { rarity: 'common', value: gearStatValue(zbrojaSzmaciana, 'common') },
+        kolczyki_drewniane: { rarity: 'common', value: gearStatValue(kolczykiDrewniane, 'common') },
+      },
     );
     expect(b).toEqual({ atk: 0, dodge: 0, crit: 0, energyMult: 0 });
   });

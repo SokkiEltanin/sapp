@@ -5,8 +5,8 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { usePetStore } from '@/store/petStore';
 import {
-  GEAR_SLOTS, GearSlot, GearRarity, RARITY_META, SLOT_META, SLOT_STAT,
-  gearById, gearBySlot, gearStatValue, gearSellValue, GEAR_STAT_LABEL, fmtGearStat,
+  GEAR_SLOTS, GearSlot, RARITY_META, SLOT_META, SLOT_STAT,
+  gearById, gearBySlot, gearSellValue, GEAR_STAT_LABEL, fmtGearStat,
 } from '@/utils/gear';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -47,8 +47,8 @@ export default function GearPanel({ children }: { children: ReactNode }) {
     // leciała generyczna emoji/ikona SLOTU, nie itemu). Puste sloty ZOSTAJĄ na `SLOT_ICON`
     // (kategoria, nie ma czego pokazać).
     const equippedItem = equippedId ? gearById(equippedId) : undefined;
-    const rarity = equippedId ? ownedGear[equippedId] : undefined;
-    const meta = rarity ? RARITY_META[rarity] : null;
+    const owned = equippedId ? ownedGear[equippedId] : undefined;
+    const meta = owned ? RARITY_META[owned.rarity] : null;
     const ownedCount = gearBySlot(slot).filter(g => ownedGear[g.id]).length;
     const Icon = SLOT_ICON[slot];
     return (
@@ -90,8 +90,8 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
   const items = gearBySlot(slot).filter(g => ownedGear[g.id]);
   const equippedId = equippedGear[slot];
   const equippedItem = equippedId ? gearById(equippedId) : undefined;
-  const equippedRarity = equippedId ? ownedGear[equippedId] : undefined;
-  const equippedVal = equippedItem && equippedRarity ? gearStatValue(equippedItem, equippedRarity) : 0;
+  const equippedOwned = equippedId ? ownedGear[equippedId] : undefined;
+  const equippedVal = equippedOwned ? equippedOwned.value : 0;
   const stat = SLOT_STAT[slot];
 
   return (
@@ -109,9 +109,10 @@ function GearSlotModal({ slot, onClose }: { slot: GearSlot | null; onClose: () =
           ) : (
             <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
               {items.map(item => {
-                const rarity = ownedGear[item.id]!;
+                const owned = ownedGear[item.id]!;
+                const rarity = owned.rarity;
                 const meta = RARITY_META[rarity];
-                const val = gearStatValue(item, rarity);
+                const val = owned.value;
                 const delta = val - equippedVal;
                 const isEquipped = equippedId === item.id;
                 return (
