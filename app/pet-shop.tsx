@@ -57,7 +57,7 @@ function fmtShopRefresh(): string {
 // Sklep (2026-08-19, restrukturyzacja) — kosmetyka kotka (kolory/oczy/nosek/dodatki)
 // PRZENIESIONA do PetCustomizeModal (modal edycji imienia na /pet) — user: "nie przecież
 // kliknięciem głaskam kotka to nie może... lepiej dać przy edycji imienia". Ten ekran zostaje
-// czysto "co kupić za gold": skrzynki (gacha), sklep dnia (3 konkretne itemy ekwipunku,
+// czysto "co kupić za gold": skrzynki (gacha), sklep dnia (4 konkretne itemy ekwipunku,
 // gwarantowany zakup, roluje się co dzień), startupy (kosmetyk ekranu ładowania — TO
 // zostaje tu, to nie "kotek"), posiadane (startupy).
 // `boxes`+`daily` SCALONE w JEDNĄ zakładkę `market` (2026-08-27, user: "w sklepie połączmy
@@ -144,7 +144,7 @@ export default function PetShop() {
     setReveal({ box: DAILY_BOX, reward, dupeCoins });
   };
 
-  // Sklep dnia — 3 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
+  // Sklep dnia — 4 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
   // co dzień o 6:00 rano (dailyShopSlots w gear.ts, deterministycznie po `shopDayKey`).
   const dailySlots = useMemo(() => dailyShopSlots(shopDayKey(), petLevel), [petLevel]);
   // Posiadasz już ten item w tej rzadkości LUB lepszej? (2026-08-26, user: "kupiłem item który
@@ -280,35 +280,42 @@ export default function PetShop() {
 
             <View style={{ gap: spacing[2] }}>
               <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
-              <Text style={s.blurbTop}>3 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
+              <Text style={s.blurbTop}>4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
               <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
               {dailySlots.length === 0 && (
                 <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
               )}
-              {dailySlots.map(slot => {
-                const { item, rarity, cost } = slot;
-                const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
-                const bought = !!dayClaims[dayKey];
-                const owned = alreadyOwnGear(item.id, rarity);
-                const meta = RARITY_META[rarity];
-                const afford = coins >= cost;
-                return (
-                  <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }}>
-                    <View style={[s.boxRow, { borderColor: meta.color + '55' }]}>
-                      <View style={[s.boxIcon, { backgroundColor: meta.color + '1E', borderColor: meta.color + '55' }]}>
-                        <Image source={item.icon} style={s.boxImg} resizeMode="contain" />
+              {/* Siatka 4 obok siebie, TYLKO ikona (2026-08-31, user: "zwiększymy do 4 itemów...
+                  ustawić itemy po 4 obok siebie tylko z ikoną, mi po kliknięciu pokazuje się
+                  popup ze statystykami i formularzem zakupu i porównania z założonym") —
+                  dawniej pełnoszerokościowy wiersz z nazwą/rzadkością/ceną wprost na liście,
+                  za wąski na 4 w rzędzie. Nazwa/rzadkość/cena/porównanie NIE zniknęły —
+                  przeniosły się w całości do `GearPreviewModal` (już istniał, patrz
+                  `gearPreview` state — ten sam popup co wcześniej, tu tylko zmienia się TRIGGER
+                  z pełnego wiersza na mały kafelek). Kafelek zostaje z jedynym stanowym
+                  wskaźnikiem (✓ posiadane/kupione) — bez niego nie dałoby się w ogóle
+                  odróżnić dostępnego od odebranego bez otwierania popupu za każdym razem. */}
+              <View style={s.dailyGrid}>
+                {dailySlots.map(slot => {
+                  const { item, rarity } = slot;
+                  const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
+                  const bought = !!dayClaims[dayKey];
+                  const owned = alreadyOwnGear(item.id, rarity);
+                  const meta = RARITY_META[rarity];
+                  return (
+                    <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={s.dailyTileWrap}>
+                      <View style={[s.dailyTile, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
+                        <Image source={item.icon} style={s.dailyTileImg} resizeMode="contain" />
+                        {(bought || owned) && (
+                          <View style={[s.dailyTileCheck, { backgroundColor: meta.color }]}>
+                            <Check size={11} color="#0B0E1A" strokeWidth={3} />
+                          </View>
+                        )}
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.cellName}>{item.name}</Text>
-                        <Text style={[s.cellState, { color: meta.color }]}>{meta.label} · {SLOT_META[item.slot].label}</Text>
-                      </View>
-                      {bought || owned
-                        ? <Check size={18} color={meta.color} />
-                        : <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{cost}</Text></View>}
-                    </View>
-                  </PressableScale>
-                );
-              })}
+                    </PressableScale>
+                  );
+                })}
+              </View>
             </View>
           </View>
         )}
@@ -510,6 +517,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   oddsTxt: { fontSize: 10, color: c.text.muted, marginTop: 3, fontWeight: '600' },
   blurbTop: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
   refreshTxt: { fontSize: 10.5, color: c.text.muted, fontWeight: '700', marginTop: -4 },
+
+  // Siatka Sklepu dnia — 4 kwadratowe kafelki obok siebie, tylo ikona (2026-08-31, patrz
+  // komentarz przy JSX). `width:'23%'` + `justifyContent:'space-between'` (nie `gap`) —
+  // odstęp między kafelkami wynika z ROZŁOŻENIA reszty szerokości, więc zawsze dokładnie 4 w
+  // rzędzie bez ręcznego liczenia dp na różnych szerokościach ekranu. `aspectRatio:1` robi
+  // kwadrat z dowolnej wyliczonej szerokości zamiast sztywnej wysokości w px.
+  dailyGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing[2] },
+  dailyTileWrap: { width: '23%' },
+  dailyTile: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dailyTileImg: { width: '58%', height: '58%' },
+  dailyTileCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 
   subHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[1] },
   tierDot: { width: 8, height: 8, borderRadius: 4 },

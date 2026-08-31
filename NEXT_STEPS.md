@@ -3,6 +3,44 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 UI: Sklep dnia — 4 itemy, siatka tylko-ikona zamiast pełnych wierszy — NIEsprawdzone (2026-08-31)
+
+User: "zrób ładniej ten sklep, zwiększymy do 4 itemów... ustawić itemy po 4 obok siebie tylko
+z ikoną, mi po kliknięciu pokazuje się popup ze statystykami i formularzem zakupu i
+porównania z założonym". `dailyShopSlots` 3→4 (domyślny `count`), nowa `s.dailyGrid` (4
+kwadratowe kafelki tylko-ikona + ✓ jeśli posiadane) zastępuje pełnoszerokościowe wiersze
+(które ZOSTAJĄ dla Skrzynek — nietknięte). Popup ze statystykami/porównaniem/zakupem to
+`GearPreviewModal`, który JUŻ ISTNIAŁ od 2026-08-22 — tylko trigger się zmienił, nie treść.
+Pełny opis w ARCHITECTURE.md. `tsc`/`jest` zielone (64/791, jeden test w `gear.test.ts`
+zaktualizowany na nowy domyślny count 4). **Priorytet testu na urządzeniu**: zakładka
+Rynek → Sklep dnia — 4 kafelki obok siebie, tap otwiera popup ze statystykami/porównaniem,
+zakup działa tak jak wcześniej.
+
+**Druga część tej samej wiadomości, NIE zrobiona w tym PR — potrzebna decyzja projektowa**:
+user chce, żeby itemy ekwipunku mogły dropić z LOSOWYM rozstrzałem statu w danej rzadkości
+(przykład: "0.5-2% dmg dodatkowego") zamiast dzisiejszej sztywnej wartości
+`baseValue × RARITY_MULT[rarity]` (w pełni deterministycznej dla danego item+rzadkość, patrz
+`gearStatValue` w `gear.ts`). To DUŻA zmiana, nie kosmetyczna:
+- `ownedGear: Record<itemId, rarity>` musiałoby się zmienić na coś przechowującego KONKRETNY
+  wylosowany wynik per posiadana kopia (nie tylko rzadkość) — dotyka `petStore.ts` (kształt
+  stanu + migracja istniejących zapisów graczy), `grantGear`/`buyDailyGear` (co się dokładnie
+  zapisuje), WSZYSTKICH miejsc czytających staty (`gearStatValue`, `gearCombatBonuses`,
+  `gearFlatHp`, `gearCoinsMult`, `GearPreviewModal`, `GearSlotModal` w `GearPanel.tsx`).
+- Konflikt z ISTNIEJĄCYM, starannie wyliczonym balansem: `baseValue` w `gear.ts` ma długi
+  komentarz uzasadniający DOKŁADNIE te liczby (żeby mythic T5 nie przebijał całej sumy lootu
+  kampanii) — rozstrzał wymaga przemyślenia czy to ŚRODEK zakresu czy coś innego, żeby nie
+  rozwalić tego balansu przypadkiem.
+- Konflikt z "gwarantowany zakup, NIE loteria" w Sklepie dnia — czy losowa wartość w Sklepie
+  dnia dalej jest deterministyczna PER DZIEŃ (ten sam roll dla wszystkich danego dnia, zgodnie
+  z dotychczasową filozofią) czy realnie losowa przy każdym zakupie (co zaprzeczałoby "nie
+  loterii")?
+- Czy dubel tej samej rzadkości z LEPSZYM rollem powinien dać się "przehandlować" (re-roll na
+  lepszą wartość w tej samej rzadkości), czy porównanie zostaje WYŁĄCZNIE po rzadkości jak
+  dziś (nowy roll tej samej rzadkości = zawsze "już masz", niezależnie od wylosowanej
+  wartości)?
+Nie zgadywane celowo — zbyt duży, nieodwracalny (dane graczy) fork bez jasnej odpowiedzi na
+te pytania. Czeka na doprecyzowanie.
+
 ## 🆕 BUG/UX: usunięta jasna "otoczka" za czarnym kotkiem na pasku misji — NIEsprawdzone (2026-08-30)
 
 User ze screenshotem ekranu Pupil (czarny kot "Fafik"): "czemu jak mam czarnego kota to
