@@ -161,9 +161,55 @@ export function gearBySlot(slot: GearSlot): GearItemDef[] {
   return GEAR_ITEMS.filter(g => g.slot === slot);
 }
 
-// Finalna wartość statu itemu w danej rzadkości.
+// Finalna wartość statu itemu w danej rzadkości — ŚRODEK rozstrzału (patrz niżej), nie
+// realna wartość konkretnej posiadanej kopii od 2026-08-31. Dalej użyteczne jako "typowa"/
+// oczekiwana wartość do zapowiedzi PRZED zdobyciem (np. etykieta rzadkości w kolorze) i jako
+// punkt odniesienia dla `gearValueRange`.
 export function gearStatValue(item: GearItemDef, rarity: GearRarity): number {
   return item.baseValue * RARITY_MULT[rarity];
+}
+
+// ── Rozstrzał wartości w danej rzadkości (2026-08-31) ───────────────────────────────────
+// User: "itemy od teraz mogą dropić w przedziałach... i się losują" — zamiast sztywnej
+// wartości per (item, rzadkość), każda ZDOBYTA kopia dostaje WŁASNY roll w przedziale wokół
+// dotychczasowego `gearStatValue` (środek, nie zmieniony — cały istniejący, starannie
+// wyliczony balans `baseValue`/`RARITY_MULT` wyżej w tym pliku ZOSTAJE punktem odniesienia,
+// rozstrzał go tylko rozmywa w obie strony, nie podbija). ±30% — TODO-balance, brak danych
+// z playtestów, jak reszta liczb w tym pliku; wystarczająco szeroko żeby "dobry"/"zły" roll
+// tej samej rzadkości było czuć, wystarczająco wąsko żeby rzadkość dalej była głównym
+// czynnikiem mocy (najlepszy roll common nie zbliża się do najgorszego rare: 1.3×common ≪
+// 0.7×rare przy RARITY_MULT common=1/rare=5).
+export const GEAR_ROLL_SPREAD: [number, number] = [0.7, 1.3];
+
+export function gearValueRange(item: GearItemDef, rarity: GearRarity): [number, number] {
+  const center = gearStatValue(item, rarity);
+  return [center * GEAR_ROLL_SPREAD[0], center * GEAR_ROLL_SPREAD[1]];
+}
+
+// Losuje realną wartość konkretnej kopii. `rand` — domyślnie `Math.random` (skrzynki, patrz
+// petBoxes.ts/petStore.ts openCrate — prawdziwa loteria), ale wołający może podać SEEDOWANĄ
+// funkcję (Sklep dnia — ten sam deterministyczny wzorzec co reszta `dailyShopSlots` niżej,
+// żeby roll też był identyczny dla wszystkich danego dnia, zgodnie z "gwarantowany zakup, nie
+// loteria").
+export function rollGearValue(item: GearItemDef, rarity: GearRarity, rand: () => number = Math.random): number {
+  const [min, max] = gearValueRange(item, rarity);
+  return min + rand() * (max - min);
+}
+
+// Posiadana kopia itemu — rzadkość ORAZ konkretny wylosowany wynik (nie tylko rzadkość jak
+// przed 2026-08-31). Jeden slot w `ownedGear` (petStore.ts) = NAJLEPSZA dotąd zdobyta kopia
+// tego itemu, S&F-style — patrz `isGearUpgrade` niżej za regułę "co liczy się jako lepsze".
+export interface OwnedGear { rarity: GearRarity; value: number }
+
+// Czy `next` jest ulepszeniem względem `cur` (albo `cur` w ogóle nie ma — zawsze ulepszenie)?
+// Rzadkość wygrywa NAJPIERW (wyższy tier zawsze lepszy, niezależnie od rolla) — dopiero PRZY
+// RÓWNEJ rzadkości decyduje wyższa wylosowana wartość (user: "lepszy roll w tej samej
+// rzadkości to realny upgrade" — ARPG-owe podbijanie tej samej rzadkości lepszym rollem, nie
+// tylko zbieranie wyższych tierów).
+export function isGearUpgrade(next: OwnedGear, cur: OwnedGear | undefined): boolean {
+  if (!cur) return true;
+  if (RARITY_MULT[next.rarity] !== RARITY_MULT[cur.rarity]) return RARITY_MULT[next.rarity] > RARITY_MULT[cur.rarity];
+  return next.value > cur.value;
 }
 
 // Formatowanie statów do UI — WYDZIELONE z GearPanel.tsx (2026-08-22, user: "jak klikam w
@@ -217,7 +263,7 @@ function dailyRarityFor(seed: string): GearRarity {
   return 'common';
 }
 
-export interface DailyShopSlot { item: GearItemDef; rarity: GearRarity; cost: number }
+export interface DailyShopSlot { item: GearItemDef; rarity: GearRarity; cost: number; value: number }
 
 export function dailyShopSlots(date: string, level: number, count = 4): DailyShopSlot[] {
   const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, level));
@@ -229,7 +275,12 @@ export function dailyShopSlots(date: string, level: number, count = 4): DailySho
     const rarity = dailyRarityFor(date + item.id);
     const tierIdx = Math.max(0, TIER_LEVELS.indexOf(item.unlockLevel));
     const cost = Math.round(TIER_BASE_COST[tierIdx] * DAILY_RARITY_COST_MULT[rarity]);
-    return { item, rarity, cost };
+    // Roll deterministyczny per dzień (2026-08-31, user wybrał tę opcję wprost) — TEN SAM
+    // seedowany wzorzec (`pseudoRandom01`) co `rarity`/dobór itemów wyżej, osobny seed-suffix
+    // ('|value') żeby nie kolidować z rzutem rzadkości na tym samym seedzie. Każdy widzi
+    // identyczny roll danego dnia — zgodnie z "gwarantowany zakup, nie loteria".
+    const value = rollGearValue(item, rarity, () => pseudoRandom01(date + item.id + '|value'));
+    return { item, rarity, cost, value };
   });
 }
 
@@ -256,16 +307,17 @@ export interface GearCombatBonuses { atk: number; dodge: number; crit: number; e
 
 export function gearCombatBonuses(
   equippedGear: Partial<Record<GearSlot, string>>,
-  ownedGear: Partial<Record<string, GearRarity>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
 ): GearCombatBonuses {
   const out: GearCombatBonuses = { atk: 0, dodge: 0, crit: 0, energyMult: 0 };
   for (const slot of GEAR_SLOTS) {
     const itemId = equippedGear[slot];
     if (!itemId) continue;
-    const item = gearById(itemId);
-    const rarity = ownedGear[itemId];
-    if (!item || !rarity) continue;
-    const val = gearStatValue(item, rarity);
+    const owned = ownedGear[itemId];
+    if (!owned) continue;
+    // Czyta REALNY wylosowany `.value` posiadanej kopii (2026-08-31), nie
+    // `gearStatValue(item, rarity)` — dwie kopie tej samej rzadkości mogą mieć różną moc.
+    const val = owned.value;
     const stat = SLOT_STAT[slot];
     if (stat === 'critPct') out.crit += val;
     else if (stat === 'dodgePct') out.dodge += val;
@@ -280,14 +332,13 @@ export function gearCombatBonuses(
 // pokazywałby się w statach ale nie chroniłby kotka naprawdę w walce.
 export function gearFlatHp(
   equippedGear: Partial<Record<GearSlot, string>>,
-  ownedGear: Partial<Record<string, GearRarity>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
 ): number {
   const itemId = equippedGear.zbroja;
   if (!itemId) return 0;
-  const item = gearById(itemId);
-  const rarity = ownedGear[itemId];
-  if (!item || !rarity) return 0;
-  return gearStatValue(item, rarity);
+  const owned = ownedGear[itemId];
+  if (!owned) return 0;
+  return owned.value;
 }
 
 // Mnożnik do nagrody monet z walki (1 = bez bonusu). Wołane w JEDNYM miejscu —
@@ -295,12 +346,11 @@ export function gearFlatHp(
 // wszystkich 6 trybów walki), żeby nie trzeba było mnożyć w wielu rozrzuconych miejscach.
 export function gearCoinsMult(
   equippedGear: Partial<Record<GearSlot, string>>,
-  ownedGear: Partial<Record<string, GearRarity>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
 ): number {
   const itemId = equippedGear.kolczyki;
   if (!itemId) return 1;
-  const item = gearById(itemId);
-  const rarity = ownedGear[itemId];
-  if (!item || !rarity) return 1;
-  return 1 + gearStatValue(item, rarity);
+  const owned = ownedGear[itemId];
+  if (!owned) return 1;
+  return 1 + owned.value;
 }

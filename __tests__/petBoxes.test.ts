@@ -1,5 +1,6 @@
 import { boxById, rollBox, LOOT_BOXES } from '@/utils/petBoxes';
 import { ShopColor } from '@/utils/petShop';
+import { gearById, gearValueRange } from '@/utils/gear';
 
 // rollBox kaskaduje kilka niezależnych progów (kolor → startup → zamrożenie → EKWIPUNEK →
 // monety) i czyta Math.random() bez wstrzykiwania. Sekwencja mockReturnValueOnce dla
@@ -62,13 +63,16 @@ describe('petBoxes — rollBox (kaskada stref prawdopodobieństwa)', () => {
   test('strefa ekwipunku: r w zakresie gearChance → nagroda typu gear, item wg poziomu odblokowania', () => {
     // sardine: [0.25, 0.40). Drugi rzut=0 → floor(0*N)=0 → pierwszy odblokowany item
     // (helm_slomiany, T1/Lv1 — GEAR_SLOTS zaczyna się od 'helm'). Trzeci rzut=0 → pierwsza
-    // rzadkość z niezerową wagą w gearRarityWeight (common, insertion order).
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    // rzadkość z niezerową wagą w gearRarityWeight (common, insertion order). Czwarty rzut=0
+    // (2026-08-31, rollGearValue) → dolna granica przedziału (min z gearValueRange, ×0.7 od
+    // środka balansu — patrz GEAR_ROLL_SPREAD w gear.ts).
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(0);
     const reward = rollBox(sardine, [], [], 1);
-    expect(reward).toEqual({ type: 'gear', itemId: 'helm_slomiany', name: 'Słomiany Kapelusz', slot: 'helm', rarity: 'common' });
+    const [minVal] = gearValueRange(gearById('helm_slomiany')!, 'common');
+    expect(reward).toEqual({ type: 'gear', itemId: 'helm_slomiany', name: 'Słomiany Kapelusz', slot: 'helm', rarity: 'common', value: minVal });
   });
   test('strefa ekwipunku: item niedostępny na niskim poziomie nie może wypaść (pula filtrowana wg unlockLevel)', () => {
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0).mockReturnValueOnce(0);
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.30).mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(0);
     const reward = rollBox(sardine, [], [], 1);
     expect(reward.type).toBe('gear');
     if (reward.type === 'gear') expect(reward.itemId).not.toBe('helm_koronaBurzy'); // unlockLevel=90

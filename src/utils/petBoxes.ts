@@ -4,7 +4,7 @@
 import { CrateTier } from '@/utils/crates';
 import { CosmeticTier, ShopColor } from '@/utils/petShop';
 import { STARTUPS } from '@/utils/petStartups';
-import { GearRarity, unlockedGearFor, GEAR_SLOTS } from '@/utils/gear';
+import { GearRarity, unlockedGearFor, GEAR_SLOTS, rollGearValue } from '@/utils/gear';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 
 export type BoxId = 'sardine' | 'silver' | 'gold';
@@ -97,7 +97,7 @@ export type BoxReward =
   | { type: 'startup'; startupId: string; name: string; ink: string; rarity: CrateTier }
   | { type: 'coins'; coins: number; rarity: CrateTier }
   | { type: 'freeze'; count: number; rarity: CrateTier }
-  | { type: 'gear'; itemId: string; name: string; slot: string; rarity: GearRarity }
+  | { type: 'gear'; itemId: string; name: string; slot: string; rarity: GearRarity; value: number }
   | { type: 'combatItem'; itemId: CombatItemId; name: string; level: number; isUpgrade: boolean; rarity: CrateTier };
 
 // Kolor mapuje na „mocniejszą" celebrację niż jego tier sklepowy (zdobycie koloru = święto).
@@ -150,7 +150,9 @@ export function rollBox(
     if (unlocked.length > 0) {
       const item = unlocked[Math.floor(Math.random() * unlocked.length)];
       const rarity = pickWeighted((Object.keys(box.gearRarityWeight) as GearRarity[]).map(g => ({ item: g, w: box.gearRarityWeight[g] })));
-      if (rarity) return { type: 'gear', itemId: item.id, name: item.name, slot: item.slot, rarity };
+      // Prawdziwa loteria (skrzynka) → domyślny Math.random w rollGearValue, NIE seedowany
+      // jak w Sklepie dnia (2026-08-31, "itemy mogą dropić w przedziałach" — patrz gear.ts).
+      if (rarity) return { type: 'gear', itemId: item.id, name: item.name, slot: item.slot, rarity, value: rollGearValue(item, rarity) };
     }
   }
   // 5) PERKI BOSSÓW (itemy z assets/itemybossy — user: "to ogólnie nie są itemy tylko bardziej

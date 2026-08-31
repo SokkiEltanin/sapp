@@ -4,7 +4,7 @@
 import { BOSSES, bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK, combatItemSlotsFor } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
 import { levelFromXp, catMaxHp, CAT_BASE_MAX_HP, type BossLogEntry } from '@/store/petStore';
-import { gearCombatBonuses, gearFlatHp, GearSlot, GearRarity } from '@/utils/gear';
+import { gearCombatBonuses, gearFlatHp, GearSlot, OwnedGear } from '@/utils/gear';
 
 export interface ProgressReportInput {
   xp: number;
@@ -21,7 +21,7 @@ export interface ProgressReportInput {
   resetGeneration?: number;   // 2026-08-17 — patrz komentarz w petStore.ts. Opcjonalne, żeby
   lastResetAt?: string | null; // istniejące wywołania/testy bez tych pól dalej działały.
   equippedGear?: Partial<Record<GearSlot, string>>;   // 2026-08-19 — krok 8, opcjonalne z tego
-  ownedGear?: Partial<Record<string, GearRarity>>;    // samego powodu co pola resetu wyżej.
+  ownedGear?: Partial<Record<string, OwnedGear>>;    // samego powodu co pola resetu wyżej.
 }
 
 const KIND_LABEL: Record<BossLogEntry['kind'], string> = {

@@ -191,7 +191,7 @@ export default function Pet() {
     else if (reward.type === 'startup') grantStartup(reward.startupId);
     else if (reward.type === 'coins') addCoins(reward.coins);
     else if (reward.type === 'freeze') addFreezes(reward.count);
-    else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity); if (c > 0) dupeCoins = c; }
+    else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
     else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
     haptic.success();
     setBoxReveal({ box: DAILY_BOX, reward, dupeCoins });

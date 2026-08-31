@@ -8,7 +8,7 @@ import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick
 import { missionMinutesFor, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST } from '@/utils/raid';
-import { GearSlot, GearRarity, gearById, RARITY_MULT, gearFlatHp, gearCombatBonuses, gearSellValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
+import { GearSlot, GearRarity, OwnedGear, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, isGearUpgrade, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
@@ -33,7 +33,7 @@ export function catMaxHp(bonus: number): number { return CAT_BASE_MAX_HP + Math.
 function campaignEnergyMax(
   ownedItems: string[],
   equippedGear: Partial<Record<GearSlot, string>>,
-  ownedGear: Partial<Record<string, GearRarity>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
 ): number {
   const loot = bossBonuses(ownedItems);
   const gear = gearCombatBonuses(equippedGear, ownedGear);
@@ -208,10 +208,12 @@ interface PetState {
   equippedCombatItems: CombatItemId[];   // max COMBAT_ITEM_SLOTS
   // ── ekwipunek pasywny (gear.ts) — 6 slotów, staty na stałe, w odróżnieniu od itemów
   // bojowych powyżej (aktywne zdolności w walce). Klucz nieobecny = nieposiadany. Wartość =
-  // NAJLEPSZA zdobyta rzadkość tego itemu (S&F-style — dubel w gorszej rzadkości nic nie
-  // daje). NIC jeszcze tego nie czyta w walce/ekonomii — czysto dodatkowy stan (patrz
-  // NEXT_STEPS.md "SYSTEM EKWIPUNKU", krok 2 — wpięcie staty to świadomie osobny krok).
-  ownedGear: Partial<Record<string, GearRarity>>;
+  // NAJLEPSZA dotąd zdobyta KOPIA tego itemu (S&F-style — dubel gorszy niż `isGearUpgrade`
+  // nic nie daje). Od 2026-08-31: rzadkość ORAZ konkretny wylosowany `.value` (nie tylko
+  // rzadkość — patrz `OwnedGear`/`isGearUpgrade` w gear.ts, "itemy mogą dropić w
+  // przedziałach"). Stary zapis (`Record<id, GearRarity>`, sama rzadkość jako string)
+  // migrowany w `onRehydrateStorage` niżej.
+  ownedGear: Partial<Record<string, OwnedGear>>;
   equippedGear: Partial<Record<GearSlot, string>>;   // slot → id założonego itemu
   // Jednorazowy onboarding (imię + wygląd) przy pierwszym uruchomieniu — patrz setOnboarded.
   onboarded: boolean;
@@ -286,7 +288,7 @@ interface PetState {
   // CHANCE_BY_TIER w crates.ts). Zawsze co najwyżej JEDNO z dwóch, nigdy oba naraz. gearDropped
   // (2026-08-20, patrz komentarz przy implementacji) — NIEZALEŻNY roll, może wypaść RAZEM z
   // itemDropped/itemLeveledUp w tym samym otwarciu.
-  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null; gearDropped: { itemId: string; name: string; rarity: GearRarity } | null } | null; // open one pending crate
+  openCrate: () => { tier: CrateTier; coins: number; itemDropped: CombatItemId | null; itemLeveledUp: { id: CombatItemId; level: number } | null; gearDropped: { itemId: string; name: string; rarity: GearRarity; value: number } | null } | null; // open one pending crate
   // boss battles
   syncEnergyRegen: () => void;  // dogania tyknięcia regeneracji energii kampanii/MAD które minęły offline
   attackBoss: (bossId: string, maxHp: number, damage: number, dodge: number) => { remaining: number; defeated: boolean };
@@ -333,14 +335,14 @@ interface PetState {
   grantOrLevelCombatItem: (id: CombatItemId, level: number) => void;            // ze skrzynek sklepowych (rollBox 'combatItem') — bezwarunkowo ustawia poziom, decyzję nowy/upgrade podjął już rollBox()
   equipCombatItem: (id: CombatItemId) => boolean;                               // false = brak slotu lub nieposiadany
   unequipCombatItem: (id: CombatItemId) => void;
-  grantGear: (itemId: string, rarity: GearRarity) => number;   // ze skrzynki/daily shopu; zwraca 0 gdy przyznano item, kwotę monet gdy duplikat (≥ tę rzadkość) skompensowano monetami zamiast go wyrzucić
+  grantGear: (itemId: string, rarity: GearRarity, value: number) => number;   // ze skrzynki/daily shopu; zwraca 0 gdy przyznano/ulepszono item (isGearUpgrade), kwotę monet gdy NIE lepszy — skompensowano monetami zamiast go wyrzucić
   equipGear: (itemId: string) => boolean;                     // false = nieposiadany lub poziom za niski
   unequipGear: (slot: GearSlot) => void;
   sellGear: (itemId: string) => number;   // sprzedaje POSIADANY item za monety (auto-unequip jeśli założony); zwraca zarobione monety, 0 = nieposiadany
   // Sklep dnia (gear.ts dailyShopSlots) — gwarantowany zakup, nie loteria. `dayKey` unikalny
   // per (dzień, slot itemu) — ten sam mechanizm co dayClaims dla questów, żeby nie dało się
   // kupić tego samego slotu dwa razy tego samego dnia.
-  buyDailyGear: (dayKey: string, itemId: string, rarity: GearRarity, cost: number) => boolean;
+  buyDailyGear: (dayKey: string, itemId: string, rarity: GearRarity, cost: number, value: number) => boolean;
   setOnboarded: () => void;
   ackPetLevel: (level: number) => void;   // po pokazaniu celebracji level-upu
   reset: () => void;
@@ -622,7 +624,7 @@ export const usePetStore = create<PetState>()(
         // skrzynka z pieszczenia) nigdy nie wołała tej logiki. Reużywamy TĘ SAMĄ konfigurację
         // (`gearChance`/`gearRarityWeight` skrzynki 'sardine') zamiast wymyślać nową tabelę —
         // niezależny roll od itemów bojowych wyżej, może wypaść RAZEM w tym samym otwarciu.
-        let gearDropped: { itemId: string; name: string; rarity: GearRarity } | null = null;
+        let gearDropped: { itemId: string; name: string; rarity: GearRarity; value: number } | null = null;
         const sardineBox = boxById('sardine');
         if (Math.random() < sardineBox.gearChance) {
           const level = levelFromXp(s.xp).level;
@@ -630,16 +632,20 @@ export const usePetStore = create<PetState>()(
           if (unlocked.length > 0) {
             const item = unlocked[Math.floor(Math.random() * unlocked.length)];
             const rarity = pickWeighted((Object.keys(sardineBox.gearRarityWeight) as GearRarity[]).map(g => ({ item: g, w: sardineBox.gearRarityWeight[g] })));
-            if (rarity) gearDropped = { itemId: item.id, name: item.name, rarity };
+            // Prawdziwa loteria (skrzynka) → `Math.random()` domyślny w `rollGearValue`,
+            // NIE seedowany jak w Sklepie dnia (2026-08-31, patrz komentarz przy tej funkcji
+            // w gear.ts).
+            if (rarity) gearDropped = { itemId: item.id, name: item.name, rarity, value: rollGearValue(item, rarity) };
           }
         }
+        const gearUpgrade = gearDropped ? isGearUpgrade({ rarity: gearDropped.rarity, value: gearDropped.value }, s.ownedGear[gearDropped.itemId]) : false;
         set({
           pendingCrates: s.pendingCrates - 1,
           coins: s.coins + roll.coins,
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
           ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
-          ...(gearDropped && (!s.ownedGear[gearDropped.itemId] || RARITY_MULT[s.ownedGear[gearDropped.itemId]!] < RARITY_MULT[gearDropped.rarity])
-            ? { ownedGear: { ...s.ownedGear, [gearDropped.itemId]: gearDropped.rarity } } : {}),
+          ...(gearDropped && gearUpgrade
+            ? { ownedGear: { ...s.ownedGear, [gearDropped.itemId]: { rarity: gearDropped.rarity, value: gearDropped.value } } } : {}),
         });
         return { ...roll, itemDropped, itemLeveledUp, gearDropped };
       },
@@ -874,16 +880,21 @@ export const usePetStore = create<PetState>()(
       // zwraca skompensowaną kwotę (0 = normalny przyznany item) żeby wołające UI mogło
       // pokazać to uczciwie zamiast udawać że gracz dostał nową kopię (patrz `BoxRevealModal`
       // prop `dupeCoins`).
-      grantGear: (itemId, rarity) => {
+      //
+      // "Duplikat" od 2026-08-31 = `!isGearUpgrade` (rzadkość NIE wyższa, a przy równej —
+      // roll NIE lepszy), nie tylko "rzadkość nie wyższa" jak dawniej — user: "lepszy roll w
+      // tej samej rzadkości to realny upgrade". `gearSellValue` (kompensata) ZOSTAJE
+      // rarity-only (wewnętrzna "cena skupu" nie musi znać dokładnego rolla).
+      grantGear: (itemId, rarity, value) => {
         const s = get();
         const cur = s.ownedGear[itemId];
-        if (cur && RARITY_MULT[cur] >= RARITY_MULT[rarity]) {
+        if (!isGearUpgrade({ rarity, value }, cur)) {
           const item = gearById(itemId);
           const coins = item ? gearSellValue(item, rarity) : 0;
           if (coins > 0) set({ coins: s.coins + coins });
           return coins;
         }
-        set({ ownedGear: { ...s.ownedGear, [itemId]: rarity } });
+        set({ ownedGear: { ...s.ownedGear, [itemId]: { rarity, value } } });
         return 0;
       },
       equipGear: (itemId) => {
@@ -901,13 +912,14 @@ export const usePetStore = create<PetState>()(
       }),
       // Sprzedaż (2026-08-20, user: "co robimy z itemami co sa słabsze ale je mamy w eq?
       // mozna je sprzedać?"). Auto-zdejmuje ze slotu jeśli akurat założony (nie da się
-      // sprzedać czegoś co dalej "jest na kotku") — `gearSellValue` w gear.ts liczy monety.
+      // sprzedać czegoś co dalej "jest na kotku") — `gearSellValue` w gear.ts liczy monety
+      // (rarity-only, patrz komentarz przy `grantGear` wyżej).
       sellGear: (itemId) => {
         const s = get();
-        const rarity = s.ownedGear[itemId];
+        const owned = s.ownedGear[itemId];
         const item = gearById(itemId);
-        if (!rarity || !item) return 0;
-        const coinsEarned = gearSellValue(item, rarity);
+        if (!owned || !item) return 0;
+        const coinsEarned = gearSellValue(item, owned.rarity);
         const nextOwned = { ...s.ownedGear };
         delete nextOwned[itemId];
         const nextEquipped = { ...s.equippedGear };
@@ -923,17 +935,20 @@ export const usePetStore = create<PetState>()(
       // zakup wcześniej (return false, PRZED odjęciem monet/zużyciem slotu) — UI
       // (`pet-shop.tsx`) i tak nie powinien nawet pokazać przycisku "Kup" w tym stanie, ale
       // ten guard jest tu, na poziomie store'u, jako prawdziwe źródło prawdy (nie tylko UI).
-      buyDailyGear: (dayKey, itemId, rarity, cost) => {
+      // `alreadyHave` od 2026-08-31 = `!isGearUpgrade` (patrz `grantGear` wyżej) — sklep dnia
+      // teraz oferuje deterministyczny, ale KONKRETNY roll (`value`, patrz `dailyShopSlots`
+      // w gear.ts), więc "już mam" musi też uwzględniać czy TEN roll jest lepszy niż
+      // posiadany, nie tylko rzadkość.
+      buyDailyGear: (dayKey, itemId, rarity, cost, value) => {
         const s = get();
         if (s.dayClaims[dayKey]) return false;
         const cur = s.ownedGear[itemId];
-        const alreadyHave = cur && RARITY_MULT[cur] >= RARITY_MULT[rarity];
-        if (alreadyHave) return false;
+        if (!isGearUpgrade({ rarity, value }, cur)) return false;
         if (s.coins < cost) return false;
         set({
           coins: s.coins - cost,
           dayClaims: { ...s.dayClaims, [dayKey]: true },
-          ownedGear: { ...s.ownedGear, [itemId]: rarity },
+          ownedGear: { ...s.ownedGear, [itemId]: { rarity, value } },
         });
         return true;
       },
@@ -1019,6 +1034,22 @@ export const usePetStore = create<PetState>()(
         // istniejącego, już nazwanego pupila, onboarding ma się pokazać TYLKO nowym pupilom
         // (initial state w create() ustawia false, to migracyjny fallback dla starych zapisów).
         state.ownedGear = state.ownedGear ?? {};
+        // Migracja rozstrzału wartości (2026-08-31) — stary zapis trzymał `ownedGear[id]`
+        // jako SAM string rzadkości (np. `"common"`), nowy kształt to `{rarity, value}`
+        // (patrz `OwnedGear` w gear.ts). Backfill: dla każdego wpisu, który jest jeszcze
+        // stringiem, oblicz `value` STARYM deterministycznym wzorem `gearStatValue`
+        // (`baseValue × RARITY_MULT`, środek dzisiejszego rozstrzału) — gracz zachowuje
+        // DOKŁADNIE tę samą moc co miał przed migracją, żaden roll nic mu nie odbiera ani nie
+        // dodaje z zaskoczenia. Brakujący `gearById` (item usunięty z katalogu — nie powinno
+        // się zdarzyć, ale nie crashować migracji) po prostu pomija wpis.
+        for (const id of Object.keys(state.ownedGear)) {
+          const cur = state.ownedGear[id];
+          if (typeof cur === 'string') {
+            const item = gearById(id);
+            if (item) state.ownedGear[id] = { rarity: cur, value: gearStatValue(item, cur) };
+            else delete state.ownedGear[id];
+          }
+        }
         state.equippedGear = state.equippedGear ?? {};
         state.onboarded = state.onboarded ?? true;
         // Level-up celebration (2026-08-19) — stary zapis nie ma `lastSeenLevel`. Ustaw na

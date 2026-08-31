@@ -16,30 +16,34 @@ zaktualizowany na nowy domyślny count 4). **Priorytet testu na urządzeniu**: z
 Rynek → Sklep dnia — 4 kafelki obok siebie, tap otwiera popup ze statystykami/porównaniem,
 zakup działa tak jak wcześniej.
 
-**Druga część tej samej wiadomości, NIE zrobiona w tym PR — potrzebna decyzja projektowa**:
-user chce, żeby itemy ekwipunku mogły dropić z LOSOWYM rozstrzałem statu w danej rzadkości
-(przykład: "0.5-2% dmg dodatkowego") zamiast dzisiejszej sztywnej wartości
-`baseValue × RARITY_MULT[rarity]` (w pełni deterministycznej dla danego item+rzadkość, patrz
-`gearStatValue` w `gear.ts`). To DUŻA zmiana, nie kosmetyczna:
-- `ownedGear: Record<itemId, rarity>` musiałoby się zmienić na coś przechowującego KONKRETNY
-  wylosowany wynik per posiadana kopia (nie tylko rzadkość) — dotyka `petStore.ts` (kształt
-  stanu + migracja istniejących zapisów graczy), `grantGear`/`buyDailyGear` (co się dokładnie
-  zapisuje), WSZYSTKICH miejsc czytających staty (`gearStatValue`, `gearCombatBonuses`,
-  `gearFlatHp`, `gearCoinsMult`, `GearPreviewModal`, `GearSlotModal` w `GearPanel.tsx`).
-- Konflikt z ISTNIEJĄCYM, starannie wyliczonym balansem: `baseValue` w `gear.ts` ma długi
-  komentarz uzasadniający DOKŁADNIE te liczby (żeby mythic T5 nie przebijał całej sumy lootu
-  kampanii) — rozstrzał wymaga przemyślenia czy to ŚRODEK zakresu czy coś innego, żeby nie
-  rozwalić tego balansu przypadkiem.
-- Konflikt z "gwarantowany zakup, NIE loteria" w Sklepie dnia — czy losowa wartość w Sklepie
-  dnia dalej jest deterministyczna PER DZIEŃ (ten sam roll dla wszystkich danego dnia, zgodnie
-  z dotychczasową filozofią) czy realnie losowa przy każdym zakupie (co zaprzeczałoby "nie
-  loterii")?
-- Czy dubel tej samej rzadkości z LEPSZYM rollem powinien dać się "przehandlować" (re-roll na
-  lepszą wartość w tej samej rzadkości), czy porównanie zostaje WYŁĄCZNIE po rzadkości jak
-  dziś (nowy roll tej samej rzadkości = zawsze "już masz", niezależnie od wylosowanej
-  wartości)?
-Nie zgadywane celowo — zbyt duży, nieodwracalny (dane graczy) fork bez jasnej odpowiedzi na
-te pytania. Czeka na doprecyzowanie.
+## 🆕 Roll wartości statu w przedziale zamiast stałej wartości na rzadkość — NIEsprawdzone (2026-08-31)
+
+Druga część tej samej wiadomości co punkt wyżej ("itemy od teraz mogą dropić w przedziałach
+czyli od 0.5-2% dmg dodatkowego i się losują"). Przed implementacją 3 pytania doprecyzowujące
+(AskUserQuestion, duża/nieodwracalna zmiana ekonomii+danych graczy) — user wybrał
+rekomendowane za każdym razem: (1) roll Sklepu dnia zostaje DETERMINISTYCZNY per dzień, (2)
+lepszy roll w TEJ SAMEJ rzadkości LICZY SIĘ jako realny upgrade, (3) mechanika na WSZYSTKICH
+6 slotach, nie tylko obroży/atkPct.
+`GEAR_ROLL_SPREAD: [0.7, 1.3]` w `gear.ts` — ±30% wokół ISTNIEJĄCEGO `gearStatValue` (środek
+przedziału, cały dotychczasowy balans zostaje nietknięty). `gearValueRange`/`rollGearValue`
+(seedable, domyślnie `Math.random`); Sklep dnia seeduje `pseudoRandom01(date+id+'|value')`
+(deterministyczne), skrzynki (`petBoxes.ts`, `petStore.openCrate`) BEZ seeda (prawdziwa
+loteria). `petStore.ownedGear` zmienił kształt: `Partial<Record<string, GearRarity>>` →
+`Partial<Record<string, OwnedGear>>` (`{rarity, value}`) — z migracją w `onRehydrateStorage`
+(stary string-rarity → `{rarity, value: gearStatValue(item, rarity)}`, gracz zachowuje
+DOKŁADNIE tę samą moc, żaden roll nic nie zabiera/dodaje z zaskoczenia przy update apki).
+`isGearUpgrade(next, cur)` (gear.ts) — JEDYNE źródło prawdy "czy to ulepszenie" wszędzie
+(`openCrate`, `grantGear`, `buyDailyGear`, `GearPreviewModal`): rzadkość wygrywa najpierw, przy
+remisie wyższy `value`. `sellGear` CELOWO zostaje rarity-only (poza zakresem — "cena skupu" to
+nieprecyzyjna wewnętrzna abstrakcja). Pełny opis w ARCHITECTURE.md. `tsc`/`jest` zielone
+(64 suity/793 testy) — zaktualizowane `gear.test.ts`, `grantGear.test.ts`,
+`buyDailyGear.test.ts`, `petBoxes.test.ts` + nowe testy na "lepszy roll w tej samej rzadkości =
+upgrade". **Priorytet testu na urządzeniu**: (a) otwórz kilka skrzynek/Sklep dnia, sprawdź że
+wyświetlana wartość statu w `GearPreviewModal`/`GearSlotModal` różni się między kopiami tego
+samego itemu+rzadkości (nie jest już sztywna); (b) Sklep dnia — ten sam zestaw+wartości
+powinien być identyczny cały dzień (deterministyczne), nowy zestaw dopiero o 6:00; (c) stary
+zapis (jeśli jest urządzenie z danymi sprzed tej zmiany) po aktualizacji nie traci mocy
+ekwipunku — staty bojowe przed/po migracji powinny wyjść identyczne.
 
 ## 🆕 BUG/UX: usunięta jasna "otoczka" za czarnym kotkiem na pasku misji — NIEsprawdzone (2026-08-30)
 
