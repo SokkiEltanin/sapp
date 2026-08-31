@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 BUG/UX: usunięta jasna "otoczka" za czarnym kotkiem na pasku misji — NIEsprawdzone (2026-08-30)
+
+User ze screenshotem ekranu Pupil (czarny kot "Fafik"): "czemu jak mam czarnego kota to
+jakieś kółko się pojawia pod nim wtedy, wywal je xd". To był `missionCatHalo` — świadomie
+dodany 2026-08-21 jasny okrąg za kotkiem na ciemnym pasku misji (żeby ciemne futro nie
+wtapiało się w tło), ale w praktyce przy małym rozmiarze kotka na pasku (`MISSION_CAT_SIZE`)
+wyglądał po prostu jak losowe szare kółko, nie jak subtelny kontrast. Usunięty całkowicie
+(`catCoatIsDark`/`missionCatHalo`/import `luma` z `pet.tsx`) — kotek na pasku misji renderuje
+się teraz zawsze bez halo. `tsc`/`jest` zielone (64/791, bez regresji — czysto usunięcie UI
+elementu, bez logiki do przetestowania). **Priorytet testu na urządzeniu**: pupil z ciemnym
+kolorem futra (czarny/szary/brązowy) w trakcie misji — pasek misji NIE powinien mieć żadnego
+kółka za kotkiem.
+
 ## 🆕 UI: portrety areny powiększone + wysłany szablon SVG pod przyszłe tła — NIEsprawdzone (2026-08-30)
 
 User: "boss i pupil był większy bo są tacy malutcy tutaj" (ze screenshotem ekranu walki) +

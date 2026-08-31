@@ -2384,6 +2384,14 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `missionBarTrack` dostał `onLayout` mierzący jego rzeczywistą szerokość w px
       (`missionBarWidthPx` state) — przed pierwszym layoutem fallback na starą wersję
       procentową (jedna klatka, nieszkodliwe). Test regresji w `fmtMissionCountdown.test.ts`.
+  - **Jasna otoczka za ciemnym kotkiem na pasku misji USUNIĘTA (2026-08-30)** — dodana
+    2026-08-21 (user: "jeżeli jest wybrany ciemny kolor to dawaj mu chyba jasną otoczkę żeby
+    było jakoś widać"), ale user teraz (ze screenshotem czarnego kota "Fafik"): "czemu jak
+    mam czarnego kota to jakieś kółko się pojawia pod nim, wywal je xd" — w praniu wyglądała
+    jak nieproszony szary krążek za malutkim (`MISSION_CAT_SIZE`) kotkiem, nie jako subtelny
+    kontrast. `catCoatIsDark`/`missionCatHalo`/`luma` import CAŁKOWICIE usunięte z `pet.tsx`
+    (nieużywane nigdzie indziej w pliku) — kotek na pasku misji renderuje się teraz zawsze
+    bez halo, niezależnie od koloru futra.
   - **Seria logowań przeniesiona na dashboard + usunięty tip "Smacznie śpi"** (2026-08-21,
     user: (3) "serię logowan przenieśmy na główny pulpit" (4) "wywalmy te dodatkowy napis
     obok kotka co pisze smacznie śpi"). (3): `loginStrip` (Flame + "Seria logowań: X dni" +
