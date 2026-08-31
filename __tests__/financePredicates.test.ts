@@ -1,5 +1,5 @@
 import { isSelfTransfer } from '@/utils/statWidgets';
-import { looksLikeBill } from '@/utils/recurringBills';
+import { looksLikeBill, billTagFor } from '@/utils/recurringBills';
 import { Expense } from '@/types';
 
 const e = (o: Partial<Expense>): Expense => ({
@@ -27,5 +27,22 @@ describe('recurringBills — looksLikeBill', () => {
   test('zwykły zakup ≠ rachunek', () => {
     expect(looksLikeBill('chleb masło mleko')).toBe(false);
     expect(looksLikeBill('')).toBe(false);
+  });
+});
+
+// 2026-08-31 — user: "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile płacę za
+// prąd" — Finanse's "Rachunki" filter reuses this to recognize a bill by storeName
+// (nie tylko note/tagi jak `looksLikeBill`), bo paragony/ręczne wpisy za prąd zwykle
+// mają "PGE"/"Tauron" jako storeName, nie w note.
+describe('recurringBills — billTagFor', () => {
+  test('rozpoznaje po storeName (np. paragon/ręczny wpis bez note)', () => {
+    expect(billTagFor(e({ storeName: 'PGE Obrót' }))).toEqual({ tag: 'prąd', name: 'Prąd' });
+    expect(billTagFor(e({ storeName: 'Tauron' }))).toEqual({ tag: 'prąd', name: 'Prąd' });
+  });
+  test('rozpoznaje po note, jak dawniej', () => {
+    expect(billTagFor(e({ note: 'Rachunek za prąd sierpień' }))).toEqual({ tag: 'prąd', name: 'Prąd' });
+  });
+  test('zwykły zakup → null', () => {
+    expect(billTagFor(e({ storeName: 'Biedronka', note: 'zakupy' }))).toBeNull();
   });
 });

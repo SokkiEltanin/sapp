@@ -485,6 +485,24 @@ kafelka". Dwa fixy:
   potem DWIE czytelne linie (tempo vs ten sam dzień zeszłego miesiąca; ile/dzień zostało).
   Odchudzona z zabałaganionej siatki 2×2. Lista transakcji domyślnie ostatnie 31 dni +
   „Pokaż starsze" (`capTx`/`showAllTx`).
+- **Filtr „Rachunki" (prąd/czynsz/internet…) + suma po filtrach (2026-08-31)** — user:
+  „dodaj mi filtry po tagach np pge itp żeby wiedzieć ile płacę za prąd". Zwykły filtr
+  „Tag" (istniejący od dawna) wymaga RĘCZNIE dodanego tagu na wydatku — większość
+  rachunków (paragon/ręczny wpis za prąd) nie ma żadnego tagu, tylko `storeName` typu
+  „PGE"/„Tauron". Nowy `billTagFor(e)` w `recurringBills.ts` (eksportowany razem z
+  `BILL_TYPES`, którego wcześniej używał TYLKO `detectRecurringBills` dla dashboardowej
+  „Propozycji stałego rachunku") dopasowuje `note` + `storeName` + `tags` do tej SAMEJ
+  listy rachunków (prąd/czynsz/internet/gaz/woda/ogrzewanie/ubezpieczenie/telefon) —
+  jedna definicja „co liczy się jako rachunek za prąd" zamiast dwóch, które mogłyby się
+  rozjechać. `finances.tsx`: nowy `activeBillFilter` (niezależny od `activeTagFilter`,
+  oba mogą być aktywne naraz — AND), `billsInData` (tylko rachunki faktycznie obecne w
+  danych, dedup po tagu), chipy w sekcji „Rachunki" filtra POD „Płatność" a NAD „Tag".
+  Przy każdym aktywnym filtrze filtry i tak przeszukują CAŁĄ historię (nie tylko
+  ostatnie 31 dni — `capTx` wyłącza się gdy `activeFilterCount > 0`), więc "Prąd" łapie
+  wszystko od zawsze. Nowa linia „N transakcji · razem X PLN" pod paskiem filtrów
+  (widoczna TYLKO gdy `activeFilterCount > 0`) sumuje `sections[].total` — bez tego
+  „ile płacę za prąd" wymagałoby ręcznego dodawania kwot z nagłówków dni. Testy:
+  `billTagFor` w `financePredicates.test.ts` (storeName-only, note-only, brak dopasowania).
 
 ## 7. Bank → wydatek (pipeline) — patrz też memory [[bank_auto_expenses]]
 

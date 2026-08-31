@@ -2,8 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Expense, Subscription } from '@/types';
 
 // Recognisable recurring-bill types — matched against an expense's note + tags.
-// Order = display priority.
-const BILL_TYPES: { match: string[]; name: string; tag: string }[] = [
+// Order = display priority. Exported (2026-08-31) so the Finanse filter (finances.tsx)
+// can reuse the SAME recognition as the dashboard's bill-suggest — one definition of
+// "co liczy się jako rachunek za prąd" instead of two that could drift apart.
+export const BILL_TYPES: { match: string[]; name: string; tag: string }[] = [
   { match: ['czynsz', 'mieszkanie', 'administr', 'adm ', 'spółdziel', 'spoldziel', 'wspólnot', 'wspolnot'], name: 'Czynsz / mieszkanie', tag: 'czynsz' },
   { match: ['prąd', 'prad', 'pge', 'tauron', 'energa', 'enea', 'energia elektr'], name: 'Prąd', tag: 'prąd' },
   { match: ['internet'], name: 'Internet', tag: 'internet' },
@@ -18,6 +20,16 @@ const BILL_TYPES: { match: string[]; name: string; tag: string }[] = [
 export function looksLikeBill(text: string): boolean {
   const hay = text.toLowerCase();
   return BILL_TYPES.some(bt => bt.match.some(m => hay.includes(m)));
+}
+
+// Which BILL_TYPE (if any) an expense belongs to — checked against note + storeName +
+// tags, so a receipt logged with storeName "PGE" (no note/tag at all) still matches
+// "Prąd" (2026-08-31, user: "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile
+// płacę za prąd" — the Finanse filter needs this same match, not just the tag list).
+export function billTagFor(e: { note?: string; storeName?: string; tags?: string[] }): { tag: string; name: string } | null {
+  const hay = `${e.note ?? ''} ${e.storeName ?? ''} ${(e.tags ?? []).join(' ')}`.toLowerCase();
+  const t = BILL_TYPES.find(bt => bt.match.some(m => hay.includes(m)));
+  return t ? { tag: t.tag, name: t.name } : null;
 }
 
 export interface BillCandidate {
