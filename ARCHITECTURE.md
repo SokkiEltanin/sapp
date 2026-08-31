@@ -2110,6 +2110,24 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
       `grantCombatItem` (itemy bojowe, `combatItems.ts`) ma dokładnie tę samą klasę no-opa na
       duplikacie ze skrzynki — inny system, inna decyzja projektowa potrzebna (auto-upgrade
       poziomu zamiast kompensaty monetami?), patrz NEXT_STEPS.md.
+    - **Sklep dnia: 3→4 itemy + siatka TYLKO-ikona zamiast pełnych wierszy (2026-08-31)** —
+      user: "zwiększymy do 4 itemów... zrobić grafikę bazarku i ustawić itemy po 4 obok
+      siebie tylko z ikoną, mi po kliknięciu pokazuje się popup ze statystykami i formularzem
+      zakupu i porównania z założonym". `dailyShopSlots(date, level, count=4)` — domyślny
+      `count` 3→4 (jedyny call site w `pet-shop.tsx` nie podawał argumentu, więc automatycznie
+      przeszedł na 4; `dailyShopSlots` z ograniczoną pulą unlocked itemów i tak zawsze
+      przycina do `Math.min(count, unlocked.length)`, więc niski poziom pupila nie crashuje).
+      UI: nowa `s.dailyGrid` (4 kwadratowe kafelki, `width:'23%'` + `justifyContent:
+      'space-between'` zamiast `gap` — odstępy wynikają z rozłożenia reszty szerokości,
+      działa identycznie na dowolnej szerokości ekranu) ZASTĘPUJE dawne pełnoszerokościowe
+      wiersze (`s.boxRow`, ZOSTAJE nietknięty — dalej używany przez sekcję Skrzynek). Kafelek
+      pokazuje TYLKO ikonę (+ mały ✓ overlay jeśli posiadane/kupione dziś) — żadnej nazwy/
+      rzadkości/ceny wprost na liście. To NIE utrata informacji: `GearPreviewModal` (już
+      istniejący od 2026-08-22, patrz wyżej — nazwa/ikona/rzadkość/stat/delta-vs-założony/
+      przycisk kup) był i JEST jedynym miejscem pokazującym te dane — zmienia się tylko
+      TRIGGER (mały kafelek zamiast pełnego wiersza), nie treść popupu. Test
+      `gear.test.ts`'s "poziom 1: 3 sloty" zaktualizowany na 4 (był hardkodowany na stary
+      domyślny `count`).
     - **Sloty powiększone (2026-08-27)** — user: "te sloty na itemy musimy powiększyć bo sa
       za malutkie przy kotku". `s.slot` 40×40 → 50×50 (+25%), `slotImg` 26→34, ikona kategorii
       (pusty slot) 18→22, `slotDot` (kropka "posiadasz, nie założone") 7→8px, `flankCol`

@@ -183,8 +183,9 @@ export function unlockedGearFor(slot: GearSlot, level: number): GearItemDef[] {
   return gearBySlot(slot).filter(g => g.unlockLevel <= level);
 }
 
-// ── Sklep dnia — 3 konkretne itemy do kupienia za gold, roluje się raz dziennie ────────
-// (2026-08-19, user: "3 itemy daily do kupienia za złoto roluje się codziennie"). Ten sam
+// ── Sklep dnia — 4 konkretne itemy do kupienia za gold, roluje się raz dziennie ────────
+// (2026-08-19, user: "3 itemy daily do kupienia za złoto roluje się codziennie"; 3→4,
+// 2026-08-31, user: "zwiększymy do 4 itemów"). Ten sam
 // deterministyczny wzorzec `hashOf` co `dailyExercisePool` (personalQuests.ts) i
 // `raidForWeek` (raid.ts) — ten sam dzień zawsze daje ten sam zestaw (nie tasuje się przy
 // re-renderze), inny dzień = inny zestaw. Gwarantowany zakup (nie loteria jak skrzynki),
@@ -218,7 +219,7 @@ function dailyRarityFor(seed: string): GearRarity {
 
 export interface DailyShopSlot { item: GearItemDef; rarity: GearRarity; cost: number }
 
-export function dailyShopSlots(date: string, level: number, count = 3): DailyShopSlot[] {
+export function dailyShopSlots(date: string, level: number, count = 4): DailyShopSlot[] {
   const unlocked = GEAR_SLOTS.flatMap(slot => unlockedGearFor(slot, level));
   if (unlocked.length === 0) return [];
   const picked = [...unlocked]

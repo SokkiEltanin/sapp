@@ -83,9 +83,9 @@ describe('gear — unlockedGearFor (gating wg poziomu pupila)', () => {
 });
 
 describe('gear — dailyShopSlots (sklep dnia, deterministyczny wg daty)', () => {
-  test('poziom 1: 3 sloty (tyle unlocked itemów dostępne — jeden T1 na slot × 6 slotów)', () => {
+  test('poziom 1: 4 sloty (domyślny count, ograniczony przez 6 dostępnych T1 itemów)', () => {
     const slots = dailyShopSlots('2026-08-19', 1);
-    expect(slots).toHaveLength(3);
+    expect(slots).toHaveLength(4);
     for (const slot of slots) expect(slot.item.unlockLevel).toBe(1);
   });
 
