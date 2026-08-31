@@ -27,6 +27,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { expensesService } from '@/services/expensesService';
 import { formatDate } from '@/utils/date';
 import { getCategoryMeta } from '@/utils/categories';
+import { billTagFor } from '@/utils/recurringBills';
 import { Expense } from '@/types';
 import { colors, spacing, radius, fonts } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -79,6 +80,13 @@ export default function FinancesScreen() {
   const { grouped, isLoading, reload } = useExpenses();
   const { expenses, setExpenses } = useExpensesStore();
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  // Filtr po "rachunkach" (prąd/czynsz/internet…), niezależny od zwykłego tagu — user:
+  // "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile płacę za prąd". Zwykły tag
+  // filtr wyżej wymaga RĘCZNIE dodanego tagu; ten rozpoznaje rachunek po note/storeName/
+  // tagach przez `billTagFor` (recurringBills.ts, ta sama logika co "Propozycja stałego
+  // rachunku" na dashboardzie) — łapie "PGE"/"Tauron"/"Energa"/"Enea" w nazwie sklepu czy
+  // notatce bez konieczności ręcznego tagowania każdej płatności.
+  const [activeBillFilter, setActiveBillFilter] = useState<string | null>(null);
   const [activePayer, setActivePayer] = useState<string | null>(null);
   const [activePayment, setActivePayment] = useState<'all' | 'cash' | 'card'>('all');
   const [activeType, setActiveType] = useState<'all' | 'income' | 'expense'>('all');
@@ -130,6 +138,14 @@ export default function FinancesScreen() {
       if (e.receiptItems) for (const it of e.receiptItems) for (const t of (it.tags ?? [])) freq[t] = (freq[t] ?? 0) + 1;
     }
     return Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 12).map(([tag]) => tag);
+  }, [expenses]);
+
+  // Bill types that actually occur in the data (dedup, first-seen order — priority
+  // enough for a short chip row; BILL_TYPES itself is already ordered by relevance).
+  const billsInData = useMemo(() => {
+    const seen = new Map<string, string>();   // tag → name
+    for (const e of expenses) { const b = billTagFor(e); if (b && !seen.has(b.tag)) seen.set(b.tag, b.name); }
+    return Array.from(seen, ([tag, name]) => ({ tag, name }));
   }, [expenses]);
 
   // Explicit, auditable current-month totals (string-based date match — no
@@ -244,11 +260,11 @@ export default function FinancesScreen() {
   const max = parseFloat(amtMax.replace(',', '.'));
   const activeFilterCount =
     (activeType !== 'all' ? 1 : 0) + (activePayer ? 1 : 0) + (activePayment !== 'all' ? 1 : 0) +
-    (activeTagFilter ? 1 : 0) + (!isNaN(min) ? 1 : 0) + (!isNaN(max) ? 1 : 0);
+    (activeTagFilter ? 1 : 0) + (activeBillFilter ? 1 : 0) + (!isNaN(min) ? 1 : 0) + (!isNaN(max) ? 1 : 0);
 
   const clearFilters = () => {
     setActiveType('all'); setActivePayer(null); setActivePayment('all');
-    setActiveTagFilter(null); setAmtMin(''); setAmtMax('');
+    setActiveTagFilter(null); setActiveBillFilter(null); setAmtMin(''); setAmtMax('');
   };
 
   // Cap the DEFAULT (unfiltered) transaction list to a recent window so a long history
@@ -274,6 +290,7 @@ export default function FinancesScreen() {
       if (activePayment !== 'all' && (e.paymentMethod ?? 'card') !== activePayment) return false;
       if (!isNaN(min) && e.amount < min) return false;
       if (!isNaN(max) && e.amount > max) return false;
+      if (activeBillFilter && billTagFor(e)?.tag !== activeBillFilter) return false;
       if (activeTagFilter) {
         if ((e.tags ?? []).includes(activeTagFilter)) return true;
         if (e.receiptItems?.some(it => (it.tags ?? []).includes(activeTagFilter))) return true;
@@ -291,7 +308,13 @@ export default function FinancesScreen() {
       data: items,
       total: items.reduce((s, e) => s + (isExp(e) ? e.amount : 0), 0),
     }));
-  }, [grouped, activeTagFilter, activePayer, activePayment, activeType, min, max, activeFilterCount, capTx, recentCutoff]);
+  }, [grouped, activeTagFilter, activeBillFilter, activePayer, activePayment, activeType, min, max, activeFilterCount, capTx, recentCutoff]);
+
+  // Suma po filtrach (2026-08-31) — bez tego "ile płacę za prąd" wymagałoby ręcznego
+  // dodawania kwot z każdego dnia; sekcje już pokazują total PER DZIEŃ (sectionTotal
+  // niżej), tu tylko sumujemy je razem gdy jakiś filtr jest aktywny.
+  const filteredTotal = useMemo(() => sections.reduce((s, sec) => s + sec.total, 0), [sections]);
+  const filteredCount = useMemo(() => sections.reduce((s, sec) => s + sec.data.length, 0), [sections]);
 
   return (
     <SafeAreaView style={st.root} edges={[]}>
@@ -497,6 +520,17 @@ export default function FinancesScreen() {
                   </TouchableOpacity>
                 )}
               </View>
+
+              {/* Suma po filtrach — patrz komentarz przy filteredTotal wyżej. Pokazuje się
+                  dopiero gdy jakiś filtr jest aktywny (bez filtrów lista jest przycięta do
+                  ostatnich 31 dni — suma "wszystkiego" byłaby myląca). */}
+              {activeFilterCount > 0 && (
+                <View style={st.filterSummary}>
+                  <Text style={st.filterSummaryTxt}>
+                    {filteredCount} {filteredCount === 1 ? 'transakcja' : filteredCount < 5 ? 'transakcje' : 'transakcji'} · razem {filteredTotal.toFixed(0)} PLN
+                  </Text>
+                </View>
+              )}
             </>
           }
           renderSectionHeader={({ section }) => (
@@ -610,6 +644,26 @@ export default function FinancesScreen() {
                       <TouchableOpacity key={val} onPress={() => { haptic.tap(); setActivePayment(val); }}
                         style={[st.tagChip, activePayment === val && st.tagChipOn]} activeOpacity={0.8}>
                         <Text style={[st.tagText, activePayment === val && st.tagTextOn]}>{lbl}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* Rachunki (prąd/czynsz/internet…) — rozpoznane po note/storeName/tagach,
+                  patrz komentarz przy activeBillFilter wyżej */}
+              {billsInData.length > 0 && (
+                <>
+                  <Text style={st.fmLabel}>Rachunki</Text>
+                  <View style={st.fmRow}>
+                    <TouchableOpacity onPress={() => { haptic.tap(); setActiveBillFilter(null); }}
+                      style={[st.tagChip, !activeBillFilter && st.tagChipOn]} activeOpacity={0.8}>
+                      <Text style={[st.tagText, !activeBillFilter && st.tagTextOn]}>Wszystkie</Text>
+                    </TouchableOpacity>
+                    {billsInData.map(b => (
+                      <TouchableOpacity key={b.tag} onPress={() => { haptic.tap(); setActiveBillFilter(activeBillFilter === b.tag ? null : b.tag); }}
+                        style={[st.tagChip, activeBillFilter === b.tag && st.tagChipOn]} activeOpacity={0.8}>
+                        <Text style={[st.tagText, activeBillFilter === b.tag && st.tagTextOn]}>{b.name}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -835,6 +889,8 @@ const makeStyles = (c: any, f: any) => StyleSheet.create({
   filterBtnText: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
   filterClear: { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
   filterClearText: { fontSize: 12, fontWeight: '600', color: c.text.muted },
+  filterSummary: { paddingHorizontal: spacing[4], marginBottom: spacing[2] },
+  filterSummaryTxt: { fontSize: 12.5, fontWeight: '700', color: c.text.secondary },
   fmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   fmCard: {
     backgroundColor: c.bg.card, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,

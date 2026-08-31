@@ -3,6 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Finanse: filtr „Rachunki" (prąd/czynsz/…) + suma po filtrach — NIEsprawdzone (2026-08-31)
+
+User: "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile płacę za prąd, albo na
+dashboardzie wykres płatności prądu" — zaimplementowana PIERWSZA opcja (filtr), bo działa na
+danych które już istnieją (`storeName`/`note` na wydatku) bez ręcznego tagowania i bez
+budowania nowej sekcji dashboardu (playbook w §12 — DEFAULT_DASHBOARD_SECTIONS +
+SECTION_TITLES/DESC/GROUP + node w index.tsx — większy koszt niż filtr, który dawał to samo
+"ile płacę za prąd" szybciej). **Wykres płatności prądu na dashboardzie NIE zrobiony —
+jeśli sam filtr w Finansach nie wystarcza (np. user chce trend miesiąc-do-miesiąca bez
+ręcznego przełączania filtra), to osobna, większa zmiana do zrobienia później.**
+Szczegóły w ARCHITECTURE.md §6 (finances.tsx). `billTagFor()` w `recurringBills.ts`
+(eksportowany razem z `BILL_TYPES`) — ta sama lista rachunków co dashboardowa "Propozycja
+stałego rachunku", teraz reużyta w filtrze Finansów zamiast duplikowanej logiki. `tsc`/`jest`
+zielone (64 suity/796 testów — nowe testy `billTagFor` w `financePredicates.test.ts`).
+**Priorytet testu na urządzeniu**: Finanse → Filtry → sekcja "Rachunki" (widoczna tylko gdy
+w danych jest coś rozpoznane jako rachunek) → wybierz "Prąd" → sprawdź czy lista pokazuje
+WSZYSTKIE płatności PGE/Tauron/etc. (nawet sprzed 31 dni — filtr przeszukuje całą historię)
+i czy licznik "N transakcji · razem X PLN" pod paskiem filtrów pokazuje poprawną sumę.
+
 ## 🆕 UI: Sklep dnia — 4 itemy, siatka tylko-ikona zamiast pełnych wierszy — NIEsprawdzone (2026-08-31)
 
 User: "zrób ładniej ten sklep, zwiększymy do 4 itemów... ustawić itemy po 4 obok siebie tylko
