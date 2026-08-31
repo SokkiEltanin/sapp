@@ -21,7 +21,7 @@ import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
 import { computePetState, petStatusLine, PetInput } from '@/utils/petState';
-import { paletteById, luma } from '@/utils/catPalettes';
+import { paletteById } from '@/utils/catPalettes';
 import { useHabits } from '@/hooks/useHabits';
 import { usePetHealthSync } from '@/hooks/usePetHealthSync';
 import { useMoodStore } from '@/store/moodStore';
@@ -201,13 +201,6 @@ export default function Pet() {
   // affection resets each day — show 0 on a fresh day even before the first tap
   const affToday = affectionDay === todayISO() ? affection : 0;
   const palette = useMemo(() => paletteById(catColor), [catColor]);
-  // Jasna otoczka za kotkiem na TEMNYM pasku misji, gdy futro jest ciemne (2026-08-21, user:
-  // "jeżeli jest wybrany ciemny kolor to dawaj mu chyba jasna otoczkę zeby go było jakis
-  // widać") — `missionBarTrack` ma ciemne tło (`c.bg.elevated`, ciemny motyw apki), więc
-  // czarny/szary/brązowy kotek wtapiał się w pasek. TEN SAM próg `luma>0.55` co
-  // `markFor(coat)` w catPalettes.ts (jasny/ciemny kolor pręg) — jedna prawda, nie druga
-  // zgadywana granica jasności.
-  const catCoatIsDark = useMemo(() => luma(palette.coat) <= 0.55, [palette]);
   const { habits, todayDone } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -409,7 +402,6 @@ export default function Pet() {
                 <View style={s.missionHeadRow}>
                   <Text style={s.missionDestTxt} numberOfLines={1}>{missionMb ? missionMb.destination : 'W drodze…'}</Text>
                   <View style={s.missionHeadCatWrap}>
-                    {catCoatIsDark && <View style={s.missionCatHalo} pointerEvents="none" />}
                     <Animated.View style={{ transform: [{ translateY: missionEnterY }, { scale: missionEnterScale }] }}>
                       <Animated.View style={{ transform: [{ translateX: missionSwayX }, { rotate: missionSwayRotate }] }}>
                         <CatArt size={MISSION_CAT_SIZE} animate={false} palette={palette} stripes={catStripes}
@@ -811,10 +803,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
     fontSize: 12.5, fontWeight: '800', color: '#fff', letterSpacing: 0.4, fontVariant: ['tabular-nums'],
     textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
   },
-  // Jasna otoczka za ciemnym kotkiem (2026-08-21, patrz `catCoatIsDark` wyżej) — okrąg 10px
-  // większy niż kotek, wyśrodkowany na tym samym punkcie (`top`/`left` = -połowa różnicy).
-  missionCatHalo: { position: 'absolute', width: MISSION_CAT_SIZE + 10, height: MISSION_CAT_SIZE + 10, borderRadius: (MISSION_CAT_SIZE + 10) / 2, top: -5, left: -5, backgroundColor: 'rgba(255,255,255,0.55)' },
-
   // Popup wyboru profilu misji (2026-08-20) — zastępuje dawną inline `missionChooseCard`
   // (user: "kafelek misji jest jakby podwojony... miał być malutki przycisk... otwierany
   // popup z wyborem"). Ten sam bottom-sheet wzorzec co `GearSlotModal` w GearPanel.tsx.
