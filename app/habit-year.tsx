@@ -9,7 +9,7 @@ import { ChevronLeft, Flame, Snowflake } from 'lucide-react-native';
 import { Habit } from '@/types';
 import { getHabits } from '@/utils/habits';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { useCounters, matchesAvoid, type Counter } from '@/store/countersStore';
+import { useCounters, matchesAvoid, matchedEatDays, type Counter } from '@/store/countersStore';
 import { useFoodStore } from '@/store/foodStore';
 import { expensesService } from '@/services/expensesService';
 import { spacing, radius, fonts } from '@/theme';
@@ -44,6 +44,7 @@ export default function HabitYear() {
   const frozen = useStreakFreezeStore(st => st.frozen);
   const allCounters = useCounters(st => st.counters);
   const meals = useFoodStore(st => st.meals);
+  const foodProducts = useFoodStore(st => st.products);
 
   const [habit, setHabit] = useState<Habit | null>(null);
   const [counter, setCounter] = useState<Counter | null>(null);
@@ -85,12 +86,16 @@ export default function HabitYear() {
     return () => { alive = false; };
   }, [habitId, counterId, isCounter, allCounters]);
 
-  // dni „wpadki" auto-licznika „bez X": zjedzenie (Co zjadłem) domyślnie, albo kupno (paragony)
+  // dni „wpadki" auto-licznika „bez X": zjedzenie (Co zjadłem) domyślnie, albo kupno (paragony).
+  // Ścieżka "eat" reużywa `matchedEatDays` z countersStore.ts (2026-08-31) zamiast własnej
+  // kopii tej pętli — dawniej dopasowywała TYLKO po nazwie itemu, więc np. "Milka" (bez
+  // "czekolad"/"słodycz" w nazwie) nie łapała się jako wpadka mimo otagowanego produktu
+  // "słodycze" — patrz komentarz przy `matchedEatDays`.
   const matchDays = useMemo(() => {
-    const set = new Set<string>();
-    if (!isCounter || !counter?.keyword) return set;
+    if (!isCounter || !counter?.keyword) return new Set<string>();
     const kw = counter.keyword;
     if ((counter.track ?? 'eat') === 'buy') {
+      const set = new Set<string>();
       for (const e of expenses) {
         if (e?.type === 'income') continue;
         const day = (e?.date ?? '').slice(0, 10);
@@ -101,18 +106,12 @@ export default function HabitYear() {
         ].filter(Boolean).join(' ');
         if (matchesAvoid(parts, kw)) set.add(day);
       }
-    } else {
-      for (const m of meals) {
-        const day = (m?.date ?? '').slice(0, 10);
-        if (!day) continue;
-        const names = (m.items ?? [])
-          .flatMap((it: any) => [it?.name, ...((it?.parts ?? []).map((p: any) => p?.name))])
-          .filter(Boolean).join(' ');
-        if (matchesAvoid(names, kw)) set.add(day);
-      }
+      return set;
     }
-    return set;
-  }, [isCounter, counter, expenses, meals]);
+    const catByProductId: Record<string, string | undefined> = {};
+    for (const p of foodProducts) catByProductId[p.id] = p.cat;
+    return matchedEatDays(kw, meals, catByProductId);
+  }, [isCounter, counter, expenses, meals, foodProducts]);
 
   // ── build the grid + stats ─────────────────────────────────────────────
   const { cells, weeks, monthCols, stats } = useMemo(() => {

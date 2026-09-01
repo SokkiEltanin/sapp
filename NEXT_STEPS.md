@@ -3,6 +3,32 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Grey screen w "Co zjadłem" — user potwierdził, że już nie występuje (2026-08-31)
+
+Zgłoszony wcześniej tego dnia (Co zjadłem → Produkty → ciastka → Zapisz). Przeszukane
+statycznie (kod + eslint pod kątem hooków) bez znalezienia przyczyny; user następnie
+zgłosił że dodanie na "wczoraj" nie crashuje (możliwa wskazówka: coś specyficznego dla
+DZISIEJSZEJ daty), ale finalnie user: "nie wywala już grey screena nie wiem o co chodzi
+narazie odhaczony problem" — NIE naprawiony świadomie, po prostu przestał się powtarzać.
+Jeśli wróci, zacząć od świeżego zrzutu z Ustawienia → Diagnostyka (z dzisiejszą datą) i
+sprawdzić czy dotyczy TYLKO wpisów na dziś vs wsteczne daty.
+
+## 🆕 Nawyk "Bez słodyczy" nie łapał produktu bez słowa-klucza w NAZWIE (tylko w kategorii) — NIEsprawdzone (2026-08-31)
+
+User: "nie łapie ciastek Milka jako słodyczy i nie resetuje to problem niech flaguje takie
+rzeczy bo to bez sensu zjem i mam nadal streak słodyczy xdd". Realny bug: dopasowanie do
+`avoidKeyword` sprawdzało TYLKO nazwę zjedzonego itemu — produkt nazwany dosłownie "Milka"
+nigdy nie trafiał, mimo otagowania kategorią "Słodycze" przy dodawaniu produktu. Naprawione
++ skonsolidowane: nowa `matchedEatDays()` w `countersStore.ts` zastępuje TRZY niezależne
+kopie tej samej (buggy) pętli, które istniały osobno w `habits.ts`, `countersStore.ts` i
+`habit-year.tsx` — teraz wszystkie trzy dopasowują nazwę ORAZ kategorię produktu (przez
+`productId` → `FoodProduct.cat`). Pełny opis w ARCHITECTURE.md (sekcja Nawyki). `tsc`/`jest`
+zielone (64 suity/799 testów, 3 nowe testy w `habits.test.ts`). **Priorytet testu na
+urządzeniu**: (a) zjedz coś otagowane "Słodycze" ale nazwane bez słowa typu
+"czekolad/słodycz/ciast/..." (np. dosłownie "Milka") — streak nawyku "Bez słodyczy" powinien
+pęknąć tego dnia; (b) sprawdź kalendarz roczny (`habit-year.tsx`, długie przytrzymanie
+nawyku/licznika) pokazuje ten sam dzień jako "wpadkę".
+
 ## 🆕 Powiadomienie/UI misji mówią SKĄD kotek wrócił — NIEsprawdzone (2026-08-31)
 
 User: "jak jest powiadomienie że pupil wrócił z misji to niech będzie napisane z jakiego

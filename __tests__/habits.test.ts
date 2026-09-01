@@ -209,6 +209,30 @@ describe('habits — computeAvoidCounts (kind="avoid", auto z dziennika jedzenia
     expect(merged['2026-08-15']?.sweets ?? 0).toBe(0);
   });
 
+  // 2026-08-31, user: "nie łapie ciastek Milka jako słodyczy i nie resetuje... zjem i mam
+  // nadal streak" — item nazwany np. "Milka" nie zawiera żadnego fragmentu z avoidKeyword
+  // (ani "słodycz", ani "czekolad"), ale JEST otagowany kategorią "słodycze" na produkcie.
+  test('produkt bez pasującego słowa w NAZWIE, ale otagowany kategorią "słodycze" → 0 (broke)', () => {
+    const meals = [{ date: '2026-08-15', items: [{ name: 'Milka', productId: 'p1' }] }];
+    const products = [{ id: 'p1', cat: 'słodycze' }];
+    const { merged } = computeAvoidCounts([avoidHabit], meals, ['2026-08-15'], {}, products);
+    expect(merged['2026-08-15']?.sweets ?? 0).toBe(0);
+  });
+
+  test('to samo dopasowanie działa w zagnieżdżonych "parts"', () => {
+    const meals = [{ date: '2026-08-15', items: [{ name: 'Deser', parts: [{ name: 'Milka', productId: 'p1' }] }] }];
+    const products = [{ id: 'p1', cat: 'słodycze' }];
+    const { merged } = computeAvoidCounts([avoidHabit], meals, ['2026-08-15'], {}, products);
+    expect(merged['2026-08-15']?.sweets ?? 0).toBe(0);
+  });
+
+  test('productId wskazujący na produkt BEZ pasującej kategorii → dalej 1 (done)', () => {
+    const meals = [{ date: '2026-08-15', items: [{ name: 'Milka', productId: 'p1' }] }];
+    const products = [{ id: 'p1', cat: 'nabiał' }];
+    const { merged } = computeAvoidCounts([avoidHabit], meals, ['2026-08-15'], {}, products);
+    expect(merged['2026-08-15']).toEqual({ sweets: 1 });
+  });
+
   test('dzień "broke" NADPISUJE istniejący done=1 na 0 (streak realnie pęka)', () => {
     const meals = [meal('2026-08-15', 'Czekolada mleczna')];
     const existing = { '2026-08-15': { sweets: 1 } };

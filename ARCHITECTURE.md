@@ -2848,6 +2848,32 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     odznaczenie i tak zostałoby nadpisane przy następnym auto-sync. Testy: `habits.test.ts`
     (`computeAvoidCounts` — done/broke/parts-match/nie nadpisuje innych nawyków/no-op gdy
     wartość już poprawna).
+    - **Dopasowanie po KATEGORII produktu, nie tylko po nazwie itemu (2026-08-31)** — user:
+      "nie łapie ciastek Milka jako słodyczy i nie resetuje... zjem i mam nadal streak
+      słodyczy xdd". Realny bug: `matchesAvoid` dopasowuje tylko tekst NAZWY zjedzonego
+      itemu do `avoidKeyword` — produkt nazwany dosłownie "Milka" (bez "czekolad"/"słodycz"
+      w nazwie) nigdy nie trafiał, mimo że user otagował go kategorią "Słodycze" przy
+      dodawaniu produktu (`FoodProduct.cat`). `countersStore.ts`'s `autoLastDate` (śledzenie
+      po ZAKUPIE, nie zjedzeniu) miał TEN SAM fix już wcześniej dla itemów paragonu (dopasowuje
+      `it.tags` obok nazwy) — strona "zjedzenia" (ta, która faktycznie resetuje TEN streak,
+      patrz akapit wyżej) go nie miała. Fix + konsolidacja: nowa `matchedEatDays(keyword,
+      meals, catByProductId)` w `countersStore.ts` — JEDNA implementacja zamiast TRZECH
+      niezależnych kopii tej samej pętli, które istniały wcześniej w `habits.ts`
+      (`brokenDaysFor`, teraz usunięte, woła `matchedEatDays` wprost), `countersStore.ts`'s
+      `autoLastEatDate` (teraz cienki wrapper) i `habit-year.tsx`'s inline `matchDays`
+      useMemo (miał WŁASNĄ, trzecią kopię tej samej buggy pętli dla kalendarza rocznego —
+      naprawiona przy okazji, żeby nie było czwartego miejsca z tym samym bugiem). Każdy
+      `MealItem` (i jego `parts`) niesie `productId` — `matchedEatDays` rozwiązuje go do
+      `FoodProduct.cat` przez mapę `catByProductId` budowaną przez wywołującego (`products`
+      z `useFoodStore`) i dokłada kategorię do tego samego haystacka co nazwa. `computeAvoidCounts`
+      dostał nowy, opcjonalny 5. param `products`; `autoDaysWithout` (countersStore.ts) dostał
+      nowy `products` param WSTAWIONY PRZED `now` (żaden caller nie przekazywał `now` wprost,
+      więc kolejność dało się zmienić bez `undefined`-placeholderów na wywołaniach).
+      `useHabits.ts`, `app/counters.tsx`, `app/counters/[id].tsx`, `app/(tabs)/index.tsx`
+      (×2 miejsca) i `app/habit-year.tsx` zaktualizowane — wszystkie już miały `products`
+      dostępne przez `useFoodStore`, tylko brakowało przekazania dalej. Testy: 3 nowe w
+      `habits.test.ts` (dopasowanie po kategorii bez słowa w nazwie, to samo w `parts`,
+      productId na kategorię BEZ dopasowania dalej liczy się jako "done").
 - **Powiadomienia**: `notificationsService.ts` — master `notif_enabled` + per-typ flagi;
   deep-linki obsługiwane w `_layout.tsx`.
 - **Ustawienia (`app/settings.tsx`)**: data-driven, nie flat JSX. Typy `SettingsSectionDef`/

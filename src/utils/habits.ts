@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '@/types';
-import { matchesAvoid } from '@/store/countersStore';
+import { matchedEatDays } from '@/store/countersStore';
 
 const HABITS_KEY = 'habits_list';
 const cntKey    = (date: string) => `habits_cnt_${date}`;
@@ -101,20 +101,7 @@ async function setCountsRange(entries: [date: string, counts: Record<string, num
 // mirrors habit-year.tsx's counter branch (`matchDays.has(ds) ? 'broke' : 'done'`), so a day
 // with nothing logged yet (including today, still in progress) reads as clean until proven
 // otherwise, exactly like the counter it's modeled on.
-type MatchMeal = { date?: string; items?: { name?: string; parts?: { name?: string }[] }[] };
-
-function brokenDaysFor(keyword: string, meals: MatchMeal[]): Set<string> {
-  const set = new Set<string>();
-  for (const m of meals) {
-    const day = (m.date ?? '').slice(0, 10);
-    if (!day) continue;
-    const names = (m.items ?? [])
-      .flatMap((it) => [it?.name, ...((it?.parts ?? []).map((p) => p?.name))])
-      .filter(Boolean).join(' ');
-    if (matchesAvoid(names, keyword)) set.add(day);
-  }
-  return set;
-}
+type MatchMeal = { date?: string; items?: { name?: string; productId?: string; parts?: { name?: string; productId?: string }[] }[] };
 
 // PURE (no I/O, easily testable) — given the ALREADY-LOADED `existing` counts for `dates`
 // (whatever useHabits.ts's own getCountsRange call returned, reused rather than re-fetched),
@@ -127,12 +114,15 @@ export function computeAvoidCounts(
   meals: MatchMeal[],
   dates: string[],
   existing: Record<string, Record<string, number>>,
+  products: { id: string; cat?: string }[] = [],
 ): { merged: Record<string, Record<string, number>>; changed: [string, Record<string, number>][] } {
   const avoidHabits = habits.filter((h) => h.kind === 'avoid' && h.avoidKeyword);
   if (avoidHabits.length === 0) return { merged: existing, changed: [] };
+  const catByProductId: Record<string, string | undefined> = {};
+  for (const p of products) catByProductId[p.id] = p.cat;
   const brokenByKeyword = new Map<string, Set<string>>();
   for (const h of avoidHabits) {
-    if (!brokenByKeyword.has(h.avoidKeyword!)) brokenByKeyword.set(h.avoidKeyword!, brokenDaysFor(h.avoidKeyword!, meals));
+    if (!brokenByKeyword.has(h.avoidKeyword!)) brokenByKeyword.set(h.avoidKeyword!, matchedEatDays(h.avoidKeyword!, meals, catByProductId));
   }
   const merged: Record<string, Record<string, number>> = { ...existing };
   const changed: [string, Record<string, number>][] = [];

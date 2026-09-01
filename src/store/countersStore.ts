@@ -129,27 +129,50 @@ export function autoLastDate(keyword: string, expenses: MatchExpense[]): string 
 // ── Match against the FOOD LOG (Co zjadłem) — reset on EATING, not buying ────
 // User can buy sweets once and eat them over a month, or buy them as a gift — so a
 // „bez słodyczy" streak should break when a matching food is LOGGED, not purchased.
-type MatchMeal = { date?: string; items?: { name?: string; parts?: { name?: string }[] }[] };
+type MatchMeal = { date?: string; items?: { name?: string; productId?: string; parts?: { name?: string; productId?: string }[] }[] };
 
-export function autoLastEatDate(keyword: string, meals: MatchMeal[]): string | null {
-  let last: string | null = null;
+// `catByProductId` (2026-08-31, user: "nie łapie ciastek Milka jako słodyczy i nie
+// resetuje... zjem i mam nadal streak") — a logged item's NAME might not contain any
+// avoid-keyword fragment (e.g. a chocolate bar literally named "Milka") even though its
+// PRODUCT is categorized "słodycze". `autoLastDate` above (purchase-based) already folds
+// a receipt item's `tags` into the match; this brings the food-log side to parity by
+// resolving each item's `productId` to its product's category.
+// Exported (not just used by `autoLastEatDate` below) — `useHabits.ts`'s `computeAvoidCounts`
+// (habits.ts) and `habit-year.tsx`'s calendar view need the SAME "which days match" set, not
+// just the latest one; before this consolidation each had its OWN copy of this loop (with the
+// Milka bug fixed in only one of the three when this comment was written — one definition
+// now, can't silently drift out of sync again).
+export function matchedEatDays(keyword: string, meals: MatchMeal[], catByProductId: Record<string, string | undefined> = {}): Set<string> {
+  const set = new Set<string>();
   for (const m of meals) {
     const day = (m.date ?? '').slice(0, 10);
     if (!day) continue;
-    const names = (m.items ?? [])
-      .flatMap(it => [it?.name, ...((it?.parts ?? []).map(p => p?.name))])
+    const leaves = (m.items ?? []).flatMap(it => [it, ...(it?.parts ?? [])]);
+    const hay = leaves
+      .flatMap(it => [it?.name, it?.productId ? catByProductId[it.productId] : undefined])
       .filter(Boolean).join(' ');
-    if (matchesAvoid(names, keyword) && (!last || day > last)) last = day;
+    if (matchesAvoid(hay, keyword)) set.add(day);
   }
+  return set;
+}
+
+export function autoLastEatDate(keyword: string, meals: MatchMeal[], catByProductId: Record<string, string | undefined> = {}): string | null {
+  let last: string | null = null;
+  for (const day of matchedEatDays(keyword, meals, catByProductId)) if (!last || day > last) last = day;
   return last;
 }
 
 // Days "without" for an auto counter: since the last matching EAT (default) or BUY,
 // or since the counter was created if there was never one.
-export function autoDaysWithout(c: Counter, expenses: MatchExpense[], meals: MatchMeal[] = [], now = Date.now()): number {
+export function autoDaysWithout(
+  c: Counter, expenses: MatchExpense[], meals: MatchMeal[] = [],
+  products: { id: string; cat?: string }[] = [], now = Date.now(),
+): number {
   const track = c.track ?? 'eat';
+  const catByProductId: Record<string, string | undefined> = {};
+  for (const p of products) catByProductId[p.id] = p.cat;
   const last = c.keyword
-    ? (track === 'buy' ? autoLastDate(c.keyword, expenses) : autoLastEatDate(c.keyword, meals))
+    ? (track === 'buy' ? autoLastDate(c.keyword, expenses) : autoLastEatDate(c.keyword, meals, catByProductId))
     : null;
   const from = last ?? (c.startDate || c.createdAt.slice(0, 10));
   return Math.max(0, Math.floor((now - atMidnight(from)) / MS_DAY));

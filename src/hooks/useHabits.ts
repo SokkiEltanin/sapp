@@ -85,8 +85,11 @@ export function useHabits() {
   const bump = useHabitsSync((s) => s.bump);
   // 'avoid' habits (auto-tracked from "Co zjadłem", see computeAvoidCounts) need the food
   // log to compute — re-syncing whenever it changes keeps e.g. "nie jem słodyczy" current the
-  // moment a sweet gets logged, not just on next screen mount.
+  // moment a sweet gets logged, not just on next screen mount. `products` (2026-08-31) so a
+  // logged item without an avoid-keyword in its NAME (e.g. "Milka", tagged "słodycze" as its
+  // product category) still breaks the streak — patrz komentarz przy `brokenDaysFor`.
   const meals = useFoodStore((s) => s.meals);
+  const products = useFoodStore((s) => s.products);
 
   // Zamrożenia serii — dzień zamrożony liczy się jako zaliczony.
   const frozen      = useStreakFreezeStore((s) => s.frozen);
@@ -114,19 +117,20 @@ export function useHabits() {
       // 'avoid' habits recompute their own days from the food log — reuses the SAME `map`
       // just read above (no second storage round-trip), overrides only the habit(s) that are
       // kind:'avoid' (no-op fast path when there are none), and persists only what changed.
-      const { merged, changed } = computeAvoidCounts(list, meals, dates, map);
+      const { merged, changed } = computeAvoidCounts(list, meals, dates, map, products);
       setHabits(list);
       setComp(merged);
       if (changed.length) persistAvoidCounts(changed).catch(() => {});
     } finally {
       setIsLoading(false);
     }
-  }, [today, meals]);
+  }, [today, meals, products]);
 
-  // Loads on mount AND re-syncs whenever the food log changes (a meal logged/edited/
-  // deleted), so an 'avoid' habit reflects it immediately — not just on next screen mount.
-  // `load()` is cheap/idempotent, so covering both triggers with one effect is safe.
-  useEffect(() => { load(); }, [meals]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Loads on mount AND re-syncs whenever the food log OR a product's category changes (a
+  // meal logged/edited/deleted, or a product re-tagged "słodycze" after already being
+  // eaten), so an 'avoid' habit reflects it immediately — not just on next screen mount.
+  // `load()` is cheap/idempotent, so covering all three triggers with one effect is safe.
+  useEffect(() => { load(); }, [meals, products]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Another instance mutated → re-read the list + today's counts (cheap) so a
   // deleted habit disappears everywhere, not just on the screen that deleted it.
