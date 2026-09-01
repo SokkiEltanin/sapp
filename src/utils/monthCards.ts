@@ -184,11 +184,17 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
   const cap = ctx.maxMonths ?? 24;
   const nowKey = currentMonthKey();
 
-  // ── which months exist at all (any signal) ────────────────────────────────
+  // ── which months exist at all — REAL app usage only, not synced step history ──
+  // (2026-08-31, user: found via a real data export that 39 of ~48 candidate months were
+  // near-empty "step-only" cards — Health Connect backfills step counts for years BEFORE
+  // someone starts using the rest of the app, so `healthDays` alone spans a much wider
+  // range than any actual "month with Sapp" ever did. A card built from JUST that history
+  // has no spend/mood/sweets to show — it's watch-sync noise, not a Wrapped moment.
+  // `healthDays` still ENRICHES a card once the month already qualifies (steps hero stat,
+  // distance fun fact) — it just can't be the ONLY reason a month exists in the collection.
   const months = new Set<string>();
   for (const e of expenses) { const m = (e.date ?? '').slice(0, 7); if (m) months.add(m); }
   for (const e of moodEntries) { const m = (e.date ?? '').slice(0, 7); if (m) months.add(m); }
-  for (const d of Object.keys(healthDays)) { const m = d.slice(0, 7); if (m) months.add(m); }
   for (const r of payMonths) if (r.month) months.add(r.month);
   const ordered = Array.from(months).filter(Boolean).sort();   // asc for indexing
   if (!ordered.length) return [];

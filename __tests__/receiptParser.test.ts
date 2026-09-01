@@ -20,6 +20,22 @@ describe('getFoodTags — wykrywanie słodyczy', () => {
     expect(tags).toContain('pieczywo');
     expect(tags).not.toContain('słodycze');
   });
+
+  // 2026-08-31, user (realny eksport danych): "duzo pomyłek kategorii słodycze przekąski" —
+  // paragony skracają "Ciastko"/"Ciasteczka" do samego "Ciast" (bez "k"), więc dawny stem
+  // 'ciastk' tego nie łapał; luki w markach/nazwach (Balconi, Jelly, miętówki, grylaż).
+  test('mocno skrócone "Ciast" (bez "k", jak na realnych paragonach) też łapie się jako słodycze', () => {
+    expect(getFoodTags('ŁowiczDesRyżKruCiastŚliw100g')).toContain('słodycze');
+  });
+  test('marki/nazwy dopisane po realnym audycie danych: Balconi, Jelly, miętówki, grylaż', () => {
+    expect(getFoodTags('Balconi Mix max')).toContain('słodycze');
+    expect(getFoodTags('Owolovo Jelly')).toContain('słodycze');
+    expect(getFoodTags('Miętówki MountainHills')).toContain('słodycze');
+    expect(getFoodTags('Grylaż kukurydza 62g')).toContain('słodycze');
+  });
+  test('"mieszanka studencka" (trail mix) łapie się jako przekąski', () => {
+    expect(getFoodTags('Mieszanka studencka 200g')).toContain('przekąski');
+  });
 });
 
 // 2026-08-20 — user przesłał realny paragon Lidl ze zwrotem kaucji za butelki: "SUMA PLN"

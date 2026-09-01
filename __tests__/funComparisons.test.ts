@@ -12,7 +12,20 @@ describe('funComparisons — stepsToDistanceFact', () => {
   });
 
   test('duży dystans: liczba z separatorem tysięcy (pl-PL) i wielokrotność landmarku', () => {
-    expect(stepsToDistanceFact(300000)).toBe('229 km piechotą — prawie tyle co z Lublina do Rzeszowa');
+    expect(stepsToDistanceFact(300000)).toBe('229 km piechotą — prawie tyle co z Rzeszowa do Częstochowy');
+  });
+
+  // 2026-08-31, user: "duzo zaokrąglone powtórzeń ze te kroki sa z Rzeszowa do Lublina bez
+  // sensu" — realistyczny miesiąc (~150k-350k kroków ≈ 115-265 km) trafiał w TYLKO dwa
+  // landmarki (90 km/150 km) zanim tabela została zagęszczona; test pilnuje, że kilka
+  // typowych miesięcznych sum realnie różni się landmarkiem, nie tylko mnożnikiem.
+  test('typowe miesięczne sumy (115–265 km) trafiają w RÓŻNE landmarki, nie zawsze ten sam', () => {
+    // wyciąga sam landmark (po "co " / "× "), nie całą liczbę km — inaczej test byłby
+    // trywialnie zielony (km zawsze się różni) nawet gdyby landmark był ciągle ten sam.
+    const landmarks = new Set([160000, 200000, 250000, 300000, 350000]
+      .map(stepsToDistanceFact)
+      .map(f => f.replace(/^.*(?:co |× )/, '')));
+    expect(landmarks.size).toBeGreaterThan(1);
   });
 
   test('tuż nad progiem landmarku (maraton 42,2 km) → "prawie tyle co", nie wielokrotność', () => {

@@ -3,6 +3,42 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Karty miesięcy: odcięcie pustych miesięcy + mniej powtórzeń + poprawki tagów — NIEsprawdzone (2026-08-31)
+
+User: "ulepsz karty miesięcy podsyłam eksport danych do wglądu" → potem screenshot pytania z
+3 opcjami (odetnij puste miesiące / więcej stat / redesign wizualny), user zaznaczył WSZYSTKIE
++ dopisał konkretne skargi: "sporo zaokrąglone powtórzeń ze te kroki sa z Rzeszowa do Lublina
+bez sensu, duzo pomyłek kategorii słodycze przekąski". Ta sesja zrobiła TRZY konkretne fixy
+(zweryfikowane na PRAWDZIWYM eksporcie JSON usera, nie na ślepo — pełny opis w ARCHITECTURE.md
+sekcja "Wrapped/kolekcje"):
+1. Karta miesiąca wymaga TERAZ realnego sygnału apki (wydatek/nastrój/wypłata) — same
+   zsynchronizowane kroki z zegarka (Health Connect backfill sięgał u tego usera do 2022,
+   3 lata przed użyciem reszty apki) już nie tworzą pustej karty.
+2. `stepsToDistanceFact` — zagęszczona tabela landmarków 90-650 km (było tylko 2 landmarki
+   w typowym miesięcznym zakresie tego usera, teraz 5).
+3. `getFoodTags` — kilka realnych luk w słowach-kluczach słodycze/przekąski (skrócone
+   paragonowe "Ciast" bez 'k', brakujące marki Balconi/Jelly/miętówki/grylaż).
+
+`tsc`/`jest` zielone (65 suit/808 testów — nowe pliki `monthCards.test.ts`, rozszerzone
+`funComparisons.test.ts`/`receiptParser.test.ts`). **Priorytet testu na urządzeniu**: Kolekcja
+miesięcy — sprawdź czy liczba kart spadła (bez pustych "same kroki" kart sprzed używania
+apki), czy ciekawostka o dystansie różni się między kartami różnych miesięcy, i czy nowo
+zeskanowane paragony ze słodyczami/przekąskami/miętówkami/grylażem łapią właściwy tag.
+
+**NIE zrobione w tej sesji, wciąż otwarte z tej samej rozmowy:**
+- **Więcej stat/ciekawostek na karcie** i **redesign wizualny** — user zaznaczył OBA jako
+  chciane w AskUserQuestion, ale nie sprecyzował KONKRETNIE co (jaki stat, jaki nowy layout).
+  Czeka na doprecyzowanie / konkretny przykład zanim zacznę zgadywać design.
+- **"Sporo zaokrąglone bez sensu w całej apce"** — user napisał to ogólnikowo o CAŁEJ apce,
+  nie tylko kartach miesięcy. Zbyt szerokie żeby ruszać bez konkretnych przykładów (które
+  ekrany/liczby) — czeka na wskazanie GDZIE dokładnie widzi zaokrąglenia, które nie mają sensu.
+- **Sklejony nagłówek adresu sklepu z nazwą pierwszego produktu na paragonie** — w eksporcie
+  usera 2 itemy z JEDNEGO paragonu miały dosłownie "Kaufland Rzeszów-Nowe Miasto ul. Rejtana
+  40 Rzeszów <nazwa produktu>" jako nazwę itemu (adres sklepu wleciał w linijkę pierwszego
+  produktu). Osobny, wąski bug w `receiptParser.ts`'s parsowaniu linii — niezbadany (za mało
+  przykładów żeby bezpiecznie zdiagnozować regex/logikę bez ryzyka zepsucia innych paragonów),
+  niski priorytet (2 itemy na setki), ale wart odnotowania jeśli user zgłosi więcej podobnych.
+
 ## ✅ Grey screen w "Co zjadłem" — user potwierdził, że już nie występuje (2026-08-31)
 
 Zgłoszony wcześniej tego dnia (Co zjadłem → Produkty → ciastka → Zapisz). Przeszukane

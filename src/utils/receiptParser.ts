@@ -346,7 +346,7 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'porzeczk','granat','papaja','awokado','limonka','grejpfrut',
   ]],
   ['słodycze',   [
-    'czekolad','czekoladk','cukierek','cukierk','batonik','baton','lody','wafelek','ciastk','ciasteczk','biszkopty',
+    'czekolad','czekoladk','cukierek','cukierk','batonik','baton','lody','wafelek','ciast','biszkopty',
     'kinder','kitkat','pralinki','toffi','galaretk','żelki','karmel',
     'ptasie mleczk','michałk','krówk','chałw','miodownik','piernik',
     'snickers','twix','mars','bounty','milky way','raffaello','ferrero',
@@ -360,6 +360,11 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'herbatnik','digestive','petit beurre','bahlsen','leibniz','princessa',
     'merci','celebrations','tic tac','skittles','m&m','smarties','nimm2','chupa',
     'sorbet','markiza','kokosank',
+    // rozszerzenie 2026-08-31 (user: "duzo pomyłek kategorii słodycze przekąski") — realne
+    // luki znalezione w danych: 'ciastk'→'ciast' (paragony skracają "Ciastko" do samego
+    // "Ciast", stem z 'k' tego nie łapał), 'miętówk' (miętówki — dotąd żadna mięta w liście),
+    // 'balconi'/'jelly' (marki/nazwy pomijane przy dotychczasowych słowach kluczowych).
+    'miętówk','miętow','balconi','jelly','grylaż','grylaz',
   ]],
   ['pieczywo',   [
     'chleb','bułk','bagietk','tost','graham','pumpernik','orkiszow','rustykalna',
@@ -380,6 +385,8 @@ const FOOD_TAG_MAP: [string, string[]][] = [
     'krakelin','wafle ryż','wafle kukurydz','sezamk','flips','bake rolls','bakerolls',
     'talarki','tuc','lajkonik','beskidzkie','monster munch','curly','sun snack',
     'peperami','twist','chrupki kukurydz','pop corn',
+    // rozszerzenie 2026-08-31 — patrz komentarz przy słodyczach wyżej
+    'mieszanka studencka',
   ]],
   ['chemia',     [
     'szampon','mydło','proszek','płyn do','chusteczk','papier toalet',
