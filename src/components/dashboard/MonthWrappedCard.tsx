@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Footprints, TrendingUp, TrendingDown, Trophy, Coins, Smile, Sparkles, ChevronRight } from 'lucide-react-native';
+import { Footprints, TrendingUp, TrendingDown, Trophy, Coins, Smile, Sparkles, ChevronRight, Moon, Scale } from 'lucide-react-native';
 import { MonthCard, MonthPace } from '@/utils/monthCards';
 import { stepsToDistanceFact } from '@/utils/funComparisons';
 
@@ -76,6 +76,13 @@ export default function MonthWrappedCard({
     chips.push({ icon: card.spendVsPrevPct < 0 ? TrendingDown : TrendingUp,
       text: `${card.spendVsPrevPct > 0 ? '+' : ''}${card.spendVsPrevPct}% vs poprz.`,
       tone: card.spendVsPrevPct < 0 ? 'up' : 'down' });
+  // Waga (2026-09-01) — bez znajomości celu usera (schudnąć/przytyć) nie zgadujemy czy
+  // wzrost/spadek to "dobrze"/"źle" (`tone: 'star'`, neutralny akcent koloru karty, nie
+  // zielony/czerwony); próg 0,3 kg odcina szum pomiarowy wagi.
+  if (card.weightChangeKg != null && Math.abs(card.weightChangeKg) >= 0.3 && chips.length < 3)
+    chips.push({ icon: Scale,
+      text: `Waga ${card.weightChangeKg > 0 ? '+' : ''}${card.weightChangeKg.toFixed(1).replace('.', ',')} kg`,
+      tone: 'star' });
 
   const Body = (
     <Animated.View style={enterStyle}>
@@ -133,6 +140,18 @@ export default function MonthWrappedCard({
               <View>
                 <Text style={st.heroVal}>{fmt(card.earned)}</Text>
                 <Text style={st.heroKey}>zł zarobku</Text>
+              </View>
+            </View>
+          )}
+          {/* Sen (2026-09-01, user: "dodałeś do tych kart więcej danych żeby nie były takie
+              nudne???") — `avgSleepH`/`weightChangeKg` istniały już w danych (healthDays),
+              po prostu nieużywane na karcie. */}
+          {card.avgSleepH != null && (
+            <View style={st.heroStat}>
+              <View style={st.heroIcon}><Moon size={16} color="#fff" /></View>
+              <View>
+                <Text style={st.heroVal}>{card.avgSleepH.toFixed(1).replace('.', ',')}h</Text>
+                <Text style={st.heroKey}>śr. snu</Text>
               </View>
             </View>
           )}
@@ -253,7 +272,7 @@ const st = StyleSheet.create({
   month: { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -1, ...shadow },
   year: { color: 'rgba(255,255,255,0.75)', fontSize: 15, fontWeight: '700', marginTop: -2, ...shadow },
 
-  heroRow: { flexDirection: 'row', gap: 20, marginTop: 14 },
+  heroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, rowGap: 10, marginTop: 14 },
   heroStat: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   heroIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   heroVal: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5, ...shadow },

@@ -25,7 +25,7 @@ export function usePetQuests() {
   } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const lvl = levelFromXp(xp);
-  const { health, waterGoal, waterToday, recentDays, cardsCollected } = usePetHealthSync();
+  const { health, waterGoal, waterToday, recentDays, cardsCollected, synced } = usePetHealthSync();
   const { habits, todayDone, completions, getStreak } = useHabits();
   const { entries: moodEntries } = useMoodStore();
   const { expenses } = useExpensesStore();
@@ -101,5 +101,5 @@ export function usePetQuests() {
     });
   }, [recentDays, moodEntries, habits, completions, waterGoal, dayClaims, lvl.level]);
 
-  return { questCtx, quests, missed, lvl, personalTargets, todaysPool };
+  return { questCtx, quests, missed, lvl, personalTargets, todaysPool, synced };
 }

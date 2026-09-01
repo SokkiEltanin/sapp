@@ -3,6 +3,41 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Pupil: "Odbierz" czeka na dzisiejszy sync + karty miesięcy dostały sen/wagę — NIEsprawdzone (2026-09-01)
+
+User: "dane w pupilu powinny czekać na załadowanie aktualnych kroków, snu itp z dnia danego bo
+bez aktualizacji pobiera z wczoraj i można odebrać" + "dodałeś do tych kart więcej danych żeby
+nie były takie nudne???". Dwie osobne rzeczy z tej samej wiadomości, pełny opis w
+ARCHITECTURE.md:
+1. **Nowy `synced` z `usePetHealthSync`** — `reload()` pokazuje cache NATYCHMIAST, dopiero
+   POTEM woła prawdziwy sync z zegarka; w tej luce quest oparty o kroki/sen mógł wyglądać na
+   "do odebrania" na nieświeżych danych. `app/pet-quests.tsx` blokuje teraz "Odbierz"
+   (dzienne/bonusowe/tygodniowe/miesięczne) dopóki `!synced`, pokazując "Ładuję…".
+2. **`avgSleepH`/`weightStartKg`/`weightEndKg`/`weightChangeKg`** dołączone do kart miesięcy —
+   dane (`healthDays`) już tam były, po prostu nieużywane. Sen jako 3. hero-stat, zmiana wagi
+   jako chip (próg ±0,3 kg, neutralny kolor — apka nie zna celu usera).
+
+`tsc`/`jest` zielone (65 suit/812 testów — nowe testy w `monthCards.test.ts`; `synced` w
+`usePetHealthSync`/`usePetQuests` to hooki z I/O, ten sam brak jednostkowego pokrycia co reszta
+tego zestawu, spójne z istniejącym wzorcem w repo). **Priorytet testu na urządzeniu**:
+(a) otwórz `/pet-quests` zaraz po starcie apki (najlepiej z zablokowanym/wolnym internetem,
+żeby złapać okno przed sync'em) — przyciski "Odbierz" powinny być zablokowane z napisem
+"Ładuję…" dopóki dane z zegarka się nie zsynchronizują, NIE powinno dać się kliknąć na
+podstawie starych danych; (b) Kolekcja miesięcy — miesiące z danymi o śnie/wadze z zegarka
+powinny pokazywać nowy hero-stat snu i/lub chip zmiany wagi.
+
+**Wciąż otwarte, świadomie NIE ruszone w tej sesji (user: "jutro ci wyeksportuję dane moje z
+pupila i zerkniemy")**: user opisał, że w walkach kampanii nadal widnieje tekst o "redukcji
+obrażeń przez nawyki/sen", mimo że (jak sam zauważył) taka mechanika NIE jest realnie
+podłączona — bossy są po prostu silniejsze (pancerz/kryt/większy dmg), nie ma żadnego realnego
+wpływu nawyków/snu na obrażenia. Przeszukane PONOWNIE (drugi raz w tej sesji, po wcześniejszym
+sprawdzeniu z 2026-08-30 — patrz niżej) `boss-fight.tsx`, `bosses.ts`, `combatItems.ts`,
+`gear.ts` pod kątem "redukcj"/"nawyk"/"sen" — nic nie znalezione. User świadomie odłożył
+dalsze grzebanie do jutra, kiedy dostarczy eksport danych z pupila (podobny do tego użytego w
+audycie kart miesięcy) — **nie zgadywać, czekać na ten eksport / dokładniejsze wskazanie GDZIE
+w UI ten tekst faktycznie widać** (przyda się zrzut ekranu z konkretnym miejscem, nie tylko
+surowe dane).
+
 ## 🆕 Karty miesięcy: odcięcie pustych miesięcy + mniej powtórzeń + poprawki tagów — NIEsprawdzone (2026-08-31)
 
 User: "ulepsz karty miesięcy podsyłam eksport danych do wglądu" → potem screenshot pytania z

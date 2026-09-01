@@ -60,3 +60,49 @@ describe('monthCards — buildMonthCards (odcięcie pustych miesięcy tylko-z-kr
     expect(buildMonthCards(baseCtx())).toEqual([]);
   });
 });
+
+// 2026-09-01, user: "dodałeś do tych kart więcej danych żeby nie były takie nudne???" —
+// `healthDays` niosło sen/wagę od początku (MonthCardCtx), ale karta czytała z niego tylko
+// kroki. `avgSleepH`/`weightStartKg`/`weightEndKg`/`weightChangeKg` teraz też liczone.
+describe('monthCards — buildMonthCards (sen i waga)', () => {
+  test('avgSleepH: średnia z dni, które MAJĄ dane o śnie (0 traktowane jako brak danych)', () => {
+    const cards = buildMonthCards(baseCtx({
+      expenses: [e({ date: '2026-05-15T10:00:00' })],
+      healthDays: {
+        '2026-05-10': { steps: 0, sleepMinutes: 420, weightKg: null },  // 7h
+        '2026-05-11': { steps: 0, sleepMinutes: 480, weightKg: null },  // 8h
+        '2026-05-12': { steps: 0, sleepMinutes: 0, weightKg: null },    // brak danych — pomijany
+      },
+    }));
+    expect(cards[0].avgSleepH).toBeCloseTo(7.5, 5);
+  });
+
+  test('brak jakichkolwiek dni ze snem → avgSleepH: null', () => {
+    const cards = buildMonthCards(baseCtx({ expenses: [e({ date: '2026-05-15T10:00:00' })] }));
+    expect(cards[0].avgSleepH).toBeNull();
+  });
+
+  test('waga: pierwszy/ostatni pomiar W KOLEJNOŚCI DAT (nie kolejności wstawiania) i ich różnica', () => {
+    const cards = buildMonthCards(baseCtx({
+      expenses: [e({ date: '2026-05-15T10:00:00' })],
+      healthDays: {
+        '2026-05-20': { steps: 0, sleepMinutes: 0, weightKg: 70 },   // wstawione pierwsze, ale to NIE jest pierwsza data
+        '2026-05-01': { steps: 0, sleepMinutes: 0, weightKg: 72 },
+        '2026-05-10': { steps: 0, sleepMinutes: 0, weightKg: 71 },   // środek miesiąca — nie liczy się
+      },
+    }));
+    expect(cards[0].weightStartKg).toBe(72);
+    expect(cards[0].weightEndKg).toBe(70);
+    expect(cards[0].weightChangeKg).toBeCloseTo(-2, 5);
+  });
+
+  test('tylko JEDEN pomiar wagi w miesiącu → weightChangeKg: null (brak dwóch punktów do porównania)', () => {
+    const cards = buildMonthCards(baseCtx({
+      expenses: [e({ date: '2026-05-15T10:00:00' })],
+      healthDays: { '2026-05-10': { steps: 0, sleepMinutes: 0, weightKg: 70 } },
+    }));
+    expect(cards[0].weightStartKg).toBe(70);
+    expect(cards[0].weightEndKg).toBe(70);
+    expect(cards[0].weightChangeKg).toBeNull();
+  });
+});

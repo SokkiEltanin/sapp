@@ -41,7 +41,7 @@ export default function PetQuests() {
     markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
     markTrainingDay, equippedGear, ownedGear,
   } = usePetStore();
-  const { questCtx, quests, missed } = usePetQuests();
+  const { questCtx, quests, missed, synced } = usePetQuests();
   // "Kolczyki" (gear) mnożą monety ze WSZYSTKICH źródeł, w tym questów — ten sam wzorzec co
   // boss-fight.tsx (`gearCoinsMult`), żeby zainwestowany gear liczył się też tutaj.
   const coinsMult = useMemo(() => gearCoinsMult(equippedGear, ownedGear), [equippedGear, ownedGear]);
@@ -131,7 +131,13 @@ export default function PetQuests() {
 
         <View style={s.qHead}>
           <Text style={s.section}>Codzienne</Text>
-          {quests.claimableCount > 0 && <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>{quests.claimableCount} do odbioru</Text></View>}
+          {/* `synced` (2026-09-01, user: "dane w pupilu powinny czekać na załadowanie
+              aktualnych kroków, snu itp... bo bez aktualizacji pobiera z wczoraj i można
+              odebrać") — dopóki świeży sync z zegarka się nie skończył, przyciski "Odbierz"
+              są zablokowane (patrz `q.done && synced` niżej), więc user widzi TU dlaczego. */}
+          {!synced
+            ? <Text style={s.qSyncHint}>ładowanie danych z dziś…</Text>
+            : quests.claimableCount > 0 && <View style={s.claimBadge}><Gift size={11} color="#0B0E1A" /><Text style={s.claimBadgeTxt}>{quests.claimableCount} do odbioru</Text></View>}
         </View>
         <View style={s.qCard}>
           {(() => {
@@ -149,9 +155,9 @@ export default function PetQuests() {
                       )}
                     </View>
                     {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{finalQuestCoins(q.coins)}</Text></View>}
-                    {q.done
+                    {q.done && synced
                       ? <PressableScale onPress={() => onClaimQuest(q.id, q.coins, q.xp)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
-                      : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Odbierz</Text></View>}
+                      : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>{q.done ? 'Ładuję…' : 'Odbierz'}</Text></View>}
                   </View>
                 ))}
                 {claimedN > 0 && (
@@ -193,11 +199,13 @@ export default function PetQuests() {
                             )}
                           </View>
                           {q.done && <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{finalQuestCoins(q.coins)}</Text></View>}
-                          {q.done
+                          {q.done && synced
                             ? <PressableScale onPress={() => onClaimQuest(q.id, q.coins, q.xp)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
-                            : session
-                              ? <PressableScale onPress={() => { haptic.tap(); setTraining(session); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Rozpocznij</Text></View></PressableScale>
-                              : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Odbierz</Text></View>}
+                            : q.done
+                              ? <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Ładuję…</Text></View>
+                              : session
+                                ? <PressableScale onPress={() => { haptic.tap(); setTraining(session); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Rozpocznij</Text></View></PressableScale>
+                                : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Odbierz</Text></View>}
                         </View>
                       );
                     })}
@@ -222,13 +230,15 @@ export default function PetQuests() {
                 <View key={w.id} style={s.mCard}>
                   <View style={s.mTop}>
                     <Text style={s.mLabel}>{w.label}</Text>
-                    {w.done && !w.claimed
+                    {w.done && !w.claimed && synced
                       ? <PressableScale onPress={() => onClaimWeekly(w.id, w.coins, w.xp, w.label)}>
                           <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>Odbierz +{w.coins}</Text></View>
                         </PressableScale>
                       : w.claimed
                         ? <View style={[s.mTier, s.mTierClaimed]}><CheckIcon size={10} color="#2AC68F" /><Text style={[s.mTierTxt, { color: '#2AC68F' }]}>odebrane</Text></View>
-                        : <Text style={s.mVal}>+{w.coins} 🪙</Text>}
+                        : w.done
+                          ? <Text style={s.mVal}>Ładuję…</Text>
+                          : <Text style={s.mVal}>+{w.coins} 🪙</Text>}
                   </View>
                   <View style={s.moTrack}><View style={[s.moFill, { width: `${Math.round(w.progress * 100)}%`, backgroundColor: w.done ? '#2AC68F' : '#FBBF24' }]} /></View>
                   <Text style={s.moVal}>{w.value.toLocaleString('pl-PL')} / {w.target.toLocaleString('pl-PL')} {w.unit}</Text>
@@ -246,13 +256,15 @@ export default function PetQuests() {
                 <View key={m.id} style={s.mCard}>
                   <View style={s.mTop}>
                     <Text style={s.mLabel}>{m.label}</Text>
-                    {m.done && !m.claimed
+                    {m.done && !m.claimed && synced
                       ? <PressableScale onPress={() => onClaimMonthly(m.id, m.coins, m.xp, m.label)}>
                           <View style={s.mClaim}><CoinsIcon size={11} color="#0B0E1A" /><Text style={s.mClaimTxt}>Odbierz +{m.coins}</Text></View>
                         </PressableScale>
                       : m.claimed
                         ? <View style={[s.mTier, s.mTierClaimed]}><CheckIcon size={10} color="#2AC68F" /><Text style={[s.mTierTxt, { color: '#2AC68F' }]}>odebrane</Text></View>
-                        : <Text style={s.mVal}>+{m.coins} 🪙</Text>}
+                        : m.done
+                          ? <Text style={s.mVal}>Ładuję…</Text>
+                          : <Text style={s.mVal}>+{m.coins} 🪙</Text>}
                   </View>
                   <View style={s.moTrack}><View style={[s.moFill, { width: `${Math.round(m.progress * 100)}%`, backgroundColor: m.done ? '#2AC68F' : '#FBBF24' }]} /></View>
                   <Text style={s.moVal}>{m.value.toLocaleString('pl-PL')} / {m.target.toLocaleString('pl-PL')} {m.unit}</Text>
@@ -326,6 +338,7 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qHead: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[4], marginBottom: spacing[2] },
   claimBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
   claimBadgeTxt: { fontSize: 10.5, fontWeight: '900', color: '#0B0E1A' },
+  qSyncHint: { fontSize: 11, fontWeight: '700', color: c.text.muted, fontStyle: 'italic' },
   qCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, paddingHorizontal: spacing[3] },
   missedCard: { borderColor: '#FBBF2466', backgroundColor: '#FBBF240D' },
   qRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: spacing[3] },
