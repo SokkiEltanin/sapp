@@ -451,6 +451,13 @@ export default function Pet() {
                     onPress={onFightMission} />
                 </View>
                 <Animated.View style={[s.missionReadyPromptWrap, { opacity: missionReadyOpacity }]} pointerEvents="none">
+                  {/* Skąd wrócił (2026-08-31, user: "jak jest powiadomienie że pupil wrócił z
+                      misji to niech będzie napisane z jakiego miejsca wrócił") — ta sama
+                      `destination` co w pasku "w drodze" (missionDestTxt wyżej) i w push
+                      powiadomieniu (notificationsService.scheduleMissionReady); bez tego ekran
+                      by "zapominał" skąd kotek wrócił w chwili, gdy notyfikacja właśnie to
+                      powiedziała. */}
+                  {missionMb && <Text style={s.missionReadyDest} numberOfLines={1}>Wrócił z: {missionMb.destination}</Text>}
                   <Swords size={22} color="#2AC68F" />
                   <Text style={s.missionReadyPrompt}>Naciśnij, aby zawalczyć{'\n'}i zakończyć misję</Text>
                 </Animated.View>
@@ -721,6 +728,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   missionReadyPrompt: {
     fontSize: 13, fontWeight: '800', color: '#2AC68F', textAlign: 'center',
     marginTop: 6, letterSpacing: 0.3, textTransform: 'uppercase', lineHeight: 18,
+  },
+  missionReadyDest: {
+    fontSize: 11, fontWeight: '700', color: c.text.secondary, textAlign: 'center', marginBottom: 2,
   },
   room: { position: 'absolute', width: 290, height: 240, borderRadius: 28, top: 20, alignSelf: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   roomDecor: { position: 'absolute', fontSize: 22, opacity: 0.85 },

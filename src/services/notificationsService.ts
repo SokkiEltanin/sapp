@@ -703,13 +703,17 @@ export const notificationsService = {
   // (sending the pet off), not a passive daily nag, so no `notif_enabled` gate — same reasoning
   // as scheduleSnoozeReminder above. Fires once the mission's real-time duration has elapsed,
   // even with the app fully closed (missions can run for hours).
-  async scheduleMissionReady(endsAtIso: string): Promise<void> {
+  // `destination` (2026-08-31, user: "jak jest powiadomienie że pupil wrócił z misji to niech
+  // będzie napisane z jakiego miejsca wrócił") — optional so a stale/old scheduled call
+  // (shouldn't happen, but callers shouldn't be forced to pass it) still degrades to the
+  // original generic title instead of crashing.
+  async scheduleMissionReady(endsAtIso: string, destination?: string): Promise<void> {
     const until = new Date(endsAtIso);
     if (until <= new Date()) return;
     await Notifications.scheduleNotificationAsync({
       identifier: 'mission-ready',
       content: {
-        title: 'Pupil wrócił z misji! 🎒',
+        title: destination ? `Pupil wrócił z misji: ${destination}! 🎒` : 'Pupil wrócił z misji! 🎒',
         body: 'Czeka walka i nagroda — wpadnij, zanim zapomnisz.',
         data: { screen: 'pet' },
       },
