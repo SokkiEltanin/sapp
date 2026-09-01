@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 ZNALEZIONE (nie naprawione, user: "zostaw, ja się wygrindnę") — realny bossLog pokazuje ścianę na "Widmo Porównań" (2026-09-01)
+
+Analiza REALNEGO `pet-v1.bossLog` z eksportu (101 walk) — nie symulacja: **win-rate kampanii
+tego usera to tylko 23%** (39 walk, 30× kotek zemdlał). Największy winowajca: boss `compare`
+("Widmo Porównań", `unlockLevel: 30`, hp 1481) — user trafił na niego na poziomie **21** (9
+poziomów PONIŻEJ jego `unlockLevel`) i przegrał 4/4 razy, KAŻDA walka identyczna: kontratak
+stały 35 dmg/rundę (0% wariancji w 32 rundach!), kotek pada dokładnie w rundzie 8 (260 HP /
+35 = 7,4), boss ledwo drapnięty (1481→~470 HP, ~32% zdjęte). To NIE przypadek — sekwencyjne
+odblokowanie kampanii (2026-08-17, "bez progu poziomu... pokonaj poprzedniego") pozwala
+dotrzeć do bossa zbalansowanego pod dużo wyższy poziom niż ten, na którym realnie jest gracz,
+jeśli tempo levelowania (questy/misje) nie nadąża za tempem pokonywania bossów. Podobny wzorzec
+widać wcześniej w logu: `dragon` (unlockLevel 9) zajął 10 prób (level 8→10), `insomnia`
+(unlockLevel 26) zajęło 13 prób (level 18→19) — user dosłownie "grindował" lewelami W
+TRAKCIE utykania na tych samych bossach, dokładnie problem który tu opisuję.
+**User świadomie wybrał NIE naprawiać teraz** (AskUserQuestion: "Zostaw jak jest, ja się
+wygrindnę" zamiast "zbalansuj krzywą" lub "dodaj ostrzeżenie przed walką nad poziomem") — ale
+to POTWIERDZA na realnych danych wcześniejszą hipotezę „ŚWIADOMIE NIEROZWIĄZANE — raid
+endgame" (patrz niżej w pliku) i prawdopodobnie wyjaśnia user'a wcześniejszą, niejasną skargę
+o bossach kampanii które „są silniejsze, mają pancerz/kryt/dmg większy" — może nie chodzić o
+żaden zepsuty tekst UI, tylko o to DOKŁADNIE zjawisko (level gracza vs `unlockLevel` bossa).
+Jeśli user wróci do tego tematu: opcje z pytania to (a) przebalansować krzywą HP/regen
+bossów, (b) dodać ostrzeżenie w UI przed walką z bossem znacznie powyżej poziomu gracza,
+zanim wejdzie w walkę na ślepo.
+
 ## 🆕 Pupil: "Odbierz" czeka na dzisiejszy sync + karty miesięcy dostały sen/wagę — NIEsprawdzone (2026-09-01)
 
 User: "dane w pupilu powinny czekać na załadowanie aktualnych kroków, snu itp z dnia danego bo
