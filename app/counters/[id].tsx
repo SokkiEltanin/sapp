@@ -45,6 +45,7 @@ export default function CounterDetail() {
   const { counters } = useCounters();
   const { expenses } = useExpensesStore();
   const meals = useFoodStore(st => st.meals);
+  const foodProducts = useFoodStore(st => st.products);
   const { tasks, create: createTask, toggle: toggleTask, remove: removeTask } = useTasks();
 
   const counter = counters.find(cn => cn.id === id);
@@ -90,7 +91,7 @@ export default function CounterDetail() {
   const bigLabel = !isUntil ? '' : over ? 'minęło'
     : during ? (endLeft > 1 ? `koniec za ${endLeft} dni` : endLeft === 1 ? 'ostatni dzień!' : 'kończy się dziś!')
     : untilLabel(left);
-  const sinceN = !isUntil ? (counter.mode === 'auto' ? autoDaysWithout(counter, expenses, meals) : daysSince(counter)) : 0;
+  const sinceN = !isUntil ? (counter.mode === 'auto' ? autoDaysWithout(counter, expenses, meals, foodProducts) : daysSince(counter)) : 0;
 
   // Quick relative-date chips for a linked task, anchored on the event's own date —
   // "muszę się spakować, więc dzień przed wyjazdem" was the user's own example.

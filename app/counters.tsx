@@ -39,6 +39,7 @@ export default function Counters() {
   const { events, gcalEvents } = useCalendarStore();
   const { expenses } = useExpensesStore();
   const meals = useFoodStore(st => st.meals);
+  const foodProducts = useFoodStore(st => st.products);
 
   type UiKind = 'until' | 'since' | 'avoid';
   const [editing, setEditing] = useState<Counter | null>(null);
@@ -53,7 +54,7 @@ export default function Counters() {
   const [onDash, setOnDash] = useState(true);
   const [pickCal, setPickCal] = useState(false);
 
-  const daysFor = (cn: Counter) => cn.mode === 'auto' ? autoDaysWithout(cn, expenses, meals) : daysSince(cn);
+  const daysFor = (cn: Counter) => cn.mode === 'auto' ? autoDaysWithout(cn, expenses, meals, foodProducts) : daysSince(cn);
   const untils = counters.filter(x => x.kind === 'until').sort((a, b) => a.date.localeCompare(b.date));
   const sinces = counters.filter(x => x.kind === 'since').sort((a, b) => daysFor(b) - daysFor(a));
 

@@ -543,9 +543,9 @@ export default function DashboardScreen() {
   const nextCountdownDays = activeCountdowns.length ? daysUntil(activeCountdowns[0]) : null;
   const dashSince = useMemo(
     () => counters.filter(cn => cn.kind === 'since' && cn.onDashboard !== false)
-      .map(cn => ({ cn, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses, foodMeals) : daysSince(cn) }))
+      .map(cn => ({ cn, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses, foodMeals, foodProducts) : daysSince(cn) }))
       .sort((a, b) => b.days - a.days),
-    [counters, expenses, foodMeals, dayKey],
+    [counters, expenses, foodMeals, foodProducts, dayKey],
   );
 
   // "Rekordy życiowe" widget — all-time bests from the data already loaded.
@@ -586,9 +586,9 @@ export default function DashboardScreen() {
     const fromHabits = habits.map(h => ({ key: `h:${h.id}`, name: h.title, days: getStreak(h.id) }));
     const fromCounters = counters
       .filter(cn => cn.kind === 'since')
-      .map(cn => ({ key: `c:${cn.id}`, name: cn.mode === 'auto' ? `bez ${cn.name}` : cn.name, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses, foodMeals) : daysSince(cn) }));
+      .map(cn => ({ key: `c:${cn.id}`, name: cn.mode === 'auto' ? `bez ${cn.name}` : cn.name, days: cn.mode === 'auto' ? autoDaysWithout(cn, expenses, foodMeals, foodProducts) : daysSince(cn) }));
     return [...fromHabits, ...fromCounters];
-  }, [habits, getStreak, counters, expenses, foodMeals, dayKey]);
+  }, [habits, getStreak, counters, expenses, foodMeals, foodProducts, dayKey]);
 
   // ── Animations ────────────────────────────────────────────────────────────
   // static blob — subtle color tint behind glassmorphism, no pulsing
