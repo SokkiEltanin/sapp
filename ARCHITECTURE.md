@@ -2033,6 +2033,23 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     - `celebrate` (animacja świętowania na kotku przy odbiorze nagrody) świadomie NIE
       przeniesiony do `pet-quests.tsx` — quest-claim tam już nie animuje kotka (nie ma go
       na tym ekranie), to oczekiwana konsekwencja rozdzielenia ekranów, nie regresja.
+    - **`synced` — blokada "Odbierz" dopóki dzisiejszy sync się nie skończył (2026-09-01)**
+      — user: "dane w pupilu powinny czekać na załadowanie aktualnych kroków, snu itp z dnia
+      danego bo bez aktualizacji pobiera z wczoraj i można odebrać". `usePetHealthSync`'s
+      `reload()` już wcześniej pokazywało CACHE natychmiast (`readHealth()`), a DOPIERO
+      potem woła `autoSyncHealth` i odświeża ponownie — w tej luce quest oparty o kroki/sen
+      (`questCtx.stepsToday`/`sleepMinutes`, oba z `health`) mógł pokazać się jako "do
+      odebrania" na podstawie nieświeżych danych sprzed sync'u. Nowy `synced: boolean`
+      (start `false`, `true` PO pierwszym zakończonym `autoSyncHealth` tej sesji ekranu —
+      albo od razu `true` przy błędzie sync'u, żeby offline nie blokowało odbioru na stałe)
+      zwracany z `usePetHealthSync`, przekazany przez `usePetQuests`. `app/pet-quests.tsx`
+      blokuje przyciski "Odbierz" (`q.done && synced` zamiast samego `q.done`) dla
+      dziennych/bonusowych/tygodniowych/miesięcznych questów — pokazuje "Ładuję…" zamiast
+      aktywnego przycisku, plus podpowiedź "ładowanie danych z dziś…" w nagłówku sekcji
+      Codzienne dopóki `!synced`. **NIE dotyczy** `missed` (zaległe questy z poprzednich dni
+      — te czytają JUŻ ROZLICZONE dane historyczne z `recentDays`, nie mają tego wyścigu) ani
+      `quests.milestones` (rekordy życiowe typu "najlepszy dzień kroków" — osiągnięte dawno,
+      świeży sync dzisiejszego dnia i tak by ich nie cofnął).
   - **`PetCustomizeModal.tsx` (imię+kosmetyka) + onboarding + przebudowa sklepu** —
     krok 5-6 planu (NEXT_STEPS.md "SYSTEM EKWIPUNKU"). User: "nie przecież kliknięciem
     głaskam kotka to nie może... lepiej dać przy edycji imienia kosmetyki".
@@ -2805,6 +2822,21 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
        Jeden dwuitemowy przypadek sklejenia nagłówka adresu sklepu z nazwą pierwszego produktu
        na paragonie — osobny, wąski bug parsera, niezbadany, zanotowany w NEXT_STEPS.md.)
        Testy w `receiptParser.test.ts`.
+    4. **Sen + zmiana wagi jako nowe staty karty (2026-09-01)** — user: "dodałeś do tych kart
+       więcej danych żeby nie były takie nudne???". `MonthCardCtx.healthDays` niosło
+       `sleepMinutes`/`weightKg` PER DZIEŃ od samego początku, ale `buildMonthCards()` czytało
+       z niego TYLKO `steps` — reszta siedziała nieużywana. Dodane do `MonthCard`: `avgSleepH`
+       (średnia z dni które MAJĄ dane snu — dzień z `sleepMinutes:0` liczy się jako "brak
+       danych", nie "spał 0h"), `weightStartKg`/`weightEndKg`/`weightChangeKg` (pierwszy i
+       ostatni zapisany pomiar wagi W KOLEJNOŚCI DAT tego miesiąca — iteracja po
+       `Object.keys(healthDays).sort()`, nie po `Object.entries()`, bo kolejność wstawiania do
+       obiektu nie gwarantuje kolejności dat; `weightChangeKg` wymaga **≥2 ODRĘBNYCH pomiarów**
+       tego miesiąca, nie samego `!= null` — z JEDNYM pomiarem `first===last` dałoby mylące
+       "0,0 kg zmiany" zamiast uczciwego braku danych). `MonthWrappedCard.tsx`: sen jako trzeci
+       hero-stat obok kroków/zarobku (ikona `Moon`, tylko gdy `avgSleepH != null`), zmiana wagi
+       jako chip w istniejącym rzędzie porównań (ikona `Scale`, próg ±0,3 kg żeby odciąć szum
+       pomiarowy, `tone:'star'` NEUTRALNY — apka nie zna celu usera (schudnąć/przytyć), więc nie
+       zgaduje czy wzrost/spadek to zielone czy czerwone). Testy w `monthCards.test.ts`.
 - **Nawyki/liczniki**: `utils/habits.ts` + `useHabits`, `countersStore` (dni bez / odliczania).
   `app/habit-year.tsx` = jeden ekran pixeli dla NAWYKU (`?id=`) **i** LICZNIKA (`?counter=`):
   MIESIĄC = kalendarz (Pn..Nd + numery dni), ROK = rolka GitHub. Nawyk: done=kolor nawyku,

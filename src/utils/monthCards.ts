@@ -83,6 +83,13 @@ export interface MonthCard {
   stepsDays: number;      // days with step data
   avgSteps: number;       // steps / stepsDays
   avgMood: number | null;
+  // 2026-09-01 — user: "dodałeś do tych kart więcej danych żeby nie były takie nudne???"
+  // `healthDays` (steps + sleepMinutes + weightKg per day) było już w MonthCardCtx od
+  // początku, ale karta czytała TYLKO steps z niego — sen i waga siedziały nieużywane.
+  avgSleepH: number | null;      // średnia snu w GODZINACH (dni z danymi o śnie), null = brak danych
+  weightStartKg: number | null;  // pierwszy zapisany pomiar wagi w miesiącu
+  weightEndKg: number | null;    // ostatni zapisany pomiar wagi w miesiącu
+  weightChangeKg: number | null; // end − start, null gdy brak OBU pomiarów
   earned: number;         // paycheck FOR that month (0 if unknown)
   sweetsSpend: number;
   sweets: MonthCardSweet[];   // top favourites, most-bought first
@@ -204,9 +211,14 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     spend: number; income: number; steps: number; stepDays: number;
     moodSum: number; moodN: number; sweetsSpend: number;
     sweets: Record<string, { count: number; spend: number; raw: string }>;
+    sleepMinSum: number; sleepDays: number;       // 2026-09-01 — patrz komentarz przy avgSleepH
+    weightFirstKg: number | null; weightLastKg: number | null; weightDays: number;
   };
   const agg: Record<string, Agg> = {};
-  const ensure = (m: string) => (agg[m] ??= { spend: 0, income: 0, steps: 0, stepDays: 0, moodSum: 0, moodN: 0, sweetsSpend: 0, sweets: {} });
+  const ensure = (m: string) => (agg[m] ??= {
+    spend: 0, income: 0, steps: 0, stepDays: 0, moodSum: 0, moodN: 0, sweetsSpend: 0, sweets: {},
+    sleepMinSum: 0, sleepDays: 0, weightFirstKg: null, weightLastKg: null, weightDays: 0,
+  });
 
   for (const e of expenses) {
     const m = (e.date ?? '').slice(0, 7);
@@ -231,11 +243,20 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     if (!m) continue;
     const a = ensure(m); a.moodSum += e.mood; a.moodN++;
   }
-  for (const [d, v] of Object.entries(healthDays)) {
+  // Posortowane chronologicznie (2026-09-01) — `weightFirstKg`/`weightLastKg` potrzebują
+  // PIERWSZEGO i OSTATNIEGO pomiaru W KOLEJNOŚCI dat, `Object.entries` nie gwarantuje kolejności.
+  for (const d of Object.keys(healthDays).sort()) {
+    const v = healthDays[d];
     const m = d.slice(0, 7);
     if (!m || !v) continue;
     const a = ensure(m);
     if (v.steps > 0) { a.steps += v.steps; a.stepDays++; }
+    if (v.sleepMinutes > 0) { a.sleepMinSum += v.sleepMinutes; a.sleepDays++; }
+    if (v.weightKg != null && v.weightKg > 0) {
+      if (a.weightFirstKg == null) a.weightFirstKg = v.weightKg;
+      a.weightLastKg = v.weightKg;
+      a.weightDays++;
+    }
   }
   const earnedByMonth: Record<string, number> = {};
   for (const r of payMonths) earnedByMonth[r.month] = (earnedByMonth[r.month] ?? 0) + r.amount;
@@ -270,6 +291,12 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
     const avgMood = a.moodN ? a.moodSum / a.moodN : null;
     const avgSteps = a.stepDays ? a.steps / a.stepDays : 0;
     const earned = earnedByMonth[month] ?? 0;
+    // 2026-09-01 — patrz komentarz przy `avgSleepH` w MonthCard interface.
+    const avgSleepH = a.sleepDays ? a.sleepMinSum / a.sleepDays / 60 : null;
+    // `weightDays >= 2` (nie samo != null) — z JEDNYM pomiarem first===last, różnica
+    // wyszłaby myląco jako 0,0 ("brak zmiany") zamiast uczciwego "za mało danych".
+    const weightChangeKg = a.weightDays >= 2 && a.weightFirstKg != null && a.weightLastKg != null
+      ? Math.round((a.weightLastKg - a.weightFirstKg) * 10) / 10 : null;
 
     const sweets: MonthCardSweet[] = Object.values(a.sweets)
       .sort((x, y2) => y2.count - x.count || y2.spend - x.spend)
@@ -312,6 +339,7 @@ export function buildMonthCards(ctx: MonthCardCtx): MonthCard[] {
       totalSpend: a.spend, totalIncome: a.income, balance: a.income - a.spend,
       steps: a.steps, stepsDays: a.stepDays, avgSteps,
       avgMood, earned, sweetsSpend: a.sweetsSpend, sweets,
+      avgSleepH, weightStartKg: a.weightFirstKg, weightEndKg: a.weightLastKg, weightChangeKg,
       spendRank: spendRankList.indexOf(month) + 1,
       monthsTracked: ordered.length,
       stepsVsAvgPct, spendVsPrevPct,

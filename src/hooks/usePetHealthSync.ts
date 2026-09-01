@@ -41,6 +41,16 @@ export function usePetHealthSync() {
   // apka nie była otwarta dało się odebrać z opóźnieniem (patrz `missed` w usePetQuests.ts).
   const [recentDays, setRecentDays] = useState<RecentDay[]>([]);
   const [cardsCollected, setCardsCollected] = useState(0);
+  // `synced` (2026-09-01, user: "dane w pupilu powinny czekać na załadowanie aktualnych
+  // kroków, snu itp z dnia danego bo bez aktualizacji pobiera z wczoraj i można odebrać") —
+  // `reload()` niżej pokazuje CACHE natychmiast (`readHealth()`), a dopiero POTEM woła
+  // `autoSyncHealth` i odświeża jeszcze raz — między tymi dwoma odczytami quest oparty o
+  // kroki/sen mógł pokazać się jako "do odebrania" na podstawie nieświeżych danych. `synced`
+  // startuje `false` i przechodzi na `true` PO PIERWSZYM zakończonym sync'u tej sesji ekranu
+  // (nie resetuje się z powrotem na kolejnych focus/appstate reloadach — te tylko dogrywają
+  // różnicę, nie ma już czego "czekać" po pierwszym prawdziwym sync'u). Ekrany renderujące
+  // przyciski "Odbierz" oparte o `health`/`questCtx` blokują je dopóki `!synced`.
+  const [synced, setSynced] = useState(false);
 
   const readHealth = useCallback(() => {
     const t = todayISO();
@@ -77,8 +87,8 @@ export function usePetHealthSync() {
     readHealth(); // show cache immediately…
     import('@/services/healthAutoSync')
       .then(({ autoSyncHealth }) => autoSyncHealth(7, true))
-      .then(() => readHealth())
-      .catch(() => {});
+      .then(() => { readHealth(); setSynced(true); })
+      .catch(() => setSynced(true));   // sync failed (offline etc.) — don't block forever on cache
   }, [readHealth]);
 
   useFocusEffect(reload);
@@ -99,5 +109,5 @@ export function usePetHealthSync() {
     return () => clearInterval(iv);
   }, [reload]);
 
-  return { health, stepGoal, waterGoal, budgets, waterToday, recentDays, cardsCollected, reload };
+  return { health, stepGoal, waterGoal, budgets, waterToday, recentDays, cardsCollected, reload, synced };
 }
