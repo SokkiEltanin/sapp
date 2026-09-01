@@ -11,7 +11,7 @@ import { useMoodStore } from '@/store/moodStore';
 import { useHabits } from '@/hooks/useHabits';
 import { useWorkEarnings } from '@/hooks/useWorkEarnings';
 import { usePetStore } from '@/store/petStore';
-import { fmtMissionDuration } from '@/utils/missions';
+import { fmtMissionDuration, minibossForMission } from '@/utils/missions';
 import { getBudgets, MonthlyBudgets } from '@/utils/budgets';
 import { useTimeAccent } from '@/hooks/useTimeAccent';
 import { colors, fonts } from '@/theme';
@@ -129,6 +129,7 @@ export default function TopPill() {
   // misja w toku i energia bossów gotowa do walki, oba jako kandydaci na LUŹNĄ (nie-pilną)
   // pulę rotacji niżej, obok habit-risk/mood/pending/all-clear.
   const missionEndsAt = usePetStore(s => s.missionEndsAt);
+  const missionStartedAt = usePetStore(s => s.missionStartedAt);
   const bossEnergy    = usePetStore(s => s.energy);
 
   // The pill never re-focuses (it lives in the tab bar), so reload budgets on
@@ -340,10 +341,15 @@ export default function TopPill() {
     if (missionEndsAt) {
       const remainingMs = new Date(missionEndsAt).getTime() - Date.now();
       const ready = remainingMs <= 0;
+      // Miejsce (2026-08-31, user: "jak jest powiadomienie że pupil wrócił z misji to niech
+      // będzie napisane z jakiego miejsca wrócił") — ta sama `destination` co w push
+      // powiadomieniu i na scenie /pet, `numberOfLines={1}` niżej w renderze bezpiecznie
+      // przycina dłuższe nazwy zamiast łamać layout pigułki.
+      const dest = ready && missionStartedAt ? minibossForMission(missionStartedAt).destination : null;
       calmCandidates.push({
         badge:  ready ? 'GOTOWA' : fmtMissionDuration(remainingMs / 60000),
         color:  '#2AC68F',             // zielony — kolor Pupila w tab barze
-        text:   ready ? 'PUPIL WRÓCIŁ Z MISJI' : 'PUPIL NA MISJI',
+        text:   ready ? `PUPIL WRÓCIŁ Z: ${dest ?? 'MISJI'}`.toUpperCase() : 'PUPIL NA MISJI',
         route:  '/pet',
         key:    `mission-${ready ? 'ready' : Math.round(remainingMs / 60000)}`,
       });
@@ -406,7 +412,7 @@ export default function TopPill() {
     calTasks,
     gcalEvents,
     expenses, budgets,
-    missionEndsAt, bossEnergy, calmTick,
+    missionEndsAt, missionStartedAt, bossEnergy, calmTick,
     habits, todayDone,
     todayMoodEntry,
     today, tomorrow, weekEnd, hour, timeAccent, openWorkPanel,

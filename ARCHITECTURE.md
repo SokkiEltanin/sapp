@@ -1425,6 +1425,25 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
     leniwie WEWNĄTRZ akcji `startMission`/`claimMission`, nie na górze pliku). Pasek postępu
     (2026-08-15, drugi tego dnia) w `app/pet.tsx` — elapsed/total liczone z `missionStartedAt`/
     `missionEndsAt`, capowane 0..1.
+    - **Powiadomienie/UI mówią SKĄD kotek wrócił (2026-08-31)** — user: "jak jest powiadomienie
+      że pupil wrócił z misji to niech będzie napisane z jakiego miejsca wrócił". Miejsce
+      (`MiniBoss.destination`, minibosses.ts) już istniało — było widoczne TYLKO na pasku "w
+      drodze" (`missionDestTxt`), znikało z ekranu i z push powiadomienia w chwili gdy misja
+      faktycznie się kończyła, czyli DOKŁADNIE gdy user najbardziej chciał wiedzieć skąd kotek
+      wraca. `notificationsService.scheduleMissionReady(endsAtIso, destination?)` dostał nowy,
+      opcjonalny 2. argument — `startMission` w petStore.ts liczy go RAZ przy wysyłce
+      (`minibossForMission(startedAt.toISOString()).destination`, ten sam deterministyczny
+      dobór co reszta systemu misji) i przekazuje dalej; tytuł powiadomienia zamiast
+      generycznego "Pupil wrócił z misji! 🎒" pokazuje "Pupil wrócił z misji: <miejsce>! 🎒".
+      Żeby ekran `/pet` i pigułka `TopPill.tsx` NIE przeczyły temu co właśnie powiedziało
+      powiadomienie (dead-end, patrz zasada #7 w CLAUDE.md), obie strony dostały TĘ SAMĄ
+      informację: `missionReady` prompt na scenie (`app/pet.tsx`) pokazuje nową linię "Wrócił
+      z: <miejsce>" nad "Naciśnij, aby zawalczyć" (czyta `missionMb` — już istniejący, liczony
+      z `missionStartedAt`, ten sam co pasek "w drodze"); `TopPill.tsx`'s "PUPIL WRÓCIŁ Z MISJI"
+      → "PUPIL WRÓCIŁ Z: <MIEJSCE>" (nowy `missionStartedAt` selector, bo pill dotąd czytał
+      tylko `missionEndsAt`). Wszystkie trzy miejsca liczą destination z TEGO SAMEGO
+      `minibossForMission(missionStartedAt)` — deterministyczne, więc zawsze zgodne ze sobą bez
+      przekazywania go w danych powiadomienia.
     - **Kotek "w podróży" na pasku** (2026-08-18, user: "musi przeskalowywać się na pasek
       podróży... pasek kotek wskakuje i tak jakby porusza się z progressem misji") —
       zaproponował export osobnych ikon kotków per kolor, ale `CatArt` to już komponent SVG

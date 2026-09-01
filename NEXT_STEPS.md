@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Powiadomienie/UI misji mówią SKĄD kotek wrócił — NIEsprawdzone (2026-08-31)
+
+User: "jak jest powiadomienie że pupil wrócił z misji to niech będzie napisane z jakiego
+miejsca wrócił". `MiniBoss.destination` już istniało (widoczne na pasku "w drodze"), teraz
+dociągnięte do WSZYSTKICH trzech miejsc, które mówią "wrócił": push powiadomienie
+(`notificationsService.scheduleMissionReady`, tytuł "Pupil wrócił z misji: <miejsce>! 🎒"),
+scena `/pet` w stanie `missionReady` (nowa linia "Wrócił z: <miejsce>" nad przyciskiem walki),
+i `TopPill.tsx` ("PUPIL WRÓCIŁ Z: <MIEJSCE>" zamiast generycznego "Z MISJI"). Pełny opis w
+ARCHITECTURE.md (sekcja Misja pupila). `tsc`/`jest` zielone (64 suity/796 testów — logika
+`minibossForMission`/`destination` była już testowana, nic nowego do przetestowania jednostkowo
+w samym wiring). **Priorytet testu na urządzeniu**: wyślij pupila na misję, zaczekaj (albo
+skróć czas testowo) aż będzie gotowa — sprawdź czy (a) push powiadomienie pokazuje nazwę
+miejsca, (b) po wejściu w `/pet` napis "Wrócił z: X" nad kotkiem zgadza się z tym co było w
+powiadomieniu, (c) pigułka na górze ekranu (jeśli akurat rotuje na misję) też pokazuje to samo
+miejsce — wszystkie trzy powinny być IDENTYCZNE (ten sam deterministyczny dobór po
+`missionStartedAt`).
+
 ## 🆕 Finanse: filtr „Rachunki" (prąd/czynsz/…) + suma po filtrach — NIEsprawdzone (2026-08-31)
 
 User: "dodaj mi filtry po tagach np pge itp żeby wiedzieć ile płacę za prąd, albo na

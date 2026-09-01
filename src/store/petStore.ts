@@ -5,7 +5,7 @@ import { weekKeyOf } from '@/utils/quests';
 import { rollCrate, CrateTier, COMBAT_ITEM_DROP_CHANCE_BY_TIER } from '@/utils/crates';
 import { CombatItemId, COMBAT_ITEMS } from '@/utils/combatItems';
 import { COMBAT_ITEM_SLOTS, combatItemSlotsFor, energyRegenTick, energySpendTick, bossBonuses, dailyAttempts } from '@/utils/bosses';
-import { missionMinutesFor, MissionProfile } from '@/utils/missions';
+import { missionMinutesFor, minibossForMission, MissionProfile } from '@/utils/missions';
 import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST } from '@/utils/raid';
 import { GearSlot, GearRarity, OwnedGear, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, isGearUpgrade, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
@@ -699,7 +699,8 @@ export const usePetStore = create<PetState>()(
         if (s.missionEndsAt) return s;
         const startedAt = new Date();
         const endsAt = new Date(startedAt.getTime() + missionMinutesFor(level) * 60000);
-        require('@/services/notificationsService').notificationsService.scheduleMissionReady(endsAt.toISOString()).catch(() => {});
+        const destination = minibossForMission(startedAt.toISOString()).destination;
+        require('@/services/notificationsService').notificationsService.scheduleMissionReady(endsAt.toISOString(), destination).catch(() => {});
         return { missionStartedAt: startedAt.toISOString(), missionEndsAt: endsAt.toISOString(), missionProfile: profile };
       }),
       // Zeruje slot (kolejną misję można wysłać od razu, user: "można po misji na kolejną") —
