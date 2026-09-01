@@ -2770,6 +2770,41 @@ switchu). Każdy zwraca `{products[], subtotal, total, totalDiscount, paymentMet
   `__tests__/perfLog.test.ts`.
 - **Wrapped/kolekcje**: `monthCards.ts`/`yearCards.ts` + `MonthWrappedCard`/`YearWrappedCard`
   (BEZ emotek — „wyglądało tanio"). `YearPixels` = rok w pikselach (viz `pixels`).
+  - **Trzy poprawki po audycie realnego eksportu danych (2026-08-31)** — user: "ulepsz karty
+    miesięcy... sporo zaokrąglone powtórzeń ze te kroki sa z Rzeszowa do Lublina bez sensu,
+    duzo pomyłek kategorii słodycze przekąski" + wybrał (z AskUserQuestion) "odetnij puste
+    miesiące" jako priorytet. Przeanalizowany prawdziwy eksport JSON (AsyncStorage dump)
+    ujawnił KONKRETNE, mierzalne przyczyny obu skarg, nie zgadywane na ślepo:
+    1. **Karta miesiąca powstaje TYLKO przy realnym sygnale apki (wydatek/nastrój/wypłata),
+       nie samych krokach z zegarka** — `buildMonthCards()` w `monthCards.ts` budowało zbiór
+       „miesięcy" z UNII expenses+moodEntries+healthDays+payMonths; u tego usera `healthDays`
+       (backfill Health Connect) sięgał do 2022, ale expenses/mood dopiero od grudnia 2025 —
+       więc 39 z ~48 kandydujących kart było prawie puste (same kroki, bez wydatków/nastroju/
+       słodyczy), rozwadniając kolekcję. Fix: `months` liczy się TERAZ tylko z
+       expenses/moodEntries/payMonths; `healthDays` dalej WZBOGACA już kwalifikujący się
+       miesiąc (hero-stat kroków, dystans-ciekawostka) — po prostu nie może być JEDYNYM
+       powodem istnienia karty. Testy: `monthCards.test.ts` (nowy plik).
+    2. **`stepsToDistanceFact` (funComparisons.ts) — zagęszczona tabela landmarków 90-650 km**
+       — user dosłownie: kroki "z Rzeszowa do Lublina" powtarzały się bez sensu. Realny audyt:
+       typowy aktywny miesiąc tego usera (~150k-350k kroków ≈ 115-265 km) trafiał w TYLKO
+       DWA landmarki (90 km "z Rzeszowa do Krakowa" / 150 km "z Lublina do Rzeszowa") w 48/48
+       policzonych miesiącach — ogromna dziura między 150 km a 300 km w starej tabeli.
+       Dodane: 60 km (Tarnów), 120 km (Zamość), 180 km (Katowice), 220 km (Częstochowa),
+       480 km (Poznań) — u TEGO usera realnie rozbija rozkład na 5 różnych landmarków
+       zamiast 2 (zweryfikowane przeliczeniem jego prawdziwych 48 miesięcy kroków). Test
+       regresji w `funComparisons.test.ts` pilnuje, że kilka typowych sum miesięcznych
+       faktycznie trafia w różne landmarki.
+    3. **`getFoodTags` (receiptParser.ts) — realne luki w słowach-kluczach słodycze/przekąski**
+       — audyt WSZYSTKICH `receiptItems` z eksportu (nie zgadywanie): `'ciastk'` (stem z 'k')
+       nie łapał paragonowego skrótu "Ciast" (bez 'k' — realny przykład: "ŁowiczDesRyżKruCiast
+       Śliw100g"), rozszerzone na `'ciast'`. Dodane marki/nazwy widoczne w danych, których
+       dotąd NIE było w liście: `balconi`, `jelly`, `miętówk`/`miętow`, `grylaż`/`grylaz`,
+       `mieszanka studencka`. (Odrzucone jako NIE-bug po weryfikacji: większość „niezłapanych"
+       itemów w eksporcie to STARE dane sprzed rozszerzenia listy z 2026-08 — tagi liczą się
+       RAZ przy skanowaniu, nie przeliczają retroaktywnie; re-skan złapałby je już teraz.
+       Jeden dwuitemowy przypadek sklejenia nagłówka adresu sklepu z nazwą pierwszego produktu
+       na paragonie — osobny, wąski bug parsera, niezbadany, zanotowany w NEXT_STEPS.md.)
+       Testy w `receiptParser.test.ts`.
 - **Nawyki/liczniki**: `utils/habits.ts` + `useHabits`, `countersStore` (dni bez / odliczania).
   `app/habit-year.tsx` = jeden ekran pixeli dla NAWYKU (`?id=`) **i** LICZNIKA (`?counter=`):
   MIESIĄC = kalendarz (Pn..Nd + numery dni), ROK = rolka GitHub. Nawyk: done=kolor nawyku,
