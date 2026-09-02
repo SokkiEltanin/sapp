@@ -3,6 +3,36 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🔴 ZNALEZIONE (architektoniczne, czeka na decyzję) — rosnący blob storage expenses/foodStore (2026-09-02)
+
+Runda 2 audytu wydajności (user: "optymalizuj dalej"). Zustand `persist` re-serializuje
+(`JSON.stringify`) CAŁY rosnący blob `expenses`/`meals`/`products` przy KAŻDEJ pojedynczej
+mutacji (dodanie jednego wydatku/posiłku) — `throttledStorage.ts` koalescuje CZĘSTOTLIWOŚĆ
+zapisów, nie ich ROZMIAR. Symetrycznie: cold-start rehydracja parsuje ten sam, rosnący blob
+przy każdym starcie apki. To NIE bug, to architektura — koszt rośnie z wiekiem konta (setki
+wydatków/posiłków u aktywnych userów, realnie potwierdzone w eksportach danych z tej sesji).
+Pełny opis w ARCHITECTURE.md §15. **Realna naprawa to spory redesign** (archiwizacja starych
+wpisów, podział na klucze/paginacja w AsyncStorage) — NIE zrobione świadomie, wymaga Twojej
+decyzji czy warto (koszt/ryzyko migracji vs realny odczuwalny zysk, który rośnie dopiero po
+latach użytkowania). Daj znać jeśli chcesz to ruszyć.
+
+## 🆕 Optymalizacja wydajności, runda 2 — dashboard deferred fix — NIEsprawdzone (2026-09-02)
+
+User: "optymalizuj dalej" (kontynuacja poprzedniej rundy). Realny fix: 7 `useMemo` na
+dashboardzie (funFacts/weightFacts/correlations/insightLinks/foodBreakdown/shopsCollection/
+topProducts) skanowały CAŁĄ historię `expenses` na KAŻDYM renderze mimo że ich JSX i tak było
+zagatowane za `deferredReady`/`InteractionManager` (staging z 2026-08-24) — hooki Reacta lecą
+zawsze, niezależnie co komponent finalnie zwraca. Naprawione: wczesny return pustego stuba
+dopóki `!deferredReady`. Zero zmiany w TYM KIEDY user widzi te sekcje — usunięty tylko
+marnowany CPU na pierwszej klatce. Pełny opis w ARCHITECTURE.md §15. `tsc`/`jest` zielone
+(67 suit/822 testy). **Priorytet testu na urządzeniu**: otwórz dashboard po dłuższej przerwie
+(zimny start) — sekcje powinny pojawić się tak samo jak wcześniej, ale sam dashboard powinien
+poczuć się responsywniej na pierwszej klatce, zwłaszcza z dużą historią wydatków.
+
+**Przy okazji sprawdzone, dead end**: nowo wgrane PNG-i bossów (wilk/osa/kraken/upior) — to
+były FAŁSZYWY alarm pierwszego przebiegu audytu, już moje własne przeskalowane wersje z
+poprzedniej rundy, nie ponowny upload oryginałów.
+
 ## 🆕 Connect zakupy→streak w Co zjadłem + tło areny walki — NIEsprawdzone (2026-09-02)
 
 User: "Musimy ogarnąć lepszy connect pomiędzy CO ZJADŁEM a produktami które kupuję żeby jak
