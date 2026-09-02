@@ -303,31 +303,35 @@ export default function FoodAdd() {
   };
 
   // ── candidate list ───────────────────────────────────────────────────────
+  // Curated products + their normalized names are only recomputed when the
+  // product library itself changes, not on every keystroke of `query`.
+  const curated: (Candidate & { _rank: number; _norm: string })[] = useMemo(() => products.map(p => ({
+    name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
+    protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, sugar100: p.sugar100, cat: p.cat,
+    unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: isRecipeProduct(p), source: 'curated',
+    _rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
+    _norm: normalizeProductName(p.name),
+  } as any)), [products]);
+
   const candidates: Candidate[] = useMemo(() => {
-    const curated: Candidate[] = products.map(p => ({
-      name: p.name, kcalPer100g: p.kcalPer100g, kcalPerPortion: p.kcalPerPortion,
-      protein100: p.protein100, carbs100: p.carbs100, fat100: p.fat100, sugar100: p.sugar100, cat: p.cat,
-      unitGrams: p.unitGrams, defaultUnit: p.defaultUnit, productId: p.id, isRecipe: isRecipeProduct(p), source: 'curated',
-      _rank: (p.fresh && Date.now() - p.fresh < 7 * 864e5 ? 1e12 : 0) + (p.lastUsed ?? 0) + p.uses * 1000,
-    } as any));
     const q = query.trim();
     if (!q) {
       // recent / fresh first, then base staples to fill
-      curated.sort((a: any, b: any) => b._rank - a._rank);
-      const seen = new Set(curated.map(x => normalizeProductName(x.name)));
+      const sorted = [...curated].sort((a, b) => b._rank - a._rank);
+      const seen = new Set(curated.map(x => x._norm));
       const base: Candidate[] = searchFoodBase('', 14)
         .filter(f => !seen.has(normalizeProductName(f.name)))
         .map(f => ({ name: f.name, kcalPer100g: f.kcal, protein100: f.protein, sugar100: f.sugar, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
-      return [...curated.slice(0, 10), ...base];
+      return [...sorted.slice(0, 10), ...base];
     }
     const nq = normalizeProductName(q);
-    const curatedMatch = curated.filter(x => normalizeProductName(x.name).includes(nq));
-    const seen = new Set(curatedMatch.map(x => normalizeProductName(x.name)));
+    const curatedMatch = curated.filter(x => x._norm.includes(nq));
+    const seen = new Set(curatedMatch.map(x => x._norm));
     const base: Candidate[] = searchFoodBase(q, 24)
       .filter(f => !seen.has(normalizeProductName(f.name)))
       .map(f => ({ name: f.name, kcalPer100g: f.kcal, sugar100: f.sugar, unitGrams: f.unitGrams, defaultUnit: f.unit, source: 'base' }));
     return [...curatedMatch, ...base];
-  }, [products, query]);
+  }, [curated, query]);
 
   // ── picker helpers ───────────────────────────────────────────────────────
   const pickerUnits = useMemo(() => {

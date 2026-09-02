@@ -3,6 +3,33 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Optymalizacja wydajności — audyt + 4 fixy — NIEsprawdzone (2026-09-02)
+
+User: "jak skończysz od razu weź się za optymalizację dalszą apki" (ogólne, bez konkretnego
+zgłoszenia). Statyczny audyt kodu (nie profiler na urządzeniu) znalazł i naprawił:
+1. `app/notes.tsx` — `NoteCard` re-renderował się CAŁY przy każdej zmianie stanu ekranu
+   (wpisywanie w search itp.), mimo że dane notatki się nie zmieniały — handlery
+   przepięte na `useCallback` + `React.memo(NoteCard)` + wywołania bez inline-closures.
+2. `app/food/add.tsx` — wyszukiwarka jedzenia przeliczała CAŁĄ bibliotekę produktów
+   (`normalizeProductName` per produkt) na każde naciśnięcie klawisza. Rozdzielone na
+   `curated` (liczy się tylko gdy zmienia się `products`) i `candidates` (per-klawisz tylko
+   filtruje gotowe dane).
+3. `app/(tabs)/health.tsx` — sprawdzone, ŚWIADOMIE NIE ruszone (koszt znikomy, ryzyko
+   stale-closure > korzyść — pełne uzasadnienie w ARCHITECTURE.md §13).
+4. **Duże PNG-i ekwipunku/bossów przeskalowane w dół** (za zgodą usera) — źródła do
+   3095×3095/1,8MB wyświetlane jako miniaturki 40-130px. `assets/ekwipunek/` +
+   `assets/ikonybosów/`: **17,4 MB → 4,4 MB** (Pillow/LANCZOS, alfa zachowana, sam wygląd
+   BEZ zmian — tylko rozdzielczość). Ikony appki/splash celowo nietknięte (natywne, przez
+   `app.json`+build, patrz ARCHITECTURE.md §11).
+
+Pełny opis w ARCHITECTURE.md §13. `tsc`/`jest` zielone (65 suit/812 testów, bez nowych testów
+— czysto wydajnościowe fixy). **Priorytet testu na urządzeniu**: (a) Notatki — wpisywanie w
+wyszukiwarkę przy sporej liczbie notatek powinno być płynniejsze, funkcjonalnie bez zmian;
+(b) Co zjadłem → dodaj — pisanie w polu szukania przy dużej bibliotece produktów powinno być
+responsywniejsze; (c) Sklep/Ekwipunek/dowolna walka — ikony hełmów/talizmanów/bossów powinny
+wyglądać IDENTYCZNIE jak wcześniej (czysty downscale) — jeśli coś rozmyte/przycięte, to
+regresja do zgłoszenia.
+
 ## 🔴 ZNALEZIONE (nie naprawione, user: "zostaw, ja się wygrindnę") — realny bossLog pokazuje ścianę na "Widmo Porównań" (2026-09-01)
 
 Analiza REALNEGO `pet-v1.bossLog` z eksportu (101 walk) — nie symulacja: **win-rate kampanii

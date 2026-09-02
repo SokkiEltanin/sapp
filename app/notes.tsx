@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   Alert, KeyboardAvoidingView, Platform, Modal,
@@ -512,14 +512,14 @@ const makeEm = (c: any) => StyleSheet.create({
 
 // ─── Note card ────────────────────────────────────────────────────────────────
 
-function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOpenCounter }: {
+const NoteCard = memo(function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOpenCounter }: {
   note: Note;
-  onPress: () => void;
-  onPin: () => void;
-  onDelete: () => void;
-  onConvert: () => void;
+  onPress: (note: Note) => void;
+  onPin: (note: Note) => void;
+  onDelete: (note: Note) => void;
+  onConvert: (note: Note) => void;
   counterName?: string;      // set when note.counterId resolves to a live counter
-  onOpenCounter?: () => void;
+  onOpenCounter?: (note: Note) => void;
 }) {
   const colors = useColors();
   const nc = useMemo(() => makeNc(colors), [colors]);
@@ -530,7 +530,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOp
   const wordCount = plainBody.trim() ? plainBody.trim().split(/\s+/).length : 0;
 
   return (
-    <PressableScale onPress={onPress} style={[nc.wrap, note.pinned && nc.pinned]}>
+    <PressableScale onPress={() => onPress(note)} style={[nc.wrap, note.pinned && nc.pinned]}>
       <View style={nc.topRow}>
         {note.title ? (
           <Text style={nc.title} numberOfLines={1}>{note.title}</Text>
@@ -538,16 +538,16 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOp
           <Text style={nc.titleEmpty} numberOfLines={1}>{preview || 'Pusta notatka'}</Text>
         )}
         <View style={nc.actions}>
-          <TouchableOpacity onPress={() => { haptic.tap(); onConvert(); }} hitSlop={8} style={nc.actionBtn}>
+          <TouchableOpacity onPress={() => { haptic.tap(); onConvert(note); }} hitSlop={8} style={nc.actionBtn}>
             <ClipboardList size={13} color={V.accent + 'BB'} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { haptic.tap(); onPin(); }} hitSlop={8} style={nc.actionBtn}>
+          <TouchableOpacity onPress={() => { haptic.tap(); onPin(note); }} hitSlop={8} style={nc.actionBtn}>
             {note.pinned
               ? <PinOff size={13} color={colors.accent.amber} />
               : <Pin size={13} color={colors.text.muted} />
             }
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { haptic.medium(); onDelete(); }} hitSlop={8} style={nc.actionBtn}>
+          <TouchableOpacity onPress={() => { haptic.medium(); onDelete(note); }} hitSlop={8} style={nc.actionBtn}>
             <Trash2 size={13} color={colors.text.muted} />
           </TouchableOpacity>
         </View>
@@ -575,7 +575,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOp
           </View>
         )}
         {!!counterName && (
-          <TouchableOpacity style={nc.folderBadge} onPress={onOpenCounter} hitSlop={4}>
+          <TouchableOpacity style={nc.folderBadge} onPress={() => onOpenCounter?.(note)} hitSlop={4}>
             <CalendarClock size={8} color={colors.accent.blue + 'CC'} />
             <Text style={nc.folderText} numberOfLines={1}>{counterName}</Text>
           </TouchableOpacity>
@@ -598,7 +598,7 @@ function NoteCard({ note, onPress, onPin, onDelete, onConvert, counterName, onOp
       </View>
     </PressableScale>
   );
-}
+});
 
 const makeNc = (c: any) => StyleSheet.create({
   wrap: {
@@ -699,10 +699,10 @@ export default function NotesScreen() {
     if (newParam) { setEditorNote(null); setEditorOpen(true); }
   }, [newParam]);
 
-  const openEdit = (note: Note) => {
+  const openEdit = useCallback((note: Note) => {
     setEditorNote(note);
     setEditorOpen(true);
-  };
+  }, []);
 
   const handleSave = async (title: string, blocks: RichBlock[], tags: string[], folder: string | undefined) => {
     setEditorOpen(false);
@@ -721,13 +721,13 @@ export default function NotesScreen() {
     loadAll();
   };
 
-  const handlePin = async (note: Note) => {
+  const handlePin = useCallback(async (note: Note) => {
     haptic.tap();
     await updateNote(note.id, { pinned: !note.pinned });
     loadAll();
-  };
+  }, [loadAll]);
 
-  const handleConvert = (note: Note) => {
+  const handleConvert = useCallback((note: Note) => {
     Alert.alert(
       'Konwertuj na zadanie',
       `Dodać "${note.title || note.body.slice(0, 40) || 'notatkę'}" jako zadanie?`,
@@ -744,9 +744,12 @@ export default function NotesScreen() {
         },
       ],
     );
-  };
+  }, []);
 
-  const handleDelete = (note: Note) => { haptic.tap(); setConfirmDelete({ kind: 'note', note }); };
+  const handleDelete = useCallback((note: Note) => { haptic.tap(); setConfirmDelete({ kind: 'note', note }); }, []);
+  const openCounterNote = useCallback((note: Note) => {
+    if (note.counterId) router.push(`/counters/${note.counterId}` as any);
+  }, []);
   const doDeleteNote = async (note: Note) => {
     haptic.medium();
     await deleteNote(note.id);
@@ -918,12 +921,12 @@ export default function NotesScreen() {
                 <NoteCard
                   key={note.id}
                   note={note}
-                  onPress={() => openEdit(note)}
-                  onPin={() => handlePin(note)}
-                  onDelete={() => handleDelete(note)}
-                  onConvert={() => handleConvert(note)}
+                  onPress={openEdit}
+                  onPin={handlePin}
+                  onDelete={handleDelete}
+                  onConvert={handleConvert}
                   counterName={counterName(note.counterId)}
-                  onOpenCounter={() => note.counterId && router.push(`/counters/${note.counterId}` as any)}
+                  onOpenCounter={openCounterNote}
                 />
               ))}
             </>
@@ -935,10 +938,10 @@ export default function NotesScreen() {
             <NoteCard
               key={note.id}
               note={note}
-              onPress={() => openEdit(note)}
-              onPin={() => handlePin(note)}
-              onDelete={() => handleDelete(note)}
-              onConvert={() => handleConvert(note)}
+              onPress={openEdit}
+              onPin={handlePin}
+              onDelete={handleDelete}
+              onConvert={handleConvert}
             />
           ))}
         </ScrollView>
