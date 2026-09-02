@@ -10,7 +10,7 @@ import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
-import { attackPng, CAMPAIGN_ARENA_BG } from '@/utils/bossIcons';
+import { attackPng, arenaBgFor } from '@/utils/bossIcons';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
@@ -667,9 +667,14 @@ export default function BossFight() {
                 kotek stoją bezpośrednio na scenie, etykieta+pasek HP zostają (cień tekstu pod
                 czytelność, bo tło bywa jasne w miejscach). Reszta karty (motyw/przycisk/mechaniki
                 pod spodem) zostaje na zwykłym tle ekranu — obrazek to STAŁEJ wysokości scena
-                portretów, nie cała, zmiennej wysokości karta walki. */}
+                portretów, nie cała, zmiennej wysokości karta walki. `arenaBgFor(kind)` (tej
+                samej sesji, przygotowanie pod przyszłość) — user zapowiedział osobne tła dla
+                questów/eventów/MAD, kampania zostaje jak jest: dopóki te pliki nie istnieją,
+                wszystkie `kind` pożyczają `CAMPAIGN_ARENA_BG` jako fallback, patrz
+                `ARENA_BG_BY_KIND` w bossIcons.ts — dodanie nowego pliku tam wystarczy, zero
+                zmian tutaj. */}
             <ImageBackground
-              source={CAMPAIGN_ARENA_BG}
+              source={arenaBgFor(kind)}
               style={s.arenaScene}
               imageStyle={s.arenaSceneImg}
               resizeMode="cover"

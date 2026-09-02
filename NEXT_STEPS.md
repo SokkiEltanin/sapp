@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Startupy → PetCustomizeModal + przygotowanie teł areny per typ — NIEsprawdzone (2026-09-02)
+
+User: "przeniosłeś z rynku pupila startupy na [modal z edycją imienia/kolorów]?" → "tak ogarnij
+to" + (mid-turn) "Questy będą miały oddzielne tło... eventowe osobne... MAD bossy jeszcze
+inne... na razie może zostać... możesz przygotować pod to najwyżej". Dwie rzeczy:
+1. **Startupy przeniesione** z `pet-shop.tsx` do `PetCustomizeModal.tsx` (nowa sekcja obok
+   koloru/oczu/nosa/dodatków). Rynek stracił przełącznik zakładek (Rynek/Startupy/Posiadane →
+   tylko Rynek, bez tabów — reszta i tak pokazywała startupy). `grantStartup` (nagroda ze
+   skrzynki) bez zmian.
+2. **Tła areny per typ walki — SAMO PRZYGOTOWANIE, bez nowej grafiki.** `arenaBgFor(kind)` +
+   `ARENA_BG_BY_KIND` w `bossIcons.ts` — dziś wszystko dalej pokazuje `CAMPAIGN_ARENA_BG`
+   (fallback), ale dodanie tła dla quest/event/mad w przyszłości to jedna linia w tej mapie,
+   zero zmian w `boss-fight.tsx`. **Czeka na usera** — obiecał dosłać grafiki dla
+   questów/eventów/MAD później, wtedy trzeba je tylko wrzucić do `assets/ikonybosów/` i
+   odkomentować/dopisać wpis w `ARENA_BG_BY_KIND`.
+
+Pełny opis w ARCHITECTURE.md §18. `tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu
+na urządzeniu**: (a) `/pet` → edytuj imię → sekcja Startup na dole — kup/ustaw działa jak
+wcześniej w sklepie; (b) Rynek bez zakładek, skrzynka ze startupem w nagrodzie dalej działa;
+(c) walka — tło areny identyczne jak przed tą zmianą (czysto przygotowanie, nie redesign).
+
 ## ✅ Kampania optymalizacji wydajności ZAKOŃCZONA — 4 rundy, malejące zwroty (2026-09-02)
 
 User: "nie zatrzymuj się, optymalizuj dopóki nie stwierdzisz że jest zajebiście". Runda 4:

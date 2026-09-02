@@ -2,18 +2,16 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, Rocket, Backpack, Store, X } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, X } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
-import StartupPreview from '@/components/pet/StartupPreview';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { SHOP_COLORS, TIER_META, CosmeticTier } from '@/utils/petShop';
+import { SHOP_COLORS } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
-import { STARTUPS, startupById, ANIM_LABEL, Startup } from '@/utils/petStartups';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -56,43 +54,32 @@ function fmtShopRefresh(): string {
 
 // Sklep (2026-08-19, restrukturyzacja) — kosmetyka kotka (kolory/oczy/nosek/dodatki)
 // PRZENIESIONA do PetCustomizeModal (modal edycji imienia na /pet) — user: "nie przecież
-// kliknięciem głaskam kotka to nie może... lepiej dać przy edycji imienia". Ten ekran zostaje
-// czysto "co kupić za gold": skrzynki (gacha), sklep dnia (4 konkretne itemy ekwipunku,
-// gwarantowany zakup, roluje się co dzień), startupy (kosmetyk ekranu ładowania — TO
-// zostaje tu, to nie "kotek"), posiadane (startupy).
-// `boxes`+`daily` SCALONE w JEDNĄ zakładkę `market` (2026-08-27, user: "w sklepie połączmy
-// SKLEP DNIA oraz SKRZYNKI, nazywając to ogólnie RYNEK LUB BAZAR... ja moze zrobię grafikę pod
-// ten bazarek potem, ale to potem — na razie połączmy [je] żeby były razem jak jedna
-// zakładka"). Treść obu (skrzynki gacha + sklep dnia z gwarantowanymi itemami) renderuje się
-// jedna pod drugą pod wspólnym nagłówkiem `s.subSection`, żadna logika zakupu nie zmieniona —
-// czysto łączenie dwóch zakładek w jedną. `Store` = neutralna ikona "rynku", nie przesądza na
-// razie żadnego motywu (user planuje własną grafikę pod bazarek później).
-type Cat = 'market' | 'startups' | 'owned';
-const CATS: { id: Cat; label: string; Icon: any }[] = [
-  { id: 'market',   label: 'Rynek',      Icon: Store },
-  { id: 'startups', label: 'Startupy',   Icon: Rocket },
-  { id: 'owned',    label: 'Posiadane',  Icon: Backpack },
-];
-const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
+// kliknięciem głaskam kotka to nie może... lepiej dać przy edycji imienia". Startupy (kosmetyk
+// ekranu ładowania) DOŁĄCZYŁY do tej przeprowadzki (2026-09-02, user: "przenieś z rynku
+// pupila startupy na [modal], gdzie ma edycję nazwy i kolory") — mimo że pierwotnie (2026-08-19)
+// świadomie zostały TU, jako "nie kotek"; user po czasie chciał jednak WSZYSTKĄ kosmetykę w
+// jednym miejscu. Ten ekran zostaje czysto "co kupić za gold": skrzynki (gacha) + sklep dnia
+// (4 konkretne itemy ekwipunku, gwarantowany zakup, roluje się co dzień) — jedna zakładka
+// "Rynek", bez kategorii-przełącznika (miał sens tylko przy 3 zakładkach, przy jednej to
+// martwy UI). `grantStartup` (nagroda ze skrzynki) ZOSTAJE — startupy dalej dropują z gaczy,
+// tylko wybór/zakup przeniósł się do PetCustomizeModal.
 
 export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
-  const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, buyStartup, grantStartup, equippedStartup,
+  const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, grantStartup,
     claimDailyBox, dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
     ownedCombatItems, grantOrLevelCombatItem } = usePetStore();
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
 
-  const [cat, setCat] = useState<Cat>('market');
   const [reveal, setReveal] = useState<{ box: LootBox; reward: BoxReward; dupeCoins?: number } | null>(null);
-  const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);
   // Podgląd statów PRZED zakupem w Sklepie dnia (2026-08-22, user: "jak klikam w sklepiku to
   // żeby po kliknięciu w item pokazywało jego staty i porównanie z itemem założonym") — dawniej
   // tap na kafelku szedł od razu do `onBuyDaily`/ConfirmDialog bez pokazania CO właściwie się
   // kupuje. Tylko Sklep dnia — jedyna zakładka sprzedająca KONKRETNE itemy ekwipunku o znanym
-  // staty/rarity; skrzynki (losowe) i startupy (kosmetyka bez statów bojowych) tego nie mają.
+  // staty/rarity; skrzynki (losowe) tego nie mają.
   const [gearPreview, setGearPreview] = useState<DailyShopSlot | null>(null);
 
   const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string } | null>(null);
@@ -171,38 +158,6 @@ export default function PetShop() {
     });
   };
 
-  // Startup (kosmetyk splasha): kup+ustaw, albo tylko ustaw jeśli już masz.
-  const onStartup = (su: Startup) => {
-    haptic.tap();
-    setPreviewStartupId(su.id);
-    const had = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
-    if (had) { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`${su.name} — ustawione`); } return; }
-    if (coins < su.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${su.cost}`); return; }
-    confirmBuy(su.name, su.cost, () => { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`Kupione: ${su.name}`); } });
-  };
-
-  const renderStartupCell = (su: Startup) => {
-    const owned = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
-    const on = equippedStartup === su.id;
-    const tier = TIER_META[su.tier];
-    return (
-      <PressableScale key={su.id} onPress={() => onStartup(su)}>
-        <View style={[s.cell, on && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
-          <View style={[s.startupSwatch, { borderColor: su.ink + '55' }]}>
-            {su.anim === 'custom' && su.asset
-              ? <Image source={su.asset} style={{ width: 60, height: 34 }} resizeMode="contain" fadeDuration={0} />
-              : <Text style={[s.startupSwatchMark, { color: su.ink }]}>Sapp</Text>}
-          </View>
-          <Text style={s.cellName} numberOfLines={1}>{su.name}</Text>
-          <Text style={s.animTag}>{ANIM_LABEL[su.anim]}{su.glow ? ' · glow' : ''}</Text>
-          {owned
-            ? <Text style={[s.cellState, { color: on ? tier.color : c.text.muted }]}>{on ? 'ustawione' : 'kupione'}</Text>
-            : <View style={s.cost}><Coins size={9} color="#FBBF24" /><Text style={s.costTxt}>{su.cost}</Text></View>}
-        </View>
-      </PressableScale>
-    );
-  };
-
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.head}>
@@ -240,143 +195,75 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
-        {/* KATEGORIE */}
-        <View style={s.chips}>
-          {CATS.map(({ id, label, Icon }) => {
-            const active = cat === id;
-            return (
-              <TouchableOpacity key={id} onPress={() => { haptic.tap(); setCat(id); }}
-                style={[s.chip, active && s.chipOn]} activeOpacity={0.8}>
-                <Icon size={14} color={active ? c.bg.primary : c.text.muted} />
-                <Text style={[s.chipTxt, active && s.chipTxtOn]}>{label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
         {/* ── RYNEK — skrzynki (gacha) + sklep dnia (gwarantowane itemy), scalone w jedną
-            zakładkę (2026-08-27, patrz komentarz przy `CATS` wyżej) ── */}
-        {cat === 'market' && (
-          <View style={{ gap: spacing[3] }}>
-            <View style={{ gap: spacing[2] }}>
-              <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
-              <Text style={s.blurbTop}>Losujesz ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
-              {LOOT_BOXES.map(box => {
-                const afford = coins >= box.cost;
+            zakładkę (2026-08-27) — jedyna zawartość tego ekranu (patrz komentarz nad
+            komponentem), więc bez przełącznika kategorii. ── */}
+        <View style={{ gap: spacing[3] }}>
+          <View style={{ gap: spacing[2] }}>
+            <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
+            <Text style={s.blurbTop}>Losujesz ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
+            {LOOT_BOXES.map(box => {
+              const afford = coins >= box.cost;
+              return (
+                <PressableScale key={box.id} onPress={() => onBuyBox(box)}>
+                  <View style={[s.boxRow, { borderColor: box.color + '55' }]}>
+                    <View style={[s.boxIcon, { backgroundColor: box.color + '1E', borderColor: box.color + '55' }]}>
+                      <Text style={s.boxEmoji}>{box.emoji}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cellName}>{box.name}</Text>
+                      <Text style={s.cellState}>{box.blurb}</Text>
+                      <Text style={s.oddsTxt}>ekwipunek {Math.round(box.gearChance * 100)}% · kolor {Math.round(box.colorChance * 100)}% · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
+                    </View>
+                    <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
+                  </View>
+                </PressableScale>
+              );
+            })}
+          </View>
+
+          <View style={{ gap: spacing[2] }}>
+            <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
+            <Text style={s.blurbTop}>4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
+            <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
+            {dailySlots.length === 0 && (
+              <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
+            )}
+            {/* Siatka 4 obok siebie, TYLKO ikona (2026-08-31, user: "zwiększymy do 4 itemów...
+                ustawić itemy po 4 obok siebie tylko z ikoną, mi po kliknięciu pokazuje się
+                popup ze statystykami i formularzem zakupu i porównania z założonym") —
+                dawniej pełnoszerokościowy wiersz z nazwą/rzadkością/ceną wprost na liście,
+                za wąski na 4 w rzędzie. Nazwa/rzadkość/cena/porównanie NIE zniknęły —
+                przeniosły się w całości do `GearPreviewModal` (już istniał, patrz
+                `gearPreview` state — ten sam popup co wcześniej, tu tylko zmienia się TRIGGER
+                z pełnego wiersza na mały kafelek). Kafelek zostaje z jedynym stanowym
+                wskaźnikiem (✓ posiadane/kupione) — bez niego nie dałoby się w ogóle
+                odróżnić dostępnego od odebranego bez otwierania popupu za każdym razem. */}
+            <View style={s.dailyGrid}>
+              {dailySlots.map(slot => {
+                const { item, rarity, value } = slot;
+                const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
+                const bought = !!dayClaims[dayKey];
+                const owned = alreadyOwnGear(item.id, rarity, value);
+                const meta = RARITY_META[rarity];
                 return (
-                  <PressableScale key={box.id} onPress={() => onBuyBox(box)}>
-                    <View style={[s.boxRow, { borderColor: box.color + '55' }]}>
-                      <View style={[s.boxIcon, { backgroundColor: box.color + '1E', borderColor: box.color + '55' }]}>
-                        <Text style={s.boxEmoji}>{box.emoji}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.cellName}>{box.name}</Text>
-                        <Text style={s.cellState}>{box.blurb}</Text>
-                        <Text style={s.oddsTxt}>ekwipunek {Math.round(box.gearChance * 100)}% · kolor {Math.round(box.colorChance * 100)}% · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
-                      </View>
-                      <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
+                  <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={s.dailyTileWrap}>
+                    <View style={[s.dailyTile, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
+                      <Image source={item.icon} style={s.dailyTileImg} resizeMode="contain" />
+                      {(bought || owned) && (
+                        <View style={[s.dailyTileCheck, { backgroundColor: meta.color }]}>
+                          <Check size={11} color="#0B0E1A" strokeWidth={3} />
+                        </View>
+                      )}
                     </View>
                   </PressableScale>
                 );
               })}
             </View>
-
-            <View style={{ gap: spacing[2] }}>
-              <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
-              <Text style={s.blurbTop}>4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
-              <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
-              {dailySlots.length === 0 && (
-                <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
-              )}
-              {/* Siatka 4 obok siebie, TYLKO ikona (2026-08-31, user: "zwiększymy do 4 itemów...
-                  ustawić itemy po 4 obok siebie tylko z ikoną, mi po kliknięciu pokazuje się
-                  popup ze statystykami i formularzem zakupu i porównania z założonym") —
-                  dawniej pełnoszerokościowy wiersz z nazwą/rzadkością/ceną wprost na liście,
-                  za wąski na 4 w rzędzie. Nazwa/rzadkość/cena/porównanie NIE zniknęły —
-                  przeniosły się w całości do `GearPreviewModal` (już istniał, patrz
-                  `gearPreview` state — ten sam popup co wcześniej, tu tylko zmienia się TRIGGER
-                  z pełnego wiersza na mały kafelek). Kafelek zostaje z jedynym stanowym
-                  wskaźnikiem (✓ posiadane/kupione) — bez niego nie dałoby się w ogóle
-                  odróżnić dostępnego od odebranego bez otwierania popupu za każdym razem. */}
-              <View style={s.dailyGrid}>
-                {dailySlots.map(slot => {
-                  const { item, rarity, value } = slot;
-                  const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
-                  const bought = !!dayClaims[dayKey];
-                  const owned = alreadyOwnGear(item.id, rarity, value);
-                  const meta = RARITY_META[rarity];
-                  return (
-                    <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={s.dailyTileWrap}>
-                      <View style={[s.dailyTile, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
-                        <Image source={item.icon} style={s.dailyTileImg} resizeMode="contain" />
-                        {(bought || owned) && (
-                          <View style={[s.dailyTileCheck, { backgroundColor: meta.color }]}>
-                            <Check size={11} color="#0B0E1A" strokeWidth={3} />
-                          </View>
-                        )}
-                      </View>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-            </View>
           </View>
-        )}
+        </View>
 
-        {/* ── STARTUPY (ekran ładowania) ───────────────────────────── */}
-        {cat === 'startups' && (
-          <View style={{ gap: spacing[2] }}>
-            <Text style={s.blurbTop}>Zmieniają ekran ładowania apki. Zobaczysz przy następnym starcie.</Text>
-            {(() => {
-              const shown = startupById(previewStartupId ?? equippedStartup);
-              const isPreview = !!previewStartupId && previewStartupId !== equippedStartup;
-              return (
-                <View style={{ gap: 5 }}>
-                  <StartupPreview startup={shown} height={92} fontSize={30} />
-                  <Text style={s.startupPreviewCap}>{isPreview ? 'podgląd' : 'teraz'}: {shown.name} · {ANIM_LABEL[shown.anim]}</Text>
-                  <Text style={s.startupPreviewHint}>Stuknij startup poniżej, aby zobaczyć jego animację tutaj</Text>
-                </View>
-              );
-            })()}
-            {TIER_ORDER.map(tier => {
-              const items = STARTUPS.filter(x => x.tier === tier && !ownedItems.includes(`startup:${x.id}`));
-              if (!items.length) return null;
-              return (
-                <View key={tier} style={{ gap: spacing[2] }}>
-                  <View style={s.subHead}>
-                    <View style={[s.tierDot, { backgroundColor: TIER_META[tier].color }]} />
-                    <Text style={[s.subSection, { color: TIER_META[tier].color }]}>{TIER_META[tier].label}</Text>
-                  </View>
-                  <View style={s.grid}>{items.map(renderStartupCell)}</View>
-                </View>
-              );
-            })}
-            {STARTUPS.every(x => x.cost === 0 || ownedItems.includes(`startup:${x.id}`)) && (
-              <Text style={s.blurbTop}>Masz już wszystkie startupy — zobacz w Posiadane.</Text>
-            )}
-          </View>
-        )}
-
-        {/* ── POSIADANE — startupy (kosmetyka kotka jest w modalu imienia na /pet) ──── */}
-        {cat === 'owned' && (() => {
-          const ownedStartups = STARTUPS.filter(su => ownedItems.includes(`startup:${su.id}`));
-          if (ownedStartups.length === 0) {
-            return (
-              <View style={s.emptyOwned}>
-                <Backpack size={30} color={c.text.muted} />
-                <Text style={s.emptyOwnedTxt}>Nic jeszcze nie kupione — zajrzyj do Startupów.</Text>
-              </View>
-            );
-          }
-          return (
-            <View style={{ gap: spacing[3] }}>
-              <Text style={s.blurbTop}>Masz {ownedStartups.length} z {STARTUPS.filter(su => su.cost > 0).length} startupów.</Text>
-              <View style={s.grid}>{ownedStartups.map(renderStartupCell)}</View>
-            </View>
-          );
-        })()}
-
-        <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota.</Text>
+        <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota. Startupy (ekran ładowania) i kosmetyka kotka: edytuj imię na /pet.</Text>
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -506,11 +393,6 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   freezeSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
 
   // kategorie
-  chips: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
-  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 9, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
-  chipOn: { backgroundColor: c.text.primary, borderColor: c.text.primary },
-  chipTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.muted },
-  chipTxtOn: { color: c.bg.primary },
 
   // wspólny wiersz (skrzynki / sklep dnia)
   boxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
@@ -532,15 +414,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   dailyTileImg: { width: '58%', height: '58%' },
   dailyTileCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 
-  subHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing[1] },
-  tierDot: { width: 8, height: 8, borderRadius: 4 },
   subSection: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
-  cell: { width: 96, alignItems: 'center', gap: 5, padding: spacing[2], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   cellState: { fontSize: 10, color: c.text.muted },
-  cost: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  costTxt: { fontSize: 11, fontWeight: '800', color: '#FBBF24' },
 
   buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
@@ -557,17 +433,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   dailyCtaTxt: { fontSize: 11, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.5 },
 
   // startupy (kosmetyki splasha)
-  startupPreviewCap: { fontSize: 11, color: c.text.secondary, fontWeight: '700', textAlign: 'center' },
-  startupPreviewHint: { fontSize: 10, color: c.text.muted, textAlign: 'center' },
-  startupSwatch: { width: 74, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
-  startupSwatchMark: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
-  animTag: { fontSize: 9, color: c.text.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
 
   hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
 
   // Posiadane — pusty stan
-  emptyOwned: { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[6] },
-  emptyOwnedTxt: { fontSize: 12.5, color: c.text.muted, textAlign: 'center', lineHeight: 17, maxWidth: 220 },
 
   // podgląd itemu ze Sklepu dnia przed zakupem
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'flex-end' },

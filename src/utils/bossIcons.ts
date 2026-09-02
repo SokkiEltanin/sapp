@@ -113,7 +113,24 @@ export function attackPng(kind: AttackKind | undefined): ImageSourcePropType {
   return kind ? ATTACK_PNG[kind] : FIST_PNG;
 }
 
-// Tło areny walki kampanii/raidu/eventu/questu/mad/misji (2026-09-02, user dostarczył
-// dedykowany art po wcześniejszym `arena-template.svg`). JEDNO tło dla wszystkich trybów
-// walki na boss-fight.tsx — nie per-boss, w przeciwieństwie do `BOSS_PNG` wyżej.
+// Tło areny walki kampanii (2026-09-02, user dostarczył dedykowany art po wcześniejszym
+// `arena-template.svg`). Nazwa zostaje "CAMPAIGN" (nie "DEFAULT") — to WCIĄŻ dedykowane tło
+// kampanii, tylko dodatkowo pełni rolę fallbacku w `arenaBgFor()` niżej.
 export const CAMPAIGN_ARENA_BG: ImageSourcePropType = require('../../assets/ikonybosów/LOKACJA_KAMPANIA.png');
+
+// Tła areny PER TYP WALKI (2026-09-02, user: "questy będą miały oddzielne tło... a eventowe
+// będą miały osobne, a MAD bossy będą miały jeszcze inne" — ale bez gotowej grafiki jeszcze,
+// więc na razie tylko przygotowanie: kampania ma dedykowany art, reszta pożycza go jako
+// fallback przez `arenaBgFor()`, dopóki user nie dostarczy własnych plików. Dodanie nowego
+// tła = jedna nowa linia w tej mapie (`require()` na gotowy plik) + WPIS DO TEJ MAPY,
+// zero zmian w boss-fight.tsx — `arenaBgFor` już tam jest podpięte.
+type ArenaKind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
+const ARENA_BG_BY_KIND: Partial<Record<ArenaKind, ImageSourcePropType>> = {
+  campaign: CAMPAIGN_ARENA_BG,
+  // quest:  require('../../assets/ikonybosów/LOKACJA_QUEST.png'),
+  // event:  require('../../assets/ikonybosów/LOKACJA_EVENT.png'),
+  // mad:    require('../../assets/ikonybosów/LOKACJA_MAD.png'),
+};
+export function arenaBgFor(kind: ArenaKind): ImageSourcePropType {
+  return ARENA_BG_BY_KIND[kind] ?? CAMPAIGN_ARENA_BG;
+}
