@@ -3279,6 +3279,50 @@ zostawione — koszt realnie znikomy. Czwarta runda znalazła jeden, coraz mniej
 malejący zwrot z kolejnych przebiegów tego samego audytu) — dalsze rundy w tym samym stylu
 zaczęłyby produkować teoretyczne nitpicki zamiast realnych, odczuwalnych problemów.
 
+## 18. Startupy przeniesione do PetCustomizeModal + tła areny per typ walki (przygotowanie) — 2026-09-02
+
+**Startupy (kosmetyk ekranu ładowania) — pełna migracja z `pet-shop.tsx` do `PetCustomizeModal.tsx`.**
+User: "przeniosłeś z rynku pupila startupy na [modal], gdzie ma edycję nazwy i kolory?" →
+"tak ogarnij to". Pierwotnie (2026-08-19) Startupy świadomie ZOSTAŁY w sklepie przy migracji
+Kolorów+Dodatków do `PetCustomizeModal` — uzasadnienie brzmiało "to nie 'kotek'" (startup to
+kosmetyka APKI, nie zwierzaka). User po czasie chciał jednak WSZYSTKĄ kosmetykę w jednym
+miejscu. Zmiana:
+- **`PetCustomizeModal.tsx`** dostał nową sekcję "Startup (ekran ładowania)" — ten sam
+  wzorzec kup/ustaw co Kolor/Oczy/Nosek (`onStartup`/`renderStartupCell`, reużywają
+  `s.cell`/`s.cellName`/`s.cellState`/`s.costTxt`/`s.grid`/`confirmBuy` — wszystko już
+  istniało w tym pliku). Grupowanie po `TIER_ORDER` (basic/rare/epic, z kolorowym `tierDot` +
+  nagłówkiem) — `TIER_ORDER` był już zadeklarowany w tym pliku, ale nieużywany (martwy
+  leftover po jakiejś wcześniejszej próbie) — teraz ma zastosowanie.
+- **`app/pet-shop.tsx`** — cała zakładka "Startupy" i "Posiadane" (która i tak pokazywała
+  TYLKO startupy) USUNIĘTE razem z przełącznikiem kategorii `CATS`/`Cat` (przy jednej
+  pozostałej kategorii "Rynek" przełącznik byłby martwym UI) — ekran renderuje teraz Rynek
+  (skrzynki+sklep dnia) bezpośrednio, bez zakładek. `grantStartup` (nagroda ze skrzynki gacha)
+  ZOSTAJE — startupy dalej dropują z loot boxów, tylko wybór/zakup przeniósł się do modala.
+  Martwe importy/style po usunięciu (Rocket/Backpack ikony, StartupPreview, petStartups,
+  TIER_META/CosmeticTier, style `chips`/`chip*`/`subHead`/`tierDot`/`grid`/`cell`/`cost*`/
+  `startup*`/`animTag`/`emptyOwned*`) posprzątane.
+
+**Tła areny walki PER TYP — przygotowanie architektury, bez nowej grafiki.** User
+(mid-turn): "Questy będą miały oddzielne tło, kampania bosów to co jest, a eventowe będą
+miały osobne a MAD bossy będą miały jeszcze inne — ogarniasz? Ale to na razie może zostać,
+sprawdzę to co mamy, a potem jak będę miał nowe tła to napiszę — możesz przygotować pod to
+najwyżej." Zrobione TYLKO przygotowanie (user nie ma jeszcze plików dla quest/event/mad):
+`bossIcons.ts` dostał `ARENA_BG_BY_KIND: Partial<Record<ArenaKind, ImageSourcePropType>>`
+(dziś tylko `campaign: CAMPAIGN_ARENA_BG`, reszta zakomentowana jako gotowe miejsca na
+przyszłe `require()`) + `arenaBgFor(kind)` (fallback na `CAMPAIGN_ARENA_BG` dla `kind` bez
+własnego wpisu). `boss-fight.tsx` woła teraz `arenaBgFor(kind)` zamiast stałego
+`CAMPAIGN_ARENA_BG` — wizualnie DZIŚ nic się nie zmienia (wszystkie tryby dalej widzą to samo
+tło kampanii), ale dodanie kolejnej grafiki w przyszłości to JEDNA linia w mapie w
+`bossIcons.ts`, zero zmian w `boss-fight.tsx`.
+
+`tsc`/`jest` zielone (67 suit/822 testy, bez zmian w testach — czysto UI-owa migracja +
+architektoniczne przygotowanie, bez nowej logiki biznesowej do przetestowania jednostkowo).
+**Priorytet testu na urządzeniu**: (a) `/pet` → tap w imię → sekcja "Startup" na dole modala —
+kup/ustaw działa tak samo jak wcześniej w sklepie, podgląd animacji na górze się aktualizuje;
+(b) Rynek (`/pet-shop`) — bez zakładek, od razu widać Skrzynki+Sklep dnia, otwarcie skrzynki
+z wylosowanym startupem dalej działa (modal "NOWY STARTUP!"); (c) dowolna walka — tło areny
+wygląda identycznie jak przed tą zmianą (to czysto przygotowanie pod przyszłość, nie redesign).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

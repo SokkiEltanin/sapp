@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Modal, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { Modal, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Check } from 'lucide-react-native';
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
+import StartupPreview from '@/components/pet/StartupPreview';
 import { usePetStore } from '@/store/petStore';
 import { SHOP_COLORS, STRIPES, TIER_META, CosmeticTier } from '@/utils/petShop';
+import { STARTUPS, startupById, ANIM_LABEL, Startup } from '@/utils/petStartups';
 import { paletteById } from '@/utils/catPalettes';
 import { spacing, radius, typography } from '@/theme';
 import { useColors } from '@/theme/useColors';
@@ -44,11 +46,15 @@ const TIER_ORDER: CosmeticTier[] = ['basic', 'rare', 'epic'];
 
 // Modal imienia + kosmetyki kotka (2026-08-19) — user pierwotnie chciał "klik w kotka"
 // jako wejście do kupna kolorów, potem sam to odrzucił: "nie przecież kliknięciem głaskam
-// kotka... lepiej dać przy edycji imienia". Wchłania sekcje Kolory+Dodatki z pet-shop.tsx
-// (Startupy = kosmetyk EKRANU ŁADOWANIA apki, zostaje w sklepie — to nie "kotek"). Ten
-// sam komponent obsługuje DWA tryby: `mode="edit"` (tap w imię na /pet, X zamyka bez
-// zapisu jeśli nic nie zmienione) i `mode="onboarding"` (pierwsze uruchomienie — brak X,
-// wymaga niepustego imienia żeby przycisk "Gotowe" zadziałał, patrz onboarded w petStore).
+// kotka... lepiej dać przy edycji imienia". Wchłania sekcje Kolory+Dodatki z pet-shop.tsx.
+// Startupy (kosmetyk EKRANU ŁADOWANIA apki) DOŁĄCZYŁY tutaj (2026-09-02, user: "przenieś
+// z rynku pupila startupy [tu], gdzie ma edycję nazwy i kolory") — pierwotnie (2026-08-19)
+// świadomie zostały w sklepie jako "nie kotek", ale user po czasie chciał całą kosmetykę w
+// jednym miejscu; wybór/zakup w `pet-shop.tsx` USUNIĘTY, `grantStartup` (nagroda ze
+// skrzynki) tam zostaje. Ten sam komponent obsługuje DWA tryby: `mode="edit"` (tap w imię
+// na /pet, X zamyka bez zapisu jeśli nic nie zmienione) i `mode="onboarding"` (pierwsze
+// uruchomienie — brak X, wymaga niepustego imienia żeby przycisk "Gotowe" zadziałał, patrz
+// onboarded w petStore).
 export default function PetCustomizeModal({ visible, onClose, mode = 'edit' }: {
   visible: boolean; onClose: () => void; mode?: 'edit' | 'onboarding';
 }) {
@@ -57,6 +63,7 @@ export default function PetCustomizeModal({ visible, onClose, mode = 'edit' }: {
   const {
     name, coins, ownedItems, catColor, catStripes, catEyeColor, catNoseColor, catWhiskers, catLegStripes,
     setName, buyColor, buyStripes, buyEyeColor, buyNoseColor, buyWhiskers, buyLegStripes, setOnboarded,
+    equippedStartup, buyStartup,
   } = usePetStore();
 
   const [draft, setDraft] = useState(name);
@@ -66,6 +73,7 @@ export default function PetCustomizeModal({ visible, onClose, mode = 'edit' }: {
   const [pvNose, setPvNose] = useState<string | null>(null);
   const [pvWhiskers, setPvWhiskers] = useState<boolean | null>(null);
   const [pvLeg, setPvLeg] = useState<boolean | null>(null);
+  const [previewStartupId, setPreviewStartupId] = useState<string | null>(null);
 
   const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void } | null>(null);
   const confirmBuy = (nm: string, cost: number, onYes: () => void) => setPendingBuy({ name: nm, cost, onYes });
@@ -188,6 +196,39 @@ export default function PetCustomizeModal({ visible, onClose, mode = 'edit' }: {
     );
   };
 
+  // Startup (kosmetyk ekranu ładowania): kup+ustaw, albo tylko ustaw jeśli już masz.
+  // Przeniesione tu z pet-shop.tsx (2026-09-02) — ten sam wzorzec kup/ustaw co reszta
+  // kosmetyki w tym modalu (kolor/oczy/nosek), tylko klucz posiadania ma prefiks `startup:`.
+  const onStartup = (su: Startup) => {
+    haptic.tap();
+    setPreviewStartupId(su.id);
+    const had = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
+    if (had) { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`${su.name} — ustawione`); } return; }
+    if (coins < su.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${su.cost}`); return; }
+    confirmBuy(su.name, su.cost, () => { if (buyStartup(su.id, su.cost)) { haptic.success(); toast.success(`Kupione: ${su.name}`); } });
+  };
+  const renderStartupCell = (su: Startup) => {
+    const owned = ownedItems.includes(`startup:${su.id}`) || su.cost === 0;
+    const on = equippedStartup === su.id;
+    const tier = TIER_META[su.tier];
+    return (
+      <PressableScale key={su.id} onPress={() => onStartup(su)}>
+        <View style={[s.cell, on && { borderColor: tier.color, backgroundColor: tier.color + '1E' }]}>
+          <View style={[s.startupSwatch, { borderColor: su.ink + '55' }]}>
+            {su.anim === 'custom' && su.asset
+              ? <Image source={su.asset} style={{ width: 60, height: 34 }} resizeMode="contain" fadeDuration={0} />
+              : <Text style={[s.startupSwatchMark, { color: su.ink }]}>Sapp</Text>}
+          </View>
+          <Text style={s.cellName} numberOfLines={1}>{su.name}</Text>
+          <Text style={s.animTag}>{ANIM_LABEL[su.anim]}{su.glow ? ' · glow' : ''}</Text>
+          {owned
+            ? <Text style={[s.cellState, { color: on ? tier.color : c.text.muted }]}>{on ? 'ustawiony' : 'kupiony'}</Text>
+            : <Text style={s.costTxt}>{su.cost} 🪙</Text>}
+        </View>
+      </PressableScale>
+    );
+  };
+
   const onDone = () => {
     const trimmed = draft.trim();
     if (mode === 'onboarding' && !trimmed) { haptic.error(); toast.error('Nadaj imię pupilowi'); return; }
@@ -242,6 +283,34 @@ export default function PetCustomizeModal({ visible, onClose, mode = 'edit' }: {
             {extraRow('legstripes', 'Pręgi na łapkach', 'poziome pręgi na łapkach', catLegStripes, LEGSTRIPES_COST,
               () => onToggleExtra('legstripes', LEGSTRIPES_COST, 'Pręgi na łapkach', catLegStripes, setPvLeg, buyLegStripes))}
           </View>
+
+          <View style={s.section}>
+            <Text style={s.subSection}>Startup (ekran ładowania)</Text>
+            <Text style={s.startupHint}>Zmienia ekran ładowania apki. Zobaczysz przy następnym starcie.</Text>
+            {(() => {
+              const shown = startupById(previewStartupId ?? equippedStartup);
+              const isPreview = !!previewStartupId && previewStartupId !== equippedStartup;
+              return (
+                <View style={{ gap: 5, marginBottom: spacing[2] }}>
+                  <StartupPreview startup={shown} height={92} fontSize={30} />
+                  <Text style={s.startupPreviewCap}>{isPreview ? 'podgląd' : 'teraz'}: {shown.name} · {ANIM_LABEL[shown.anim]}</Text>
+                </View>
+              );
+            })()}
+            {TIER_ORDER.map(tier => {
+              const items = STARTUPS.filter(x => x.tier === tier);
+              if (!items.length) return null;
+              return (
+                <View key={tier} style={{ gap: spacing[2], marginBottom: spacing[2] }}>
+                  <View style={s.tierHead}>
+                    <View style={[s.tierDot, { backgroundColor: TIER_META[tier].color }]} />
+                    <Text style={[s.subSection, { color: TIER_META[tier].color }]}>{TIER_META[tier].label}</Text>
+                  </View>
+                  <View style={s.grid}>{items.map(renderStartupCell)}</View>
+                </View>
+              );
+            })}
+          </View>
         </ScrollView>
 
         <View style={s.footer}>
@@ -286,6 +355,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   boxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   buyPill: { backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
+  // startupy (kosmetyka ekranu ładowania, przeniesione z pet-shop.tsx 2026-09-02)
+  startupHint: { fontSize: 11, color: c.text.secondary, lineHeight: 15, marginBottom: spacing[2] },
+  startupPreviewCap: { fontSize: 11, color: c.text.secondary, fontWeight: '700', textAlign: 'center' },
+  startupSwatch: { width: 74, height: 40, borderRadius: 8, borderWidth: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
+  startupSwatchMark: { fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+  animTag: { fontSize: 9, color: c.text.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
+  tierHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tierDot: { width: 8, height: 8, borderRadius: 4 },
   footer: { padding: spacing[4] },
   doneBtn: { backgroundColor: '#2AC68F', borderRadius: radius.lg, paddingVertical: 14, alignItems: 'center' },
   doneBtnTxt: { fontSize: 15, fontWeight: '900', color: '#07160F' },
