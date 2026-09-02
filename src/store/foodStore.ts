@@ -318,7 +318,10 @@ interface FoodState {
     semi?: boolean; roughSoup?: boolean;
   }) => FoodProduct;
   markFresh: (name: string) => void;            // one product bought
-  markFreshMany: (names: string[]) => void;     // a receipt's worth (already-counted only)
+  // a receipt's worth (already-counted only) — optional `cat` backfills FoodProduct.cat
+  // on products that don't have one yet, using the tag already assigned on the receipt
+  // (e.g. słodycze), so avoid-habit/streak tracking picks it up without manual re-tagging.
+  markFreshMany: (items: { name: string; cat?: string }[]) => void;
 
   // meals
   addMeal: (type: MealType, items: MealItem[], note?: string, date?: string) => void;
@@ -406,16 +409,29 @@ export const useFoodStore = create<FoodState>()(
       },
       // Bump `fresh` on every counted product a receipt just bought. Never CREATES a
       // product (only the user adds those) — it just floats already-counted ones up.
-      markFreshMany: (names) => {
-        const keys = new Set(names.map(n => normalizeProductName(n)).filter(Boolean));
+      // Also backfills `cat` (2026-09-02) from the receipt's own tag when the product
+      // doesn't have one yet — never overwrites an already-set (manually chosen) cat.
+      markFreshMany: (items) => {
+        const catByKey = new Map<string, string>();
+        const keys = new Set<string>();
+        for (const it of items) {
+          const key = normalizeProductName(it.name);
+          if (!key) continue;
+          keys.add(key);
+          if (it.cat) catByKey.set(key, it.cat);
+        }
         if (keys.size === 0) return;
         const now = Date.now();
         set(s => {
           let changed = false;
           const products = s.products.map(p => {
-            const hit = keys.has(normalizeProductName(p.name)) || (p.linkedName && keys.has(normalizeProductName(p.linkedName)));
-            if (hit) { changed = true; return { ...p, fresh: now }; }
-            return p;
+            const nameKey = normalizeProductName(p.name);
+            const linkedKey = p.linkedName ? normalizeProductName(p.linkedName) : undefined;
+            const hit = keys.has(nameKey) || (linkedKey != null && keys.has(linkedKey));
+            if (!hit) return p;
+            changed = true;
+            const backfillCat = !p.cat ? (catByKey.get(nameKey) ?? (linkedKey ? catByKey.get(linkedKey) : undefined)) : undefined;
+            return backfillCat ? { ...p, fresh: now, cat: backfillCat } : { ...p, fresh: now };
           });
           return changed ? { products } : {};
         });

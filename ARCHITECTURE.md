@@ -3062,6 +3062,77 @@ się responsywniej przy dłuższej bibliotece; (c) Sklep/Ekwipunek/dowolna walka
 ikony hełmów/talizmanów/bossów powinny wyglądać IDENTYCZNIE jak przed zmianą (to czysty
 downscale, nie redesign) — jeśli coś wygląda rozmyte/przycięte, to regresja do zgłoszenia.
 
+## 14. Połączenie "co kupuję" → "co zjadłem" (kategoria/streak) + tło areny — 2026-09-02
+
+User: "Musimy ogarnąć lepszy connect pomiędzy CO ZJADŁEM a produktami które kupuję żeby jak
+kupię drożdżówkę i ją oflaguję że to pieczywo/słodycz - to jak zaznaczę że ją zjadłem to
+trzeba żeby oflagowało to że zjadłem słodycz i tracę streak".
+
+**Diagnoza**: `ReceiptItem.tags` (wydatki/paragony, np. `['słodycze']` z `FOOD_TAG_MAP` w
+`receiptParser.ts`) i `FoodProduct.cat` (dziennik jedzenia, `FOOD_SUBCATS` w `food.ts`) dzielą
+DOKŁADNIE ten sam słownik tagów, ale były dwoma zupełnie niepowiązanymi systemami — żaden kod
+nie przenosił jednego w drugie. Avoid-habit/streak matching (`matchedEatDays` w
+`countersStore.ts`, konsolidacja z 2026-08-31) już CZYTA `FoodProduct.cat` przez
+`catByProductId`, ale nic nigdy go nie USTAWIAŁO przy tworzeniu nowego produktu w Co zjadłem
+— stąd realna luka.
+
+**Fix — `purchasedCatForName(name, expenses)`** (nowa, `src/utils/food.ts`): szuka po
+znormalizowanej nazwie NAJNOWSZEGO paragonowego itemu z tym samym imieniem i zwraca jego
+`foodSubcat()` (pomijając `'inne'`). Podpięta w trzech miejscach:
+1. `app/food/add.tsx` — `confirmPicker`/`confirmManual` (tworzenie NOWEGO produktu wprost z
+   wyszukiwarki "Co zjadłem", najczęstsza ścieżka) — seed `cat` tylko gdy produkt jeszcze go
+   nie ma (sprawdzone przez `findProductByName` PRZED wywołaniem `upsertProductByName`, żeby
+   nigdy nie wysłać jawnego `cat: undefined`, które nadpisałoby istniejącą kategorię —
+   `upsertProductByName` na ISTNIEJĄCYM produkcie spreaduje cały seed wprost jako patch).
+2. `app/food/product.tsx` (pełny formularz) — `useEffect` na `name`, auto-uzupełnia `cat`
+   TYLKO dla nowego produktu (`!editing`) bez jeszcze wybranej kategorii — nigdy nie nadpisuje
+   edytowanego produktu ani świadomego wyboru usera.
+3. `foodStore.markFreshMany` (wołane z `app/expenses/scan.tsx` po zapisie paragonu) —
+   backfill `cat` na już-śledzonych produktach, które go jeszcze nie mają, z tagu PRAWDZIWIE
+   wtedy przypisanego na tym paragonie (`foodSubcat(it)`) — sygnatura zmieniona z `string[]`
+   (same nazwy) na `{name, cat?}[]`.
+
+**Osobny, równie realny fix — `AVOID_PRESETS.sweets` keyword** (`countersStore.ts`):
+konkretny przykład usera (drożdżówka) NIE jest złapany przez powyższy mechanizm wcale —
+`FOOD_TAG_MAP` celowo kategoryzuje drożdżówkę/rogal/croissant jako `'pieczywo'`, nie
+`'słodycze'` (żeby nie dublować wydatków na słodycze w podziale finansowym), więc
+`purchasedCatForName` zwróciłby `'pieczywo'`, co NIE pasuje do keyworda słodyczy. Naprawione
+tak samo jak istniejący precedens `'pączek'` w tym samym keywordzie — dopisane
+`drożdż|rogal|kroasan|croissant` jako dopasowanie PO NAZWIE (niezależne od kategorii).
+Świadomie NIE dotknięte: `FOOD_TAG_MAP` samo (dublowanie kategorii zmieniłoby podział
+wydatków na innych ekranach, poza zakresem tego zgłoszenia).
+
+**Sprawdzone i NIE zmienione** (już działało poprawnie): "streak sprawdza ile dni temu
+ostatnio zjadłem... chyba że edytuję bo było przez przypadek dodane" — `autoLastEatDate`/
+`autoDaysWithout` to CZYSTE funkcje liczące na żywo z bieżącego `meals`, nie persystowany
+stan — edycja/usunięcie błędnego wpisu w Co zjadłem automatycznie naprawia policzony streak
+przy następnym odczycie, bez żadnej dodatkowej logiki "cofnięcia".
+
+**Tło areny walki** — user dostarczył `LOKACJA_KAMPANIA.png` (pchnięte bezpośrednio na
+`master`, wymagało zmergowania do branża roboczego; PRZY OKAZJI user wgrał też PEŁNOROZDZIELCZE
+zbroja/buty PNG-i zastępujące stare placeholdery — 1,5-2MB/plik, ten sam wzorzec co §13,
+przeskalowane tym samym skryptem do max 300px). Wpięte w `boss-fight.tsx` jako
+`CAMPAIGN_ARENA_BG` (nowy export w `bossIcons.ts`) — user: "wypierdolić ramki że bosy stoją na
+tym... hp jest podspodem". Scoped do NOWEGO `arenaScene` (`ImageBackground`, STAŁEJ wysokości,
+tylko kafelki/portrety/HP) zamiast całego `arena` (który ma zmienną wysokość — motyw/przycisk/
+mechaniki pod spodem rosną/kurczą się z rundy na rundę; naciąganie obrazka na całość
+wyglądałoby źle). `tile` stracił własne tło/ramkę (`c.bg.elevated`+border) — bossy/kotek stoją
+bezpośrednio na scenie; `tileLabel`/`tileHpTxt` dostały stały biały kolor + text-shadow
+(zamiast zależnego od motywu `c.text.primary`/`muted`) pod czytelność na zmiennym tle obrazka;
+`tileHpTrack` półprzezroczysty czarny zamiast płaskiego koloru motywu. Geometria WEWNĄTRZ
+`arenaScene` (padding kafelka, `tilePortrait`, `projectile.top`) celowo NIE zmieniona — sama
+tylko zmieniła nośnik tła. Plik tła przeskalowany 1536×1024/2MB → 1200×800/1,2MB (Pillow,
+alfa zachowana — obrazek ma ok. 20% przezroczystych, zaokrąglonych narożników w stylu
+"naklejki", `resizeMode="cover"` przycina/skaluje resztę).
+
+`tsc`/`jest` zielone (67 suit/822 testy — nowe `food.test.ts`/`countersStore.test.ts`).
+**Priorytet testu na urządzeniu**: (a) Co zjadłem → dodaj NOWY produkt o nazwie identycznej
+jak coś wcześniej kupione i otagowane jako słodycze/przekąski na paragonie — sprawdź że
+streak "Bez X" łapie to bez ręcznego tagowania; (b) zeskanuj paragon z drożdżówką/rogalem/
+croissantem, zjedz, sprawdź że łamie streak słodyczy; (c) dowolna walka bossa — arena powinna
+mieć widoczne tło (loch/arena), kafelki BEZ ramek, portrety stoją "na scenie", HP pod spodem
+czytelne; sprawdź że pocisk (łapka/broń bossa) dalej trafia w środek portretu, nie w pasek HP.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

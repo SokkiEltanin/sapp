@@ -10,6 +10,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import AnimatedButton from '@/components/ui/AnimatedButton';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { parseReceiptText, ParsedReceipt, ReceiptProduct, getFoodTags } from '@/utils/receiptParser';
+import { foodSubcat } from '@/utils/food';
 import { sameLocalDay } from '@/utils/bankNotification';
 import { toast } from '@/store/toastStore';
 import { localISO } from '@/utils/date';
@@ -520,8 +521,16 @@ export default function ScanReceiptModal() {
         .map(({ p, i }) => ({ name: (editedNames[i]?.trim() || p.name), verdict: (selected.has(i) ? 'product' : 'ignore') as 'product' | 'ignore' }));
       saveLineVerdicts(receipt.storeName, verdicts).catch(() => {});
       // Float freshly-bought products up in the calorie-logger's suggestions (only
-      // ones you already count — never creates a product from a receipt).
-      try { useFoodStore.getState().markFreshMany(receiptItems.map(it => it.name)); } catch {}
+      // ones you already count — never creates a product from a receipt) and backfill
+      // their category from this receipt's tags when they don't have one yet (2026-09-02,
+      // user: "kupię drożdżówkę i ją oflaguję że to pieczywo/słodycz - jak zaznaczę że
+      // zjadłem to trzeba żeby oflagowało że zjadłem słodycz i tracę streak").
+      try {
+        useFoodStore.getState().markFreshMany(receiptItems.map(it => {
+          const sc = foodSubcat(it);
+          return { name: it.name, cat: sc !== 'inne' ? sc : undefined };
+        }));
+      } catch {}
       if (validCustom.length > 0) {
         saveCustomProductsToMemory(validCustom.map(p => ({ name: p.name.trim(), category: p.category }))).catch(() => {});
         const taggedCustom = validCustom.filter(p => p.tags.length > 0).map(p => ({ name: p.name.trim(), tags: p.tags }));

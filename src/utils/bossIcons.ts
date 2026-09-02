@@ -112,3 +112,8 @@ export const FIST_PNG: ImageSourcePropType = require('../../assets/ikonybosów/B
 export function attackPng(kind: AttackKind | undefined): ImageSourcePropType {
   return kind ? ATTACK_PNG[kind] : FIST_PNG;
 }
+
+// Tło areny walki kampanii/raidu/eventu/questu/mad/misji (2026-09-02, user dostarczył
+// dedykowany art po wcześniejszym `arena-template.svg`). JEDNO tło dla wszystkich trybów
+// walki na boss-fight.tsx — nie per-boss, w przeciwieństwie do `BOSS_PNG` wyżej.
+export const CAMPAIGN_ARENA_BG: ImageSourcePropType = require('../../assets/ikonybosów/LOKACJA_KAMPANIA.png');
