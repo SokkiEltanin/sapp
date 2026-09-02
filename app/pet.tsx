@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Easing, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ChevronLeft, Pencil, Check, Coins, Heart, Zap, Lock, Gift, Swords, Compass, Hourglass, X, Wind, Target } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
@@ -70,6 +70,17 @@ export default function Pet() {
   // minutach i sekundach"). Interval sam się zatrzymuje gdy misja staje się gotowa (remaining
   // <=0) — nie ma sensu dalej tykać co sekundę, skoro pasek/licznik i tak znika z tego widoku.
   // `missionTick` sam w sobie nieużywany — wymusza tylko przeliczenie missionRemainingMs niżej.
+  // Ekran zostaje ZAMONTOWANY pod walką misji (`router.push('/boss-fight?...')`, brak
+  // `freezeOnBlur` w _layout.tsx) — bez tego gate'u pełne pętle idle (oddech/mruganie/
+  // spojrzenie/uszy/liźnięcie w CatArt.tsx) dalej by leciały PODCZAS walki, obciążając ten
+  // sam wątek JS co animacje ekranu walki (2026-09-02, audyt wydajności #3). `useFocusEffect`
+  // (nie `useIsFocused` — ten sam wzorzec co reszta apki, patrz `reload()` w innych ekranach)
+  // ustawia `focused` na true przy każdym powrocie i false w cleanupie przy zejściu z ekranu.
+  const [focused, setFocused] = useState(true);
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    return () => setFocused(false);
+  }, []));
   const [missionTick, setMissionTick] = useState(0);
   useEffect(() => {
     if (!missionEndsAt) return;
@@ -463,7 +474,7 @@ export default function Pet() {
                 </Animated.View>
               </TouchableOpacity>
             ) : (
-              <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} palette={palette} stripes={catStripes}
+              <CatArt expression={pet.expression} size={STAGE_SIZE[stage] + 90} animate={focused} palette={palette} stripes={catStripes}
                 eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes}
                 onPress={handlePet} onLongPress={handleCuddle} celebrate={celebrate} affection={affToday} />
             )}

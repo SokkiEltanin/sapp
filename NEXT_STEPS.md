@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Optymalizacja wydajności, runda 3 — pupil w tle walki + Nastrój — NIEsprawdzone (2026-09-02)
+
+User: "dawaj dalej" (kontynuacja poprzednich rund). Dwa fixy: (1) `app/pet.tsx` — pełne pętle
+idle CatArt (oddech/mruganie/spojrzenie/uszy/liźnięcie) leciały dalej w tle PODCZAS walki
+misji, bo `/pet` zostaje zamontowany pod ekranem walki (brak `freezeOnBlur`) — naprawione
+przez `focused` (`useFocusEffect`) → `animate={focused}`; (2) `app/(tabs)/mood.tsx` — sześć
+kart analitycznych (słowa kluczowe/wzorce/rozkład/dni tygodnia/pora dnia/kalendarz miesiąca)
+liczyło pełną historię wpisów przy KAŻDYM renderze, spotęgowane przez `useMoodStore()` bez
+selektora (3 zbędne re-renderi na każde `load()`) — naprawione `useMemo` + wąskie selektory.
+Pełny opis w ARCHITECTURE.md §16. `tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu
+na urządzeniu**: (a) misja gotowa → wejdź w walkę — kotek na Pupilu pod spodem nie powinien
+animować się podczas walki; (b) zakładka Nastrój, dłuższa historia — dodaj/edytuj/usuń wpis,
+pull-to-refresh — powinno czuć się responsywniej, liczby na kartach identyczne jak wcześniej.
+
 ## 🔴 ZNALEZIONE (architektoniczne, czeka na decyzję) — rosnący blob storage expenses/foodStore (2026-09-02)
 
 Runda 2 audytu wydajności (user: "optymalizuj dalej"). Zustand `persist` re-serializuje

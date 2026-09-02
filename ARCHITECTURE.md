@@ -3183,6 +3183,56 @@ logiki biznesowej). **Priorytet testu na urządzeniu**: otwórz dashboard po dł
 później niż "ważne" sekcje), ale sam dashboard powinien poczuć się responsywniej na pierwszej
 klatce, zwłaszcza na koncie z dużą historią wydatków.
 
+## 16. Optymalizacja wydajności, runda 3 — 2026-09-02
+
+Kontynuacja §13/§15 (user: "dawaj dalej"). Dwa realne fixy z trzeciego przebiegu audytu.
+
+**`app/pet.tsx` — pełne pętle idle CatArt leciały dalej pod ekranem walki misji.**
+`onFightMission` robi `router.push('/boss-fight?...')` — `/pet` zostaje ZAMONTOWANY pod spodem
+(brak `freezeOnBlur` w `_layout.tsx`). Główny, w pełni animowany `<CatArt>` (linia z
+normalnym stanem pupila, BEZ `animate={false}` — w przeciwieństwie do dwóch INNYCH instancji
+na tym samym ekranie, misja-w-drodze/misja-gotowa, które już miały `animate={false}` od
+dawna) nie miał żadnego gatingu po widoczności ekranu — wszystkie 5 pętli idle w `CatArt.tsx`
+(oddech/mruganie/spojrzenie/uszy/auto-liźnięcie) dalej biły w tle PODCZAS walki, obciążając
+ten sam wątek JS co animacje `boss-fight.tsx` (ten sam ekran, który §-audyt z 2026-08-30
+świadomie odchudził z animacji kotka pod wydajność). Fix: nowy `focused` (`useFocusEffect`
+z `expo-router`, ten sam wzorzec co `reload()` na innych ekranach apki — `true` na fokus,
+`false` w cleanupie przy zejściu z ekranu) → `animate={focused}` na tym jednym CatArt. Każdy
+idle-`useEffect` w `CatArt.tsx` już miał `animate` w tablicy zależności + poprawny cleanup
+(`loop.stop()`/`clearTimeout`), więc zmiana propa czysto zatrzymuje/wznawia pętle bez zmian
+w `CatArt.tsx` samym.
+
+**`app/(tabs)/mood.tsx` — analityka nastroju liczyła się od nowa przy każdym renderze.**
+W przeciwieństwie do `expenses/stats.tsx` (wszystko w `useMemo`), sześć subkomponentów
+(`KeywordInsights`/`MoodInsights`/`MoodDistribution`/`WeekdayPattern`/`TimeOfDayPattern`/
+`MonthHeatmap`) liczyło filter/reduce/zagnieżdżone pętle po CAŁEJ historii `entries` WPROST
+w ciele renderu, bez `useMemo` — dokładnie ten sam wzorzec co dashboard w §15, tylko jeszcze
+nie przeniesiony tutaj. Pierwotna przyczyna WIELU zbędnych re-renderów: `useMoodStore()`
+wołany BEZ selektora (`const { entries, setEntries, setLoading, deleteEntry } =
+useMoodStore()`) — store niesie też `isLoading`/`todayEntry`, których ten ekran nigdzie nie
+czyta, ale bez selektora KAŻDA ich zmiana i tak przerenderowywała cały ekran. `load()`
+(mount/pull-to-refresh/po dodaniu-edycji-usunięciu wpisu) robi `setLoading(true)` → await →
+`setEntries(...)` → `setLoading(false)` = 3 re-rendery, z czego TYLKO JEDEN realnie zmienia
+`entries` — bez selektora i bez `useMemo` w subkomponentach wszystkie 3 na nowo liczyły
+WSZYSTKO. Fix dwuwarstwowy: (1) wąskie selektory (`useMoodStore(st => st.entries)` itd. —
+akcje są stabilnymi referencjami w zustand, więc same w sobie nie wywołują re-renderu);
+(2) każdy z sześciu subkomponentów dostał `useMemo(() => {...}, [entries])` wokół swojej
+derywowanej logiki (early-returny na podstawie wyniku memo przeniesione ZA wywołanie hooka,
+nie przed — zgodnie z rules-of-hooks), JSX niżej nietknięty (memo zwraca ten sam kształt
+obiektu, który wcześniej istniał jako luźne zmienne lokalne). `MonthHeatmap`'s `byDate` już
+było memoizowane wcześniej — dołożone tylko brakujące `hasMonthEntries` (i zamienione z
+`.filter().length===0` na `.some()`, żeby nie budować całej tablicy tylko po to, by sprawdzić
+czy jest pusta).
+
+`tsc`/`jest` zielone (67 suit/822 testy — bez nowych testów, czysto wydajnościowe fixy bez
+nowej logiki biznesowej; ten sam brak jednostkowego pokrycia UI-komponentów co reszta apki).
+**Priorytet testu na urządzeniu**: (a) wyślij pupila na misję, poczekaj aż będzie gotowa,
+wejdź w walkę — kotek na ekranie Pupil (pod spodem) nie powinien już animować się w tle
+podczas walki (subtelne, głównie kwestia zużycia baterii/CPU, nie coś widocznego wprost);
+(b) zakładka Nastrój z dłuższą historią wpisów — dodaj/edytuj/usuń wpis, pociągnij do
+odświeżenia — ekran powinien czuć się responsywniej, bez zmiany w TYM co pokazują karty
+analityczne (liczby identyczne, tylko szybciej liczone).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
