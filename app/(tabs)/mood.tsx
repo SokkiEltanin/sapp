@@ -122,11 +122,18 @@ function KeywordInsights({ entries }: { entries: MoodEntry[] }) {
   const colors = useColors();
   const P = useMemo(() => pFor(colors), [colors]);
   const kw = useMemo(() => makeKw(colors, P), [colors, P]);
-  const withNotes = entries.filter(e => e.note?.trim() && (e.mood >= 4 || e.mood <= 2));
-  if (withNotes.length < 4) return null;
-
-  const { positive, negative } = extractKeywords(entries);
-  if (positive.length === 0 && negative.length === 0) return null;
+  // Widok montuje się i re-renderuje wielokrotnie w trakcie load() (setLoading/setEntries/
+  // setLoading) — bez useMemo ten filter+extractKeywords (tokenizacja WSZYSTKICH notatek)
+  // liczyłby się od nowa przy każdym z tych renderów, nawet gdy `entries` się nie zmieniło.
+  const calc = useMemo(() => {
+    const withNotes = entries.filter(e => e.note?.trim() && (e.mood >= 4 || e.mood <= 2));
+    if (withNotes.length < 4) return null;
+    const { positive, negative } = extractKeywords(entries);
+    if (positive.length === 0 && negative.length === 0) return null;
+    return { positive, negative };
+  }, [entries]);
+  if (!calc) return null;
+  const { positive, negative } = calc;
 
   return (
     <View style={kw.card}>
@@ -201,52 +208,59 @@ function MoodInsights({ entries }: { entries: MoodEntry[] }) {
   const colors = useColors();
   const P = useMemo(() => pFor(colors), [colors]);
   const ins = useMemo(() => makeIns(colors, P), [colors, P]);
-  if (entries.length < 5) return null;
+  // Patrz komentarz przy `KeywordInsights` — ten sam re-render storm z load(), tu dodatkowo
+  // dwie pełne pętle po `entries` (dowData + tag-counts).
+  const calc = useMemo(() => {
+    if (entries.length < 5) return null;
 
-  const now = new Date();
-  const pad2 = (n: number) => String(n).padStart(2, '0');
-  const thisMonthStart = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-01`;
-  const lastMonthDate  = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthStart = `${lastMonthDate.getFullYear()}-${pad2(lastMonthDate.getMonth() + 1)}-01`;
+    const now = new Date();
+    const pad2 = (n: number) => String(n).padStart(2, '0');
+    const thisMonthStart = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-01`;
+    const lastMonthDate  = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthStart = `${lastMonthDate.getFullYear()}-${pad2(lastMonthDate.getMonth() + 1)}-01`;
 
-  const thisMonth = entries.filter(e => e.date >= thisMonthStart);
-  const lastMonth = entries.filter(e => e.date >= lastMonthStart && e.date < thisMonthStart);
-  const thisAvg = thisMonth.length
-    ? thisMonth.reduce((a, b) => a + b.mood, 0) / thisMonth.length : null;
-  const lastAvg = lastMonth.length
-    ? lastMonth.reduce((a, b) => a + b.mood, 0) / lastMonth.length : null;
+    const thisMonth = entries.filter(e => e.date >= thisMonthStart);
+    const lastMonth = entries.filter(e => e.date >= lastMonthStart && e.date < thisMonthStart);
+    const thisAvg = thisMonth.length
+      ? thisMonth.reduce((a, b) => a + b.mood, 0) / thisMonth.length : null;
+    const lastAvg = lastMonth.length
+      ? lastMonth.reduce((a, b) => a + b.mood, 0) / lastMonth.length : null;
 
-  const dowData = Array(7).fill(null).map(() => ({ total: 0, count: 0 }));
-  for (const e of entries) {
-    const dow = new Date(e.date).getDay();
-    dowData[dow].total += e.mood;
-    dowData[dow].count++;
-  }
-  const bestDow = dowData.reduce<{ total: number; count: number; i: number }>((best, curr, i) => {
-    const avg = curr.count >= 2 ? curr.total / curr.count : -1;
-    const bestAvg = best.count >= 2 ? best.total / best.count : -1;
-    return avg > bestAvg ? { ...curr, i } : best;
-  }, { total: 0, count: 0, i: -1 });
-
-  const goodTagCounts: Record<string, number> = {};
-  const badTagCounts:  Record<string, number> = {};
-  for (const e of entries) {
-    for (const tag of e.tags ?? []) {
-      if (e.mood >= 4) goodTagCounts[tag] = (goodTagCounts[tag] ?? 0) + 1;
-      if (e.mood <= 2) badTagCounts[tag]  = (badTagCounts[tag]  ?? 0) + 1;
+    const dowData = Array(7).fill(null).map(() => ({ total: 0, count: 0 }));
+    for (const e of entries) {
+      const dow = new Date(e.date).getDay();
+      dowData[dow].total += e.mood;
+      dowData[dow].count++;
     }
-  }
-  const topGoodTags = Object.entries(goodTagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
-  const topBadTags  = Object.entries(badTagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
+    const bestDow = dowData.reduce<{ total: number; count: number; i: number }>((best, curr, i) => {
+      const avg = curr.count >= 2 ? curr.total / curr.count : -1;
+      const bestAvg = best.count >= 2 ? best.total / best.count : -1;
+      return avg > bestAvg ? { ...curr, i } : best;
+    }, { total: 0, count: 0, i: -1 });
 
-  const hasTrend  = thisAvg != null && lastAvg != null;
-  const trendDiff = hasTrend ? thisAvg! - lastAvg! : 0;
-  const trendUp   = trendDiff >= 0;
+    const goodTagCounts: Record<string, number> = {};
+    const badTagCounts:  Record<string, number> = {};
+    for (const e of entries) {
+      for (const tag of e.tags ?? []) {
+        if (e.mood >= 4) goodTagCounts[tag] = (goodTagCounts[tag] ?? 0) + 1;
+        if (e.mood <= 2) badTagCounts[tag]  = (badTagCounts[tag]  ?? 0) + 1;
+      }
+    }
+    const topGoodTags = Object.entries(goodTagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
+    const topBadTags  = Object.entries(badTagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
 
-  const hasBestDow = bestDow.i >= 0 && bestDow.count >= 2;
-  const hasTagInsights = topGoodTags.length > 0 || topBadTags.length > 0;
+    const hasTrend  = thisAvg != null && lastAvg != null;
+    const trendDiff = hasTrend ? thisAvg! - lastAvg! : 0;
+    const trendUp   = trendDiff >= 0;
 
-  if (!hasTrend && !hasBestDow && !hasTagInsights) return null;
+    const hasBestDow = bestDow.i >= 0 && bestDow.count >= 2;
+    const hasTagInsights = topGoodTags.length > 0 || topBadTags.length > 0;
+
+    if (!hasTrend && !hasBestDow && !hasTagInsights) return null;
+    return { thisAvg, bestDow, topGoodTags, topBadTags, hasTrend, trendDiff, trendUp, hasBestDow, hasTagInsights };
+  }, [entries]);
+  if (!calc) return null;
+  const { thisAvg, bestDow, topGoodTags, topBadTags, hasTrend, trendDiff, trendUp, hasBestDow, hasTagInsights } = calc;
 
   return (
     <View style={ins.card}>
@@ -457,11 +471,15 @@ function MoodDistribution({ entries }: { entries: MoodEntry[] }) {
   const P = useMemo(() => pFor(colors), [colors]);
   const dist = useMemo(() => makeDist(colors, P), [colors, P]);
   const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
-  const recent = entries.filter(e => e.date >= dateMinusDays(30));
-  if (recent.length < 4) return null;
-  const counts: Record<MoodLevel, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  for (const e of recent) counts[e.mood]++;
-  const total = recent.length;
+  const calc = useMemo(() => {
+    const recent = entries.filter(e => e.date >= dateMinusDays(30));
+    if (recent.length < 4) return null;
+    const counts: Record<MoodLevel, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const e of recent) counts[e.mood]++;
+    return { counts, total: recent.length };
+  }, [entries]);
+  if (!calc) return null;
+  const { counts, total } = calc;
   const levels: MoodLevel[] = [5, 4, 3, 2, 1];
 
   return (
@@ -513,17 +531,21 @@ function WeekdayPattern({ entries }: { entries: MoodEntry[] }) {
   const P = useMemo(() => pFor(colors), [colors]);
   const wd = useMemo(() => makeWd(colors, P), [colors, P]);
   const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
-  if (entries.length < 5) return null;
-  const buckets = Array.from({ length: 7 }, () => ({ total: 0, count: 0 })); // Mon..Sun
-  for (const e of entries) {
-    const dow = (new Date(e.date).getDay() + 6) % 7; // Mon=0
-    buckets[dow].total += e.mood;
-    buckets[dow].count++;
-  }
-  const avgs = buckets.map(b => b.count ? b.total / b.count : null);
-  const valid = avgs.filter((v): v is number => v != null);
-  if (valid.length < 3) return null;
-  const best = Math.max(...valid);
+  const calc = useMemo(() => {
+    if (entries.length < 5) return null;
+    const buckets = Array.from({ length: 7 }, () => ({ total: 0, count: 0 })); // Mon..Sun
+    for (const e of entries) {
+      const dow = (new Date(e.date).getDay() + 6) % 7; // Mon=0
+      buckets[dow].total += e.mood;
+      buckets[dow].count++;
+    }
+    const avgs = buckets.map(b => b.count ? b.total / b.count : null);
+    const valid = avgs.filter((v): v is number => v != null);
+    if (valid.length < 3) return null;
+    return { avgs, best: Math.max(...valid) };
+  }, [entries]);
+  if (!calc) return null;
+  const { avgs, best } = calc;
 
   return (
     <View style={styles.card}>
@@ -574,17 +596,20 @@ function TimeOfDayPattern({ entries }: { entries: MoodEntry[] }) {
   const P = useMemo(() => pFor(colors), [colors]);
   const tod = useMemo(() => makeTod(colors, P), [colors, P]);
   const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
-  const withTime = entries.filter(e => e.createdAt);
-  if (withTime.length < 5) return null;
-  const stats = TOD_BUCKETS.map(b => {
-    const inBucket = withTime.filter(e => {
-      const h = new Date(e.createdAt).getHours();
-      return h >= b.from && h < b.to;
+  const stats = useMemo(() => {
+    const withTime = entries.filter(e => e.createdAt);
+    if (withTime.length < 5) return null;
+    const st = TOD_BUCKETS.map(b => {
+      const inBucket = withTime.filter(e => {
+        const h = new Date(e.createdAt).getHours();
+        return h >= b.from && h < b.to;
+      });
+      const avg = inBucket.length ? inBucket.reduce((a, c) => a + c.mood, 0) / inBucket.length : null;
+      return { ...b, avg, count: inBucket.length };
     });
-    const avg = inBucket.length ? inBucket.reduce((a, c) => a + c.mood, 0) / inBucket.length : null;
-    return { ...b, avg, count: inBucket.length };
-  });
-  if (stats.every(s => s.count === 0)) return null;
+    return st.every(s => s.count === 0) ? null : st;
+  }, [entries]);
+  if (!stats) return null;
 
   return (
     <View style={styles.card}>
@@ -651,8 +676,9 @@ function MonthHeatmap({ entries }: { entries: MoodEntry[] }) {
   const rows: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
 
-  const monthEntries = entries.filter(e => e.date.startsWith(`${year}-${p2(month + 1)}`));
-  if (monthEntries.length === 0) return null;
+  const monthKey = `${year}-${p2(month + 1)}`;
+  const hasMonthEntries = useMemo(() => entries.some(e => e.date.startsWith(monthKey)), [entries, monthKey]);
+  if (!hasMonthEntries) return null;
 
   return (
     <View style={styles.card}>
@@ -935,7 +961,16 @@ export default function MoodScreen() {
   const insets = useSafeAreaInsets();
   const P = useMemo(() => pFor(colors), [colors]);
   const styles = useMemo(() => makeStyles(colors, P), [colors, P]);
-  const { entries, setEntries, setLoading, deleteEntry } = useMoodStore();
+  // Wąskie selektory zamiast gołego useMoodStore() (2026-09-02, audyt wydajności #3) —
+  // store ma też `isLoading`/`todayEntry`, których ten ekran nie czyta wprost, ale bez
+  // selektora KAŻDA ich zmiana i tak wywoływała pełny re-render (load() woła
+  // setLoading(true)→await→setEntries(...)→setLoading(false) = 3 re-rendery, z czego tylko
+  // jeden realnie zmienia `entries`) — te 3 rendery uruchamiały od nowa WSZYSTKIE
+  // nieopamiętane przeliczenia w komponentach niżej (KeywordInsights/MoodInsights/…).
+  const entries = useMoodStore(st => st.entries);
+  const setEntries = useMoodStore(st => st.setEntries);
+  const setLoading = useMoodStore(st => st.setLoading);
+  const deleteEntry = useMoodStore(st => st.deleteEntry);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null);
   const [refreshing, setRefreshing] = useState(false);
