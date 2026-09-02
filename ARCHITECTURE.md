@@ -3006,6 +3006,62 @@ połowicznie podpiętej.
 3. Nowa sekcja → dopisz wpis do tablicy `sections` (id/title/icon/color/keywords/items) —
    pojawi się automatycznie w liście i w wyszukiwarce, nic więcej nie trzeba podpinać.
 
+## 13. Optymalizacja wydajności — 2026-09-02
+
+User poprosił ogólnie o "dalszą optymalizację apki" (bez konkretnego zgłoszenia). Zamiast
+zgadywać, zrobiony statyczny audyt kodu (nie profiler na urządzeniu — brak dostępu) pod kątem
+realnych, ewidencjonowanych problemów. Cztery fixy:
+
+1. **`app/notes.tsx` — `NoteCard` re-renderował się cały przy KAŻDEJ zmianie stanu ekranu**
+   (wpisywanie w search, przełączanie folderu), nawet jeśli konkretna notatka się nie
+   zmieniła — `.map()` przekazywał NOWE closures (`onPress={() => openEdit(note)}`) do
+   każdej karty przy każdym renderze, więc samo opakowanie w `React.memo` nic by nie dało
+   (props i tak zawsze "inne"). Naprawione właściwie: `openEdit`/`handlePin`/`handleDelete`/
+   `handleConvert` (już przyjmowały `note` jako argument) owinięte w `useCallback` ze
+   stabilnymi zależnościami, nowy `openCounterNote` (też `useCallback`), `NoteCard` wywoływany
+   z gołymi referencjami (`onPress={openEdit}` zamiast `onPress={() => openEdit(note)}`) —
+   sam komponent bierze `note` i woła `onPress(note)` wewnątrz. Dopiero to + `memo(NoteCard)`
+   realnie ogranicza re-render do notatek, których dane faktycznie się zmieniły.
+2. **`app/food/add.tsx` — wyszukiwarka jedzenia przeliczała CAŁĄ bibliotekę produktów na
+   każde naciśnięcie klawisza** — `candidates` (`useMemo`) miał deps `[products, query]` i za
+   każdym razem od nowa budował listę `curated` (mapa po `products`, `normalizeProductName`
+   per produkt) ZANIM w ogóle zaczął filtrować po `query`. Rozdzielone na dwa `useMemo`:
+   `curated` (deps `[products]` — liczy się tylko gdy zmienia się biblioteka produktów,
+   od razu z prekalkulowanym `_norm`) i `candidates` (deps `[curated, query]` — per klawisz
+   tylko filtruje/sortuje gotowe dane, żadnego ponownego `normalizeProductName`). Uwaga:
+   `curated` jest teraz WSPÓLNYM, memoizowanym obiektem między renderami — gałąź pustego
+   query musi robić `[...curated].sort(...)` (kopia), nie `curated.sort(...)` w miejscu, bo
+   mutacja rozjechałaby kolejność przy następnym renderze z niepustym `query`.
+3. **`app/(tabs)/health.tsx` — sprawdzone, ŚWIADOMIE NIE ruszone.** Detale steps/sleep liczą
+   filter/reduce/max inline w JSX (IIFE) zamiast `useMemo`, ale działają WYŁĄCZNIE gdy
+   odpowiedni modal szczegółów jest otwarty, na max ~30 elementach (`monthData`) — realny
+   koszt znikomy, a przepisanie tych bloków na `useMemo` (dużo zmiennych domknięcia:
+   `sleepH`/`sleepM`/`sleepRange`/`hcExtra`/`healthStats`) niosło większe ryzyko
+   stale-closure bugów niż realna korzyść. Zostawione jak jest.
+4. **Duże PNG-i ekwipunku/bossów renderowane jako miniaturki** — `assets/ekwipunek/**`
+   (hełmy/talizmany, źródła do 3095×3095/1,8MB) wyświetlane max 44×44px
+   (`GearPanel.tsx`/`BoxRevealModal.tsx`/`pet-shop.tsx`), `assets/ikonybosów/**` (źródła do
+   3095×3095/1,7MB) wyświetlane max 130×130px (`BossArt.tsx` w `boss-fight.tsx`,
+   `PORTRAIT_SIZE`). Każde otwarcie sklepu/ekwipunku/walki dekodowało kilka pełnorozdzielczych
+   PNG-ów tylko po to, żeby pokazać miniaturkę — realny koszt otwarcia ekranu + pamięć/bateria
+   na słabszych telefonach. Za zgodą usera (AskUserQuestion) przeskalowane proporcjonalnie w
+   dół (Pillow, LANCZOS, alfa zachowana): ekwipunek do maks. 300px na dłuższym boku, bossy do
+   maks. 600px (spory zapas ponad 3× gęstość pikseli przy realnym rozmiarze wyświetlania —
+   VALUE nie zmienia się wizualnie). 18 z 72 plików w tych dwóch folderach było większych niż
+   docelowy rozmiar; łącznie `assets/ekwipunek/` + `assets/ikonybosów/`: **17,4 MB → 4,4 MB**.
+   Ikony appki/splash (`icon.png`/`splash-icon.png`/`adaptive-icon.png`/`logoSapp.png`) CELOWO
+   NIE tknięte — to natywne assety pod konkretne wymagane rozmiary (App Store/Play Store),
+   zmieniane tylko przez `app.json` + nowy build (patrz §11).
+
+`tsc`/`jest` zielone (65 suit/812 testów, bez zmian w testach — czysto wydajnościowe fixy,
+brak nowej logiki biznesowej do przetestowania). **Priorytet testu na urządzeniu**: (a) Notatki
+— wpisuj coś w wyszukiwarkę mając sporo notatek, ekran powinien reagować płynniej niż
+wcześniej (zero funkcjonalnej zmiany — pin/usuń/konwertuj/otwórz nadal działają tak samo);
+(b) Co zjadłem → dodaj → pisz w polu szukania mając sporo własnych produktów — powinno czuć
+się responsywniej przy dłuższej bibliotece; (c) Sklep/Ekwipunek/dowolna walka z bossem —
+ikony hełmów/talizmanów/bossów powinny wyglądać IDENTYCZNIE jak przed zmianą (to czysty
+downscale, nie redesign) — jeśli coś wygląda rozmyte/przycięte, to regresja do zgłoszenia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
