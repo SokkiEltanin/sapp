@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Kampania optymalizacji wydajności ZAKOŃCZONA — 4 rundy, malejące zwroty (2026-09-02)
+
+User: "nie zatrzymuj się, optymalizuj dopóki nie stwierdzisz że jest zajebiście". Runda 4:
+jeden fix (`app/vehicles.tsx` — `summarizeVehicle()` bez `useMemo`, dokładnie ta sama luka co
+Nastrój w rundzie 3), reszta sprawdzonych kątów (Animated/Reanimated w całej apce, lazy-loading
+przez expo-router, sync z Firestore w tle, konfiguracja list, powtarzające się odczyty
+AsyncStorage) to same dead endy — apka jest już w tym dobrym stanie. Pełne podsumowanie
+wszystkich 4 rund w ARCHITECTURE.md §17. **Mój wniosek: kampania optymalizacyjna skończona —
+kolejne rundy w tym samym stylu zaczęłyby produkować teoretyczne nitpicki, nie realne,
+odczuwalne problemy.** Jeśli coś konkretnego zacznie znowu lagować, wróć do tego z konkretnym
+opisem (który ekran, kiedy) zamiast kolejnego ogólnego audytu.
+`tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu na urządzeniu**: zakładka Pojazdy
+— rozwijanie karty pojazdu powinno być płynniejsze przy dłuższej historii wydatków.
+
 ## 🆕 Optymalizacja wydajności, runda 3 — pupil w tle walki + Nastrój — NIEsprawdzone (2026-09-02)
 
 User: "dawaj dalej" (kontynuacja poprzednich rund). Dwa fixy: (1) `app/pet.tsx` — pełne pętle
