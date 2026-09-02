@@ -3233,6 +3233,52 @@ podczas walki (subtelne, głównie kwestia zużycia baterii/CPU, nie coś widocz
 odświeżenia — ekran powinien czuć się responsywniej, bez zmiany w TYM co pokazują karty
 analityczne (liczby identyczne, tylko szybciej liczone).
 
+## 17. Optymalizacja wydajności, runda 4 — i podsumowanie kampanii — 2026-09-02
+
+User: "nie zatrzymuj się, optymalizuj dopóki nie stwierdzisz że jest zajebiście". Czwarty
+przebieg audytu wydajności, celowo szukający NOWEGO terytorium (Animated/Reanimated w całej
+apce, lazy-loading ekranów przez expo-router, synchronizacja z Firestore w tle, konfiguracja
+FlatList/SectionList, powtarzające się odczyty AsyncStorage, ekrany pojazdów/osiągnięć).
+
+**Jeden realny fix — `app/vehicles.tsx`.** `summarizeVehicle(v, expenses, mainId)` (skanuje
+CAŁĄ historię `expenses` przez `expenseMatchesVehicle` per pojazd) był wołany bezpośrednio w
+`vehicles.map(...)` w ciele renderu, bez `useMemo` — dokładnie ten sam wzorzec co
+`mood.tsx` w §16, tylko na ekranie Pojazdy. Ponieważ `expanded` (rozwinięcie karty) to lokalny
+stan w TYM SAMYM komponencie, samo tapnięcie w kartę pojazdu (żeby ją rozwinąć/zwinąć)
+przerenderowywało cały ekran i na nowo skanowało pełną historię wydatków dla KAŻDEGO pojazdu.
+Naprawione: `summaries: Record<string, VehicleSummary>` liczony raz w `useMemo([vehicles,
+expenses, mainId])`, render czyta gotowy wynik (`summaries[v.id]`) zamiast wołać funkcję
+wprost.
+
+**Reszta czwartej rundy — same dead endy** (dokładnie sprawdzone, nic do zrobienia):
+Animated/Reanimated w CAŁEJ apce (TopPill/AnimatedCardBg/TabBar/StreakFlame/CatArt/Confetti/
+BadgeArt/YearWrappedCard/MonthWrappedCard i więcej) już poprawnie ma `useNativeDriver: true`
+wszędzie gdzie to możliwe (jedyne dwa `useNativeDriver: false` w `boss-fight.tsx` są jawnie
+skomentowane jako wymagane — animują `left`, właściwość layoutu, nie kwalifikującą się do
+native drivera) i każda pętla ma poprawny `.stop()` w cleanupie; `expo-router` już ma
+świadomy code-splitting przez dynamiczny `import()` dla serwisów pobocznych (powiadomienia,
+kalendarz, sync zdrowia, przetwarzanie banku) w kilku ekranach; `react-native-chart-kit` to
+jedyna "ciężka" biblioteka w `package.json`, ale ZERO importów nigdzie (koszt na dysku, nie w
+runtime); serwisy Firestore/backup (`maybeAutoBackup`, `flushPendingExpenseWrites`,
+`drainBankNotifications`, `autoSyncHealth`) są już throttlowane/dedup-gated; `finances.tsx`'s
+`SectionList` już capuje się do ostatniego miesiąca; ~113 miejsc czytających `AsyncStorage`
+wszystkie effect-gated, żadne w ciele renderu; `achievements.tsx` już memoizuje kontekst/stany.
+
+`tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu na urządzeniu**: zakładka
+Pojazdy — rozwijanie/zwijanie karty pojazdu powinno czuć się płynniej przy dłuższej historii
+wydatków; liczby (suma/ten miesiąc/paliwo) identyczne jak wcześniej.
+
+**Podsumowanie kampanii (4 rundy, ta sama sesja)**: notatki (memoizacja listy), wyszukiwarka
+jedzenia (re-normalizacja na klawisz), assety ekwipunku/bossów ×2 (17MB→4MB, potem kolejne
+nowo wgrane pliki), dashboard (7 "deferred" widgetów liczonych mimo stagingu), pupil (animacje
+w tle podczas walki), Nastrój (6 kart analitycznych bez memoizacji + zły selektor store'a),
+Pojazdy (ta sama luka co Nastrój). Świadomie NIE ruszone (udokumentowane, czekają na decyzję):
+rosnący koszt pełnego re-serialize blobu w zustand persist (§15) — duży redesign warstwy
+danych, nie coś do zrobienia po cichu. Zdrowie (`health.tsx`) sprawdzone i świadomie
+zostawione — koszt realnie znikomy. Czwarta runda znalazła jeden, coraz mniejszy fix (klasyczny
+malejący zwrot z kolejnych przebiegów tego samego audytu) — dalsze rundy w tym samym stylu
+zaczęłyby produkować teoretyczne nitpicki zamiast realnych, odczuwalnych problemów.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

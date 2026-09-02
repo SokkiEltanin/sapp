@@ -21,7 +21,7 @@ import { weatherService } from '@/services/weatherService';
 import { Vehicle, VehicleKind, VehicleMaintenance, Expense } from '@/types';
 import {
   summarizeVehicle, expenseMatchesVehicle, mainCarId,
-  maintenanceDueMonths, maintenancePresets,
+  maintenanceDueMonths, maintenancePresets, VehicleSummary,
 } from '@/utils/vehicleMatch';
 import { toast } from '@/store/toastStore';
 import { haptic } from '@/utils/haptics';
@@ -91,6 +91,14 @@ export default function VehiclesScreen() {
   }, []);
 
   const mainId = useMemo(() => mainCarId(vehicles), [vehicles]);
+  // summarizeVehicle() skanuje CAŁĄ historię expenses per pojazd — bez memoizacji liczyło się
+  // od nowa dla KAŻDEGO pojazdu przy KAŻDYM renderze, nawet przy zwykłym expand/collapse karty
+  // (`expanded` to lokalny stan w tym samym komponencie) (2026-09-02, audyt wydajności #4).
+  const summaries = useMemo(() => {
+    const m: Record<string, VehicleSummary> = {};
+    for (const v of vehicles) m[v.id] = summarizeVehicle(v, expenses, mainId);
+    return m;
+  }, [vehicles, expenses, mainId]);
   const setVF = <K extends keyof VForm>(k: K, v: VForm[K]) => setVForm(f => ({ ...f, [k]: v }));
 
   // ── Vehicle CRUD ──────────────────────────────────────────────────────────
@@ -207,7 +215,7 @@ export default function VehiclesScreen() {
             <AnimatedButton onPress={openAddVehicle} label="Dodaj pojazd" icon={<Plus size={16} color={c.bg.primary} />} size="md" />
           </View>
         ) : vehicles.map(v => {
-          const sum = summarizeVehicle(v, expenses, mainId);
+          const sum = summaries[v.id];
           const Icon = KIND_META[v.kind].Icon;
           const isOpen = expanded === v.id;
           const maint = v.maintenance ?? [];
