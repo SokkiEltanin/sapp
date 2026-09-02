@@ -3,6 +3,36 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Connect zakupy→streak w Co zjadłem + tło areny walki — NIEsprawdzone (2026-09-02)
+
+User: "Musimy ogarnąć lepszy connect pomiędzy CO ZJADŁEM a produktami które kupuję żeby jak
+kupię drożdżówkę i ją oflaguję że to pieczywo/słodycz - to jak zaznaczę że ją zjadłem to
+trzeba żeby oflagowało to że zjadłem słodycz i tracę streak" + "Dodałem ekwipunek/zbroję oraz
+ekwipunek/buty, i dodałem LOKACJA_KAMPANIA.png w bosach żebyś wrzucił jako tło do bosów".
+Pełny opis w ARCHITECTURE.md §14. Trzy części:
+1. **Nowa `purchasedCatForName()`** (`src/utils/food.ts`) łączy `ReceiptItem.tags` (paragony)
+   z `FoodProduct.cat` (dziennik jedzenia) — dotąd dwa niepowiązane systemy mimo wspólnego
+   słownika tagów. Podpięta przy tworzeniu NOWEGO produktu w `food/add.tsx`/`food/product.tsx`
+   i przy backfillu w `markFreshMany` (skan paragonu) — nigdy nie nadpisuje już ustawionej
+   kategorii.
+2. **`AVOID_PRESETS.sweets` keyword** (`countersStore.ts`) — konkretny przykład usera
+   (drożdżówka) i tak NIE łapałby się przez powyższe, bo `FOOD_TAG_MAP` celowo kategoryzuje
+   słodkie wypieki jako `'pieczywo'`, nie `'słodycze'` (dla podziału finansowego). Naprawione
+   po nazwie, wzorem istniejącego `'pączek'` — dopisane `drożdż|rogal|kroasan|croissant`.
+3. **Tło areny walki** — `LOKACJA_KAMPANIA.png` (user wgrał bezpośrednio na `master`, razem z
+   PEŁNOROZDZIELCZYMI zbroja/buty PNG-ami zastępującymi stare placeholdery — przeskalowane
+   tym samym skryptem co PR optymalizacyjny, §13). Wpięte jako tło TYLKO w scenie portretów/HP
+   (`boss-fight.tsx`), nie całej karty walki (zmienna wysokość niżej). Kafelki straciły
+   ramki/tło — bossy/kotek stoją bezpośrednio na scenie (user: "wypierdolić ramki... hp jest
+   podspodem"), etykiety dostały text-shadow pod czytelność.
+
+`tsc`/`jest` zielone (67 suit/822 testy — nowe `food.test.ts`/`countersStore.test.ts`).
+**Priorytet testu na urządzeniu**: (a) Co zjadłem → nowy produkt o nazwie = coś wcześniej
+kupione+otagowane jako słodycze/przekąski → streak "Bez X" powinien złapać bez ręcznego
+tagowania; (b) zeskanuj paragon z drożdżówką/rogalem/croissantem, zjedz — streak słodyczy
+powinien pęknąć; (c) walka z dowolnym bossem — widoczne tło areny, kafelki bez ramek, portrety
+"na scenie", HP czytelne pod spodem, pocisk dalej trafia portret (nie pasek HP nad nim).
+
 ## 🆕 Optymalizacja wydajności — audyt + 4 fixy — NIEsprawdzone (2026-09-02)
 
 User: "jak skończysz od razu weź się za optymalizację dalszą apki" (ogólne, bez konkretnego

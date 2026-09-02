@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Trophy, Compass } from 'lucide-react-native';
@@ -10,7 +10,7 @@ import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
-import { attackPng } from '@/utils/bossIcons';
+import { attackPng, CAMPAIGN_ARENA_BG } from '@/utils/bossIcons';
 import Confetti from '@/components/achievements/Confetti';
 import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
@@ -660,8 +660,20 @@ export default function BossFight() {
         ) : (
           <View style={s.arena}>
             {/* dwa symetryczne kafelki — Pupil / Boss. Pupil ma pasek HP w kampanii I wydarzeniu
-                (obie mają realny kontratak) — TYLKO raid go nie ma, pasek zawsze pełny byłby mylący. */}
-            <View style={{ width: '100%', position: 'relative' }}>
+                (obie mają realny kontratak) — TYLKO raid go nie ma, pasek zawsze pełny byłby mylący.
+                Scena walki (2026-09-02, user dostarczył `LOKACJA_KAMPANIA.png`, i: "wypierdolić
+                ramki że bosy stoją na tym... hp jest podspodem") — samo pole portretów/HP dostało
+                tło-obrazek zamiast per-kafelkowej karty; kafelki straciły własne tło/ramkę, bossy/
+                kotek stoją bezpośrednio na scenie, etykieta+pasek HP zostają (cień tekstu pod
+                czytelność, bo tło bywa jasne w miejscach). Reszta karty (motyw/przycisk/mechaniki
+                pod spodem) zostaje na zwykłym tle ekranu — obrazek to STAŁEJ wysokości scena
+                portretów, nie cała, zmiennej wysokości karta walki. */}
+            <ImageBackground
+              source={CAMPAIGN_ARENA_BG}
+              style={s.arenaScene}
+              imageStyle={s.arenaSceneImg}
+              resizeMode="cover"
+            >
             <View style={s.vsRow}>
               <View style={s.tile}>
                 <Text style={s.tileLabel} numberOfLines={1}>Pupil</Text>
@@ -764,7 +776,7 @@ export default function BossFight() {
                 <Image source={counterPng} style={{ width: 28, height: 28 }} resizeMode="contain" />
               </Animated.View>
             )}
-            </View>
+            </ImageBackground>
 
             <Text style={s.bossTaunt}>„{target.taunt}"</Text>
             {/* Tylko HP + motyw (słabość) — BEZ nagrody i mechanik (osłona/regen) przed walką,
@@ -965,12 +977,23 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // nominalny `size`) zamiast osobnej magicznej liczby.
   arena: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
 
+  // Scena portretów/HP (2026-09-02) — STAŁEJ wysokości podkładka pod `LOKACJA_KAMPANIA.png`,
+  // odseparowana od reszty `arena` (motyw/przycisk/mechaniki), której wysokość zmienia się
+  // wraz z liczbą widocznych linijek feedbacku — obrazek areny nigdy się nie rozciąga/kurczy.
+  // BEZ własnego paddingu — geometria wewnątrz (kafelki/portret/pocisk) zostaje DOKŁADNIE
+  // taka jak przed zmianą (patrz `projectile.top`, przeliczony niegdyś wprost z tych
+  // paddingów), tylko nośnikiem tła zamiast płaskiego koloru jest teraz obrazek.
+  arenaScene: { width: '100%', position: 'relative', borderRadius: radius.lg, overflow: 'hidden' },
+  arenaSceneImg: { borderRadius: radius.lg },
+
   vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%' },
-  tile: { flex: 1, minWidth: 0, alignItems: 'center', backgroundColor: c.bg.elevated, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[2], gap: 6 },
-  tileLabel: { fontSize: 12.5, fontWeight: '800', color: c.text.primary },
-  tileHpTrack: { width: '100%', height: 8, borderRadius: 4, backgroundColor: c.bg.primary, overflow: 'hidden' },
+  // Kafelki straciły własne tło/ramkę (2026-09-02, user: "wypierdolić ramki że bosy stoją na
+  // tym... hp jest podspodem") — bossy/kotek stoją bezpośrednio na `arenaScene` powyżej.
+  tile: { flex: 1, minWidth: 0, alignItems: 'center', padding: spacing[2], gap: 6 },
+  tileLabel: { fontSize: 12.5, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  tileHpTrack: { width: '100%', height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.55)', overflow: 'hidden' },
   tileHpFill: { height: '100%', borderRadius: 4, backgroundColor: '#EF4444' },
-  tileHpTxt: { fontSize: 10, fontWeight: '700', color: c.text.muted },
+  tileHpTxt: { fontSize: 10, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   tilePortrait: { height: PORTRAIT_SIZE + 18, width: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },

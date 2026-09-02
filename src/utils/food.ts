@@ -74,6 +74,27 @@ export function foodSubcat(it: ReceiptItem): string {
   return 'inne';
 }
 
+// Bridges "co kupuję" (wydatki/paragony) → "co zjadłem" (dziennik jedzenia): looks up a
+// food-subcat tag (słodycze/pieczywo/…) already assigned to a purchased receipt item
+// with this exact name, so a NEW FoodProduct can inherit it instead of defaulting to
+// no category (which avoid-habit/streak tracking reads via FoodProduct.cat — see
+// matchedEatDays w countersStore.ts). Most recent purchase wins, so a re-tag on a later
+// receipt takes over. Returns undefined (never 'inne') when nothing usable is found, so
+// callers can leave `cat` alone instead of forcing a guess.
+export function purchasedCatForName(name: string, expenses: Expense[]): string | undefined {
+  const key = normalizeProductName(name);
+  if (!key) return undefined;
+  const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
+  for (const e of sorted) {
+    for (const it of e.receiptItems ?? []) {
+      if (normalizeProductName(it.name) !== key) continue;
+      const sc = foodSubcat(it);
+      if (sc !== 'inne') return sc;
+    }
+  }
+  return undefined;
+}
+
 // How much of an expense is FOOD: with items → sum food lines; without items but the
 // whole expense is groceries → the whole amount (can't break it down); else 0.
 export function foodAmountOf(e: Expense): number {

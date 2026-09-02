@@ -5,7 +5,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Check, Link2, Search, X, Trash2 } from 'lucide-react-native';
 
 import { useFoodStore, FoodUnit } from '@/store/foodStore';
-import { FOOD_SUBCATS } from '@/utils/food';
+import { FOOD_SUBCATS, purchasedCatForName } from '@/utils/food';
+import { Expense } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
 import { spacing, radius, colors } from '@/theme';
@@ -40,6 +41,7 @@ export default function FoodProductForm() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkQuery, setLinkQuery] = useState('');
   const [purchased, setPurchased] = useState<string[]>([]);
+  const [purchasedExpenses, setPurchasedExpenses] = useState<Expense[]>([]);
 
   // prefill on edit / from a passed name
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function FoodProductForm() {
   // purchased product names (from receipts) for the optional link
   useEffect(() => {
     Promise.all([expensesService.getAll(), loadNameAliases()]).then(([exps, aliases]) => {
+      setPurchasedExpenses(exps);
       const map = new Map<string, string>();
       for (const e of exps) for (const it of (e.receiptItems ?? [])) {
         const nm = canonicalProductName(it.name ?? '', aliases);
@@ -70,6 +73,16 @@ export default function FoodProductForm() {
       setPurchased([...map.values()].sort((a, b) => a.localeCompare(b, 'pl')));
     }).catch(() => {});
   }, []);
+
+  // Auto-sugestia kategorii z historii zakupów (2026-09-02, user: "kupię drożdżówkę i ją
+  // oflaguję że to pieczywo/słodycz - jak zaznaczę że zjadłem to trzeba żeby oflagowało że
+  // zjadłem słodycz i tracę streak"). Tylko dla NOWEGO produktu bez jeszcze wybranej
+  // kategorii — nigdy nie nadpisuje edytowanego produktu ani świadomego wyboru usera.
+  useEffect(() => {
+    if (editing || cat || !name.trim()) return;
+    const suggested = purchasedCatForName(name, purchasedExpenses);
+    if (suggested) setCat(suggested);
+  }, [name, editing, cat, purchasedExpenses]);
 
   const linkResults = useMemo(() => {
     const q = normalizeProductName(linkQuery);

@@ -95,7 +95,12 @@ export function eventProgress(c: Counter, now = Date.now()): number {
 
 // ── Auto "days without X" — tracked from purchases ──────────────────────────
 export const AVOID_PRESETS: { key: string; label: string; keyword: string }[] = [
-  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|toffi|chips|chrupk|paluszk' },
+  // 'drożdż'/'rogal'/'kroasan'/'croissant' (2026-09-02, user: "kupię drożdzówkę i ją
+  // oflaguję że to pieczywo/słodycz - jak zaznaczę że zjadłem to trzeba żeby oflagowało") —
+  // te słodkie wypieki są kategoryzowane jako 'pieczywo' w FOOD_TAG_MAP (finansowy podział
+  // wydatków celowo NIE dubluje ich do słodyczy), więc kategoria produktu im nie pomoże;
+  // złapane tu, po nazwie, tym samym wzorcem co już istniejące 'pączek'.
+  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|drożdż|drozdz|rogal|kroasan|croissant|toffi|chips|chrupk|paluszk' },
   { key: 'fastfood', label: 'fast foodów', keyword: 'mcdonald|kfc|pizza|burger|kebab|kebap|frytk|sushi|glovo|wolt|telepizza|bobby' },
   { key: 'alcohol',  label: 'alkoholu',    keyword: 'piwo|wino|wódka|wodka|whisky|drink|alkohol|browar|cydr|tyskie|żubr|zubr|lech ' },
   { key: 'energy',   label: 'energetyków', keyword: 'monster|red bull|redbull|tiger energy|energetyk|rockstar|burn ' },

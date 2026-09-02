@@ -13,6 +13,8 @@ import {
 import { searchFoodBase } from '@/data/foodBase';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { normalizeProductName } from '@/utils/productMemory';
+import { purchasedCatForName } from '@/utils/food';
+import { useExpensesStore } from '@/store/expensesStore';
 import { spacing, radius, colors } from '@/theme';
 import { fonts } from '@/theme/fonts';
 import { useColors } from '@/theme/useColors';
@@ -71,6 +73,8 @@ export default function FoodAdd() {
   const s = useMemo(() => makeS(c), [c]);
 
   const products            = useFoodStore(st => st.products);
+  const findProductByName   = useFoodStore(st => st.findProductByName);
+  const expenses            = useExpensesStore(st => st.expenses);
   const presets             = useFoodStore(st => st.presets);
   const storeMeals          = useFoodStore(st => st.meals);
   const addMeal             = useFoodStore(st => st.addMeal);
@@ -423,10 +427,20 @@ export default function FoodAdd() {
     const k100 = parseFloat(kcal100.replace(',', '.'));
     let productId = sel.productId;
     if (!productId) {
+      // Zjedzone po raz pierwszy — jeśli to samo (po nazwie) było już kiedyś kupione i
+      // otagowane na paragonie (np. "drożdżówka" → słodycze), nowy produkt dziedziczy tę
+      // kategorię, żeby streak "Bez słodyczy" łapał go od razu, bez ręcznego tagowania
+      // drugi raz. Tylko gdy produkt jeszcze NIE ma kategorii — nigdy nie nadpisuje
+      // świadomego wyboru usera (i nigdy nie wysyła `cat: undefined`, bo `upsertProductByName`
+      // aktualizujący JUŻ istniejący produkt spreaduje seed wprost na patch — jawny `undefined`
+      // wyczyściłby istniejącą kategorię).
+      const existingByName = findProductByName(sel.name);
+      const catSeed = (!existingByName?.cat) ? purchasedCatForName(sel.name, expenses) : undefined;
       const p = upsertProductByName(sel.name, {
         kcalPer100g: k100 > 0 ? k100 : sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
         protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100, sugar100: sel.sugar100,
         unitGrams: sel.unitGrams, defaultUnit: unit, fromBase: sel.source === 'base',
+        ...(catSeed ? { cat: catSeed } : {}),
       });
       productId = p.id;
     } else if (k100 > 0 && k100 !== sel.kcalPer100g) {
@@ -456,7 +470,9 @@ export default function FoodAdd() {
     const name = mName.trim();
     const kcal = Math.round(parseFloat(mKcal.replace(',', '.')));
     if (!name || !(kcal > 0)) return;
-    const p = upsertProductByName(name, { kcalPerPortion: kcal, defaultUnit: 'porcja' });
+    const existingByName = findProductByName(name);
+    const catSeed = (!existingByName?.cat) ? purchasedCatForName(name, expenses) : undefined;
+    const p = upsertProductByName(name, { kcalPerPortion: kcal, defaultUnit: 'porcja', ...(catSeed ? { cat: catSeed } : {}) });
     setItems(prev => [...prev, { name, productId: p.id, qty: 1, unit: 'porcja', grams: 0, kcal }]);
     setManual(false); setMName(''); setMKcal('');
   };
