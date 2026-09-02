@@ -2318,6 +2318,13 @@ export default function DashboardScreen() {
 
   // ── Fun facts / advanced analytics from all shopping data ──────────────────
   const funFacts = useMemo(() => {
+    // Staged render (2026-09-02) — ta sekcja i tak nie renderuje się przed `deferredReady`
+    // (patrz `DEFERRED_SECTIONS`/gate przy `nodes[id]` niżej), ale SAM useMemo liczył się
+    // bez względu na to (hooki React lecą zawsze, niezależnie od tego co zwraca render) —
+    // skanował CAŁĄ historię `expenses` na pierwszej, "ważnej" klatce, dokładnie ten koszt
+    // który staging miał odłożyć. Wczesny return pustej listy aż `deferredReady` faktycznie
+    // przełączy się na true (dep w tablicy niżej) naprawia to bez zmiany reszty logiki.
+    if (!deferredReady) return [];
     // Non-obvious, data-driven insights you CAN'T read off the other tiles.
     const WD = ['niedzielę', 'poniedziałek', 'wtorek', 'środę', 'czwartek', 'piątek', 'sobotę'];
     const monthKey = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
@@ -2415,12 +2422,13 @@ export default function DashboardScreen() {
     if (stepFact) facts.unshift({ icon: 'footprints', label: `W tym miesiącu przeszedłeś ${stepFact}` });
 
     return facts.slice(0, 8);
-  }, [expenses, nameAliases, scope, healthDays]);
+  }, [deferredReady, expenses, nameAliases, scope, healthDays]);
 
   // ── Weight ciekawostka: kg per food group THIS MONTH, with top-2 breakdown ──
   // e.g. "10 kg sera — 4 kg gouda, 6 kg cesarski". Best-effort: only weighed
   // items (fractional quantity = kg) of the same tag group are summed.
   const weightFacts = useMemo(() => {
+    if (!deferredReady) return [];   // patrz komentarz przy `funFacts` — sam staging JSX
     const monthKey = `${new Date().getFullYear()}-${pad(new Date().getMonth() + 1)}`;
     const GROUPS: { tag: string; label: string }[] = [
       { tag: 'nabiał', label: 'sera/nabiału' },
@@ -2465,10 +2473,11 @@ export default function DashboardScreen() {
       out.push(`Ten miesiąc: ${kg.toFixed(1).replace('.0', '')} kg ${g.label}${parts.length ? ` — ${parts.join(', ')}` : ''}`);
     }
     return out;
-  }, [expenses, nameAliases, weightMemory, scope]);
+  }, [deferredReady, expenses, nameAliases, weightMemory, scope]);
 
   // ── Cross-metric correlations (#16): sleep / steps / mood / daily spend ──────
   const correlations = useMemo(() => {
+    if (!deferredReady) return [];   // patrz komentarz przy `funFacts` — sam staging JSX
     const spendByDay: Record<string, number> = {};
     for (const e of expenses) {
       if (e.type === 'income') continue;
@@ -2488,7 +2497,7 @@ export default function DashboardScreen() {
       });
     });
     return correlationInsights(points);
-  }, [expenses, healthDays, moodByDay]);
+  }, [deferredReady, expenses, healthDays, moodByDay]);
 
   // ── Top 3 most-bought products (by # of receipt appearances) ──────────────
   // Grouped by CANONICAL identity so OCR variants / cross-store spellings of the
@@ -2528,6 +2537,7 @@ export default function DashboardScreen() {
   // „Co na Ciebie wpływa" — powiązania (Pearson) między sen/energia/humor/słodycze/praca/kroki/
   // pogoda z ostatnich 30 dni. Buduje metryki per-dzień z danych, które dashboard już ma.
   const insightLinks = useMemo(() => {
+    if (!deferredReady) return [];   // patrz komentarz przy `funFacts` — sam staging JSX
     const wcol = workSettings.workColor;
     const wp = workSettings.workPrefix?.trim().toLowerCase();
     const hasWork = !!(wcol || wp);
@@ -2568,11 +2578,17 @@ export default function DashboardScreen() {
       });
     }
     return strongestLinks(days);
-  }, [expenses, moodByDay, healthDays, allEvents, workSettings, scope, weatherByDay]);
+  }, [deferredReady, expenses, moodByDay, healthDays, allEvents, workSettings, scope, weatherByDay]);
 
   // "Jedzenie — rozkład": this month's FOOD spend (food lines only) split by week-of-month,
   // by day-of-week, and by food subcategory (mięso/nabiał/…).
   const foodBreakdown = useMemo(() => {
+    // Pusty stub aż `deferredReady` (patrz komentarz przy `funFacts`) — BEZPIECZNY mimo że
+    // `foodSel`/`foodSelYm` niżej czytają z tego obiektu bezwarunkowo: jedyne miejsce, gdzie
+    // realnie się w nie wgryza (modal `{foodCat && ...}`, linia ~4545) nie może się otworzyć
+    // zanim karta "Jedzenie — rozkład" (sama zagatowana za `deferredReady`) w ogóle wyrenderuje
+    // przycisk do jej otwarcia — `foodCat` startuje jako `null`.
+    if (!deferredReady) return { months: [] as { ym: string; label: string; total: number }[], mk: '', display: {} as Record<string, { total: number; weeks: number[]; dow: number[]; subRows: [string, number][]; subItems: Record<string, Record<string, number>>; subSrc: Record<string, Record<string, { id: string; date: string }[]>>; name: string }>, prevTotal: 0 };
     const now = new Date();
     const y = now.getFullYear(), mo = now.getMonth();
     const mk = `${y}-${pad(mo + 1)}`;
@@ -2630,7 +2646,7 @@ export default function DashboardScreen() {
     const months = monthKeys.map(k => ({ ym: k, label: MONTH_SHORT[parseInt(k.slice(5, 7), 10) - 1], total: perMonth[k].total }));
     const prevMk = monthKeys[4];
     return { months, mk, display, prevTotal: perMonth[prevMk]?.total ?? 0 };
-  }, [expenses, scope, nameAliases, nonFoodVer]);
+  }, [deferredReady, expenses, scope, nameAliases, nonFoodVer]);
 
   // The month the food widget is currently showing (null = bieżący).
   const foodSelYm = foodMonthSel ?? foodBreakdown.mk;
@@ -2659,6 +2675,7 @@ export default function DashboardScreen() {
   // "Kolekcja sklepów" — where you shop as a collection: distinct stores, favourite
   // (most visits), and the most recently discovered new one.
   const shopsCollection = useMemo(() => {
+    if (!deferredReady) return { rows: [] as [string, number][], total: 0, fav: null as [string, number] | null, newest: null as { name: string; date: string } | null };
     const counts: Record<string, number> = {};
     const firstSeen: Record<string, string> = {};
     for (const e of expenses) {
@@ -2672,12 +2689,13 @@ export default function DashboardScreen() {
     const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const newest = Object.entries(firstSeen).sort((a, b) => b[1].localeCompare(a[1]))[0];
     return { rows, total: rows.length, fav: rows[0] ?? null, newest: newest ? { name: newest[0], date: newest[1] } : null };
-  }, [expenses, nonShopVer]);
+  }, [deferredReady, expenses, nonShopVer]);
 
   // BUG FIX (2026-08-26, user: "wydaje mi się że liczy ile razy coś kupiłem ale nie bierze
   // pod uwagę ile sztuk na każdym paragonie") — count musi sumować `it.quantity`, nie +1 za
   // każdą linię paragonu. Ten sam wzorzec co `exportAnalysis.ts`'s topProducts.
   const topProducts = useMemo(() => {
+    if (!deferredReady) return [];   // patrz komentarz przy `funFacts` — sam staging JSX
     const count: Record<string, number> = {};
     const spent: Record<string, number> = {};
     const names: Record<string, string[]> = {};                    // original canon names per group
@@ -2710,7 +2728,7 @@ export default function DashboardScreen() {
           .sort((a, b) => b[1] - a[1])
           .map(([n, cc]) => ({ name: n, count: cc })),
       }));
-  }, [expenses, nameAliases, scope]);
+  }, [deferredReady, expenses, nameAliases, scope]);
 
   // ── Floating Lifebar ──────────────────────────────────────────────────────
   // ─── Render ───────────────────────────────────────────────────────────────

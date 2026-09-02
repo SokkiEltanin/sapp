@@ -3133,6 +3133,56 @@ croissantem, zjedz, sprawdź że łamie streak słodyczy; (c) dowolna walka boss
 mieć widoczne tło (loch/arena), kafelki BEZ ramek, portrety stoją "na scenie", HP pod spodem
 czytelne; sprawdź że pocisk (łapka/broń bossa) dalej trafia w środek portretu, nie w pasek HP.
 
+## 15. Optymalizacja wydajności, runda 2 — 2026-09-02
+
+Kontynuacja §13 (user: "optymalizuj dalej" po ogarnięciu poprzedniej listy). Statyczny audyt
+(bez profilera na urządzeniu) skupiony na obszarach NIE pokrytych w §13.
+
+**Realny fix — dashboard "deferred" sekcje liczyły się mimo stagingu.** `DEFERRED_SECTIONS`
+(§ „Snapshot statystyk"/dashboard, `app/(tabs)/index.tsx`) + `deferredReady` (flip via
+`InteractionManager.runAfterInteractions`, 2026-08-24) gatują TYLKO co zwraca JSX
+(`if (!deferredReady && (DEFERRED_SECTIONS.has(id) ...)) return null` przy budowie `nodes`) —
+ale hooki Reacta lecą ZAWSZE, niezależnie od tego co komponent finalnie zwraca. Siedem
+`useMemo` karmiących wyłącznie te sekcje — `funFacts`/`weightFacts` (→'fun-facts'),
+`correlations` (→'correlations'), `insightLinks` (→'insights-web'), `foodBreakdown`
+(→'food-breakdown'), `shopsCollection` (→'shops-collection'), `topProducts`
+(→'top-products') — i tak skanowały CAŁĄ historię `expenses` (część z zagnieżdżoną pętlą po
+`receiptItems`) na KAŻDYM renderze, w tym na samej pierwszej, "ważnej" klatce, którą staging
+miał odciążyć. Naprawione: każdy dostał `if (!deferredReady) return <pusty stub>;` jako
+pierwszą linię ciała + `deferredReady` w tablicy zależności — realne przeliczenie odpala się
+DOPIERO gdy `InteractionManager` faktycznie da znać, dokładnie tak jak zamierzał oryginalny
+staging. Zero zmiany w tym KIEDY user widzi te sekcje (i tak nie renderowały się przed
+`deferredReady`) — usunięty tylko marnowany CPU na liczenie czegoś, co i tak było odrzucane.
+Jedna subtelność: `foodBreakdown`'s stub ma puste `display: {}`, a `foodSelYm`/`foodSel`
+(pochodne, liczone bezwarunkowo zaraz pod memo) czytają z niego bez opcjonalnego chainingu —
+bezpieczne mimo to, bo jedyne miejsce, które realnie się w nie wgryza (modal `{foodCat && …}`)
+nie może się otworzyć zanim karta „Jedzenie — rozkład" (sama zagatowana) w ogóle wyrenderuje
+przycisk do jego otwarcia (`foodCat` startuje jako `null`).
+
+**Sprawdzone, dead end (już OK)**: start apki (`_layout.tsx` — żaden z ~15 `useEffect` nie
+blokuje pierwszej klatki, `onRehydrateStorage` hooki robią tylko małe, ograniczone fixupy);
+inne listy poza notatkami (subscriptions/templates/vehicles/pet-quests/achievements/
+notifications/bosses-codex — wszystkie naturalnie małe lub ograniczone katalogiem, nie rosną
+bez ograniczeń z historią usera); nowo wgrane PNG-i bossów (wilk/osa/kraken/upior) — FAŁSZYWY
+alarm pierwszej rundy audytu, to już MOJE własne przeskalowane 600×600 wersje z §13, nie
+ponowny upload oryginałów (zweryfikowane bajt-po-bajcie).
+
+**🔴 ZNALEZIONE, NIE naprawione — czeka na decyzję usera** (patrz NEXT_STEPS.md): zustand
+`persist` re-serializuje (`JSON.stringify`) CAŁY rosnący blob `expenses`/`meals`/`products`
+przy KAŻDEJ pojedynczej mutacji (dodanie jednego wydatku/posiłku), zanim trafi do throttlingu
+częstotliwości zapisu (`throttledStorage.ts` — ten koalescuje TYLE zapisów, nie ich ROZMIAR).
+Symetrycznie: cold-start rehydracja parsuje ten sam, rosnący blob przy każdym starcie apki.
+Koszt rośnie z wiekiem konta (setki wydatków/posiłków u aktywnych userów), nie jest to bug
+tylko architektura — realna naprawa (archiwizacja starych wpisów / podział na klucze/paginacja
+w AsyncStorage) to spory, ryzykowny redesign warstwy danych, nie coś do zrobienia po cichu przy
+okazji audytu wydajności.
+
+`tsc`/`jest` zielone (67 suit/822 testy — bez nowych testów, czysto wydajnościowy fix bez nowej
+logiki biznesowej). **Priorytet testu na urządzeniu**: otwórz dashboard po dłuższej przerwie
+(zimny start) — sekcje z `DEFERRED_SECTIONS` powinny pojawić się tak samo jak wcześniej (delikatnie
+później niż "ważne" sekcje), ale sam dashboard powinien poczuć się responsywniej na pierwszej
+klatce, zwłaszcza na koncie z dużą historią wydatków.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
