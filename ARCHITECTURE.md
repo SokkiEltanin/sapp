@@ -3323,6 +3323,45 @@ kup/ustaw działa tak samo jak wcześniej w sklepie, podgląd animacji na górze
 z wylosowanym startupem dalej działa (modal "NOWY STARTUP!"); (c) dowolna walka — tło areny
 wygląda identycznie jak przed tą zmianą (to czysto przygotowanie pod przyszłość, nie redesign).
 
+## 19. Foldery assetów bossów/lokalizacji — posegregowane jak ekwipunek — 2026-09-02
+
+User zapowiedział nową grafikę Rynku (2 warstwy + sklepikarz między nimi) i poprosił NA RAZIE
+o dwie rzeczy: (1) posegregować foldery assetów jak `assets/ekwipunek/<slot>/`, (2)
+zaprojektować "sklepikarza" (kotek w przebraniu za ladą). Ten wpis dotyczy (1) — (2) osobno,
+patrz niżej / kolejny PR.
+
+**`assets/ikonybosów/` (43 pliki, mieszanka wszystkiego) + `assets/minibosses/` (8 plików)
+→ `assets/bossy/{kampania,questy,eventy-rajdy,umiejetnosci}/` + `assets/lokalizacje/`.**
+Wszystkie pliki przeniesione przez `git mv` (historia gita zachowana, widoczne jako
+`renamed` nie `deleted+added`). Podział wg REALNEGO id/mechaniki (nie nazwy pliku):
+- **`kampania/`** — 22 bossów kampanii (`sloth`...`wizard`) + `BOSS_atakfire_adventure.png`
+  (martwy plik bez odpowiadającego id w `BOSSES` — zostawiony, może się przyda na przyszłego
+  bossa).
+- **`questy/`** — minibossy questowe: `mb_capybara/duck/shark/harpy/macaws/snake` (dawne
+  `assets/minibosses/`) + `mb_wilk/grizzly/osa` (dawniej luzem w `ikonybosów/`) +
+  `MINIBOSS_goat.png`/`MINIBOSS_whale.png` (martwe, wycofane z rotacji 2026-08-26 — zostawione
+  na wypadek powrotu do puli).
+- **`eventy-rajdy/`** — user połączył sezonowe eventy (`wakacje/wiosna/jesien/zima`) I raid
+  (`kraken/golem/phantom` + ich warianty `MADBOSS_*`) w JEDNĄ zakładkę, więc jeden folder.
+- **`umiejetnosci/`** — ikony ataku bossów (`BOSSATTACK_*`, pocisk kontrataku w
+  `boss-fight.tsx`) + `BOSSATTACK_bomb.png` (martwy, po usuniętym efekcie z 2026-08-18).
+- **`assets/lokalizacje/`** — `LOKACJA_KAMPANIA.png` (tło areny, patrz §18's `arenaBgFor`) —
+  przyszłe `LOKACJA_QUEST/EVENT/MAD.png` też tu trafią.
+
+3 bossy raidu (`behemoth`/`wyrm`/`siren`) POŻYCZAJĄ art z folderu `kampania/` (dzielą motyw z
+`sugar`/`dragon`/`drought`, patrz istniejący komentarz w `bossIcons.ts`) — ich `require()`
+wskazuje przez folder, to nie błąd, po prostu pożyczony plik mieszka gdzie indziej niż
+własny id boss'a. Wszystkie `require()` w `src/utils/bossIcons.ts` zaktualizowane (jedyne
+miejsce w kodzie, gdzie te ścieżki żyją — reszta plików ma tylko historyczne komentarze
+wspominające starą nazwę folderu, celowo nietknięte, to opis PRZESZŁYCH wydarzeń).
+
+`tsc`/`jest` zielone (67 suit/822 testy, bez zmian w testach — czysty przenos plików + zmiana
+ścieżek). Zweryfikowane skryptem: każdy `require()` w `bossIcons.ts` wskazuje na realnie
+istniejący plik pod nową ścieżką. **Priorytet testu na urządzeniu**: dowolny ekran z bossami
+(kampania/raid/event/quest/MAD/misja) i dowolna walka — WSZYSTKIE portrety/ikony ataku/tło
+areny powinny wyglądać DOKŁADNIE tak jak przed tą zmianą (to czysty przenos plików, zero
+zmiany w tym co się renderuje).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

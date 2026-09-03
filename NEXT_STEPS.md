@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Foldery bossów/lokalizacji posegregowane jak ekwipunek — NIEsprawdzone (2026-09-02)
+
+User zapowiedział nową grafikę Rynku (2 warstwy + sklepikarz) i poprosił o dwie rzeczy: (1)
+posegregować foldery — ZROBIONE (patrz ARCHITECTURE.md §19): `assets/ikonybosów/` (mieszanka
+43 plików) + `assets/minibosses/` → `assets/bossy/{kampania,questy,eventy-rajdy,umiejetnosci}/`
++ `assets/lokalizacje/`, wszystkie `require()` w `bossIcons.ts` zaktualizowane, czysty przenos
+bez zmiany czegokolwiek widocznego. (2) Zaprojektować "sklepikarza" — kotek w przebraniu
+(wąsy-inkognito, kapelusik z uszami na wierzchu, bez lizania/reakcji-na-głaskanie, ale z
+rozglądaniem, inny kolor) stojący za ladą w sklepie — **W TRAKCIE, osobny wpis/PR gdy
+gotowe**. `tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu na urządzeniu**: dowolna
+walka z dowolnym bossem — wszystko powinno wyglądać identycznie jak wcześniej (czysty przenos
+plików).
+
 ## 🆕 Startupy → PetCustomizeModal + przygotowanie teł areny per typ — NIEsprawdzone (2026-09-02)
 
 User: "przeniosłeś z rynku pupila startupy na [modal z edycją imienia/kolorów]?" → "tak ogarnij
