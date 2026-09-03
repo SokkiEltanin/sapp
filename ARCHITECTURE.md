@@ -3362,6 +3362,53 @@ istniejący plik pod nową ścieżką. **Priorytet testu na urządzeniu**: dowol
 areny powinny wyglądać DOKŁADNIE tak jak przed tą zmianą (to czysty przenos plików, zero
 zmiany w tym co się renderuje).
 
+## 20. "Sklepikarz" — CatArt w przebraniu za ladą — 2026-09-03
+
+Część 2 zapowiedzianego Rynku (§19 to część 1). User: "sklepikarz to będzie nasz ten
+kotek tylko go ubierzemy w wąsy takie (jakby byl inkognito) kapelusik przez który będą mu
+uszka wystawały, wyłączymy mu animacje lizania i głaskanie... rozgladanie mu zostaje tylko
+zeby nie byl zbyt statyczny... zeby go odróżnić będzie on miał kolor specyficzny". Zero
+nowego komponentu — to jest `CatArt` z nowym propem.
+
+**`CatArt.tsx` — nowy prop `shopkeeper?: boolean` (domyślnie `false`):**
+- Renderuje wąsy (fałszywy handlebar-mustache, stały kolor `#241A10`, niezależny od
+  `palette` — to kostium, nie futro) + kapelusz (rondo/daszek/pasek/klamra, odcienie brązu)
+  jako nowe elementy WEWNĄTRZ `<Svg>`, narysowane na samym końcu (po oczach/ustach/wąsach/
+  ikonach chorego-smutnego) — więc leżą na wierzchu twarzy.
+- **Uszy automatycznie wychodzą na wierzch kapelusza za darmo** — `<Ear>` to osobny
+  overlay renderowany PO zamknięciu `<Svg>` (już taki był layer order, patrz komentarz przy
+  `<Ear side="R">`/`<Ear side="L">` ~L610), więc kapelusz narysowany WEWNĄTRZ Svg zawsze
+  będzie pod uszami bez żadnej dodatkowej maski/cutout.
+- Wyłącza auto-lizanie: idle-lick `useEffect` (był gated `[animate, asleep, angry,
+  licking]`) ma teraz `|| shopkeeper` w warunku wyjścia + w deps.
+- Wyłącza reakcje na dotyk/przytulanie: `onTap`/`doCuddle` (wewnętrzne handlery
+  `Pressable`, odpalają się ZAWSZE niezależnie od tego czy caller podał `onPress`) mają
+  teraz `|| shopkeeper` w guard-clause — więc tap na sklepikarza nie odpala hop/wiggle/
+  serduszek/purr-wibracji/half-lid oczu.
+- **Świadomie NIE dotknięte**: breathe/blink/idle-glance/idle-ear-flutter — user explicit:
+  "rozgladanie mu zostaje tylko zeby nie byl zbyt statyczny". Sklepikarz oddycha, mruga,
+  łypie okiem i strzyże uchem tak samo jak zwykły kotek — tylko nie liże się i nie reaguje
+  na tapnięcia.
+
+**`catPalettes.ts` — nowy `SHOPKEEPER_PALETTE` (poza `CAT_PALETTES`, gracz go nie kupuje/
+zakłada):** stały ciepły tan (`#C9A876`), dobrany żeby wizualnie różnić się od wszystkich
+10 kupowalnych presetów (najbliżsi sąsiedzi: ginger `#EDA968`, brown `#A97B54` — ten jest
+jaśniejszy/bardziej wyszarzony niż oba) — niezależnie jaki kolor gracz wybrał SWOJEMU
+kotkowi, sklepikarz zawsze będzie inny. `shade()` wyeksportowane z `catPalettes.ts` (było
+prywatne) żeby policzyć `shade`/`ear` tej palety tym samym wzorem co reszta presetów.
+
+Weryfikacja wizualna: zbudowana statyczna replika SVG (te same ścieżki co w `CatArt.tsx`)
+wyrenderowana przez `playwright screenshot` — zanim cokolwiek trafiło do prawdziwego
+komponentu, zobaczyłem jak mustache/hat/ears-on-top wygląda naprawdę, iterując kształt
+wąsów (draft 1 → wyraźniejszy handlebar z zawiniętymi końcówkami) i głębię kapelusza
+(dodany highlight + klamra na pasku) zanim wkleiłem finalne ścieżki do `CatArt.tsx`.
+
+**Priorytet testu na urządzeniu**: `<CatArt shopkeeper palette={SHOPKEEPER_PALETTE} .../>`
+gdziekolwiek zostanie użyty (przyszły ekran Rynku, jeszcze nie podpięty — user ma dopiero
+przysłać grafikę tła/slotów) — sprawdzić że wąsy/kapelusz/uszy wyglądają dobrze w
+rzeczywistej skali `size` (SVG-owe ścieżki liczone ręcznie z viewBox 2000×2000, nie testowane
+w RN, tylko w przeglądarce) i że tap na niego faktycznie nic nie robi (brak serduszek/hop).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

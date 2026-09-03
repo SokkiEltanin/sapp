@@ -49,7 +49,7 @@ function mouthFor(expr: PetExpression, angry: boolean, soft: boolean, ink: strin
 export default function CatArt({
   size = 150, expression = 'happy', animate = true, onPress, onLongPress, celebrate = 0, affection = 0,
   palette = DEFAULT_PALETTE, stripes = false, onAngry, lively = false,
-  eyeColor = '', noseColor = '', whiskers = false, legStripes = false, attack = 0,
+  eyeColor = '', noseColor = '', whiskers = false, legStripes = false, attack = 0, shopkeeper = false,
 }: {
   size?: number; expression?: PetExpression; animate?: boolean; onPress?: () => void;
   onLongPress?: () => void;   // hold = a distinct "cuddle" (paw-lick + hearts + long purr)
@@ -61,6 +61,13 @@ export default function CatArt({
   whiskers?: boolean;  // wąsy
   legStripes?: boolean; // pręgi na łapkach
   attack?: number;     // increment to make the cat swat + pull a battle face (boss fights)
+  // "Sklepikarz" — the market stall persona (2026-09-03): fałszywe wąsy + kapelusik z
+  // uszami wystającymi na wierzchu (mustache/hat są rysowane w SVG, więc siedzą POD
+  // overlayem `Ear` renderowanym niżej — stąd uszy zawsze wychodzą na wierzch bez
+  // dodatkowej maski). Wyłącza auto-lizanie i reakcje na dotyk/przytulanie (kotek za ladą
+  // nie jest tapowalnym zwierzakiem) — ale NIE dotyka breathe/blink/glance/ear-flutter,
+  // żeby nie był statyczny (user: "rozgladanie mu zostaje tylko zeby nie byl zbyt statyczny").
+  shopkeeper?: boolean;
 }) {
   const p = palette;
   const breathe = useRef(new Animated.Value(0)).current;
@@ -201,12 +208,12 @@ export default function CatArt({
     ]).start(() => setLicking(false));
   };
   useEffect(() => {
-    if (!animate || asleep) return;
+    if (!animate || asleep || shopkeeper) return;
     let t: any;
     const loop = () => { t = setTimeout(() => { if (!angry && Math.random() < 0.6) doLick(); loop(); }, 12000 + Math.random() * 10000); };
     loop();
     return () => clearTimeout(t);
-  }, [animate, asleep, angry, licking]);
+  }, [animate, asleep, angry, licking, shopkeeper]);
 
   // ── angry ──
   const doSwat = (vibrate: boolean = true) => {
@@ -267,7 +274,7 @@ export default function CatArt({
   // slower move), a warmer shower of hearts drifts up, a longer soft purr buzzes, and it
   // keeps content half-lidded eyes for a beat. Reads clearly as "mizianie", not a poke.
   const doCuddle = () => {
-    if (asleep || angry) return;
+    if (asleep || angry || shopkeeper) return;
     taps.current = [];                       // a deliberate cuddle shouldn't count toward anger
     doLick();
     setPetting(true);
@@ -278,7 +285,7 @@ export default function CatArt({
   };
 
   const onTap = () => {
-    if (angry) return;
+    if (angry || shopkeeper) return;
     const now = Date.now();
     // Anger needs deliberate fast tapping but should be reachable. 7-in-4s snapped during
     // normal petting; 20-in-2.5s (8/sec) was too hard to sustain. 12 in 2.5s (~5/sec) is
@@ -515,6 +522,25 @@ export default function CatArt({
                 )}
                 {expression === 'sad' && <Path d="M726 838 q-40 74 0 116 q40 -40 0 -116 z" fill="#5AB0F0" stroke="#3E93D8" strokeWidth={5} />}
                 {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
+                {/* "sklepikarz" disguise — fake handlebar mustache + hat. Fixed costume
+                    colours (not palette-driven): a fake mustache/hat wouldn't match the
+                    cat's own fur anyway. Drawn LAST inside the SVG (after eyes/mouth) so it
+                    sits on top of the face, and — crucially — the hat is drawn INSIDE this
+                    <Svg>, which closes below BEFORE the <Ear> overlays render, so the ears
+                    automatically poke out on top of the brim with no extra cutout math. */}
+                {shopkeeper && (
+                  <G>
+                    <G fill="#241A10" opacity={0.94}>
+                      <Path d="M985 884 C 964 864, 930 852, 888 856 C 856 859, 828 872, 812 892 C 806 900, 806 908, 812 912 C 820 917, 830 913, 838 904 C 854 885, 878 874, 906 872 C 928 870, 948 876, 962 890 Z" />
+                      <Path d="M985 884 C 1006 864, 1040 852, 1082 856 C 1114 859, 1142 872, 1158 892 C 1164 900, 1164 908, 1158 912 C 1150 917, 1140 913, 1132 904 C 1116 885, 1092 874, 1064 872 C 1042 870, 1022 876, 1008 890 Z" />
+                    </G>
+                    <Ellipse cx={960} cy={640} rx={330} ry={70} fill="#2E2620" />
+                    <Path d="M700 640 Q700 430 960 400 Q1220 430 1220 640 Z" fill="#3A3128" />
+                    <Path d="M760 632 Q772 470 940 410 Q820 460 800 632 Z" fill="#463C31" opacity={0.55} />
+                    <Rect x={700} y={600} width={520} height={46} fill="#241A10" />
+                    <Rect x={928} y={596} width={64} height={54} rx={6} fill="#171310" />
+                  </G>
+                )}
               </G>
             </Svg>
 
