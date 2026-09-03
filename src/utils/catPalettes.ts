@@ -23,7 +23,7 @@ export interface CatPalette {
   cost: number;   // coins; the starting coat is free
 }
 
-function shade(hex: string, amt: number): string {
+export function shade(hex: string, amt: number): string {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   const f = (c: number) => Math.max(0, Math.min(255, Math.round(amt > 0 ? c + (255 - c) * amt : c * (1 + amt))));
@@ -82,3 +82,16 @@ export function paletteById(id?: string): CatPalette {
 // read as stickers; stripes work because they run ACROSS the shape).
 export const STRIPES_ID = 'stripes';
 export const STRIPES_COST = 45;
+
+// "Sklepikarz" (2026-09-03) — the market-stall NPC cat (see CatArt's `shopkeeper` prop:
+// mustache + hat, no lick/petting reactions). Deliberately OUTSIDE `CAT_PALETTES` — the
+// player never buys or equips it — so it stays a fixed, un-purchasable identity that reads
+// as visually distinct from whatever coat the player picked for their own cat. A muted warm
+// tan, chosen to sit clearly apart from all 10 purchasable presets (nearest neighbours are
+// ginger #EDA968 and brown #A97B54 — this sits between them but is lighter/greyer than both).
+const SHOPKEEPER_COAT = '#C9A876';
+export const SHOPKEEPER_PALETTE: CatPalette = {
+  id: 'shopkeeper', name: 'Sklepikarz',
+  coat: SHOPKEEPER_COAT, shade: shade(SHOPKEEPER_COAT, -0.07), ear: shade(SHOPKEEPER_COAT, -0.16),
+  ink: '#4A3E2A', mark: markFor(SHOPKEEPER_COAT), cost: 0,
+};

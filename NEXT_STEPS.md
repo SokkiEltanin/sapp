@@ -3,16 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Foldery bossów/lokalizacji posegregowane jak ekwipunek — NIEsprawdzone (2026-09-02)
+## 🆕 "Sklepikarz" (CatArt w przebraniu) — czeka na ekran Rynku — NIEsprawdzone (2026-09-03)
+
+Część 2 (część 1 = foldery, patrz wpis niżej). User: kotek za ladą, wąsy-inkognito +
+kapelusik z uszami wystającymi na wierzchu, bez lizania/reakcji-na-głaskanie, ale z
+rozglądaniem (żeby nie był statyczny), inny kolor niż kotek gracza. **Zrobione**: nowy prop
+`shopkeeper?: boolean` na `CatArt` (wąsy+kapelusz rysowane w SVG, uszy automatycznie na
+wierzchu bo to już osobny późniejszy layer; wyłącza auto-lick i tap/cuddle-reakcje; NIE
+rusza breathe/blink/glance/ear-flutter) + `SHOPKEEPER_PALETTE` w `catPalettes.ts` (poza
+kupowalną listą, stały ciepły tan). Pełny opis w ARCHITECTURE.md §20. `tsc`/`jest` zielone.
+
+**Nie zrobione / czeka**: sam ekran Rynku (2 warstwy grafiki + sklepikarz między nimi +
+sloty na skrzynki/freeze/itemy dnia) — user obiecał przysłać grafikę tła/rynku, dopiero
+wtedy komponować `<CatArt shopkeeper palette={SHOPKEEPER_PALETTE}>` na realnym ekranie.
+**Priorytet testu na urządzeniu**: na razie brak — `shopkeeper` prop nigdzie jeszcze nie
+jest użyty w żadnym ekranie, więc zero widocznej zmiany dopóki nie powstanie ekran Rynku.
+
+## ✅ Foldery bossów/lokalizacji posegregowane jak ekwipunek (2026-09-02)
 
 User zapowiedział nową grafikę Rynku (2 warstwy + sklepikarz) i poprosił o dwie rzeczy: (1)
 posegregować foldery — ZROBIONE (patrz ARCHITECTURE.md §19): `assets/ikonybosów/` (mieszanka
 43 plików) + `assets/minibosses/` → `assets/bossy/{kampania,questy,eventy-rajdy,umiejetnosci}/`
 + `assets/lokalizacje/`, wszystkie `require()` w `bossIcons.ts` zaktualizowane, czysty przenos
-bez zmiany czegokolwiek widocznego. (2) Zaprojektować "sklepikarza" — kotek w przebraniu
-(wąsy-inkognito, kapelusik z uszami na wierzchu, bez lizania/reakcji-na-głaskanie, ale z
-rozglądaniem, inny kolor) stojący za ladą w sklepie — **W TRAKCIE, osobny wpis/PR gdy
-gotowe**. `tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu na urządzeniu**: dowolna
+bez zmiany czegokolwiek widocznego. (2) Zaprojektować "sklepikarza" — patrz wpis wyżej,
+ZROBIONE. `tsc`/`jest` zielone (67 suit/822 testy). **Priorytet testu na urządzeniu**: dowolna
 walka z dowolnym bossem — wszystko powinno wyglądać identycznie jak wcześniej (czysty przenos
 plików).
 
