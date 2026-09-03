@@ -8,6 +8,7 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
+import GroundShadow from '@/components/ui/GroundShadow';
 import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import { attackPng, arenaBgFor } from '@/utils/bossIcons';
@@ -43,6 +44,14 @@ const WEAK_COLOR: Record<string, string> = {
 // od tej wartości (patrz komentarze tam), żeby zmiana rozmiaru w jednym miejscu nie
 // rozjeżdżała reszty geometrii areny.
 const PORTRAIT_SIZE = 130;
+// Kotek dostaje WIĘKSZY `size` niż boss przy tym samym `PORTRAIT_SIZE` (2026-09-03, user:
+// "kotka powiększyć bo jest teraz mniejszy od wroga znacznie") — CatArt to SVG z viewBox
+// 2000×2000, ale sam kotek zajmuje w nim wyraźnie mniej niż całą ramkę (sporo pustego
+// marginesu wokół), podczas gdy PNG bossów (BossArt) są przycięte ciasno do sylwetki — więc
+// przy IDENTYCZNYM `size` boss zawsze wygląda znacznie większy. Podbite o ~35%, nie 1:1 z
+// PORTRAIT_SIZE, bo oba portrety dzielą tę samą wysokość kafelka (`tilePortrait`, patrz
+// niżej) — zbyt duży skok zacząłby wychodzić poza scenę areny (ma `overflow:'hidden'`).
+const CAT_PORTRAIT_SIZE = 175;
 
 type Kind = 'campaign' | 'raid' | 'event' | 'quest' | 'mad' | 'mission';
 type VictoryInfo = { kind: Kind; id: string; name: string; emoji: string; coins: number; xp: number; loot?: BossLoot; itemDropped?: CombatItemId; itemLeveledUp?: { id: CombatItemId; level: number }; isMenace?: boolean };
@@ -681,69 +690,85 @@ export default function BossFight() {
             >
             <View style={s.vsRow}>
               <View style={s.tile}>
+                {/* Portret NAD nazwą/paskiem HP (2026-09-03, user: "w bossach w walkach
+                    zdrowie musi byc pod spodem") — dawniej etykieta+HP siedziały nad
+                    portretem; teraz portret jest pierwszym elementem kafelka (patrz
+                    `s.projectile.top`, przeliczony wprost z tej nowej kolejności zamiast z
+                    wysokości linijek tekstu nad nim — deterministyczne, nie zgadywane). */}
+                <View style={s.tilePortrait}>
+                  {/* Wewnętrzny box DOKŁADNIE rozmiaru kotka (nie całej, wyższej
+                      `tilePortrait`, patrz komentarz przy `CAT_PORTRAIT_SIZE`) — żeby cień
+                      (GroundShadow, `bottom:0` względem SWOJEGO rodzica) siadał pod
+                      faktycznymi łapkami kotka, a nie pod pustym marginesem wspólnego,
+                      wyższego kafelka. */}
+                  <View style={s.spriteBoxCat}>
+                    <GroundShadow width={CAT_PORTRAIT_SIZE * 0.62} height={CAT_PORTRAIT_SIZE * 0.18} />
+                    <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
+                      {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
+                          statyczny bez animacji, bo teraz jest w pełni z głaskaniem
+                          animacjami lizania co pewnie laguje") — wyłącza WSZYSTKIE idle-pętle
+                          (oddech/mruganie/spojrzenie/uszy/auto-liźnięcie, patrz CatArt.tsx),
+                          cios (`attack={attackPulse}`) dalej działa — CatArt.tsx celowo NIE
+                          blokuje efektu ataku pod `!animate`, tylko pod `asleep`. */}
+                      <CatArt size={CAT_PORTRAIT_SIZE} expression="content" animate={false} attack={attackPulse} palette={palette} stripes={catStripes}
+                        eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
+                    </Animated.View>
+                    {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
+                        pojawiać się na pupila") — atak w zwarciu, nie rzut: zamiast
+                        podróżującego pocisku (boltFlying niżej, suppressed dla claw), burst
+                        ikony wprost NA portrecie kotka, wyzwalany tym samym `boltTravel` co
+                        lot pocisku dla pozostałych typów. `RadialGlow` statyczny (bez własnego
+                        Animated.Value — dziedziczy opacity/scale z tego samego wrappera co
+                        ikona, patrz komentarz przy usunięciu `tileFlash` wyżej) zastępuje
+                        dawne czerwone kółko-flash jako "hit" feedback. */}
+                    {boltFlying && target?.attackKind === 'claw' && (
+                      <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
+                        <RadialGlow size={130} color="#F87171" opacity={0.55} />
+                        <Image source={counterPng} style={{ width: 90, height: 90 }} resizeMode="contain" />
+                      </Animated.View>
+                    )}
+                    {catHit && !!catHit.dmg && (
+                      <Animated.Text style={[s.dmgFloat, { opacity: kFloatOp, transform: [{ translateY: kFloatY }], color: '#F87171' }]}>-{catHit.dmg}</Animated.Text>
+                    )}
+                  </View>
+                </View>
                 <Text style={s.tileLabel} numberOfLines={1}>Pupil</Text>
                 {/* Wszystkie 3 tryby mają teraz realny kontratak (2026-08-12) — pasek HP kotka
                     pokazuje się zawsze, nie tylko w kampanii/wydarzeniu. */}
                 <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(catHp / catMax * 100)}%`, backgroundColor: '#2AC68F' }]} /></View>
                 <Text style={s.tileHpTxt}>{catHp} / {catMax}</Text>
-                <View style={s.tilePortrait}>
-                  <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
-                    {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
-                        statyczny bez animacji, bo teraz jest w pełni z głaskaniem
-                        animacjami lizania co pewnie laguje") — wyłącza WSZYSTKIE idle-pętle
-                        (oddech/mruganie/spojrzenie/uszy/auto-liźnięcie, patrz CatArt.tsx),
-                        cios (`attack={attackPulse}`) dalej działa — CatArt.tsx celowo NIE
-                        blokuje efektu ataku pod `!animate`, tylko pod `asleep`. */}
-                    <CatArt size={PORTRAIT_SIZE} expression="content" animate={false} attack={attackPulse} palette={palette} stripes={catStripes}
-                      eyeColor={catEyeColor} noseColor={catNoseColor} whiskers={catWhiskers} legStripes={catLegStripes} />
-                  </Animated.View>
-                  {/* Pazury (2026-08-17, user: "jak są pazury to nie mają lecieć tylko
-                      pojawiać się na pupila") — atak w zwarciu, nie rzut: zamiast
-                      podróżującego pocisku (boltFlying niżej, suppressed dla claw), burst
-                      ikony wprost NA portrecie kotka, wyzwalany tym samym `boltTravel` co
-                      lot pocisku dla pozostałych typów. `RadialGlow` statyczny (bez własnego
-                      Animated.Value — dziedziczy opacity/scale z tego samego wrappera co
-                      ikona, patrz komentarz przy usunięciu `tileFlash` wyżej) zastępuje
-                      dawne czerwone kółko-flash jako "hit" feedback. */}
-                  {boltFlying && target?.attackKind === 'claw' && (
-                    <Animated.View pointerEvents="none" style={[s.clawFx, { opacity: boltOp, transform: [{ scale: boltScale }, { rotate: '12deg' }] }]}>
-                      <RadialGlow size={130} color="#F87171" opacity={0.55} />
-                      <Image source={counterPng} style={{ width: 90, height: 90 }} resizeMode="contain" />
-                    </Animated.View>
-                  )}
-                  {catHit && !!catHit.dmg && (
-                    <Animated.Text style={[s.dmgFloat, { opacity: kFloatOp, transform: [{ translateY: kFloatY }], color: '#F87171' }]}>-{catHit.dmg}</Animated.Text>
-                  )}
-                </View>
               </View>
 
               <View style={s.tile}>
+                <View style={s.tilePortrait}>
+                  <View style={s.spriteBoxBoss}>
+                    <GroundShadow width={PORTRAIT_SIZE * 0.62} height={PORTRAIT_SIZE * 0.18} />
+                    {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
+                        chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
+                        się pokazuje, nic więcej). Per-bossowy burst-image (bomby/ogień/…) USUNIĘTY
+                        permanentnie (2026-08-18, user: "te bomby... pojawiały się tylko na sobie
+                        samym, robiły scaling up i znikały, zadając dmg na odległość dziwnie xd,
+                        wywalmy je wgle" — statyczny obrazek scale+fade czytał się jako płaski
+                        "scan i zniknięcie", nie realny cios; działające wzorce to WYŁĄCZNIE
+                        podróżujący pocisk (łapka/magia) i burst-na-celu (pazury), oba już tu są).
+                        Zostaje shake+liczba obrażeń — ten sam, spójny język co raid/event/
+                        quest/mad/misja miały od zawsze (one nigdy nie dostały attackFx).
+                        Czerwone kółko-flash (`tileFlash`) USUNIĘTE (2026-08-30, patrz komentarz
+                        przy `bFlash`/`playBossHitFx` wyżej) — "hit" niesie teraz ikona ataku ze
+                        statycznym `RadialGlow` za sobą, nie osobny animowany obiekt na portrecie. */}
+                    <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
+                      <BossArt id={target.id} emoji={target.emoji} size={PORTRAIT_SIZE} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
+                    </Animated.View>
+                    {lastHit && (
+                      <Animated.Text style={[s.dmgFloat, { opacity: bFloatOp, transform: [{ translateY: bFloatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
+                        -{lastHit.dmg}{lastHit.crit ? ' KRYT!' : ''}
+                      </Animated.Text>
+                    )}
+                  </View>
+                </View>
                 <Text style={[s.tileLabel, { color: WEAK_COLOR[target.weakness] ?? c.text.primary }]} numberOfLines={1}>{target.name}</Text>
                 <View style={s.tileHpTrack}><View style={[s.tileHpFill, { width: `${Math.round(targetRemaining / target.maxHp * 100)}%` }]} /></View>
                 <Text style={s.tileHpTxt}>{targetRemaining} / {target.maxHp}</Text>
-                <View style={s.tilePortrait}>
-                  {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
-                      chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
-                      się pokazuje, nic więcej). Per-bossowy burst-image (bomby/ogień/…) USUNIĘTY
-                      permanentnie (2026-08-18, user: "te bomby... pojawiały się tylko na sobie
-                      samym, robiły scaling up i znikały, zadając dmg na odległość dziwnie xd,
-                      wywalmy je wgle" — statyczny obrazek scale+fade czytał się jako płaski
-                      "scan i zniknięcie", nie realny cios; działające wzorce to WYŁĄCZNIE
-                      podróżujący pocisk (łapka/magia) i burst-na-celu (pazury), oba już tu są).
-                      Zostaje shake+liczba obrażeń — ten sam, spójny język co raid/event/
-                      quest/mad/misja miały od zawsze (one nigdy nie dostały attackFx).
-                      Czerwone kółko-flash (`tileFlash`) USUNIĘTE (2026-08-30, patrz komentarz
-                      przy `bFlash`/`playBossHitFx` wyżej) — "hit" niesie teraz ikona ataku ze
-                      statycznym `RadialGlow` za sobą, nie osobny animowany obiekt na portrecie. */}
-                  <Animated.View style={{ transform: [{ translateX: bShakeX }] }}>
-                    <BossArt id={target.id} emoji={target.emoji} size={PORTRAIT_SIZE} powered={kind === 'raid' || kind === 'mad' || (kind === 'event' && isMenace)} />
-                  </Animated.View>
-                  {lastHit && (
-                    <Animated.Text style={[s.dmgFloat, { opacity: bFloatOp, transform: [{ translateY: bFloatY }], color: lastHit.crit ? '#FDE047' : '#F87171' }]}>
-                      -{lastHit.dmg}{lastHit.crit ? ' KRYT!' : ''}
-                    </Animated.Text>
-                  )}
-                </View>
               </View>
             </View>
 
@@ -977,9 +1002,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   // Powiększone portrety (2026-08-30, patrz `PORTRAIT_SIZE` u góry pliku) — padding areny/
   // odstęp wierszy/padding kafelka lekko ścieśnione (16→12 / 12→8 / 12→8), żeby oddać
-  // portretowi więcej miejsca bez rozsadzania szerokości ekranu; `tilePortrait.height`
-  // wprost z `PORTRAIT_SIZE` (+18 na oddech wokół, kotek/ogon bywa odrobinę szerszy niż
-  // nominalny `size`) zamiast osobnej magicznej liczby.
+  // portretowi więcej miejsca bez rozsadzania szerokości ekranu. (`tilePortrait.height` ma
+  // teraz własny, nowszy komentarz niżej — 2026-09-03 dodał drugi, większy rozmiar dla kotka.)
   arena: { alignItems: 'center', backgroundColor: c.bg.card, borderRadius: radius.xl, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
 
   // Scena portretów/HP (2026-09-02) — STAŁEJ wysokości podkładka pod `LOKACJA_KAMPANIA.png`,
@@ -993,13 +1017,23 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   vsRow: { flexDirection: 'row', gap: spacing[2], width: '100%' },
   // Kafelki straciły własne tło/ramkę (2026-09-02, user: "wypierdolić ramki że bosy stoją na
-  // tym... hp jest podspodem") — bossy/kotek stoją bezpośrednio na `arenaScene` powyżej.
+  // tym") — bossy/kotek stoją bezpośrednio na `arenaScene` powyżej. Kolejność dzieci w JSX
+  // (2026-09-03, user: "zdrowie musi byc pod spodem") — portret jest teraz PIERWSZY, etykieta+
+  // pasek HP DRUGIE — patrz `projectile.top` niżej, przeliczony z tej nowej kolejności.
   tile: { flex: 1, minWidth: 0, alignItems: 'center', padding: spacing[2], gap: 6 },
   tileLabel: { fontSize: 12.5, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   tileHpTrack: { width: '100%', height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.55)', overflow: 'hidden' },
   tileHpFill: { height: '100%', borderRadius: 4, backgroundColor: '#EF4444' },
   tileHpTxt: { fontSize: 10, fontWeight: '700', color: '#fff', textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  tilePortrait: { height: PORTRAIT_SIZE + 18, width: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  // Wysokość liczona z WIĘKSZEGO z dwóch portretów (kotek > boss, patrz `CAT_PORTRAIT_SIZE`)
+  // — obie kolumny (Pupil/Boss) dzielą tę samą wysokość `tilePortrait`, żeby etykieta+HP pod
+  // spodem wyrównywały się w tym samym rzędzie mimo różnych rozmiarów portretów.
+  tilePortrait: { height: Math.max(PORTRAIT_SIZE, CAT_PORTRAIT_SIZE) + 18, width: '100%', justifyContent: 'center', alignItems: 'center' },
+  // Box DOKŁADNIE rozmiaru danego sprite'a (nie całej `tilePortrait`) — patrz komentarz przy
+  // użyciu w JSX: `GroundShadow` wewnątrz siada `bottom:0` względem TEGO boxa, więc cień
+  // trafia pod faktyczne łapki sprite'a, nie pod pusty margines wspólnego, wyższego kafelka.
+  spriteBoxCat: { width: CAT_PORTRAIT_SIZE, height: CAT_PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center' },
+  spriteBoxBoss: { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, alignItems: 'center', justifyContent: 'center' },
 
   dmgFloat: { position: 'absolute', top: 4, fontSize: 19, fontWeight: '900' },
   bossTaunt: { fontSize: 12.5, color: c.text.muted, fontStyle: 'italic', marginTop: spacing[3], textAlign: 'center' },
@@ -1046,8 +1080,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   vHint: { position: 'absolute', bottom: 48, color: 'rgba(255,255,255,0.5)', fontSize: 12.5, fontWeight: '600' },
 
   clawFx: { position: 'absolute', width: 150, height: 150, alignItems: 'center', justifyContent: 'center' },
-  // top przeliczony (96→108, 2026-08-30) — portret przesunął się w dół o (tile padding
-  // 12→8) + (tilePortrait +32/2) = 12dp wraz z powiększeniem portretów, żeby lecący
-  // pocisk dalej trafiał w wizualny środek portretu, a nie w pasek HP nad nim.
-  projectile: { position: 'absolute', top: 108, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // top przeliczony (108→91, 2026-09-03) — portret jest teraz PIERWSZYM elementem kafelka
+  // (etykieta+HP przeniesione pod spód, patrz JSX), więc jego pionowy środek to już tylko
+  // `tile.padding-top + tilePortrait.height/2`, bez zgadywania wysokości linijek tekstu, co
+  // wcześniej stało nad nim: 8 (padding spacing[2]) + 193/2 (tilePortrait, patrz wyżej) -
+  // 14 (połowa wysokości samej ikony pocisku, 28px) = 90.5 → 91.
+  projectile: { position: 'absolute', top: 91, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
 }));

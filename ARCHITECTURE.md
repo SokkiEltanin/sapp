@@ -3409,6 +3409,52 @@ przysłać grafikę tła/slotów) — sprawdzić że wąsy/kapelusz/uszy wygląd
 rzeczywistej skali `size` (SVG-owe ścieżki liczone ręcznie z viewBox 2000×2000, nie testowane
 w RN, tylko w przeglądarce) i że tap na niego faktycznie nic nie robi (brak serduszek/hop).
 
+## 21. Walka bossów — HP pod portretem, "ground shadow", większy kotek — 2026-09-03
+
+User (patrząc na zrzut ekranu areny): "w bossach w walkach zdrowie musi byc pod spodem I
+musimy jakoś wyróżnić cieniem te bossy i kotka (oraz kotka powiększyć bo jest teraz mniejszy
+od wroga znacznie)". Trzy zmiany w `app/boss-fight.tsx`, ten sam ekran co §19/§20 dotyczyły
+tła.
+
+- **HP pod portretem, nie nad nim.** W obu kolumnach (`s.tile`) portret (`s.tilePortrait`)
+  jest teraz PIERWSZYM dzieckiem, etykieta+pasek HP+tekst HP idą PO nim. To odwraca
+  dotychczasową kolejność (etykieta/HP/portret) — wizualnie kotek/boss stoją na scenie, a HP
+  czyta się jak podpis pod nimi, nie nagłówek nad.
+- **`s.projectile.top` przeliczony deterministycznie.** Wcześniej ta stała była wyliczona z
+  wysokości linijek tekstu NAD portretem (nieprecyzyjne, zależne od domyślnego line-height
+  fontu). Teraz portret jest pierwszym elementem, więc jego pionowy środek to czysta suma:
+  `tile.padding-top (8) + tilePortrait.height/2 (193/2) - połowa ikony pocisku (14) = 91`.
+  Zero zgadywania metryk fontu.
+- **`GroundShadow` (nowy `src/components/ui/GroundShadow.tsx`)** — miękki, spłaszczony cień
+  pod stopami sprite'a, ta sama technika co `RadialGlow` (prawdziwy SVG radial-gradient, bo
+  RN Views go nie mają), tylko rozciągnięty nierównomiernie (`preserveAspectRatio="none"`) w
+  elipsę zamiast koła. Renderowany jako PIERWSZE dziecko nowego, DOKŁADNIE-rozmiaru-sprite'a
+  wrappera (`s.spriteBoxCat`/`s.spriteBoxBoss`, osadzonego wewnątrz wspólnej, wyższej
+  `tilePortrait`) — `bottom:0` względem TEGO ciasnego boxa, więc cień trafia pod faktyczne
+  łapki, nie pod pusty margines wspólnego kafelka.
+- **Kotek większy niż boss przy tym samym `PORTRAIT_SIZE`.** Nowa stała
+  `CAT_PORTRAIT_SIZE = 175` (boss zostaje `PORTRAIT_SIZE = 130`) — CatArt to SVG z viewBox
+  2000×2000, ale sam kotek zajmuje w nim wyraźnie mniej niż całą ramkę (spory margines wokół),
+  podczas gdy PNG bossów (`BossArt`) są przycięte ciasno do sylwetki — przy identycznym
+  `size` boss zawsze wyglądał wyraźnie większy. `tilePortrait.height` liczone z WIĘKSZEGO z
+  dwóch rozmiarów (`Math.max(PORTRAIT_SIZE, CAT_PORTRAIT_SIZE) + 18`), żeby obie kolumny
+  dzieliły tę samą wysokość kafelka i etykiety/HP wyrównywały się w tym samym rzędzie mimo
+  różnych rozmiarów portretów.
+
+Geometria zweryfikowana offline: schematyczny HTML mockup (kolorowe sylwetki zamiast
+prawdziwego SVG/PNG, te same px co w kodzie: 175/130/193/91/0.62/0.18) wyrenderowany przez
+`playwright screenshot` — czerwona linia na wysokości `projectile.top=91` przechodzi
+dokładnie przez środek obu portretów, cień siada pod "stopami" obu sylwetek, HP wyrównuje
+się w tym samym rzędzie po obu stronach mimo różnych rozmiarów boxów.
+
+`tsc`/`jest` zielone (67 suit/822 testy, brak zmian w testowalnej logice — czysto layout).
+**Priorytet testu na urządzeniu**: dowolna walka — (a) HP pod portretem czytelne, nie
+nachodzi na nic; (b) cień widoczny pod kotkiem i bossem, nie "pływa" oderwany od sprite'a;
+(c) kotek wyraźnie większy niż wcześniej, ale NIE ucięty przez `overflow:'hidden'` sceny
+areny na węższych telefonach (to jedyne ryzyko tej zmiany — `CAT_PORTRAIT_SIZE=175` dobrany
+z zapasem, ale nie zmierzony na prawdziwym, wąskim ekranie); (d) lecący pocisk/łapka dalej
+trafia wizualnie w środek portretu, nie w pasek HP.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
