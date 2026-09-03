@@ -527,18 +527,36 @@ export default function CatArt({
                     cat's own fur anyway. Drawn LAST inside the SVG (after eyes/mouth) so it
                     sits on top of the face, and — crucially — the hat is drawn INSIDE this
                     <Svg>, which closes below BEFORE the <Ear> overlays render, so the ears
-                    automatically poke out on top of the brim with no extra cutout math. */}
+                    automatically poke out on top of the brim with no extra cutout math.
+                    Draft 3 (2026-09-03, user saw draft 1's screenshot: "uszy mają wystawać
+                    ale naturalnie i wąsy podkreślone bardziej") — mustache switched from a
+                    thin filled blob to bold ROUND-CAP STROKES with small curl-tip discs (much
+                    more legible as a handlebar at portrait scale); hat crown narrowed
+                    (760-1160 vs old 700-1220) so it doesn't reach as far into each ear's own
+                    silhouette, exposing more of BOTH ears symmetrically (ear geometry itself
+                    is untouched — same <Ear> paths used everywhere else), plus a small dark
+                    "gather" ellipse at each ear's base (drawn on the hat, so the ear renders
+                    on top of it) reading as a fold in the fabric the ear pokes THROUGH,
+                    rather than something merely sitting beside a hat. */}
                 {shopkeeper && (
                   <G>
-                    <G fill="#241A10" opacity={0.94}>
-                      <Path d="M985 884 C 964 864, 930 852, 888 856 C 856 859, 828 872, 812 892 C 806 900, 806 908, 812 912 C 820 917, 830 913, 838 904 C 854 885, 878 874, 906 872 C 928 870, 948 876, 962 890 Z" />
-                      <Path d="M985 884 C 1006 864, 1040 852, 1082 856 C 1114 859, 1142 872, 1158 892 C 1164 900, 1164 908, 1158 912 C 1150 917, 1140 913, 1132 904 C 1116 885, 1092 874, 1064 872 C 1042 870, 1022 876, 1008 890 Z" />
+                    <G stroke="#1B140C" strokeWidth={24} strokeLinecap="round" fill="none">
+                      <Path d="M985 892 C 954 866 908 856 862 868 C 828 877 802 896 788 916" />
+                      <Path d="M985 892 C 1016 866 1062 856 1108 868 C 1142 877 1168 896 1182 916" />
                     </G>
-                    <Ellipse cx={960} cy={640} rx={330} ry={70} fill="#2E2620" />
-                    <Path d="M700 640 Q700 430 960 400 Q1220 430 1220 640 Z" fill="#3A3128" />
-                    <Path d="M760 632 Q772 470 940 410 Q820 460 800 632 Z" fill="#463C31" opacity={0.55} />
-                    <Rect x={700} y={600} width={520} height={46} fill="#241A10" />
-                    <Rect x={928} y={596} width={64} height={54} rx={6} fill="#171310" />
+                    <Circle cx={788} cy={916} r={15} fill="#1B140C" />
+                    <Circle cx={1182} cy={916} r={15} fill="#1B140C" />
+                    <G stroke="#3C2C1A" strokeWidth={6} strokeLinecap="round" fill="none" opacity={0.65}>
+                      <Path d="M960 878 C 930 862 898 858 866 868" />
+                      <Path d="M1010 878 C 1040 862 1072 858 1104 868" />
+                    </G>
+                    <Ellipse cx={960} cy={645} rx={300} ry={62} fill="#2E2620" />
+                    <Path d="M760 645 Q760 460 960 428 Q1160 460 1160 645 Z" fill="#3A3128" />
+                    <Path d="M805 638 Q815 490 940 435 Q850 478 830 638 Z" fill="#463C31" opacity={0.55} />
+                    <Rect x={760} y={610} width={400} height={42} fill="#241A10" />
+                    <Rect x={928} y={606} width={64} height={50} rx={6} fill="#171310" />
+                    <Ellipse cx={742} cy={600} rx={58} ry={34} fill="#171310" opacity={0.45} />
+                    <Ellipse cx={1178} cy={600} rx={58} ry={34} fill="#171310" opacity={0.45} />
                   </G>
                 )}
               </G>

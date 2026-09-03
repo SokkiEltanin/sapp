@@ -25,7 +25,11 @@ rozglądaniem (żeby nie był statyczny), inny kolor niż kotek gracza. **Zrobio
 `shopkeeper?: boolean` na `CatArt` (wąsy+kapelusz rysowane w SVG, uszy automatycznie na
 wierzchu bo to już osobny późniejszy layer; wyłącza auto-lick i tap/cuddle-reakcje; NIE
 rusza breathe/blink/glance/ear-flutter) + `SHOPKEEPER_PALETTE` w `catPalettes.ts` (poza
-kupowalną listą, stały ciepły tan). Pełny opis w ARCHITECTURE.md §20. `tsc`/`jest` zielone.
+kupowalną listą, stały ciepły tan). **Draft 2 (2026-09-03)** — user zobaczył zrzut: "uszy
+mają wystawać ale naturalnie i wąsy podkreślone bardziej" → wąsy z cienkiego blobu na
+grube łuki z zawiniętymi końcówkami, korona kapelusza zwężona (odsłania OBA ucha
+symetrycznie, wcześniej prawe ledwo było widać) + cień-fałda u podstawy każdego ucha.
+Geometria samych uszu nietknięta. Pełny opis w ARCHITECTURE.md §20. `tsc`/`jest` zielone.
 
 **Nie zrobione / czeka**: sam ekran Rynku (2 warstwy grafiki + sklepikarz między nimi +
 sloty na skrzynki/freeze/itemy dnia) — user obiecał przysłać grafikę tła/rynku, dopiero
