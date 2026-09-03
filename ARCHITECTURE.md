@@ -3409,6 +3409,24 @@ przysłać grafikę tła/slotów) — sprawdzić że wąsy/kapelusz/uszy wygląd
 rzeczywistej skali `size` (SVG-owe ścieżki liczone ręcznie z viewBox 2000×2000, nie testowane
 w RN, tylko w przeglądarce) i że tap na niego faktycznie nic nie robi (brak serduszek/hop).
 
+**Draft 2 (2026-09-03)** — user zobaczył zrzut ekranu draftu 1: "to musimy go dopracować
+uszy mają wystawać ale naturalnie i wąsy podkreślone bardziej". Dwie poprawki, ZERO zmian w
+geometrii samych uszu (`<Ear>` to współdzielony komponent używany wszędzie indziej w
+aplikacji — poprawka dotyczy WYŁĄCZNIE kapelusza/wąsów wokół nich):
+- **Wąsy** — z cienkiego wypełnionego kształtu na GRUBE łuki (`strokeWidth=24`,
+  `strokeLinecap="round"`) z małymi kółkami na końcówkach (zawinięty handlebar) + cienki,
+  jaśniejszy highlight wzdłuż górnej krawędzi. Dużo czytelniejsze w skali portretu niż
+  poprzedni cienki filled-blob.
+- **Kapelusz** — korona zwężona (760-1160 zamiast 700-1220), więc jej skos nie wchodzi
+  tak głęboko w sylwetkę każdego ucha — odsłania WIĘCEJ obu uszu symetrycznie (wcześniej
+  prawe ucho ledwo było widoczne, bo korona je prawie całkiem zasłaniała). Dodana mała,
+  ciemna elipsa "gather" (fałda materiału) u podstawy każdego ucha, narysowana NA
+  kapeluszu, ale POD uchem (uszy renderują się już po zamknięciu całej tej grupy) — czyta
+  się jako "ucho wychodzi PRZEZ dziurę w materiale", nie "coś leży obok kapelusza".
+
+Zweryfikowane tym samym `playwright screenshot` na statycznej replice (zoom 1000×1000 do
+sprawdzenia symetrii uszu z bliska) przed wklejeniem do `CatArt.tsx`.
+
 ## 21. Walka bossów — HP pod portretem, "ground shadow", większy kotek — 2026-09-03
 
 User (patrząc na zrzut ekranu areny): "w bossach w walkach zdrowie musi byc pod spodem I
