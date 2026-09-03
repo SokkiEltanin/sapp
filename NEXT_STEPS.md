@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Quest rowerowy → self-report + sekcja "Trening" na górze Zadań — NIEsprawdzone (2026-09-03)
+
+User: "rower... dziwnie łapie bo zawsze nawet jak nie robię to zawsze jest do odebrania
+zaliczone" — przyczyna: JEDYNY z 6 questów treningowych oparty o czujnik (Health Connect
+ExerciseSession), a telefon/zegarek czasem myli jazdę samochodem/szybki spacer z rowerem
+(nie da się tego odfiltrować po naszej stronie, HC nie ma confidence score). **Naprawa**:
+rower przerobiony na self-report jak pozostała piątka (`TrainingSessionModal`, timer na
+`bikeTarget` min) — nowy `petStore.bikeDay`/`markBikeDone()`, `QuestCtx.bikeToday` zamiast
+`bikeMinutesToday`. Do tego: nagrody questów treningowych **2× w górę** (4/10→8/20 itd, rower
+5/13→10/26 — user: "musi byc zachęta by to robić") + nowa sekcja **"Trening" na samej górze**
+`app/pet-quests.tsx` (przed nawet zaległymi/codziennymi), pomarańczowy akcent + plakietka
+EKSTRA + ikona per ćwiczenie (lucide, placeholder — user później doda grafiki) + pigułka
+nagrody pokazuje teraz też XP. Skalowanie z poziomem pupila — już istniało dla wszystkich
+questów (`questRewardMult`), świadomie nie dodana druga krzywa tylko dla treningu.
+
+Pełny opis w ARCHITECTURE.md §22. `tsc`/`jest` zielone (67 suit/822 testy). **Priorytet
+testu na urządzeniu**: (a) sekcja "Trening" faktycznie na samej górze ekranu Zadań; (b) rower
+NIE zalicza się sam — wymaga przejścia przez "Rozpocznij"→timer→potwierdzenie; (c) nagrody w
+pigułce (monety+XP) zgadzają się z tym co faktycznie dopisuje "Odbierz"; (d) `bikeDay`
+persystuje między sesjami tego samego dnia.
+
 ## 🆕 Walka bossów: HP pod portretem, cień, większy kotek — NIEsprawdzone (2026-09-03)
 
 User pokazał zrzut ekranu areny: "zdrowie musi byc pod spodem I musimy jakoś wyróżnić

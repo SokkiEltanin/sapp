@@ -39,7 +39,10 @@ export interface QuestCtx {
   situpsToday?: boolean;
   plankToday?: boolean;
   stretchToday?: boolean;
-  bikeMinutesToday?: number;   // from Health Connect ExerciseSession (biking)
+  bikeToday?: boolean;         // self-reported (2026-09-03 — was Health Connect ExerciseSession,
+                                // switched off it: phone/watch activity recognition sometimes
+                                // misclassifies a car ride or a brisk walk as "biking", so the
+                                // quest could show done without ever touching a bike)
 }
 
 export interface ClaimState {
@@ -115,27 +118,35 @@ const BONUS: BonusDef[] = [
     label: () => 'Prześpij 7 godzin', note: c => `${((c.sleepMinutes ?? 0) / 60).toFixed(1)}h / 7h`, done: c => (c.sleepMinutes ?? 0) >= 420,
     progress: c => (c.sleepMinutes ?? 0) / 420 },
   // Personalized training quests — only show once Ustawienia → Personalizacja is filled
-  // in (targets computed there). Pushups/squats are self-reported (tap when done, see
-  // markPushupsDone/markSquatsDone in petStore — no sensor can count reps); the bike
-  // ride is verified from Health Connect cycling minutes, same as the other data-driven
-  // dailies above.
-  { id: 'b_pushups', coins: 4, xp: 10, available: c => (c.pushupTarget ?? 0) > 0,
+  // in (targets computed there). All 6 are self-reported (tap through TrainingSessionModal,
+  // see markPushupsDone/…/markBikeDone in petStore) — no sensor can count reps, and the
+  // bike ride USED TO be verified from Health Connect cycling minutes, but that's gone
+  // (2026-09-03, see `bikeToday` comment in QuestCtx above): a real sensor sounded more
+  // rigorous, but phone/watch activity recognition false-positives (a car ride, a brisk
+  // walk) made it show done on days you never touched a bike. Rewards roughly DOUBLED
+  // from the original flat 4/10 (2026-08-12 pass) — user (2026-09-03): "musi byc zachęta
+  // by to robić" — these are real physical effort, not a one-tap habit checkbox, and the
+  // old rate didn't reflect that. Bike stays the highest of the six (biggest time ask).
+  // On top of this flat bump, ALL of these already scale with pet level through the shared
+  // `questRewardMult` in `buildQuests` below — same mechanism as every other quest, so a
+  // higher-level pupil pays out more here too without a second, training-only curve.
+  { id: 'b_pushups', coins: 8, xp: 20, available: c => (c.pushupTarget ?? 0) > 0,
     label: c => `Zrób ${c.pushupTarget} pompek`, note: c => c.pushupsToday ? 'zrobione' : 'stuknij po zrobieniu', done: c => !!c.pushupsToday },
-  { id: 'b_squats', coins: 4, xp: 10, available: c => (c.squatTarget ?? 0) > 0,
+  { id: 'b_squats', coins: 8, xp: 20, available: c => (c.squatTarget ?? 0) > 0,
     label: c => `Zrób ${c.squatTarget} przysiadów`, note: c => c.squatsToday ? 'zrobione' : 'stuknij po zrobieniu', done: c => !!c.squatsToday },
-  { id: 'b_situps', coins: 4, xp: 10, available: c => (c.situpTarget ?? 0) > 0,
+  { id: 'b_situps', coins: 8, xp: 20, available: c => (c.situpTarget ?? 0) > 0,
     label: c => `Zrób ${c.situpTarget} brzuszków`, note: c => c.situpsToday ? 'zrobione' : 'stuknij po zrobieniu', done: c => !!c.situpsToday },
-  { id: 'b_plank', coins: 4, xp: 10, available: c => (c.plankTarget ?? 0) > 0,
+  { id: 'b_plank', coins: 8, xp: 20, available: c => (c.plankTarget ?? 0) > 0,
     label: c => `Deska — ${c.plankTarget}s`, note: c => c.plankToday ? 'zrobione' : 'stuknij po zrobieniu', done: c => !!c.plankToday },
-  { id: 'b_stretch', coins: 4, xp: 9, available: c => (c.stretchTarget ?? 0) > 0,
+  { id: 'b_stretch', coins: 8, xp: 18, available: c => (c.stretchTarget ?? 0) > 0,
     label: c => `Rozciąganie — ${c.stretchTarget} min`, note: c => c.stretchToday ? 'zrobione' : 'stuknij po zrobieniu', done: c => !!c.stretchToday },
-  { id: 'b_bikeride', coins: 5, xp: 13, available: c => (c.bikeTarget ?? 0) > 0,
-    label: c => `Przejażdżka rowerem (${c.bikeTarget} min)`, note: c => `${c.bikeMinutesToday ?? 0}/${c.bikeTarget} min`,
-    done: c => (c.bikeMinutesToday ?? 0) >= (c.bikeTarget ?? Infinity),
-    progress: c => (c.bikeMinutesToday ?? 0) / (c.bikeTarget || 1) },
+  { id: 'b_bikeride', coins: 10, xp: 26, available: c => (c.bikeTarget ?? 0) > 0,
+    label: c => `Przejażdżka rowerem (${c.bikeTarget} min)`, note: c => c.bikeToday ? 'zrobione' : 'stuknij po zrobieniu', done: c => !!c.bikeToday },
 ];
 // Wszystkie 6 questów treningowych — do rozpoznania "czy ten claim liczy się do streaka" w
 // pet.tsx (bumpTrainingDay) i do MILESTONES `m_training` niżej, bez duplikowania listy id.
+// Ta sama lista wyciąga je do osobnej sekcji "Trening" na SAMEJ GÓRZE app/pet-quests.tsx
+// (2026-09-03, user: "te zadania muszą byc na samej górze jako ekstra").
 export const TRAINING_QUEST_IDS = ['b_pushups', 'b_squats', 'b_situps', 'b_plank', 'b_stretch', 'b_bikeride'];
 
 // ─── Monthly challenges (claim once per month) ──────────────────────────────

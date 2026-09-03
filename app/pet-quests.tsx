@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Coins as CoinsIcon, Check as CheckIcon, Gift } from 'lucide-react-native';
+import { ChevronLeft, Coins, Coins as CoinsIcon, Check as CheckIcon, Gift, Dumbbell, Flame, Activity, Timer, Sparkles, Bike, Zap as XpIcon } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import TrainingSessionModal, { SelfReportExercise } from '@/components/pet/TrainingSessionModal';
@@ -21,6 +21,14 @@ import { toast } from '@/store/toastStore';
 const ymdOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const todayISO = () => ymdOf(new Date());
 
+// Ikona na quest treningowy (2026-09-03, sekcja "Trening" — patrz komentarz przy JSX niżej).
+// Czysto dekoracyjne/orientacyjne, nie 1:1 anatomicznie trafne dla każdego ćwiczenia — user
+// obiecał docelową grafikę później ("moge potem wygenerować grafiki pod to"), to tymczasowy,
+// ale już czytelny placeholder zamiast gołego tekstu.
+const TRAINING_ICON: Record<string, typeof Dumbbell> = {
+  b_pushups: Dumbbell, b_squats: Flame, b_situps: Activity, b_plank: Timer, b_stretch: Sparkles, b_bikeride: Bike,
+};
+
 // "wczoraj" / "N dni temu" dla listy zaległych questów (2026-08-27) — odkąd `missed` sięga
 // kilka dni wstecz, nie tylko wczoraj, każdy wiersz pokazuje SKĄD jest, żeby dwa te same
 // questy z różnych dni (np. "Wypij wodę" zaległe za wtorek I środę naraz) nie wyglądały jak
@@ -38,7 +46,7 @@ export default function PetQuests() {
   const s = useMemo(() => makeS(c), [c]);
   const {
     coins, claimDaily, claimDailyFor, claimQuest, claimMonthly, claimWeekly,
-    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone,
+    markPushupsDone, markSquatsDone, markSitupsDone, markPlankDone, markStretchDone, markBikeDone,
     markTrainingDay, equippedGear, ownedGear,
   } = usePetStore();
   const { questCtx, quests, missed, synced } = usePetQuests();
@@ -92,6 +100,22 @@ export default function PetQuests() {
   };
   const [training, setTraining] = useState<{ exercise: SelfReportExercise; target: number; action: () => void } | null>(null);
 
+  // Sekcja "Trening" (2026-09-03, user: "te zadania muszą byc na samej górze jako ekstra i
+  // byc za więcej coinow i XP") — wyciąga WSZYSTKIE 6 questów treningowych z ogólnej puli
+  // `bonusDaily` do własnej, wyróżnionej sekcji na samej górze ekranu, zamiast zlewać się z
+  // krokomierzem/wodą/snem niżej. Reszta `bonusDaily` (stepbeat/water/sleep) zostaje w
+  // zwykłej sekcji "Bonusowe dziś" bez zmian.
+  const trainingQuests = quests.bonusDaily.filter(q => TRAINING_QUEST_IDS.includes(q.id));
+  const otherBonus = quests.bonusDaily.filter(q => !TRAINING_QUEST_IDS.includes(q.id));
+  const selfReport: Record<string, { exercise: SelfReportExercise; target: number; action: () => void }> = {
+    b_pushups:  { exercise: 'pushups', target: questCtx.pushupTarget ?? 0, action: markPushupsDone },
+    b_squats:   { exercise: 'squats',  target: questCtx.squatTarget ?? 0,  action: markSquatsDone },
+    b_situps:   { exercise: 'situps',  target: questCtx.situpTarget ?? 0,  action: markSitupsDone },
+    b_plank:    { exercise: 'plank',   target: questCtx.plankTarget ?? 0,  action: markPlankDone },
+    b_stretch:  { exercise: 'stretch', target: questCtx.stretchTarget ?? 0, action: markStretchDone },
+    b_bikeride: { exercise: 'bike',    target: questCtx.bikeTarget ?? 0,   action: markBikeDone },
+  };
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
@@ -106,6 +130,71 @@ export default function PetQuests() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        {/* "Trening" — SAMA GÓRA ekranu, przed nawet zaległymi nagrodami (2026-09-03, user:
+            "te zadania muszą byc na samej górze jako ekstra i byc za więcej coinow i XP...
+            musi byc zachęta by to robić"). Wyróżniony wygląd (pomarańczowa ramka/plakietka
+            EKSTRA, ikona per ćwiczenie, pigułka nagrody pokazuje TEŻ XP — reszta list pokazuje
+            tylko monety) odróżnia to od zwykłych, jednorazowych "odhacz i zapomnij" zadań:
+            to prawdziwy wysiłek fizyczny, nie stuknięcie w checkbox. Rower dołączył do
+            self-reportu (patrz TrainingSessionModal) — był jedyny z szóstki oparty o czujnik
+            (Health Connect), user: "dziwnie łapie... zawsze nawet jak nie robię to zawsze
+            jest do odebrania zaliczone" — auto-detekcja aktywności telefonu/zegarka czasem
+            myli jazdę samochodem/szybki spacer z jazdą rowerem, więc quest fałszywie zaliczał
+            się sam. Nagrody (i tu, i w reszcie ekranu) skalują się z poziomem pupila przez
+            wspólny `questRewardMult` w quests.ts — nie ma osobnej krzywej tylko dla treningu. */}
+        {trainingQuests.length > 0 && (
+          <>
+            <View style={s.qHead}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={s.section}>Trening</Text>
+                <View style={s.extraBadge}><Text style={s.extraBadgeTxt}>EKSTRA</Text></View>
+              </View>
+            </View>
+            <View style={[s.qCard, s.trainingCard]}>
+              {(() => {
+                const active = trainingQuests.filter(q => !q.claimed);
+                const claimedN = trainingQuests.length - active.length;
+                return (
+                  <>
+                    {active.map((q, i) => {
+                      const session = selfReport[q.id];
+                      const Icon = TRAINING_ICON[q.id] ?? Dumbbell;
+                      return (
+                        <View key={q.id} style={[s.qRow, i > 0 && s.qRowBorder]}>
+                          <View style={s.trainingIconWrap}><Icon size={18} color="#FB923C" /></View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={s.qLabel} numberOfLines={1}>{q.label}</Text>
+                            {q.note && <Text style={s.qNote}>{q.note}</Text>}
+                          </View>
+                          {q.done && (
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <View style={s.qReward}><CoinsIcon size={11} color="#FBBF24" /><Text style={s.qRewardTxt}>{finalQuestCoins(q.coins)}</Text></View>
+                              <View style={s.qReward}><XpIcon size={10} color="#38BDF8" /><Text style={s.qRewardXpTxt}>{q.xp} XP</Text></View>
+                            </View>
+                          )}
+                          {q.done && synced
+                            ? <PressableScale onPress={() => onClaimQuest(q.id, q.coins, q.xp)}><View style={s.qClaim}><Text style={s.qClaimTxt}>Odbierz</Text></View></PressableScale>
+                            : q.done
+                              ? <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Ładuję…</Text></View>
+                              : session
+                                ? <PressableScale onPress={() => { haptic.tap(); setTraining(session); }}><View style={s.qSelfReport}><Text style={s.qSelfReportTxt}>Rozpocznij</Text></View></PressableScale>
+                                : <View style={[s.qClaim, s.qClaimOff]}><Text style={s.qClaimTxt}>Odbierz</Text></View>}
+                        </View>
+                      );
+                    })}
+                    {claimedN > 0 && (
+                      <View style={[s.qClaimedFoot, active.length > 0 && s.qRowBorder]}>
+                        <CheckIcon size={12} color="#2AC68F" />
+                        <Text style={s.qClaimedTxt}>{claimedN} odebrane dziś</Text>
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
+            </View>
+          </>
+        )}
+
         {missed.length > 0 && (
           <>
             <View style={s.qHead}>
@@ -171,20 +260,13 @@ export default function PetQuests() {
           })()}
         </View>
 
-        {quests.bonusDaily.length > 0 && (
+        {otherBonus.length > 0 && (
           <>
             <Text style={s.section}>Bonusowe dziś</Text>
             <View style={s.qCard}>
               {(() => {
-                const active = quests.bonusDaily.filter(q => !q.claimed);
-                const claimedN = quests.bonusDaily.length - active.length;
-                const selfReport: Record<string, { exercise: SelfReportExercise; target: number; action: () => void }> = {
-                  b_pushups: { exercise: 'pushups', target: questCtx.pushupTarget ?? 0, action: markPushupsDone },
-                  b_squats:  { exercise: 'squats',  target: questCtx.squatTarget ?? 0,  action: markSquatsDone },
-                  b_situps:  { exercise: 'situps',  target: questCtx.situpTarget ?? 0,  action: markSitupsDone },
-                  b_plank:   { exercise: 'plank',   target: questCtx.plankTarget ?? 0,  action: markPlankDone },
-                  b_stretch: { exercise: 'stretch', target: questCtx.stretchTarget ?? 0, action: markStretchDone },
-                };
+                const active = otherBonus.filter(q => !q.claimed);
+                const claimedN = otherBonus.length - active.length;
                 return (
                   <>
                     {active.map((q, i) => {
@@ -356,6 +438,15 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   qProgFill: { height: '100%', borderRadius: 2, backgroundColor: '#38BDF8' },
   qSelfReport: { backgroundColor: c.bg.elevated, borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: c.border.default },
   qSelfReportTxt: { fontSize: 12.5, fontWeight: '800', color: c.text.secondary },
+
+  // Sekcja "Trening" (2026-09-03) — pomarańczowy akcent (#FB923C), odróżnia się od zielonych
+  // "Odbierz"/złotych monet/niebieskiego paska postępu użytych wszędzie indziej na tym
+  // ekranie, żeby czytało się jako WYŻSZY, osobny tier nagród, nie kolejny wpis na liście.
+  extraBadge: { backgroundColor: '#FB923C', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  extraBadgeTxt: { fontSize: 10.5, fontWeight: '900', color: '#2B0F00', letterSpacing: 0.4 },
+  trainingCard: { borderColor: '#FB923C4D', backgroundColor: '#FB923C0D' },
+  trainingIconWrap: { width: 34, height: 34, borderRadius: radius.md, backgroundColor: '#FB923C1F', alignItems: 'center', justifyContent: 'center' },
+  qRewardXpTxt: { fontSize: 10.5, fontWeight: '800', color: '#38BDF8' },
 
   mCard: { width: '100%', backgroundColor: c.bg.card, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, padding: spacing[3] },
   mTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[2] },
