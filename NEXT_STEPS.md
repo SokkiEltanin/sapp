@@ -3,6 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Walka bossów: HP pod portretem, cień, większy kotek — NIEsprawdzone (2026-09-03)
+
+User pokazał zrzut ekranu areny: "zdrowie musi byc pod spodem I musimy jakoś wyróżnić
+cieniem te bossy i kotka (oraz kotka powiększyć bo jest teraz mniejszy od wroga znacznie)".
+`app/boss-fight.tsx` — pełny opis w ARCHITECTURE.md §21. Skrót: portret teraz NAD etykietą+
+paskiem HP (było odwrotnie); nowy `GroundShadow` (miękki elipsowy cień, SVG radial-gradient)
+pod stopami obu sprite'ów; kotek dostał `CAT_PORTRAIT_SIZE=175` (boss zostaje 130) — SVG
+kotka ma spory pusty margines w viewBox, więc przy identycznym `size` zawsze wyglądał
+mniejszy niż ciasno przycięte PNG bossów. `tsc`/`jest` zielone. **Priorytet testu na
+urządzeniu**: (a) HP czytelne pod portretem; (b) cień widoczny, "przyklejony" do sprite'a,
+nie oderwany; (c) kotek zauważalnie większy ale NIE ucięty przez zaokrągloną scenę areny na
+węższych telefonach — jedyne realne ryzyko tej zmiany, niezmierzone na prawdziwym ekranie;
+(d) lecący pocisk/łapka dalej trafia w środek portretu.
+
 ## 🆕 "Sklepikarz" (CatArt w przebraniu) — czeka na ekran Rynku — NIEsprawdzone (2026-09-03)
 
 Część 2 (część 1 = foldery, patrz wpis niżej). User: kotek za ladą, wąsy-inkognito +
