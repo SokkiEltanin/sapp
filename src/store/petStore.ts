@@ -150,6 +150,13 @@ interface PetState {
   situpsDay: string | null;
   plankDay: string | null;
   stretchDay: string | null;
+  // Rower — było sensor-owe (Health Connect ExerciseSession), user (2026-09-03): "te questów
+  // ze jeździć rowerem 20 min dziwnie łapie... zawsze nawet jak nie robię to zawsze jest do
+  // odebrania zaliczone" — telefon/zegarek czasem auto-klasyfikuje jazdę samochodem/szybki
+  // spacer jako "biking" (znany fałszywy-pozytyw wykrywania aktywności, nic do naprawienia
+  // po stronie naszego kodu — Health Connect nie daje confidence score). Przerobione na
+  // self-report jak pozostałe 5 (TrainingSessionModal, timer na `bikeTarget` minut).
+  bikeDay: string | null;
   // day → true for any day a training quest (any of the 6) was CLAIMED — feeds the
   // m_training milestone streak (quests.ts trainingStreakFrom). Keyed by day, not by
   // quest, because the streak is "did ANY training happen today", not per-exercise
@@ -282,6 +289,7 @@ interface PetState {
   markSitupsDone: () => void;
   markPlankDone: () => void;
   markStretchDone: () => void;
+  markBikeDone: () => void;              // self-report today's bike quest (2026-09-03, was sensor-based)
   markTrainingDay: () => void;   // called once per claimed training quest — feeds m_training streak
   // itemDropped = nowy, jeszcze nieposiadany item (poziom 1). itemLeveledUp = ulepszenie JUŻ
   // posiadanego itemu o +1 poziom (2026-08-18, tylko epic/legendary — patrz COMBAT_ITEM_DROP_
@@ -383,6 +391,7 @@ export const usePetStore = create<PetState>()(
       situpsDay: null,
       plankDay: null,
       stretchDay: null,
+      bikeDay: null,
       trainingDays: {},
       energy: campaignEnergyMax([], {}, {}),
       energyRegenAt: null,
@@ -591,6 +600,7 @@ export const usePetStore = create<PetState>()(
       markSitupsDone: () => set({ situpsDay: todayISO() }),
       markPlankDone: () => set({ plankDay: todayISO() }),
       markStretchDone: () => set({ stretchDay: todayISO() }),
+      markBikeDone: () => set({ bikeDay: todayISO() }),
       markTrainingDay: () => set((s) => ({ trainingDays: { ...s.trainingDays, [todayISO()]: true } })),
       openCrate: () => {
         const s = get();
@@ -973,7 +983,7 @@ export const usePetStore = create<PetState>()(
         weeklyClaims: s.weeklyClaims, monthlyClaims: s.monthlyClaims,
         affection: s.affection, affectionDay: s.affectionDay, affectionRewardDay: s.affectionRewardDay, pendingCrates: s.pendingCrates,
         pushupsDay: s.pushupsDay, squatsDay: s.squatsDay,
-        situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, trainingDays: s.trainingDays,
+        situpsDay: s.situpsDay, plankDay: s.plankDay, stretchDay: s.stretchDay, bikeDay: s.bikeDay, trainingDays: s.trainingDays,
         energy: s.energy, energyRegenAt: s.energyRegenAt,
         defeatedBosses: s.defeatedBosses, defeatedMadBosses: s.defeatedMadBosses,
         missionStartedAt: s.missionStartedAt, missionEndsAt: s.missionEndsAt, missionProfile: s.missionProfile,

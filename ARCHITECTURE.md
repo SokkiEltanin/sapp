@@ -3473,6 +3473,64 @@ areny na węższych telefonach (to jedyne ryzyko tej zmiany — `CAT_PORTRAIT_SI
 z zapasem, ale nie zmierzony na prawdziwym, wąskim ekranie); (d) lecący pocisk/łapka dalej
 trafia wizualnie w środek portretu, nie w pasek HP.
 
+## 22. Quest "rower" — z czujnika na self-report, sekcja "Trening" na górze Zadań — 2026-09-03
+
+User: "te questów ze jeździć rowerem 20 min dziwnie łapie bo zawsze nawet jak nie robię to
+zawsze jest do odebrania zaliczone... moze zrobmy inne ćwiczenia czy coś... i te zadania
+muszą byc na samej górze jako ekstra i byc za więcej coinow i XP (musi byc zachęta by to
+robić) zrob ładniejszy ekran cwiczen... i skaluje to z lvl kotka pupila".
+
+**Przyczyna false-positive (nie bug w naszym kodzie)**: `b_bikeride` był JEDYNYM z 6 questów
+treningowych opartym o czujnik — `ExerciseSession` z Health Connect, filtrowane po
+`exerciseType` BIKING/BIKING_STATIONARY (`healthConnectService.ts`). Telefon/zegarek czasem
+auto-klasyfikuje jazdę samochodem albo szybki spacer jako "biking" — znany fałszywy-pozytyw
+wykrywania aktywności, Health Connect nie udostępnia confidence score do odfiltrowania tego.
+Stąd "zawsze zaliczone nawet jak nie jeżdżę".
+
+**Naprawa — rower dołączył do self-reportu, jak pozostałe 5:**
+- `quests.ts`: `QuestCtx.bikeMinutesToday` (Health Connect) → `bikeToday?: boolean`
+  (self-report, jak `pushupsToday` itd). `b_bikeride.done` = `!!c.bikeToday`, `note` = "zrobione"
+  / "stuknij po zrobieniu" (ten sam wzorzec co reszta piątki, bez paska postępu — self-report
+  jest binarny, nie ma czego pokazać jako ułamek).
+- `petStore.ts`: nowe pole `bikeDay: string | null` + akcja `markBikeDone()`, dokładnie ten
+  sam wzorzec co `pushupsDay`/`markPushupsDone` itd (persist partialize zaktualizowany).
+- `TrainingSessionModal.tsx`: `SelfReportExercise` był `Exclude<TrainingExercise, 'bike'>` —
+  teraz pełny `TrainingExercise` (bike włączony). Rower dołączył do `TIMED` (jak
+  deska/rozciąganie — realnie odliczany timer na `bikeTarget` minut, z przyciskiem "Pomiń"
+  jeśli user faktycznie już przejechał się wcześniej), `META.bike = { label: 'Rower', unit:
+  'minutes' }`.
+- `usePetQuests.ts`: czyta `bikeDay` ze store'a zamiast `health.cyclingMinutesToday` do
+  zbudowania `bikeToday`. `cyclingMinutesToday`/Health Connect biking-sensing SAM W SOBIE
+  zostaje nietknięty (nadal zasila wykres w `app/(tabs)/health.tsx` — to inny, niezależny
+  odbiorca tych samych surowych danych, nie ma powodu go ruszać).
+
+**Wyższe nagrody + zachęta (2× flat bump, `quests.ts` BONUS)**: pushups/squats/situps/plank
+4→8 monet, 10→20 XP; stretch 4→8 / 9→18; bike (nadal najwyższy z szóstki — największy
+wymagany czas) 5→10 / 13→26. Wszystkie 6 dalej skalują się z poziomem pupila przez ISTNIEJĄCY
+wspólny `questRewardMult(level)` w `buildQuests` — user chciał skalowania z lvl, a to już
+działało dla WSZYSTKICH questów (nie tylko treningowych); świadomie NIE dodana druga,
+osobna krzywa tylko dla treningu — jedna, wspólna, już przetestowana wystarcza.
+
+**`app/pet-quests.tsx` — nowa sekcja "Trening" na SAMEJ GÓRZE ekranu** (przed nawet
+"Nieodebrane z poprzednich dni"): wyciąga wszystkie 6 questów treningowych
+(`TRAINING_QUEST_IDS`) z ogólnej puli `bonusDaily` do własnej, wizualnie odrębnej karty —
+pomarańczowy akcent (`#FB923C`, plakietka "EKSTRA"), ikona per ćwiczenie (Dumbbell/Flame/
+Activity/Timer/Sparkles/Bike z lucide — czysto orientacyjny placeholder, user obiecał
+docelową grafikę później: "moge potem wygenerować grafiki pod to"), pigułka nagrody pokazuje
+TERAZ TEŻ XP (nie tylko monety jak reszta list) — podkreśla że to wyższy tier. Reszta
+`bonusDaily` (stepbeat/water/sleep) zostaje w zwykłej sekcji "Bonusowe dziś" niżej, filtrowana
+osobno (`otherBonus`). `selfReport` mapa (exercise→target→action) podniesiona z lokalnej
+zmiennej wewnątrz JSX do jednego wspólnego miejsca w komponencie — używana teraz przez OBIE
+sekcje (trening na górze, ewentualny fallback niżej), zero duplikacji.
+
+`tsc`/`jest` zielone (67 suit/822 testy, żaden test nie odwoływał się do starych wartości
+nagród/`bikeMinutesToday` — nic do aktualizacji w testach). **Priorytet testu na
+urządzeniu**: (a) sekcja "Trening" faktycznie na samej górze, nad zaległymi/codziennymi;
+(b) rower NIE zalicza się sam — trzeba przejść przez "Rozpocznij" → timer → potwierdzenie,
+jak deska/rozciąganie; (c) nagrody widoczne w pigułce (monety+XP) zgadzają się z tym co
+faktycznie dopisuje się po "Odbierz"; (d) `markBikeDone`/`bikeDay` persystują między
+sesjami (zamknij i otwórz apkę tego samego dnia — rower powinien zostać "zrobione").
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

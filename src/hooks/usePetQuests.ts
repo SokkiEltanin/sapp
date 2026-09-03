@@ -21,7 +21,7 @@ const todayISO = () => ymdOf(new Date());
 export function usePetQuests() {
   const {
     xp, claimedQuests, dailyClaims, dayClaims, weeklyClaims, monthlyClaims, affection, affectionDay,
-    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, trainingDays,
+    pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay, trainingDays,
   } = usePetStore();
   const { birthdate, gender, trainingLevel } = useProfileStore();
   const lvl = levelFromXp(xp);
@@ -73,9 +73,9 @@ export function usePetQuests() {
       situpsToday: situpsDay === t,
       plankToday: plankDay === t,
       stretchToday: stretchDay === t,
-      bikeMinutesToday: health.cyclingMinutesToday,
+      bikeToday: bikeDay === t,
     };
-  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay]);
+  }, [health, moodEntries, todayDone.length, habits.length, expenses, habitBestStreak, cardsCollected, waterToday, waterGoal, affToday, trainingDays, personalTargets, todaysPool, pushupsDay, squatsDay, situpsDay, plankDay, stretchDay, bikeDay]);
   const quests = useMemo(
     () => buildQuests(questCtx, { claimedMilestones: claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, today: todayISO(), week: weekKeyOf() }, lvl.level),
     [questCtx, claimedQuests, dailyClaims, weeklyClaims, monthlyClaims, lvl.level],

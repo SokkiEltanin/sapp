@@ -5,15 +5,20 @@ import { haptic } from '@/utils/haptics';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import type { TrainingExercise } from '@/utils/personalQuests';
 
-// Self-report training questy (b_pushups/b_squats/b_situps/b_plank/b_stretch, quests.ts) nie
-// mają czujnika liczącego powtórzenia/czas — dawniej jedno bezmyślne tapnięcie "Zrobione".
-// User (2026-08-15): chce realny przebieg ćwiczenia. Rozpocznij → (deska/rozciąganie: realnie
-// ODLICZANY timer na ekranie; pompki/przysiady/brzuszki: ekran z docelową liczbą powtórzeń) →
-// potwierdzenie. Wciąż samo-raportowanie (bez czujnika), tylko z rytmem sesji zamiast jednego
-// tapnięcia — onComplete woła to samo mark*Done co wcześniej.
-export type SelfReportExercise = Exclude<TrainingExercise, 'bike'>;
+// Self-report training questy (b_pushups/b_squats/b_situps/b_plank/b_stretch/b_bikeride,
+// quests.ts) nie mają czujnika liczącego powtórzenia/czas — dawniej jedno bezmyślne
+// tapnięcie "Zrobione". User (2026-08-15): chce realny przebieg ćwiczenia. Rozpocznij →
+// (deska/rozciąganie/rower: realnie ODLICZANY timer na ekranie; pompki/przysiady/brzuszki:
+// ekran z docelową liczbą powtórzeń) → potwierdzenie. Wciąż samo-raportowanie (bez czujnika),
+// tylko z rytmem sesji zamiast jednego tapnięcia — onComplete woła to samo mark*Done co
+// wcześniej. Rower dołączył do tej listy 2026-09-03 (był jedynym z sześciu opartym na
+// czujniku — Health Connect ExerciseSession — user: "dziwnie łapie... zawsze nawet jak nie
+// robię to zawsze jest do odebrania zaliczone"; telefon/zegarek czasem auto-klasyfikuje jazdę
+// samochodem/szybki spacer jako "biking", więc quest fałszywie zaliczał się sam) — teraz
+// identyczny self-report jak deska/rozciąganie, po prostu z dłuższym, realistycznym czasem.
+export type SelfReportExercise = TrainingExercise;
 
-const TIMED: SelfReportExercise[] = ['plank', 'stretch'];
+const TIMED: SelfReportExercise[] = ['plank', 'stretch', 'bike'];
 
 const META: Record<SelfReportExercise, { label: string; unit: 'reps' | 'seconds' | 'minutes' }> = {
   pushups: { label: 'Pompki', unit: 'reps' },
@@ -21,6 +26,7 @@ const META: Record<SelfReportExercise, { label: string; unit: 'reps' | 'seconds'
   situps:  { label: 'Brzuszki', unit: 'reps' },
   plank:   { label: 'Deska', unit: 'seconds' },
   stretch: { label: 'Rozciąganie', unit: 'minutes' },
+  bike:    { label: 'Rower', unit: 'minutes' },
 };
 
 function fmt(secs: number) {
