@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Baza jedzenia: ~65 nowych produktów + naprawa dziur w wykrywaniu słodyczy — NIEsprawdzone (2026-09-04)
+
+User: "dodaj więcej o wiele produktow z kaloriami realnym, i dodatkowo zeby zaliczamy sie do
+słodyczy jak coś jest słodyczem". Dwie rzeczy, pełny opis w ARCHITECTURE.md §24:
+1. ~65 nowych produktów w `foodBase.ts` — mięso surowe, więcej ryb, strączki/tofu, owoce
+   suszone, orzechy/nasiona, napoje, kasze śniadaniowe, dania obiadowe, fast food.
+2. **Naprawiona realna dziura**: krówki, ptasie mleczko, sernik, brownie, gofry, delicje,
+   michałki, kremówka, eklerka, faworki i kilkanaście innych klasycznych słodyczy w ogóle
+   NIE łapało się jako "słodycze" w streaku "bez słodyczy" — czysty przeoczony gap w
+   `AVOID_PRESETS.sweets` (countersStore.ts), teraz naprawiony i pokryty testami.
+
+`tsc`/`jest` zielone (67 suit/837 testów). **Priorytet testu na urządzeniu**: (a) wyszukaj w
+Co zjadłem kilka nowych produktów — sensowne kalorie; (b) zjedz "Krówki" mając aktywny nawyk
+"bez słodyczy" — streak powinien pęknąć (wcześniej nie pękał).
+
 ## ✅ Black screen w "Co zjadłem" — TERAZ NAPRAWIONY (2026-09-04)
 
 To samo zgłoszenie co "Grey screen w Co zjadłem" niżej (2026-08-31) wróciło: "jak dodałem

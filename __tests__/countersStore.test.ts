@@ -21,3 +21,35 @@ describe('matchesAvoid — preset "słodycze" łapie słodkie wypieki po nazwie'
     expect(matchesAvoid('Chleb żytni razowy', sweetsKeyword)).toBe(false);
   });
 });
+
+// 2026-09-04, user: "zeby zaliczamy sie do słodyczy jak coś jest słodyczem" — audyt całej
+// foodBase.ts znalazł klasyczne polskie słodycze, które NIE łapały się wcale (samo "ciast"/
+// "czekolad"/itd nie pokrywało ich nazw). Każdy nowy fragment keyword sprawdzony pod kątem
+// fałszywych trafień na CAŁEJ bazie produktów (node -e skrypt) przed dodaniem.
+describe('matchesAvoid — preset "słodycze" łapie dobitkę 2026-09-04', () => {
+  test.each([
+    ['Krówki'],
+    ['Ptasie mleczko'],
+    ['Sernik'],
+    ['Brownie'],
+    ['Gofry'],
+    ['Delicje (biszkopt)'],
+    ['Michałki'],
+    ['Kremówka'],
+    ['Snickers'],
+    ['Kinder Bueno'],
+    ['Wafelek'],
+    ['Tortik z galaretką'],
+  ])('%s pasuje do keyword słodyczy', (name) => {
+    expect(matchesAvoid(name, sweetsKeyword)).toBe(true);
+  });
+
+  // 'tortik' (nie samo 'tort') i 'wafel' (nie 'wafl') dobrane specjalnie, żeby NIE złapać
+  // tych dwóch, realnie istniejących w bazie, niesłodkich produktów.
+  test.each([
+    ['Tortilla pszenna'],
+    ['Wafle ryżowe'],
+  ])('%s NIE pasuje (celowo, żeby uniknąć fałszywego trafienia)', (name) => {
+    expect(matchesAvoid(name, sweetsKeyword)).toBe(false);
+  });
+});

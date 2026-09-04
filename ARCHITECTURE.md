@@ -3566,6 +3566,43 @@ bez tagu nie blokuje starszego z tagiem"). **Priorytet testu na urządzeniu**: C
 Produkty → wpisz nazwę CAŁKOWICIE nowego produktu (nieużywanego wcześniej) — pisanie powinno
 być płynne, zero laga/zawieszenia, nawet z długą historią paragonów.
 
+## 24. Baza jedzenia: duża dobitka produktów + naprawa dziur w wykrywaniu słodyczy — 2026-09-04
+
+User: "dodaj więcej o wiele produktow z kaloriami realnym, i dodatkowo zeby zaliczamy sie do
+słodyczy jak coś jest sldyxzem [słodyczem]" — dwie osobne rzeczy w `src/data/foodBase.ts` i
+`src/store/countersStore.ts`.
+
+**1. ~65 nowych produktów** (`foodBase.ts`, obok dobitki słodyczy z §23-poprzedzającej sesji)
+— wypełnia największe dziury: mięso SUROWE do gotowania (nie tylko wędliny — schab, wołowina
+mielona, żeberka, karkówka, golonka, kaszanka…), więcej ryb (dorsz, pstrąg, krewetki, paluszki
+rybne…), rośliny strączkowe/białko roślinne (soczewica, ciecierzyca, tofu, tempeh, edamame),
+owoce suszone, orzechy/nasiona (pistacje, chia, siemię lniane…), napoje, kasze śniadaniowe
+(kuskus, quinoa, manna), sporo dań obiadowych (bigos, żurek, gulasz, gołąbki, risotto, curry…)
+i fast foodowych (cheeseburger, nachos, falafel, gyros…). Zweryfikowane skryptem, że ŻADNA
+nowa nazwa nie duplikuje istniejącej (baza ma 19 PRZEDWCZEŚNIEJSZYCH duplikatów z
+wcześniejszych rund — świadomie NIE ruszone, poza zakresem tej prośby).
+
+**2. Naprawiona realna dziura w `AVOID_PRESETS.sweets`** (`countersStore.ts`) — audyt CAŁEJ
+bazy `foodBase.ts` (nie tylko nowo dodanych produktów) ujawnił, że sporo KLASYCZNYCH polskich
+słodyczy w ogóle nie łapało się jako "słodycze" dla streaka "bez słodyczy": **krówki, ptasie
+mleczko, sernik, brownie, gofry, delicje/biszkopt, michałki, kremówka, eklerka, faworki,
+beza, kasztanka, andruty, herbatniki, muffinka, budyń, wafelek** + marki (Snickers/Kinder
+Bueno/Prince Polo/Grześki). Zjedzenie krówki czy ptasiego mleczka NIE psuło streaka mimo że
+to oczywiste słodycze — czysty przeoczony gap w keyword-liście, nie architektoniczny problem.
+
+Każdy nowy fragment keyword ręcznie sprawdzony (node -e skrypt na CAŁEJ bazie) pod kątem
+fałszywych trafień: `tortik` zamiast samego `tort` (żeby nie złapać "Tortilla pszenna"),
+`wafel` zamiast `wafl` (żeby nie złapać "Wafle ryżowe" — inny, niesłodki produkt), `beza`/
+`bezy` zamiast gołego `bez` (za krótki/niebezpieczny podciąg). Diakrytyki zdublowane tym
+samym wzorcem co reszta listy (kremówk/kremowk, michałk/michalk, krówk/krowk).
+
+`tsc`/`jest` zielone (67 suit/837 testów — 14 nowych w `countersStore.test.ts`: 12 nowo
+łapanych słodyczy + 2 celowe non-matche na Tortilla/Wafle ryżowe, dowodzące że fix nie
+wprowadził fałszywych trafień). **Priorytet testu na urządzeniu**: (a) Co zjadłem → wyszukaj
+kilka nowych produktów (np. "Soczewica", "Krewetki", "Bigos") — powinny się znaleźć z
+sensownymi kaloriami; (b) zjedz "Krówki" lub "Ptasie mleczko" mając aktywny nawyk "bez
+słodyczy" — streak powinien się zresetować (wcześniej NIE resetował się).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
