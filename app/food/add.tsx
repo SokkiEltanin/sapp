@@ -13,7 +13,7 @@ import {
 import { searchFoodBase } from '@/data/foodBase';
 import DatePickerField from '@/components/ui/DatePickerField';
 import { normalizeProductName } from '@/utils/productMemory';
-import { purchasedCatForName } from '@/utils/food';
+import { purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
 import { useExpensesStore } from '@/store/expensesStore';
 import { spacing, radius, colors } from '@/theme';
 import { fonts } from '@/theme/fonts';
@@ -75,6 +75,12 @@ export default function FoodAdd() {
   const products            = useFoodStore(st => st.products);
   const findProductByName   = useFoodStore(st => st.findProductByName);
   const expenses            = useExpensesStore(st => st.expenses);
+  // Zbudowany RAZ per `expenses` (2026-09-04) zamiast pełnego sortu wewnątrz
+  // `purchasedCatForName` przy każdym wywołaniu — patrz komentarz przy
+  // `buildPurchasedCatIndex` w utils/food.ts (ten sam koszt, tu wywoływany tylko na
+  // zapisie nowego produktu, nie per-klawisz jak w food/product.tsx, ale wciąż zbędny
+  // pełny re-sort historii wydatków za każdym razem).
+  const purchasedCatIndex   = useMemo(() => buildPurchasedCatIndex(expenses), [expenses]);
   const presets             = useFoodStore(st => st.presets);
   const storeMeals          = useFoodStore(st => st.meals);
   const addMeal             = useFoodStore(st => st.addMeal);
@@ -435,7 +441,7 @@ export default function FoodAdd() {
       // aktualizujący JUŻ istniejący produkt spreaduje seed wprost na patch — jawny `undefined`
       // wyczyściłby istniejącą kategorię).
       const existingByName = findProductByName(sel.name);
-      const catSeed = (!existingByName?.cat) ? purchasedCatForName(sel.name, expenses) : undefined;
+      const catSeed = (!existingByName?.cat) ? purchasedCatForName(sel.name, purchasedCatIndex) : undefined;
       const p = upsertProductByName(sel.name, {
         kcalPer100g: k100 > 0 ? k100 : sel.kcalPer100g, kcalPerPortion: sel.kcalPerPortion,
         protein100: sel.protein100, carbs100: sel.carbs100, fat100: sel.fat100, sugar100: sel.sugar100,
@@ -471,7 +477,7 @@ export default function FoodAdd() {
     const kcal = Math.round(parseFloat(mKcal.replace(',', '.')));
     if (!name || !(kcal > 0)) return;
     const existingByName = findProductByName(name);
-    const catSeed = (!existingByName?.cat) ? purchasedCatForName(name, expenses) : undefined;
+    const catSeed = (!existingByName?.cat) ? purchasedCatForName(name, purchasedCatIndex) : undefined;
     const p = upsertProductByName(name, { kcalPerPortion: kcal, defaultUnit: 'porcja', ...(catSeed ? { cat: catSeed } : {}) });
     setItems(prev => [...prev, { name, productId: p.id, qty: 1, unit: 'porcja', grams: 0, kcal }]);
     setManual(false); setMName(''); setMKcal('');

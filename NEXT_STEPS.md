@@ -3,6 +3,23 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Black screen w "Co zjadłem" — TERAZ NAPRAWIONY (2026-09-04)
+
+To samo zgłoszenie co "Grey screen w Co zjadłem" niżej (2026-08-31) wróciło: "jak dodałem
+ciastka wczorajsze ze zjadłem na testa to znowu mam black screena, z dzisiejszymi nie ma
+problemu z wczorajszymi jest". Tym razem znaleziona i naprawiona REALNA przyczyna (Explore-
+agent + ręczna weryfikacja): `purchasedCatForName()` (`src/utils/food.ts`) sortowała CAŁĄ
+historię wydatków przy każdym wywołaniu, a `app/food/product.tsx` wołało ją z `useEffect`
+zależnego od tekstu w polu nazwy — czyli PRZY KAŻDYM ZNAKU wpisywanym przy tworzeniu nowego
+produktu. Nie chodziło o datę posiłku (stąd myląca korelacja usera) — chodziło o to, czy
+"ciastka" było już ZNANYM produktem (bailuje szybko) czy tworzone od zera (kosztowny path).
+Naprawa: `buildPurchasedCatIndex()` sortuje RAZ (memoized per `expenses`), lookup potem to
+O(1) `Map.get`. Pełny opis w ARCHITECTURE.md §23. `tsc`/`jest` zielone (67 suit/823 testy,
+nowy test w `food.test.ts`). **Priorytet testu na urządzeniu**: Co zjadłem → Produkty →
+wpisz CAŁKOWICIE nową nazwę produktu — pisanie płynne, zero laga, nawet z długą historią
+paragonów. Stary wpis "Grey screen..." niżej zostaje jako historia (opisywał TĘ SAMĄ ścieżkę
+repro, ale bez znalezienia przyczyny wtedy).
+
 ## 🆕 Quest rowerowy → self-report + sekcja "Trening" na górze Zadań — NIEsprawdzone (2026-09-03)
 
 User: "rower... dziwnie łapie bo zawsze nawet jak nie robię to zawsze jest do odebrania
@@ -300,15 +317,18 @@ zeskanowane paragony ze słodyczami/przekąskami/miętówkami/grylażem łapią 
   przykładów żeby bezpiecznie zdiagnozować regex/logikę bez ryzyka zepsucia innych paragonów),
   niski priorytet (2 itemy na setki), ale wart odnotowania jeśli user zgłosi więcej podobnych.
 
-## ✅ Grey screen w "Co zjadłem" — user potwierdził, że już nie występuje (2026-08-31)
+## ✅ Grey screen w "Co zjadłem" (2026-08-31) — WRÓCIŁO 2026-09-04, TERAZ NAPRAWIONE NA REAL
 
 Zgłoszony wcześniej tego dnia (Co zjadłem → Produkty → ciastka → Zapisz). Przeszukane
 statycznie (kod + eslint pod kątem hooków) bez znalezienia przyczyny; user następnie
 zgłosił że dodanie na "wczoraj" nie crashuje (możliwa wskazówka: coś specyficznego dla
 DZISIEJSZEJ daty), ale finalnie user: "nie wywala już grey screena nie wiem o co chodzi
-narazie odhaczony problem" — NIE naprawiony świadomie, po prostu przestał się powtarzać.
-Jeśli wróci, zacząć od świeżego zrzutu z Ustawienia → Diagnostyka (z dzisiejszą datą) i
-sprawdzić czy dotyczy TYLKO wpisów na dziś vs wsteczne daty.
+narazie odhaczony problem" — NIE naprawiony wtedy, po prostu przestał się powtarzać, i
+wrócił 2026-09-04 (patrz nowy wpis na samej górze tego pliku + ARCHITECTURE.md §23) — tym
+razem znaleziona i naprawiona REALNA przyczyna (`purchasedCatForName` resortująca całą
+historię wydatków co klawisz w polu nazwy nowego produktu, `app/food/product.tsx`). Data
+posiłku nigdy nie miała znaczenia — myląca korelacja usera, prawdziwy czynnik to "czy
+produkt jest już znany (cat ustawione) czy tworzony od zera".
 
 ## 🆕 Nawyk "Bez słodyczy" nie łapał produktu bez słowa-klucza w NAZWIE (tylko w kategorii) — NIEsprawdzone (2026-08-31)
 
