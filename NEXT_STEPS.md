@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Pupil: większe sloty ekwipunku, zbita siatka staty, powiększony pasek Lv — NIEsprawdzone (2026-09-04)
+
+User: "I te sloty na ekwipunku pupila jeszcze powiększyć trochę bo teraz itemy nadal sa
+trochę malo widoczne plus zbić bardziej te statystyki i wydłużyć i powiększyć lvl zeby byl
+czytelniejszy i bardziej widoczny kosztem nawet wywalenia tego paska głaskania z serduszkiem".
+Pełny opis w ARCHITECTURE.md §25. Sloty ekwipunku 50→62px (drugie powiększenie), siatka "Siła
+bojowa" zbita (mniejsze karty/fonty/ikony), pasek głaskania z sercem USUNIĘTY z headera
+(mechanika działa dalej, zniknął tylko widoczny pasek), miejsce poszło na większy/szerszy
+pasek Lv. `tsc`/`jest` zielone (67 suit/837 testów, czyste UI, zero zmian w testach).
+**Priorytet testu na urządzeniu**: ekran Pupil → itemy w slotach wyraźnie widoczne? Pasek Lv
+czytelny i nie ucieka poza header obok imienia na wąskim telefonie? Siatka staty mieści się
+bez dziwnego zawijania? Tapnięcie kotka nadal daje reakcję głaskania mimo braku paska?
+
 ## 🆕 Baza jedzenia: ~65 nowych produktów + naprawa dziur w wykrywaniu słodyczy — NIEsprawdzone (2026-09-04)
 
 User: "dodaj więcej o wiele produktow z kaloriami realnym, i dodatkowo zeby zaliczamy sie do
