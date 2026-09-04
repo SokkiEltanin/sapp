@@ -198,6 +198,22 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Kisiel',               kcal: 55,  protein: 0.2, sugar: 12, unit: 'porcja',   unitGrams: { porcja: 150 } },
   { name: 'Gofry',                kcal: 290, protein: 6,   sugar: 12, unit: 'szt',      unitGrams: { szt: 80 } },
   { name: 'Cukier',               kcal: 400, protein: 0,   sugar: 100,unit: 'lyzeczka', unitGrams: { lyzeczka: 5, lyzka: 12 } },
+  // Dobitka słodyczy (2026-09-03, user: "torcikow kupnych z galaretką na oko możesz mi
+  // dać, i wgle więcej ich zrobić") — wartości "na oko" jak reszta tej sekcji (packaged
+  // goods, ±10-15%), tym samym stylem/formatem co powyżej.
+  { name: 'Tortik z galaretką',   kcal: 410, protein: 4.5, sugar: 38, unit: 'szt',      unitGrams: { szt: 40 } },
+  { name: 'Kasztanka',            kcal: 480, protein: 5,   sugar: 45, unit: 'szt',      unitGrams: { szt: 15 } },
+  { name: 'Beza',                 kcal: 390, protein: 3,   sugar: 85, unit: 'szt',      unitGrams: { szt: 15 } },
+  { name: 'Eklerka',              kcal: 330, protein: 5,   sugar: 20, unit: 'szt',      unitGrams: { szt: 70 } },
+  { name: 'Kremówka',             kcal: 310, protein: 4,   sugar: 18, unit: 'szt',      unitGrams: { szt: 100 } },
+  { name: 'Faworki',              kcal: 460, protein: 6,   sugar: 20, unit: 'garsc',    unitGrams: { garsc: 40, szt: 15 } },
+  { name: 'Rurka z kremem',       kcal: 400, protein: 5,   sugar: 25, unit: 'szt',      unitGrams: { szt: 50 } },
+  { name: 'Herbatniki',           kcal: 440, protein: 7,   sugar: 22, unit: 'szt',      unitGrams: { szt: 8 } },
+  { name: 'Wafle ryżowe',         kcal: 385, protein: 8,   sugar: 1,  unit: 'szt',      unitGrams: { szt: 9 } },
+  { name: 'Ciastka owsiane',      kcal: 440, protein: 7,   sugar: 22, unit: 'szt',      unitGrams: { szt: 15 } },
+  { name: 'Ciastka czekoladowe',  kcal: 490, protein: 5,   sugar: 33, unit: 'szt',      unitGrams: { szt: 12 } },
+  { name: 'Muffinka',             kcal: 380, protein: 5,   sugar: 28, unit: 'szt',      unitGrams: { szt: 70 } },
+  { name: 'Andruty',              kcal: 400, protein: 5,   sugar: 30, unit: 'szt',      unitGrams: { szt: 25 } },
 
   // ── Fast food / na mieście ───────────────────────────────────────────────────
   { name: 'Kebab (bułka)',        kcal: 215, protein: 12,  unit: 'szt',      unitGrams: { szt: 350 } },
