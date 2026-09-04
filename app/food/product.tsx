@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Check, Link2, Search, X, Trash2 } from 'lucide-react-native';
 
 import { useFoodStore, FoodUnit } from '@/store/foodStore';
-import { FOOD_SUBCATS, purchasedCatForName } from '@/utils/food';
+import { FOOD_SUBCATS, purchasedCatForName, buildPurchasedCatIndex } from '@/utils/food';
 import { Expense } from '@/types';
 import { expensesService } from '@/services/expensesService';
 import { loadNameAliases, canonicalProductName, normalizeProductName } from '@/utils/productMemory';
@@ -78,11 +78,17 @@ export default function FoodProductForm() {
   // oflaguję że to pieczywo/słodycz - jak zaznaczę że zjadłem to trzeba żeby oflagowało że
   // zjadłem słodycz i tracę streak"). Tylko dla NOWEGO produktu bez jeszcze wybranej
   // kategorii — nigdy nie nadpisuje edytowanego produktu ani świadomego wyboru usera.
+  // Indeks zbudowany RAZ per `purchasedExpenses` (2026-09-04, było: pełny sort całej
+  // historii wydatków wewnątrz `purchasedCatForName` przy KAŻDYM wywołaniu, a ten efekt
+  // odpala się na KAŻDE naciśnięcie klawisza w polu nazwy — user z dłuższą historią
+  // paragonów dostawał realny freeze JS threada = "black screen" przy samym pisaniu nazwy
+  // nowego produktu, patrz pełny opis przy `buildPurchasedCatIndex` w utils/food.ts).
+  const purchasedCatIndex = useMemo(() => buildPurchasedCatIndex(purchasedExpenses), [purchasedExpenses]);
   useEffect(() => {
     if (editing || cat || !name.trim()) return;
-    const suggested = purchasedCatForName(name, purchasedExpenses);
+    const suggested = purchasedCatForName(name, purchasedCatIndex);
     if (suggested) setCat(suggested);
-  }, [name, editing, cat, purchasedExpenses]);
+  }, [name, editing, cat, purchasedCatIndex]);
 
   const linkResults = useMemo(() => {
     const q = normalizeProductName(linkQuery);

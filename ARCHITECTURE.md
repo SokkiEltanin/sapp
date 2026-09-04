@@ -3531,6 +3531,41 @@ jak deska/rozciąganie; (c) nagrody widoczne w pigułce (monety+XP) zgadzają si
 faktycznie dopisuje się po "Odbierz"; (d) `markBikeDone`/`bikeDay` persystują między
 sesjami (zamknij i otwórz apkę tego samego dnia — rower powinien zostać "zrobione").
 
+## 23. Black screen w "Co zjadłem" — `purchasedCatForName` resortowała CAŁĄ historię wydatków co klawisz — 2026-09-04
+
+User: "jak dodałem ciastka wczorajsze ze zjadłem na testa to znowu mam black screena, z
+dzisiejszymi nie ma problemu z wczorajszymi jest" — "znowu" bo TO SAMO zgłoszenie ("Co
+zjadłem → Produkty → ciastka → Zapisz") padło już 2026-08-31, wtedy przeszukane statycznie
+bez znalezienia przyczyny i odhaczone jako "user: nie wywala już, nie wiem o co chodzi" —
+czyli NIGDY realnie nie naprawione, po prostu przestało się powtarzać, aż wróciło.
+
+**Root cause** (znaleziony przez Explore-agenta, potwierdzony ręcznie): `purchasedCatForName()`
+(`src/utils/food.ts`, dodana w §14 — most kategorii "co kupuję"→"co zjadłem") robiła
+`[...expenses].sort(...)` — pełny klon+sort CAŁEJ historii wydatków — PRZY KAŻDYM WYWOŁANIU.
+`app/food/product.tsx` woła ją z `useEffect` zależnego od `name` — czyli TEKSTU wpisywanego w
+polu nazwy nowego produktu — więc każdy pojedynczy znak wpisany przy tworzeniu nowego produktu
+(np. "ciastka") odpalał pełny re-sort historii paragonów. Dla usera z dłuższą historią
+(setki wydatków, patrz §15 "rosnący blob") to realny freeze JS threada = black screen,
+dokładnie przy pisaniu nazwy — nie przy samej dacie posiłku. Wyjaśnia "dzisiejszymi nie ma
+problemu": produkt "ciastka" najpewniej istniał już jako ZNANY produkt z kategorią
+(`cat` ustawione) z wcześniejszego testu, więc dla "dzisiaj" ten `useEffect` bailował
+natychmiast (`if (editing || cat || ...) return`) — "wczoraj" najwyraźniej trafiło na
+tworzenie GENUINE NOWEGO produktu, ten sam kosztowny per-znak path.
+
+**Fix**: `purchasedCatForName(name, expenses)` rozdzielona na `buildPurchasedCatIndex(expenses)`
+(sort+scan RAZ, buduje `Map<znormalizowana nazwa, subcat>`) + `purchasedCatForName(name, index)`
+(już tylko `Map.get`, O(1)). Semantyka zachowana 1:1 (nowy test w `food.test.ts` to sprawdza) —
+najnowszy zakup wygrywa, ale jeśli najnowszy nie ma użytecznego tagu (samo "inne"), indeks
+patrzy dalej wstecz zamiast się poddawać. Obaj callerzy (`app/food/product.tsx` — per-klawisz,
+`app/food/add.tsx` — per-zapis nowego produktu, 2 miejsca) budują indeks RAZ przez
+`useMemo(() => buildPurchasedCatIndex(expenses), [expenses])` zamiast wołać starą funkcję
+bezpośrednio.
+
+`tsc`/`jest` zielone (67 suit/823 testy — nowy test w `food.test.ts` na semantykę "najnowszy
+bez tagu nie blokuje starszego z tagiem"). **Priorytet testu na urządzeniu**: Co zjadłem →
+Produkty → wpisz nazwę CAŁKOWICIE nowego produktu (nieużywanego wcześniej) — pisanie powinno
+być płynne, zero laga/zawieszenia, nawet z długą historią paragonów.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

@@ -79,20 +79,39 @@ export function foodSubcat(it: ReceiptItem): string {
 // with this exact name, so a NEW FoodProduct can inherit it instead of defaulting to
 // no category (which avoid-habit/streak tracking reads via FoodProduct.cat — see
 // matchedEatDays w countersStore.ts). Most recent purchase wins, so a re-tag on a later
-// receipt takes over. Returns undefined (never 'inne') when nothing usable is found, so
-// callers can leave `cat` alone instead of forcing a guess.
-export function purchasedCatForName(name: string, expenses: Expense[]): string | undefined {
-  const key = normalizeProductName(name);
-  if (!key) return undefined;
+// receipt takes over.
+//
+// `buildPurchasedCatIndex` was `purchasedCatForName(name, expenses)` doing a fresh
+// `[...expenses].sort()` INSIDE the function (2026-09-02, PR#126) — cheap-looking, but
+// `app/food/product.tsx` called it from a `useEffect` keyed on the NAME TEXT INPUT, so
+// it re-sorted the user's entire expense history on every keystroke while typing a new
+// product name. Documented as an unresolved "grey screen" (Co zjadłem → Produkty →
+// ciastka → Zapisz, 2026-08-31 NEXT_STEPS.md) that "stopped repeating" without ever being
+// fixed — it came back (2026-09-04, user: "dodałem ciastka wczorajsze... znowu mam black
+// screena") the next time a genuinely NEW product name hit that path (an already-known
+// product with a `cat` set skips this effect entirely, hence "dzisiejszymi nie ma
+// problemu" if today's cookie was picked from an existing entry). Fix: sort+scan ONCE per
+// `expenses` reference (memoized by the caller) into a name→subcat index; every lookup
+// after that is an O(1) Map.get instead of an O(n log n) resort.
+export function buildPurchasedCatIndex(expenses: Expense[]): Map<string, string> {
   const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
+  const map = new Map<string, string>();
   for (const e of sorted) {
     for (const it of e.receiptItems ?? []) {
-      if (normalizeProductName(it.name) !== key) continue;
+      const key = normalizeProductName(it.name);
+      if (!key || map.has(key)) continue;
       const sc = foodSubcat(it);
-      if (sc !== 'inne') return sc;
+      if (sc !== 'inne') map.set(key, sc);   // keep looking at OLDER purchases if the newest has no useful tag
     }
   }
-  return undefined;
+  return map;
+}
+
+// Returns undefined (never 'inne') when nothing usable is found, so callers can leave
+// `cat` alone instead of forcing a guess.
+export function purchasedCatForName(name: string, index: Map<string, string>): string | undefined {
+  const key = normalizeProductName(name);
+  return key ? index.get(key) : undefined;
 }
 
 // How much of an expense is FOOD: with items → sum food lines; without items but the
