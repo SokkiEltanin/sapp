@@ -100,7 +100,18 @@ export const AVOID_PRESETS: { key: string; label: string; keyword: string }[] = 
   // te słodkie wypieki są kategoryzowane jako 'pieczywo' w FOOD_TAG_MAP (finansowy podział
   // wydatków celowo NIE dubluje ich do słodyczy), więc kategoria produktu im nie pomoże;
   // złapane tu, po nazwie, tym samym wzorcem co już istniejące 'pączek'.
-  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|drożdż|drozdz|rogal|kroasan|croissant|toffi|chips|chrupk|paluszk' },
+  //
+  // Dobitka (2026-09-04, user: "zeby zaliczamy sie do słodyczy jak coś jest słodyczem") —
+  // audyt CAŁEJ bazy `foodBase.ts` ujawnił, że sporo oczywistych, klasycznych polskich
+  // słodyczy NIE łapało się w ogóle: krówki, ptasie mleczko, sernik, brownie, gofry,
+  // delicje/biszkopt, michałki, kremówka, eklerka, faworki, beza, kasztanka, andruty,
+  // herbatniki, muffinka, budyń, wafelek, + marki (Snickers/Kinder Bueno/Prince Polo/
+  // Grześki). Każdy fragment ręcznie sprawdzony (node -e skrypt) pod kątem fałszywych
+  // trafień na CAŁEJ bazie — 'tortik' (nie samo 'tort', bo złapałoby 'Tortilla'), 'wafel'
+  // (nie 'wafl', bo złapałoby 'Wafle ryżowe' — inny, niesłodki produkt), 'bez'a'/'bez'y'
+  // (nie samo 'bez', za krótkie/niebezpieczne jako podciąg). Diakrytyki zdublowane tym
+  // samym wzorcem co reszta listy (kremówk/kremowk, michałk/michalk, krówk/krowk).
+  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|drożdż|drozdz|rogal|kroasan|croissant|toffi|chips|chrupk|paluszk|tortik|kasztank|beza|bezy|eklerk|kremówk|kremowk|fawork|rurka z kremem|herbatnik|andrut|muffin|sernik|brownie|gofr|ptasie mleczko|michałk|michalk|krówk|krowk|delicj|biszkopt|budyn|budyń|snickers|kinder|bueno|prince polo|grzesk|grześk|wafelek' },
   { key: 'fastfood', label: 'fast foodów', keyword: 'mcdonald|kfc|pizza|burger|kebab|kebap|frytk|sushi|glovo|wolt|telepizza|bobby' },
   { key: 'alcohol',  label: 'alkoholu',    keyword: 'piwo|wino|wódka|wodka|whisky|drink|alkohol|browar|cydr|tyskie|żubr|zubr|lech ' },
   { key: 'energy',   label: 'energetyków', keyword: 'monster|red bull|redbull|tiger energy|energetyk|rockstar|burn ' },

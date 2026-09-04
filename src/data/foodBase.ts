@@ -298,6 +298,95 @@ export const FOOD_BASE: BaseFood[] = [
   { name: 'Nuggetsy z kurczaka',  kcal: 250, protein: 14,  unit: 'szt',      unitGrams: { szt: 18 } },
   { name: 'Spaghetti bolognese',  kcal: 150, protein: 7,   unit: 'porcja',   unitGrams: { porcja: 300 } },
   { name: 'Sałatka grecka',       kcal: 110, protein: 4,   unit: 'porcja',   unitGrams: { porcja: 200 } },
+
+  // ── Duża dobitka (2026-09-04, user: "dodaj więcej o wiele produktow z kaloriami
+  // realnym") — wypełnia największe dziury: mięso SUROWE do gotowania (nie tylko
+  // wędliny), więcej ryb, rośliny strączkowe/białko roślinne, owoce suszone, orzechy/
+  // nasiona, napoje, śniadaniowe kasze, i sporo dań obiadowych/fast foodowych, których
+  // wcześniej brakowało mimo że to bardzo częste pozycje na polskim talerzu.
+
+  // ── Mięso surowe / do gotowania (nie wędliny) ─────────────────────────────
+  { name: 'Schab surowy',         kcal: 157, protein: 21,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Wołowina mielona (surowa)', kcal: 250, protein: 17, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Filet z indyka (surowy)', kcal: 107, protein: 24, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Kurczak cały (pieczony)', kcal: 215, protein: 27, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Żeberka wieprzowe (pieczone)', kcal: 290, protein: 19, unit: 'porcja', unitGrams: { porcja: 200 } },
+  { name: 'Karkówka (grillowana)', kcal: 270, protein: 20,  unit: 'porcja',  unitGrams: { porcja: 150 } },
+  { name: 'Boczek surowy',        kcal: 520, protein: 9,   unit: 'plaster',  unitGrams: { plaster: 15 } },
+  { name: 'Golonka',              kcal: 230, protein: 19,  unit: 'porcja',   unitGrams: { porcja: 250 } },
+  { name: 'Skrzydełka z kurczaka (pieczone)', kcal: 230, protein: 22, unit: 'szt', unitGrams: { szt: 60 } },
+  { name: 'Kaszanka',             kcal: 280, protein: 10,  unit: 'plaster',  unitGrams: { plaster: 30 } },
+
+  // ── Ryby (dobitka) ─────────────────────────────────────────────────────────
+  { name: 'Dorsz (pieczony)',     kcal: 105, protein: 23,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Pstrąg (pieczony)',    kcal: 150, protein: 21,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Łosoś (pieczony)',     kcal: 208, protein: 20,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Krewetki',             kcal: 99,  protein: 21,  unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Paluszki rybne',       kcal: 220, protein: 12,  unit: 'szt',      unitGrams: { szt: 25 } },
+  { name: 'Filet z mintaja',      kcal: 90,  protein: 19,  unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Sardynki w oleju',     kcal: 210, protein: 21,  unit: 'porcja',   unitGrams: { porcja: 80 } },
+
+  // ── Rośliny strączkowe / białko roślinne ──────────────────────────────────
+  { name: 'Soczewica (gotowana)', kcal: 116, protein: 9,   unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Ciecierzyca (gotowana)', kcal: 164, protein: 9, unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Fasola czerwona (gotowana)', kcal: 127, protein: 9, unit: 'porcja', unitGrams: { porcja: 150 } },
+  { name: 'Tofu',                 kcal: 76,  protein: 8,   unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Tempeh',               kcal: 195, protein: 19,  unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Edamame',              kcal: 122, protein: 11,  unit: 'porcja',   unitGrams: { porcja: 100 } },
+
+  // ── Owoce suszone ──────────────────────────────────────────────────────────
+  { name: 'Rodzynki',             kcal: 300, protein: 3,   sugar: 59, unit: 'garsc', unitGrams: { garsc: 30 } },
+  { name: 'Morele suszone',       kcal: 240, protein: 3.4, sugar: 53, unit: 'garsc', unitGrams: { garsc: 30 } },
+  { name: 'Daktyle',              kcal: 280, protein: 2.5, sugar: 63, unit: 'garsc', unitGrams: { garsc: 30 } },
+  { name: 'Śliwki suszone',       kcal: 240, protein: 2.2, sugar: 38, unit: 'garsc', unitGrams: { garsc: 30 } },
+  { name: 'Figi suszone',         kcal: 250, protein: 3.3, sugar: 48, unit: 'garsc', unitGrams: { garsc: 30 } },
+
+  // ── Orzechy / nasiona (dobitka) ────────────────────────────────────────────
+  { name: 'Pistacje',             kcal: 560, protein: 20,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Orzechy laskowe',      kcal: 630, protein: 15,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Orzechy brazylijskie', kcal: 660, protein: 14,  unit: 'garsc',    unitGrams: { garsc: 30 } },
+  { name: 'Nasiona słonecznika',  kcal: 580, protein: 21,  unit: 'lyzka',    unitGrams: { lyzka: 12 } },
+  { name: 'Pestki dyni',          kcal: 560, protein: 30,  unit: 'lyzka',    unitGrams: { lyzka: 10 } },
+  { name: 'Siemię lniane',        kcal: 530, protein: 18,  unit: 'lyzka',    unitGrams: { lyzka: 10 } },
+  { name: 'Chia (nasiona)',       kcal: 490, protein: 17,  unit: 'lyzka',    unitGrams: { lyzka: 12 } },
+
+  // ── Napoje (dobitka) ───────────────────────────────────────────────────────
+  { name: 'Herbata (bez cukru)',  kcal: 1,   protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Woda gazowana',        kcal: 0,   protein: 0,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Kompot',               kcal: 40,  protein: 0,   sugar: 9,  unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Wino czerwone',        kcal: 85,  protein: 0.1, unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Kawa z mlekiem',       kcal: 20,  protein: 1,   unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+  { name: 'Cappuccino',           kcal: 40,  protein: 2,   unit: 'szklanka', unitGrams: { szklanka: 200, ml: 1 } },
+  { name: 'Sprite / Fanta',       kcal: 42,  protein: 0,   sugar: 10, unit: 'szklanka', unitGrams: { szklanka: 250, ml: 1 } },
+
+  // ── Śniadaniowe (dobitka) ──────────────────────────────────────────────────
+  { name: 'Płatki czekoladowe',   kcal: 390, protein: 6,   sugar: 30, unit: 'porcja', unitGrams: { porcja: 40 } },
+  { name: 'Otręby pszenne',       kcal: 210, protein: 16,  unit: 'lyzka',    unitGrams: { lyzka: 10 } },
+  { name: 'Kasza manna (sucha)',  kcal: 360, protein: 10,  unit: 'porcja',   unitGrams: { porcja: 50 } },
+  { name: 'Kasza kuskus (sucha)', kcal: 375, protein: 13,  unit: 'porcja',   unitGrams: { porcja: 70 } },
+  { name: 'Komosa ryżowa (quinoa, gotowana)', kcal: 120, protein: 4.4, unit: 'porcja', unitGrams: { porcja: 150 } },
+
+  // ── Dania gotowe / obiady (dobitka) ────────────────────────────────────────
+  { name: 'Gulasz wołowy',        kcal: 150, protein: 12,  unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Bigos',                kcal: 110, protein: 6,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Żurek',                kcal: 70,  protein: 3,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Barszcz czerwony',     kcal: 35,  protein: 1,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Kotlet schabowy',      kcal: 260, protein: 20,  unit: 'szt',      unitGrams: { szt: 150 } },
+  { name: 'Kotlet mielony',       kcal: 230, protein: 15,  unit: 'szt',      unitGrams: { szt: 100 } },
+  { name: 'Gołąbki',              kcal: 130, protein: 6,   unit: 'szt',      unitGrams: { szt: 150 } },
+  { name: 'Placki ziemniaczane',  kcal: 210, protein: 4,   unit: 'szt',      unitGrams: { szt: 60 } },
+  { name: 'Risotto',              kcal: 160, protein: 4,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Curry z kurczakiem',   kcal: 140, protein: 10,  unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Chili con carne',      kcal: 130, protein: 9,   unit: 'porcja',   unitGrams: { porcja: 300 } },
+  { name: 'Sałatka jarzynowa',    kcal: 150, protein: 3,   unit: 'porcja',   unitGrams: { porcja: 150 } },
+  { name: 'Sałatka cesar',        kcal: 180, protein: 9,   unit: 'porcja',   unitGrams: { porcja: 250 } },
+
+  // ── Fast food (dobitka) ────────────────────────────────────────────────────
+  { name: 'Cheeseburger',         kcal: 280, protein: 15,  unit: 'szt',      unitGrams: { szt: 115 } },
+  { name: 'Nachos z serem',       kcal: 320, protein: 6,   unit: 'porcja',   unitGrams: { porcja: 100 } },
+  { name: 'Kurczak w cieście (KFC-style)', kcal: 280, protein: 17, unit: 'szt', unitGrams: { szt: 100 } },
+  { name: 'Falafel',              kcal: 330, protein: 13,  unit: 'szt',      unitGrams: { szt: 17 } },
+  { name: 'Gyros (danie)',        kcal: 200, protein: 12,  unit: 'porcja',   unitGrams: { porcja: 300 } },
 ];
 
 // Fuzzy-ish search over the base: normalized substring + token match, ranked so a
