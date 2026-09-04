@@ -3603,6 +3603,40 @@ kilka nowych produktów (np. "Soczewica", "Krewetki", "Bigos") — powinny się 
 sensownymi kaloriami; (b) zjedz "Krówki" lub "Ptasie mleczko" mając aktywny nawyk "bez
 słodyczy" — streak powinien się zresetować (wcześniej NIE resetował się).
 
+## 25. Ekran Pupil: większe sloty ekwipunku, zbita siatka staty, powiększony pasek Lv — 2026-09-04
+
+User: "I te sloty na ekwipunku pupila jeszcze powiększyć trochę bo teraz itemy nadal sa
+trochę malo widoczne plus zbić bardziej te statystyki i wydłużyć i powiększyć lvl zeby byl
+czytelniejszy i bardziej widoczny kosztem nawet wywalenia tego paska głaskania z serduszkiem".
+Trzy zmiany czysto wizualne, zero logiki ruszonej.
+
+**1. Sloty ekwipunku** (`GearPanel.tsx`) — DRUGIE powiększenie (pierwsze było 2026-08-27,
+40→50px). Teraz 50→62px slot, ikona obrazka itemu 34→44px, kolumna flank 56→68px, pusty-slot
+lucide-icon 22→27px, kropka-wskaźnik 8→9px.
+
+**2. Siatka "Siła bojowa"** (`app/pet.tsx`, `statGrid`/`statCard`) — zbita: padding karty
+12→9, gap siatki 8→6, `statVal` 20→17, `statLabel` 11→10, `statSub` 9.5→9, wszystkie 8 ikon
+w kartach (Swords/Heart/Zap/Compass/Swords/Hourglass/Wind/Target) 18→15px, `buyPill`
+marginTop 6→4 (3 miejsca: atak/HP/wyślij misję).
+
+**3. Pasek Lv powiększony kosztem paska głaskania** — usunięty `miniBarRow` (ikona serca +
+różowy progress-bar głaskania) z `topRight` w headerze. **WAŻNE**: to usunęło tylko wizualny
+pasek — `affToday` (`affectionDay === todayISO() ? affection : 0`) nadal liczone i nadal
+przekazywane jako prop `affection` do `<CatArt>` (steruje intensywnością animacji głaskania
+przy tapnięciu), a mechanika "100 głaskań dziennie → `r.justFull` → toast '❤️ {imię} daje Ci
+skrzynkę sardynek!' + przycisk `pendingCrates`" działa dokładnie tak samo jak wcześniej —
+zniknął tylko wskaźnik postępu w headerze, nie sama funkcja. Zwolnione miejsce poszło na Lv:
+`topRight`/`lvlBarRow` width 132→176, `lvlBarLabel` font 11.5→14.5 (width 34→42),
+`lvlBarTrack` height 8→13 (borderRadius 4→6.5 też na fill), `lvlXpTxt` font 9.5→11.5 (usunięty
+stary hack `marginTop:-4`). Style `miniBarRow/miniBarLabel/miniBarTrack/miniBarFill/affHeart`
+skasowane.
+
+`tsc`/`jest` zielone (67 suit/837 testów — bez zmian w testach, to czyste UI). **Priorytet
+testu na urządzeniu**: ekran Pupil → sprawdź czy itemy w slotach ekwipunku są teraz wyraźnie
+widoczne, czy pasek Lv jest czytelny i nie ucieka poza header na wąskim ekranie (obok imienia
++ chipa nastroju), czy siatka staty nadal się mieści bez dziwnego zawijania, i czy tapnięcie
+kotka nadal daje normalną reakcję głaskania mimo braku widocznego paska.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

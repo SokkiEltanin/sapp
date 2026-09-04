@@ -373,19 +373,19 @@ export default function Pet() {
             </View>
           </View>
           <View style={s.topRight}>
-            {/* Pasek Lv POWIĘKSZONY (2026-08-20) — jedyny wskaźnik poziomu na ekranie odkąd
-                osobna karta "Doświadczenie" w gridzie Siła bojowa zniknęła (zastąpiona kaflem
-                misji, patrz niżej) — user: "tamten na górze level zostawiamy jako jedyny
-                powiększamy trochę żeby było widać ile na ile XP jeszcze". */}
+            {/* Pasek Lv POWIĘKSZONY DRUGI RAZ (2026-09-04, user: "zbić bardziej te statystyki i
+                wydłużyć i powiększyć lvl zeby byl czytelniejszy i bardziej widoczny kosztem
+                nawet wywalenia tego paska głaskania z serduszkiem") — pierwsze powiększenie
+                było 2026-08-20. Pasek pogłaskania (dawny `miniBarRow`/`affHeart`) USUNIĘTY z
+                widoku — mechanika ZOSTAJE nietknięta (affToday dalej liczy się i jedzie do
+                CatArt niżej dla reakcji na dotyk, a pełny bar dalej daje skrzynkę sardynek,
+                patrz `r.justFull` toast w `handlePet`/`handleCuddle`) — usunięty jest tylko
+                WIDOK paska, bo user świadomie wybrał oddać to miejsce czytelniejszemu Lv. */}
             <View style={s.lvlBarRow}>
               <Text style={s.lvlBarLabel}>Lv {lvl.level}</Text>
               <View style={s.lvlBarTrack}><View style={[s.lvlBarFill, { width: `${Math.round(lvl.progress * 100)}%`, backgroundColor: '#A78BFA' }]} /></View>
             </View>
             <Text style={s.lvlXpTxt}>{lvl.inLevel}/{lvl.needed} XP</Text>
-            <View style={s.miniBarRow}>
-              <Text style={s.affHeart}>{affToday >= 100 ? '❤️' : affToday > 0 ? '🩵' : '🤍'}</Text>
-              <View style={s.miniBarTrack}><View style={[s.miniBarFill, { width: `${affToday}%`, backgroundColor: '#F472B6' }]} /></View>
-            </View>
           </View>
         </View>
         <Text style={s.tip}>{petStatusLine(pet)}</Text>
@@ -510,49 +510,49 @@ export default function Pet() {
               tekst "+N" dziedziczył kolor moneta niezależnie od kontekstu. Cena w monetach
               (druga ikona+tekst w tym samym przycisku) ZOSTAJE żółta bez zmian. */}
           <View style={[s.statCard, { borderColor: '#F8717144', backgroundColor: '#F8717112' }]}>
-            <Swords size={18} color="#F87171" />
+            <Swords size={15} color="#F87171" />
             <Text style={s.statVal}>{Math.round(power)}</Text>
             <Text style={s.statLabel}>Moc ataku</Text>
             <Text style={s.statSub}>({BASE_ATK}+{atkStatBonus}) × {mult.toFixed(2)}</Text>
-            <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+            <TouchableOpacity onPress={onBuyAtk} style={[s.buyPill, { marginTop: 4 }]} activeOpacity={0.8}>
               <Swords size={10} color="#F87171" /><Text style={[s.buyPillTxt, { color: '#F87171' }]}>+{ATK_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{atkCost}</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#2AC68F44', backgroundColor: '#2AC68F12' }]}>
-            <Heart size={18} color="#2AC68F" />
+            <Heart size={15} color="#2AC68F" />
             <Text style={s.statVal}>{maxHp}</Text>
             <Text style={s.statLabel}>Max HP kotka</Text>
             <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}{gearFlatHp(equippedGear, ownedGear) > 0 ? ` + ${Math.round(gearFlatHp(equippedGear, ownedGear))} (ekwipunek)` : ''}</Text>
-            <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+            <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 4 }]} activeOpacity={0.8}>
               <Heart size={10} color="#2AC68F" /><Text style={[s.buyPillTxt, { color: '#2AC68F' }]}>+{HP_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
-            <Zap size={18} color="#38BDF8" />
+            <Zap size={15} color="#38BDF8" />
             <Text style={s.statVal}>{attempts}</Text>
             <Text style={s.statLabel}>Prób dziennie</Text>
             <Text style={s.statSub}>{bonuses.energyMult > 0 ? `+${(bonuses.energyMult * 100).toFixed(1)}% z łupu` : 'baza 3'}</Text>
           </View>
           {/* Kafel misji (2026-08-20) — zastępuje dawną kartę "Doświadczenie" (XP/Lv ma teraz
-              TYLKO powiększony pasek w nagłówku, patrz `topRight`/`miniBarRow` niżej). Trzy
+              TYLKO powiększony pasek w nagłówku, patrz `topRight` wyżej). Trzy
               stany: brak misji → przycisk otwierający `MissionSendModal`; w drodze → ikona
               klepsydry + odliczanie (kotek na scenie ma już swój pasek, tu tylko skrót);
               gotowa → przycisk Walcz. */}
           <View style={[s.statCard, { borderColor: '#38BDF844', backgroundColor: '#38BDF812' }]}>
             {!missionEndsAt ? (
               <>
-                <Compass size={18} color="#38BDF8" />
+                <Compass size={15} color="#38BDF8" />
                 <Text style={s.statLabel}>Misja</Text>
                 <Text style={s.statSub}>Wyślij po nagrodę</Text>
-                <TouchableOpacity onPress={() => { haptic.tap(); setMissionModalOpen(true); }} style={[s.buyPill, { marginTop: 6 }]} activeOpacity={0.8}>
+                <TouchableOpacity onPress={() => { haptic.tap(); setMissionModalOpen(true); }} style={[s.buyPill, { marginTop: 4 }]} activeOpacity={0.8}>
                   <Compass size={10} color="#38BDF8" /><Text style={s.buyPillTxt}>Wyślij</Text>
                 </TouchableOpacity>
               </>
             ) : missionReady ? (
               <>
-                <Swords size={18} color="#2AC68F" />
+                <Swords size={15} color="#2AC68F" />
                 <Text style={s.statVal}>Gotowe!</Text>
                 <Text style={s.statLabel}>Misja</Text>
                 <TouchableOpacity onPress={onFightMission} style={[s.buyPill, { marginTop: 6, backgroundColor: '#2AC68F18', borderColor: '#2AC68F40' }]} activeOpacity={0.8}>
@@ -561,7 +561,7 @@ export default function Pet() {
               </>
             ) : (
               <>
-                <Hourglass size={18} color="#38BDF8" />
+                <Hourglass size={15} color="#38BDF8" />
                 <Text style={s.statVal}>{fmtMissionDuration(missionRemainingMs / 60000)}</Text>
                 <Text style={s.statLabel}>Misja w drodze</Text>
               </>
@@ -578,7 +578,7 @@ export default function Pet() {
               zsumowaniu. Ten sam fix na `energyMult` wyżej i w `bossProgressReport.ts`. */}
           {bonuses.dodge > 0 && (
             <View style={[s.statCard, { borderColor: '#22D3EE44', backgroundColor: '#22D3EE12' }]}>
-              <Wind size={18} color="#22D3EE" />
+              <Wind size={15} color="#22D3EE" />
               <Text style={s.statVal}>+{(bonuses.dodge * 100).toFixed(1)}%</Text>
               <Text style={s.statLabel}>Unik</Text>
               <Text style={s.statSub}>z łupu bossów</Text>
@@ -586,7 +586,7 @@ export default function Pet() {
           )}
           {bonuses.crit > 0 && (
             <View style={[s.statCard, { borderColor: '#C084FC44', backgroundColor: '#C084FC12' }]}>
-              <Target size={18} color="#C084FC" />
+              <Target size={15} color="#C084FC" />
               <Text style={s.statVal}>+{(bonuses.crit * 100).toFixed(1)}%</Text>
               <Text style={s.statLabel}>Kryt</Text>
               <Text style={s.statSub}>z łupu bossów</Text>
@@ -753,27 +753,21 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // z poprzedniej wersji, które schodziły niżej na ekranie.
   topHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%', marginTop: spacing[1] },
   topLeft: { alignItems: 'flex-start', gap: 4, flexShrink: 1 },
-  topRight: { alignItems: 'flex-end', gap: 6, minWidth: 132 },
-  // Pasek Lv POWIĘKSZONY (2026-08-20) — szerszy i grubszy niż `miniBarRow` (affection zostaje
-  // małe), plus osobna linijka z liczbami XP pod spodem (user: "powiększamy trochę żeby było
-  // widać ile na ile XP jeszcze" — jedyny wskaźnik poziomu odkąd karta "Doświadczenie"
-  // zniknęła z grida Siła bojowa, patrz kafel misji tam).
-  lvlBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 132 },
-  lvlBarLabel: { fontSize: 11.5, fontWeight: '800', color: c.text.muted, width: 34 },
-  lvlBarTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: c.bg.elevated, overflow: 'hidden' },
-  lvlBarFill: { height: '100%', borderRadius: 4 },
-  lvlXpTxt: { fontSize: 9.5, fontWeight: '700', color: c.text.muted, marginTop: -4 },
-  miniBarRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 108 },
-  miniBarLabel: { fontSize: 10.5, fontWeight: '800', color: c.text.muted, width: 30 },
-  miniBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: c.bg.elevated, overflow: 'hidden' },
-  miniBarFill: { height: '100%', borderRadius: 3 },
+  topRight: { alignItems: 'flex-end', gap: 4, minWidth: 176 },
+  // Pasek Lv POWIĘKSZONY DRUGI RAZ (2026-09-04, było 132/8/11.5, user: "wydłużyć i powiększyć
+  // lvl zeby byl czytelniejszy i bardziej widoczny kosztem nawet wywalenia tego paska
+  // głaskania z serduszkiem" — usunięty pasek/miejsce oddane temu). Pierwsze powiększenie
+  // 2026-08-20 (było 104/6/10).
+  lvlBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, width: 176 },
+  lvlBarLabel: { fontSize: 14.5, fontWeight: '800', color: c.text.muted, width: 42 },
+  lvlBarTrack: { flex: 1, height: 13, borderRadius: 6.5, backgroundColor: c.bg.elevated, overflow: 'hidden' },
+  lvlBarFill: { height: '100%', borderRadius: 6.5 },
+  lvlXpTxt: { fontSize: 11.5, fontWeight: '700', color: c.text.muted },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   name: { fontSize: 16, fontWeight: '800', color: c.text.primary, letterSpacing: -0.3 },
   moodChip: { marginTop: 3, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.full, borderWidth: 1 },
   status: { fontSize: 12, fontWeight: '800' },
   tip: { fontSize: 11.5, color: c.text.muted, marginTop: 3, textAlign: 'center' },
-
-  affHeart: { fontSize: 14 },
   crateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', marginTop: spacing[2], paddingVertical: 11, borderRadius: radius.lg, backgroundColor: '#FBBF2418', borderWidth: 1, borderColor: '#FBBF2455' },
   crateBtnTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
   dailyBoxIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.lg, backgroundColor: '#FBBF24', marginLeft: 6 },
@@ -836,12 +830,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   missionModalBtnTxt: { fontSize: 12.5, fontWeight: '800', color: '#0B0E1A' },
 
   // Siła bojowa + Ekwipunek bojowy (scalone z pet-stats.tsx, 2026-08-19).
+  // Zbite bardziej (2026-09-04, user: "zbić bardziej te statystyki" — miejsce oddane
+  // powiększonemu paskowi Lv w nagłówku i większym slotom ekwipunku) — padding 12→9, odstęp
+  // gridu 8→6, wartość 20→17, etykieta 11→10, podpis 9.5→9, ikony w kartach (Swords/Heart/
+  // Zap/itd) 18→15, `marginTop` przed przyciskiem kup 6→4.
   blurb: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16, width: '100%' },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], width: '100%' },
-  statCard: { width: '48%', borderRadius: radius.lg, borderWidth: 1, padding: spacing[3], gap: 2 },
-  statVal: { fontSize: 20, fontWeight: '800', color: c.text.primary, marginTop: 4 },
-  statLabel: { fontSize: 11, color: c.text.secondary, fontWeight: '600' },
-  statSub: { fontSize: 9.5, color: c.text.muted },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, width: '100%' },
+  statCard: { width: '48%', borderRadius: radius.lg, borderWidth: 1, padding: 9, gap: 1 },
+  statVal: { fontSize: 17, fontWeight: '800', color: c.text.primary, marginTop: 3 },
+  statLabel: { fontSize: 10, color: c.text.secondary, fontWeight: '600' },
+  statSub: { fontSize: 9, color: c.text.muted },
   cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   cellState: { fontSize: 10, color: c.text.muted },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
