@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ciekawostka dnia: bez kategorii "z książki", rozwijalny opis + źródło — NIEsprawdzone (2026-09-06)
+
+User: "rozbuduj ciekawostki widget... więcej ciekawostek (z książek fragmenty są useless,
+wywalamy je) i jak kliknę w ciekawostkę to rozwija mi ją więcej jest ładnie opisane i jest
+źródło na dole podane". Pełny opis w ARCHITECTURE.md §28. Skrót: kategoria `ksiazka` (69
+wpisów) skasowana całkowicie; każdy z 152 pozostałych wpisów (`src/data/trivia.ts`) dostał
+nowe, wymagane pole `detail` (1-3 zdania rozwinięcia, czasem z realnym źródłem) — tap na
+ciekawostkę w `TriviaCard` teraz rozwija ją, pokazując `detail` i dopiero pod nim `src` (jeśli
+jest). Dodano też netto kilka nowych faktów w każdej kategorii. Mechanizm "To znam"/nie-
+powtarzania (dismissed/counts) NIETKNIĘTY. `tsc`/`jest` zielone (67 suit/837 testów).
+
+**Priorytet testu na urządzeniu**: dashboard → "Ciekawostka dnia" → tap na tekst rozwija
+(dłuższy opis + czasem źródło na dole), drugi tap zwija; żadna ciekawostka nie ma już etykiety
+„Z książki"; "To znam" dalej działa jak wcześniej; nowa ciekawostka zawsze startuje zwinięta
+(nie pamięta rozwinięcia z poprzedniego dnia).
+
 ## 🆕 Pasek misji: kwadratowy, przygotowany pod przyszłą tematyczną grafikę — NIEsprawdzone (2026-09-05)
 
 User: "pasek ładowania questa zróbmy tematyczny... każdy quest będzie miał osobną grafikę tła
