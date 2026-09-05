@@ -3,26 +3,55 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Sklep (Rynek): prawdziwa grafika zamiast plain-kart — NIEsprawdzone (2026-09-05)
+## 🆕 Pasek misji: kwadratowy, przygotowany pod przyszłą tematyczną grafikę — NIEsprawdzone (2026-09-05)
 
-User wygenerował i wgrał 3 pliki (`LADAGORA.png`, `LADADOL.png`, `TLOSKLEPIKARZ.png` w
-`assets/lokalizacje/`) wg specyfikacji z poprzedniej sesji. Pełny opis w ARCHITECTURE.md §26
-— skrót: tło sklepu na cały ekran, skrzynka dnia+3 skrzynki jako 4 okna na małej tablicy,
-Sklep dnia (4 itemy) jako górny rząd okien właściwej lady, dolny rząd (4 okna) na razie
-nieużywany (pokazuje tło przez otwór — Sklep dnia ma tylko 4 pozycje, nie 8). Zero zmian w
-mechanice/ekonomii, czysto wizualne przeniesienie istniejącej logiki na nową grafikę.
-`tsc`/`jest` zielone (67 suit/837 testów, bez nowych testów — nie ma nowej logiki).
+User: "pasek ładowania questa zróbmy tematyczny... każdy quest będzie miał osobną grafikę tła
+pod walkę i wtedy część to będzie wypełniało pasek ładujący się jakby że z czarnego przechodzi
+w tę grafikę, na razie przygotujmy pasek, zróbmy go kwadratowym". Pełny opis w
+ARCHITECTURE.md §27 (punkt 4). Zrobione TERAZ tylko to o co user prosił wprost:
+`missionBarTrack`/`missionBarFillWrap` w `app/pet.tsx` — pigułka (`borderRadius =
+MISSION_BAR_HEIGHT/2`) → kwadratowy (`radius.sm`). Wypełnienie (niebieski gradient+fala)
+NIETKNIĘTE — podmiana na "ciemność→grafika lokacji" czeka na realne pliki per quest (jeszcze
+nie istnieją), ten sam wzorzec przygotowania co `arenaBgFor(kind)` w bossIcons.ts.
+`tsc`/`jest` zielone (67 suit/837 testów). **Priorytet testu na urządzeniu**: pasek misji w
+trakcie (kotek w drodze) — teraz kwadratowy zamiast pigułki, countdown/fala/wypełnienie
+działają identycznie jak wcześniej.
 
-**Priorytet testu na urządzeniu**: otwórz Sklep → wygląda spójnie (bez przesunięcia okien
-względem grafiki na realnym DPI, nie tylko w statycznym podglądzie na PC)? Header czytelny
-na tle grafiki? Wszystkie 4+4 okna klikalne i robią właściwą rzecz (skrzynka dnia, 3
-skrzynki, podgląd+zakup itemu Sklepu dnia)? ConfirmDialog dla skrzynek pokazuje teraz opis+
-szanse w drugiej linijce (dawniej widoczne wprost na liście, teraz przeniesione tu)?
+## 🆕 Sklep (Rynek): kontrast slotów, gradient rzadkości, sklepikarz w scenie — NIEsprawdzone (2026-09-05)
 
-Jeśli podoba się kierunek, ale dolny rząd 8-okiennej lady razi pustką — do rozważania:
-poszerzyć Sklep dnia z 4 do 8 itemów (`dailyShopSlots(date, level, count)` już przyjmuje
-`count`, zmiana jest jednolinijkowa), ale to zmiana ekonomii (2x więcej gwarantowanych
-zakupów dziennie), więc świadomie NIE zrobione bez pytania.
+Follow-up na poprzedni wpis (prawdziwa grafika Rynku, ARCHITECTURE.md §26) — user zobaczył
+realny zrzut ekranu i dorzucił: "Sloty muszą mieć... ciemniejsze TŁO żeby zwiększyć kontrast
+itemów", "co to jest za SKLEPIK... gdzie sklepikarz", i osobno "rzadkość itemów to niech
+będzie kolor gradientu za nimi + gradientowo kolorowy schludny pod nazwę itemu". Pełny opis
+w ARCHITECTURE.md §27. Trzy fixy:
+1. Ciemny kontrastowy podkład (`artSlotBg`) pod ikoną w KAŻDYM z 8 slotów (skrzynka dnia, 3
+   skrzynki, 4 itemy Sklepu dnia) — okno na grafice samo w sobie przezroczyste, ikony ledwo
+   było widać na busy tle.
+2. Sklep dnia (4 itemy) dostał `LinearGradient` (ciemny róg → kolor rzadkości) ZAMIAST płaskiego
+   tła — łączy kontrast z sygnałem rzadkości. `GearPreviewModal` dostał cienką gradientową
+   kreskę pod nazwą itemu (ten sam kolor rzadkości).
+3. **Sklepikarz nareszcie stoi w scenie** — `shopkeeper` prop na `CatArt` istniał od
+   2026-09-03 (§20), ale czekał na sam ekran Rynku i NIGDY nie został faktycznie wstawiony
+   nawet po tym jak ekran powstał (§26) — czysty dead-end złapany przez usera, nie nowy
+   request. Teraz `<CatArt shopkeeper palette={SHOPKEEPER_PALETTE}>` stoi wyśrodkowany w
+   widocznej luce między tablicą a ladą.
+4. **Scena odklejała się od tła przy scrollu** (user, patrząc na PR #140 zanim ten PR
+   zdążył dojechać: "grafiki wstawione nie na miejscu... rusza się a miało być statyczne
+   jakby ze sobą") — realny bug od PR #140, tło było przypięte do EKRANU podczas gdy
+   tablica/lada scrollowały w środku ScrollView, więc przy przewijaniu rozjeżdżały się od
+   tła. Naprawione: `RYNEK_BG` teraz wewnątrz nowego `s.scene` wrappera razem z tablicą/
+   kotkiem/ladą — scrolluje jako jedna sztywna całość, zawsze w rejestracji.
+
+`tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — czysto wizualne).
+**Priorytet testu na urządzeniu**: Sklep → sloty czytelniejsze na busy tle? Sklep dnia ma
+kolorowy gradient zależny od rzadkości wylosowanego itemu? Popup po tapnięciu ma kolorową
+kreskę pod nazwą? Sklepikarz widoczny między tablicą a ladą, rozgląda się (nie statyczny),
+NIE reaguje na tapnięcie? **Najważniejsze**: przewiń ekran w górę/dół — tablica/sklepikarz/
+lada powinny przewijać się RAZEM z tłem jako jedna scena, nie osobno od siebie.
+
+Wciąż otwarte z poprzedniego wpisu: dolny rząd 8-okiennej lady (Sklep dnia ma tylko 4
+pozycje) pokazuje tło przez otwór — poszerzenie do 8 itemów to zmiana ekonomii, czeka na
+Twoje "tak, rób".
 
 ## 🆕 Pupil: większe sloty ekwipunku, zbita siatka staty, powiększony pasek Lv — NIEsprawdzone (2026-09-04)
 

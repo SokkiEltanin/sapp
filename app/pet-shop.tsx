@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check, Snowflake, Gift, X } from 'lucide-react-native';
@@ -8,9 +9,11 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
+import CatArt from '@/components/pet/CatArt';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS } from '@/utils/petShop';
+import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
@@ -171,11 +174,6 @@ export default function PetShop() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Tło Rynku (2026-09-05) — scena wnętrza sklepu na CAŁY ekran, pod headerem i
-          scrollem (oba mają przezroczyste tło, patrz style). Patrz `rynekArt.ts` po
-          kontekst trzech warstw. */}
-      <ImageBackground source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-
       <View style={s.head}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Sklep</Text>
@@ -195,16 +193,34 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
-        {/* ── RYNEK — skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA,
-            4 okna. Dawny pełnoszerokościowy hero-wiersz skrzynki dnia i lista skrzynek
-            (2026-08-27) ZASTĄPIONE tym samym contentem, tylko jako okna na grafice usera
-            (2026-09-05) — patrz `rynekArt.ts`. ── */}
+        {/* ── SCENA RYNKU (2026-09-05, fix po zgłoszeniu usera: "grafiki wstawione nie na
+            miejscu... rusza się a miało być statyczne jakby ze sobą") — tło było wcześniej
+            `position:absolute` PRZYPIĘTE DO EKRANU jako sibling ScrollView, podczas gdy
+            tablica/luka-ze-sklepikarzem/lada scrollowały NORMALNIE w środku ScrollView —
+            przy scrollu tło zostawało w miejscu a grafiki nad nim jechały, więc licznik
+            (kontuar mający stać na podłodze, tablica wisząca u sufitu) odjeżdżał od tła
+            i wyglądał "nie na miejscu"/"w złej skali", mimo że każdy z 3 plików osobno miał
+            poprawny rozmiar. Naprawa: `RYNEK_BG` teraz PIERWSZE DZIECKO w środku TEGO
+            `s.scene` wrappera (position:relative, wysokość = suma treści pod spodem, nie
+            cały ekran) — tło scrolluje RAZEM z tablicą/kotkiem/ladą bo są w tym samym
+            rodzicu, więc zawsze zostają w idealnej rejestracji względem siebie niezależnie
+            od pozycji scrolla. Freeze-card (nad scenerią) i `hint` (pod nią) świadomie
+            ZOSTAJĄ POZA tym wrapperem — nigdy nie miały wymogu piksel-w-piksel wyrównania
+            z konkretnym miejscem na obrazku, to zwykłe karty UI, nie część "obrazu". ── */}
+        <View style={s.scene}>
+          <Image source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+
+        {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Dawny
+            pełnoszerokościowy hero-wiersz skrzynki dnia i lista skrzynek (2026-08-27)
+            ZASTĄPIONE tym samym contentem, tylko jako okna na grafice usera (2026-09-05) —
+            patrz `rynekArt.ts`. */}
         <View style={{ gap: spacing[2] }}>
           <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
           <Text style={s.blurbTop}>Pierwsze okno: skrzynka dnia za darmo. Reszta losuje ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
           <View style={[s.artPiece, { aspectRatio: RYNEK_TOP_ASPECT }]}>
             <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
+              <View style={s.artSlotBg} />
               <Gift size={26} color={dailyReady ? '#FBBF24' : c.text.muted} />
               {dailyReady
                 ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
@@ -214,12 +230,23 @@ export default function PetShop() {
               const afford = coins >= box.cost;
               return (
                 <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
+                  <View style={s.artSlotBg} />
                   <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
                   <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                 </PressableScale>
               );
             })}
           </View>
+        </View>
+
+        {/* Sklepikarz (2026-09-05) — kotek w przebraniu (`shopkeeper` prop na CatArt,
+            zaprojektowany 2026-09-03, czekał na sam ekran Rynku żeby mieć gdzie stanąć —
+            patrz ARCHITECTURE.md §20). Stoi w scenie sklepu widocznej MIĘDZY tablicą a ladą
+            (`TLOSKLEPIKARZ` przebija przez tę lukę) — user: "co to jest za sklepik, gdzie
+            sklepikarz". Bez `onPress` — `shopkeeper` i tak wygasza tap/cuddle-reakcje
+            wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
+        <View style={{ alignItems: 'center' }}>
+          <CatArt size={140} palette={SHOPKEEPER_PALETTE} shopkeeper />
         </View>
 
         {/* ── Sklep dnia — 4 konkretne itemy ekwipunku na dziś, teraz jako górny rząd okien
@@ -243,6 +270,16 @@ export default function PetShop() {
               const meta = RARITY_META[rarity];
               return (
                 <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
+                  {/* Tło slotu = gradient rzadkości (2026-09-05, user: "kolor gradientu za
+                      nimi jakby") — ciemny róg dla kontrastu ikony na busy tle, przeciwległy
+                      róg podbarwiony kolorem rzadkości, ten sam `meta.color` co plakietka ✓
+                      i pigułka w GearPreviewModal, więc kolor rzadkości czyta się spójnie
+                      wszędzie w Sklepie dnia. */}
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0.55)', meta.color + '77'] as [string, string]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.artSlotBg}
+                  />
                   <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
                   {(bought || owned) && (
                     <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
@@ -253,6 +290,7 @@ export default function PetShop() {
               );
             })}
           </View>
+        </View>
         </View>
 
         <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota. Startupy (ekran ładowania) i kosmetyka kotka: edytuj imię na /pet.</Text>
@@ -332,7 +370,18 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
       <View style={s.previewOverlay}>
         <View style={s.previewSheet}>
           <View style={s.sheetHead}>
-            <Text style={s.title2}>{item.name}</Text>
+            <View style={{ flex: 1, marginRight: spacing[2] }}>
+              <Text style={s.title2}>{item.name}</Text>
+              {/* Gradientowa kreska rzadkości pod nazwą (2026-09-05, user: "kolor gradientu
+                  za nimi jakby + gradientowo kolorowy schludny pod nazwę itemu") — ten sam
+                  `meta.color` co reszta modala (etykieta rzadkości, plakietka ✓), gaśnie do
+                  przezroczystości zamiast twardej krawędzi. */}
+              <LinearGradient
+                colors={[meta.color, meta.color + '00'] as [string, string]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={s.rarityUnderline}
+              />
+            </View>
             <TouchableOpacity onPress={onClose} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
           </View>
           <View style={s.previewTop}>
@@ -392,6 +441,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   blurbTop: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
   refreshTxt: { fontSize: 10.5, color: c.text.muted, fontWeight: '700', marginTop: -4 },
 
+  // Scena Rynku (2026-09-05, fix "grafiki się rushają/nie na miejscu") — jeden
+  // `position:relative` wrapper wokół tablicy+kotka+lady, żeby `RYNEK_BG` (pierwsze dziecko,
+  // absoluteFillObject) scrollował RAZEM z nimi zamiast być przypięty do ekranu jako
+  // niezależna warstwa. Wysokość = suma treści w środku (żadnego sztywnego rozmiaru) —
+  // działa bo `position:absolute` dziecko w RN rozciąga się do już WYLICZONEGO rozmiaru
+  // rodzica, nie wpływa na jego pomiar. `overflow:'hidden'` na wypadek gdyby `cover` na
+  // skrajnie wąskim/szerokim ekranie chciał wystawić poza zaokrąglone rogi (scena i tak nie
+  // ma tu rogów, ale to tania asekuracja przed przypadkowym poziomym scrollem).
+  scene: { position: 'relative', overflow: 'hidden', gap: spacing[3] },
+
   // Kafelki na "tablicy"/ladzie Rynku (2026-09-05) — `s.artPiece` to kontener o wymiarach
   // `width:'100%'` + `aspectRatio` z `rynekArt.ts` (skaluje się z ekranem, bez zniekształcania
   // grafiki), dzieci to `PressableScale` pozycjonowane PROCENTOWO (`pctStyle`) na zmierzone
@@ -399,11 +458,18 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // w rogu), tylko teraz miejsce kafelka dyktuje grafika, nie flex-wrap.
   artPiece: { width: '100%', position: 'relative' },
   artSlot: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  // Ciemne tło slotu bez rzadkości (skrzynka dnia + 3 skrzynki) — 2026-09-05, user: "sloty
+  // muszą mieć jaśniejsze lub ciemniejsze lepiej ciemniejsze tło żeby zwiększyć kontrast
+  // itemów". Okno na grafice jest samo w sobie przezroczyste (przebija ruchliwe tło sklepu),
+  // więc bez tego ikony/emoji ledwo widać. `inset` zamiast absoluteFillObject — mały margines
+  // (4%) żeby ciemny prostokąt nie wychodził poza obrys okna narysowanego na grafice.
+  artSlotBg: { position: 'absolute', top: '4%', left: '4%', right: '4%', bottom: '4%', borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.5)' },
   artSlotImg: { width: '62%', height: '62%' },
   artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   artCostPill: { position: 'absolute', bottom: -8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
   artSlotBadge: { position: 'absolute', bottom: -8, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
   artSlotBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.3 },
+  rarityUnderline: { height: 3, borderRadius: 1.5, marginTop: 5, width: '70%' },
 
   subSection: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   cellState: { fontSize: 10, color: c.text.muted },
