@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground, Modal } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check, Snowflake, Gift, X } from 'lucide-react-native';
@@ -8,9 +9,11 @@ import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
+import CatArt from '@/components/pet/CatArt';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS } from '@/utils/petShop';
+import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
@@ -205,6 +208,7 @@ export default function PetShop() {
           <View style={[s.artPiece, { aspectRatio: RYNEK_TOP_ASPECT }]}>
             <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
+              <View style={s.artSlotBg} />
               <Gift size={26} color={dailyReady ? '#FBBF24' : c.text.muted} />
               {dailyReady
                 ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
@@ -214,12 +218,23 @@ export default function PetShop() {
               const afford = coins >= box.cost;
               return (
                 <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
+                  <View style={s.artSlotBg} />
                   <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
                   <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                 </PressableScale>
               );
             })}
           </View>
+        </View>
+
+        {/* Sklepikarz (2026-09-05) — kotek w przebraniu (`shopkeeper` prop na CatArt,
+            zaprojektowany 2026-09-03, czekał na sam ekran Rynku żeby mieć gdzie stanąć —
+            patrz ARCHITECTURE.md §20). Stoi w scenie sklepu widocznej MIĘDZY tablicą a ladą
+            (`TLOSKLEPIKARZ` przebija przez tę lukę) — user: "co to jest za sklepik, gdzie
+            sklepikarz". Bez `onPress` — `shopkeeper` i tak wygasza tap/cuddle-reakcje
+            wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
+        <View style={{ alignItems: 'center' }}>
+          <CatArt size={140} palette={SHOPKEEPER_PALETTE} shopkeeper />
         </View>
 
         {/* ── Sklep dnia — 4 konkretne itemy ekwipunku na dziś, teraz jako górny rząd okien
@@ -243,6 +258,16 @@ export default function PetShop() {
               const meta = RARITY_META[rarity];
               return (
                 <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
+                  {/* Tło slotu = gradient rzadkości (2026-09-05, user: "kolor gradientu za
+                      nimi jakby") — ciemny róg dla kontrastu ikony na busy tle, przeciwległy
+                      róg podbarwiony kolorem rzadkości, ten sam `meta.color` co plakietka ✓
+                      i pigułka w GearPreviewModal, więc kolor rzadkości czyta się spójnie
+                      wszędzie w Sklepie dnia. */}
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0.55)', meta.color + '77'] as [string, string]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.artSlotBg}
+                  />
                   <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
                   {(bought || owned) && (
                     <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
@@ -332,7 +357,18 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
       <View style={s.previewOverlay}>
         <View style={s.previewSheet}>
           <View style={s.sheetHead}>
-            <Text style={s.title2}>{item.name}</Text>
+            <View style={{ flex: 1, marginRight: spacing[2] }}>
+              <Text style={s.title2}>{item.name}</Text>
+              {/* Gradientowa kreska rzadkości pod nazwą (2026-09-05, user: "kolor gradientu
+                  za nimi jakby + gradientowo kolorowy schludny pod nazwę itemu") — ten sam
+                  `meta.color` co reszta modala (etykieta rzadkości, plakietka ✓), gaśnie do
+                  przezroczystości zamiast twardej krawędzi. */}
+              <LinearGradient
+                colors={[meta.color, meta.color + '00'] as [string, string]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={s.rarityUnderline}
+              />
+            </View>
             <TouchableOpacity onPress={onClose} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
           </View>
           <View style={s.previewTop}>
@@ -399,11 +435,18 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // w rogu), tylko teraz miejsce kafelka dyktuje grafika, nie flex-wrap.
   artPiece: { width: '100%', position: 'relative' },
   artSlot: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  // Ciemne tło slotu bez rzadkości (skrzynka dnia + 3 skrzynki) — 2026-09-05, user: "sloty
+  // muszą mieć jaśniejsze lub ciemniejsze lepiej ciemniejsze tło żeby zwiększyć kontrast
+  // itemów". Okno na grafice jest samo w sobie przezroczyste (przebija ruchliwe tło sklepu),
+  // więc bez tego ikony/emoji ledwo widać. `inset` zamiast absoluteFillObject — mały margines
+  // (4%) żeby ciemny prostokąt nie wychodził poza obrys okna narysowanego na grafice.
+  artSlotBg: { position: 'absolute', top: '4%', left: '4%', right: '4%', bottom: '4%', borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.5)' },
   artSlotImg: { width: '62%', height: '62%' },
   artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   artCostPill: { position: 'absolute', bottom: -8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
   artSlotBadge: { position: 'absolute', bottom: -8, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
   artSlotBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.3 },
+  rarityUnderline: { height: 3, borderRadius: 1.5, marginTop: 5, width: '70%' },
 
   subSection: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   cellState: { fontSize: 10, color: c.text.muted },

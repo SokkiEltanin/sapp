@@ -3685,6 +3685,53 @@ statycznym podglądzie na PC), czy header jest czytelny na tle ruchliwej grafiki
 tapnięcie każdego z 4+4 okien robi to co powinno (skrzynka dnia/skrzynki/podgląd itemu przed
 zakupem), i czy ConfirmDialog dla skrzynek pokazuje teraz blurb+szanse w drugiej linijce.
 
+## 27. Rynek: kontrast slotów, gradient rzadkości, sklepikarz w scenie + kwadratowy pasek misji — 2026-09-05
+
+User zobaczył realny zrzut ekranu Rynku (PR #140 na urządzeniu) i dorzucił trzy uwagi w jednej
+wiadomości: "Sloty muszą mieć trochę jaśniejsze lub ciemniejsze lepiej ciemniejsze TŁO żeby
+zwiększyć kontrast itemów... co to jest za SKLEPIK... gdzie sklepikarz", plus osobno "rzadkość
+itemów to niech będzie kolor gradientu za nimi + gradientowo kolorowy schludny pod nazwę
+itemu", plus (inny wątek, ten sam batch wiadomości) pasek misji ma być przygotowany pod
+przyszłą tematyczną grafikę.
+
+**1. Kontrast slotów** (`app/pet-shop.tsx`) — nowy `s.artSlotBg` (ciemny zaokrąglony
+prostokąt, `rgba(0,0,0,0.5)`, 4% inset od krawędzi okna) pod ikoną/emoji w KAŻDYM z 8 slotów
+(skrzynka dnia, 3 skrzynki, 4 itemy Sklepu dnia) — okno na grafice samo w sobie jest
+przezroczyste (przebija ruchliwe tło sklepu), bez ciemnego podkładu ikony ledwo było widać.
+
+**2. Gradient rzadkości** (2. wiadomość) — Sklep dnia (4 itemy) dostał `LinearGradient`
+(`rgba(0,0,0,0.55)` → `meta.color+'77'`, ten sam `RARITY_META[rarity].color` co wszędzie
+indziej) ZAMIAST płaskiego `artSlotBg` — łączy kontrast (ciemny róg) z sygnałem rzadkości
+(kolorowy róg) w jednym elemencie. W `GearPreviewModal` pod nazwą itemu doszła cienka
+(`height:3`) gradientowa kreska `meta.color → meta.color+'00'` — ten sam kolor rzadkości
+czyta się teraz spójnie: plakietka ✓, pigułka, i teraz też kreska pod nazwą.
+
+**3. Sklepikarz nareszcie stoi w scenie** — `shopkeeper` prop na `CatArt` (zaprojektowany
+2026-09-03, §20) czekał na SAM ekran Rynku, żeby mieć gdzie stanąć; teraz gdy ekran istnieje
+(§26), user zauważył że kotek nigdy nie został faktycznie wstawiony — czysty dead-end, nie
+nowy request. Naprawione: `<CatArt size={140} palette={SHOPKEEPER_PALETTE} shopkeeper />`
+wyśrodkowany w widocznej luce MIĘDZY tablicą (LADAGORA) a ladą (LADADOL) — dokładnie tam,
+gdzie `TLOSKLEPIKARZ` (scena wnętrza, okno/regały) przebija między dwoma kawałkami grafiki.
+Bez `onPress` — `shopkeeper` i tak wygasza tap/cuddle-reakcje wewnątrz komponentu.
+
+**4. Pasek misji przygotowany pod tematyczną grafikę** (`app/pet.tsx`) — user zapowiedział że
+KAŻDY quest dostanie kiedyś osobną grafikę tła pod walkę, i wtedy wypełnienie paska ma
+przechodzić "z czarnego w tę grafikę" zamiast płaskiego niebieskiego gradientu. Sama grafika
+NIE ISTNIEJE jeszcze (ten sam wzorzec przygotowania co `arenaBgFor(kind)` dla quest/event/MAD
+w §18 — miejsce gotowe, fallback dopóki plików nie ma) — na razie zrobione TYLKO to, o co user
+prosił wprost: `missionBarTrack`/`missionBarFillWrap` borderRadius `MISSION_BAR_HEIGHT/2`
+(pigułka) → `radius.sm` (kwadratowy), żeby pasek zaczął wyglądać jak "okno" na przyszłą
+grafikę miejsca, nie jak abstrakcyjny loading-bar. Wypełnienie samo (niebieski gradient +
+fala) NIETKNIĘTE — podmiana na "ciemność→tło lokacji" czeka na realne pliki per quest.
+
+`tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — czysto wizualne). **Priorytet
+testu na urządzeniu**: (a) Sklep — sloty czytelniejsze na busy tle, Sklep dnia ma kolorowy
+gradient zależny od rzadkości (szary/niebieski/fioletowy/złoty zależnie co wylosowało), popup
+po tapnięciu itemu ma kolorową kreskę pod nazwą; (b) sklepikarz widoczny między tablicą a ladą,
+rozgląda się (nie jest statyczny), NIE reaguje na tapnięcie (brak lizania/serduszek); (c) pasek
+misji w trakcie — teraz kwadratowy zamiast pigułki, wypełnienie/countdown/fala działają jak
+wcześniej (czysta zmiana kształtu, zero zmiany logiki timera).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

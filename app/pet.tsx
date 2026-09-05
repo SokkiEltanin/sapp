@@ -800,15 +800,17 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // pigułka (borderRadius = połowa wysokości). `missionBarFillWrap` ma `overflow:'hidden'`
   // żeby fala (`missionBarWave`) i gradient nie wystawały poza aktualną szerokość wypełnienia.
   //
-  // TYLKO lewe rogi zaokrąglone (2026-08-21, user: "ładujący sie fluid jest w postaci kwadratu
-  // a sam pasek [jest] zaokrąglone") — dawne jednolite `borderRadius:15` na WSZYSTKICH 4 rogach
-  // przy małym postępie (wąskie wypełnienie, szerokość rzędu kilku-kilkunastu px, mniej niż
-  // 2×15) dawało zdegenerowany, kwadratowo wyglądający kształt zamiast pigułki. Prawa krawędź
-  // wypełnienia i tak POWINNA być prosta (to rosnąca krawędź progresu, nie kraniec paska) —
-  // zaokrąglone TYLKO lewe rogi (dopasowane do lewego kapsla `missionBarTrack`) usuwa problem
-  // przy każdej szerokości, nie tylko naprawia efekt uboczny małego postępu.
-  missionBarTrack: { position: 'relative', width: '100%', height: MISSION_BAR_HEIGHT, borderRadius: MISSION_BAR_HEIGHT / 2, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
-  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: MISSION_BAR_HEIGHT / 2, borderBottomLeftRadius: MISSION_BAR_HEIGHT / 2, overflow: 'hidden' },
+  // Kwadratowy pasek (2026-09-05, user: "pasek ładowania questa zróbmy tematyczny... każdy
+  // quest będzie miał osobną grafikę tła pod walkę i wtedy część to będzie wypełniało pasek
+  // ładujący się jakby że z czarnego przechodzi w tę grafikę, na razie przygotujmy pasek,
+  // zróbmy go kwadratowym") — PRZYGOTOWANIE pod przyszłość: dawna pigułka (borderRadius =
+  // połowa wysokości) zastąpiona małym `radius.sm`, żeby pasek wyglądał jak "okno" na
+  // przyszłą grafikę miejsca docelowego, nie jak abstrakcyjny loading-bar. Sama grafika
+  // (fill = ciemność→tło lokacji per `missionDestination`) NIE zrobiona teraz — nie ma
+  // jeszcze plików per-quest, to osobna, późniejsza zmiana (ten sam wzorzec co
+  // `arenaBgFor(kind)` w bossIcons.ts — przygotowanie miejsca, fallback dopóki grafiki nie ma).
+  missionBarTrack: { position: 'relative', width: '100%', height: MISSION_BAR_HEIGHT, borderRadius: radius.sm, backgroundColor: c.bg.elevated, borderWidth: 1, borderColor: c.border.default },
+  missionBarFillWrap: { position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: radius.sm, borderBottomLeftRadius: radius.sm, overflow: 'hidden' },
   missionBarWave: { position: 'absolute', top: -10, bottom: -10, width: 34, backgroundColor: 'rgba(255,255,255,0.32)' },
   // Licznik M:SS WYŚRODKOWANY na całym pasku, NAD wypełnieniem (2026-08-26) — kotek już tu nie
   // jeździ, więc miejsce po nim zajmuje dokładny odliczający czas. Cień tekstu zamiast osobnego
