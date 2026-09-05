@@ -3724,13 +3724,29 @@ prosił wprost: `missionBarTrack`/`missionBarFillWrap` borderRadius `MISSION_BAR
 grafikę miejsca, nie jak abstrakcyjny loading-bar. Wypełnienie samo (niebieski gradient +
 fala) NIETKNIĘTE — podmiana na "ciemność→tło lokacji" czeka na realne pliki per quest.
 
+**5. Scena Rynku odklejała się od tła przy scrollu** (znalezione PRZED wysłaniem PR #141 na
+urządzenie, user zdążył zobaczyć tylko stan sprzed tego PR-a i pomylił to z "zjebałeś" —
+realny bug istniał już w PR #140, po prostu jeszcze niewidoczny bo tablica/lada nie miały
+się wtedy z czym rozjeżdżać). Przyczyna: `RYNEK_BG` był `position:absolute` PRZYPIĘTY DO
+EKRANU jako sibling `ScrollView`, podczas gdy tablica/sklepikarz/lada scrollowały NORMALNIE w
+środku `ScrollView` — przy przewijaniu tło zostawało w miejscu, a grafiki nad nim jechały,
+więc kontuar (mający "stać na podłodze" sceny) i tablica (mająca "wisieć u sufitu") odjeżdżały
+od tła i wyglądały jak wklejone w złym miejscu/skali, mimo że każdy z 3 plików osobno miał
+poprawny rozmiar. Naprawa: nowy `s.scene` wrapper (`position:relative`) wokół tablicy+kotka+
+lady — `RYNEK_BG` teraz PIERWSZE DZIECKO w środku TEGO wrappera (nie ekranu), więc scrolluje
+RAZEM z resztą sceny, zawsze w idealnej rejestracji niezależnie od pozycji scrolla. Freeze-
+card (nad sceną) i `hint` (pod nią) świadomie ZOSTAJĄ POZA wrapperem — nigdy nie miały wymogu
+piksel-w-piksel wyrównania z konkretnym miejscem na obrazku, to zwykłe karty UI.
+
 `tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — czysto wizualne). **Priorytet
 testu na urządzeniu**: (a) Sklep — sloty czytelniejsze na busy tle, Sklep dnia ma kolorowy
 gradient zależny od rzadkości (szary/niebieski/fioletowy/złoty zależnie co wylosowało), popup
 po tapnięciu itemu ma kolorową kreskę pod nazwą; (b) sklepikarz widoczny między tablicą a ladą,
 rozgląda się (nie jest statyczny), NIE reaguje na tapnięcie (brak lizania/serduszek); (c) pasek
 misji w trakcie — teraz kwadratowy zamiast pigułki, wypełnienie/countdown/fala działają jak
-wcześniej (czysta zmiana kształtu, zero zmiany logiki timera).
+wcześniej (czysta zmiana kształtu, zero zmiany logiki timera); (d) **NAJWAŻNIEJSZE** — przewiń
+ekran Sklepu w górę/dół, sprawdź czy tablica/sklepikarz/lada PRZEWIJAJĄ SIĘ RAZEM z tłem
+(cała scena rusza się jako jedna sztywna całość), a nie osobno od siebie jak wcześniej.
 
 ---
 

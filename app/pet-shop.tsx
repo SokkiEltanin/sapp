@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -174,11 +174,6 @@ export default function PetShop() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Tło Rynku (2026-09-05) — scena wnętrza sklepu na CAŁY ekran, pod headerem i
-          scrollem (oba mają przezroczyste tło, patrz style). Patrz `rynekArt.ts` po
-          kontekst trzech warstw. */}
-      <ImageBackground source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-
       <View style={s.head}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Sklep</Text>
@@ -198,10 +193,27 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
-        {/* ── RYNEK — skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA,
-            4 okna. Dawny pełnoszerokościowy hero-wiersz skrzynki dnia i lista skrzynek
-            (2026-08-27) ZASTĄPIONE tym samym contentem, tylko jako okna na grafice usera
-            (2026-09-05) — patrz `rynekArt.ts`. ── */}
+        {/* ── SCENA RYNKU (2026-09-05, fix po zgłoszeniu usera: "grafiki wstawione nie na
+            miejscu... rusza się a miało być statyczne jakby ze sobą") — tło było wcześniej
+            `position:absolute` PRZYPIĘTE DO EKRANU jako sibling ScrollView, podczas gdy
+            tablica/luka-ze-sklepikarzem/lada scrollowały NORMALNIE w środku ScrollView —
+            przy scrollu tło zostawało w miejscu a grafiki nad nim jechały, więc licznik
+            (kontuar mający stać na podłodze, tablica wisząca u sufitu) odjeżdżał od tła
+            i wyglądał "nie na miejscu"/"w złej skali", mimo że każdy z 3 plików osobno miał
+            poprawny rozmiar. Naprawa: `RYNEK_BG` teraz PIERWSZE DZIECKO w środku TEGO
+            `s.scene` wrappera (position:relative, wysokość = suma treści pod spodem, nie
+            cały ekran) — tło scrolluje RAZEM z tablicą/kotkiem/ladą bo są w tym samym
+            rodzicu, więc zawsze zostają w idealnej rejestracji względem siebie niezależnie
+            od pozycji scrolla. Freeze-card (nad scenerią) i `hint` (pod nią) świadomie
+            ZOSTAJĄ POZA tym wrapperem — nigdy nie miały wymogu piksel-w-piksel wyrównania
+            z konkretnym miejscem na obrazku, to zwykłe karty UI, nie część "obrazu". ── */}
+        <View style={s.scene}>
+          <Image source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+
+        {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Dawny
+            pełnoszerokościowy hero-wiersz skrzynki dnia i lista skrzynek (2026-08-27)
+            ZASTĄPIONE tym samym contentem, tylko jako okna na grafice usera (2026-09-05) —
+            patrz `rynekArt.ts`. */}
         <View style={{ gap: spacing[2] }}>
           <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
           <Text style={s.blurbTop}>Pierwsze okno: skrzynka dnia za darmo. Reszta losuje ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
@@ -278,6 +290,7 @@ export default function PetShop() {
               );
             })}
           </View>
+        </View>
         </View>
 
         <Text style={s.hint}>Monety: questy (za dbanie o SIEBIE) + darmowa skrzynka dnia + głaskanie kota. Startupy (ekran ładowania) i kosmetyka kotka: edytuj imię na /pet.</Text>
@@ -427,6 +440,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   boxEmoji: { fontSize: 26 },
   blurbTop: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
   refreshTxt: { fontSize: 10.5, color: c.text.muted, fontWeight: '700', marginTop: -4 },
+
+  // Scena Rynku (2026-09-05, fix "grafiki się rushają/nie na miejscu") — jeden
+  // `position:relative` wrapper wokół tablicy+kotka+lady, żeby `RYNEK_BG` (pierwsze dziecko,
+  // absoluteFillObject) scrollował RAZEM z nimi zamiast być przypięty do ekranu jako
+  // niezależna warstwa. Wysokość = suma treści w środku (żadnego sztywnego rozmiaru) —
+  // działa bo `position:absolute` dziecko w RN rozciąga się do już WYLICZONEGO rozmiaru
+  // rodzica, nie wpływa na jego pomiar. `overflow:'hidden'` na wypadek gdyby `cover` na
+  // skrajnie wąskim/szerokim ekranie chciał wystawić poza zaokrąglone rogi (scena i tak nie
+  // ma tu rogów, ale to tania asekuracja przed przypadkowym poziomym scrollem).
+  scene: { position: 'relative', overflow: 'hidden', gap: spacing[3] },
 
   // Kafelki na "tablicy"/ladzie Rynku (2026-09-05) — `s.artPiece` to kontener o wymiarach
   // `width:'100%'` + `aspectRatio` z `rynekArt.ts` (skaluje się z ekranem, bez zniekształcania

@@ -35,12 +35,19 @@ w ARCHITECTURE.md §27. Trzy fixy:
    nawet po tym jak ekran powstał (§26) — czysty dead-end złapany przez usera, nie nowy
    request. Teraz `<CatArt shopkeeper palette={SHOPKEEPER_PALETTE}>` stoi wyśrodkowany w
    widocznej luce między tablicą a ladą.
+4. **Scena odklejała się od tła przy scrollu** (user, patrząc na PR #140 zanim ten PR
+   zdążył dojechać: "grafiki wstawione nie na miejscu... rusza się a miało być statyczne
+   jakby ze sobą") — realny bug od PR #140, tło było przypięte do EKRANU podczas gdy
+   tablica/lada scrollowały w środku ScrollView, więc przy przewijaniu rozjeżdżały się od
+   tła. Naprawione: `RYNEK_BG` teraz wewnątrz nowego `s.scene` wrappera razem z tablicą/
+   kotkiem/ladą — scrolluje jako jedna sztywna całość, zawsze w rejestracji.
 
 `tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — czysto wizualne).
 **Priorytet testu na urządzeniu**: Sklep → sloty czytelniejsze na busy tle? Sklep dnia ma
 kolorowy gradient zależny od rzadkości wylosowanego itemu? Popup po tapnięciu ma kolorową
 kreskę pod nazwą? Sklepikarz widoczny między tablicą a ladą, rozgląda się (nie statyczny),
-NIE reaguje na tapnięcie?
+NIE reaguje na tapnięcie? **Najważniejsze**: przewiń ekran w górę/dół — tablica/sklepikarz/
+lada powinny przewijać się RAZEM z tłem jako jedna scena, nie osobno od siebie.
 
 Wciąż otwarte z poprzedniego wpisu: dolny rząd 8-okiennej lady (Sklep dnia ma tylko 4
 pozycje) pokazuje tło przez otwór — poszerzenie do 8 itemów to zmiana ekonomii, czeka na
