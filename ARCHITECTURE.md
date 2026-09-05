@@ -3637,6 +3637,54 @@ widoczne, czy pasek Lv jest czytelny i nie ucieka poza header na wąskim ekranie
 + chipa nastroju), czy siatka staty nadal się mieści bez dziwnego zawijania, i czy tapnięcie
 kotka nadal daje normalną reakcję głaskania mimo braku widocznego paska.
 
+## 26. Ekran Rynku (Sklep) dostał prawdziwą grafikę zamiast plain-kart — 2026-09-05
+
+Kontynuacja wątku z poprzedniej sesji (spec artefakt "Rynek", user wysłał referencyjny
+`LOKACJA_KAMPANIA.png` do ChatGPT + prompt) — user wygenerował i wgrał 3 pliki bezpośrednio
+przez GitHub UI na `master` (`assets/lokalizacje/LADAGORA.png`, `LADADOL.png`,
+`TLOSKLEPIKARZ.png`, wszystkie RGBA z realną przezroczystością, nie białym tłem).
+
+**Odkrycie nazw wbrew intuicji**: mimo nazw, `LADAGORA.png` ("lada góra") to MAŁA tablica z
+TYLKO 4 oknami (zawieszona jak szyld), a `LADADOL.png` ("lada dół") to WŁAŚCIWA lada — cały
+kontuar z workiem/sejfem na blacie, godłem-koszykiem i 8 oknami (2×4), zakotwiczona przy
+DOLE swojej kanwy. `TLOSKLEPIKARZ.png` to tło wnętrza sklepu (regały, okno, skrzynie).
+Wszystkie trzy oryginalnie 1080×1920 z dużym marginesem przezroczystości — `LADAGORA`/
+`LADADOL` PRZYCIĘTE (Pillow, bbox nieprzezroczystych pikseli + 24px marginesu) żeby nie
+marnować wysokości ekranu; `TLOSKLEPIKARZ` zostaje w oryginalnym rozmiarze (pełnoekranowe
+tło, `resizeMode="cover"` i tak przycina brzegi). Współrzędne okien (bbox przezroczystych
+"dziur" wewnątrz nieprzezroczystego obrysu) zmierzone RAZ skryptem Python na kanale alfa,
+zapisane jako procenty w `src/utils/rynekArt.ts` — jeśli obrazek zostanie kiedyś podmieniony,
+trzeba przeliczyć od nowa tym samym skryptem (nie ma go w repo, jednorazowy).
+
+**Mapowanie na istniejącą logikę `app/pet-shop.tsx`** (bez zmian w mechanice/ekonomii,
+czysto wizualne przeniesienie): tablica (4 okna) = skrzynka dnia (za darmo) + 3 skrzynki
+(`LOOT_BOXES`, sardine/silver/gold rosnąco kosztem) — dawny pełnoszerokościowy hero-wiersz +
+lista 3 wierszy ZASTĄPIONE. Górny rząd lady (4 z 8 okien) = Sklep dnia (`dailyShopSlots`,
+zawsze ≤4 pozycji) — dawna siatka `dailyGrid` ZASTĄPIONA. Dolny rząd lady (4 okna)
+NIEUŻYWANY na razie — Sklep dnia ma tylko 4 pozycje, nie 8; okna po prostu pokazują tło
+przez otwór (jak niewypełniona gablota), zero zmiany w danych/ekonomii. Skrzynki straciły
+widoczny blurb+odds z listy (za mało miejsca w małym oknie) — ta informacja WCALE nie
+zniknęła, przeniosła się do `ConfirmDialog` (nowe pole `extra` na `pendingBuy`, drugi
+wiersz wiadomości) — user dalej widzi opis + szanse PRZED zakupem, tylko nie na liście.
+
+Cały ekran dostał pełnoekranowe tło (`ImageBackground` z `RYNEK_BG`, position:absolute pod
+headerem i scrollem — oba renderują się z przezroczystym tłem teraz) + półprzezroczysty
+scrim za headerem (`c.bg.primary + 'CC'`, zwykłe rgba — ŚWIADOMIE bez `BlurView`, ta sama
+decyzja co przy `TabBar` "czyściej + płynniej na Androidzie"). Freeze-streak zostaje jako
+zwykła karta (nie pasuje do metafory "okna na kontuarze", to akcja, nie przedmiot).
+
+Wyrównanie okien zweryfikowane PRZED wpięciem do RN — szybki statyczny HTML z prawdziwymi
+przyciętymi PNG-ami + kolorowe boxy na policzonych procentach, screenshot playwright,
+potwierdzone piksel-w-piksel zanim przełożone na `pctStyle()` w kodzie.
+
+`tsc`/`jest` zielone (67 suit/837 testów, bez zmian w testach — czysto wizualne wpięcie
+istniejącej logiki, zero nowej logiki do testowania). **Priorytet testu na urządzeniu**:
+otwórz Sklep → sprawdź czy tło + oba kawałki grafiki wyglądają spójnie (bez przesunięcia
+okien względem grafiki, różne rozmiary ekranu/DPI mogą się zachować inaczej niż w
+statycznym podglądzie na PC), czy header jest czytelny na tle ruchliwej grafiki, czy
+tapnięcie każdego z 4+4 okien robi to co powinno (skrzynka dnia/skrzynki/podgląd itemu przed
+zakupem), i czy ConfirmDialog dla skrzynek pokazuje teraz blurb+szanse w drugiej linijce.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

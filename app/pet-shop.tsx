@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ImageBackground, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ChevronLeft, Coins, Check, Snowflake, Gift, X } from 'lucide-react-native';
@@ -13,11 +13,18 @@ import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
+import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
 import { spacing, radius } from '@/theme';
 import { useColors } from '@/theme/useColors';
 import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
+
+// Pozycjonuje dziecko wewnątrz `s.artPiece` (position:relative, wymiary z aspectRatio) na
+// procentowy prostokąt zmierzony na obrazku — patrz `rynekArt.ts`.
+const pctStyle = (r: PctRect) => ({
+  left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: `${r.height}%`,
+}) as any;
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 
@@ -82,9 +89,9 @@ export default function PetShop() {
   // staty/rarity; skrzynki (losowe) tego nie mają.
   const [gearPreview, setGearPreview] = useState<DailyShopSlot | null>(null);
 
-  const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string } | null>(null);
-  const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup') => {
-    setPendingBuy({ name, cost, onYes, verb });
+  const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string; extra?: string } | null>(null);
+  const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup', extra?: string) => {
+    setPendingBuy({ name, cost, onYes, verb, extra });
   };
 
   const onBuyFreeze = () => {
@@ -99,6 +106,10 @@ export default function PetShop() {
   const onBuyBox = (box: LootBox) => {
     haptic.tap();
     if (coins < box.cost) { haptic.error(); toast.error(`Za mało monet — potrzeba ${box.cost}`); return; }
+    // Kafelek-okno na tablicy Rynku (2026-09-05) nie ma już miejsca na blurb/odds jak dawny
+    // pełnoszerokościowy wiersz — obie linijki idą teraz do ConfirmDialog, żeby user dalej
+    // widział je PRZED zakupem, nie tylko rozmiar/emoji skrzynki.
+    const odds = `${box.blurb}\nekwipunek ${Math.round(box.gearChance * 100)}% · kolor ${Math.round(box.colorChance * 100)}% · ❄ ${Math.round(box.freezeChance * 100)}% · reszta monety`;
     confirmBuy(box.name, box.cost, () => {
       if (!spendCoins(box.cost)) { haptic.error(); toast.error('Nie udało się kupić skrzynki'); return; }
       const reward = rollBox(box, SHOP_COLORS, ownedItems, petLevel, ownedCombatItems);
@@ -111,7 +122,7 @@ export default function PetShop() {
       else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
       haptic.success();
       setReveal({ box, reward, dupeCoins });
-    }, 'Otwórz');
+    }, 'Otwórz', odds);
   };
 
   // Darmowa skrzynka dnia — raz dziennie: losuj i przyznaj (jak w sklepowej gaczy).
@@ -160,6 +171,11 @@ export default function PetShop() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      {/* Tło Rynku (2026-09-05) — scena wnętrza sklepu na CAŁY ekran, pod headerem i
+          scrollem (oba mają przezroczyste tło, patrz style). Patrz `rynekArt.ts` po
+          kontekst trzech warstw. */}
+      <ImageBackground source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+
       <View style={s.head}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Sklep</Text>
@@ -167,22 +183,6 @@ export default function PetShop() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        {/* PRZYPIĘTE: darmowa skrzynka dnia — główne nowe źródło monet */}
-        <PressableScale onPress={onDailyBox}>
-          <View style={[s.dailyHero, !dailyReady && s.dailyHeroDone]}>
-            <View style={[s.dailyIcon, !dailyReady && { backgroundColor: '#FBBF2420' }]}>
-              <Gift size={22} color={dailyReady ? '#0B0E1A' : '#FBBF24'} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.dailyTitle}>Skrzynka dnia — za darmo</Text>
-              <Text style={s.dailySub}>{dailyReady ? 'Odbierz codziennie: monety, ekwipunek, czasem kolor lub ❄' : 'Odebrane — wróć jutro'}</Text>
-            </View>
-            {dailyReady
-              ? <View style={s.dailyCta}><Text style={s.dailyCtaTxt}>ODBIERZ</Text></View>
-              : <Check size={18} color="#FBBF24" />}
-          </View>
-        </PressableScale>
-
         {/* PRZYPIĘTE NA GÓRZE — zamrożenie serii (najważniejsze, funkcjonalne) */}
         <PressableScale onPress={onBuyFreeze}>
           <View style={s.freezeHero}>
@@ -195,71 +195,63 @@ export default function PetShop() {
           </View>
         </PressableScale>
 
-        {/* ── RYNEK — skrzynki (gacha) + sklep dnia (gwarantowane itemy), scalone w jedną
-            zakładkę (2026-08-27) — jedyna zawartość tego ekranu (patrz komentarz nad
-            komponentem), więc bez przełącznika kategorii. ── */}
-        <View style={{ gap: spacing[3] }}>
-          <View style={{ gap: spacing[2] }}>
-            <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
-            <Text style={s.blurbTop}>Losujesz ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
-            {LOOT_BOXES.map(box => {
+        {/* ── RYNEK — skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA,
+            4 okna. Dawny pełnoszerokościowy hero-wiersz skrzynki dnia i lista skrzynek
+            (2026-08-27) ZASTĄPIONE tym samym contentem, tylko jako okna na grafice usera
+            (2026-09-05) — patrz `rynekArt.ts`. ── */}
+        <View style={{ gap: spacing[2] }}>
+          <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
+          <Text style={s.blurbTop}>Pierwsze okno: skrzynka dnia za darmo. Reszta losuje ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
+          <View style={[s.artPiece, { aspectRatio: RYNEK_TOP_ASPECT }]}>
+            <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
+            <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
+              <Gift size={26} color={dailyReady ? '#FBBF24' : c.text.muted} />
+              {dailyReady
+                ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
+                : <View style={[s.artSlotCheck, { backgroundColor: c.text.muted }]}><Check size={11} color="#0B0E1A" strokeWidth={3} /></View>}
+            </PressableScale>
+            {LOOT_BOXES.map((box, i) => {
               const afford = coins >= box.cost;
               return (
-                <PressableScale key={box.id} onPress={() => onBuyBox(box)}>
-                  <View style={[s.boxRow, { borderColor: box.color + '55' }]}>
-                    <View style={[s.boxIcon, { backgroundColor: box.color + '1E', borderColor: box.color + '55' }]}>
-                      <Text style={s.boxEmoji}>{box.emoji}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.cellName}>{box.name}</Text>
-                      <Text style={s.cellState}>{box.blurb}</Text>
-                      <Text style={s.oddsTxt}>ekwipunek {Math.round(box.gearChance * 100)}% · kolor {Math.round(box.colorChance * 100)}% · ❄ {Math.round(box.freezeChance * 100)}% · reszta monety</Text>
-                    </View>
-                    <View style={[s.buyPill, !afford && { opacity: 0.5 }]}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
-                  </View>
+                <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
+                  <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
+                  <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                 </PressableScale>
               );
             })}
           </View>
+        </View>
 
-          <View style={{ gap: spacing[2] }}>
-            <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
-            <Text style={s.blurbTop}>4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
-            <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
-            {dailySlots.length === 0 && (
-              <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
-            )}
-            {/* Siatka 4 obok siebie, TYLKO ikona (2026-08-31, user: "zwiększymy do 4 itemów...
-                ustawić itemy po 4 obok siebie tylko z ikoną, mi po kliknięciu pokazuje się
-                popup ze statystykami i formularzem zakupu i porównania z założonym") —
-                dawniej pełnoszerokościowy wiersz z nazwą/rzadkością/ceną wprost na liście,
-                za wąski na 4 w rzędzie. Nazwa/rzadkość/cena/porównanie NIE zniknęły —
-                przeniosły się w całości do `GearPreviewModal` (już istniał, patrz
-                `gearPreview` state — ten sam popup co wcześniej, tu tylko zmienia się TRIGGER
-                z pełnego wiersza na mały kafelek). Kafelek zostaje z jedynym stanowym
-                wskaźnikiem (✓ posiadane/kupione) — bez niego nie dałoby się w ogóle
-                odróżnić dostępnego od odebranego bez otwierania popupu za każdym razem. */}
-            <View style={s.dailyGrid}>
-              {dailySlots.map(slot => {
-                const { item, rarity, value } = slot;
-                const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
-                const bought = !!dayClaims[dayKey];
-                const owned = alreadyOwnGear(item.id, rarity, value);
-                const meta = RARITY_META[rarity];
-                return (
-                  <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={s.dailyTileWrap}>
-                    <View style={[s.dailyTile, { borderColor: meta.color + '55', backgroundColor: meta.color + '14' }]}>
-                      <Image source={item.icon} style={s.dailyTileImg} resizeMode="contain" />
-                      {(bought || owned) && (
-                        <View style={[s.dailyTileCheck, { backgroundColor: meta.color }]}>
-                          <Check size={11} color="#0B0E1A" strokeWidth={3} />
-                        </View>
-                      )}
+        {/* ── Sklep dnia — 4 konkretne itemy ekwipunku na dziś, teraz jako górny rząd okien
+            lady LADADOL (dolny rząd nieużywany, patrz `rynekArt.ts`). Popup ze statystykami
+            i porównaniem (`GearPreviewModal`) BEZ ZMIAN — tylko trigger się przeniósł z
+            plain-kafelka na okno na grafice. ── */}
+        <View style={{ gap: spacing[2] }}>
+          <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
+          <Text style={s.blurbTop}>4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
+          <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
+          {dailySlots.length === 0 && (
+            <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
+          )}
+          <View style={[s.artPiece, { aspectRatio: RYNEK_BOTTOM_ASPECT }]}>
+            <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
+            {dailySlots.map((slot, i) => {
+              const { item, rarity, value } = slot;
+              const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
+              const bought = !!dayClaims[dayKey];
+              const owned = alreadyOwnGear(item.id, rarity, value);
+              const meta = RARITY_META[rarity];
+              return (
+                <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
+                  <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
+                  {(bought || owned) && (
+                    <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
+                      <Check size={11} color="#0B0E1A" strokeWidth={3} />
                     </View>
-                  </PressableScale>
-                );
-              })}
-            </View>
+                  )}
+                </PressableScale>
+              );
+            })}
           </View>
         </View>
 
@@ -280,7 +272,7 @@ export default function PetShop() {
       <ConfirmDialog
         visible={!!pendingBuy}
         title="Potwierdź zakup"
-        message={pendingBuy ? `${pendingBuy.name} — ${pendingBuy.cost} monet` : ''}
+        message={pendingBuy ? `${pendingBuy.name} — ${pendingBuy.cost} monet${pendingBuy.extra ? `\n${pendingBuy.extra}` : ''}` : ''}
         confirmLabel={pendingBuy?.verb ?? 'Kup'}
         cancelLabel="Anuluj"
         destructive={false}
@@ -380,7 +372,10 @@ function GearPreviewModal({ slot, equippedGear, ownedGear, dayClaims, coins, onB
 
 const makeS = themedStyles((c: any) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.bg.primary },
-  head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
+  // Scrim za headerem (2026-09-05) — tło Rynku jest teraz ruchliwą grafiką pod spodem,
+  // bez półprzezroczystego paska back/tytuł/monety zlewałyby się z tłem. Świadomie zwykłe
+  // rgba, BEZ BlurView (ten sam wybór co TabBar — "czyściej + płynniej na Androidzie").
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingHorizontal: spacing[4], paddingVertical: spacing[3], backgroundColor: c.bg.primary + 'CC' },
   title: { fontSize: 18, fontWeight: '800', color: c.text.primary, flex: 1 },
   coinPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#FBBF2440' },
   coinTxt: { fontSize: 13, fontWeight: '800', color: '#FBBF24' },
@@ -392,47 +387,29 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   freezeTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
   freezeSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
 
-  // kategorie
-
-  // wspólny wiersz (skrzynki / sklep dnia)
-  boxRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: c.border.default, backgroundColor: c.bg.card },
   boxIcon: { width: 46, height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boxEmoji: { fontSize: 26 },
-  boxImg: { width: 30, height: 30 },
-  oddsTxt: { fontSize: 10, color: c.text.muted, marginTop: 3, fontWeight: '600' },
   blurbTop: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
   refreshTxt: { fontSize: 10.5, color: c.text.muted, fontWeight: '700', marginTop: -4 },
 
-  // Siatka Sklepu dnia — 4 kwadratowe kafelki obok siebie, tylo ikona (2026-08-31, patrz
-  // komentarz przy JSX). `width:'23%'` + `justifyContent:'space-between'` (nie `gap`) —
-  // odstęp między kafelkami wynika z ROZŁOŻENIA reszty szerokości, więc zawsze dokładnie 4 w
-  // rzędzie bez ręcznego liczenia dp na różnych szerokościach ekranu. `aspectRatio:1` robi
-  // kwadrat z dowolnej wyliczonej szerokości zamiast sztywnej wysokości w px.
-  dailyGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing[2] },
-  dailyTileWrap: { width: '23%' },
-  dailyTile: { width: '100%', aspectRatio: 1, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  dailyTileImg: { width: '58%', height: '58%' },
-  dailyTileCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  // Kafelki na "tablicy"/ladzie Rynku (2026-09-05) — `s.artPiece` to kontener o wymiarach
+  // `width:'100%'` + `aspectRatio` z `rynekArt.ts` (skaluje się z ekranem, bez zniekształcania
+  // grafiki), dzieci to `PressableScale` pozycjonowane PROCENTOWO (`pctStyle`) na zmierzone
+  // okna. Ten sam wzorzec co dawny `dailyGrid`/`dailyTile` (kwadratowy kafelek + check-badge
+  // w rogu), tylko teraz miejsce kafelka dyktuje grafika, nie flex-wrap.
+  artPiece: { width: '100%', position: 'relative' },
+  artSlot: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  artSlotImg: { width: '62%', height: '62%' },
+  artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  artCostPill: { position: 'absolute', bottom: -8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FBBF2440' },
+  artSlotBadge: { position: 'absolute', bottom: -8, backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },
+  artSlotBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.3 },
 
   subSection: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
-  cellName: { fontSize: 12, fontWeight: '700', color: c.text.primary },
   cellState: { fontSize: 10, color: c.text.muted },
 
   buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },
   buyPillTxt: { fontSize: 12, fontWeight: '800', color: '#FBBF24' },
-
-  // seria logowań
-
-  // skrzynka dnia (darmowa, przypięta)
-  dailyHero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#FBBF2455', backgroundColor: '#FBBF2414' },
-  dailyHeroDone: { borderColor: c.border.default, backgroundColor: c.bg.card },
-  dailyIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#FBBF24', alignItems: 'center', justifyContent: 'center' },
-  dailyTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
-  dailySub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
-  dailyCta: { backgroundColor: '#FBBF24', borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 6 },
-  dailyCtaTxt: { fontSize: 11, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.5 },
-
-  // startupy (kosmetyki splasha)
 
   hint: { fontSize: 11, color: c.text.muted, textAlign: 'center', marginTop: spacing[2] },
 

@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Sklep (Rynek): prawdziwa grafika zamiast plain-kart — NIEsprawdzone (2026-09-05)
+
+User wygenerował i wgrał 3 pliki (`LADAGORA.png`, `LADADOL.png`, `TLOSKLEPIKARZ.png` w
+`assets/lokalizacje/`) wg specyfikacji z poprzedniej sesji. Pełny opis w ARCHITECTURE.md §26
+— skrót: tło sklepu na cały ekran, skrzynka dnia+3 skrzynki jako 4 okna na małej tablicy,
+Sklep dnia (4 itemy) jako górny rząd okien właściwej lady, dolny rząd (4 okna) na razie
+nieużywany (pokazuje tło przez otwór — Sklep dnia ma tylko 4 pozycje, nie 8). Zero zmian w
+mechanice/ekonomii, czysto wizualne przeniesienie istniejącej logiki na nową grafikę.
+`tsc`/`jest` zielone (67 suit/837 testów, bez nowych testów — nie ma nowej logiki).
+
+**Priorytet testu na urządzeniu**: otwórz Sklep → wygląda spójnie (bez przesunięcia okien
+względem grafiki na realnym DPI, nie tylko w statycznym podglądzie na PC)? Header czytelny
+na tle grafiki? Wszystkie 4+4 okna klikalne i robią właściwą rzecz (skrzynka dnia, 3
+skrzynki, podgląd+zakup itemu Sklepu dnia)? ConfirmDialog dla skrzynek pokazuje teraz opis+
+szanse w drugiej linijce (dawniej widoczne wprost na liście, teraz przeniesione tu)?
+
+Jeśli podoba się kierunek, ale dolny rząd 8-okiennej lady razi pustką — do rozważania:
+poszerzyć Sklep dnia z 4 do 8 itemów (`dailyShopSlots(date, level, count)` już przyjmuje
+`count`, zmiana jest jednolinijkowa), ale to zmiana ekonomii (2x więcej gwarantowanych
+zakupów dziennie), więc świadomie NIE zrobione bez pytania.
+
 ## 🆕 Pupil: większe sloty ekwipunku, zbita siatka staty, powiększony pasek Lv — NIEsprawdzone (2026-09-04)
 
 User: "I te sloty na ekwipunku pupila jeszcze powiększyć trochę bo teraz itemy nadal sa
