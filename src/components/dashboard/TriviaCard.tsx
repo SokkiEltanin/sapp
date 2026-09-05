@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FlaskConical, BookOpen, Lightbulb, Globe, Sparkles, Check, GraduationCap } from 'lucide-react-native';
+import { FlaskConical, Lightbulb, Globe, Sparkles, Check, GraduationCap, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { haptic } from '@/utils/haptics';
 import { TRIVIA, Trivia, TriviaCat } from '@/data/trivia';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,10 +10,9 @@ import { themedStyles } from '@/theme/themedStyles';
 import { spacing, radius, fonts } from '@/theme';
 
 const META: Record<TriviaCat, { icon: any; label: string; color: string }> = {
-  nauka:   { icon: FlaskConical, label: 'Nauka',     color: '#46B0DE' },
-  ksiazka: { icon: BookOpen,     label: 'Z książki', color: '#A855F7' },
-  rozwoj:  { icon: Lightbulb,    label: 'Rozwój',    color: '#2AC68F' },
-  swiat:   { icon: Globe,        label: 'Świat',     color: '#E0A33A' },
+  nauka:   { icon: FlaskConical, label: 'Nauka',  color: '#46B0DE' },
+  rozwoj:  { icon: Lightbulb,    label: 'Rozwój', color: '#2AC68F' },
+  swiat:   { icon: Globe,        label: 'Świat',  color: '#E0A33A' },
 };
 
 const KEY = 'trivia_state_v1';
@@ -107,6 +106,15 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
     return () => { alive = false; };
   }, []);
 
+  // Rozwiń/zwiń (2026-09-06, user: "jak kliknę w ciekawostkę to rozwija mi ją, więcej jest
+  // ładnie opisane i jest źródło na dole podane") — `text` zostaje krótkim teaserem jak
+  // dotąd, tap odsłania `detail` (i `src`, jeśli jest, TYLKO w stanie rozwiniętym — dawniej
+  // `src` był zawsze widoczny, teraz przeniósł się pod rozwinięcie). Resetuje się przy
+  // zmianie ciekawostki (nowy dzień / „To znam"), żeby nie zostać rozwinięty na kolejnym
+  // fakcie, który user jeszcze nie widział.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { setExpanded(false); }, [st?.currentKey]);
+
   const [confirmDismiss, setConfirmDismiss] = useState(false);
   const onKnowIt = () => {
     if (!st?.currentKey) return;
@@ -164,8 +172,15 @@ export default function TriviaCard({ cardBg }: { cardBg: string }) {
         </View>
       </View>
 
-      <Text style={s.text}>{t.text}</Text>
-      {t.src ? <Text style={s.src}>— {t.src}</Text> : null}
+      <TouchableOpacity onPress={() => { haptic.tap(); setExpanded(e => !e); }} activeOpacity={0.7}>
+        <Text style={s.text}>{t.text}</Text>
+        {expanded && <Text style={s.detail}>{t.detail}</Text>}
+        {expanded && t.src ? <Text style={s.src}>— {t.src}</Text> : null}
+        <View style={s.moreRow}>
+          {expanded ? <ChevronUp size={13} color={c.text.muted} /> : <ChevronDown size={13} color={c.text.muted} />}
+          <Text style={s.moreTxt}>{expanded ? 'Zwiń' : 'Czytaj więcej'}</Text>
+        </View>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={onKnowIt} style={s.knowBtn} activeOpacity={0.8} hitSlop={6}>
         <Check size={12} color={c.text.muted} />
@@ -183,7 +198,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, borderWidth: 1 },
   catTxt: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
   text: { fontSize: 14, lineHeight: 20, color: c.text.primary, fontWeight: '500' },
-  src: { fontSize: 12, color: c.text.muted, fontStyle: 'italic' },
+  detail: { fontSize: 13, lineHeight: 19, color: c.text.secondary, marginTop: spacing[2] },
+  src: { fontSize: 12, color: c.text.muted, fontStyle: 'italic', marginTop: spacing[1] },
+  moreRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: spacing[1] },
+  moreTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted },
   knowBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: spacing[1], paddingVertical: 4, paddingHorizontal: 8, borderRadius: radius.full, borderWidth: 1, borderColor: c.border.default },
   knowTxt: { fontSize: 11, fontWeight: '700', color: c.text.muted },
 }));

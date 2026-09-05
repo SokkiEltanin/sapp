@@ -3748,6 +3748,58 @@ wcześniej (czysta zmiana kształtu, zero zmiany logiki timera); (d) **NAJWAŻNI
 ekran Sklepu w górę/dół, sprawdź czy tablica/sklepikarz/lada PRZEWIJAJĄ SIĘ RAZEM z tłem
 (cała scena rusza się jako jedna sztywna całość), a nie osobno od siebie jak wcześniej.
 
+## 28. Ciekawostka dnia: usunięta kategoria "z książki", rozwijalny opis + źródło, dużo nowej treści — 2026-09-06
+
+User: "rozbuduj ciekawostki widget, teraz skrót sentencja ciekawostki jest tak jak jest ale
+więcej ciekawostek (nie wiem czy masz wgląd do tych co już kliknąłem żeby nie pokazywały się
+albo to znam (z książek fragmenty są useless, wywalamy je) i jak kliknę w ciekawostkę to
+rozwija mi ją więcej jest ładnie opisane i jest źródło na dole podane". Dotyczy `TriviaCard`
+(dashboard) + `src/data/trivia.ts` — NIE dotyczy osobnego, podobnie nazwanego widgetu
+"Ciekawostki z Twoich danych" (`FunFactsSection.tsx`/`funComparisons.ts`, personalizowane
+porównania z liczb usera typu kroki→km) — ten zostaje bez zmian.
+
+**1. Kategoria `ksiazka` USUNIĘTA CAŁKOWICIE** — 69 wpisów (parafrazy idei z książek
+samorozwojowych/popularnonaukowych z przypisanym źródłem) skasowane, `TriviaCat` zwężony do
+`'nauka' | 'rozwoj' | 'swiat'`, ikona/etykieta „Z książki" usunięta z `META` w `TriviaCard.tsx`
+(dead code inaczej). Wpisy te były w praktyce już same w sobie długie (2-3 zdania), więc nie
+dawały się sensownie skrócić do wzorca "krótki teaser + rozwinięcie po tapnięciu" jak reszta
+kategorii — user ocenił całą kategorię jako nudną i kazał usunąć, nie tylko skrócić.
+
+**2. Nowe pole `detail: string` — WYMAGANE na każdym wpisie** (nie opcjonalne, żeby żadna
+ciekawostka nie brakowała rozwinięcia po dodaniu). `text` zostaje krótkim teaserem bez zmian
+w stylu; `detail` to 1-3 zdania rozwinięcia — mechanizm/kontekst/dlaczego tak jest, czasem z
+realnym źródłem (`src`, opcjonalne — konkretna instytucja/badacz/eksperyment, NIGDY zmyślone;
+część wpisów świadomie go nie ma). Napisany `detail` dla WSZYSTKICH 150 zachowanych wpisów
+(58 nauka + 39 rozwój + 47 świat sprzed tej zmiany, minus dwie wcześniej niechcący pominięte
+przy pierwszym szkicu tego pliku — `Rów Mariański`/`Jeanne Calment` — odzyskane, sprawdzone
+skryptem porównującym stary/nowy plik fragment-po-fragmencie) + dla nowych wpisów.
+
+**3. Dużo nowej treści** — dodano netto: +5 nauka, +3 rozwój, +2 świat wprost, ale głównym
+przyrostem jest sam `detail` na każdym z 150 zachowanych faktów (dawniej same suche
+jednozdaniowe teasery bez żadnego rozwinięcia). Finalnie **152 wpisy** (63 nauka / 42 rozwój /
+47 świat) — mniej niż 213 sprzed usunięcia `ksiazka`, ale każdy z realnym rozwinięciem, część
+z cytowalnym źródłem, zero fragmentów-z-książek.
+
+**4. UI (`TriviaCard.tsx`)** — cały tekst (`text`+opcjonalnie `detail`+`src`) owinięty w
+`TouchableOpacity` z lokalnym `useState<boolean> expanded` (`useEffect` resetuje go do
+`false` przy zmianie `st?.currentKey`, żeby nowy dzień/nowy fakt po "To znam" zawsze startował
+zwinięty). Rozwinięty stan pokazuje `detail` (kolor `text.secondary`, mniejszy font niż
+teaser) i DOPIERO wtedy `src` (dawniej `src` był widoczny ZAWSZE, teraz przeniósł się pod
+rozwinięcie — user chciał "źródło na dole", czyli na dole ROZWINIĘTEGO widoku, nie na dole
+zwiniętego teasera). Wiersz `ChevronDown/ChevronUp` + "Czytaj więcej"/"Zwiń" (ten sam wzorzec
+co istniejący `bosses.tsx` — pokonani bossowie collapse/expand). Mechanizm "seen/dismissed"
+(`dismissed`, `counts`, `REPEAT_GAP_DAYS`, hash `keyOf(text)`) NIETKNIĘTY — usunięcie `ksiazka`
+i dodanie nowych wpisów jest dla niego przezroczyste (orphanowane klucze usuniętych faktów są
+po prostu nieszkodliwe, nowe wpisy wchodzą do puli normalnie od zera).
+
+`tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — trivia.ts nie ma własnych
+testów jednostkowych, ten sam brak pokrycia co przed zmianą, dane statyczne). **Priorytet
+testu na urządzeniu**: (a) dashboard → karta "Ciekawostka dnia" → tapnij tekst — rozwija się,
+pokazuje dłuższy opis i (czasem) źródło na dole, drugi tap zwija; (b) żadna ciekawostka nie
+ma już etykiety „Z książki"; (c) "To znam — nie pokazuj" dalej działa identycznie (dismissed
+state nietknięty); (d) po pokazaniu nowej ciekawostki karta startuje ZAWSZE zwinięta, nie
+zapamiętuje rozwinięcia z poprzedniego dnia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
