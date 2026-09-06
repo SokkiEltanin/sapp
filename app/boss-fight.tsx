@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Easing, Modal, Pressable, Image, ImageBackground } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Lock, Swords, Zap, Shield, HeartPulse, Coins, PawPrint, Trophy, Compass } from 'lucide-react-native';
@@ -688,6 +689,19 @@ export default function BossFight() {
               imageStyle={s.arenaSceneImg}
               resizeMode="cover"
             >
+            {/* Scrim/winieta (2026-09-06, user ze zrzutem: "postacie są niewidoczne, arena
+                za jasna... wygląda tanio, zrób z tego high-end fight scene") — 3-stopniowy
+                pionowy gradient przyciemniający górę/dół sceny (gdzie tło zwykle jest
+                najbardziej "zgiełkliwe" — łańcuchy/pochodnie w obecnej grafice), a środek
+                (twarze sprite'ów) zostaje jaśniejszy. Niezależne od TEGO, jak jasne/ciemne
+                jest samo źródłowe zdjęcie areny — winieta ZAWSZE dodaje kontrast i głębię,
+                więc zostaje nawet po podmianie `LOKACJA_KAMPANIA.png` na nową grafikę usera. */}
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.55)'] as [string, string, string]}
+              locations={[0, 0.45, 1]}
+              style={StyleSheet.absoluteFillObject}
+            />
             <View style={s.vsRow}>
               <View style={s.tile}>
                 {/* Portret NAD nazwą/paskiem HP (2026-09-03, user: "w bossach w walkach
@@ -702,6 +716,12 @@ export default function BossFight() {
                       faktycznymi łapkami kotka, a nie pod pustym marginesem wspólnego,
                       wyższego kafelka. */}
                   <View style={s.spriteBoxCat}>
+                    {/* Halo za sprite'em (2026-09-06, "high-end fight scene" — patrz komentarz
+                        przy winiecie wyżej) — miękka poświata w kolorze futra kotka, żeby
+                        sylwetka odcinała się od TŁA NIEZALEŻNIE od tego, jak jasna/zgiełkliwa
+                        jest akurat grafika areny za nim. `GroundShadow` (cień pod łapkami)
+                        zostaje bez zmian, to DODATKOWA, osobna poświata za całym sprite'em. */}
+                    <RadialGlow size={CAT_PORTRAIT_SIZE * 1.5} color={palette.coat} opacity={0.22} />
                     <GroundShadow width={CAT_PORTRAIT_SIZE * 0.62} height={CAT_PORTRAIT_SIZE * 0.18} />
                     <Animated.View style={{ transform: [{ translateX: kShakeX }] }}>
                       {/* animate=false (2026-08-30, user: "laguja walki... kotek żeby był
@@ -742,6 +762,10 @@ export default function BossFight() {
               <View style={s.tile}>
                 <View style={s.tilePortrait}>
                   <View style={s.spriteBoxBoss}>
+                    {/* Halo za bossem — ten sam zabieg co przy kotku wyżej, kolorem "słabości"
+                        bossa (`WEAK_COLOR`, już używanym przy etykiecie/motywie), więc poświata
+                        nie jest przypadkowa — czyta się jak sygnatura elementu bossa. */}
+                    <RadialGlow size={PORTRAIT_SIZE * 1.6} color={WEAK_COLOR[target.weakness] ?? '#F87171'} opacity={0.25} />
                     <GroundShadow width={PORTRAIT_SIZE * 0.62} height={PORTRAIT_SIZE * 0.18} />
                     {/* Tylko shake na samym sprite'cie bossa (2026-08-14, user: "u nas trochę
                         chaos" — porównanie do S&F: łapka leci, uderza, wróg się trzęsie, dmg
