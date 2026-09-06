@@ -522,41 +522,30 @@ export default function CatArt({
                 )}
                 {expression === 'sad' && <Path d="M726 838 q-40 74 0 116 q40 -40 0 -116 z" fill="#5AB0F0" stroke="#3E93D8" strokeWidth={5} />}
                 {expression === 'sick' && <Path d="M1245 706 q34 64 0 100 q-34 -36 0 -100 z" fill="#BFE3F5" stroke="#8FCDEA" strokeWidth={4} />}
-                {/* "sklepikarz" disguise — fake handlebar mustache + hat. Fixed costume
-                    colours (not palette-driven): a fake mustache/hat wouldn't match the
-                    cat's own fur anyway. Drawn LAST inside the SVG (after eyes/mouth) so it
+                {/* "sklepikarz" disguise — hat + cheek scratch mark. Fixed costume colours
+                    (not palette-driven). Drawn LAST inside the SVG (after eyes/mouth) so it
                     sits on top of the face, and — crucially — the hat is drawn INSIDE this
                     <Svg>, which closes below BEFORE the <Ear> overlays render, so the ears
                     automatically poke out on top of the brim with no extra cutout math.
-                    Draft 3 (2026-09-03, user saw draft 1's screenshot: "uszy mają wystawać
-                    ale naturalnie i wąsy podkreślone bardziej") — mustache switched from a
-                    thin filled blob to bold ROUND-CAP STROKES with small curl-tip discs (much
-                    more legible as a handlebar at portrait scale); hat crown narrowed
-                    (760-1160 vs old 700-1220) so it doesn't reach as far into each ear's own
-                    silhouette, exposing more of BOTH ears symmetrically (ear geometry itself
-                    is untouched — same <Ear> paths used everywhere else), plus a small dark
-                    "gather" ellipse at each ear's base (drawn on the hat, so the ear renders
-                    on top of it) reading as a fold in the fabric the ear pokes THROUGH,
-                    rather than something merely sitting beside a hat. */}
+                    Draft 4 (2026-09-06) — user dostał statyczny .svg-eksport (ten sam
+                    viewBox 0 0 2000, patrz ARCHITECTURE.md §36) i sam dopracował wygląd w
+                    zewnętrznym edytorze wektorowym, odsyłając gotowy plik
+                    (`assets/Gotowysklepikarz.svg`). Względem draftu 3: kapelusz WIĘKSZY i
+                    szerszy (rondo 604-1274 vs dawne 760-1160, korona/rondo przeskalowane
+                    ~1.67×, wyśrodkowane tak samo nad głową), "gather"-elipsy przy uszach
+                    USUNIĘTE (zbędne przy szerszym rondzie), CAŁA wąsata "handlebar mustache"
+                    USUNIĘTA (user uznał sam uśmiech za wystarczający, bez doklejonych wąsów)
+                    — zastąpiona małym akcentem: bliznowatą "błyskawicą" na prawym policzku.
+                    Współrzędne przeniesione 1:1 z przysłanego pliku (dokładna transformacja
+                    macierzy z edytora rozpisana na sztywno, nie przybliżenie). */}
                 {shopkeeper && (
                   <G>
-                    <G stroke="#1B140C" strokeWidth={24} strokeLinecap="round" fill="none">
-                      <Path d="M985 892 C 954 866 908 856 862 868 C 828 877 802 896 788 916" />
-                      <Path d="M985 892 C 1016 866 1062 856 1108 868 C 1142 877 1168 896 1182 916" />
-                    </G>
-                    <Circle cx={788} cy={916} r={15} fill="#1B140C" />
-                    <Circle cx={1182} cy={916} r={15} fill="#1B140C" />
-                    <G stroke="#3C2C1A" strokeWidth={6} strokeLinecap="round" fill="none" opacity={0.65}>
-                      <Path d="M960 878 C 930 862 898 858 866 868" />
-                      <Path d="M1010 878 C 1040 862 1072 858 1104 868" />
-                    </G>
-                    <Ellipse cx={960} cy={645} rx={300} ry={62} fill="#2E2620" />
-                    <Path d="M760 645 Q760 460 960 428 Q1160 460 1160 645 Z" fill="#3A3128" />
-                    <Path d="M805 638 Q815 490 940 435 Q850 478 830 638 Z" fill="#463C31" opacity={0.55} />
-                    <Rect x={760} y={610} width={400} height={42} fill="#241A10" />
-                    <Rect x={928} y={606} width={64} height={50} rx={6} fill="#171310" />
-                    <Ellipse cx={742} cy={600} rx={58} ry={34} fill="#171310" opacity={0.45} />
-                    <Ellipse cx={1178} cy={600} rx={58} ry={34} fill="#171310" opacity={0.45} />
+                    <Ellipse cx={939.03} cy={645.59} rx={501.83} ry={103.71} fill="#2E2620" />
+                    <Path d="M604.47 645.59 C604.47 439.28 715.99 318.28 939.03 282.59 C1162.07 318.28 1273.59 439.28 1273.59 645.59 L604.47 645.59 Z" fill="#3A3128" />
+                    <Path d="M679.75 633.88 C690.9 468.83 766.18 355.64 905.57 294.3 C805.21 342.25 743.87 455.45 721.57 633.88 L679.75 633.88 Z" fill="#463C31" opacity={0.55} />
+                    <Rect x={604.47} y={587.04} width={669.11} height={70.26} fill="#241A10" />
+                    <Rect x={885.5} y={580.35} width={107.06} height={83.64} rx={10.04} fill="#171310" />
+                    <Path d="M1194.04 866.41 L1126.18 949.72 L1185.45 937.18 L1109.01 1017.58 L1217.23 937.18 L1237.84 906.04 L1172.57 923.04 Z" fill="#87714E" />
                   </G>
                 )}
               </G>

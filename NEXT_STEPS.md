@@ -3,6 +3,21 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Sklepikarz: user sam dopracował kapelusz+wąsy, przeniesione do CatArt.tsx — NIEsprawdzone (2026-09-06)
+
+User dostał statyczny `.svg`-eksport sklepikarza (patrz wpis niżej), sam go dopracował w
+zewnętrznym edytorze i odesłał gotowy plik (`assets/Gotowysklepikarz.svg`, zostaje w repo jako
+referencja). Pełny opis w ARCHITECTURE.md §38. Przeniesione 1:1: kapelusz WIĘKSZY (~1.67×,
+uszy dalej ładnie wystają po obu stronach), "gather"-elipsy przy uszach usunięte, CAŁA
+handlebar-wąsata mustache usunięta (sam uśmiech wystarczy), nowy akcent — mała bliznowata
+"błyskawica" na prawym policzku. Zweryfikowane wizualnie (symulacja obok-obok z przysłanym
+plikiem), `tsc`/`jest` zielone.
+
+**Priorytet testu na urządzeniu**: ekran Sklepu — sklepikarz z większym kapeluszem, bez wąsów,
+z błyskawicą na policzku. Sam ROZMIAR/POZYCJA sklepikarza w scenie (czy "wystarczająco duży",
+"siedzi za ladą") to osobna sprawa — do tego służy edytor sceny (`cat.scale`/`x`/`y`) z wpisu
+niżej.
+
 ## 🆕 Rynek: czarne pasy po bokach sceny naprawione (TLOSKLEPIKARZ.png przycięty) — NIEsprawdzone (2026-09-06)
 
 User ze zrzutem po fixie z §32: "zobacz nadal [źle], musisz poprawić". Realna przyczyna
@@ -16,8 +31,9 @@ przycięty do bbox alfa (+8px), zero zmian w kodzie. Zweryfikowane symulacją Pi
 zielone.
 
 **Priorytet testu na urządzeniu**: ekran Sklepu — scena powinna wypełniać całą szerokość
-ekranu, bez czarnych pasów po bokach tablicy/luki/lady. Sklepikarz (większy, za ladą,
-poprawione wąsy/czapka) dalej NIE ruszony — czeka na osobne zlecenie usera.
+ekranu, bez czarnych pasów po bokach tablicy/luki/lady. Wygląd sklepikarza (kapelusz/wąsy)
+ZROBIONY osobno (patrz wpis wyżej) — jego rozmiar/pozycja w scenie to wciąż osobna sprawa,
+dostrajana edytorem sceny.
 
 ## 🆕 Rynek: edytor sceny na urządzeniu (X/Y/skala PER GRAFIKA + eksport) + statyczny .svg sklepikarza — NIEsprawdzone (2026-09-06)
 
