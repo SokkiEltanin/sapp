@@ -4129,6 +4129,40 @@ na żywo, `top`/`topSlots` (i analogicznie `bottom`/`bottomSlots`) da się przes
 od siebie; (b) sklepikarz — uszy NIE wystają ponad rondo kapelusza, tylko mały prześwit z
 każdej strony jak w przysłanym pliku.
 
+## 40. Walka: winieta + poświata za sprite'ami — "high-end fight scene" zamiast płaskiej sceny — 2026-09-06
+
+User ze zrzutem areny walki: "postacie są niewidoczne, arena za jasna, wygląda tanio, zrób z
+tego high-end fight scene — możemy tę grafikę [`LOKACJA_KAMPANIA.png`] wywalić zupełnie i
+zrobię inną, ale żeby to dobrze leżało". Dwie rzeczy, obie NIEZALEŻNE od tego, jaka grafika
+areny akurat jest podpięta — zostają nawet po podmianie na nową grafikę usera:
+
+1. **Winieta** — 3-stopniowy pionowy `LinearGradient` (góra/dół sceny przyciemnione ~50%,
+   środek tylko ~8%) narysowany NA obrazku areny, PRZED sprite'ami. Dodaje głębię i kontrast
+   niezależnie od tego, jak jasne/zgiełkliwe jest samo źródłowe zdjęcie — klasyczny zabieg z
+   gier, żeby scena nie czytała się jak płaskie zdjęcie w tle.
+2. **Poświata za sprite'ami** (`RadialGlow`, już istniejący komponent z `BossArt.tsx`/
+   `StreakFlame.tsx`) — miękka, kolorowa "aura" WIĘKSZA niż sam sprite, wyśrodkowana za nim
+   (ten sam wzorzec auto-centrowania co w `BossArt`: `position:'absolute'` dziecko
+   `alignItems/justifyContent:'center'` rodzica). Kotek dostaje poświatę w kolorze WŁASNEGO
+   futra (`palette.coat`), boss w kolorze swojej "słabości" (`WEAK_COLOR[target.weakness]`,
+   już używanym przy etykiecie/motywie — poświata więc nie jest przypadkowa, czyta się jak
+   sygnatura elementu). To DODATEK do istniejącego `GroundShadow` (cień pod łapkami), nie
+   zamiennik — dwie różne, uzupełniające się poprawki czytelności sylwetki.
+
+Zweryfikowane wizualnie symulacją Pillow (`LOKACJA_KAMPANIA.png` przycięty dokładnie tak jak
+robi to `resizeMode="cover"` w realnym boksie sceny, potem ta sama winieta nałożona w
+Pythonie) — widoczny, ale niebrutalny wzrost kontrastu/głębi. `tsc`/`jest` zielone.
+
+**Dla usera projektującego nową grafikę areny**: obecny box sceny to ok. **2.5:1** (szeroki,
+niski baner — źródłowy `LOKACJA_KAMPANIA.png` to 1200×800 czyli 1.5:1, więc `cover` i tak
+mocno przycinał górę/dół). Nowa grafika najlepiej leży w podobnych proporcjach (np. 1600×640)
+— `cover` i tak przytnie brzegi jeśli proporcje się nie zgadzają dokładnie, ale bliżej 2.5:1
+= mniej przypadkowego kadrowania.
+
+**Priorytet testu na urządzeniu**: ekran Walki — winieta widoczna (góra/dół sceny ciemniejsze
+niż środek), kotek i boss mają subtelną kolorową poświatę za sobą, sylwetki czytelniejsze na
+tle nawet przy busy/jasnym fragmencie areny.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

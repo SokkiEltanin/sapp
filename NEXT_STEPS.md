@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Walka: winieta + poświata za sprite'ami ("high-end fight scene") — NIEsprawdzone (2026-09-06)
+
+User ze zrzutem: "postacie są niewidoczne, arena za jasna, wygląda tanio... możemy tę grafikę
+wywalić zupełnie i zrobię inną, ale żeby to dobrze leżało". Pełny opis w ARCHITECTURE.md §40.
+Dwie poprawki NIEZALEŻNE od konkretnej grafiki areny (zostają po ewentualnej podmianie usera):
+1. Winieta — pionowy gradient przyciemniający górę/dół sceny, środek jaśniejszy.
+2. Poświata (`RadialGlow`) za kotkiem (kolor futra) i bossem (kolor "słabości") — sylwetki
+   czytelniejsze niezależnie od tła.
+
+**Jeśli/gdy user przyśle nową grafikę areny**: obecny box sceny to ok. 2.5:1 (szeroki, niski
+baner) — stary `LOKACJA_KAMPANIA.png` był 1.5:1 i mocno się przycinał przez `resizeMode=
+"cover"`. Nowa grafika najlepiej ok. 1600×640 albo podobne proporcje.
+
+`tsc`/`jest` zielone. **Priorytet testu na urządzeniu**: ekran Walki — winieta widoczna,
+kotek/boss mają subtelną kolorową poświatę, sylwetki czytelniejsze na tle.
+
 ## 🆕 Dwie poprawki po ostrej informacji zwrotnej: edytor draft 3 + uszy sklepikarza 1:1 — NIEsprawdzone (2026-09-06)
 
 User: "zjebałeś?" — poprzedni wpis (edytor draft 2, sklepikarz §38) miał DWA realne błędy,
