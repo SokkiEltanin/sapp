@@ -11,8 +11,19 @@
 // Oryginalne kanwy usera miały 1080x1920 z dużym marginesem przezroczystości dookoła
 // właściwej grafiki (ChatGPT wygenerował portretowy obrazek, ale treść zajmowała tylko
 // część wysokości) — `RYNEK_TOP`/`RYNEK_BOTTOM` są PRZYCIĘTE (Pillow, bbox nieprzezroczystych
-// pikseli + 24px marginesu) żeby nie marnować wysokości ekranu na pusty obszar. `RYNEK_BG`
-// zostaje w oryginalnym rozmiarze (pełnoekranowe tło, resizeMode="cover" i tak przycina brzegi).
+// pikseli + 24px marginesu) żeby nie marnować wysokości ekranu na pusty obszar.
+//
+// `RYNEK_BG` (2026-09-06, fix po zgłoszeniu usera "nadal [źle], musisz poprawić" ze zrzutem
+// pokazującym grube czarne pasy po bokach całej sceny) — DAWNIEJ zostawiony w oryginalnym
+// 1080x1920, założenie było że `resizeMode="cover"` "i tak przytnie brzegi". Fałszywe
+// założenie: `TLOSKLEPIKARZ.png` miał ~12% przezroczystego marginesu po KAŻDEJ stronie (bbox
+// alfa: 126-939 z 1080 szer.), a `cover` dopasowuje się do WYSOKOŚCI całej sceny (tablica+
+// kotek+lada), która w tym pionowym obrazku wychodzi węższa niż potrzeba do pokrycia —
+// `cover` przycinał tylko ~15px z każdej strony, zostawiając ~75px czystego marginesu
+// przezroczystości (czyli czarnego tła apki) po OBU stronach na realnym ekranie. Naprawa:
+// `TLOSKLEPIKARZ.png` przycięty do bbox alfa (+8px marginesu) tym samym skryptem co
+// TOP/BOTTOM — teraz `cover` przycina rzeczywistą treść (trochę dachu u góry / podłogi u
+// dołu, bez znaczenia wizualnego), a scena wypełnia całą szerokość bez czarnych pasów.
 //
 // Współrzędne okien (procent szerokości/wysokości WŁASNEGO kontenera obrazka, nie ekranu)
 // zmierzone RAZ skryptem Python na kanale alfa (bbox przezroczystych "dziur" wewnątrz
