@@ -3826,6 +3826,30 @@ jeśli coś wygląda gorzej/bardziej „spłaszczone", to realna regresja do zg�
 powinno, ale 8-bit banding na bardzo płynnych gradientach teoretycznie mógłby się ujawnić na
 niektórych ekranach).
 
+## 30. Ciekawostki: masowy dolew treści (152 → 237 wpisów) — 2026-09-06
+
+User po §28 (usunięcie kategorii "z książki" + rozwijalny opis): "żeby tych ciekawostek było
+mnóstwo" + pytanie, czy warto przysłać listę tych, które są nieaktualne/nudne, żebym nie
+pisał podobnych — odpowiedź: tak, wpisz konkretne teksty (albo zrzut ekranu) tego, co jest
+błędne/przestarzałe/powtarzalne, poprawię i będę pilnował podobnych błędów na przyszłość;
+sam mechanizm "To znam" (opisany w §28) już automatycznie wyklucza z rotacji to, co user
+oznaczy jako znane — osobna lista jest potrzebna TYLKO dla realnych błędów merytorycznych,
+nie dla "już widziałem".
+
+Dodano **85 nowych wpisów** (+30 nauka, +25 rozwój, +30 świat) do `src/data/trivia.ts`,
+każdy od razu z `text` (krótki teaser) + `detail` (1-3 zdania rozwinięcia) w tym samym stylu
+co reszta pliku — zero wpisów bez rozwinięcia. Zweryfikowane skryptem: **zero duplikatów**
+`text` w całym pliku (237/237 unikalnych) i zero nakładania się tematów z istniejącymi 152.
+Rozwój (kategoria `rozwoj`) dostał nowe koncepcje z psychologii behawioralnej BEZ przypisania
+do konkretnej książki (np. reguła szczytu i końca, węzeł Odyseusza, łączenie pokus, efekt
+Ovsiankiny) — świadomie neutralne, żeby nie zbliżyć się z powrotem do usuniętej w §28
+kategorii "z książki". Finalnie **237 wpisów** (93 nauka / 67 rozwój / 77 świat).
+
+`tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — dane statyczne bez własnego
+pokrycia, jak przed zmianą). **Priorytet testu na urządzeniu**: dashboard → "Ciekawostka
+dnia" przez kilka dni z rzędu — nowe fakty powinny wchodzić do rotacji naturalnie (mechanizm
+`advance()` z §-wcześniejszych sesji nie wymagał zmian), każdy z działającym rozwinięciem.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
