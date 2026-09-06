@@ -3,6 +3,16 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## ✅ Assety Rynku odchudzone — TLOSKLEPIKARZ.png 16-bit→8-bit (2026-09-06)
+
+User zobaczył zrzut ekranu Rynku (sklepikarz+kontrast już działają, PR #141) i spytał "poprawiłeś
+mi te zdjęcia, żeby nie były takie duże". Pełny opis w ARCHITECTURE.md §29 — skrót:
+`TLOSKLEPIKARZ.png` zostało przez przeoczenie w 16-bit kolorze (PNG nigdy tego realnie nie
+potrzebuje), przekonwertowane na 8-bit: **1076 KB → 418 KB** (61% mniej, zero zmiany w
+wyglądzie, zweryfikowane wizualnie). `LADAGORA.png`/`LADADOL.png` dostały tylko drobną
+domiarkę (już były 8-bit z §26). Czysto binarna zmiana plików, `tsc` zielony. **Priorytet
+testu na urządzeniu**: tło sceny Sklepu powinno wyglądać identycznie jak wcześniej.
+
 ## 🆕 Ciekawostka dnia: bez kategorii "z książki", rozwijalny opis + źródło — NIEsprawdzone (2026-09-06)
 
 User: "rozbuduj ciekawostki widget... więcej ciekawostek (z książek fragmenty są useless,
