@@ -195,10 +195,20 @@ export default function PetShop() {
         {/* PRZYPIĘTE NA GÓRZE — zamrożenie serii (najważniejsze, funkcjonalne) */}
         <PressableScale onPress={onBuyFreeze}>
           <View style={s.freezeHero}>
+            <LinearGradient
+              colors={['#7DD3FC22', '#7DD3FC08'] as [string, string]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
             <View style={s.freezeIcon}><Snowflake size={22} color="#7DD3FC" /></View>
             <View style={{ flex: 1 }}>
+              {/* Podpis "ratuje serię za 1 pominięty dzień" USUNIĘTY (2026-09-06, user:
+                  "wypierdol te napisy wszystkie... i wgle przebuduj żeby było dobrze" —
+                  odchudzenie sceny Rynku z instruktażowych podpisów objęło też tę kartę) —
+                  to tekst dla NOWEGO usera, powracający już wie co robi zamrożenie; sama
+                  nazwa + licznik posiadanych wystarczy. */}
               <Text style={s.freezeTitle}>Zamrożenie serii</Text>
-              <Text style={s.freezeSub}>ratuje serię za 1 pominięty dzień · masz: {freezes}</Text>
+              <Text style={s.freezeSub}>masz: {freezes}</Text>
             </View>
             <View style={s.buyPill}><Coins size={11} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
           </View>
@@ -221,13 +231,13 @@ export default function PetShop() {
         <View style={s.scene}>
           <Image source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
 
-        {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Dawny
-            pełnoszerokościowy hero-wiersz skrzynki dnia i lista skrzynek (2026-08-27)
-            ZASTĄPIONE tym samym contentem, tylko jako okna na grafice usera (2026-09-05) —
-            patrz `rynekArt.ts`. */}
+        {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Etykieta
+            "Skrzynki" + instruktażowy podpis USUNIĘTE (2026-09-06, user: "wypierdol te
+            napisy wszystkie... przebuduj żeby było dobrze") — czysta scena bez tekstu na
+            tle grafiki, opis skrzynki i tak wyskakuje w ConfirmDialog przy zakupie
+            (`odds` w `onBuyBox`), więc informacja nie zniknęła, tylko przestała siedzieć na
+            stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
-          <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
-          <Text style={s.blurbTop}>Pierwsze okno: skrzynka dnia za darmo. Reszta losuje ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
           <View style={[s.artPiece, { width: ART_CONTENT_W, height: ART_CONTENT_W / RYNEK_TOP_ASPECT, alignSelf: 'center' }]}>
             <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
@@ -263,16 +273,21 @@ export default function PetShop() {
         {/* ── Sklep dnia — 4 konkretne itemy ekwipunku na dziś, teraz jako górny rząd okien
             lady LADADOL (dolny rząd nieużywany, patrz `rynekArt.ts`). Popup ze statystykami
             i porównaniem (`GearPreviewModal`) BEZ ZMIAN — tylko trigger się przeniósł z
-            plain-kafelka na okno na grafice. ── */}
+            plain-kafelka na okno na grafice. Etykieta "Sklep dnia" + instruktażowy podpis
+            USUNIĘTE (2026-09-06, ten sam porządek co "Skrzynki" wyżej) — licznik odświeżenia
+            ZOSTAJE (to żywa, funkcjonalna informacja, nie instrukcja), ale jako mała
+            pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
-          <Text style={[s.subSection, { color: c.text.muted }]}>Sklep dnia</Text>
-          <Text style={s.blurbTop}>4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.</Text>
-          <Text style={s.refreshTxt}>Nowy zestaw za {fmtShopRefresh()} (codziennie o 6:00)</Text>
-          {dailySlots.length === 0 && (
-            <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
-          )}
           <View style={[s.artPiece, { width: ART_CONTENT_W, height: ART_CONTENT_W / RYNEK_BOTTOM_ASPECT, alignSelf: 'center' }]}>
             <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
+            <View style={s.refreshRow} pointerEvents="none">
+              <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
+            </View>
+            {dailySlots.length === 0 && (
+              <View style={s.emptyRow} pointerEvents="none">
+                <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Brak itemów na Twoim poziomie</Text></View>
+              </View>
+            )}
             {dailySlots.map((slot, i) => {
               const { item, rarity, value } = slot;
               const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
@@ -442,15 +457,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   scroll: { paddingHorizontal: spacing[4], gap: spacing[3], paddingTop: spacing[1] },
 
   // przypięty freeze
-  freezeHero: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#7DD3FC44', backgroundColor: '#7DD3FC12' },
+  freezeHero: { position: 'relative', overflow: 'hidden', flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[3], borderRadius: radius.lg, borderWidth: 1, borderColor: '#7DD3FC44', backgroundColor: '#7DD3FC12' },
   freezeIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#7DD3FC1E', borderWidth: 1, borderColor: '#7DD3FC44', alignItems: 'center', justifyContent: 'center' },
   freezeTitle: { fontSize: 14, fontWeight: '800', color: c.text.primary },
   freezeSub: { fontSize: 11, color: c.text.muted, marginTop: 1 },
 
   boxIcon: { width: 46, height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   boxEmoji: { fontSize: 26 },
-  blurbTop: { fontSize: 11.5, color: c.text.secondary, lineHeight: 16 },
-  refreshTxt: { fontSize: 10.5, color: c.text.muted, fontWeight: '700', marginTop: -4 },
 
   // Scena Rynku (2026-09-05, fix "grafiki się rushają/nie na miejscu") — jeden
   // `position:relative` wrapper wokół tablicy+kotka+lady, żeby `RYNEK_BG` (pierwsze dziecko,
@@ -483,7 +496,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   artSlotBadgeTxt: { fontSize: 9, fontWeight: '900', color: '#0B0E1A', letterSpacing: 0.3 },
   rarityUnderline: { height: 3, borderRadius: 1.5, marginTop: 5, width: '70%' },
 
-  subSection: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
+  // Pigułka odświeżenia Sklepu dnia (2026-09-06) — zastępuje dawne pełne zdanie tekstu nad
+  // ladą ("Nowy zestaw za..." + "Brak itemów...") po usunięciu instruktażowych podpisów z
+  // całej sceny Rynku. `refreshRow`/`emptyRow` to niewidoczne, pełnoszerokościowe "wiersze
+  // pozycjonujące" (position:absolute + alignItems:center) — sama widoczna pigułka to
+  // dziecko `refreshPill`, które hugguje tekst zamiast rozciągać się na całą szerokość.
+  refreshRow: { position: 'absolute', top: -13, left: 0, right: 0, alignItems: 'center' },
+  emptyRow: { position: 'absolute', top: '38%', left: 0, right: 0, alignItems: 'center' },
+  refreshPill: { backgroundColor: 'rgba(11,14,26,0.85)', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  refreshPillTxt: { fontSize: 10.5, fontWeight: '700', color: '#fff' },
+
   cellState: { fontSize: 10, color: c.text.muted },
 
   buyPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FBBF2418', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#FBBF2440' },

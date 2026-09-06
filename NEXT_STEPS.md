@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: odchudzenie z instruktażowych podpisów — NIEsprawdzone (2026-09-06)
+
+User: "wypierdol te napisy wszystkie... i wgle przebuduj żeby było dobrze tak samo
+zamrożenie". Pełny opis w ARCHITECTURE.md §33. Usunięte całkowicie: etykiety "Skrzynki"/
+"Sklep dnia" + oba instruktażowe akapity opisu (info o skrzynkach dalej w ConfirmDialog przy
+zakupie, o Sklepie dnia w GearPreviewModal po tapnięciu — nic nie zniknęło funkcjonalnie).
+Licznik odświeżenia + komunikat pustego stanu ZOSTAŁY, ale jako małe pigułki nad ladą zamiast
+zdań tekstu. Karta "Zamrożenie serii" straciła instruktażowy podpis + dostała subtelny lodowy
+gradient w tle. Zero martwych stylów. `tsc`/`jest` zielone.
+
+**Priorytet testu na urządzeniu**: ekran Sklepu — czyściej bez tekstu na scenie, pigułka
+licznika czytelna nad ladą, karta zamrożenia wygląda dopracowanie, wszystkie interakcje
+(zakup skrzynki, podgląd itemu, kupno zamrożenia) działają jak wcześniej.
+
+**Zgłoszone przez usera, czeka w kolejce** (jego słowa: "potem ja będę testował a ty ogarnij
+więcej ciekawostek lepszych i wgle rozbuduj resztę i wgle potem możesz optymalizować, nie
+przestawaj robić") — po tym PR-cie: (1) więcej/lepsze ciekawostki (kontynuacja §30-31), (2)
+"rozbuduj resztę" — bez konkretów, do sprecyzowania albo do rozsądnej własnej inicjatywy po
+przejrzeniu reszty tego pliku, (3) runda optymalizacji na końcu. Sklepikarz (większy, za
+ladą, poprawione wąsy/czapka) osobno — czeka aż user da znać że gotowy.
+
 ## 🆕 Rynek: grafiki wychodziły poza ekran — fix na piksele zamiast aspectRatio — NIEsprawdzone (2026-09-06)
 
 User ze zrzutem: "grafiki wychodzą poza ekran, wyśrodkuj, zmniejsz do wielkości ekranu,
