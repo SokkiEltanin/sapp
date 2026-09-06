@@ -43,33 +43,35 @@ const ART_CONTENT_W = SCREEN_W - spacing[4] * 2;   // dokładnie tyle, ile zosta
 
 // Ręczny "edytor sceny" (2026-09-06, user po kolejnym zrzucie "nadal [źle]": zamiast żebym
 // dalej zgadywał współrzędne na ślepo bez dostępu do urządzenia, user dostaje suwaki do
-// samodzielnego dostrojenia skali/przesunięcia/odstępów NA ŻYWO na telefonie, a potem
-// przycisk "Eksportuj" wypluwa dokładne liczby do wklejenia w czacie — ja je już tylko
-// wpisuję na sztywno jako nowe wartości domyślne, zero kolejnych rund zgadywania). Wartości
-// persystują w AsyncStorage (żeby dostrajanie przetrwało między sesjami), niezależne od
-// samego wyglądu dla zwykłego użytku — edytor jest schowany za ikoną w headerze, nie
-// przeszkadza w normalnym korzystaniu ze sklepu.
-interface ArtAdjust {
-  scale: number;       // mnożnik szerokości tablicy/lady (ART_CONTENT_W * scale)
-  offsetX: number;     // przesunięcie X całej sceny (tło+tablica+kotek+lada razem)
-  gapTop: number;      // odstęp tablica → kotek
-  gapBottom: number;   // odstęp kotek → lada
-  catSize: number;     // rozmiar sklepikarza
-  catOffsetX: number;  // przesunięcie X samego kotka
-  bgFocusY: number;    // 0=pokaż górę tła (dach), 1=pokaż dół (podłogę), 0.5=środek
-}
+// samodzielnego dostrojenia NA ŻYWO na telefonie, a potem przycisk "Eksportuj" wypluwa
+// dokładne liczby do wklejenia w czacie — ja je już tylko wpisuję na sztywno jako nowe
+// wartości domyślne, zero kolejnych rund zgadywania). Draft 2 (ten sam dzień, user: "daj mi
+// to modyfikowane dla każdej grafiki osobno i jasne instrukcje typu położenie XYZ, skalowanie
+// itp i tyle") — zamiast pomieszanych/pośrednich pokręteł (wspólna skala na dwa obrazki, gap
+// zamiast Y, `bgFocusY` jako ułamek zamiast piksela), KAŻDA z 4 grafik (tło/tablica/
+// sklepikarz/lada) dostaje TEN SAM, jednolity zestaw 3 pokręteł: X, Y, skala — jak warstwa w
+// edytorze grafiki. `scale: 1` = dzisiejszy domyślny rozmiar/pozycja dla każdej z osobna,
+// `x`/`y` to przesunięcie w px od tej domyślnej pozycji (czysty `transform`, nie wpływa na
+// zarezerwowane miejsce w layoucie — więc X/Y potrafi też posłużyć jako to, czym wcześniej
+// był `gapTop`/`gapBottom`: przysuń kotka bliżej tablicy przez `cat.y` ujemne, itd).
+// Wartości persystują w AsyncStorage, edytor schowany za ikoną w headerze.
+interface ImgAdjust { x: number; y: number; scale: number }
+interface ArtAdjust { bg: ImgAdjust; top: ImgAdjust; cat: ImgAdjust; bottom: ImgAdjust }
+const DEFAULT_IMG: ImgAdjust = { x: 0, y: 0, scale: 1 };
 const DEFAULT_ADJUST: ArtAdjust = {
-  scale: 1, offsetX: 0, gapTop: spacing[3], gapBottom: spacing[3], catSize: 140, catOffsetX: 0, bgFocusY: 0.5,
+  bg: { ...DEFAULT_IMG }, top: { ...DEFAULT_IMG }, cat: { ...DEFAULT_IMG }, bottom: { ...DEFAULT_IMG },
 };
-const ADJUST_KEY = 'rynek_art_adjust_v1';
-const ADJUST_FIELDS: { key: keyof ArtAdjust; label: string; step: number; min: number; max: number; fmt: (v: number) => string }[] = [
-  { key: 'scale', label: 'Skala grafik (tablica/lada)', step: 0.02, min: 0.6, max: 1.3, fmt: v => `${Math.round(v * 100)}%` },
-  { key: 'offsetX', label: 'Przesunięcie X całej sceny', step: 2, min: -80, max: 80, fmt: v => `${v}px` },
-  { key: 'gapTop', label: 'Odstęp: tablica → kotek', step: 2, min: 0, max: 60, fmt: v => `${v}px` },
-  { key: 'gapBottom', label: 'Odstęp: kotek → lada', step: 2, min: 0, max: 60, fmt: v => `${v}px` },
-  { key: 'catSize', label: 'Rozmiar sklepikarza', step: 4, min: 60, max: 260, fmt: v => `${v}px` },
-  { key: 'catOffsetX', label: 'Przesunięcie X sklepikarza', step: 4, min: -140, max: 140, fmt: v => `${v}px` },
-  { key: 'bgFocusY', label: 'Tło: która część widoczna (dach ↔ podłoga)', step: 0.02, min: 0, max: 1, fmt: v => `${Math.round(v * 100)}%` },
+const ADJUST_KEY = 'rynek_art_adjust_v2';
+const IMG_GROUPS: { key: keyof ArtAdjust; label: string }[] = [
+  { key: 'bg', label: 'Tło (cała scena)' },
+  { key: 'top', label: 'Tablica (skrzynki)' },
+  { key: 'cat', label: 'Sklepikarz' },
+  { key: 'bottom', label: 'Lada (sklep dnia)' },
+];
+const IMG_FIELDS: { key: keyof ImgAdjust; label: string; step: number; min: number; max: number; fmt: (v: number) => string }[] = [
+  { key: 'x', label: 'Pozycja X', step: 4, min: -160, max: 160, fmt: v => `${v}px` },
+  { key: 'y', label: 'Pozycja Y', step: 4, min: -160, max: 160, fmt: v => `${v}px` },
+  { key: 'scale', label: 'Skala', step: 0.02, min: 0.6, max: 1.6, fmt: v => `${Math.round(v * 100)}%` },
 ];
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
@@ -152,30 +154,37 @@ export default function PetShop() {
     if (!adjustLoaded) return;
     AsyncStorage.setItem(ADJUST_KEY, JSON.stringify(adjust)).catch(() => {});
   }, [adjust, adjustLoaded]);
-  const stepAdjust = (key: keyof ArtAdjust, dir: 1 | -1) => {
+  const stepImgAdjust = (group: keyof ArtAdjust, field: keyof ImgAdjust, dir: 1 | -1) => {
     haptic.tap();
-    const f = ADJUST_FIELDS.find(f => f.key === key)!;
+    const f = IMG_FIELDS.find(f => f.key === field)!;
     setAdjust(a => {
-      const raw = Math.min(f.max, Math.max(f.min, a[key] + dir * f.step));
-      return { ...a, [key]: Math.round(raw * 100) / 100 };
+      const raw = Math.min(f.max, Math.max(f.min, a[group][field] + dir * f.step));
+      return { ...a, [group]: { ...a[group], [field]: Math.round(raw * 100) / 100 } };
     });
   };
   const resetAdjust = () => { haptic.tap(); setAdjust(DEFAULT_ADJUST); setShowExport(false); };
 
   // Rozmiary sceny wyliczone z aktualnych `adjust` (zamiast sztywnego ART_CONTENT_W) — patrz
-  // komentarz przy `RYNEK_BG` w rynekArt.ts. Tło pozycjonowane RĘCZNIE (własna matematyka
-  // "cover" z pionowym punktem zaczepienia `bgFocusY`), bo zwykły `resizeMode="cover"` zawsze
-  // centruje — nie da się nim wybrać "pokaż więcej dachu" / "pokaż więcej podłogi".
+  // komentarz przy `RYNEK_BG` w rynekArt.ts oraz przy `ArtAdjust` u góry tego pliku. Tablica/
+  // lada/kotek: `scale` zmienia rozmiar (i tym samym miejsce zarezerwowane w layoucie), `x`/`y`
+  // to czysty `transform` (przesunięcie WIZUALNE, nie zmienia zarezerwowanego miejsca — więc
+  // np. ujemny `cat.y` "podciąga" kotka bliżej tablicy bez przeliczania reszty sceny). Tło:
+  // `scale` to mnożnik NAD minimalną skalą `cover` (1.0 = dokładnie tyle co dziś, wypełnia bez
+  // przycinania na sztywno), `x`/`y` przesuwają wykadrowany fragment od domyślnego środka —
+  // jednolity model z resztą grafik zamiast osobnego `bgFocusY` z draftu 1.
   const bgSrc = useMemo(() => Image.resolveAssetSource(RYNEK_BG), []);
-  const artW = ART_CONTENT_W * adjust.scale;
-  const sceneTopH = artW / RYNEK_TOP_ASPECT;
-  const sceneBotH = artW / RYNEK_BOTTOM_ASPECT;
-  const sceneH = sceneTopH + adjust.gapTop + adjust.catSize + adjust.gapBottom + sceneBotH;
-  const bgScale = Math.max(ART_CONTENT_W / bgSrc.width, sceneH / bgSrc.height);
+  const topW = ART_CONTENT_W * adjust.top.scale;
+  const topH = topW / RYNEK_TOP_ASPECT;
+  const botW = ART_CONTENT_W * adjust.bottom.scale;
+  const botH = botW / RYNEK_BOTTOM_ASPECT;
+  const catSize = 140 * adjust.cat.scale;
+  const sceneH = topH + spacing[3] + catSize + spacing[3] + botH;
+  const bgMinScale = Math.max(ART_CONTENT_W / bgSrc.width, sceneH / bgSrc.height);
+  const bgScale = bgMinScale * adjust.bg.scale;
   const bgRenderW = bgSrc.width * bgScale;
   const bgRenderH = bgSrc.height * bgScale;
-  const bgLeft = -(bgRenderW - ART_CONTENT_W) / 2;
-  const bgTop = -(bgRenderH - sceneH) * adjust.bgFocusY;
+  const bgLeft = (ART_CONTENT_W - bgRenderW) / 2 + adjust.bg.x;
+  const bgTop = (sceneH - bgRenderH) / 2 + adjust.bg.y;
 
   const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string; extra?: string } | null>(null);
   const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup', extra?: string) => {
@@ -306,7 +315,7 @@ export default function PetShop() {
             od pozycji scrolla. Freeze-card (nad scenerią) i `hint` (pod nią) świadomie
             ZOSTAJĄ POZA tym wrapperem — nigdy nie miały wymogu piksel-w-piksel wyrównania
             z konkretnym miejscem na obrazku, to zwykłe karty UI, nie część "obrazu". ── */}
-        <View style={[s.scene, { height: sceneH, transform: [{ translateX: adjust.offsetX }] }]}>
+        <View style={[s.scene, { height: sceneH }]}>
           <Image source={RYNEK_BG} style={{ position: 'absolute', width: bgRenderW, height: bgRenderH, left: bgLeft, top: bgTop }} resizeMode="stretch" />
 
         {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Etykieta
@@ -316,7 +325,7 @@ export default function PetShop() {
             (`odds` w `onBuyBox`), więc informacja nie zniknęła, tylko przestała siedzieć na
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
-          <View style={[s.artPiece, { width: artW, height: sceneTopH, alignSelf: 'center' }]}>
+          <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center', transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }] }]}>
             <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
               <View style={s.artSlotBg} />
@@ -344,9 +353,9 @@ export default function PetShop() {
             (`TLOSKLEPIKARZ` przebija przez tę lukę) — user: "co to jest za sklepik, gdzie
             sklepikarz". Bez `onPress` — `shopkeeper` i tak wygasza tap/cuddle-reakcje
             wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
-        <View style={{ alignItems: 'center', marginTop: adjust.gapTop, marginBottom: adjust.gapBottom }}>
-          <View style={{ transform: [{ translateX: adjust.catOffsetX }] }}>
-            <CatArt size={adjust.catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
+        <View style={{ alignItems: 'center', marginTop: spacing[3], marginBottom: spacing[3] }}>
+          <View style={{ transform: [{ translateX: adjust.cat.x }, { translateY: adjust.cat.y }] }}>
+            <CatArt size={catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
           </View>
         </View>
 
@@ -358,7 +367,7 @@ export default function PetShop() {
             ZOSTAJE (to żywa, funkcjonalna informacja, nie instrukcja), ale jako mała
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
-          <View style={[s.artPiece, { width: artW, height: sceneBotH, alignSelf: 'center' }]}>
+          <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center', transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }] }]}>
             <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <View style={s.refreshRow} pointerEvents="none">
               <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
@@ -440,15 +449,20 @@ export default function PetShop() {
               <TouchableOpacity onPress={() => setEditScene(false)} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
             </View>
             <Text style={s.adjustIntro}>Dostrój suwakami na żywo, potem "Eksportuj" i wyślij mi te liczby w czacie — wpiszę je na sztywno.</Text>
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {ADJUST_FIELDS.map(f => (
-                <View key={f.key} style={s.adjustRow}>
-                  <Text style={s.adjustLabel}>{f.label}</Text>
-                  <View style={s.adjustCtrl}>
-                    <TouchableOpacity onPress={() => stepAdjust(f.key, -1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>−</Text></TouchableOpacity>
-                    <Text style={s.adjustVal}>{f.fmt(adjust[f.key])}</Text>
-                    <TouchableOpacity onPress={() => stepAdjust(f.key, 1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>+</Text></TouchableOpacity>
-                  </View>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {IMG_GROUPS.map(g => (
+                <View key={g.key} style={s.adjustGroup}>
+                  <Text style={s.adjustGroupTitle}>{g.label}</Text>
+                  {IMG_FIELDS.map(f => (
+                    <View key={f.key} style={s.adjustRow}>
+                      <Text style={s.adjustLabel}>{f.label}</Text>
+                      <View style={s.adjustCtrl}>
+                        <TouchableOpacity onPress={() => stepImgAdjust(g.key, f.key, -1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>−</Text></TouchableOpacity>
+                        <Text style={s.adjustVal}>{f.fmt(adjust[g.key][f.key])}</Text>
+                        <TouchableOpacity onPress={() => stepImgAdjust(g.key, f.key, 1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>+</Text></TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
                 </View>
               ))}
             </ScrollView>
@@ -590,9 +604,9 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // rodzica, nie wpływa na jego pomiar. `overflow:'hidden'` na wypadek gdyby `cover` na
   // skrajnie wąskim/szerokim ekranie chciał wystawić poza zaokrąglone rogi (scena i tak nie
   // ma tu rogów, ale to tania asekuracja przed przypadkowym poziomym scrollem).
-  // `gap` USUNIĘTY (2026-09-06) — odstępy tablica↔kotek↔lada są teraz NIEZALEŻNE
-  // (`adjust.gapTop`/`gapBottom` z edytora sceny), więc siedzą jako `marginTop`/`marginBottom`
-  // wprost na wrapperze kotka, nie jako jeden wspólny `gap` na tym kontenerze.
+  // `gap` USUNIĘTY (2026-09-06) — odstęp tablica↔kotek↔lada to teraz stały `spacing[3]` jako
+  // `marginTop`/`marginBottom` wprost na wrapperze kotka (fine-tuning idzie przez `x`/`y` w
+  // edytorze sceny, patrz `ArtAdjust`), nie jeden wspólny `gap` na tym kontenerze.
   scene: { position: 'relative', overflow: 'hidden' },
 
   // Kafelki na "tablicy"/ladzie Rynku — `s.artPiece` to kontener na PIKSELOWO (nie
@@ -650,6 +664,8 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
 
   // Edytor sceny Rynku (2026-09-06) — patrz `ArtAdjust` u góry pliku.
   adjustIntro: { fontSize: 12, color: c.text.muted, marginBottom: spacing[2] },
+  adjustGroup: { marginBottom: spacing[3] },
+  adjustGroupTitle: { fontSize: 12, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing[1] },
   adjustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[2], borderBottomWidth: 1, borderBottomColor: c.border.default },
   adjustLabel: { flex: 1, fontSize: 12.5, color: c.text.primary, fontWeight: '600', marginRight: spacing[2] },
   adjustCtrl: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },

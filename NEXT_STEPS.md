@@ -19,26 +19,28 @@ zielone.
 ekranu, bez czarnych pasów po bokach tablicy/luki/lady. Sklepikarz (większy, za ladą,
 poprawione wąsy/czapka) dalej NIE ruszony — czeka na osobne zlecenie usera.
 
-## 🆕 Rynek: edytor sceny na urządzeniu (suwaki + eksport) + statyczny .svg sklepikarza — NIEsprawdzone (2026-09-06)
+## 🆕 Rynek: edytor sceny na urządzeniu (X/Y/skala PER GRAFIKA + eksport) + statyczny .svg sklepikarza — NIEsprawdzone (2026-09-06)
 
 User: "dasz mi opcje żebym zmienił ręcznie położenie/skalę, ja dostosuję, potem przycisk
-eksportuj — nie będziesz zgadywał; a sklepikarza sam zrobię, tylko daj mi plik svg". Pełny
-opis w ARCHITECTURE.md §36. Dwie rzeczy:
-1. **Edytor sceny** — ikona suwaków w headerze Sklepu (`app/pet-shop.tsx`) otwiera panel z
-   7 wartościami (skala tablicy/lady, przesunięcie X sceny, odstępy tablica↔kotek↔lada,
-   rozmiar/przesunięcie sklepikarza, punkt zaczepienia tła w pionie), persystowanych w
-   AsyncStorage. Przycisk "Eksportuj" pokazuje JSON do skopiowania i przysłania mi w czacie —
-   wpiszę te wartości na sztywno jako nowe domyślne.
+eksportuj — nie będziesz zgadywał; a sklepikarza sam zrobię, tylko daj mi plik svg", potem po
+zobaczeniu draftu 1: "daj mi to modyfikowane dla każdej grafiki osobno i jasne instrukcje typu
+położenie XYZ, skalowanie itp i tyle". Pełny opis w ARCHITECTURE.md §36-37. Dwie rzeczy:
+1. **Edytor sceny** — ikona suwaków w headerze Sklepu (`app/pet-shop.tsx`) otwiera panel z 4
+   grupami (Tło / Tablica / Sklepikarz / Lada), KAŻDA z jednolitym zestawem 3 pól: pozycja X,
+   pozycja Y (px), skala (% — 100% = dzisiejszy domyślny rozmiar/pozycja tej JEDNEJ grafiki).
+   Wartości (`rynek_art_adjust_v2`) persystują w AsyncStorage. Przycisk "Eksportuj" pokazuje
+   JSON do skopiowania i przysłania mi w czacie — wpiszę te wartości na sztywno jako nowe
+   domyślne (i mogę wtedy usunąć sam edytor albo zostawić na przyszłość).
 2. **Statyczny `.svg` sklepikarza** wysłany userowi osobno (nie w repo — plik roboczy do
    edycji zewnętrznej) — CatArt.tsx to programistyczny komponent, nie gotowy plik, więc to
    wierny STATYCZNY zrzut spoczynkowej pozy do edycji w Inkscape/Figmie/etc. Po zmianach user
    odsyła plik albo opis zmian, ja przenoszę na sztywno do `shopkeeper` bloku w `CatArt.tsx`.
 
 `tsc`/`jest` zielone (67 suit/837 testów). **Priorytet testu na urządzeniu**: ikona suwaków w
-Sklepie → panel się otwiera → zmiana wartości widoczna na scenie na żywo → "Eksportuj" daje
-poprawny JSON → wartości przetrwają zamknięcie ekranu. Docelowo: user dostraja suwakami aż
-scena wygląda dobrze, wysyła mi wyeksportowany JSON, ja hardkoduję i (opcjonalnie) usuwam
-edytor.
+Sklepie → panel się otwiera, 4 sekcje po 3 pola → zmiana X/Y/skali JEDNEJ grafiki nie rusza
+pozostałych w dziwny sposób → "Eksportuj" daje poprawny JSON → wartości przetrwają zamknięcie
+ekranu. Docelowo: user dostraja suwakami aż scena wygląda dobrze, wysyła mi wyeksportowany
+JSON, ja hardkoduję i (opcjonalnie) usuwam edytor.
 
 ## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 → 310 → 369 wpisów — NIEsprawdzone (2026-09-06)
 
