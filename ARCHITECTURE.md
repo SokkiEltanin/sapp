@@ -4030,6 +4030,35 @@ suwaków w Sklepie, pokręć wartościami — scena powinna zmieniać się na ż
 ekranu; "Eksportuj" pokazuje poprawny JSON do skopiowania; wartości przetrwają zamknięcie i
 ponowne otwarcie ekranu.
 
+## 37. Edytor sceny, draft 2 — jednolite X/Y/skala PER GRAFIKA zamiast pomieszanych pokręteł — 2026-09-06
+
+User zobaczył draft 1 (§36, 7 pól: wspólna skala tablicy+lady, jeden `offsetX` na całą scenę,
+`gapTop`/`gapBottom`, rozmiar+X kotka, `bgFocusY` jako ułamek 0-1) i poprosił wprost: "daj mi
+to modyfikowane dla każdej grafiki osobno i jasne instrukcje typu położenie XYZ, skalowanie
+itp i tyle". Draft 1 mieszał różne jednostki/znaczenia (gap ≠ pozycja, ułamek ≠ piksel, jedna
+skala na dwie różne grafiki) — nieintuicyjne. Przebudowane na **jeden jednolity model**: każda
+z 4 grafik (Tło / Tablica / Sklepikarz / Lada) dostaje TEN SAM zestaw 3 pokręteł — `x`, `y`
+(px, przesunięcie od domyślnej pozycji), `scale` (% — 100% = dzisiejszy domyślny rozmiar).
+
+`ArtAdjust` zmienione z płaskiej struktury na `{ bg, top, cat, bottom }`, każde pole typu
+`ImgAdjust = { x, y, scale }`. Dla tablicy/lady/kotka: `scale` zmienia rozmiar (i miejsce
+zarezerwowane w layoucie, licząc wysokość sceny), `x`/`y` to czysty `transform` (wizualne
+przesunięcie, nie przelicza layoutu — więc np. `cat.y` ujemne "podciąga" kotka bliżej tablicy,
+przejmując rolę dawnego `gapTop`/`gapBottom` z draftu 1, ale jako bardziej ogólne narzędzie).
+Dla tła: `scale` to mnożnik NAD minimalną skalą wymaganą przez algorytm "cover" (1.0 = dziś,
+pełne pokrycie bez przycinania na sztywno; >1 daje margines na przesuwanie kadru), `x`/`y`
+przesuwają wykadrowany fragment od wyśrodkowanej pozycji — zastąpiło osobny, mniej intuicyjny
+`bgFocusY` (ułamek pionowy) z draftu 1 tym samym modelem co reszta grafik. Klucz AsyncStorage
+podbity na `rynek_art_adjust_v2` (draft 1 i 2 mają niekompatybilne kształty — stary zapis po
+prostu zostaje zignorowany, żadnej migracji, wartość i tak jeszcze nieużywana produkcyjnie).
+
+Panel edytora pogrupowany nagłówkami per grafika (12 pól razem, 4×3), reszta mechaniki
+(persist w AsyncStorage, przycisk Eksportuj z zaznaczalnym JSON-em) bez zmian względem §36.
+
+`tsc`/`jest` zielone (67 suit/837 testów). **Priorytet testu na urządzeniu**: jak w §36 —
+zweryfikuj że X/Y/skala per grafika faktycznie przesuwają/skalują TYLKO tę jedną grafikę,
+reszta sceny się nie przelicza w dziwny sposób.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
