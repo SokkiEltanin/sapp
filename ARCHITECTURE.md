@@ -3800,6 +3800,32 @@ ma już etykiety „Z książki"; (c) "To znam — nie pokazuj" dalej działa id
 state nietknięty); (d) po pokazaniu nowej ciekawostki karta startuje ZAWSZE zwinięta, nie
 zapamiętuje rozwinięcia z poprzedniego dnia.
 
+## 29. Assety Rynku odchudzone (16-bit → 8-bit, dead waga bez zmiany wyglądu) — 2026-09-06
+
+User zobaczył zrzut ekranu Rynku po PR #141 (sklepikarz widoczny, kontrast slotów lepszy —
+te fixy zadziałały) i spytał wprost: "poprawiłeś mi tutaj te zdjęcia wszystkie, żeby nie były
+takie duże". Odpowiedź: częściowo — `LADAGORA.png`/`LADADOL.png` były już przycięte (§26,
+usunięty margines przezroczystości) i miały rozsądny rozmiar, ale `TLOSKLEPIKARZ.png` (tło
+sceny) zostało wtedy PRZEOCZONE — zostało w oryginalnym 16-bitowym kodowaniu koloru, którego
+PNG w praktyce nigdy realnie nie potrzebuje dla zwykłej ilustracji (8 bitów/kanał daje 16,7
+mln kolorów, więcej niż oko rozróżnia).
+
+Naprawa (Pillow, `im.convert('RGBA').save(path, optimize=True)` — ten sam, bezstratny wobec
+WYGLĄDU zabieg co poprzednie rundy odchudzania assetów w §11/§13): `TLOSKLEPIKARZ.png`
+**1076 KB → 418 KB** (61% mniej, sam 16-bit→8-bit + optymalizacja kompresji PNG, te same
+1080×1920 px, zero zmiany w wyglądzie — zweryfikowane wizualnie). `LADAGORA.png`/`LADADOL.png`
+dostały tylko drobną domiarkę (`optimize=True`, 53→51 KB i 159→153 KB) — były już w 8-bit.
+Łącznie folder `assets/lokalizacje/` dla samego Rynku: ~1,29 MB → ~0,62 MB. `LOKACJA_KAMPANIA.png`
+(niepowiązane, osobny ekran walki bossów, już 8-bit) świadomie NIETKNIĘTE — poza zakresem tego
+pytania.
+
+Zero zmian w kodzie — czysto binarna podmiana plików assetów, `tsc` zielony (nic do
+przetestowania jednostkowo, dane wizualne). **Priorytet testu na urządzeniu**: ekran Sklepu —
+tło sceny powinno wyglądać IDENTYCZNIE jak przed tą zmianą (czysty re-encode, nie redesign);
+jeśli coś wygląda gorzej/bardziej „spłaszczone", to realna regresja do zgłoszenia (nie
+powinno, ale 8-bit banding na bardzo płynnych gradientach teoretycznie mógłby się ujawnić na
+niektórych ekranach).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
