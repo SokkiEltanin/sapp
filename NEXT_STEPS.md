@@ -3,6 +3,22 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 → 310 → 369 wpisów — NIEsprawdzone (2026-09-06)
+
+User: "żeby tych ciekawostek było mnóstwo", potem "dawaj więcej ciekawostek", potem "ogarnij
+więcej ciekawostek LEPSZYCH" — trzy dolewy z rzędu (§30: +85, §31: +73, §34: +59), każdy
+nowy wpis od razu z pełnym `detail` (rozwinięciem), czwarta runda celowo z naciskiem na
+jakość/rzadszy kąt tematu, nie tylko liczbę. Pełny opis w ARCHITECTURE.md §30-31, §34. Zero
+duplikatów w całym pliku (zweryfikowane skryptem po każdym dolewie), rozwój bez odwołań do
+konkretnych książek (żeby nie wrócić do usuniętej w §28 kategorii "z książki"). `tsc`/`jest`
+zielone. Finalnie **369 wpisów** (138 nauka / 109 rozwój / 122 świat).
+
+**Jeśli user przyśle listę konkretnych faktów uznanych za błędne/przestarzałe/nudne** — to
+osobna sprawa od "To znam" (które już automatycznie wyklucza z rotacji): poprawić/usunąć
+wskazane wpisy w `trivia.ts` i zanotować tu wzorzec błędu (żeby nie powtórzyć go w kolejnych
+partiach). **Priorytet testu na urządzeniu**: kilka dni z rzędu na dashboardzie — nowe fakty
+powinny naturalnie wchodzić do rotacji, każdy z działającym rozwinięciem po tapnięciu.
+
 ## 🆕 Rynek: odchudzenie z instruktażowych podpisów — NIEsprawdzone (2026-09-06)
 
 User: "wypierdol te napisy wszystkie... i wgle przebuduj żeby było dobrze tak samo
@@ -44,20 +60,6 @@ grafice.
 sklepikarz ma być większy, ma faktycznie "siedzieć za ladą" (dziś stoi w luce między tablicą
 a ladą, nie za kontuarem), wąsy i czapka wymagają poprawy rysunku.
 
-## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 → 310 wpisów — NIEsprawdzone (2026-09-06)
-
-User: "żeby tych ciekawostek było mnóstwo", potem jeszcze "dawaj więcej ciekawostek" — dwa
-dolewy z rzędu (§30: +85, §31: +73), każdy nowy wpis od razu z pełnym `detail`
-(rozwinięciem). Pełny opis w ARCHITECTURE.md §30-31. Zero duplikatów w całym pliku
-(zweryfikowane skryptem po każdym dolewie), rozwój bez odwołań do konkretnych książek (żeby
-nie wrócić do usuniętej w §28 kategorii "z książki"). `tsc`/`jest` zielone. Finalnie **310
-wpisów** (117 nauka / 89 rozwój / 104 świat).
-
-**Jeśli user przyśle listę konkretnych faktów uznanych za błędne/przestarzałe/nudne** — to
-osobna sprawa od "To znam" (które już automatycznie wyklucza z rotacji): poprawić/usunąć
-wskazane wpisy w `trivia.ts` i zanotować tu wzorzec błędu (żeby nie powtórzyć go w kolejnych
-partiach). **Priorytet testu na urządzeniu**: kilka dni z rzędu na dashboardzie — nowe fakty
-powinny naturalnie wchodzić do rotacji, każdy z działającym rozwinięciem po tapnięciu.
 
 ## ✅ Assety Rynku odchudzone — TLOSKLEPIKARZ.png 16-bit→8-bit (2026-09-06)
 

@@ -3939,6 +3939,26 @@ jako nieużywane). **Priorytet testu na urządzeniu**: ekran Sklepu powinien wyg
 kartą zamrożenia; wszystkie interakcje (zakup skrzynki, podgląd itemu, zamrożenie) powinny
 działać identycznie jak wcześniej.
 
+## 34. Ciekawostki: czwarty dolew, celowo "lepszej jakości" (310 → 369 wpisów) — 2026-09-06
+
+Kontynuacja kolejki zadań usera z §33 ("potem ja będę testował a ty ogarnij więcej
+ciekawostek LEPSZYCH i wgle rozbuduj resztę"). Dodano **59 nowych wpisów** (+21 nauka, +20
+rozwój, +18 świat). Nacisk na "lepszych" (nie tylko "więcej") — dobrane tematy z realnie
+zaskakującym, rzadziej powtarzanym kątem: fizyka kwantowa/kosmologia (efekt Casimira, Wielki
+Wybuch jako rozciąganie przestrzeni a nie eksplozja W przestrzeni, neutrina), konkretne
+nazwane zjawiska psychologiczne bez odwołań do książek (dysonans poznawczy, efekt Diderota,
+efekt Barnuma, błąd przetrwałych/samolotów z II wojny, hipoteza sprawiedliwego świata),
+i nietypowa geopolityka/geografia (Bir Tawil — ziemia niczyja, wojna Australii z emu,
+Kiribati we wszystkich 4 półkulach naraz, Liechtenstein podwójnie śródlądowy).
+
+Zweryfikowane skryptem jak poprzednio: zero duplikatów `text` (369/369 unikalnych), zero
+znaków cyrylicy (powtarzalny błąd literówki z poprzednich dwóch rund — tym razem czysto od
+razu). Finalnie **369 wpisów** (138 nauka / 109 rozwój / 122 świat).
+
+`tsc`/`jest` zielone (67 suit/837 testów, bez zmian w testach). **Priorytet testu na
+urządzeniu**: jak w §30-31 — nowe fakty powinny naturalnie wchodzić do rotacji "Ciekawostki
+dnia" przez kolejne dni.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
