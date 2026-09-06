@@ -3850,6 +3850,21 @@ pokrycia, jak przed zmianą). **Priorytet testu na urządzeniu**: dashboard → 
 dnia" przez kilka dni z rzędu — nowe fakty powinny wchodzić do rotacji naturalnie (mechanizm
 `advance()` z §-wcześniejszych sesji nie wymagał zmian), każdy z działającym rozwinięciem.
 
+## 31. Ciekawostki: trzeci dolew (237 → 310 wpisów) — 2026-09-06
+
+User, jednym zdaniem po §30: "dawaj więcej ciekawostek". Dodano kolejne **73 wpisy** do
+`src/data/trivia.ts` (+24 nauka, +22 rozwój, +27 świat), ten sam wzorzec co §30: każdy od
+razu z `text` + `detail`, część z realnym `src`. Zweryfikowane skryptem: zero duplikatów
+`text` w całym pliku (310/310 unikalnych) po raz drugi z rzędu, dobrana tematyka celowo
+NIE nakładająca się z 237 wcześniejszymi (m.in. nowe wątki fizyki kwantowej/antymaterii,
+dodatkowe zjawiska psychologii behawioralnej bez odwołań do książek — kotwiczenie, domyślne
+opcje, technika stopy w drzwiach, efekt aureoli/Pigmaliona/Baader-Meinhof — i nowa geografia/
+historia świata). Finalnie **310 wpisów** (117 nauka / 89 rozwój / 104 świat).
+
+`tsc`/`jest` zielone (67 suit/837 testów, bez zmian w testach). **Priorytet testu na
+urządzeniu**: jak w §30 — nowe fakty powinny naturalnie wchodzić do rotacji "Ciekawostki
+dnia" przez kolejne dni, z działającym rozwinięciem.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

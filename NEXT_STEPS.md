@@ -3,12 +3,14 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 wpisów — NIEsprawdzone (2026-09-06)
+## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 → 310 wpisów — NIEsprawdzone (2026-09-06)
 
-User: "żeby tych ciekawostek było mnóstwo" — dodano 85 nowych wpisów (+30 nauka, +25 rozwój,
-+30 świat), każdy od razu z pełnym `detail` (rozwinięciem). Pełny opis w ARCHITECTURE.md §30.
-Zero duplikatów (zweryfikowane skryptem), rozwój bez odwołań do konkretnych książek (żeby nie
-wrócić do usuniętej w §28 kategorii "z książki"). `tsc`/`jest` zielone.
+User: "żeby tych ciekawostek było mnóstwo", potem jeszcze "dawaj więcej ciekawostek" — dwa
+dolewy z rzędu (§30: +85, §31: +73), każdy nowy wpis od razu z pełnym `detail`
+(rozwinięciem). Pełny opis w ARCHITECTURE.md §30-31. Zero duplikatów w całym pliku
+(zweryfikowane skryptem po każdym dolewie), rozwój bez odwołań do konkretnych książek (żeby
+nie wrócić do usuniętej w §28 kategorii "z książki"). `tsc`/`jest` zielone. Finalnie **310
+wpisów** (117 nauka / 89 rozwój / 104 świat).
 
 **Jeśli user przyśle listę konkretnych faktów uznanych za błędne/przestarzałe/nudne** — to
 osobna sprawa od "To znam" (które już automatycznie wyklucza z rotacji): poprawić/usunąć
