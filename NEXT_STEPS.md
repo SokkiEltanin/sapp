@@ -3,15 +3,25 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Sklepikarz: user sam dopracował kapelusz+wąsy, przeniesione do CatArt.tsx — NIEsprawdzone (2026-09-06)
+## 🆕 Dwie poprawki po ostrej informacji zwrotnej: edytor draft 3 + uszy sklepikarza 1:1 — NIEsprawdzone (2026-09-06)
 
-User dostał statyczny `.svg`-eksport sklepikarza (patrz wpis niżej), sam go dopracował w
-zewnętrznym edytorze i odesłał gotowy plik (`assets/Gotowysklepikarz.svg`, zostaje w repo jako
-referencja). Pełny opis w ARCHITECTURE.md §38. Przeniesione 1:1: kapelusz WIĘKSZY (~1.67×,
-uszy dalej ładnie wystają po obu stronach), "gather"-elipsy przy uszach usunięte, CAŁA
-handlebar-wąsata mustache usunięta (sam uśmiech wystarczy), nowy akcent — mała bliznowata
-"błyskawica" na prawym policzku. Zweryfikowane wizualnie (symulacja obok-obok z przysłanym
-plikiem), `tsc`/`jest` zielone.
+User: "zjebałeś?" — poprzedni wpis (edytor draft 2, sklepikarz §38) miał DWA realne błędy,
+oba naprawione. Pełny opis w ARCHITECTURE.md §39.
+1. **Edytor sceny** — panel był pełnoekranowym `<Modal>` (user: "klikam i nie widzę" — bo
+   modal zasłaniał scenę, którą miał dostrajać), i jeden wspólny `x/y/scale` na tablicę/ladę
+   poruszał RAZEM obrazek i sloty (user chciał naprawić rozjazd MIĘDZY nimi, a wspólny
+   transform to uniemożliwiał). Naprawa: panel to teraz pływający pasek przyklejony do dołu
+   (NIE modal, scena zostaje widoczna nad nim), a tablica/lada dostały NIEZALEŻNE warstwy —
+   `top`/`bottom` (obrazek) osobno od `topSlots`/`bottomSlots` (siatka klikalnych okien).
+   Klucz AsyncStorage: `rynek_art_adjust_v3`.
+2. **Uszy sklepikarza** — poprzednia poprawka przeniosła kapelusz 1:1, ale zostawiła
+   standardowy, w pełni widoczny `<Ear>`, dokładnie to czego user NIE chciał (miał je
+   specjalnie schować pod rondem). Naprawa: `<Ear>` wyłączony dla `shopkeeper`, zastąpiony
+   4 custom kształtami z przysłanego pliku (małe prześwity z obu stron, w większości
+   schowane pod rondem) — współrzędne przepuszczone przez skrypt, nie ręcznie przepisane.
+
+Zweryfikowane wizualnie OBA razy PRZED napisaniem kodu (symulacja porównana z przysłanym
+plikiem), żeby nie powtórzyć błędu "wygląda inaczej niż miało". `tsc`/`jest` zielone.
 
 **Priorytet testu na urządzeniu**: ekran Sklepu — sklepikarz z większym kapeluszem, bez wąsów,
 z błyskawicą na policzku. Sam ROZMIAR/POZYCJA sklepikarza w scenie (czy "wystarczająco duży",

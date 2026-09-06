@@ -45,28 +45,41 @@ const ART_CONTENT_W = SCREEN_W - spacing[4] * 2;   // dokładnie tyle, ile zosta
 // dalej zgadywał współrzędne na ślepo bez dostępu do urządzenia, user dostaje suwaki do
 // samodzielnego dostrojenia NA ŻYWO na telefonie, a potem przycisk "Eksportuj" wypluwa
 // dokładne liczby do wklejenia w czacie — ja je już tylko wpisuję na sztywno jako nowe
-// wartości domyślne, zero kolejnych rund zgadywania). Draft 2 (ten sam dzień, user: "daj mi
-// to modyfikowane dla każdej grafiki osobno i jasne instrukcje typu położenie XYZ, skalowanie
-// itp i tyle") — zamiast pomieszanych/pośrednich pokręteł (wspólna skala na dwa obrazki, gap
-// zamiast Y, `bgFocusY` jako ułamek zamiast piksela), KAŻDA z 4 grafik (tło/tablica/
-// sklepikarz/lada) dostaje TEN SAM, jednolity zestaw 3 pokręteł: X, Y, skala — jak warstwa w
-// edytorze grafiki. `scale: 1` = dzisiejszy domyślny rozmiar/pozycja dla każdej z osobna,
-// `x`/`y` to przesunięcie w px od tej domyślnej pozycji (czysty `transform`, nie wpływa na
-// zarezerwowane miejsce w layoucie — więc X/Y potrafi też posłużyć jako to, czym wcześniej
-// był `gapTop`/`gapBottom`: przysuń kotka bliżej tablicy przez `cat.y` ujemne, itd).
-// Wartości persystują w AsyncStorage, edytor schowany za ikoną w headerze.
+// wartości domyślne, zero kolejnych rund zgadywania). Draft 3 (ten sam dzień, user po
+// drafcie 2: "steruję slotami i skaluję sloty razem z tą grafiką... nie mogę jej w ogóle
+// poprzesuwać, klikam i nie widzę") — dwa realne problemy z draftu 2:
+// 1. Panel był pełnoekranowym `<Modal>` — user dostrajał "na ślepo", bo sam edytor
+//    ZASŁANIAŁ scenę, którą miał dostrajać. Naprawa: panel to teraz NIE modal, tylko
+//    pływający, PÓŁPRZEZROCZYSTY pasek przyklejony do DOŁU ekranu (nad `PupilNavbar`),
+//    zajmujący ~46% wysokości — górna część sceny zostaje widoczna nad panelem, a user
+//    może przescrollować `ScrollView` żeby ustawić w tej widocznej części dokładnie to,
+//    co dostraja.
+// 2. Dla tablicy/lady jeden wspólny `x/y/scale` poruszał NAROŻNIKI + SLOTY (klikalne okna
+//    na skrzynki/itemy) RAZEM — user chciał móc naprawić NIEDOPASOWANIE między obrazkiem a
+//    siatką slotów (czyli poruszyć je WZGLĘDEM SIEBIE), a nie tylko przesunąć oba na raz.
+//    Naprawa: `topSlots`/`bottomSlots` to NIEZALEŻNA druga warstwa (osobny x/y/scale) nad
+//    obrazkiem tej samej wielkości co `top`/`bottom` — steruje WYŁĄCZNIE pozycją/skalą
+//    siatki klikalnych okien, obrazek pod spodem się nie rusza.
+// `scale: 1` = dzisiejszy domyślny rozmiar/pozycja dla każdej warstwy z osobna, `x`/`y` to
+// przesunięcie w px od tej domyślnej pozycji (czysty `transform`). Wartości persystują w
+// AsyncStorage, panel schowany za ikoną w headerze.
 interface ImgAdjust { x: number; y: number; scale: number }
-interface ArtAdjust { bg: ImgAdjust; top: ImgAdjust; cat: ImgAdjust; bottom: ImgAdjust }
+interface ArtAdjust {
+  bg: ImgAdjust; top: ImgAdjust; topSlots: ImgAdjust; cat: ImgAdjust; bottom: ImgAdjust; bottomSlots: ImgAdjust;
+}
 const DEFAULT_IMG: ImgAdjust = { x: 0, y: 0, scale: 1 };
 const DEFAULT_ADJUST: ArtAdjust = {
-  bg: { ...DEFAULT_IMG }, top: { ...DEFAULT_IMG }, cat: { ...DEFAULT_IMG }, bottom: { ...DEFAULT_IMG },
+  bg: { ...DEFAULT_IMG }, top: { ...DEFAULT_IMG }, topSlots: { ...DEFAULT_IMG },
+  cat: { ...DEFAULT_IMG }, bottom: { ...DEFAULT_IMG }, bottomSlots: { ...DEFAULT_IMG },
 };
-const ADJUST_KEY = 'rynek_art_adjust_v2';
+const ADJUST_KEY = 'rynek_art_adjust_v3';
 const IMG_GROUPS: { key: keyof ArtAdjust; label: string }[] = [
   { key: 'bg', label: 'Tło (cała scena)' },
-  { key: 'top', label: 'Tablica (skrzynki)' },
+  { key: 'top', label: 'Tablica — obrazek' },
+  { key: 'topSlots', label: 'Tablica — sloty (klikalne okna)' },
   { key: 'cat', label: 'Sklepikarz' },
-  { key: 'bottom', label: 'Lada (sklep dnia)' },
+  { key: 'bottom', label: 'Lada — obrazek' },
+  { key: 'bottomSlots', label: 'Lada — sloty (klikalne okna)' },
 ];
 const IMG_FIELDS: { key: keyof ImgAdjust; label: string; step: number; min: number; max: number; fmt: (v: number) => string }[] = [
   { key: 'x', label: 'Pozycja X', step: 4, min: -160, max: 160, fmt: v => `${v}px` },
@@ -325,25 +338,34 @@ export default function PetShop() {
             (`odds` w `onBuyBox`), więc informacja nie zniknęła, tylko przestała siedzieć na
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
-          <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center', transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }] }]}>
-            <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
-            <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
-              <View style={s.artSlotBg} />
-              <Gift size={26} color={dailyReady ? '#FBBF24' : c.text.muted} />
-              {dailyReady
-                ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
-                : <View style={[s.artSlotCheck, { backgroundColor: c.text.muted }]}><Check size={11} color="#0B0E1A" strokeWidth={3} /></View>}
-            </PressableScale>
-            {LOOT_BOXES.map((box, i) => {
-              const afford = coins >= box.cost;
-              return (
-                <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
-                  <View style={s.artSlotBg} />
-                  <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
-                  <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
-                </PressableScale>
-              );
-            })}
+          <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center' }]}>
+            {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
+                spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }] }]}>
+              <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
+            </View>
+            {/* Warstwa SLOTÓW — własne x/y/scale z `adjust.topSlots`, żeby dało się poprawić
+                niedopasowanie siatki klikalnych okien względem narysowanych na obrazku okien,
+                bez ruszania samego obrazka. */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.topSlots.x }, { translateY: adjust.topSlots.y }, { scale: adjust.topSlots.scale }] }]}>
+              <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
+                <View style={s.artSlotBg} />
+                <Gift size={26} color={dailyReady ? '#FBBF24' : c.text.muted} />
+                {dailyReady
+                  ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
+                  : <View style={[s.artSlotCheck, { backgroundColor: c.text.muted }]}><Check size={11} color="#0B0E1A" strokeWidth={3} /></View>}
+              </PressableScale>
+              {LOOT_BOXES.map((box, i) => {
+                const afford = coins >= box.cost;
+                return (
+                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
+                    <View style={s.artSlotBg} />
+                    <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
+                    <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
+                  </PressableScale>
+                );
+              })}
+            </View>
           </View>
         </View>
 
@@ -367,43 +389,51 @@ export default function PetShop() {
             ZOSTAJE (to żywa, funkcjonalna informacja, nie instrukcja), ale jako mała
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
-          <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center', transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }] }]}>
-            <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
-            <View style={s.refreshRow} pointerEvents="none">
-              <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
+          <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center' }]}>
+            {/* Warstwa OBRAZKA — patrz analogiczny komentarz przy tablicy wyżej. */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }] }]}>
+              <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             </View>
-            {dailySlots.length === 0 && (
-              <View style={s.emptyRow} pointerEvents="none">
-                <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Brak itemów na Twoim poziomie</Text></View>
+            {/* Warstwa SLOTÓW + pigułki (żywe, funkcjonalne, więc jadą RAZEM ze slotami, nie
+                z samym obrazkiem — mają zostać czytelne względem okien niezależnie od tego,
+                jak bardzo obrazek trzeba było doszlifować x/y). */}
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottomSlots.x }, { translateY: adjust.bottomSlots.y }, { scale: adjust.bottomSlots.scale }] }]}>
+              <View style={s.refreshRow} pointerEvents="none">
+                <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
               </View>
-            )}
-            {dailySlots.map((slot, i) => {
-              const { item, rarity, value } = slot;
-              const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
-              const bought = !!dayClaims[dayKey];
-              const owned = alreadyOwnGear(item.id, rarity, value);
-              const meta = RARITY_META[rarity];
-              return (
-                <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
-                  {/* Tło slotu = gradient rzadkości (2026-09-05, user: "kolor gradientu za
-                      nimi jakby") — ciemny róg dla kontrastu ikony na busy tle, przeciwległy
-                      róg podbarwiony kolorem rzadkości, ten sam `meta.color` co plakietka ✓
-                      i pigułka w GearPreviewModal, więc kolor rzadkości czyta się spójnie
-                      wszędzie w Sklepie dnia. */}
-                  <LinearGradient
-                    colors={['rgba(0,0,0,0.55)', meta.color + '77'] as [string, string]}
-                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                    style={s.artSlotBg}
-                  />
-                  <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
-                  {(bought || owned) && (
-                    <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
-                      <Check size={11} color="#0B0E1A" strokeWidth={3} />
-                    </View>
-                  )}
-                </PressableScale>
-              );
-            })}
+              {dailySlots.length === 0 && (
+                <View style={s.emptyRow} pointerEvents="none">
+                  <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Brak itemów na Twoim poziomie</Text></View>
+                </View>
+              )}
+              {dailySlots.map((slot, i) => {
+                const { item, rarity, value } = slot;
+                const dayKey = `gearDaily:${shopDayKey()}:${item.id}`;
+                const bought = !!dayClaims[dayKey];
+                const owned = alreadyOwnGear(item.id, rarity, value);
+                const meta = RARITY_META[rarity];
+                return (
+                  <PressableScale key={item.id} onPress={() => { haptic.tap(); setGearPreview(slot); }} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i])]}>
+                    {/* Tło slotu = gradient rzadkości (2026-09-05, user: "kolor gradientu za
+                        nimi jakby") — ciemny róg dla kontrastu ikony na busy tle, przeciwległy
+                        róg podbarwiony kolorem rzadkości, ten sam `meta.color` co plakietka ✓
+                        i pigułka w GearPreviewModal, więc kolor rzadkości czyta się spójnie
+                        wszędzie w Sklepie dnia. */}
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.55)', meta.color + '77'] as [string, string]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={s.artSlotBg}
+                    />
+                    <Image source={item.icon} style={s.artSlotImg} resizeMode="contain" />
+                    {(bought || owned) && (
+                      <View style={[s.artSlotCheck, { backgroundColor: meta.color }]}>
+                        <Check size={11} color="#0B0E1A" strokeWidth={3} />
+                      </View>
+                    )}
+                  </PressableScale>
+                );
+              })}
+            </View>
           </View>
         </View>
         </View>
@@ -421,7 +451,6 @@ export default function PetShop() {
         onClose={() => setReveal(null)}
       />
 
-      <PupilNavbar current="shop" />
       <ConfirmDialog
         visible={!!pendingBuy}
         title="Potwierdź zakup"
@@ -441,31 +470,36 @@ export default function PetShop() {
         onBuy={(item, rarity, cost, value) => { setGearPreview(null); onBuyDaily(item.id, rarity, cost, value, item.name); }}
         onClose={() => setGearPreview(null)}
       />
-      <Modal visible={editScene} transparent animationType="slide" onRequestClose={() => setEditScene(false)}>
-        <View style={s.previewOverlay}>
-          <View style={[s.previewSheet, { maxHeight: '88%' }]}>
-            <View style={s.sheetHead}>
-              <Text style={s.title2}>Edytor sceny Rynku</Text>
-              <TouchableOpacity onPress={() => setEditScene(false)} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
-            </View>
-            <Text style={s.adjustIntro}>Dostrój suwakami na żywo, potem "Eksportuj" i wyślij mi te liczby w czacie — wpiszę je na sztywno.</Text>
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              {IMG_GROUPS.map(g => (
-                <View key={g.key} style={s.adjustGroup}>
-                  <Text style={s.adjustGroupTitle}>{g.label}</Text>
-                  {IMG_FIELDS.map(f => (
-                    <View key={f.key} style={s.adjustRow}>
-                      <Text style={s.adjustLabel}>{f.label}</Text>
-                      <View style={s.adjustCtrl}>
-                        <TouchableOpacity onPress={() => stepImgAdjust(g.key, f.key, -1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>−</Text></TouchableOpacity>
-                        <Text style={s.adjustVal}>{f.fmt(adjust[g.key][f.key])}</Text>
-                        <TouchableOpacity onPress={() => stepImgAdjust(g.key, f.key, 1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>+</Text></TouchableOpacity>
-                      </View>
+      {/* Panel edytora — draft 3 (2026-09-06, user: "klikam i nie widzę"). CELOWO nie
+          `<Modal>` — modal zasłaniał całą scenę, więc user dostrajał na ślepo, nie mogąc
+          widzieć efektu. Zamiast tego: pływający, PÓŁPRZEZROCZYSTY pasek przyklejony do
+          DOŁU ekranu (nad `PupilNavbar`, który się w tym trybie chowa), ~46% wysokości —
+          górna część sceny zostaje odsłonięta nad panelem; user przescrolluje `ScrollView`
+          pod spodem (dalej aktywny, panel go nie blokuje poza swoim własnym obszarem), żeby
+          ustawić w tym widocznym pasku dokładnie to, co akurat dostraja. */}
+      {editScene && (
+        <View style={s.editorPanel}>
+          <View style={s.editorHead}>
+            <Text style={s.title2}>Edytor sceny Rynku</Text>
+            <TouchableOpacity onPress={() => setEditScene(false)} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
+          </View>
+          <Text style={s.adjustIntro}>Przescrolluj scenę POD panelem żeby widzieć co zmieniasz. Dostrój, potem "Eksportuj" i wyślij mi te liczby w czacie.</Text>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            {IMG_GROUPS.map(g => (
+              <View key={g.key} style={s.adjustGroup}>
+                <Text style={s.adjustGroupTitle}>{g.label}</Text>
+                {IMG_FIELDS.map(f => (
+                  <View key={f.key} style={s.adjustRow}>
+                    <Text style={s.adjustLabel}>{f.label}</Text>
+                    <View style={s.adjustCtrl}>
+                      <TouchableOpacity onPress={() => stepImgAdjust(g.key, f.key, -1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>−</Text></TouchableOpacity>
+                      <Text style={s.adjustVal}>{f.fmt(adjust[g.key][f.key])}</Text>
+                      <TouchableOpacity onPress={() => stepImgAdjust(g.key, f.key, 1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>+</Text></TouchableOpacity>
                     </View>
-                  ))}
-                </View>
-              ))}
-            </ScrollView>
+                  </View>
+                ))}
+              </View>
+            ))}
             <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] }}>
               <TouchableOpacity onPress={resetAdjust} style={[s.previewBuyBtn, { flex: 1, backgroundColor: c.bg.secondary }]}>
                 <Text style={[s.previewBuyTxt, { color: c.text.primary }]}>Reset</Text>
@@ -480,9 +514,11 @@ export default function PetShop() {
                 <Text selectable style={s.exportTxt}>{JSON.stringify(adjust, null, 2)}</Text>
               </View>
             )}
-          </View>
+            <View style={{ height: 24 }} />
+          </ScrollView>
         </View>
-      </Modal>
+      )}
+      {!editScene && <PupilNavbar current="shop" />}
     </SafeAreaView>
   );
 }
@@ -662,7 +698,11 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   previewBuyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FBBF24', borderRadius: radius.lg, paddingVertical: 14 },
   previewBuyTxt: { fontSize: 14, fontWeight: '900', color: '#0B0E1A' },
 
-  // Edytor sceny Rynku (2026-09-06) — patrz `ArtAdjust` u góry pliku.
+  // Edytor sceny Rynku (2026-09-06) — patrz `ArtAdjust` u góry pliku. `editorPanel` NIE jest
+  // modalem (draft 3, patrz komentarz przy `editScene` w JSX) — pływający pasek przyklejony
+  // do dołu, żeby scena nad nim zostawała widoczna i przescrollowywalna podczas dostrajania.
+  editorPanel: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '46%', backgroundColor: 'rgba(11,14,26,0.94)', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderTopWidth: 1, borderColor: c.border.default, padding: spacing[4] },
+  editorHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] },
   adjustIntro: { fontSize: 12, color: c.text.muted, marginBottom: spacing[2] },
   adjustGroup: { marginBottom: spacing[3] },
   adjustGroupTitle: { fontSize: 12, fontWeight: '800', color: c.text.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing[1] },
