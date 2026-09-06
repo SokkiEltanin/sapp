@@ -3,6 +3,19 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 wpisów — NIEsprawdzone (2026-09-06)
+
+User: "żeby tych ciekawostek było mnóstwo" — dodano 85 nowych wpisów (+30 nauka, +25 rozwój,
++30 świat), każdy od razu z pełnym `detail` (rozwinięciem). Pełny opis w ARCHITECTURE.md §30.
+Zero duplikatów (zweryfikowane skryptem), rozwój bez odwołań do konkretnych książek (żeby nie
+wrócić do usuniętej w §28 kategorii "z książki"). `tsc`/`jest` zielone.
+
+**Jeśli user przyśle listę konkretnych faktów uznanych za błędne/przestarzałe/nudne** — to
+osobna sprawa od "To znam" (które już automatycznie wyklucza z rotacji): poprawić/usunąć
+wskazane wpisy w `trivia.ts` i zanotować tu wzorzec błędu (żeby nie powtórzyć go w kolejnych
+partiach). **Priorytet testu na urządzeniu**: kilka dni z rzędu na dashboardzie — nowe fakty
+powinny naturalnie wchodzić do rotacji, każdy z działającym rozwinięciem po tapnięciu.
+
 ## ✅ Assety Rynku odchudzone — TLOSKLEPIKARZ.png 16-bit→8-bit (2026-09-06)
 
 User zobaczył zrzut ekranu Rynku (sklepikarz+kontrast już działają, PR #141) i spytał "poprawiłeś
