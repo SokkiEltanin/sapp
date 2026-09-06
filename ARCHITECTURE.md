@@ -4059,6 +4059,34 @@ Panel edytora pogrupowany nagłówkami per grafika (12 pól razem, 4×3), reszta
 zweryfikuj że X/Y/skala per grafika faktycznie przesuwają/skalują TYLKO tę jedną grafikę,
 reszta sceny się nie przelicza w dziwny sposób.
 
+## 38. Sklepikarz, draft 4 — user sam dopracował kapelusz+wąsy w zewnętrznym edytorze — 2026-09-06
+
+Zamknięcie wątku z §20/§36: user dostał statyczny `.svg`-eksport sklepikarza (ten sam viewBox
+0 0 2000 co `CatArt.tsx`), edytował go sam w zewnętrznym edytorze wektorowym i odesłał gotowy
+plik (`assets/Gotowysklepikarz.svg`, zostaje w repo jako referencja/źródło tych współrzędnych).
+
+Zmiany względem draftu 3, przeniesione 1:1 (dokładna transformacja macierzy z pliku rozpisana
+na sztywno w kodzie, nie przybliżenie „na oko"):
+- **Kapelusz WIĘKSZY** — rondo/korona przeskalowane ~1.67× (rondo 604-1274 vs dawne 760-1160),
+  wyśrodkowane tak, żeby środek zostać w tym samym miejscu nad głową. Uszy dalej ładnie
+  wystają symetrycznie po obu stronach (geometria uszu nietknięta, `<Ear>` bez zmian).
+- **"Gather"-elipsy przy nasadzie uszu USUNIĘTE** — przy szerszym rondzie nie były już
+  potrzebne (rondo samo w sobie daje wystarczający kontrast).
+- **Cała "handlebar mustache" USUNIĘTA** — user zdecydował, że sam uśmiech (`mouthFor`,
+  niezmieniony, wspólny dla wszystkich kotków) wystarczy, bez doklejonych wąsów. Usunięte:
+  obie krzywe wąsów, 2 kropki na końcówkach zawijasów, jaśniejsze podkreślenie.
+- **Nowy akcent**: mała bliznowata "błyskawica" (`#87714E`) na prawym policzku — jedyny
+  zupełnie nowy element, którego nie było w żadnym poprzednim drafcie.
+
+Zweryfikowane wizualnie (nie tylko `tsc`) — statyczna symulacja pełnego kotka z nowymi
+współrzędnymi porównana obok-obok z podglądem przysłanego pliku, wygląd identyczny.
+`tsc`/`jest` zielone (67 suit/837 testów, czysto wizualna zmiana SVG-geometrii).
+
+**Priorytet testu na urządzeniu**: ekran Sklepu — sklepikarz z większym kapeluszem (uszy dalej
+widoczne po bokach), bez wąsów, z małą błyskawicą na policzku. Rozmiar/pozycja SAMEGO
+sklepikarza w scenie (czy jest "wystarczająco duży", czy "siedzi za ladą") to osobna sprawa —
+edytor sceny z §36-37 (`cat.scale`/`cat.x`/`cat.y`) służy właśnie do tego dostrojenia.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
