@@ -3903,6 +3903,42 @@ dokładnie na narysowane okienka na grafice.
 kotek-sklepikarz ma być większy, ma "siedzieć za ladą" (obecnie stoi w luce MIĘDZY tablicą a
 ladą, nie fizycznie za kontuarem), i wąsy/czapka wymagają poprawy. Czeka na osobne zlecenie.
 
+## 33. Rynek: odchudzenie z instruktażowych podpisów (Skrzynki/Sklep dnia/Zamrożenie) — 2026-09-06
+
+User: "wtedy wypierdol te napisy wszystkie na razie SKLEP DNIA i co tam pod spodem i wgle
+przebuduj żeby było dobrze tak samo zamrożenie". Cel: scena Rynku miała nałożone WPROST na
+grafikę zwykłe, jednorazowo-instruktażowe zdania ("Pierwsze okno: skrzynka dnia za darmo...",
+"4 konkretne itemy ekwipunku na dziś — gwarantowany zakup, nie loteria.") — potrzebne raz dla
+nowego usera, ale zaśmiecające ekran przy każdej kolejnej wizycie i wizualnie kłócące się z
+malowaną sceną.
+
+**Usunięte całkowicie**: etykiety sekcji "Skrzynki"/"Sklep dnia" (`s.subSection`) i oba
+instruktażowe akapity (`s.blurbTop`) — teraz zniknęły z DOM-u, nie tylko wizualnie ukryte.
+Informacja NIE zniknęła bezpowrotnie: opis+szanse skrzynek dalej wyskakują w `ConfirmDialog`
+przy próbie zakupu (`odds` w `onBuyBox`, wpięte w §27), a Sklep dnia i tak tłumaczy się sam
+przez `GearPreviewModal` po tapnięciu itemu.
+
+**Zostało, ale przeprojektowane**: licznik odświeżenia Sklepu dnia ("Nowy zestaw za...") i
+komunikat pustego stanu ("Brak itemów...") to ŻYWA, funkcjonalna informacja (nie instrukcja),
+więc zostały — ale jako małe, eleganckie pigułki (`refreshPill`, wzorem `coinPill` z
+headera) pływające NAD ladą, zamiast pełnych zdań tekstu pod nagłówkiem. Wzorzec "niewidoczny
+pełnoszerokościowy wiersz-pozycjoner (`refreshRow`/`emptyRow`, `alignItems:'center'`) +
+przylegająca do treści pigułka w środku" — bo `alignSelf` na elemencie `position:absolute` w
+RN bywa niepewny, więc zamiast na to liczyć, wrapper jawnie centruje przez flex.
+
+**Karta "Zamrożenie serii"** dostała ten sam zabieg: podpis "ratuje serię za 1 pominięty
+dzień" usunięty (powracający user wie, co robi zamrożenie — sama nazwa + `masz: {freezes}`
+wystarczy), plus lekki wizualny lifting — subtelny lodowy `LinearGradient` w tle zamiast
+płaskiego koloru, żeby karta nie wyglądała jak generyczny wiersz listy, tylko dopracowany
+element sklepu.
+
+`tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — czysto wizualne). Zero
+martwych stylów po usunięciu (`subSection`/`blurbTop`/`refreshTxt` skasowane, nie zostawione
+jako nieużywane). **Priorytet testu na urządzeniu**: ekran Sklepu powinien wyglądać czyściej
+— bez tekstowych nagłówków/opisów na scenie, z małą pigułką licznika nad ladą i uproszczoną
+kartą zamrożenia; wszystkie interakcje (zakup skrzynki, podgląd itemu, zamrożenie) powinny
+działać identycznie jak wcześniej.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
