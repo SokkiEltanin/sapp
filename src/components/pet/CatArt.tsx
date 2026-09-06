@@ -546,15 +546,32 @@ export default function CatArt({
                     <Rect x={604.47} y={587.04} width={669.11} height={70.26} fill="#241A10" />
                     <Rect x={885.5} y={580.35} width={107.06} height={83.64} rx={10.04} fill="#171310" />
                     <Path d="M1194.04 866.41 L1126.18 949.72 L1185.45 937.18 L1109.01 1017.58 L1217.23 937.18 L1237.84 906.04 L1172.57 923.04 Z" fill="#87714E" />
+                    {/* Uszy sklepikarza SCHOWANE za czapką (user: "uszy specjalnie ukryłem za
+                        czapką, a ty je znowu wyjąłeś") — zamiast pełnowymiarowego, animowanego
+                        <Ear> (który wystaje wyraźnie ponad rondo), tylko mały, statyczny
+                        "prześwit" ucha wystający spod ronda z KAŻDEJ strony, dokładnie wg
+                        kształtu z przysłanego pliku (assets/Gotowysklepikarz.svg, grupa
+                        "ear-left" — mimo nazwy zawierała kształty dla OBU stron; prawa strona
+                        w pliku, "ear-right", była pusta = user faktycznie chciał różne, mniejsze
+                        kształty na obu bokach, nie stary symetryczny trójkąt). Rysowane TU,
+                        wewnątrz głównego <Svg>, więc chowają się pod rondem/koroną kapelusza
+                        (narysowanymi wyżej w tym samym G) zamiast wystawać nad nimi jak
+                        standardowy <Ear>-overlay. */}
+                    <Path d="M581.78 627.54 L553.21 534.45 L562.87 434.03 L652.1 448.49 C646.59 457.78 641.57 467.43 637.01 477.45 L594.04 469.61 L611.32 566.49 C611.32 566.49 607.73 583.44 607.96 587.04 L604.47 657.3 L581.78 627.54 Z" fill={p.coat} />
+                    <Path d="M604.47 637.28 C604.47 637.28 584.37 585.24 581.78 551.82 C579.16 518.01 589.2 468.2 589.2 468.2 L637.01 477.45 C624.64 504.67 611.33 565.81 611.33 565.81 L604.47 637.28 Z" fill={p.ear} />
+                    <Path d="M1240.39 476.03 L1352.94 464.09 L1340.3 583.32 C1340.3 583.32 1325.44 621.87 1314.32 634.2 C1303.87 645.79 1273.58 657.3 1273.58 657.3 L1322.07 489.75 L1251.2 502.62 C1247.95 493.49 1244.35 484.62 1240.39 476.03 Z" fill={p.coat} />
+                    <Path d="M1251.2 502.62 L1322.07 489.75 L1299.48 630.18 L1273.58 657.3 L1267.57 567.21 C1267.57 567.21 1258.39 522.83 1251.2 502.62 Z" fill={p.ear} />
                   </G>
                 )}
               </G>
             </Svg>
 
             {/* ears — overlays on top of the head so they can flutter (native-driver
-                wrapper rotation about the ear base) */}
-            <Ear side="R" anim={earR} size={size} coat={p.coat} inner={p.ear} />
-            <Ear side="L" anim={earL} size={size} coat={p.coat} inner={p.ear} />
+                wrapper rotation about the ear base). Sklepikarz dostaje WŁASNE, schowane pod
+                czapką uszy narysowane wyżej wewnątrz <Svg> — standardowy pełnowymiarowy
+                <Ear> zawsze wystawałby ponad rondo, więc jest tu wyłączony dla shopkeeper. */}
+            {!shopkeeper && <Ear side="R" anim={earR} size={size} coat={p.coat} inner={p.ear} />}
+            {!shopkeeper && <Ear side="L" anim={earL} size={size} coat={p.coat} inner={p.ear} />}
 
             {/* The raised foreleg lives OUTSIDE the SVG, in its own wrapper, so it can be
                 animated with the native driver — and it renders ON TOP of the head, which

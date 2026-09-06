@@ -4087,6 +4087,48 @@ widoczne po bokach), bez wąsów, z małą błyskawicą na policzku. Rozmiar/poz
 sklepikarza w scenie (czy jest "wystarczająco duży", czy "siedzi za ladą") to osobna sprawa —
 edytor sceny z §36-37 (`cat.scale`/`cat.x`/`cat.y`) służy właśnie do tego dostrojenia.
 
+## 39. Dwie realne poprawki po ostrej informacji zwrotnej — edytor draft 3 + uszy 1:1 — 2026-09-06
+
+User, wprost: "zjebałeś?" — dwie osobne, konkretne rzeczy, obie naprawione tego samego dnia:
+
+**1. Edytor sceny (draft 2 → 3, patrz §36-37).** Dwa realne problemy, nie kosmetyka:
+   - **"Klikam i nie widzę"** — panel edytora był pełnoekranowym `<Modal>`, więc dosłownie
+     ZASŁANIAŁ scenę, którą user miał dostrajać. Naprawa: `editScene` renderuje teraz
+     pływający, półprzezroczysty pasek PRZYKLEJONY DO DOŁU ekranu (`s.editorPanel`,
+     `position:'absolute', bottom:0, height:'46%'`, chowa `PupilNavbar` na czas edycji) —
+     NIE modal. Górna część sceny zostaje odsłonięta i przescrollowywalna pod panelem.
+   - **"Steruję slotami i skaluję sloty razem z tą grafiką"** — jeden wspólny `x/y/scale`
+     dla tablicy/lady poruszał RAZEM obrazek i siatkę klikalnych okien (slotów), więc nie dało
+     się skorygować niedopasowania MIĘDZY nimi (to było źródłem realnej frustracji — user
+     próbował naprawić rozjazd obrazek↔sloty, a wspólny transform przesuwał oba na raz,
+     zerując różnicę). Naprawa: `ArtAdjust` dostał DWIE niezależne warstwy na tablicę/ladę —
+     `top`/`bottom` (obrazek) i `topSlots`/`bottomSlots` (siatka slotów) — każda z własnym
+     x/y/scale, renderowane jako dwa osobne `position:'absolute'` layery tej samej wielkości
+     nad sobą. Klucz AsyncStorage podbity na `rynek_art_adjust_v3`.
+
+**2. Sklepikarz nie 1:1 (poprawka do §38).** User: "uszy specjalnie ukryłem za czapką, a ty
+je znowu wyjąłeś". Błąd w §38: przeniosłem hat+cheek-mark 1:1, ale ZOSTAWIŁEM standardowy,
+pełnowymiarowy `<Ear>`-overlay (ten sam co zwykły kotek) zamiast custom, schowanych kształtów
+z przysłanego pliku — więc uszy dalej wystawały wyraźnie ponad rondo, dokładnie tak jak user
+NIE chciał. Realna przyczyna: plik miał grupę `id="ear-right"` PUSTĄ i `id="ear-left"` z
+bespoke bezier-paths (NIE prostym trójkątem jak `<Ear>`) — ale MIMO nazwy "ear-left" ta grupa
+zawierała kształty dla OBU stron (dwie pary coat+ear-inner path, jedna przy lewej krawędzi
+kapelusza, jedna przy prawej), więc user faktycznie zaprojektował małe, RÓŻNE (nie
+symetryczny trójkąt) "prześwity" ucha z każdej strony, w większości schowane pod rondem.
+Naprawa: dla `shopkeeper` wyłączony `<Ear>`-overlay CAŁKOWICIE (`{!shopkeeper && <Ear .../>}`),
+a 4 nowe `<Path>` (współrzędne z pliku przepuszczone przez skrypt Python odtwarzający dokładną
+macierz transformacji, nie ręczne przepisywanie) dorysowane WEWNĄTRZ głównego `<Svg>` sklepikarza
+(w tej samej grupie co kapelusz) — chowają się pod rondem zamiast wystawać nad nim.
+
+Zweryfikowane wizualnie oba razy (nie tylko `tsc`) — statyczna symulacja Pillow/cairosvg
+porównana obok-obok z przysłanym plikiem PRZED napisaniem kodu, żeby nie powtórzyć tego
+samego błędu "wygląda inaczej niż miało". `tsc`/`jest` zielone (67 suit/837 testów).
+
+**Priorytet testu na urządzeniu**: (a) edytor sceny — panel NIE zasłania sceny, widać zmiany
+na żywo, `top`/`topSlots` (i analogicznie `bottom`/`bottomSlots`) da się przesuwać NIEZALEŻNIE
+od siebie; (b) sklepikarz — uszy NIE wystają ponad rondo kapelusza, tylko mały prześwit z
+każdej strony jak w przysłanym pliku.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
