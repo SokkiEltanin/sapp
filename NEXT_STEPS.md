@@ -3,6 +3,26 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: grafiki wychodziły poza ekran — fix na piksele zamiast aspectRatio — NIEsprawdzone (2026-09-06)
+
+User ze zrzutem: "grafiki wychodzą poza ekran, wyśrodkuj, zmniejsz do wielkości ekranu,
+dopasuj względem slotów". Realny bug widoczny tylko na urządzeniu (kod na pierwszy rzut oka
+wyglądał poprawnie) — `aspectRatio`+`width:'100%'` na dziecku `gap`-kontenera (`s.scene`,
+dodany w §27) to kruchy przypadek w Yodze, który na części urządzeń dawał zawyżoną szerokość.
+Pełny opis w ARCHITECTURE.md §32. Naprawa: `s.artPiece` liczy szerokość/wysokość WPROST z
+`Dimensions.get('window').width`, bez żadnego `aspectRatio`. Sloty (`pctStyle`) NIE wymagały
+osobnej poprawki — były poprawne względem kontenera, tylko kontener miał złą szerokość.
+`tsc`/`jest` zielone.
+
+**Priorytet testu na urządzeniu (KRYTYCZNY — jedyny sposób weryfikacji)**: ekran Sklepu —
+tablica i lada powinny mieścić się CAŁKOWICIE w szerokości ekranu, wyśrodkowane, bez
+wystawania poza krawędzie, a sloty powinny nachodzić dokładnie na okienka narysowane na
+grafice.
+
+**Zgłoszone, czeka na osobne zlecenie** (user: "tego sklepikarza ogarniemy zaraz") —
+sklepikarz ma być większy, ma faktycznie "siedzieć za ladą" (dziś stoi w luce między tablicą
+a ladą, nie za kontuarem), wąsy i czapka wymagają poprawy rysunku.
+
 ## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 → 310 wpisów — NIEsprawdzone (2026-09-06)
 
 User: "żeby tych ciekawostek było mnóstwo", potem jeszcze "dawaj więcej ciekawostek" — dwa

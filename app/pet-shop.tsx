@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -23,11 +23,22 @@ import { themedStyles } from '@/theme/themedStyles';
 import { haptic } from '@/utils/haptics';
 import { toast } from '@/store/toastStore';
 
-// Pozycjonuje dziecko wewnątrz `s.artPiece` (position:relative, wymiary z aspectRatio) na
-// procentowy prostokąt zmierzony na obrazku — patrz `rynekArt.ts`.
+// Pozycjonuje dziecko wewnątrz `s.artPiece` na procentowy prostokąt zmierzony na obrazku —
+// patrz `rynekArt.ts`.
 const pctStyle = (r: PctRect) => ({
   left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: `${r.height}%`,
 }) as any;
+
+// Szerokość obu kawałków grafiki Rynku liczona WPROST z `Dimensions` (2026-09-06, fix po
+// zgłoszeniu usera: "grafiki wychodzą poza ekran") — dawne `width:'100%'` + `aspectRatio` na
+// dziecku wewnątrz `s.scene` (który ma `gap`) dawało na części urządzeń zawyżoną szerokość
+// zamiast dopasować się do ekranu, więc `resizeMode="contain"` skalował obrazek w GÓRĘ od tej
+// zawyżonej podstawy i wychodził poza widoczny ekran. Zamiast liczyć na Yogę (aspectRatio +
+// procent + gap w tym samym łańcuchu), liczymy szerokość i wysokość WPROST w pikselach — ten
+// sam wzorzec co `missionBarFillPx` w app/pet.tsx (jawna matematyka zamiast CSS-owego
+// aspectRatio, żeby wyeliminować możliwość takiego rozjazdu).
+const SCREEN_W = Dimensions.get('window').width;
+const ART_CONTENT_W = SCREEN_W - spacing[4] * 2;   // dokładnie tyle, ile zostaje po paddingHorizontal `s.scroll`
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 
@@ -217,7 +228,7 @@ export default function PetShop() {
         <View style={{ gap: spacing[2] }}>
           <Text style={[s.subSection, { color: c.text.muted }]}>Skrzynki</Text>
           <Text style={s.blurbTop}>Pierwsze okno: skrzynka dnia za darmo. Reszta losuje ekwipunek, kolor kotka (im rzadszy tym trudniej), zamrożenie albo monety.</Text>
-          <View style={[s.artPiece, { aspectRatio: RYNEK_TOP_ASPECT }]}>
+          <View style={[s.artPiece, { width: ART_CONTENT_W, height: ART_CONTENT_W / RYNEK_TOP_ASPECT, alignSelf: 'center' }]}>
             <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
               <View style={s.artSlotBg} />
@@ -260,7 +271,7 @@ export default function PetShop() {
           {dailySlots.length === 0 && (
             <Text style={s.blurbTop}>Brak dostępnych itemów na twoim poziomie jeszcze.</Text>
           )}
-          <View style={[s.artPiece, { aspectRatio: RYNEK_BOTTOM_ASPECT }]}>
+          <View style={[s.artPiece, { width: ART_CONTENT_W, height: ART_CONTENT_W / RYNEK_BOTTOM_ASPECT, alignSelf: 'center' }]}>
             <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             {dailySlots.map((slot, i) => {
               const { item, rarity, value } = slot;
@@ -451,12 +462,13 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // ma tu rogów, ale to tania asekuracja przed przypadkowym poziomym scrollem).
   scene: { position: 'relative', overflow: 'hidden', gap: spacing[3] },
 
-  // Kafelki na "tablicy"/ladzie Rynku (2026-09-05) — `s.artPiece` to kontener o wymiarach
-  // `width:'100%'` + `aspectRatio` z `rynekArt.ts` (skaluje się z ekranem, bez zniekształcania
-  // grafiki), dzieci to `PressableScale` pozycjonowane PROCENTOWO (`pctStyle`) na zmierzone
-  // okna. Ten sam wzorzec co dawny `dailyGrid`/`dailyTile` (kwadratowy kafelek + check-badge
-  // w rogu), tylko teraz miejsce kafelka dyktuje grafika, nie flex-wrap.
-  artPiece: { width: '100%', position: 'relative' },
+  // Kafelki na "tablicy"/ladzie Rynku — `s.artPiece` to kontener na PIKSELOWO (nie
+  // procentowo) wyliczonych `width`/`height` (patrz `ART_CONTENT_W` u góry pliku — fix
+  // 2026-09-06 po zgłoszeniu "grafiki wychodzą poza ekran"), dzieci to `PressableScale`
+  // pozycjonowane PROCENTOWO (`pctStyle`) na zmierzone okna względem TEGO kontenera. Ten sam
+  // wzorzec co dawny `dailyGrid`/`dailyTile` (kwadratowy kafelek + check-badge w rogu), tylko
+  // teraz miejsce kafelka dyktuje grafika, nie flex-wrap.
+  artPiece: { position: 'relative' },
   artSlot: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   // Ciemne tło slotu bez rzadkości (skrzynka dnia + 3 skrzynki) — 2026-09-05, user: "sloty
   // muszą mieć jaśniejsze lub ciemniejsze lepiej ciemniejsze tło żeby zwiększyć kontrast
