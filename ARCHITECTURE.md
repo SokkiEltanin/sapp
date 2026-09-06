@@ -3865,6 +3865,44 @@ historia świata). Finalnie **310 wpisów** (117 nauka / 89 rozwój / 104 świat
 urządzeniu**: jak w §30 — nowe fakty powinny naturalnie wchodzić do rotacji "Ciekawostki
 dnia" przez kolejne dni, z działającym rozwinięciem.
 
+## 32. Rynek: grafiki wychodziły poza ekran — piksele zamiast aspectRatio+% w gap-kontenerze — 2026-09-06
+
+User ze zrzutem ekranu: "zobacz jak grafiki wychodzą poza ekran, weź je wyśrodkuj, zmniejsz do
+wielkości ekranu, dopasuj względem miejsc slotów (one jak będą takie same w skali to powinny
+idealnie nachodzić i tylko kwestia wysokości później)". Realny bug na urządzeniu — tablica/
+lada renderowały się SZERSZE niż ekran, wychodząc częściowo poza widoczny obszar.
+
+**Przyczyna** (najbardziej prawdopodobna, kod na pierwszy rzut oka był poprawny): oba
+`artPiece` miały `width:'100%'` + `aspectRatio: RYNEK_TOP/BOTTOM_ASPECT` jako DZIECKO
+`s.scene`, wrappera który ma `gap: spacing[3]` (dodany w §27 przy okazji fixu scrollowania
+sceny). Kombinacja `aspectRatio` na elemencie z procentową szerokością WEWNĄTRZ
+gap-kontenera to znany, kruchy przypadek w silnikach layoutu opartych o Yogę — na części
+urządzeń/wersji RN potrafi policzyć szerokość PRZED uwzględnieniem `gap`, dając zawyżoną
+podstawę, od której `resizeMode="contain"` skaluje obrazek w górę, wychodząc poza realny
+ekran. Nie dało się tego złapać czytaniem kodu na PC — potrzebny był realny zrzut z
+urządzenia.
+
+**Naprawa**: `s.artPiece` przestał polegać na `aspectRatio`/`width:'100%'` w ogóle — szerokość
+i wysokość liczone WPROST w pikselach z `Dimensions.get('window').width - spacing[4]*2` (ten
+sam wzorzec jawnej matematyki co `missionBarFillPx` w `app/pet.tsx` — zero zaufania do
+CSS-owego aspectRatio w newralgicznym miejscu). `ART_CONTENT_W` liczone raz, na starcie
+modułu. Oba `<View style={[s.artPiece, {width, height, alignSelf:'center'}]}>` dostają teraz
+DOKŁADNIE tę samą, jawnie wyliczoną szerokość co reszta contentu w `s.scroll`
+(`paddingHorizontal: spacing[4]`), więc obraz i sloty (`pctStyle`, procent WZGLĘDEM TEGO
+SAMEGO kontenera) automatycznie wracają do idealnej rejestracji — nie trzeba było osobno
+poprawiać współrzędnych slotów, one już były poprawne WZGLĘDEM kontenera, tylko sam kontener
+miał złą szerokość.
+
+`tsc`/`jest` zielone (67 suit/837 testów, zero zmian w testach — czysto layoutowy fix).
+**Priorytet testu na urządzeniu (KRYTYCZNY, to jedyny sposób weryfikacji tej klasy buga)**:
+ekran Sklepu — tablica i lada powinny teraz mieścić się CAŁKOWICIE w szerokości ekranu, bez
+wystawania poza prawą/lewą krawędź, wyśrodkowane, a sloty (skrzynki/itemy) powinny nachodzić
+dokładnie na narysowane okienka na grafice.
+
+**Zgłoszone, ŚWIADOMIE NIE zrobione teraz** (user: "tego sklepikarza ogarniemy zaraz") —
+kotek-sklepikarz ma być większy, ma "siedzieć za ladą" (obecnie stoi w luce MIĘDZY tablicą a
+ladą, nie fizycznie za kontuarem), i wąsy/czapka wymagają poprawy. Czeka na osobne zlecenie.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
