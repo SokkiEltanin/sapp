@@ -3959,6 +3959,77 @@ razu). Finalnie **369 wpisów** (138 nauka / 109 rozwój / 122 świat).
 urządzeniu**: jak w §30-31 — nowe fakty powinny naturalnie wchodzić do rotacji "Ciekawostki
 dnia" przez kolejne dni.
 
+## 35. Rynek: czarne pasy po bokach sceny — TLOSKLEPIKARZ.png przycięty do bbox alfa — 2026-09-06
+
+User przysłał zrzut ekranu Sklepu z komentarzem "zobacz nadal [źle], musisz poprawić" — po
+naprawie z §32 (grafiki mieściły się już w ekranie, bez wychodzenia poza krawędź), ale scena
+wyglądała na "połamaną": grube czarne pasy ciągnące się po OBU stronach całej sceny (tablicy,
+kotka-sklepikarza, lady), sprawiające wrażenie że tło w ogóle się nie wczytało.
+
+**Realna przyczyna** (zweryfikowana lokalnie przez zmierzenie bbox kanału alfa i symulację
+renderu Pillow — nie zgadywanie): `TLOSKLEPIKARZ.png` (tło `RYNEK_BG`) zostało w §29 tylko
+odchudzone z 16-bit na 8-bit, ale NIGDY nie przycięte z transparentnego marginesu jak
+`RYNEK_TOP`/`RYNEK_BOTTOM` — miało ~12% przezroczystego marginesu po KAŻDEJ stronie (bbox
+alfa: x 126-939 z 1080 szerokości). Założenie z komentarza w `rynekArt.ts` ("`resizeMode=
+cover` i tak przytnie brzegi") było błędne w praktyce: `cover` dopasowuje się do WYSOKOŚCI
+całej sceny (tablica+kotek+lada, ~1279px), a przy takiej wysokości i pionowym obrazku
+1080×1920 `cover` przycinał tylko ~15px z każdej strony — zostawiając ~75px CZYSTEGO
+marginesu przezroczystości (czyli czarnego tła apki spod spodu) po OBU stronach na realnym
+ekranie. Fałszywy alarm pierwszego wrażenia: to NIE regresja overflow z §32 (który naprawiał
+co innego — obrazek wychodzący POZA ekran, nie za wąski margines wewnątrz).
+
+**Naprawa**: `TLOSKLEPIKARZ.png` przycięty do bbox kanału alfa (+8px marginesu, ten sam
+skrypt/wzorzec co `RYNEK_TOP`/`RYNEK_BOTTOM` w ich własnym przycinaniu) — 1080×1920 → 829×1881.
+Zero zmian w kodzie `pet-shop.tsx` — `resizeMode="cover"` teraz przycina rzeczywistą treść
+(odrobinę dachu u góry / podłogi u dołu, bez znaczenia wizualnego) zamiast pustego marginesu,
+więc scena wypełnia całą szerokość ekranu bez czarnych pasów. Zweryfikowane symulacją Pillow
+całego łańcucha renderowania (dokładna matematyka z `pet-shop.tsx`: `ART_CONTENT_W`, wysokości
+per-aspect, `cover`-crop) — PRZED i PO przycięciu, różnica widoczna i jednoznaczna.
+
+`tsc`/`jest` zielone (67 suit/837 testów, czysto binarna zmiana pliku). **Priorytet testu na
+urządzeniu (jedyny pewny sposób weryfikacji na realnym ekranie)**: ekran Sklepu — scena
+(tablica/luka ze sklepikarzem/lada) powinna wypełniać całą szerokość ekranu bez czarnych
+pasów po bokach; sklepikarz (większy, za ladą, poprawione wąsy/czapka) dalej czeka na osobne
+zlecenie — NIE ruszony w tym PR-cie.
+
+## 36. Rynek: ręczny "edytor sceny" na urządzeniu — koniec zgadywania współrzędnych na ślepo — 2026-09-06
+
+Po dwóch rundach naprawiania sceny Rynku na ślepo z samych zrzutów ekranu (§32, §35) user
+zaproponował inne podejście: "dasz mi opcje żebym zmienił ręcznie położenie/skalę itp, ja to
+dostosuję, a potem [...] wrzucę dane, jakiś przycisk eksportuj [...] i tak zakodujesz, nie
+będziesz zgadywał". Sensowne — testowanie idzie w jedną stronę (user na telefonie, ja bez
+dostępu do urządzenia), więc lepiej dać mu narzędzie do dostrojenia NA ŻYWO niż kolejne rundy
+zrzut→zgadywanie→PR→zrzut.
+
+**Nowość w `app/pet-shop.tsx`**: ikona (`SlidersHorizontal`) w headerze Sklepu otwiera modal
+"Edytor sceny" z 7 suwakami (+/− steppery, nie drag — prościej i pewniej niż gesty na
+telefonie): skala tablicy/lady, przesunięcie X całej sceny, odstęp tablica→kotek, odstęp
+kotek→lada, rozmiar sklepikarza, przesunięcie X sklepikarza, oraz **punkt zaczepienia tła w
+pionie** (który fragment `TLOSKLEPIKARZ.png` widać — dach czy podłoga; własna matematyka
+"cover" z ręcznym `focusY`, bo zwykły `resizeMode="cover"` zawsze centruje i nie da się nim
+tego wybrać). Wartości (`ArtAdjust`) persystują w AsyncStorage (`rynek_art_adjust_v1`), więc
+dostrajanie przetrwa między sesjami. Przycisk "Eksportuj" pokazuje aktualne wartości jako
+zaznaczalny JSON — user kopiuje i wkleja mi w czacie, ja wpisuję je na sztywno jako nowe
+wartości domyślne (`DEFAULT_ADJUST`) i mogę usunąć/zostawić sam edytor.
+
+Refaktor przy okazji: `s.scene` stracił wspólny `gap` (niezależne odstępy górny/dolny wymagały
+osobnych `marginTop`/`marginBottom` na wrapperze kotka), a tło `RYNEK_BG` przeszło z prostego
+`resizeMode="cover"` na ręcznie pozycjonowany `<Image>` (jawne `width`/`height`/`left`/`top`
+liczone z `Image.resolveAssetSource` + tym samym wzorem co algorytm "cover", plus `focusY`).
+
+**Osobno**: user poprosił też o plik do samodzielnej edycji wąsów/czapki sklepikarza ("tylko
+mi svg plik... ja go edytuję") — wyjaśnione mu, że `CatArt.tsx` to NIE gotowy plik .svg, tylko
+programistyczny komponent (react-native-svg, animowany stanem), więc nie ma jednego pliku do
+podania wprost. Zamiast tego wyeksportowany STATYCZNY `.svg` (spoczynkowa poza sklepikarza,
+te same współrzędne co `CatArt.tsx` viewBox 0 0 2000) do edycji w dowolnym edytorze
+wektorowym — po zmianach user odsyła plik albo opisuje co zmienił, a ja przenoszę to na
+sztywno do bloku `shopkeeper` w `CatArt.tsx` (linie ~541-561).
+
+`tsc`/`jest` zielone (67 suit/837 testów). **Priorytet testu na urządzeniu**: otwórz ikonę
+suwaków w Sklepie, pokręć wartościami — scena powinna zmieniać się na żywo bez przeładowania
+ekranu; "Eksportuj" pokazuje poprawny JSON do skopiowania; wartości przetrwają zamknięcie i
+ponowne otwarcie ekranu.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

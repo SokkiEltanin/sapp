@@ -3,6 +3,43 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: czarne pasy po bokach sceny naprawione (TLOSKLEPIKARZ.png przycięty) — NIEsprawdzone (2026-09-06)
+
+User ze zrzutem po fixie z §32: "zobacz nadal [źle], musisz poprawić". Realna przyczyna
+(zmierzona lokalnie, nie zgadywana) — `TLOSKLEPIKARZ.png` (tło całej sceny) miało ~12%
+przezroczystego marginesu po KAŻDEJ stronie, nigdy nie przycięte jak `RYNEK_TOP`/
+`RYNEK_BOTTOM`; `resizeMode="cover"` dopasowywał się do WYSOKOŚCI sceny i przycinał tylko
+~15px z brzegu, zostawiając ~75px czystego czarnego marginesu po OBU stronach na realnym
+ekranie — wyglądało jak niewczytane tło. Pełny opis w ARCHITECTURE.md §35. Naprawa: obrazek
+przycięty do bbox alfa (+8px), zero zmian w kodzie. Zweryfikowane symulacją Pillow całego
+łańcucha renderu przed/po (nie samo "powinno działać") — różnica jednoznaczna. `tsc`/`jest`
+zielone.
+
+**Priorytet testu na urządzeniu**: ekran Sklepu — scena powinna wypełniać całą szerokość
+ekranu, bez czarnych pasów po bokach tablicy/luki/lady. Sklepikarz (większy, za ladą,
+poprawione wąsy/czapka) dalej NIE ruszony — czeka na osobne zlecenie usera.
+
+## 🆕 Rynek: edytor sceny na urządzeniu (suwaki + eksport) + statyczny .svg sklepikarza — NIEsprawdzone (2026-09-06)
+
+User: "dasz mi opcje żebym zmienił ręcznie położenie/skalę, ja dostosuję, potem przycisk
+eksportuj — nie będziesz zgadywał; a sklepikarza sam zrobię, tylko daj mi plik svg". Pełny
+opis w ARCHITECTURE.md §36. Dwie rzeczy:
+1. **Edytor sceny** — ikona suwaków w headerze Sklepu (`app/pet-shop.tsx`) otwiera panel z
+   7 wartościami (skala tablicy/lady, przesunięcie X sceny, odstępy tablica↔kotek↔lada,
+   rozmiar/przesunięcie sklepikarza, punkt zaczepienia tła w pionie), persystowanych w
+   AsyncStorage. Przycisk "Eksportuj" pokazuje JSON do skopiowania i przysłania mi w czacie —
+   wpiszę te wartości na sztywno jako nowe domyślne.
+2. **Statyczny `.svg` sklepikarza** wysłany userowi osobno (nie w repo — plik roboczy do
+   edycji zewnętrznej) — CatArt.tsx to programistyczny komponent, nie gotowy plik, więc to
+   wierny STATYCZNY zrzut spoczynkowej pozy do edycji w Inkscape/Figmie/etc. Po zmianach user
+   odsyła plik albo opis zmian, ja przenoszę na sztywno do `shopkeeper` bloku w `CatArt.tsx`.
+
+`tsc`/`jest` zielone (67 suit/837 testów). **Priorytet testu na urządzeniu**: ikona suwaków w
+Sklepie → panel się otwiera → zmiana wartości widoczna na scenie na żywo → "Eksportuj" daje
+poprawny JSON → wartości przetrwają zamknięcie ekranu. Docelowo: user dostraja suwakami aż
+scena wygląda dobrze, wysyła mi wyeksportowany JSON, ja hardkoduję i (opcjonalnie) usuwam
+edytor.
+
 ## 🆕 Ciekawostki: masowy dolew treści, 152 → 237 → 310 → 369 wpisów — NIEsprawdzone (2026-09-06)
 
 User: "żeby tych ciekawostek było mnóstwo", potem "dawaj więcej ciekawostek", potem "ogarnij

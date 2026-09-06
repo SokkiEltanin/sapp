@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, X } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, Gift, X, SlidersHorizontal } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -39,6 +40,37 @@ const pctStyle = (r: PctRect) => ({
 // aspectRatio, żeby wyeliminować możliwość takiego rozjazdu).
 const SCREEN_W = Dimensions.get('window').width;
 const ART_CONTENT_W = SCREEN_W - spacing[4] * 2;   // dokładnie tyle, ile zostaje po paddingHorizontal `s.scroll`
+
+// Ręczny "edytor sceny" (2026-09-06, user po kolejnym zrzucie "nadal [źle]": zamiast żebym
+// dalej zgadywał współrzędne na ślepo bez dostępu do urządzenia, user dostaje suwaki do
+// samodzielnego dostrojenia skali/przesunięcia/odstępów NA ŻYWO na telefonie, a potem
+// przycisk "Eksportuj" wypluwa dokładne liczby do wklejenia w czacie — ja je już tylko
+// wpisuję na sztywno jako nowe wartości domyślne, zero kolejnych rund zgadywania). Wartości
+// persystują w AsyncStorage (żeby dostrajanie przetrwało między sesjami), niezależne od
+// samego wyglądu dla zwykłego użytku — edytor jest schowany za ikoną w headerze, nie
+// przeszkadza w normalnym korzystaniu ze sklepu.
+interface ArtAdjust {
+  scale: number;       // mnożnik szerokości tablicy/lady (ART_CONTENT_W * scale)
+  offsetX: number;     // przesunięcie X całej sceny (tło+tablica+kotek+lada razem)
+  gapTop: number;      // odstęp tablica → kotek
+  gapBottom: number;   // odstęp kotek → lada
+  catSize: number;     // rozmiar sklepikarza
+  catOffsetX: number;  // przesunięcie X samego kotka
+  bgFocusY: number;    // 0=pokaż górę tła (dach), 1=pokaż dół (podłogę), 0.5=środek
+}
+const DEFAULT_ADJUST: ArtAdjust = {
+  scale: 1, offsetX: 0, gapTop: spacing[3], gapBottom: spacing[3], catSize: 140, catOffsetX: 0, bgFocusY: 0.5,
+};
+const ADJUST_KEY = 'rynek_art_adjust_v1';
+const ADJUST_FIELDS: { key: keyof ArtAdjust; label: string; step: number; min: number; max: number; fmt: (v: number) => string }[] = [
+  { key: 'scale', label: 'Skala grafik (tablica/lada)', step: 0.02, min: 0.6, max: 1.3, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'offsetX', label: 'Przesunięcie X całej sceny', step: 2, min: -80, max: 80, fmt: v => `${v}px` },
+  { key: 'gapTop', label: 'Odstęp: tablica → kotek', step: 2, min: 0, max: 60, fmt: v => `${v}px` },
+  { key: 'gapBottom', label: 'Odstęp: kotek → lada', step: 2, min: 0, max: 60, fmt: v => `${v}px` },
+  { key: 'catSize', label: 'Rozmiar sklepikarza', step: 4, min: 60, max: 260, fmt: v => `${v}px` },
+  { key: 'catOffsetX', label: 'Przesunięcie X sklepikarza', step: 4, min: -140, max: 140, fmt: v => `${v}px` },
+  { key: 'bgFocusY', label: 'Tło: która część widoczna (dach ↔ podłoga)', step: 0.02, min: 0, max: 1, fmt: v => `${Math.round(v * 100)}%` },
+];
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii
 
@@ -102,6 +134,48 @@ export default function PetShop() {
   // kupuje. Tylko Sklep dnia — jedyna zakładka sprzedająca KONKRETNE itemy ekwipunku o znanym
   // staty/rarity; skrzynki (losowe) tego nie mają.
   const [gearPreview, setGearPreview] = useState<DailyShopSlot | null>(null);
+
+  // Edytor sceny Rynku — patrz komentarz przy `ArtAdjust` u góry pliku. Ładowany raz z
+  // AsyncStorage; `adjustLoaded` chroni przed nadpisaniem zapisanych wartości domyślnymi
+  // zanim odczyt zdąży wrócić (ten sam wzorzec co reszta store'ów w apce).
+  const [adjust, setAdjust] = useState<ArtAdjust>(DEFAULT_ADJUST);
+  const [adjustLoaded, setAdjustLoaded] = useState(false);
+  const [editScene, setEditScene] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(ADJUST_KEY).then(raw => {
+      if (raw) { try { setAdjust({ ...DEFAULT_ADJUST, ...JSON.parse(raw) }); } catch {} }
+      setAdjustLoaded(true);
+    }).catch(() => setAdjustLoaded(true));
+  }, []);
+  useEffect(() => {
+    if (!adjustLoaded) return;
+    AsyncStorage.setItem(ADJUST_KEY, JSON.stringify(adjust)).catch(() => {});
+  }, [adjust, adjustLoaded]);
+  const stepAdjust = (key: keyof ArtAdjust, dir: 1 | -1) => {
+    haptic.tap();
+    const f = ADJUST_FIELDS.find(f => f.key === key)!;
+    setAdjust(a => {
+      const raw = Math.min(f.max, Math.max(f.min, a[key] + dir * f.step));
+      return { ...a, [key]: Math.round(raw * 100) / 100 };
+    });
+  };
+  const resetAdjust = () => { haptic.tap(); setAdjust(DEFAULT_ADJUST); setShowExport(false); };
+
+  // Rozmiary sceny wyliczone z aktualnych `adjust` (zamiast sztywnego ART_CONTENT_W) — patrz
+  // komentarz przy `RYNEK_BG` w rynekArt.ts. Tło pozycjonowane RĘCZNIE (własna matematyka
+  // "cover" z pionowym punktem zaczepienia `bgFocusY`), bo zwykły `resizeMode="cover"` zawsze
+  // centruje — nie da się nim wybrać "pokaż więcej dachu" / "pokaż więcej podłogi".
+  const bgSrc = useMemo(() => Image.resolveAssetSource(RYNEK_BG), []);
+  const artW = ART_CONTENT_W * adjust.scale;
+  const sceneTopH = artW / RYNEK_TOP_ASPECT;
+  const sceneBotH = artW / RYNEK_BOTTOM_ASPECT;
+  const sceneH = sceneTopH + adjust.gapTop + adjust.catSize + adjust.gapBottom + sceneBotH;
+  const bgScale = Math.max(ART_CONTENT_W / bgSrc.width, sceneH / bgSrc.height);
+  const bgRenderW = bgSrc.width * bgScale;
+  const bgRenderH = bgSrc.height * bgScale;
+  const bgLeft = -(bgRenderW - ART_CONTENT_W) / 2;
+  const bgTop = -(bgRenderH - sceneH) * adjust.bgFocusY;
 
   const [pendingBuy, setPendingBuy] = useState<{ name: string; cost: number; onYes: () => void; verb: string; extra?: string } | null>(null);
   const confirmBuy = (name: string, cost: number, onYes: () => void, verb = 'Kup', extra?: string) => {
@@ -189,6 +263,10 @@ export default function PetShop() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}><ChevronLeft size={24} color={c.text.primary} /></TouchableOpacity>
         <Text style={s.title}>Sklep</Text>
         <View style={s.coinPill}><Coins size={13} color="#FBBF24" /><Text style={s.coinTxt}>{coins}</Text></View>
+        {/* Edytor sceny (2026-09-06) — ukryty za ikoną, nie przeszkadza w normalnym sklepie. */}
+        <TouchableOpacity onPress={() => { haptic.tap(); setEditScene(true); }} hitSlop={10} style={{ marginLeft: spacing[2] }}>
+          <SlidersHorizontal size={18} color={c.text.muted} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -228,8 +306,8 @@ export default function PetShop() {
             od pozycji scrolla. Freeze-card (nad scenerią) i `hint` (pod nią) świadomie
             ZOSTAJĄ POZA tym wrapperem — nigdy nie miały wymogu piksel-w-piksel wyrównania
             z konkretnym miejscem na obrazku, to zwykłe karty UI, nie część "obrazu". ── */}
-        <View style={s.scene}>
-          <Image source={RYNEK_BG} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+        <View style={[s.scene, { height: sceneH, transform: [{ translateX: adjust.offsetX }] }]}>
+          <Image source={RYNEK_BG} style={{ position: 'absolute', width: bgRenderW, height: bgRenderH, left: bgLeft, top: bgTop }} resizeMode="stretch" />
 
         {/* Skrzynka dnia (darmowa) + 3 skrzynki (gacha) na "tablicy" LADAGORA, 4 okna. Etykieta
             "Skrzynki" + instruktażowy podpis USUNIĘTE (2026-09-06, user: "wypierdol te
@@ -238,7 +316,7 @@ export default function PetShop() {
             (`odds` w `onBuyBox`), więc informacja nie zniknęła, tylko przestała siedzieć na
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
-          <View style={[s.artPiece, { width: ART_CONTENT_W, height: ART_CONTENT_W / RYNEK_TOP_ASPECT, alignSelf: 'center' }]}>
+          <View style={[s.artPiece, { width: artW, height: sceneTopH, alignSelf: 'center' }]}>
             <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
               <View style={s.artSlotBg} />
@@ -266,8 +344,10 @@ export default function PetShop() {
             (`TLOSKLEPIKARZ` przebija przez tę lukę) — user: "co to jest za sklepik, gdzie
             sklepikarz". Bez `onPress` — `shopkeeper` i tak wygasza tap/cuddle-reakcje
             wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
-        <View style={{ alignItems: 'center' }}>
-          <CatArt size={140} palette={SHOPKEEPER_PALETTE} shopkeeper />
+        <View style={{ alignItems: 'center', marginTop: adjust.gapTop, marginBottom: adjust.gapBottom }}>
+          <View style={{ transform: [{ translateX: adjust.catOffsetX }] }}>
+            <CatArt size={adjust.catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
+          </View>
         </View>
 
         {/* ── Sklep dnia — 4 konkretne itemy ekwipunku na dziś, teraz jako górny rząd okien
@@ -278,7 +358,7 @@ export default function PetShop() {
             ZOSTAJE (to żywa, funkcjonalna informacja, nie instrukcja), ale jako mała
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
-          <View style={[s.artPiece, { width: ART_CONTENT_W, height: ART_CONTENT_W / RYNEK_BOTTOM_ASPECT, alignSelf: 'center' }]}>
+          <View style={[s.artPiece, { width: artW, height: sceneBotH, alignSelf: 'center' }]}>
             <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             <View style={s.refreshRow} pointerEvents="none">
               <View style={s.refreshPill}><Text style={s.refreshPillTxt}>Nowy zestaw za {fmtShopRefresh()}</Text></View>
@@ -352,6 +432,43 @@ export default function PetShop() {
         onBuy={(item, rarity, cost, value) => { setGearPreview(null); onBuyDaily(item.id, rarity, cost, value, item.name); }}
         onClose={() => setGearPreview(null)}
       />
+      <Modal visible={editScene} transparent animationType="slide" onRequestClose={() => setEditScene(false)}>
+        <View style={s.previewOverlay}>
+          <View style={[s.previewSheet, { maxHeight: '88%' }]}>
+            <View style={s.sheetHead}>
+              <Text style={s.title2}>Edytor sceny Rynku</Text>
+              <TouchableOpacity onPress={() => setEditScene(false)} hitSlop={10}><X size={20} color={c.text.primary} /></TouchableOpacity>
+            </View>
+            <Text style={s.adjustIntro}>Dostrój suwakami na żywo, potem "Eksportuj" i wyślij mi te liczby w czacie — wpiszę je na sztywno.</Text>
+            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+              {ADJUST_FIELDS.map(f => (
+                <View key={f.key} style={s.adjustRow}>
+                  <Text style={s.adjustLabel}>{f.label}</Text>
+                  <View style={s.adjustCtrl}>
+                    <TouchableOpacity onPress={() => stepAdjust(f.key, -1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>−</Text></TouchableOpacity>
+                    <Text style={s.adjustVal}>{f.fmt(adjust[f.key])}</Text>
+                    <TouchableOpacity onPress={() => stepAdjust(f.key, 1)} style={s.adjustBtn} hitSlop={6}><Text style={s.adjustBtnTxt}>+</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] }}>
+              <TouchableOpacity onPress={resetAdjust} style={[s.previewBuyBtn, { flex: 1, backgroundColor: c.bg.secondary }]}>
+                <Text style={[s.previewBuyTxt, { color: c.text.primary }]}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { haptic.tap(); setShowExport(v => !v); }} style={[s.previewBuyBtn, { flex: 1 }]}>
+                <Text style={s.previewBuyTxt}>{showExport ? 'Ukryj dane' : 'Eksportuj'}</Text>
+              </TouchableOpacity>
+            </View>
+            {showExport && (
+              <View style={s.exportBox}>
+                <Text style={s.exportHint}>Zaznacz cały tekst poniżej (długi tap → zaznacz wszystko) i wklej mi w czacie:</Text>
+                <Text selectable style={s.exportTxt}>{JSON.stringify(adjust, null, 2)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -473,7 +590,10 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // rodzica, nie wpływa na jego pomiar. `overflow:'hidden'` na wypadek gdyby `cover` na
   // skrajnie wąskim/szerokim ekranie chciał wystawić poza zaokrąglone rogi (scena i tak nie
   // ma tu rogów, ale to tania asekuracja przed przypadkowym poziomym scrollem).
-  scene: { position: 'relative', overflow: 'hidden', gap: spacing[3] },
+  // `gap` USUNIĘTY (2026-09-06) — odstępy tablica↔kotek↔lada są teraz NIEZALEŻNE
+  // (`adjust.gapTop`/`gapBottom` z edytora sceny), więc siedzą jako `marginTop`/`marginBottom`
+  // wprost na wrapperze kotka, nie jako jeden wspólny `gap` na tym kontenerze.
+  scene: { position: 'relative', overflow: 'hidden' },
 
   // Kafelki na "tablicy"/ladzie Rynku — `s.artPiece` to kontener na PIKSELOWO (nie
   // procentowo) wyliczonych `width`/`height` (patrz `ART_CONTENT_W` u góry pliku — fix
@@ -527,4 +647,16 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   previewBoughtTxt: { fontSize: 13, fontWeight: '800' },
   previewBuyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FBBF24', borderRadius: radius.lg, paddingVertical: 14 },
   previewBuyTxt: { fontSize: 14, fontWeight: '900', color: '#0B0E1A' },
+
+  // Edytor sceny Rynku (2026-09-06) — patrz `ArtAdjust` u góry pliku.
+  adjustIntro: { fontSize: 12, color: c.text.muted, marginBottom: spacing[2] },
+  adjustRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[2], borderBottomWidth: 1, borderBottomColor: c.border.default },
+  adjustLabel: { flex: 1, fontSize: 12.5, color: c.text.primary, fontWeight: '600', marginRight: spacing[2] },
+  adjustCtrl: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  adjustBtn: { width: 30, height: 30, borderRadius: radius.md, borderWidth: 1, borderColor: c.border.default, alignItems: 'center', justifyContent: 'center' },
+  adjustBtnTxt: { fontSize: 17, fontWeight: '800', color: c.text.primary, lineHeight: 20 },
+  adjustVal: { fontSize: 12.5, fontWeight: '800', color: c.text.primary, minWidth: 48, textAlign: 'center' },
+  exportBox: { marginTop: spacing[3], padding: spacing[3], borderRadius: radius.md, backgroundColor: c.bg.secondary, borderWidth: 1, borderColor: c.border.default },
+  exportHint: { fontSize: 11, color: c.text.muted, marginBottom: spacing[1] },
+  exportTxt: { fontSize: 11.5, fontFamily: 'monospace', color: c.text.primary },
 }));
