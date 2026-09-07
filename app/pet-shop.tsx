@@ -177,20 +177,23 @@ export default function PetShop() {
   };
   const resetAdjust = () => { haptic.tap(); setAdjust(DEFAULT_ADJUST); setShowExport(false); };
 
-  // Rozmiary sceny wyliczone z aktualnych `adjust` (zamiast sztywnego ART_CONTENT_W) — patrz
-  // komentarz przy `RYNEK_BG` w rynekArt.ts oraz przy `ArtAdjust` u góry tego pliku. Tablica/
-  // lada/kotek: `scale` zmienia rozmiar (i tym samym miejsce zarezerwowane w layoucie), `x`/`y`
-  // to czysty `transform` (przesunięcie WIZUALNE, nie zmienia zarezerwowanego miejsca — więc
-  // np. ujemny `cat.y` "podciąga" kotka bliżej tablicy bez przeliczania reszty sceny). Tło:
-  // `scale` to mnożnik NAD minimalną skalą `cover` (1.0 = dokładnie tyle co dziś, wypełnia bez
-  // przycinania na sztywno), `x`/`y` przesuwają wykadrowany fragment od domyślnego środka —
-  // jednolity model z resztą grafik zamiast osobnego `bgFocusY` z draftu 1.
+  // Rozmiary sceny — draft 4 (2026-09-07, user: "jak klikam skala to skaluje mi CAŁY page
+  // Rynku, a miało tylko grafikę każdą osobno") — w draft 3 `top`/`bottom`/`cat` `scale`
+  // ZMIENIAŁ rzeczywisty rozmiar rezerwowanego boksu (`topW`/`topH`/`catSize`), a te wchodzą
+  // do `sceneH`, więc skalowanie JEDNEJ grafiki przeliczało wysokość CAŁEJ sceny (tło się
+  // przeskalowywało, lada/kotek się przesuwały) — realny bug, nie tylko subiektywne wrażenie.
+  // Naprawa: `topW`/`topH`/`botW`/`botH`/`catSize` (i `sceneH` z nich liczone) są teraz STAŁE,
+  // NIEZALEŻNE od `adjust` — `scale` każdej grafiki to teraz WYŁĄCZNIE `transform: [{scale}]`
+  // na warstwie obrazka/kotka (dokładając się do istniejącego `translateX`/`translateY`), więc
+  // zoom jednej grafiki zostaje czysto wizualny i lokalny, zero wpływu na resztę sceny. Jedyny
+  // wyjątek to Tło — jego `scale` i tak ZAWSZE był niezależny od `sceneH` (mnożnik NAD
+  // minimalną skalą `cover`, patrz niżej), więc nie wymagał tej samej poprawki.
   const bgSrc = useMemo(() => Image.resolveAssetSource(RYNEK_BG), []);
-  const topW = ART_CONTENT_W * adjust.top.scale;
+  const topW = ART_CONTENT_W;
   const topH = topW / RYNEK_TOP_ASPECT;
-  const botW = ART_CONTENT_W * adjust.bottom.scale;
+  const botW = ART_CONTENT_W;
   const botH = botW / RYNEK_BOTTOM_ASPECT;
-  const catSize = 140 * adjust.cat.scale;
+  const catSize = 140;
   const sceneH = topH + spacing[3] + catSize + spacing[3] + botH;
   const bgMinScale = Math.max(ART_CONTENT_W / bgSrc.width, sceneH / bgSrc.height);
   const bgScale = bgMinScale * adjust.bg.scale;
@@ -341,7 +344,7 @@ export default function PetShop() {
           <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center' }]}>
             {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
                 spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). */}
-            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }] }]}>
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
               <Image source={RYNEK_TOP} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             </View>
             {/* Warstwa SLOTÓW — własne x/y/scale z `adjust.topSlots`, żeby dało się poprawić
@@ -376,7 +379,7 @@ export default function PetShop() {
             sklepikarz". Bez `onPress` — `shopkeeper` i tak wygasza tap/cuddle-reakcje
             wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
         <View style={{ alignItems: 'center', marginTop: spacing[3], marginBottom: spacing[3] }}>
-          <View style={{ transform: [{ translateX: adjust.cat.x }, { translateY: adjust.cat.y }] }}>
+          <View style={{ transform: [{ translateX: adjust.cat.x }, { translateY: adjust.cat.y }, { scale: adjust.cat.scale }] }}>
             <CatArt size={catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
           </View>
         </View>
@@ -391,7 +394,7 @@ export default function PetShop() {
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center' }]}>
             {/* Warstwa OBRAZKA — patrz analogiczny komentarz przy tablicy wyżej. */}
-            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }] }]}>
+            <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
               <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
             </View>
             {/* Warstwa SLOTÓW + pigułki (żywe, funkcjonalne, więc jadą RAZEM ze slotami, nie
