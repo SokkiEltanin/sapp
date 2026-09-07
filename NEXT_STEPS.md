@@ -3,6 +3,31 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Audyt specjalistyczny: parser paragonów / kategoryzacja wydatków — NIEsprawdzone (2026-09-07)
+
+User: "okiem specjalisty posprawdzaj po kolei rzeczy typu parser paragonów itp i powiedz czy
+można coś ulepszyc / zmienic zoptymalizowac bez utraty funkcji." Pełny opis w ARCHITECTURE.md
+§44. Trzy poprawki w `src/utils/receiptParser.ts`:
+1. **Realny bug**: `getFoodTags()` łapało krótkie trzony jedzenia ('ser','por','tost','rum',
+   'gin','karp','lays') jako czysty substring bez ochrony granic słowa — fałszywie
+   kategoryzowało np. "Serwis samochodowy"/"Sport"/"Autostrada"/"PlayStation" jako spożywcze
+   (dotyczy TAKŻE ręcznie wpisywanych wydatków, nie tylko OCR paragonów). Naprawione dla
+   trzonów ≤4 znaki (granica z lewej strony słowa) — usuwa 26 z 29 znalezionych kolizji.
+   **Znany, świadomie NIEnaprawiony kompromis**: trzon na samym POCZĄTKU słowa ("Ser-wis" vs
+   "Ser-ek", "Tost-er" vs "Tost-y") jest mechanicznie nieodróżnialny bez ręcznej listy
+   wyjątków — udokumentowane testami "znany, nienaprawiony przypadek" w
+   `receiptParser.test.ts`, więc nikt nie "naprawi" tego przez przypadek inaczej.
+2. `categorize()` fallback (gdy nic nie pasuje) zmieniony z `'groceries'` na `'other'` —
+   `'other'` było strukturalnie nieosiągalne mimo że istnieje i jest używane wszędzie indziej.
+3. Usunięty martwy kod (`TOTAL_RE`, nieużywany) + `parseGeneric()` teraz woła współdzielony
+   `detectTotal()` zamiast duplikować słabszą (mniej tolerancyjną na OCR) kopię inline.
+
+`tsc`/`jest` zielone (67 suit/849 testów, +10 nowych w `receiptParser.test.ts`). **Priorytet
+testu na urządzeniu**: ręczne dodawanie wydatku → wpisz "Toster"/"Laser"/"Sport"/
+"PlayStation"/"Autostrada" (powinny już NIE sugerować "Spożywcze"); "Serwis samochodowy"
+dalej się myli (znany kompromis, patrz wyżej) — jeśli to realnie przeszkadza w codziennym
+użyciu, wrócić do tego z gotowym przykładem.
+
 ## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę + dolny limit skali za wysoki + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
 
 User: "jak klikam skala to skaluje mi cały page Rynku, a miało tylko grafikę każdą osobno" +

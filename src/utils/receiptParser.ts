@@ -408,13 +408,6 @@ const FOOD_TAG_MAP: [string, string[]][] = [
   ]],
 ];
 
-export function getFoodTags(name: string): string[] {
-  const lower = name.toLowerCase();
-  return FOOD_TAG_MAP
-    .filter(([, kws]) => kws.some(kw => lower.includes(kw)))
-    .map(([tag]) => tag);
-}
-
 // Whole-word(ish) keyword match so short keywords don't fire inside longer food
 // words — "on" must not match makar[on], "imax" must not match un[imax], etc.
 const KW_LETTER = 'a-z0-9ąćęłńóśźż';
@@ -423,6 +416,33 @@ function keywordHit(lower: string, kw: string): boolean {
   if (!k) return false;
   const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(^|[^${KW_LETTER}])${esc}([^${KW_LETTER}]|$)`, 'i').test(lower);
+}
+
+// getFoodTags celowo łapie SUBSTRING (bez ochrony granic) dla dłuższych trzonów, bo część
+// tagów musi łapać obcięte/posklejane przez OCR nazwy bez spacji wcale — patrz test
+// `getFoodTags('ŁowiczDesRyżKruCiastŚliw100g')` musi dalej łapać 'ciast' w środku słowa.
+// Ale dla KRÓTKICH trzonów (<=4 znaki) czysty substring fałszywie łapał się WEWNĄTRZ zupełnie
+// niepowiązanych słów innych kategorii — "ser" w "Serwis samochodowy"/"laser"/"reserved",
+// "por" w "Sport"/"emporio", "tost" w "Autostrada", "lays" w "PlayStation", "rum"/"gin" w
+// "serum"/"pyralgina" — user pytał, dlaczego "Serwis samochodowy" (ręcznie wpisany wydatek)
+// kategoryzuje się jako spożywcze. Naprawa: krótkie (<=4) trzony wymagają granicy z LEWEJ
+// strony (nie mogą zaczynać się w środku słowa) — prawa strona zostaje bez ochrony u
+// WSZYSTKICH długości, bo trzony celowo łapią polskie końcówki fleksyjne ("ser"→
+// "serek"/"sery"/"serwatka", "jaj"→"jajko"/"jajka"). Nie eliminuje to WSZYSTKICH kolizji —
+// "Toster"/"Portfel"/"Poradnia" nadal zaczynają się od trzonu ("tost"/"por") na początku
+// słowa, tak samo jak prawdziwe produkty spożywcze ("tost-er" jedzenie vs "tost-er"
+// urządzenie) — to nierozwiązywalne mechanicznie bez listy wyjątków, więc zostawione.
+function foodKeywordHit(lower: string, kw: string): boolean {
+  if (kw.length > 4) return lower.includes(kw);
+  const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^${KW_LETTER}])${esc}`, 'i').test(lower);
+}
+
+export function getFoodTags(name: string): string[] {
+  const lower = name.toLowerCase();
+  return FOOD_TAG_MAP
+    .filter(([, kws]) => kws.some(kw => foodKeywordHit(lower, kw)))
+    .map(([tag]) => tag);
 }
 
 export function categorize(name: string): ExpenseCategory {
@@ -438,7 +458,10 @@ export function categorize(name: string): ExpenseCategory {
     if (cat === 'other') continue;
     if (keywords.some(kw => keywordHit(lower, kw))) return cat;
   }
-  return 'groceries';
+  // Nic nie pasowało — było tu na sztywno 'groceries' (spożywcze), przez co ta kategoria
+  // była "domyślnym zgadywaniem" zamiast realnego trafienia, a 'other' (jedyna kategoria
+  // faktycznie oznaczająca "nie wiadomo co") było strukturalnie nieosiągalne z tej funkcji.
+  return 'other';
 }
 
 // ─── Promotion detection ──────────────────────────────────────────────────────
@@ -489,8 +512,6 @@ const DEPOSIT_SECTION_TOTAL_RE = /przyj[ęe]|wydan|\bsuma\b|\brazem\b/i;
 const TRAIL_NEG_RE = /[-–]\s*(\d+[.,]\d{1,2})\s*$/;
 
 const SKIP_RE = /^(SUMA|RAZEM|DO ZAP[ŁL]ATY|[ŁL][AĄ]CZNIE|PTU|KWOTA|VAT\s+[A-E]|PARAGON|DZIE[NK]UJEMY|DZIE[NK]\.?|THANK|KOD\s|NIP|DATA\s|KASJER|ZAPRASZAMY|ZMIANA|GOT[ÓO]WKA|KARTA|P[ŁL]ATNO|FISKALNY|WYDRUK|POKWITOWANIE|ORYGINA[ŁL]|KOPIA|NUMER|TERMINAL|TRANSAKCJA|APPROVED|AUTORYZ|POWROT|POWRÓT|CASHBACK|SPRZEDAŻ|SPRZEDAZ|SALDO|ODBIÓR|ODBIORY|SERIA|KASY|KAS\s|CZĄSTK|CZASTK|SUMA\s+CZĄSTK|NADRUK|PARAGON FISKALN|KOPIĘ|NIEFISKALN)/i;
-
-const TOTAL_RE = /(?:SUMA(?:\s+PLN)?|RAZEM(?:\s+PLN)?|DO\s+ZAP[ŁL]ATY|[ŁL][AĄ]CZNIE|TOTAL|DO\s+ZAP[ŁL]ATY\s+PLN)\s*:?\s*(?:PLN\s*)?(\d+[.,]\d{2})/i;
 
 // ─── Abbreviation expansion ───────────────────────────────────────────────────
 // Ordered from most-specific to least-specific to avoid partial overwrites
@@ -1007,24 +1028,10 @@ function parseGeneric(text: string): ParsedReceipt {
 
   // "Płatność ... <kwota>" sprawdzane NAJPIERW — patrz komentarz przy `detectPaymentTotal`
   // wyżej (Lidl: "SUMA PLN" to suma PRZED zwrotem kaucji, "Płatność" zawsze finalna kwota).
-  const paymentTotal = detectPaymentTotal(text);
-  if (paymentTotal > 0) {
-    total = paymentTotal;
-  } else {
-    // Try multiple total patterns in priority order
-    const totalPatterns = [
-      /SUMA\s+PLN\s+(\d+[.,]\d{2})/i,
-      /DO\s+ZAP[ŁL]ATY\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-      /RAZEM\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-      /SUMA\s*:?\s*(\d+[.,]\d{2})/i,
-      /[ŁL][AĄ]CZNIE\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-      /TOTAL\s+(?:PLN\s+)?(\d+[.,]\d{2})/i,
-    ];
-    for (const pat of totalPatterns) {
-      const m = text.match(pat);
-      if (m) { total = parseFloat(m[1].replace(',', '.')); break; }
-    }
-  }
+  // `detectTotal` już robi dokładnie to (payment-total najpierw, potem wzorce SUMA/RAZEM/...)
+  // z tolerancją na spacje wokół przecinka/kropki z OCR — było tu duplikowane inline ze
+  // słabszym parsowaniem, scalone do jednego źródła prawdy.
+  total = detectTotal(text);
 
   const addProduct = (p: ReceiptProduct) => {
     if (p.name.length < 2) return;
