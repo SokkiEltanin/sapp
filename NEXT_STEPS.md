@@ -3,6 +3,30 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę (realny bug) + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
+
+User: "jak klikam skala to skaluje mi cały page Rynku, a miało tylko grafikę każdą osobno" +
+"energia bossów pokazywała mi 5/2, jakby się przeładowywała". Pełny opis w ARCHITECTURE.md
+§42. Dwie rzeczy:
+1. **Realny bug w edytorze sceny** — `scale` tablicy/lady/kotka ZMIENIAŁ rzeczywisty rozmiar
+   zarezerwowanego boksu, który wchodzi do `sceneH` — skalowanie JEDNEJ grafiki przeliczało
+   wysokość CAŁEJ sceny (tło się przeskalowywało, reszta się przesuwała). Naprawione: rozmiar
+   boksów teraz STAŁY, `scale` to czysty `transform` jak x/y — zero wpływu na resztę sceny.
+2. **Pigułka energii w Walce** — pokazywała "masz/koszt" (np. "5/2") ZAWSZE gdy koszt > 1
+   (raid), nie tylko gdy energii brakowało — wyglądało jak zepsuty ułamek przy pełnej puli.
+   Naprawione: pigułka pokazuje samą liczbę, wyjaśnienie kosztu zostaje w istniejącym
+   komunikacie pod przyciskiem WALCZ (pokazuje się TYLKO gdy realnie brakuje).
+
+**Zbadane, nie znalezione**: user opisał 3 walki z rzędu z raid-bossem po tym "przeładowaniu"
+— przejrzana cała ścieżka ataku, nie znaleziono realnej ścieżki do podwójnego wydania
+energii (synchroniczne sprawdzenie, `fightingRef` blokuje ponowne wejście). Najbardziej
+prawdopodobne: `eventEnergy` legalnie kumuluje się przez nieodwiedzane dni, a jedno
+naciśnięcie WALCZ! to PEŁNA symulowana walka (nie jeden cios) — zgodne z projektem. Jeśli
+user prześle konkretniejszy dowód (zrzut z ujemną energią itp.) w przyszłości, wrócić do tego.
+
+`tsc`/`jest` zielone. **Priorytet testu na urządzeniu**: (a) edytor sceny — scale jednej
+grafiki nie rusza reszty; (b) pigułka energii w Walce (raid) pokazuje samą liczbę.
+
 ## 🆕 Co zjadłem: Nutella nie łamała streaka "bez słodyczy" — NIEsprawdzone (2026-09-06)
 
 User: "zaznaczam Nutella to nie resetuje streaka, nawet nie wiem czy jest tak otagowany" —

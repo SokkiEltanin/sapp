@@ -4183,6 +4183,58 @@ Nowy test w `countersStore.test.ts` pokrywa oba przypadki.
 `tsc`/`jest` zielone (67 suit/839 testów — 2 nowe). **Priorytet testu na urządzeniu**: Co
 zjadłem → zjedz "Nutella" mając aktywny nawyk "bez słodyczy" → streak powinien pęknąć.
 
+## 42. Rynek: skala grafiki przeliczała CAŁĄ scenę + Walka: myląca pigułka energii — 2026-09-07
+
+Dwie osobne poprawki z jednej wiadomości usera.
+
+**1. Edytor sceny, realny bug (nie subiektywne wrażenie)** — user: "jak klikam skala to
+skaluje mi cały page Rynku, a miało tylko grafikę każdą osobno". W draft 3 (§37) `scale`
+tablicy/lady/kotka ZMIENIAŁ rzeczywisty rozmiar zarezerwowanego boksu (`topW`/`topH`/
+`catSize`) — a te wchodzą wprost do `sceneH` (sumy wysokości całej sceny), więc skalowanie
+JEDNEJ grafiki przeliczało wysokość CAŁEJ sceny: tło (`RYNEK_BG`, dopasowane przez `cover` do
+`sceneH`) przeskalowywało się razem z nią, a pozostałe elementy (lada pod tablicą, kotek
+pomiędzy) przesuwały się w pionie. Dokładnie to, przed czym user ostrzegał w §37 ("dla każdej
+grafiki osobno") — draft 3 to zrobił dla x/y (czysty `transform`, nie wpływa na layout), ale
+NIE dla scale (który wciąż zmieniał realny rozmiar).
+
+Naprawa: `topW`/`topH`/`botW`/`botH`/`catSize` (i `sceneH` z nich liczone) są teraz STAŁE,
+całkowicie niezależne od `adjust` — `scale` każdej z tych trzech grafik to teraz WYŁĄCZNIE
+`transform: [{scale}]` na warstwie obrazka/kotka, dokładający się do istniejącego
+`translateX`/`translateY` w tym samym tablicy transformacji. Zoom jednej grafiki zostaje
+czysto wizualny i lokalny — zero wpływu na scenę dookoła. Tło (`bg.scale`) NIE wymagało tej
+samej poprawki — jego skala od początku była niezależna od `sceneH` (mnożnik NAD minimalną
+skalą `cover`, patrz §37), tylko `top`/`bottom`/`cat` miały ten bug.
+
+**2. Walka: myląca pigułka energii** — user: "energia bossów pokazywała mi 5/2, znaczy że się
+przeładowywała jakby". Zbadane: pigułka w headerze POKAZYWAŁA CELOWO format "masz/koszt"
+(np. "5/2") gdy koszt ataku > 1 (raid kosztuje 2⚡) — dodane 2026-08-28, żeby tłumaczyć
+DLACZEGO "WALCZ!" nic nie robi gdy masz energię, ale za mało na TĘ walkę. Problem: ten format
+pokazywał się ZAWSZE gdy koszt > 1, NIE TYLKO gdy energii brakowało — "5/2" z pełną, obfitą
+pulą wygląda jak przepełniony/zepsuty ułamek, nie jak informacja. Naprawa: pigułka pokazuje
+teraz SAM stan puli (`5`), bez sufiksu kosztu — wyjaśnienie kosztu zostaje WYŁĄCZNIE w
+`energyShortTxt` pod przyciskiem WALCZ, który i tak już istniał i pokazuje się TYLKO gdy
+energii faktycznie brakuje ("Potrzeba 2⚡, masz 1") — ten sam problem z 2026-08-28 dalej
+pokryty, bez fałszywego alarmu przy pełnej puli.
+
+**Zbadane, ale NIE znalezione** — user opisał, że dzięki temu (mylnie odczytanemu jako
+"przeładowanie") stoczył 3 walki z rzędu z bossem tygodniowym (raid) i go pokonał. Przejrzana
+cała ścieżka `attackRoundBased()`/`raidAttack()`: sprawdzenie `pool < cost` dzieje się
+SYNCHRONICZNIE, `fightingRef` (ref, nie state) blokuje ponowne wejście, a cała sekwencja
+sprawdzenie→`simulateFight`→`raidAttack()` wykonuje się w JEDNYM wątku JS bez żadnego `await`
+pomiędzy — nie znaleziono realnej ścieżki do podwójnego wydania energii. Najbardziej
+prawdopodobne wyjaśnienie: `eventEnergy` legalnie kumuluje się przez nieodwiedzane dni (user
+miał 5, nie 2), a KAŻDE pojedyncze naciśnięcie WALCZ! symuluje PEŁNĄ, wielorundową walkę
+(`simulateFight`, nie jeden cios) — więc 2 realne naciśnięcia (4⚡ z 5) mogły dobić bossa,
+którego tygodniowa pula HP była już nadszarpnięta z wcześniejszych dni. To zachowanie zgodne
+z projektem, nie bug — ale zapisane tu na wypadek gdyby user przesłał konkretniejszy dowód
+(zrzut z ujemną energią, dokładna liczba naciśnięć vs energia) w przyszłości.
+
+`tsc`/`jest` zielone (67 suit/839 testów, czysto UI + layout). **Priorytet testu na
+urządzeniu**: (a) edytor sceny — zmiana `scale` JEDNEJ grafiki (tablica/lada/kotek) NIE rusza
+pozostałych ani tła; (b) ekran Walki (raid, koszt 2⚡) — pigułka pokazuje samą liczbę energii,
+bez mylącego "/2" gdy energii jest dużo, komunikat o brakującej energii dalej pojawia się pod
+przyciskiem gdy realnie jej brakuje.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

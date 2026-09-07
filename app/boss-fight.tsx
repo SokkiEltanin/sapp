@@ -634,11 +634,15 @@ export default function BossFight() {
             (żeby tytuł został wyśrodkowany tak jak w pozostałych trybach). */}
         {kind === 'quest' || kind === 'mission'
           ? <View style={{ width: 40 }} />
-          // Pigułka pokazuje "masz/koszt" (np. "1/2") gdy koszt > 1 (raid) — samo "1" nie
-          // tłumaczyło DLACZEGO WALCZ! nic nie robi, gdy raid kosztuje 2⚡ (2026-08-28, user
-          // ze screenshotem: "mimo że mam energię nie mogę zawalczyć").
+          // Pigułka pokazuje SAM stan puli (2026-09-07, user: "energia bosów pokazywała mi
+          // 5/2... jakby się przeładowywała" — dawny format "masz/koszt", np. "5/2", wyglądał
+          // jak zepsuty/przepełniony ułamek gdy energii było WIĘCEJ niż koszt jednego ataku,
+          // nie tylko gdy było jej za mało). Wyjaśnienie KOSZTU zostaje wyłącznie w
+          // `energyShortTxt` niżej pod przyciskiem WALCZ — ten sam problem z 2026-08-28
+          // ("mimo że mam energię nie mogę zawalczyć") dalej pokryty, ale TYLKO gdy realnie
+          // brakuje energii, nie zawsze.
           : <View style={s.energyPill}><Zap size={13} color="#38BDF8" />
-              <Text style={s.energyTxt}>{target?.energy ?? 0}{(target?.energyCost ?? 1) > 1 ? `/${target?.energyCost}` : ''}</Text>
+              <Text style={s.energyTxt}>{target?.energy ?? 0}</Text>
             </View>}
       </View>
 
