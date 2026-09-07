@@ -3,16 +3,20 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę (realny bug) + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
+## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę + dolny limit skali za wysoki + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
 
 User: "jak klikam skala to skaluje mi cały page Rynku, a miało tylko grafikę każdą osobno" +
-"energia bossów pokazywała mi 5/2, jakby się przeładowywała". Pełny opis w ARCHITECTURE.md
-§42. Dwie rzeczy:
+"energia bossów pokazywała mi 5/2, jakby się przeładowywała", potem dodatkowo "Dodaj mi
+opcję, żebym mógł skalować obrazek poniżej 60%, bo aktualnie nie mogę na tym rynku przy
+sklepikarzu". Pełny opis w ARCHITECTURE.md §42-43. Trzy rzeczy:
 1. **Realny bug w edytorze sceny** — `scale` tablicy/lady/kotka ZMIENIAŁ rzeczywisty rozmiar
    zarezerwowanego boksu, który wchodzi do `sceneH` — skalowanie JEDNEJ grafiki przeliczało
    wysokość CAŁEJ sceny (tło się przeskalowywało, reszta się przesuwała). Naprawione: rozmiar
    boksów teraz STAŁY, `scale` to czysty `transform` jak x/y — zero wpływu na resztę sceny.
-2. **Pigułka energii w Walce** — pokazywała "masz/koszt" (np. "5/2") ZAWSZE gdy koszt > 1
+2. **Dolny limit suwaka skali (0.6) za wysoki dla sklepikarza** — relikt sprzed powyższej
+   naprawy (kiedy mały `scale` groził spłaszczeniem realnego boksa). Naprawione: `min: 0.6` →
+   `min: 0.2` w `IMG_FIELDS` (`app/pet-shop.tsx`).
+3. **Pigułka energii w Walce** — pokazywała "masz/koszt" (np. "5/2") ZAWSZE gdy koszt > 1
    (raid), nie tylko gdy energii brakowało — wyglądało jak zepsuty ułamek przy pełnej puli.
    Naprawione: pigułka pokazuje samą liczbę, wyjaśnienie kosztu zostaje w istniejącym
    komunikacie pod przyciskiem WALCZ (pokazuje się TYLKO gdy realnie brakuje).
@@ -25,7 +29,8 @@ naciśnięcie WALCZ! to PEŁNA symulowana walka (nie jeden cios) — zgodne z pr
 user prześle konkretniejszy dowód (zrzut z ujemną energią itp.) w przyszłości, wrócić do tego.
 
 `tsc`/`jest` zielone. **Priorytet testu na urządzeniu**: (a) edytor sceny — scale jednej
-grafiki nie rusza reszty; (b) pigułka energii w Walce (raid) pokazuje samą liczbę.
+grafiki nie rusza reszty, da się zejść poniżej 60% aż do 20%; (b) pigułka energii w Walce
+(raid) pokazuje samą liczbę.
 
 ## 🆕 Co zjadłem: Nutella nie łamała streaka "bez słodyczy" — NIEsprawdzone (2026-09-06)
 

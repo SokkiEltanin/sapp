@@ -4235,6 +4235,18 @@ pozostałych ani tła; (b) ekran Walki (raid, koszt 2⚡) — pigułka pokazuje 
 bez mylącego "/2" gdy energii jest dużo, komunikat o brakującej energii dalej pojawia się pod
 przyciskiem gdy realnie jej brakuje.
 
+## 43. Rynek edytor — dolny limit skali 60% za wysoki przy sklepikarzu — 2026-09-07
+
+User (od razu po §42): "Dodaj mi opcję, żebym mógł skalować obrazek poniżej 60%, bo aktualnie
+nie mogę na tym rynku przy sklepikarzu." Po draft-4 (§42) `scale` każdej grafiki (`top`/
+`bottom`/`cat`) jest już CZYSTO wizualny (`transform:[{scale}]`, zero wpływu na `sceneH`/
+layout reszty sceny) — więc nie było już żadnego architektonicznego powodu trzymać dolny limit
+suwaka na `0.6`. Limit `min: 0.6` w `IMG_FIELDS` (`app/pet-shop.tsx`) był reliktem sprzed
+draft-4, kiedy `scale` jeszcze zmieniał realne wymiary `topW`/`botW`/`catSize` i zbyt mały
+scale groził spłaszczeniem/zniknięciem boxa. Naprawa: `min: 0.6` → `min: 0.2` (krok suwaka
+bez zmian, `step: 0.02`) — pozwala zmniejszyć grafikę sklepikarza (lub tablicy/lady) nawet do
+20% bez wpływu na resztę sceny.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
