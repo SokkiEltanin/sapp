@@ -53,3 +53,17 @@ describe('matchesAvoid — preset "słodycze" łapie dobitkę 2026-09-04', () =>
     expect(matchesAvoid(name, sweetsKeyword)).toBe(false);
   });
 });
+
+// 2026-09-06, user: "zaznaczam Nutella to nie pokazuje i nie resetuje mi się streak" —
+// foodBase.ts nie ma pola `cat` w ogóle, więc kategoria produktu nigdy by tego nie złapała;
+// nazwa "Nutella" nie zawiera "czekolad" (to krem orzechowo-kakaowy pod marką), złapane po
+// nazwie wprost, jak Snickers/Kinder wyżej.
+describe('matchesAvoid — preset "słodycze" łapie Nutellę (2026-09-06)', () => {
+  test('Nutella pasuje do keyword słodyczy', () => {
+    expect(matchesAvoid('Nutella', sweetsKeyword)).toBe(true);
+  });
+
+  test('Masło orzechowe nadal NIE pasuje (to nie słodycz, mimo "orzech")', () => {
+    expect(matchesAvoid('Masło orzechowe', sweetsKeyword)).toBe(false);
+  });
+});

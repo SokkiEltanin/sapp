@@ -3,6 +3,18 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Co zjadłem: Nutella nie łamała streaka "bez słodyczy" — NIEsprawdzone (2026-09-06)
+
+User: "zaznaczam Nutella to nie resetuje streaka, nawet nie wiem czy jest tak otagowany" —
+miał rację: `foodBase.ts` w ogóle nie ma pola `cat`, a nazwa "Nutella" nie zawierała żadnego
+fragmentu keyworda `sweets`. Pełny opis w ARCHITECTURE.md §41. Naprawa: `nutella` dopisane do
+keyworda (sprawdzone skryptem — zero fałszywych trafień w całej bazie, w tym "Masło
+orzechowe" nadal NIE łapie się mimo wspólnego "orzech"). Nowy test w `countersStore.test.ts`.
+`tsc`/`jest` zielone (67 suit/839 testów).
+
+**Priorytet testu na urządzeniu**: Co zjadłem → zjedz "Nutella" z aktywnym nawykiem "bez
+słodyczy" → streak powinien pęknąć.
+
 ## 🆕 Walka: winieta + poświata za sprite'ami ("high-end fight scene") — NIEsprawdzone (2026-09-06)
 
 User ze zrzutem: "postacie są niewidoczne, arena za jasna, wygląda tanio... możemy tę grafikę

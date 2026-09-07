@@ -4163,6 +4163,26 @@ mocno przycinał górę/dół). Nowa grafika najlepiej leży w podobnych proporc
 niż środek), kotek i boss mają subtelną kolorową poświatę za sobą, sylwetki czytelniejsze na
 tle nawet przy busy/jasnym fragmencie areny.
 
+## 41. Co zjadłem: "bez słodyczy" nie łapało Nutelli — dopisana po nazwie — 2026-09-06
+
+User: "zaznaczam Nutella to nie pokazuje i nie resetuje mi się streak, słabo bo musi
+sprawdzać czy to słodycz czy nie, a nawet nie wiem czy jest tak otagowany". Sprawdzone —
+miał rację na oba pytania: `BaseFood` (`foodBase.ts`) w ogóle NIE MA pola `cat` (żaden wpis z
+wbudowanej bazy nie jest otagowany kategorią), a sama nazwa "Nutella" nie zawiera żadnego
+dotychczasowego fragmentu keyworda `sweets` w `countersStore.ts` (to krem orzechowo-kakaowy
+pod marką, nie zawiera "czekolad"). `matchesAvoid` sprawdza nazwę + kategorię produktu — oba
+zawiodły, więc zjedzenie Nutelli nigdy nie łamało streaka "bez słodyczy".
+
+Naprawa: `nutella` dopisane do listy keywordów `sweets` (ten sam wzorzec co Snickers/Kinder/
+Krówki z poprzednich dobitek, §24/wcześniej). Sprawdzone skryptem po całej `foodBase.ts`
+(310 produktów) — "nutella" trafia WYŁĄCZNIE w sam produkt "Nutella", zero fałszywych trafień
+(w szczególności "Masło orzechowe" nadal NIE jest słodyczem, mimo że oba mają "orzech" —
+dlatego generyczne "orzech" NIE zostało dodane jako keyword, tylko konkretna nazwa marki).
+Nowy test w `countersStore.test.ts` pokrywa oba przypadki.
+
+`tsc`/`jest` zielone (67 suit/839 testów — 2 nowe). **Priorytet testu na urządzeniu**: Co
+zjadłem → zjedz "Nutella" mając aktywny nawyk "bez słodyczy" → streak powinien pęknąć.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
