@@ -111,7 +111,13 @@ export const AVOID_PRESETS: { key: string; label: string; keyword: string }[] = 
   // (nie 'wafl', bo złapałoby 'Wafle ryżowe' — inny, niesłodki produkt), 'bez'a'/'bez'y'
   // (nie samo 'bez', za krótkie/niebezpieczne jako podciąg). Diakrytyki zdublowane tym
   // samym wzorcem co reszta listy (kremówk/kremowk, michałk/michalk, krówk/krowk).
-  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|drożdż|drozdz|rogal|kroasan|croissant|toffi|chips|chrupk|paluszk|tortik|kasztank|beza|bezy|eklerk|kremówk|kremowk|fawork|rurka z kremem|herbatnik|andrut|muffin|sernik|brownie|gofr|ptasie mleczko|michałk|michalk|krówk|krowk|delicj|biszkopt|budyn|budyń|snickers|kinder|bueno|prince polo|grzesk|grześk|wafelek' },
+  // 'nutella' (2026-09-06, user: "zaznaczam Nutella to nie pokazuje i nie resetuje mi się
+  // streak, nawet nie wiem czy jest tak otagowany") — sprawdzone: `foodBase.ts` NIE ma pola
+  // `cat` w ogóle (BaseFood interface go nie ma), więc kategoria produktu nigdy by nie
+  // pomogła; nazwa "Nutella" sama w sobie nie zawiera żadnego dotychczasowego fragmentu
+  // (nie "czekolad", to krem orzechowo-kakaowy pod marką). Dodane po nazwie, jak reszta tej
+  // listy — sprawdzone skryptem, że "nutella" nie trafia przypadkiem w nic innego w bazie.
+  { key: 'sweets',   label: 'słodyczy',    keyword: 'słodycz|slodycz|czekolad|baton|cukier|żelk|zelk|oreo|jeżyk|jezyk|lody|ciast|chałw|chalw|pączek|paczek|drożdż|drozdz|rogal|kroasan|croissant|toffi|chips|chrupk|paluszk|tortik|kasztank|beza|bezy|eklerk|kremówk|kremowk|fawork|rurka z kremem|herbatnik|andrut|muffin|sernik|brownie|gofr|ptasie mleczko|michałk|michalk|krówk|krowk|delicj|biszkopt|budyn|budyń|snickers|kinder|bueno|prince polo|grzesk|grześk|wafelek|nutella' },
   { key: 'fastfood', label: 'fast foodów', keyword: 'mcdonald|kfc|pizza|burger|kebab|kebap|frytk|sushi|glovo|wolt|telepizza|bobby' },
   { key: 'alcohol',  label: 'alkoholu',    keyword: 'piwo|wino|wódka|wodka|whisky|drink|alkohol|browar|cydr|tyskie|żubr|zubr|lech ' },
   { key: 'energy',   label: 'energetyków', keyword: 'monster|red bull|redbull|tiger energy|energetyk|rockstar|burn ' },
