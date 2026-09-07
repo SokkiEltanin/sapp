@@ -1,4 +1,4 @@
-import { getFoodTags, parseReceiptText } from '@/utils/receiptParser';
+import { categorize, getFoodTags, parseReceiptText } from '@/utils/receiptParser';
 
 // Klasyfikacja słodyczy — po tym apka liczy „Słodycze vs jedzenie", kalendarz bez słodyczy itd.
 describe('getFoodTags — wykrywanie słodyczy', () => {
@@ -35,6 +35,62 @@ describe('getFoodTags — wykrywanie słodyczy', () => {
   });
   test('"mieszanka studencka" (trail mix) łapie się jako przekąski', () => {
     expect(getFoodTags('Mieszanka studencka 200g')).toContain('przekąski');
+  });
+});
+
+// 2026-09-07 — audyt specjalistyczny: getFoodTags łapał krótkie trzony jedzenia ("ser",
+// "por", "tost", "rum", "gin", "karp", "lays") jako CZYSTY substring bez ochrony granic słowa
+// (w odróżnieniu od keywordHit używanego przez pozostałe kategorie) — więc realne, ręcznie
+// wpisane wydatki spoza spożywczych fałszywie kategoryzowały się jako 'groceries', bo
+// categorize() sprawdza getFoodTags NAJPIERW. Naprawa: krótkie (<=4 znaki) trzony wymagają
+// granicy z lewej strony słowa — długie trzony (np. 'ciast', 'razow') zostają substringiem,
+// żeby nie stracić tolerancji na posklejane przez OCR nazwy (patrz test wyżej).
+describe('getFoodTags — krótkie trzony nie łapią się w środku niepowiązanych słów (2026-09-07)', () => {
+  test('"ser" nie łapie się w środku słowa (laser, reserved, bokserki)', () => {
+    expect(getFoodTags('Laser do włosów')).not.toContain('nabiał');
+    expect(getFoodTags('Reserved bluza')).not.toContain('nabiał');
+    expect(getFoodTags('Bokserki męskie')).not.toContain('nabiał');
+  });
+  test('"por" nie łapie się w środku słowa (sport, emporio)', () => {
+    expect(getFoodTags('Sprzęt sportowy')).not.toContain('warzywa');
+    expect(getFoodTags('Emporio Armani')).not.toContain('warzywa');
+  });
+  test('"tost" nie łapie się w Autostrada', () => {
+    expect(getFoodTags('Autostrada A1')).not.toContain('pieczywo');
+  });
+  test('"lays" nie łapie się w PlayStation', () => {
+    expect(getFoodTags('PlayStation Plus')).not.toContain('przekąski');
+  });
+  test('"rum"/"gin" nie łapią się w serum/pyralgina', () => {
+    expect(getFoodTags('Serum do twarzy')).not.toContain('napoje');
+    expect(getFoodTags('Pyralgina 10 tabletek')).not.toContain('napoje');
+  });
+  test('"ser" dalej łapie prawdziwy nabiał mimo końcówki fleksyjnej (serek, sery)', () => {
+    expect(getFoodTags('Serek wiejski')).toContain('nabiał');
+    expect(getFoodTags('Sery żółte plastry')).toContain('nabiał');
+  });
+});
+
+describe('categorize — kategoryzacja ręcznie wpisanych wydatków (2026-09-07)', () => {
+  // "PlayStation Plus" łapało się jako 'groceries' (przez 'lays' w środku "PlayStation") —
+  // po naprawie trafia poprawnie do 'entertainment' (kolejność kategorii w categorize()
+  // sprawdza entertainment przed subscriptions, więc "playstation" łapie się tam pierwsze —
+  // to osobna, wcześniejsza decyzja projektowa, nie część tej naprawy).
+  test('"PlayStation Plus" NIE trafia już do spożywczych (łapało się przez "lays")', () => {
+    expect(categorize('PlayStation Plus')).not.toBe('groceries');
+  });
+  test('nierozpoznana nazwa trafia do "other", nie na sztywno do "groceries"', () => {
+    expect(categorize('Zxqwvblorp 12345')).toBe('other');
+  });
+  // Znane, NIEnaprawione pozostałości (udokumentowane w ARCHITECTURE.md §44) — krótki trzon
+  // jedzenia na SAMYM POCZĄTKU słowa ("Ser-wis", "Tost-er") jest mechanicznie nieodróżnialny
+  // od prawdziwego jedzenia zaczynającego się tak samo ("Ser-ek", "Tost-y") bez ręcznej listy
+  // wyjątków — test pilnuje, żeby to znane ograniczenie nie zaskoczyło w przyszłości.
+  test('znany, nienaprawiony przypadek: "Serwis samochodowy" dalej łapie się jako spożywcze', () => {
+    expect(categorize('Serwis samochodowy')).toBe('groceries');
+  });
+  test('znany, nienaprawiony przypadek: "Toster" dalej łapie się jako spożywcze', () => {
+    expect(categorize('Toster')).toBe('groceries');
   });
 });
 

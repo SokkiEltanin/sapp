@@ -4235,6 +4235,79 @@ pozostałych ani tła; (b) ekran Walki (raid, koszt 2⚡) — pigułka pokazuje 
 bez mylącego "/2" gdy energii jest dużo, komunikat o brakującej energii dalej pojawia się pod
 przyciskiem gdy realnie jej brakuje.
 
+## 43. Rynek edytor — dolny limit skali 60% za wysoki przy sklepikarzu — 2026-09-07
+
+User (od razu po §42): "Dodaj mi opcję, żebym mógł skalować obrazek poniżej 60%, bo aktualnie
+nie mogę na tym rynku przy sklepikarzu." Po draft-4 (§42) `scale` każdej grafiki (`top`/
+`bottom`/`cat`) jest już CZYSTO wizualny (`transform:[{scale}]`, zero wpływu na `sceneH`/
+layout reszty sceny) — więc nie było już żadnego architektonicznego powodu trzymać dolny limit
+suwaka na `0.6`. Limit `min: 0.6` w `IMG_FIELDS` (`app/pet-shop.tsx`) był reliktem sprzed
+draft-4, kiedy `scale` jeszcze zmieniał realne wymiary `topW`/`botW`/`catSize` i zbyt mały
+scale groził spłaszczeniem/zniknięciem boxa. Naprawa: `min: 0.6` → `min: 0.2` (krok suwaka
+bez zmian, `step: 0.02`) — pozwala zmniejszyć grafikę sklepikarza (lub tablicy/lady) nawet do
+20% bez wpływu na resztę sceny.
+
+## 44. Audyt specjalistyczny: parser paragonów / kategoryzacja — 2026-09-07
+
+User: "okiem specjalisty posprawdzaj po kolei rzeczy typu parser paragonów itp i powiedz czy
+można coś ulepszyc / zmienic zoptymalizowac bez utraty funkcji." Przeczytany cały
+`src/utils/receiptParser.ts` (1229 linii). Znalezione i naprawione (bez utraty funkcji,
+zweryfikowane pełnym `tsc`/`jest`):
+
+**1. Realny bug kategoryzacji — `getFoodTags()` łapało krótkie trzony jako czysty substring
+bez ochrony granic słowa.** `categorize()` (używane ZARÓWNO przy parsowaniu paragonów, jak i
+przy ręcznym dodawaniu wydatku — `app/expenses/manual.tsx`, `app/expenses/add.tsx`) sprawdza
+`getFoodTags()` NAJPIERW, przed właściwą kategoryzacją przez `CATEGORY_KEYWORDS`/`keywordHit`
+(która MA ochronę granic słowa z obu stron). `getFoodTags` używało gołego `.includes()` —
+zero ochrony. Systematyczny audyt krzyżowy wszystkich 579 keywordów spoza `groceries`
+przeciw `FOOD_TAG_MAP` znalazł 29 realnych kolizji: krótkie trzony jedzenia typu `'ser'`
+(nabiał), `'por'` (warzywa), `'tost'` (pieczywo), `'rum'`/`'gin'` (napoje), `'karp'` (ryby),
+`'lays'` (przekąski) fałszywie łapały się WEWNĄTRZ zupełnie niepowiązanych słów: "Serwis
+samochodowy"/"Laser"/"Reserved"/"Bokserki" → nabiał, "Sport"/"Emporio" → warzywa,
+"Autostrada" → pieczywo, "PlayStation" → przekąski, "Serum"/"Pyralgina" → napoje. Ponieważ
+`categorize()` woła `getFoodTags()` NAJPIERW, każdy z tych przypadków fałszywie lądował jako
+`'groceries'` zamiast realnej kategorii — a to dotyczy też RĘCZNIE wpisywanych wydatków, nie
+tylko OCR paragonów.
+
+Naprawa: nowa funkcja `foodKeywordHit()` — trzony **≤4 znaki** wymagają teraz granicy z LEWEJ
+strony słowa (regex, ta sama klasa znaków `KW_LETTER` co `keywordHit`); trzony **≥5 znaków**
+zostają czystym substringiem BEZ ŻADNEJ ochrony, bo część z nich (np. `'ciast'`) celowo musi
+łapać obcięte/posklejane przez OCR nazwy bez spacji wcale — patrz istniejący test
+`getFoodTags('ŁowiczDesRyżKruCiastŚliw100g')` musi dalej łapać 'ciast' w środku słowa.
+Prawa strona pozostaje bez ochrony u WSZYSTKICH długości celowo — krótkie trzony jak `'ser'`
+mają łapać polskie końcówki fleksyjne (`serek`/`sery`/`serwatka`, nie tylko samo słowo "ser").
+
+Naprawa usuwa **26 z 29** znalezionych kolizji. **Świadomie NIEnaprawione (udokumentowane, nie
+przemilczane)**: trzon na SAMYM POCZĄTKU słowa jest mechanicznie nieodróżnialny od prawdziwego
+jedzenia zaczynającego się tak samo — "Ser-wis" vs "Ser-ek", "Tost-er" vs "Tost-y", "Por-tfel"/
+"Por-adnia" vs "Por-y", "jedno-razow-y" (bilet) vs "razow-y" (chleb) — naprawienie
+wymagałoby ręcznej listy wyjątków per-słowo (realny koszt utrzymania, ryzyko nowych bugów) za
+marginalny zysk. Zamiast zgadywać/ukrywać, to ograniczenie ma teraz DEDYKOWANE testy w
+`receiptParser.test.ts` ("znany, nienaprawiony przypadek..."), żeby nikt przypadkiem nie
+"naprawił" tego inaczej bez zauważenia całego kompromisu.
+
+**2. `categorize()` fallback na sztywno `'groceries'` zamiast `'other'`.** Gdy NIC nie pasowało
+(ani `getFoodTags`, ani żadna kategoria), funkcja zwracała `'groceries'` — mimo że `'other'`
+("Inne") to REALNA, zdefiniowana, wszędzie indziej w apce używana kategoria właśnie na "nie
+wiadomo co". Pętla `for (const cat of order)` miała nawet `if (cat === 'other') continue;`
+(no-op, bo `'other'` i tak nigdy nie było w `order`), czyniąc `'other'` strukturalnie
+nieosiągalnym z tej funkcji. Naprawa: fallback `'groceries'` → `'other'`. Brak istniejących
+testów asercji na fallback (sprawdzone grepem) — bezpieczna zmiana.
+
+**3. Martwy kod + duplikacja z driftem.** `TOTAL_RE` (moduł-level regex) było zdefiniowane, ale
+NIGDZIE nie używane (sprawdzone grepem) — usunięte. `parseGeneric()` miało WŁASNĄ, inline
+skopiowaną listę wzorców total-detection niemal identyczną z współdzielonym helperem
+`detectTotal()`, ale ze SŁABSZYM parsowaniem (`\d+[.,]\d{2}` zamiast tolerującego spacje z OCR
+`\d+\s*[.,]\s*\d{2}`, i `parseFloat` zamiast tolerancyjnego `parsePrice`). Naprawa: `parseGeneric`
+woła teraz wprost `detectTotal(text)` zamiast duplikować logikę — usuwa drift, ZYSKUJE
+tolerancję na luźne spacje z OCR (czysta poprawa, zero regresji, bo `detectTotal` robi
+dokładnie to samo + trochę więcej).
+
+Nowe testy w `receiptParser.test.ts` (10 nowych, w tym udokumentowane znane ograniczenia).
+`tsc`/`jest` zielone (67 suit/849 testów). **Priorytet testu**: ręczne dodawanie wydatku →
+wpisz "Serwis samochodowy" (wciąż źle, znany kompromis) i "Toster"/"Laser"/"Sport"/
+"PlayStation"/"Autostrada" (powinny już NIE sugerować "Spożywcze").
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

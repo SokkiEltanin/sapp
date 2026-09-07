@@ -84,7 +84,7 @@ const IMG_GROUPS: { key: keyof ArtAdjust; label: string }[] = [
 const IMG_FIELDS: { key: keyof ImgAdjust; label: string; step: number; min: number; max: number; fmt: (v: number) => string }[] = [
   { key: 'x', label: 'Pozycja X', step: 4, min: -160, max: 160, fmt: v => `${v}px` },
   { key: 'y', label: 'Pozycja Y', step: 4, min: -160, max: 160, fmt: v => `${v}px` },
-  { key: 'scale', label: 'Skala', step: 0.02, min: 0.6, max: 1.6, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'scale', label: 'Skala', step: 0.02, min: 0.2, max: 1.6, fmt: v => `${Math.round(v * 100)}%` },
 ];
 
 const FREEZE_COST = 50;   // monet za jedno zamrożenie serii

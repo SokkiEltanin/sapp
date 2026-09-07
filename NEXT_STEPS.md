@@ -3,16 +3,45 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
-## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę (realny bug) + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
+## 🆕 Audyt specjalistyczny: parser paragonów / kategoryzacja wydatków — NIEsprawdzone (2026-09-07)
+
+User: "okiem specjalisty posprawdzaj po kolei rzeczy typu parser paragonów itp i powiedz czy
+można coś ulepszyc / zmienic zoptymalizowac bez utraty funkcji." Pełny opis w ARCHITECTURE.md
+§44. Trzy poprawki w `src/utils/receiptParser.ts`:
+1. **Realny bug**: `getFoodTags()` łapało krótkie trzony jedzenia ('ser','por','tost','rum',
+   'gin','karp','lays') jako czysty substring bez ochrony granic słowa — fałszywie
+   kategoryzowało np. "Serwis samochodowy"/"Sport"/"Autostrada"/"PlayStation" jako spożywcze
+   (dotyczy TAKŻE ręcznie wpisywanych wydatków, nie tylko OCR paragonów). Naprawione dla
+   trzonów ≤4 znaki (granica z lewej strony słowa) — usuwa 26 z 29 znalezionych kolizji.
+   **Znany, świadomie NIEnaprawiony kompromis**: trzon na samym POCZĄTKU słowa ("Ser-wis" vs
+   "Ser-ek", "Tost-er" vs "Tost-y") jest mechanicznie nieodróżnialny bez ręcznej listy
+   wyjątków — udokumentowane testami "znany, nienaprawiony przypadek" w
+   `receiptParser.test.ts`, więc nikt nie "naprawi" tego przez przypadek inaczej.
+2. `categorize()` fallback (gdy nic nie pasuje) zmieniony z `'groceries'` na `'other'` —
+   `'other'` było strukturalnie nieosiągalne mimo że istnieje i jest używane wszędzie indziej.
+3. Usunięty martwy kod (`TOTAL_RE`, nieużywany) + `parseGeneric()` teraz woła współdzielony
+   `detectTotal()` zamiast duplikować słabszą (mniej tolerancyjną na OCR) kopię inline.
+
+`tsc`/`jest` zielone (67 suit/849 testów, +10 nowych w `receiptParser.test.ts`). **Priorytet
+testu na urządzeniu**: ręczne dodawanie wydatku → wpisz "Toster"/"Laser"/"Sport"/
+"PlayStation"/"Autostrada" (powinny już NIE sugerować "Spożywcze"); "Serwis samochodowy"
+dalej się myli (znany kompromis, patrz wyżej) — jeśli to realnie przeszkadza w codziennym
+użyciu, wrócić do tego z gotowym przykładem.
+
+## 🆕 Rynek: skala grafiki przeliczała CAŁĄ scenę + dolny limit skali za wysoki + Walka: myląca pigułka energii — NIEsprawdzone (2026-09-07)
 
 User: "jak klikam skala to skaluje mi cały page Rynku, a miało tylko grafikę każdą osobno" +
-"energia bossów pokazywała mi 5/2, jakby się przeładowywała". Pełny opis w ARCHITECTURE.md
-§42. Dwie rzeczy:
+"energia bossów pokazywała mi 5/2, jakby się przeładowywała", potem dodatkowo "Dodaj mi
+opcję, żebym mógł skalować obrazek poniżej 60%, bo aktualnie nie mogę na tym rynku przy
+sklepikarzu". Pełny opis w ARCHITECTURE.md §42-43. Trzy rzeczy:
 1. **Realny bug w edytorze sceny** — `scale` tablicy/lady/kotka ZMIENIAŁ rzeczywisty rozmiar
    zarezerwowanego boksu, który wchodzi do `sceneH` — skalowanie JEDNEJ grafiki przeliczało
    wysokość CAŁEJ sceny (tło się przeskalowywało, reszta się przesuwała). Naprawione: rozmiar
    boksów teraz STAŁY, `scale` to czysty `transform` jak x/y — zero wpływu na resztę sceny.
-2. **Pigułka energii w Walce** — pokazywała "masz/koszt" (np. "5/2") ZAWSZE gdy koszt > 1
+2. **Dolny limit suwaka skali (0.6) za wysoki dla sklepikarza** — relikt sprzed powyższej
+   naprawy (kiedy mały `scale` groził spłaszczeniem realnego boksa). Naprawione: `min: 0.6` →
+   `min: 0.2` w `IMG_FIELDS` (`app/pet-shop.tsx`).
+3. **Pigułka energii w Walce** — pokazywała "masz/koszt" (np. "5/2") ZAWSZE gdy koszt > 1
    (raid), nie tylko gdy energii brakowało — wyglądało jak zepsuty ułamek przy pełnej puli.
    Naprawione: pigułka pokazuje samą liczbę, wyjaśnienie kosztu zostaje w istniejącym
    komunikacie pod przyciskiem WALCZ (pokazuje się TYLKO gdy realnie brakuje).
@@ -25,7 +54,8 @@ naciśnięcie WALCZ! to PEŁNA symulowana walka (nie jeden cios) — zgodne z pr
 user prześle konkretniejszy dowód (zrzut z ujemną energią itp.) w przyszłości, wrócić do tego.
 
 `tsc`/`jest` zielone. **Priorytet testu na urządzeniu**: (a) edytor sceny — scale jednej
-grafiki nie rusza reszty; (b) pigułka energii w Walce (raid) pokazuje samą liczbę.
+grafiki nie rusza reszty, da się zejść poniżej 60% aż do 20%; (b) pigułka energii w Walce
+(raid) pokazuje samą liczbę.
 
 ## 🆕 Co zjadłem: Nutella nie łamała streaka "bez słodyczy" — NIEsprawdzone (2026-09-06)
 
