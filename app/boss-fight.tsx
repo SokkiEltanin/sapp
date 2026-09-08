@@ -14,7 +14,8 @@ import { paletteById } from '@/utils/catPalettes';
 import BossArt from '@/components/bosses/BossArt';
 import { attackPng, arenaBgFor } from '@/utils/bossIcons';
 import Confetti from '@/components/achievements/Confetti';
-import { usePetStore, levelFromXp, catMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
+import { usePetStore, levelFromXp, effectiveCatMaxHp, todayISO, BossFightDetail } from '@/store/petStore';
+import { potionAtkBonus } from '@/utils/potions';
 import { BOSSES, Boss, AttackKind, bossBonuses, simulateFight, MAX_FIGHT_ROUNDS, EquippedItem, BossLoot } from '@/utils/bosses';
 import { raidForWeek, raidHpFor, raidCoins, raidXp, raidAsBoss, raidCounterHpFor, RAID_ENERGY_COST } from '@/utils/raid';
 import { currentEventBoss, eventPeriodKey, eventHpFor, eventCoins, eventXp, eventAsBoss, eventDaysLeft, menaceHpFor, menaceSessionHpFor, menaceAsBoss, menaceCoins, menaceXp } from '@/utils/seasonalEvents';
@@ -22,7 +23,7 @@ import { minibossForQuest, minibossAsBoss, questFightCoins, questFightXp } from 
 import { madCandidate, madBossFor, MAD_UNLOCK_LEVEL } from '@/utils/madBosses';
 import { minibossForMission, missionRewardFor, fmtMissionDuration } from '@/utils/missions';
 import { COMBAT_ITEMS, CombatItemId } from '@/utils/combatItems';
-import { gearCombatBonuses, gearFlatHp, gearCoinsMult } from '@/utils/gear';
+import { gearCombatBonuses, gearCoinsMult } from '@/utils/gear';
 import { lootIcon } from '@/utils/bossUiIcons';
 import { monthlyWorkHours, monthlySweetsSpend, thisMonthVsAvg } from '@/utils/menaceStats';
 import { weekKeyOf, TRAINING_QUEST_IDS } from '@/utils/quests';
@@ -94,7 +95,7 @@ export default function BossFight() {
     xp, energy, eventEnergy, ownedItems, defeatedBosses, defeatBoss,
     defeatedMadBosses, defeatMadBoss, logFightAttempt,
     catHp, catMaxHpBonus, atkStatBonus, damageCat, resetCatHp, spendEnergy,
-    ownedCombatItems, equippedCombatItems, equippedGear, ownedGear,
+    ownedCombatItems, equippedCombatItems, equippedGear, ownedGear, activePotion,
     raidWeek, raidHp, raidWon, raidEnsure, raidAttack, raidClaim,
     eventWon, spendEventEnergy, eventClaim,
     menaceId, menaceHp, menaceEnsure, menaceAttack, menaceClaim,
@@ -125,14 +126,16 @@ export default function BossFight() {
   const bonuses = useMemo(() => {
     const loot = bossBonuses(ownedItems);
     const gear = gearCombatBonuses(equippedGear, ownedGear);
-    return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
-  }, [ownedItems, equippedGear, ownedGear]);
+    // Potka Furii (2026-09-08, patrz potions.ts) stackuje się DOKŁADNIE jak loot/gear —
+    // czysty addytywny dodatek do tego samego `bonuses.atk`, nie osobny mnożnik.
+    return { atk: loot.atk + gear.atk + potionAtkBonus(activePotion), dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
+  }, [ownedItems, equippedGear, ownedGear, activePotion]);
   const level = useMemo(() => levelFromXp(xp).level, [xp]);
   const equippedItems: EquippedItem[] = useMemo(
     () => equippedCombatItems.map(id => ({ id, level: ownedCombatItems[id] ?? 1 })),
     [equippedCombatItems, ownedCombatItems],
   );
-  const catMax = catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear);
+  const catMax = effectiveCatMaxHp(catMaxHpBonus, equippedGear, ownedGear, activePotion);
   // Kolczyki (coinsPct) — JEDYNY stat gear który nie pasuje do Bonuses{atk,dodge,crit,
   // energyMult}, więc osobny mnożnik wołany tu, w jedynym miejscu gdzie liczy się finalna
   // wypłata za zwycięstwo (wspólne dla wszystkich 6 trybów walki, patrz finish() niżej).

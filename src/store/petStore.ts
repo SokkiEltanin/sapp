@@ -10,6 +10,7 @@ import { MENACE_ITEM_DROP_CHANCE } from '@/utils/seasonalEvents';
 import { RAID_ENERGY_COST } from '@/utils/raid';
 import { GearSlot, GearRarity, OwnedGear, gearById, gearStatValue, gearFlatHp, gearCombatBonuses, gearSellValue, isGearUpgrade, rollGearValue, GEAR_SLOTS, unlockedGearFor } from '@/utils/gear';
 import { boxById, pickWeighted } from '@/utils/petBoxes';
+import { PotionKind, ActivePotion, POTIONS, potionFlatHp, potionXpMult } from '@/utils/potions';
 // `notificationsService` NIE importowane statycznie tutaj (2026-08-15) — ciągnie za sobą
 // expo-notifications, którego Jest nie potrafi sparsować z poziomu plików czysto logicznych
 // importowanych przez testy (bossProgressReport.ts importuje stąd BossLogEntry/levelFromXp/
@@ -25,6 +26,28 @@ export { COMBAT_ITEM_SLOTS, combatItemSlotsFor };
 // w kodzie, żeby balans był w jednym miejscu.
 export const CAT_BASE_MAX_HP = 100;
 export function catMaxHp(bonus: number): number { return CAT_BASE_MAX_HP + Math.max(0, bonus); }
+
+// Max HP RZECZYWISTE w walce — konsolidacja formuły `catMaxHp(bonus) + gearFlatHp(...)`, która
+// była zduplikowana w 4 miejscach (boss-fight.tsx, app/pet.tsx, damageCat/resetCatHp niżej) —
+// dodanie potki HP (2026-09-08, patrz `potions.ts`) w JEDNYM miejscu zamiast czterech, i bez
+// ryzyka, że kolejna kopia formuły gdzieś w przyszłości zapomni o którymś składniku.
+export function effectiveCatMaxHp(
+  catMaxHpBonus: number,
+  equippedGear: Partial<Record<GearSlot, string>>,
+  ownedGear: Partial<Record<string, OwnedGear>>,
+  activePotion: ActivePotion | null,
+): number {
+  return catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear) + potionFlatHp(activePotion);
+}
+
+// XP mnożone przez potkę Mądrości (jeśli aktywna) — JEDYNY chokepoint (żadna z 14 akcji
+// przyznających XP nie woła `addXp`, każda dawniej robiła `xp: s.xp + xp` wprost w swoim
+// `set()`, więc zamiast dublować sprawdzenie potki w każdym miejscu, ta funkcja owija samo
+// dodawanie — wszystkie 14 miejsc + `addXp` przepisane na `xpWithPotion(s, xp)`).
+function xpWithPotion(s: { activePotion: ActivePotion | null }, amount: number): number {
+  if (amount <= 0) return amount;
+  return Math.round(amount * potionXpMult(s.activePotion));
+}
 
 // Sufit banku energii kampanii/MAD — TA SAMA formuła co wyświetlana "Prób dziennie" na
 // ekranie Siła bojowa (2026-08-19, user: "niech maksymalna energia się nakłada do tych
@@ -259,6 +282,11 @@ interface PetState {
   // ── nemesis (menace) — TRWAŁY bank HP, bez timera/limitu prób, lustrzane raidWeek/raidHp ──
   menaceId: string | null;   // id nemesis (overtime/sweettooth) dla którego menaceHp jest aktualne
   menaceHp: number;          // pozostałe HP bieżącego nemesis
+  // ── potki czasowe (2026-09-08, patrz `src/utils/potions.ts`) ──
+  // TYLKO JEDNA naraz — kupienie nowej PODMIENIA poprzednią. `endsAt` sprawdzane leniwie
+  // (jak `missionEndsAt`) wszędzie gdzie efekt jest czytany; `syncPotionExpiry()` czyści pole
+  // do null po wygaśnięciu, żeby UI (badge na /pet) nie musiał liczyć tego sam za każdym razem.
+  activePotion: ActivePotion | null;
   _hydrated: boolean;
 
   setName: (name: string) => void;
@@ -353,6 +381,9 @@ interface PetState {
   buyDailyGear: (dayKey: string, itemId: string, rarity: GearRarity, cost: number, value: number) => boolean;
   setOnboarded: () => void;
   ackPetLevel: (level: number) => void;   // po pokazaniu celebracji level-upu
+  // Potki czasowe — patrz `activePotion` w stanie wyżej i `src/utils/potions.ts`.
+  buyPotion: (kind: PotionKind) => boolean;   // false = za mało monet
+  syncPotionExpiry: () => void;               // czyści `activePotion` do null jeśli wygasła
   reset: () => void;
 }
 
@@ -404,6 +435,7 @@ export const usePetStore = create<PetState>()(
       eventWon: [],
       menaceId: null,
       menaceHp: 0,
+      activePotion: null,
       defeatedBosses: [],
       defeatedMadBosses: [],
       missionStartedAt: null,
@@ -425,7 +457,7 @@ export const usePetStore = create<PetState>()(
       _hydrated: false,
 
       setName: (name) => set({ name: name.trim() || 'Blobek' }),
-      addXp: (n) => set((s) => ({ xp: Math.max(0, s.xp + n) })),
+      addXp: (n) => set((s) => ({ xp: Math.max(0, s.xp + xpWithPotion(s, n)) })),
       addCoins: (n) => set((s) => ({ coins: Math.max(0, s.coins + n) })),
       spendCoins: (n) => {
         if (!get()._hydrated) return false;            // nie wydawaj zanim portfel się wczyta
@@ -537,7 +569,7 @@ export const usePetStore = create<PetState>()(
       claimQuest: (id, coins, xp) => set((s) => s.claimedQuests.includes(id) ? s : ({
         claimedQuests: [...s.claimedQuests, id],
         coins: s.coins + coins,
-        xp: s.xp + xp,
+        xp: s.xp + xpWithPotion(s, xp),
       })),
       claimDaily: (id, coins, xp) => {
         const t = todayISO();
@@ -546,7 +578,7 @@ export const usePetStore = create<PetState>()(
         set((s) => ({
           dailyClaims: { ...s.dailyClaims, [id]: t },
           dayClaims: { ...s.dayClaims, [`${id}:${t}`]: true },
-          coins: s.coins + coins, xp: s.xp + xp,
+          coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
         }));
         return true;
       },
@@ -558,26 +590,26 @@ export const usePetStore = create<PetState>()(
         if (st.dayClaims[`${id}:${date}`] || st.dailyClaims[id] === date) return false;
         set((s) => ({
           dayClaims: { ...s.dayClaims, [`${id}:${date}`]: true },
-          coins: s.coins + coins, xp: s.xp + xp,
+          coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
         }));
         return true;
       },
       claimWeekly: (id, coins, xp) => {
         const w = weekKeyOf();
         if (get().weeklyClaims[id] === w) return false;
-        set((s) => ({ weeklyClaims: { ...s.weeklyClaims, [id]: w }, coins: s.coins + coins, xp: s.xp + xp }));
+        set((s) => ({ weeklyClaims: { ...s.weeklyClaims, [id]: w }, coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp) }));
         return true;
       },
       claimMonthly: (id, coins, xp) => {
         const m = todayISO().slice(0, 7);
         if (get().monthlyClaims[id] === m) return false;
-        set((s) => ({ monthlyClaims: { ...s.monthlyClaims, [id]: m }, coins: s.coins + coins, xp: s.xp + xp }));
+        set((s) => ({ monthlyClaims: { ...s.monthlyClaims, [id]: m }, coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp) }));
         return true;
       },
       careTick: (xp) => {
         const t = todayISO();
         if (get().lastCareTick === t) return;
-        set((s) => ({ xp: s.xp + xp, lastCareTick: t }));
+        set((s) => ({ xp: s.xp + xpWithPotion(s, xp), lastCareTick: t }));
       },
       // Tap-to-pet: fills the daily affection bar; the first time it hits 100 today
       // it grants a sardine crate to open (+ a little XP). Returns the new value +
@@ -591,7 +623,7 @@ export const usePetStore = create<PetState>()(
         set({
           affection: value,
           affectionDay: t,
-          ...(justFull ? { affectionRewardDay: t, xp: s.xp + 8, pendingCrates: (s.pendingCrates ?? 0) + 1 } : {}),
+          ...(justFull ? { affectionRewardDay: t, xp: s.xp + xpWithPotion(s, 8), pendingCrates: (s.pendingCrates ?? 0) + 1 } : {}),
         });
         return { value, justFull };
       },
@@ -692,7 +724,7 @@ export const usePetStore = create<PetState>()(
         defeatedBosses: [...s.defeatedBosses, bossId],
         ownedItems: s.ownedItems.includes(lootId) ? s.ownedItems : [...s.ownedItems, lootId],
         coins: s.coins + coins,
-        xp: s.xp + xp,
+        xp: s.xp + xpWithPotion(s, xp),
         bossLog: [...s.bossLog, { kind: 'campaign', id: bossId, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Osobna lista od defeatedBosses (madBosses.ts) — bez loot-regrantu, ten item już masz
@@ -700,7 +732,7 @@ export const usePetStore = create<PetState>()(
       defeatMadBoss: (baseBossId, coins, xp, name, level, fight) => set((s) => s.defeatedMadBosses.includes(baseBossId) ? s : ({
         defeatedMadBosses: [...s.defeatedMadBosses, baseBossId],
         coins: s.coins + coins,
-        xp: s.xp + xp,
+        xp: s.xp + xpWithPotion(s, xp),
         bossLog: [...s.bossLog, { kind: 'mad', id: baseBossId, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Misja (utils/missions.ts) — guard: no-op jeśli już jest aktywna misja (missionEndsAt
@@ -720,7 +752,7 @@ export const usePetStore = create<PetState>()(
         require('@/services/notificationsService').notificationsService.cancelMissionReady().catch(() => {});
         return {
           missionStartedAt: null, missionEndsAt: null, missionProfile: null,
-          coins: s.coins + coins, xp: s.xp + xp,
+          coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
           bossLog: [...s.bossLog, { kind: 'mission', id: 'mission', name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         };
       }),
@@ -741,7 +773,7 @@ export const usePetStore = create<PetState>()(
         return { remaining, defeated: remaining <= 0 };
       },
       raidClaim: (weekKey, coins, xp, name, level, fight) => set((s) => (s.raidWon.includes(weekKey) ? s : {
-        raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xp,
+        raidWon: [...s.raidWon, weekKey], coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
         bossLog: [...s.bossLog, { kind: 'raid', id: weekKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Identical shape to syncEnergy/syncRaidEnergy, targeting the event's own bank.
@@ -760,7 +792,7 @@ export const usePetStore = create<PetState>()(
       },
       spendEventEnergy: () => set((s) => ({ eventEnergy: Math.max(0, s.eventEnergy - 1) })),
       eventClaim: (eventKey, coins, xp, name, level, fight) => set((s) => (s.eventWon.includes(eventKey) ? s : {
-        eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xp,
+        eventWon: [...s.eventWon, eventKey], coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
         bossLog: [...s.bossLog, { kind: 'event', id: eventKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
       })),
       // Nemesis (2026-08-18) — lustrzane raidEnsure/raidAttack, bez energii (spendEventEnergy
@@ -805,7 +837,7 @@ export const usePetStore = create<PetState>()(
           }
         }
         set({
-          eventWon: [...s.eventWon, menaceKey], coins: s.coins + coins, xp: s.xp + xp,
+          eventWon: [...s.eventWon, menaceKey], coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
           ...(itemDropped ? { ownedCombatItems: { ...s.ownedCombatItems, [itemDropped]: 1 } } : {}),
           ...(itemLeveledUp ? { ownedCombatItems: { ...s.ownedCombatItems, [itemLeveledUp.id]: itemLeveledUp.level } } : {}),
           bossLog: [...s.bossLog, { kind: 'event', id: menaceKey, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
@@ -819,7 +851,7 @@ export const usePetStore = create<PetState>()(
         set((s) => ({
           dailyClaims: { ...s.dailyClaims, [questId]: t },
           dayClaims: { ...s.dayClaims, [`${questId}:${t}`]: true },
-          coins: s.coins + coins, xp: s.xp + xp,
+          coins: s.coins + coins, xp: s.xp + xpWithPotion(s, xp),
           bossLog: [...s.bossLog, { kind: 'quest', id: questId, name, at: new Date().toISOString(), level, coins, xp, ...fight }],
         }));
         return true;
@@ -849,12 +881,12 @@ export const usePetStore = create<PetState>()(
       },
       healCat: (amount) => {
         const s = get();
-        const max = CAT_BASE_MAX_HP + s.catMaxHpBonus + gearFlatHp(s.equippedGear, s.ownedGear);
+        const max = effectiveCatMaxHp(s.catMaxHpBonus, s.equippedGear, s.ownedGear, s.activePotion);
         const next = Math.min(max, s.catHp + Math.max(0, amount));
         set({ catHp: next });
         return next;
       },
-      resetCatHp: () => set((s) => ({ catHp: CAT_BASE_MAX_HP + s.catMaxHpBonus + gearFlatHp(s.equippedGear, s.ownedGear) })),
+      resetCatHp: () => set((s) => ({ catHp: effectiveCatMaxHp(s.catMaxHpBonus, s.equippedGear, s.ownedGear, s.activePotion) })),
       grantCombatItem: (id) => set((s) => s.ownedCombatItems[id] ? s : { ownedCombatItems: { ...s.ownedCombatItems, [id]: 1 } }),
       // Skrzynki sklepowe (2026-08-29, patrz komentarz przy `combatItemChance` w petBoxes.ts)
       // — `rollBox()` już zdecydował, na podstawie snapshotu `ownedCombatItems` w momencie
@@ -965,10 +997,23 @@ export const usePetStore = create<PetState>()(
       },
       setOnboarded: () => set({ onboarded: true }),
       ackPetLevel: (level) => set((s) => level > s.lastSeenLevel ? { lastSeenLevel: level } : s),
+      // Potki czasowe — patrz `activePotion` w stanie i `src/utils/potions.ts`. Kupienie nowej
+      // PODMIENIA poprzednią (bez zwrotu monet za niewykorzystany czas) — tylko jedna naraz.
+      buyPotion: (kind) => {
+        const s = get();
+        const def = POTIONS[kind];
+        if (s.coins < def.cost) return false;
+        const endsAt = new Date(Date.now() + def.durationHours * 3600000).toISOString();
+        set({ coins: s.coins - def.cost, activePotion: { kind, endsAt } });
+        return true;
+      },
+      syncPotionExpiry: () => set((s) => (
+        s.activePotion && new Date(s.activePotion.endsAt).getTime() <= Date.now() ? { activePotion: null } : s
+      )),
       // resetGeneration/lastResetAt CELOWO liczone z `get()` i INKREMENTOWANE, nie
       // zerowane — to metadane o samych resetach (patrz komentarz przy polu w interfejsie),
       // muszą przetrwać "nowy log danych" żeby kolejne rundy testowe dało się odróżnić.
-      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
+      reset: () => set((s) => ({ xp: 0, coins: 0, lastCareTick: null, ownedItems: [], catColor: 'blue', catStripes: false, catEyeColor: '', catNoseColor: '', catWhiskers: false, catLegStripes: false, equippedStartup: 'default', loginStreak: 0, lastLoginDay: null, loginBonusDay: null, equipped: {}, roomAddons: {}, claimedQuests: [], dailyClaims: {}, dayClaims: {}, weeklyClaims: {}, monthlyClaims: {}, affection: 0, affectionDay: null, affectionRewardDay: null, pendingCrates: 0, pushupsDay: null, squatsDay: null, situpsDay: null, plankDay: null, stretchDay: null, trainingDays: {}, energy: campaignEnergyMax([], {}, {}), energyRegenAt: null, defeatedBosses: [], defeatedMadBosses: [], missionStartedAt: null, missionEndsAt: null, missionProfile: null, bossHp: {}, bossLog: [], resetGeneration: s.resetGeneration + 1, lastResetAt: new Date().toISOString(), raidWeek: null, raidHp: 0, raidWon: [], eventEnergy: 0, eventEnergyDate: null, eventEnergyToday: 0, eventWon: [], menaceId: null, menaceHp: 0, activePotion: null, catHp: CAT_BASE_MAX_HP, catMaxHpBonus: 0, atkStatBonus: 0, ownedCombatItems: {}, equippedCombatItems: [], ownedGear: {}, equippedGear: {}, onboarded: false, lastSeenLevel: 1 })),
     }),
     {
       name: 'pet-v1',
@@ -993,6 +1038,7 @@ export const usePetStore = create<PetState>()(
         eventEnergy: s.eventEnergy, eventEnergyDate: s.eventEnergyDate, eventEnergyToday: s.eventEnergyToday,
         eventWon: s.eventWon,
         menaceId: s.menaceId, menaceHp: s.menaceHp,
+        activePotion: s.activePotion,
         catHp: s.catHp, catMaxHpBonus: s.catMaxHpBonus, atkStatBonus: s.atkStatBonus,
         ownedCombatItems: s.ownedCombatItems, equippedCombatItems: s.equippedCombatItems,
         ownedGear: s.ownedGear, equippedGear: s.equippedGear, onboarded: s.onboarded,

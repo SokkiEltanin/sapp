@@ -16,7 +16,8 @@ import PupilNavbar from '@/components/pet/PupilNavbar';
 import { rollBox, DAILY_BOX, LootBox, BoxReward } from '@/utils/petBoxes';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
-import { usePetStore, levelFromXp, growthStage, catMaxHp, combatItemSlotsFor } from '@/store/petStore';
+import { usePetStore, levelFromXp, growthStage, effectiveCatMaxHp, combatItemSlotsFor } from '@/store/petStore';
+import { isPotionActive, potionAtkBonus, fmtPotionCountdown, POTIONS } from '@/utils/potions';
 import { bossBonuses, atkPower, atkMultiplier, dailyAttempts, BASE_ATK } from '@/utils/bosses';
 import { COMBAT_ITEMS, CombatItemId, combatItemUpgradeCost } from '@/utils/combatItems';
 import { gearCombatBonuses, gearFlatHp } from '@/utils/gear';
@@ -62,7 +63,7 @@ export default function Pet() {
     missionStartedAt, missionEndsAt, startMission, cancelMission,
     catMaxHpBonus, atkStatBonus, buyMaxHp, buyAtkStat,
     ownedCombatItems, equippedCombatItems, upgradeCombatItem, equipCombatItem, unequipCombatItem, grantOrLevelCombatItem,
-    equippedGear, ownedGear } = usePetStore();
+    equippedGear, ownedGear, activePotion, syncPotionExpiry } = usePetStore();
   const addFreezes = useStreakFreezeStore(st => st.addFreezes);
   const lvl = levelFromXp(xp);
   // Misja (utils/missions.ts, 2026-08-15) — tik co 1s (było 30s) żeby napędzić dokładny
@@ -93,6 +94,11 @@ export default function Pet() {
   const missionRemainingMs = missionEndsAt ? new Date(missionEndsAt).getTime() - Date.now() : 0;
   void missionTick;
   const missionReady = !!missionEndsAt && missionRemainingMs <= 0;
+  // Potka wygasła w tle (offline) — sprząta `activePotion` przy otwarciu ekranu, ten sam
+  // "dogoń przy wejściu" wzorzec co `syncEnergyRegen()` (bosses.tsx). Odczyty bonusów są i
+  // tak leniwe (`isPotionActive` sprawdza `endsAt` za każdym razem), więc to czysto
+  // kosmetyczne sprzątanie stanu, nie naprawa realnego buga.
+  useEffect(() => { syncPotionExpiry(); }, []);
   // Pasek postępu (2026-08-15, user: "niech będzie pasek też ładowania przy timerze") —
   // elapsed/total od missionStartedAt do missionEndsAt, capowany 0..1 (nie powinno przekroczyć,
   // ale zegar urządzenia to nie gwarancja).
@@ -284,11 +290,13 @@ export default function Pet() {
   const bonuses = useMemo(() => {
     const loot = bossBonuses(ownedItems);
     const gear = gearCombatBonuses(equippedGear, ownedGear);
-    return { atk: loot.atk + gear.atk, dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
-  }, [ownedItems, equippedGear, ownedGear]);
+    // Potka Furii (2026-09-08) stackuje się jak loot/gear — patrz identyczny komentarz w
+    // boss-fight.tsx, ta "Siła bojowa" ma pokazywać DOKŁADNIE to, co realnie liczy się w walce.
+    return { atk: loot.atk + gear.atk + potionAtkBonus(activePotion), dodge: loot.dodge + gear.dodge, crit: loot.crit + gear.crit, energyMult: loot.energyMult + gear.energyMult };
+  }, [ownedItems, equippedGear, ownedGear, activePotion]);
   const power = atkPower(atkStatBonus, lvl.level, bonuses);
   const mult = atkMultiplier(lvl.level, bonuses);
-  const maxHp = catMaxHp(catMaxHpBonus) + gearFlatHp(equippedGear, ownedGear);
+  const maxHp = effectiveCatMaxHp(catMaxHpBonus, equippedGear, ownedGear, activePotion);
   const attempts = dailyAttempts(bonuses.energyMult);
   const hpCost = hpUpgradeCost(catMaxHpBonus);
   const atkCost = atkUpgradeCost(atkStatBonus);
@@ -371,6 +379,16 @@ export default function Pet() {
             <View style={[s.moodChip, { backgroundColor: pet.color + '1E', borderColor: pet.color + '55' }]}>
               <Text style={[s.status, { color: pet.color }]}>{pet.label}</Text>
             </View>
+            {/* Aktywna potka (2026-09-08, patrz potions.ts) — ten sam wzorzec pigułki co
+                `moodChip` powyżej, tylko tinted kolorem konkretnej potki (te same barwy co
+                etykiety ATK/HP na kartach "Siła bojowa" niżej — spójna kolorystyka statów). */}
+            {activePotion && isPotionActive(activePotion) && (
+              <View style={[s.moodChip, { marginTop: 4, backgroundColor: POTIONS[activePotion.kind].color + '1E', borderColor: POTIONS[activePotion.kind].color + '55' }]}>
+                <Text style={[s.status, { color: POTIONS[activePotion.kind].color }]}>
+                  {POTIONS[activePotion.kind].name} · {fmtPotionCountdown(activePotion.endsAt)}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={s.topRight}>
             {/* Pasek Lv POWIĘKSZONY DRUGI RAZ (2026-09-04, user: "zbić bardziej te statystyki i
@@ -523,7 +541,7 @@ export default function Pet() {
             <Heart size={15} color="#2AC68F" />
             <Text style={s.statVal}>{maxHp}</Text>
             <Text style={s.statLabel}>Max HP kotka</Text>
-            <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}{gearFlatHp(equippedGear, ownedGear) > 0 ? ` + ${Math.round(gearFlatHp(equippedGear, ownedGear))} (ekwipunek)` : ''}</Text>
+            <Text style={s.statSub}>bazowe 100 + {catMaxHpBonus}{gearFlatHp(equippedGear, ownedGear) > 0 ? ` + ${Math.round(gearFlatHp(equippedGear, ownedGear))} (ekwipunek)` : ''}{isPotionActive(activePotion, 'hp') ? ` + ${POTIONS.hp.hpBonus} (potka)` : ''}</Text>
             <TouchableOpacity onPress={onBuyMaxHp} style={[s.buyPill, { marginTop: 4 }]} activeOpacity={0.8}>
               <Heart size={10} color="#2AC68F" /><Text style={[s.buyPillTxt, { color: '#2AC68F' }]}>+{HP_UPGRADE_AMOUNT}</Text>
               <Coins size={10} color="#FBBF24" /><Text style={s.buyPillTxt}>{hpCost}</Text>
