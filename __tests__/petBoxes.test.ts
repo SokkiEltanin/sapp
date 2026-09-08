@@ -28,6 +28,35 @@ describe('petBoxes — boxById', () => {
   });
 });
 
+// 2026-09-08, user: "zostawiłeś skrzynkę dnia miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA,
+// BOSKA" — dodany 4. płatny tier ("divine"), a "silver" przemianowany na "iron" (te same
+// liczby, tylko nazwa/emoji/kolor). `BOX_RANK` zastąpiło twarde porównania `box.id === 'gold'`
+// rozsiane po rollBox() — te testy pilnują, że "divine" faktycznie jest traktowana jako
+// NAJLEPSZA (a nie przypadkiem gorsza niż gold przez literówkę w porównaniu rang).
+describe('petBoxes — 4 tiery skrzyń (drewniana/żelazna/złota/boska, 2026-09-08)', () => {
+  test('dokładnie 4 skrzynie, we właściwej kolejności', () => {
+    expect(LOOT_BOXES.map(b => b.id)).toEqual(['sardine', 'iron', 'gold', 'divine']);
+  });
+  test('divine kosztuje więcej niż gold, gold więcej niż iron, iron więcej niż sardine', () => {
+    const [sardine, iron, gold, divine] = LOOT_BOXES;
+    expect(iron.cost).toBeGreaterThan(sardine.cost);
+    expect(gold.cost).toBeGreaterThan(iron.cost);
+    expect(divine.cost).toBeGreaterThan(gold.cost);
+  });
+  test('divine, tak jak gold, PREFERUJE ulepszenie posiadanego perku (nie tylko gold)', () => {
+    const divine = boxById('divine');
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.99).mockReturnValueOnce(0);
+    const reward = rollBox(divine, [], [], 1, { dodge: 1 });
+    expect(reward).toEqual({ type: 'combatItem', itemId: 'dodge', name: 'Unik', level: 2, isUpgrade: true, rarity: 'legendary' });
+    jest.restoreAllMocks();
+  });
+  test('monety divine mieszczą się w 50%-300% jej WŁASNEGO kosztu, jak reszta skrzyń', () => {
+    const divine = boxById('divine');
+    expect(divine.coins.min).toBe(Math.round(divine.cost * 0.5));
+    expect(divine.coins.max).toBe(divine.cost * 3);
+  });
+});
+
 describe('petBoxes — rollBox (kaskada stref prawdopodobieństwa)', () => {
   afterEach(() => jest.restoreAllMocks());
   const sardine = boxById('sardine');
@@ -104,7 +133,7 @@ describe('petBoxes — rollBox strefa PERKÓW BOSSÓW (combatItemChance, 2026-08
   const sardine = boxById('sardine');
   const gold = boxById('gold');
 
-  test('sardine/silver (preferUpgrade=false): zawsze NOWY nieposiadany perk na poziomie 1', () => {
+  test('sardine/iron (preferUpgrade=false): zawsze NOWY nieposiadany perk na poziomie 1', () => {
     jest.spyOn(Math, 'random').mockReturnValueOnce(0.41).mockReturnValueOnce(0); // sardine: [0.40, 0.42)
     const reward = rollBox(sardine, [], [], 1, {});
     expect(reward).toEqual({ type: 'combatItem', itemId: 'headshot', name: 'Strzał w Łeb', level: 1, isUpgrade: false, rarity: 'rare' });

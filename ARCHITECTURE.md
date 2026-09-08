@@ -4488,6 +4488,66 @@ teraz martwy styl `artSlotBg` usunięty z arkusza.
 
 `tsc`/`jest` bez zmian w liczbie testów (69 suit/873, czysto wizualna korekta stylu).
 
+## 49. Rynek — trzy poprawki po realnym teście na urządzeniu (tło/głębia/skrzynie) — 2026-09-08
+
+User przesłał zrzut ekranu ze sklepem PO PR #158 z trzema konkretnymi zastrzeżeniami:
+
+**1. `boardBg` czytał się jako przezroczysty, nie jako "stałe brązowe".** §48 dodało jedno
+wspólne tło (dobry kierunek, potwierdzony), ale kolor `rgba(0,0,0,0.4)` — półprzezroczysta
+czerń — user: "to tło jest nadal przezroczyste a miało być stałe brązowe, a ikonki mają nie
+mieć tła, tylko lekki cień z tyłu". Naprawa: `boardBg` → `#2A1B0EF0` (prawie nieprzezroczysty
+ciepły brąz, pasujący do drewna sklepiku). Dodatkowo: każda ikona/emoji slotu (Zamrożenie, 3
+potki, 4 skrzynie) dostała miękki cień ZA SOBĄ przez `<RadialGlow color="#000" opacity={0.4}
+.../>` — CELOWO nie natywny `shadowColor`/`elevation` (SVG bez tła + `elevation` na
+Androidzie liczy cień z PROSTOKĄTA layoutu, nie z kształtu ikony — wyszedłby brzydki
+kwadratowy cień), tylko ten sam radial-gradient trik co reszta "głębi" w apce.
+
+**2. Efekt głębi za sklepikarzem wyglądał jak "jakiś prostokąt", nie jak cień.** §46 pkt 3
+skopiowało 1:1 duet z `boss-fight.tsx`: `RadialGlow` (poświata) + `GroundShadow` (eliptyczny
+cień POD ŁAPKAMI). Problem znaleziony po realnym teście: `GroundShadow` ma sens TYLKO gdy
+sprite stoi W CAŁOŚCI widoczny na podłodze (jak boss/kotek w arenie walki) — sklepikarz jest
+wycięty W POŁOWIE (widać go tylko od klatki piersiowej w górę, wystającego zza lady), więc nie
+ma żadnych łap/podłogi do których cień miałby się odnosić — renderował się mniej więcej na
+wysokości lady, czytając się jako losowy ciemny kształt zamiast realnego cienia. Naprawa:
+`GroundShadow` CAŁKOWICIE USUNIĘTY z tej sceny (import też, był tam martwy), zostaje
+wyłącznie `RadialGlow` (poświata w kolorze futra, opacity podbite 0.2→0.28, size 1.5x→1.6x) —
+jedyny z pary, który faktycznie pasuje do kompozycji "wystający zza lady".
+
+**3. Dolny rząd lady miał być 4 PŁATNE skrzynie, nie darmowa skrzynka dnia + 3 skrzynki.**
+§47 zostawiło starą darmową "skrzynkę dnia" jako jeden z 4 slotów dolnego rzędu — user: "i
+tam zostawiłeś skrzynkę dnia miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA". Naprawa
+dwuwarstwowa:
+- `src/utils/petBoxes.ts`: `BoxId` rozszerzone o realny 4. tier — `'sardine' | 'iron' | 'gold'
+  | 'divine'` (dawne `'silver'` PRZEMIANOWANE na `'iron'`/"Żelazna skrzynka", te same liczby,
+  tylko nazwa/emoji/kolor — sprawdzone grepem, id nigdzie nie jest persystowane w danych
+  usera, więc rename jest bezpieczny). Nowy `'divine'`/"Boska skrzynka" (koszt 450, najlepsze
+  szanse, `gearRarityWeight` mocno w legendary/mythic) — z UWAGĄ w komentarzu: jej
+  `gearChance` świadomie NIE jest najwyższa z czterech, bo `rollBox()` zwraca przy PIERWSZYM
+  trafionym progu kaskady (kolor→startup→zamrożenie→EKWIPUNEK→PERKI→monety) — zbyt wysoki
+  próg PRZED perkami zjadłby całą przestrzeń [0,1) i uczyniłby `combatItemChance`
+  praktycznie nieosiągalną (już się to dzieje z monetami przy gold, świadomie zaakceptowane
+  tam, ale przy boskiej user wyraźnie chce realną szansę na perk bossa, nie tylko wyższe
+  liczby na papierze). Nowy `BOX_RANK: Record<BoxId, number>` zastąpił trzy twarde
+  porównania `box.id === 'gold'`/`'silver'` w `rollBox()` (rzadkość zamrożenia, preferUpgrade,
+  perkRarity) — porównania rang zamiast konkretnych id, więc kolejny (5.) tier w przyszłości
+  nie wymaga szukania po całym pliku.
+- `app/pet-shop.tsx`: darmowa skrzynka dnia (`onDailyBox`/`dailyReady`/`Gift`-ikona) USUNIĘTA
+  z dolnego rzędu lady — dolny rząd to teraz DOKŁADNIE `LOOT_BOXES` (4 wpisy). Sama mechanika
+  darmowej skrzynki (`claimDailyBox`/`DAILY_BOX`/`dayClaims`) ŻYJE DALEJ niedotknięta — to był
+  tylko DRUGI, zduplikowany trigger do tej samej akcji; nadal odbierana z hero-karty na
+  `/pet` i pokazywana jako wskaźnik na dashboardzie (`app/(tabs)/index.tsx`), więc żadna
+  funkcja nie zniknęła z apki, tylko zbędny duplikat z Rynku.
+
+Nowe testy w `__tests__/petBoxes.test.ts` (4 nowe: dokładnie 4 skrzynie we właściwej
+kolejności, rosnący koszt, `divine` PREFERUJE ulepszenie tak jak `gold`, monety w 50%-300%
+własnego kosztu). `tsc`/`jest` zielone (69 suit/877 testów).
+
+**Priorytet testu na urządzeniu**: (a) tablica/lada mają wyraźnie brązowe, nieprzezroczyste
+tło pod oknami, ikonki mają miękki cień, nie kwadratową ramkę; (b) sklepikarz ma widoczną,
+kolistą poświatę za sobą, żaden prostokąt/blok; (c) dolny rząd lady pokazuje 4 emoji skrzyń
+(🪵⚙️🥇👑) w cenach 35/90/200/450, bez darmowego prezentu; (d) darmowa skrzynka dnia dalej
+działa z `/pet` i pokazuje się na dashboardzie jak wcześniej.
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

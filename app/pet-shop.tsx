@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { ChevronLeft, Coins, Check, Snowflake, Gift, X, SlidersHorizontal, HeartPulse, Swords, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Coins, Check, Snowflake, X, SlidersHorizontal, HeartPulse, Swords, Sparkles } from 'lucide-react-native';
 
 import PressableScale from '@/components/ui/PressableScale';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -12,13 +12,12 @@ import BoxRevealModal from '@/components/pet/BoxRevealModal';
 import PupilNavbar from '@/components/pet/PupilNavbar';
 import CatArt from '@/components/pet/CatArt';
 import RadialGlow from '@/components/ui/RadialGlow';
-import GroundShadow from '@/components/ui/GroundShadow';
 import { usePetStore, levelFromXp } from '@/store/petStore';
 import { POTIONS, PotionKind, isPotionActive, fmtPotionCountdown } from '@/utils/potions';
 import { useStreakFreezeStore } from '@/store/streakFreezeStore';
 import { SHOP_COLORS } from '@/utils/petShop';
 import { SHOPKEEPER_PALETTE } from '@/utils/catPalettes';
-import { LOOT_BOXES, DAILY_BOX, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
+import { LOOT_BOXES, LootBox, rollBox, BoxReward } from '@/utils/petBoxes';
 import { dailyShopSlots, DailyShopSlot, RARITY_META, SLOT_META, SLOT_STAT, GEAR_STAT_LABEL, fmtGearStat, gearById, isGearUpgrade, GearSlot, GearRarity, OwnedGear } from '@/utils/gear';
 import { RYNEK_BG, RYNEK_TOP, RYNEK_BOTTOM, RYNEK_TOP_ASPECT, RYNEK_BOTTOM_ASPECT, RYNEK_TOP_SLOTS, RYNEK_BOTTOM_SLOTS, PctRect } from '@/utils/rynekArt';
 import { spacing, radius } from '@/theme';
@@ -151,7 +150,7 @@ export default function PetShop() {
   const c = useColors();
   const s = useMemo(() => makeS(c), [c]);
   const { coins, xp, ownedItems, buyItem, addCoins, spendCoins, grantStartup,
-    claimDailyBox, dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
+    dayClaims, grantGear, buyDailyGear, equippedGear, ownedGear,
     ownedCombatItems, grantOrLevelCombatItem, activePotion, buyPotion } = usePetStore();
   const petLevel = levelFromXp(xp).level;
   const freezes    = useStreakFreezeStore(st => st.freezes);
@@ -269,22 +268,12 @@ export default function PetShop() {
     }, 'Otwórz', odds);
   };
 
-  // Darmowa skrzynka dnia — raz dziennie: losuj i przyznaj (jak w sklepowej gaczy).
-  const dailyReady = !dayClaims[`dailybox:${todayKey()}`];
-  const onDailyBox = () => {
-    haptic.tap();
-    if (!dailyReady || !claimDailyBox()) { haptic.error(); toast.info('Skrzynkę dnia już odebrałeś — wróć jutro'); return; }
-    const reward = rollBox(DAILY_BOX, SHOP_COLORS, ownedItems, petLevel, ownedCombatItems);
-    let dupeCoins: number | undefined;
-    if (reward.type === 'color') buyItem(reward.colorId, 0);
-    else if (reward.type === 'startup') grantStartup(reward.startupId);
-    else if (reward.type === 'coins') addCoins(reward.coins);
-    else if (reward.type === 'freeze') addFreezes(reward.count);
-    else if (reward.type === 'gear') { const c = grantGear(reward.itemId, reward.rarity, reward.value); if (c > 0) dupeCoins = c; }
-    else if (reward.type === 'combatItem') grantOrLevelCombatItem(reward.itemId, reward.level);
-    haptic.success();
-    setReveal({ box: DAILY_BOX, reward, dupeCoins });
-  };
+  // Darmowa skrzynka dnia (2026-09-08) — USUNIĘTA z tego ekranu (user: "zostawiłeś skrzynkę
+  // dnia miała być ta nowa, DREWNIANA, ZELAZNA, ZLOTA, BOSKA" — dolny rząd lady to teraz
+  // dokładnie 4 PŁATNE skrzynki, patrz JSX niżej). Sama mechanika (`claimDailyBox`/
+  // `DAILY_BOX`/`dayClaims`) ŻYJE DALEJ, niedotknięta — dalej odbierana z hero-karty na
+  // `/pet` i pokazywana jako wskaźnik na dashboardzie (`app/(tabs)/index.tsx`); to był tu
+  // tylko DRUGI, zduplikowany trigger do tej samej akcji.
 
   // Sklep dnia — 4 KONKRETNE itemy ekwipunku, gwarantowany zakup (nie loteria), roluje się
   // co dzień o 6:00 rano (dailyShopSlots w gear.ts, deterministycznie po `shopDayKey`).
@@ -382,6 +371,7 @@ export default function PetShop() {
                 osobne kwadraciki). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.topSlots.x }, { translateY: adjust.topSlots.y }, { scale: adjust.topSlots.scale }] }]}>
               <PressableScale onPress={onBuyFreeze} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
+                <RadialGlow size={40} color="#000" opacity={0.4} />
                 <Snowflake size={24} color="#7DD3FC" />
                 {freezes > 0 && <View style={s.artSlotCountBadge}><Text style={s.artSlotBadgeTxt}>{freezes}</Text></View>}
                 <View style={s.artCostPill}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
@@ -392,6 +382,7 @@ export default function PetShop() {
                 const PotionIcon = POTION_ICON[def.kind];
                 return (
                   <PressableScale key={def.kind} onPress={() => onBuyPotion(def.kind)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
+                    <RadialGlow size={38} color="#000" opacity={0.4} />
                     <PotionIcon size={22} color={def.color} style={!afford && !active ? { opacity: 0.5 } : undefined} />
                     {active
                       ? <View style={[s.artSlotBadge, { backgroundColor: def.color }]}><Text style={s.artSlotBadgeTxt}>{fmtPotionCountdown(activePotion!.endsAt)}</Text></View>
@@ -411,14 +402,19 @@ export default function PetShop() {
             wewnątrz komponentu, więc obsługa dotyku byłaby martwym kodem. */}
         <View style={{ alignItems: 'center', marginTop: spacing[3], marginBottom: spacing[3] }}>
           <View style={{ transform: [{ translateX: adjust.cat.x }, { translateY: adjust.cat.y }, { scale: adjust.cat.scale }] }}>
-            {/* Efekt głębi (2026-09-08, user: "ten sklepikarz nie był tak płasko z tym
-                obrazkiem") — ten sam duet co sprite'y w boss-fight.tsx ("high-end fight
-                scene", 2026-09-06): miękka poświata w kolorze futra ZA kotkiem (odcina
-                sylwetkę od ruchliwego tła sceny) + eliptyczny cień POD łapkami (kotek
-                wygląda jak STOI na ladzie, nie jak wklejony płasko na obrazek). */}
+            {/* Efekt głębi — POPRAWKA (2026-09-08, user: "cień za sklepikarzem miał być a
+                dałeś na sklepikach jakiś prostokąt xdd... miała być głębia"). Pierwsza
+                próba skopiowała 1:1 duet z boss-fight.tsx: poświata + `GroundShadow`
+                (eliptyczny cień POD ŁAPKAMI). Problem: `GroundShadow` ma sens tylko gdy
+                sprite STOI w całości widoczny na podłodze (jak boss/kotek w arenie) —
+                sklepikarz jest wycięty w POŁOWIE (widać go tylko od klatki piersiowej w
+                górę, WYSTAJĄCEGO zza lady), więc żadnych łap/podłogi nie widać, a eliptyczny
+                cień renderował się mniej więcej NA WYSOKOŚCI lady — stąd "jakiś prostokąt"
+                zamiast realnego cienia. Naprawa: `GroundShadow` USUNIĘTY, zostaje WYŁĄCZNIE
+                `RadialGlow` (miękka, kolista poświata w kolorze futra ZA całą sylwetką) —
+                to jedyny z pary, który ma sens w tej kompozycji "wystający zza lady". */}
             <View style={{ width: catSize, height: catSize, alignItems: 'center', justifyContent: 'center' }}>
-              <RadialGlow size={catSize * 1.5} color={SHOPKEEPER_PALETTE.coat} opacity={0.2} />
-              <GroundShadow width={catSize * 0.62} height={catSize * 0.18} opacity={0.45} />
+              <RadialGlow size={catSize * 1.6} color={SHOPKEEPER_PALETTE.coat} opacity={0.28} />
               <CatArt size={catSize} palette={SHOPKEEPER_PALETTE} shopkeeper />
             </View>
           </View>
@@ -470,20 +466,20 @@ export default function PetShop() {
                   </PressableScale>
                 );
               })}
-              {/* Dolny rząd lady (2026-09-08, przeniesione z tablicy — patrz komentarz przy
-                  górnej warstwie slotów wyżej) — skrzynka dnia (darmowa) + 3 skrzynki gacha
-                  (LOOT_BOXES), teraz na `RYNEK_BOTTOM_SLOTS[4..7]` (EKSTRAPOLOWANE
-                  współrzędne, patrz komentarz w rynekArt.ts). */}
-              <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[4])]}>
-                <Gift size={22} color={dailyReady ? '#FBBF24' : c.text.muted} />
-                {dailyReady
-                  ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
-                  : <View style={[s.artSlotCheck, { backgroundColor: c.text.muted }]}><Check size={11} color="#0B0E1A" strokeWidth={3} /></View>}
-              </PressableScale>
+              {/* Dolny rząd lady (2026-09-08, przeniesiony z tablicy) — DOKŁADNIE 4 rodzaje
+                  skrzyń, user: "zostawiłeś skrzynkę dnia miała być ta nowa, DREWNIANA,
+                  ZELAZNA, ZLOTA, BOSKA" — darmowa skrzynka dnia NIE jest już tu (zostaje
+                  dostępna z hero-karty na `/pet` i wskaźnika na dashboardzie, patrz
+                  `app/pet.tsx`/`app/(tabs)/index.tsx` — `claimDailyBox`/`DAILY_BOX` bez
+                  zmian, tylko usunięty DRUGI, zduplikowany trigger tutaj). Dokładnie 4
+                  `LOOT_BOXES` (sardine/iron/gold/divine, patrz `petBoxes.ts`) na
+                  `RYNEK_BOTTOM_SLOTS[4..7]` (EKSTRAPOLOWANE współrzędne, patrz komentarz w
+                  rynekArt.ts). */}
               {LOOT_BOXES.map((box, i) => {
                 const afford = coins >= box.cost;
                 return (
-                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 5])]}>
+                  <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 4])]}>
+                    <RadialGlow size={44} color="#000" opacity={0.4} />
                     <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
                     <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                   </PressableScale>
@@ -719,19 +715,25 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // teraz miejsce kafelka dyktuje grafika, nie flex-wrap.
   artPiece: { position: 'relative' },
   artSlot: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  // Ciemne tło slotu bez rzadkości (skrzynka dnia + 3 skrzynki) — 2026-09-05, user: "sloty
-  // muszą mieć jaśniejsze lub ciemniejsze lepiej ciemniejsze tło żeby zwiększyć kontrast
-  // itemów". Okno na grafice jest samo w sobie przezroczyste (przebija ruchliwe tło sklepu),
-  // więc bez tego ikony/emoji ledwo widać. `inset` zamiast absoluteFillObject — mały margines
-  // (4%) żeby ciemny prostokąt nie wychodził poza obrys okna narysowanego na grafice.
-  // Jedno wspólne tło POD CAŁĄ tablicą/ladą (2026-09-08, user: "miałeś zrobić wypełnienie
-  // pod slotami czyli pod grafiką dać jeden większy prostokąt... nie próbowałeś dopasować
-  // idealnie kwadraciki nie???" — poprzednia wersja, `artSlotBg`, była DOKŁADNIE tym czego
-  // user nie chciał: osobny mały kwadracik pod KAŻDYM slotem). Renderowany jako PIERWSZE
-  // dziecko `s.artPiece` (więc pod obrazkiem/slotami w z-order), rozmiaru niemal całego
-  // kontenera — jedna spójna podkładka zamiast wielu małych, żeby okna wycięte w grafice nie
-  // przebijały ruchliwej sceny Rynku pod spodem.
-  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.4)' },
+  // Jedno wspólne, STAŁE brązowe tło POD CAŁĄ tablicą/ladą (2026-09-08 — dwie poprawki pod
+  // rząd: (1) user: "miałeś zrobić wypełnienie pod slotami czyli pod grafiką dać jeden
+  // większy prostokąt... nie próbowałeś dopasować idealnie kwadraciki nie???" — poprzednia
+  // wersja, per-slot `artSlotBg`, była dokładnie tym czego user NIE chciał: osobny mały
+  // kwadracik pod KAŻDYM slotem; (2) user po tamtej poprawce: "tło jest nadal przezroczyste
+  // a miało być stałe brązowe" — `rgba(0,0,0,0.4)` czytało się jako blady/przezroczysty
+  // odcień czerni, nie jako spójny brąz sklepiku, więc kolor zmieniony na PRAWIE
+  // nieprzezroczysty ciepły brąz). Renderowany jako PIERWSZE dziecko `s.artPiece` (więc pod
+  // obrazkiem/slotami w z-order), rozmiaru niemal całego kontenera — okna wycięte w grafice
+  // (RYNEK_TOP/RYNEK_BOTTOM) mają teraz spójną, nieprzezroczystą podkładkę zamiast
+  // przebijającej ruchliwej sceny Rynku pod spodem.
+  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: '#2A1B0EF0' },
+  // Miękki cień ZA ikoną/emoji slotu (2026-09-08, user: "ikonki mają nie mieć tła, tylko
+  // lekki cień z tyłu") — CELOWO nie natywny `shadowColor`/`elevation` na samej ikonie:
+  // ikony to przezroczyste SVG (lucide), a natywny cień RN liczy się z PROSTOKĄTA layoutu
+  // (zwłaszcza `elevation` na Androidzie), więc dałby brzydki kwadratowy cień zamiast
+  // otulić kształt ikony. Zamiast tego renderowany jako `<RadialGlow color="#000".../>`
+  // (ten sam trik co reszta "głębi" w apce) tuż PRZED ikoną w tym samym wyśrodkowanym
+  // `s.artSlot` — miękka, kolista, wtapiająca się w tło poświata, nie twardy prostokąt.
   artSlotImg: { width: '62%', height: '62%' },
   artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   // Liczba posiadanych (np. zamrożeń) w rogu slotu — ten sam róg co `artSlotCheck`, ale
