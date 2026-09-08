@@ -4469,6 +4469,25 @@ pokaże, czy ekstrapolacja trafiła); (b) kupno każdej z 3 potek → badge na `
 poprawny kolor/nazwę/odliczanie; (c) walka z bossem z aktywną potką ATK/HP → widoczna różnica
 w "Siła bojowa"; (d) potka XP aktywna → quest/walka faktycznie daje więcej XP niż zwykle.
 
+## 48. Rynek — tło slotów: JEDEN duży prostokąt, nie kwadraciki per slot (korekta §46 pkt 4) — 2026-09-08
+
+User, natychmiast po PR #158: "no to hujowo bo nie tak chciałem... miałeś zrobic wypełnienie
+pod slotami czyli pod grafika dać jeden większy prostokąt pod tym co mamy teraz zeby sloty nie
+byly przezroczyste". §46 pkt 4 źle zinterpretowany — "tło pod slotami" NIE znaczyło "osobny
+mały kwadracik pod każdą ikoną" (`artSlotBg`, wciąż tam zostawiony na tablicy), tylko JEDNO
+duże tło za CAŁĄ grafiką tablicy/lady.
+
+Naprawa (`app/pet-shop.tsx`): `artSlotBg` (per-slot, `top/left/right/bottom: 4%` wewnątrz
+KAŻDEGO `s.artSlot`) usunięty ZE WSZYSTKICH miejsc gdzie jeszcze był (tablica: Zamrożenie +
+3 potki; lada: skrzynka dnia + 3 LOOT_BOXES w dolnym rzędzie — Sklep dnia w górnym rzędzie już
+wcześniej nie miał tła, zgodnie z §46 pkt 4 drugą połową). Zamiast tego nowy `s.boardBg` —
+JEDEN prostokąt (`top/left/right/bottom: 2%`, `rgba(0,0,0,0.4)`, zaokrąglone rogi) jako
+PIERWSZE dziecko `s.artPiece` (czyli pod obrazkiem i slotami w z-order), rozmiaru niemal
+całego kontenera tablicy/lady — renderowany RAZ per plansza, nie osiem razy per slot. Stary,
+teraz martwy styl `artSlotBg` usunięty z arkusza.
+
+`tsc`/`jest` bez zmian w liczbie testów (69 suit/873, czysto wizualna korekta stylu).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

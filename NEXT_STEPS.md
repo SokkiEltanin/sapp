@@ -13,8 +13,11 @@ User przesłał zrzut ekranu sklepu z pięcioma prośbami naraz. Pełny opis w A
    obrazek) + restylowana jako drewniana tabliczka szyldu.
 3. Sklepikarz dostał `RadialGlow`+`GroundShadow` (ten sam duet co sprite'y w boss-fight.tsx)
    — nie wygląda już płasko wklejony.
-4. Tło slotu USUNIĘTE dla itemów Sklepu dnia na ladzie (mają własną szczegółową ikonę),
-   ZOSTAJE dla generycznych ikon/skrzynek na tablicy.
+4. Tło slotu — **poprawione DWA RAZY** (pierwsza próba źle zrozumiana, user: "nie tak
+   chciałem... miałeś zrobić jeden większy prostokąt pod tym co mamy, nie kwadraciki").
+   Finalnie: JEDNO duże tło (`s.boardBg`) za CAŁĄ grafiką tablicy/lady (pierwsze dziecko
+   `s.artPiece`, ~cały kontener), żadnych osobnych kwadracików pod pojedynczymi slotami
+   (`artSlotBg` całkiem usunięty z pliku).
 5. **Potki czasowe** — nowy system: górne 4 sloty tablicy = Zamrożenie serii + 3 potki
    (HP +20 flat/24h, ATK +15%/24h, XP +25%/24h — świadomie umiarkowany balans, DO
    SKORYGOWANIA po realnym teście). Dolne sloty lady rozszerzone z 4 na 8 (górny rząd =

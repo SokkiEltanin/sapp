@@ -357,6 +357,14 @@ export default function PetShop() {
             stałe na ekranie. */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: topW, height: topH, alignSelf: 'center' }]}>
+            {/* Tło POD CAŁĄ tablicą (2026-09-08, user: "miałeś zrobić wypełnienie pod
+                slotami czyli pod grafiką dać jeden większy prostokąt... żeby sloty nie były
+                przezroczyste" — poprzednia próba to był osobny mały kwadracik pod KAŻDYM
+                slotem, nie to co user chciał). JEDEN duży, płaski prostokąt, PIERWSZE dziecko
+                (więc pod obrazkiem/slotami w z-order), rozmiaru całego `artPiece` — okna
+                wycięte w `RYNEK_TOP` mają teraz stałą, spójną podkładkę zamiast przebijającej
+                się ruchliwej sceny Rynku pod spodem. */}
+            <View style={s.boardBg} />
             {/* Warstwa OBRAZKA — własne x/y z `adjust.top`, niezależne od siatki slotów pod
                 spodem (patrz komentarz przy `ArtAdjust` u góry pliku, draft 3). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.top.x }, { translateY: adjust.top.y }, { scale: adjust.top.scale }] }]}>
@@ -369,10 +377,11 @@ export default function PetShop() {
                 skrzynka dnia + 3 loot-boxy PRZENIESIONE do dolnego rzędu lady (patrz niżej,
                 `RYNEK_BOTTOM_SLOTS[4..7]`), bo tablica ma teraz Zamrożenie + 3 potki. Ikony
                 potek to na razie placeholder z lucide (user: "ja zrobię grafiki pod
-                skrzynki") — do podmiany na własne ikony gdy user je dostarczy. */}
+                skrzynki") — do podmiany na własne ikony gdy user je dostarczy. Per-slot
+                `artSlotBg` USUNIĘTY (patrz `s.boardBg` wyżej — jedno wspólne tło zastępuje
+                osobne kwadraciki). */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.topSlots.x }, { translateY: adjust.topSlots.y }, { scale: adjust.topSlots.scale }] }]}>
               <PressableScale onPress={onBuyFreeze} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[0])]}>
-                <View style={s.artSlotBg} />
                 <Snowflake size={24} color="#7DD3FC" />
                 {freezes > 0 && <View style={s.artSlotCountBadge}><Text style={s.artSlotBadgeTxt}>{freezes}</Text></View>}
                 <View style={s.artCostPill}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{FREEZE_COST}</Text></View>
@@ -383,7 +392,6 @@ export default function PetShop() {
                 const PotionIcon = POTION_ICON[def.kind];
                 return (
                   <PressableScale key={def.kind} onPress={() => onBuyPotion(def.kind)} style={[s.artSlot, pctStyle(RYNEK_TOP_SLOTS[i + 1])]}>
-                    <View style={s.artSlotBg} />
                     <PotionIcon size={22} color={def.color} style={!afford && !active ? { opacity: 0.5 } : undefined} />
                     {active
                       ? <View style={[s.artSlotBadge, { backgroundColor: def.color }]}><Text style={s.artSlotBadgeTxt}>{fmtPotionCountdown(activePotion!.endsAt)}</Text></View>
@@ -425,6 +433,8 @@ export default function PetShop() {
             pigułka nad ladą zamiast pełnego zdania. ── */}
         <View style={{ gap: spacing[2] }}>
           <View style={[s.artPiece, { width: botW, height: botH, alignSelf: 'center' }]}>
+            {/* Tło POD CAŁĄ ladą — patrz identyczny komentarz przy tablicy wyżej (`s.boardBg`). */}
+            <View style={s.boardBg} />
             {/* Warstwa OBRAZKA — patrz analogiczny komentarz przy tablicy wyżej. */}
             <View style={[StyleSheet.absoluteFillObject, { transform: [{ translateX: adjust.bottom.x }, { translateY: adjust.bottom.y }, { scale: adjust.bottom.scale }] }]}>
               <Image source={RYNEK_BOTTOM} style={StyleSheet.absoluteFillObject} resizeMode="contain" />
@@ -465,7 +475,6 @@ export default function PetShop() {
                   (LOOT_BOXES), teraz na `RYNEK_BOTTOM_SLOTS[4..7]` (EKSTRAPOLOWANE
                   współrzędne, patrz komentarz w rynekArt.ts). */}
               <PressableScale onPress={onDailyBox} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[4])]}>
-                <View style={s.artSlotBg} />
                 <Gift size={22} color={dailyReady ? '#FBBF24' : c.text.muted} />
                 {dailyReady
                   ? <View style={s.artSlotBadge}><Text style={s.artSlotBadgeTxt}>ODBIERZ</Text></View>
@@ -475,7 +484,6 @@ export default function PetShop() {
                 const afford = coins >= box.cost;
                 return (
                   <PressableScale key={box.id} onPress={() => onBuyBox(box)} style={[s.artSlot, pctStyle(RYNEK_BOTTOM_SLOTS[i + 5])]}>
-                    <View style={s.artSlotBg} />
                     <Text style={[s.boxEmoji, !afford && { opacity: 0.5 }]}>{box.emoji}</Text>
                     <View style={[s.artCostPill, !afford && { opacity: 0.5 }]}><Coins size={9} color="#FBBF24" /><Text style={s.buyPillTxt}>{box.cost}</Text></View>
                   </PressableScale>
@@ -716,7 +724,14 @@ const makeS = themedStyles((c: any) => StyleSheet.create({
   // itemów". Okno na grafice jest samo w sobie przezroczyste (przebija ruchliwe tło sklepu),
   // więc bez tego ikony/emoji ledwo widać. `inset` zamiast absoluteFillObject — mały margines
   // (4%) żeby ciemny prostokąt nie wychodził poza obrys okna narysowanego na grafice.
-  artSlotBg: { position: 'absolute', top: '4%', left: '4%', right: '4%', bottom: '4%', borderRadius: radius.md, backgroundColor: 'rgba(0,0,0,0.5)' },
+  // Jedno wspólne tło POD CAŁĄ tablicą/ladą (2026-09-08, user: "miałeś zrobić wypełnienie
+  // pod slotami czyli pod grafiką dać jeden większy prostokąt... nie próbowałeś dopasować
+  // idealnie kwadraciki nie???" — poprzednia wersja, `artSlotBg`, była DOKŁADNIE tym czego
+  // user nie chciał: osobny mały kwadracik pod KAŻDYM slotem). Renderowany jako PIERWSZE
+  // dziecko `s.artPiece` (więc pod obrazkiem/slotami w z-order), rozmiaru niemal całego
+  // kontenera — jedna spójna podkładka zamiast wielu małych, żeby okna wycięte w grafice nie
+  // przebijały ruchliwej sceny Rynku pod spodem.
+  boardBg: { position: 'absolute', top: '2%', left: '2%', right: '2%', bottom: '2%', borderRadius: radius.lg, backgroundColor: 'rgba(0,0,0,0.4)' },
   artSlotImg: { width: '62%', height: '62%' },
   artSlotCheck: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   // Liczba posiadanych (np. zamrożeń) w rogu slotu — ten sam róg co `artSlotCheck`, ale
