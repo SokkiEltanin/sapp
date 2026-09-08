@@ -4612,6 +4612,36 @@ pensji → kolejny przelew od niego powinien wpaść jako [JD] bez zatwierdzania
 "prąd" do szablonu PGE, zobacz czy Finanse → filtr rachunków go łapie; (e) edytuj istniejący
 szablon, sprawdź że zmiany się zapisały.
 
+## 51. "Czasami nie łapie powiadomienia" (wypłata) — zbadane, parser działa poprawnie — 2026-09-08
+
+User: "czasami mi nie łapie z powiadomienia np tego ze wypłaty" + realny przykład (tytuł
+"Wpływ", treść "Wpłynęło 3752,78 PLN na konto *6332 od MARKETING INVESTMENT GROUP SA. Bank
+Pekao S.A."). Zgodnie z REGUŁĄ z §7 ("nie łapie" ≠ bug parsera — najpierw test na dokładnym
+stringu) — napisany i uruchomiony realny test na TĘ DOKŁADNĄ parę tytuł/treść: `parseBankNotification`
+zwraca poprawny wynik (`amount: 3752.78`, `direction: 'in'`, `store: 'MARKETING INVESTMENT
+GROUP SA'`) — **parser NIE jest tu winny**. Sprawdzone też: pakiet Pekao/PeoPay jest już na
+liście `BANK_PACKAGES` (natywny nasłuch łapie po samej nazwie pakietu, `looksLikeBankPayment`
+to tylko fallback dla NIEznanych pakietów, więc nie blokuje).
+
+Najbardziej prawdopodobne wyjaśnienie (nie zweryfikowane bez dostępu do urządzenia): natywny
+`NotificationListenerService` bywa usypiany/odłączany przez system (Android OEM battery
+management) i traci pojedyncze powiadomienia zanim `bankNotificationDrain.ts` zdąży je
+odczytać — DOKŁADNIE to, co istniejąca diagnostyka w Ustawieniach ("Sprawdź teraz
+(diagnostyka)", `peekBankCapture()`) już próbuje wykryć (czy nasłuch w ogóle coś odbiera).
+Alternatywnie: powiadomienie MOGŁO trafić do kolejki, ale jako "niepewne" (duży, nieznany
+nadawca przychodzący, `amount > 1500` → `uncertain: true` → wymaga ręcznego zatwierdzenia w
+"Płatności do zatwierdzenia", nie księguje się samo) — to nie jest "nie złapało", tylko
+"czeka na potwierdzenie", łatwe do pomylenia.
+
+Zamiast zgadywać fix bez dowodu, dodany trwały test regresyjny (`__tests__/bankNotification.test.ts`,
+dokładnie ten string user'a) — chroni przed przyszłą regresją w tej konkretnej ścieżce
+(tytuł "Wpływ" jako osobne pole + wieloczłonowy nadawca-spółka z kropką na końcu, "SA."). Jeśli
+user zauważy to znowu, priorytet: sprawdzić diagnostykę w Ustawieniach W MOMENCIE gdy się to
+zdarzy (czy nasłuch w ogóle coś widział) ORAZ sprawdzić kolejkę "Płatności do zatwierdzenia"
+zanim założymy że to nowy bug parsera.
+
+`tsc`/`jest` zielone (69 suit/885 testów, +1 nowy).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,

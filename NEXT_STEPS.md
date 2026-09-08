@@ -3,6 +3,27 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 "Czasami nie łapie powiadomienia z banku" — zbadane, parser OK, przyczyna gdzie indziej — NIEsprawdzone (2026-09-08)
+
+User: "czasami mi nie łapie z powiadomienia np tego ze wypłaty" + realny przykład (tytuł
+"Wpływ", "Wpłynęło 3752,78 PLN na konto *6332 od MARKETING INVESTMENT GROUP SA. Bank Pekao
+S.A."). Pełny opis w ARCHITECTURE.md §51. Napisany realny test na TĘ DOKŁADNĄ treść —
+`parseBankNotification` parsuje ją poprawnie (amount/direction/store), więc to NIE bug
+parsera. Dwa najbardziej prawdopodobne wyjaśnienia (żadne niezweryfikowane bez urządzenia w
+danym momencie): (a) natywny nasłuch powiadomień bywa usypiany przez Androida (OEM battery
+management) i gubi pojedyncze powiadomienia zanim apka je odczyta — ISTNIEJĄCA diagnostyka w
+Ustawieniach ("Sprawdź teraz") to sprawdza; (b) powiadomienie MOGŁO trafić do kolejki, ale
+jako "niepewne" (duży, nieznany nadawca przychodzący → wymaga ręcznego zatwierdzenia w
+"Płatności do zatwierdzenia"), co łatwo pomylić z "w ogóle nie złapało".
+
+Dodany trwały test regresyjny (`__tests__/bankNotification.test.ts`) na dokładnie ten
+przypadek (tytuł "Wpływ" jako osobne pole + wieloczłonowy nadawca-spółka z kropką, "SA.").
+
+**Priorytet, jeśli się powtórzy**: w MOMENCIE gdy user zauważy że czegoś brakuje — sprawdzić
+Ustawienia → Auto-wydatki z banku → "Sprawdź teraz (diagnostyka)" (czy nasłuch cokolwiek
+widział) ORAZ kolejkę "Płatności do zatwierdzenia" (czy tam czeka, tylko niepotwierdzona),
+zanim założymy nowy bug parsera.
+
 ## 🆕 Trudność bossów #11+ ×2, droprate perków podbity, szablony banku rozszerzone — NIEsprawdzone (2026-09-08)
 
 Trzy niezależne prośby w jednej wiadomości. Pełny opis w ARCHITECTURE.md §50.
