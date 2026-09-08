@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '@/types';
-import { matchedEatDays } from '@/store/countersStore';
+import { matchedEatDays, resolveAvoidKeyword } from '@/store/countersStore';
 
 const HABITS_KEY = 'habits_list';
 const cntKey    = (date: string) => `habits_cnt_${date}`;
@@ -120,9 +120,14 @@ export function computeAvoidCounts(
   if (avoidHabits.length === 0) return { merged: existing, changed: [] };
   const catByProductId: Record<string, string | undefined> = {};
   for (const p of products) catByProductId[p.id] = p.cat;
+  // Resolve LIVE (2026-09-08 stale-keyword fix, see resolveAvoidKeyword) instead of the frozen
+  // `avoidKeyword` copy — a habit created before a preset gained a new word must still catch it.
+  const resolvedByHabitId = new Map<string, string>();
   const brokenByKeyword = new Map<string, Set<string>>();
   for (const h of avoidHabits) {
-    if (!brokenByKeyword.has(h.avoidKeyword!)) brokenByKeyword.set(h.avoidKeyword!, matchedEatDays(h.avoidKeyword!, meals, catByProductId));
+    const resolved = resolveAvoidKeyword(h.avoidKeyword, h.avoidPresetKey)!;
+    resolvedByHabitId.set(h.id, resolved);
+    if (!brokenByKeyword.has(resolved)) brokenByKeyword.set(resolved, matchedEatDays(resolved, meals, catByProductId));
   }
   const merged: Record<string, Record<string, number>> = { ...existing };
   const changed: [string, Record<string, number>][] = [];
@@ -130,7 +135,7 @@ export function computeAvoidCounts(
     const dayCounts = { ...(existing[date] ?? {}) };
     let dirty = false;
     for (const h of avoidHabits) {
-      const broke = brokenByKeyword.get(h.avoidKeyword!)!.has(date);
+      const broke = brokenByKeyword.get(resolvedByHabitId.get(h.id)!)!.has(date);
       const want = broke ? 0 : 1;
       if ((dayCounts[h.id] ?? 0) !== want) { dayCounts[h.id] = want; dirty = true; }
     }

@@ -50,10 +50,35 @@ export function useWorkEarnings(
 ): WorkEarningsResult {
   const [tick, setTick] = useState(0);
 
+  // 2026-09-08, user: "znowu laguje... index znowu ma 5k linijek" — traced to this interval
+  // firing unconditionally, forever, at 1Hz — since `tick` feeds this hook's final composed
+  // result, every `setTick` forced a full re-render of the entire Dashboard (app/(tabs)/index.tsx,
+  // ~5000 lines), once a second, for as long as the screen stayed mounted — including backgrounded
+  // on another tab, and even when NO shift/event was active at all. `isWorkingNow` is a cheap,
+  // tick-independent check ("is a shift/event covering right now") used only to size the interval:
+  // 1s while actually working (unchanged — the live earnings counter needs that granularity), 60s
+  // otherwise (still catches a shift starting within a minute, at ~1.7% of the previous render cost).
+  const isWorkingNow = useMemo(() => {
+    const today = todayStr();
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    if (settings.workColor || settings.workPrefix) {
+      const wc = settings.workColor;
+      const wp = settings.workPrefix?.trim().toLowerCase();
+      return events.some(e => {
+        if (!e.date.startsWith(today) || !isWorkEvent(e, { workColor: wc, workPrefix: wp })) return false;
+        const r = shiftClockRange(e);
+        if (!r) return false;
+        return timeToMins(r.start) <= nowMins && nowMins <= timeToMins(r.end);
+      });
+    }
+    return shifts.some(s => s.date === today && nowMins >= timeToMins(s.startTime) && nowMins <= timeToMins(s.endTime));
+  }, [shifts, events, settings.workColor, settings.workPrefix, tick]);
+
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
+    const id = setInterval(() => setTick(t => t + 1), isWorkingNow ? 1000 : 60000);
     return () => clearInterval(id);
-  }, []);
+  }, [isWorkingNow]);
 
   // ── Salary from income entries tagged with work prefix ───────────────────
   // Returns the most recent [prefix] paycheck amount AND the YYYY-MM month it

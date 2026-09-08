@@ -50,6 +50,7 @@ export default function Counters() {
   const [endDate, setEndDate] = useState('');   // until: optional event-window end (trip)
   const [emoji, setEmoji] = useState('');       // until: hopping marker (blank = walker)
   const [keyword, setKeyword] = useState('');
+  const [presetKey, setPresetKey] = useState<string | undefined>(undefined);
   const [trackMode, setTrackMode] = useState<'buy' | 'eat'>('eat');   // avoid: reset od zjedzenia / kupna
   const [onDash, setOnDash] = useState(true);
   const [pickCal, setPickCal] = useState(false);
@@ -66,11 +67,11 @@ export default function Counters() {
       .slice(0, 10);
   }, [events, gcalEvents]);
 
-  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setEmoji(''); setKeyword(''); setTrackMode('eat'); setOnDash(true); setPickCal(false); setOpen(true); };
+  const openAdd = () => { setEditing(null); setUiKind('until'); setName(''); setDate(''); setEndDate(''); setEmoji(''); setKeyword(''); setPresetKey(undefined); setTrackMode('eat'); setOnDash(true); setPickCal(false); setOpen(true); };
   const openEdit = (cn: Counter) => {
     setEditing(cn);
     setUiKind(cn.mode === 'auto' ? 'avoid' : cn.kind === 'until' ? 'until' : 'since');
-    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setEmoji(cn.emoji ?? ''); setKeyword(cn.keyword ?? ''); setTrackMode(cn.track ?? 'eat'); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
+    setName(cn.name); setDate(cn.date); setEndDate(cn.endDate ?? ''); setEmoji(cn.emoji ?? ''); setKeyword(cn.keyword ?? ''); setPresetKey(cn.presetKey); setTrackMode(cn.track ?? 'eat'); setOnDash(cn.onDashboard !== false); setPickCal(false); setOpen(true);
   };
 
   const canSave = !!name.trim() && (uiKind === 'avoid' ? !!keyword.trim() : !!date);
@@ -78,7 +79,7 @@ export default function Counters() {
     if (!canSave) return;
     haptic.success();
     if (uiKind === 'avoid') {
-      const patch = { kind: 'since' as const, mode: 'auto' as const, name: name.trim(), keyword: keyword.trim(), track: trackMode, onDashboard: onDash };
+      const patch = { kind: 'since' as const, mode: 'auto' as const, name: name.trim(), keyword: keyword.trim(), presetKey, track: trackMode, onDashboard: onDash };
       if (editing) update(editing.id, patch);
       else add({ ...patch, date: todayStr(), startDate: todayStr() });
     } else {
@@ -220,6 +221,7 @@ export default function Counters() {
                           haptic.tap();
                           const next = active ? parts.filter(x => x !== tag) : [...parts, tag];
                           setKeyword(next.join('|'));
+                          setPresetKey(undefined);
                           if (!name.trim() && !active) setName(tag);
                         }} activeOpacity={0.8}>
                         <Text style={[s.presetText, active && { color: ACCENT }]}>{tag}</Text>
@@ -230,17 +232,17 @@ export default function Counters() {
                 <Text style={s.fieldLabel}>…lub gotowe zestawy</Text>
                 <View style={s.presetRow}>
                   {AVOID_PRESETS.map(p => {
-                    const active = keyword === p.keyword;
+                    const active = presetKey === p.key;
                     return (
                       <TouchableOpacity key={p.key} style={[s.presetChip, active && { backgroundColor: ACCENT + '22', borderColor: ACCENT }]}
-                        onPress={() => { haptic.tap(); setKeyword(p.keyword); if (!name.trim()) setName(p.label); }} activeOpacity={0.8}>
+                        onPress={() => { haptic.tap(); setKeyword(p.keyword); setPresetKey(p.key); if (!name.trim()) setName(p.label); }} activeOpacity={0.8}>
                         <Text style={[s.presetText, active && { color: ACCENT }]}>{p.label}</Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
                 <Text style={s.fieldLabel}>…lub własne słowa (oddziel znakiem |)</Text>
-                <TextInput value={keyword} onChangeText={setKeyword} placeholder="np. cola|fanta|sprite" placeholderTextColor={c.text.muted} style={s.input} autoCapitalize="none" />
+                <TextInput value={keyword} onChangeText={(v) => { setKeyword(v); setPresetKey(undefined); }} placeholder="np. cola|fanta|sprite" placeholderTextColor={c.text.muted} style={s.input} autoCapitalize="none" />
                 <Text style={s.fieldLabel}>Zerować serię gdy…</Text>
                 <View style={s.trackRow}>
                   {([['eat', 'ZJEM to', 'liczy z „Co zjadłem"'], ['buy', 'KUPIĘ to', 'liczy z paragonów']] as const).map(([k, lbl, sub]) => {

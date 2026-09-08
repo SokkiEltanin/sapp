@@ -15,6 +15,9 @@ export interface Counter {
   icon?: string;      // optional lucide key (see counterIcons)
   mode?: 'auto';      // since only: 'days without X' auto-tracked
   keyword?: string;   // auto: '|'-separated keywords matched against expenses / meals
+  presetKey?: string; // auto: if chosen from AVOID_PRESETS, its `key` — resolved LIVE at read
+                       // time (see resolveAvoidKeyword) so future preset edits (new keywords)
+                       // reach already-created counters instead of freezing `keyword` forever
   track?: 'buy' | 'eat'; // auto: reset on BUYING (paragony) or EATING (Co zjadłem). Default 'eat'.
   onDashboard?: boolean; // show as a dashboard tile
   createdAt: string;
@@ -123,6 +126,35 @@ export const AVOID_PRESETS: { key: string; label: string; keyword: string }[] = 
   { key: 'energy',   label: 'energetyków', keyword: 'monster|red bull|redbull|tiger energy|energetyk|rockstar|burn ' },
 ];
 
+// 2026-09-08, user: "w streak wgle nie łapie ze zjadłem dzisiaj nutelle i nadal mam 20 dni mimo
+// ze juz ile razy jadłem coś" — root cause traced (background investigation): `Counter.keyword` /
+// `Habit.avoidKeyword` is a ONE-TIME COPY of an `AVOID_PRESETS[].keyword` string taken the moment
+// the user tapped a preset chip. Editing `AVOID_PRESETS` afterward (e.g. appending "nutella" on
+// 09-06) never reaches an already-created counter/habit — matching always reads the frozen copy,
+// so any tracker made before a keyword addition just silently stops catching the new word forever.
+// Fix going forward: `presetKey`/`avoidPresetKey` is stored alongside the copy, and this resolver
+// prefers the LIVE preset string over the frozen one whenever a presetKey is present.
+// Fix for counters/habits created BEFORE this change (no presetKey stored, so nothing above helps
+// them): if every term of the stored keyword is already contained in a CURRENT preset's term set
+// (AVOID_PRESETS only ever grows — terms get appended, never removed), that tracker almost
+// certainly originated from that preset at an older point in time; resolve it to the live string
+// too. Guarded to >=2 terms so a deliberately narrow single-word custom keyword (rare, but
+// possible) doesn't get silently widened by coincidence.
+export function resolveAvoidKeyword(keyword: string | undefined, presetKey?: string): string | undefined {
+  if (presetKey) {
+    const preset = AVOID_PRESETS.find(p => p.key === presetKey);
+    if (preset) return preset.keyword;
+  }
+  if (!keyword) return keyword;
+  const terms = keyword.split('|').map(t => t.trim()).filter(Boolean);
+  if (terms.length < 2) return keyword;
+  for (const p of AVOID_PRESETS) {
+    const liveTerms = new Set(p.keyword.split('|').map(t => t.trim()).filter(Boolean));
+    if (terms.every(t => liveTerms.has(t))) return p.keyword;
+  }
+  return keyword;
+}
+
 type MatchExpense = { type?: string; date?: string; note?: string; tags?: string[]; storeName?: string; receiptItems?: { name?: string; tags?: string[] }[] };
 
 export function matchesAvoid(text: string, keyword: string): boolean {
@@ -193,8 +225,9 @@ export function autoDaysWithout(
   const track = c.track ?? 'eat';
   const catByProductId: Record<string, string | undefined> = {};
   for (const p of products) catByProductId[p.id] = p.cat;
-  const last = c.keyword
-    ? (track === 'buy' ? autoLastDate(c.keyword, expenses) : autoLastEatDate(c.keyword, meals, catByProductId))
+  const kw = resolveAvoidKeyword(c.keyword, c.presetKey);
+  const last = kw
+    ? (track === 'buy' ? autoLastDate(kw, expenses) : autoLastEatDate(kw, meals, catByProductId))
     : null;
   const from = last ?? (c.startDate || c.createdAt.slice(0, 10));
   return Math.max(0, Math.floor((now - atMidnight(from)) / MS_DAY));
