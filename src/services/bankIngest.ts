@@ -2,6 +2,7 @@ import { parseBankNotification } from '@/utils/bankNotification';
 import { loadMerchantMemory, merchantFor, guessCategory } from '@/utils/merchantMemory';
 import { isKnownPaycheckSender } from '@/utils/paycheckSenders';
 import { useBankQueue } from '@/store/bankQueueStore';
+import { useBankRules, matchBankRule } from '@/store/bankRulesStore';
 
 // Turn one bank push notification into a queued, pre-categorised payment. Safe to call
 // from a headless task (uses zustand + AsyncStorage, both work with the app closed).
@@ -52,7 +53,13 @@ export async function ingestBankNotification(title: string, text: string): Promi
 
   const mem = await loadMerchantMemory();
   const learned = merchantFor(tx.storeKey, mem);
-  const category = learned?.category ?? guessCategory(tx.store);
+  // Nauczony `merchantMemory` (z realnie zaakceptowanej płatności) jest najbardziej
+  // wiarygodny i wygrywa zawsze. Jeśli sklep jeszcze nieznany, sprawdź user'a szablony
+  // (Ustawienia → Auto-wydatki z banku → Szablony powiadomień) — pozwalają z góry
+  // zadeklarować kategorię dla nadawcy, zanim padnie pierwsza płatność (np. "anthropic"/
+  // "claude" → Subskrypcje, "pge" → Mieszkanie) — dopiero potem sztywny słownik-zgadywacz.
+  const rule = learned ? undefined : matchBankRule(tx.store, tx.raw, useBankRules.getState().rules);
+  const category = learned?.category ?? rule?.category ?? guessCategory(tx.store);
   // Verify better, but never critically drop: auto-book the usual card payment. Only
   // genuinely WEIRD ones ask — an unusually large amount (a common sign of a mis-parsed
   // figure, e.g. 10,18 read as 1018). A missing merchant name is NOT weird enough to
@@ -61,13 +68,13 @@ export async function ingestBankNotification(title: string, text: string): Promi
   const flagReason = uncertain ? 'nietypowo wysoka kwota — potwierdź' : undefined;
   return store.enqueue({
     ...tx,
-    store: learned?.name ?? tx.store,
+    store: learned?.name ?? rule?.name ?? tx.store,
     category,
     suggestedCategory: category,
     // Recognised merchant with saved tags (2026-08-24, user: "chciałbym móc jej nadać że
     // to jest opłata za internet, żeby mi łapało jak z wypłatą") — auto-carried onto every
     // future payment from this recipient, same as the learned category above.
-    ...(learned?.tags?.length ? { tags: learned.tags } : {}),
+    ...(learned?.tags?.length ? { tags: learned.tags } : (rule?.tags?.length ? { tags: rule.tags } : {})),
     // Full autopilot logs every card payment straight away; otherwise a merchant has to
     // earn trust (5 clean accepts) before its payments skip review — and uncertain ones
     // always fall back to review regardless.
