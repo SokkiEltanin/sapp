@@ -3,6 +3,34 @@
 Ten plik to zrzut z sesji na PC przed przejściem na zdalną pracę z telefonu (claude.ai/code).
 Aktualizuj/kasuj pozycje w miarę ogarniania, nie zostawiaj martwych wpisów.
 
+## 🆕 Dashboard perf runda 2 — `<StatTile>` wydzielony i zmemoizowany — NIEsprawdzone (2026-09-08)
+
+User: "teraz musimy zająć się optymalizacją". Kontynuacja poprzedniego wpisu (1Hz-timer, PR
+#163) — audyt z tamtej rundy wskazał custom stat tiles jako drugi/trzeci co do wielkości
+hotspot, świadomie wtedy odłożony. Pełny opis w ARCHITECTURE.md §55.
+
+`renderStatTile` (~430 linii, każdy kafelek do 8 pełnych skanów historii wydatków) wydzielony
+do `src/components/dashboard/StatTile.tsx`, owinięty w `React.memo` — teraz odpala się TYLKO
+gdy realnie zmienił się kafelek/statCtx/motyw, nie na każdym renderze dashboardu. Świadomie NIE
+zmemoizowano całego bloku `nodes` (~1040 linii) ręcznym `useMemo` — bez działającego
+`eslint-plugin-react-hooks` w tym repo (sprawdzone, brak configu) ręczna tablica zależności do
+bloku tej wielkości to realne ryzyko cichego "stale closure" bez możliwości zweryfikowania bez
+urządzenia. `React.memo` na wydzielonym komponencie jest bezpieczniejszy (React porównuje
+propsy sam) i to sprawdzony wzorzec już użyty gdzie indziej w tym pliku.
+
+`tsc`/`jest` zielone (69 suit/895 testów, +4 nowe w `dashboardFormat.test.ts` — `fmtStat`/
+`fmtWave`/`unitChip`/`periodCaption` wcześniej miały ZERO pokrycia mimo używania w każdym
+custom stat tile).
+
+**Priorytet testu na urządzeniu**: (a) dashboard z kilkoma custom stat tiles skonfigurowanymi
+(zwłaszcza pixels/wave/compare) — każdy typ ma wyglądać identycznie jak przed zmianą, zero
+zmian w logice, czysta ekstrakcja; (b) strzałki zmiany roku na kafelku pixels dalej działają;
+(c) ogólne odczucie płynności dashboardu z kilkoma kafelkami skonfigurowanymi. **Jeśli lag
+wróci mimo tego**: kolejny krok to albo naprawa `eslint-plugin-react-hooks` w repo (osobny,
+niezwiązany problem — `npx eslint` w ogóle nie znajduje configu), żeby dało się bezpiecznie
+memoizować resztę `nodes`, albo wydzielenie kolejnych pojedynczych sekcji tym samym wzorcem co
+`<StatTile>`.
+
 ## 🆕 Rynek: sloty skrzynek wyżej + naprawa wystającego tła + mocniejszy cień itemów — NIEsprawdzone (2026-09-08)
 
 User przesłał kolejny zrzut ekranu po §46-49, trzy uwagi naraz. Pełny opis w ARCHITECTURE.md

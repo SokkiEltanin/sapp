@@ -4810,6 +4810,68 @@ sklepikarza; czy itemy Sklepu dnia (górny rząd lady) mają teraz widoczny cie�
 na jaśniejszym tle. Jeśli 4-5px okaże się za mało/za dużo — łatwa poprawka `top` w
 `RYNEK_BOTTOM_SLOTS[4..7]` (`rynekArt.ts`).
 
+## 55. Dashboard perf, runda 2 — `<StatTile>` wydzielony i zmemoizowany — 2026-09-08
+
+User: *"okej teraz musimy zająć sie optymalizacja.."* — kontynuacja §53 (1Hz-timer w
+`useWorkEarnings` już naprawiony w PR #163). Agent-audyt z §53 wskazał drugi/trzeci co do
+wielkości hotspot jako świadomie NIEnaprawiony wtedy: custom stat tiles (`renderStatTile`,
+~430 linii w `app/(tabs)/index.tsx`) — każdy kafelek robił do 8 pełnych skanów historii
+wydatków (`metricSeries`/`metricList`/`metricNumber` → `bucketValue` w `statWidgets.ts`), i to
+NA KAŻDYM renderze całego dashboardu, bo `renderStatTile` był plain function odtwarzaną
+wewnątrz niezmemoizowanego bloku `nodes`. Im więcej kafelków user skonfigurował, tym drożej.
+
+**Dlaczego NIE zmemoizowano całego bloku `nodes` (~1040 linii) tym razem też** — bez
+`eslint-plugin-react-hooks`/`exhaustive-deps` DZIAŁAJĄCEGO w tym repo (sprawdzone: `npx eslint`
+nie znajduje w ogóle pliku konfiguracyjnego — osobny, niezwiązany z tą pracą problem) ręczne
+wypisanie POPRAWNEJ tablicy zależności `useMemo` do bloku tej wielkości, z dziesiątkami
+domknięć nad stanem komponentu, to realne ryzyko cichego "stale closure" bez możliwości
+zweryfikowania inaczej niż testem na urządzeniu. Zamiast tego: **ekstrakcja + `React.memo`**
+— sprawdzony, już wcześniej używany w tym pliku wzorzec (`SweetsVsFoodSection`,
+`SpendByDaySection`, itd. — patrz "Dashboard nav internals"), dużo bezpieczniejszy niż ręczna
+tablica zależności, bo React sam porównuje propsy zamiast polegać na ręcznie wypisanej liście.
+
+**Co zrobione:**
+1. `fmtStat`/`fmtWave`/`unitChip`/`periodCaption` (czyste funkcje, zero domknięć nad stanem
+   komponentu) wyniesione z `index.tsx` do `src/utils/dashboard/format.ts` — obok już tam
+   istniejących `metricTagLabel`/`fmtChartPt`. Reużywane teraz zarówno przez nowy `<StatTile>`
+   jak i modal szczegółów kafelka (który dawniej miał dostęp do nich przez współdzielone
+   domknięcie komponentu — teraz przez zwykły import). +4 nowe testy w
+   `__tests__/dashboardFormat.test.ts` (wcześniej ZERO pokrycia — to były prywatne funkcje
+   komponentu, mimo używania w KAŻDYM custom stat tile na dashboardzie).
+2. `metricIcon`/`STAT_METRIC_ICON`/`STAT_GROUP_ICON` przeniesione do nowego pliku (były już
+   module-level, więc czysty przenos + eksport — index.tsx importuje `metricIcon` z powrotem
+   dla modala szczegółów).
+3. Nowy `src/components/dashboard/StatTile.tsx` — logika `renderStatTile` skopiowana 1:1 (zero
+   zmian w zachowaniu), owinięta w `React.memo`. Propsy: `tile`/`statCtx`/`accentColor`/
+   `cardBgDark`/`colors`/`s` (współdzielony arkusz stylów, przekazywany jak jest)/
+   `updateCustomTile`/`pixelDayCache` — WSZYSTKIE zweryfikowane jako stabilne referencje
+   między renderami (przed ekstrakcją, ręcznie, po jednym): `statCtx` ma już realny `useMemo`
+   z dependency array w index.tsx, `colors` to jeden z dwóch stałych obiektów modułu
+   (`useColors()`), `s` cache'owany per motyw, `updateCustomTile` to stabilna referencja akcji
+   zustand, `pixelDayCache` to state odświeżany "raz na dzień" w tle — bez tego `React.memo`
+   byłby bezużyteczny (nowa referencja obiektu na każdym renderze = zawsze re-render).
+4. `index.tsx`'s `renderCustomTile` (`'stat'` branch) renderuje teraz `<StatTile .../>` zamiast
+   wołać starą funkcję — stara `renderStatTile` USUNIĘTA całkowicie (nie zduplikowana).
+
+**Efekt**: renderowanie custom stat tile'a (i jego 8 skanów historii wydatków) odpala się
+TERAZ TYLKO gdy realnie zmienił się `tile`/`statCtx`/motyw — nie na każdym renderze dashboardu
+(np. otwarcie modala gdzieś indziej na ekranie, toggle nawyku, cokolwiek niezwiązanego).
+Największa dźwignia dla userów z kilkoma custom stat tiles skonfigurowanymi.
+
+**Świadomie NIE ruszone**: pozostałe ~35 gałęzi bloku `nodes` (payday/finanse/habits/tasks/
+itd.) — pojedynczo dużo tańsze niż stat tiles (proste odczyty/małe filtry na małych tablicach),
+więc krańcowa korzyść z pełnej memoizacji reszty bloku jest teraz dużo mniejsza względem
+ryzyka. Jeśli lag wróci mimo tej rundy — kolejny krok to albo naprawa `eslint-plugin-
+react-hooks` w tym repo (żeby `exhaustive-deps` dało się w ogóle bezpiecznie użyć), albo
+wydzielenie kolejnych pojedynczych sekcji `nodes[...]` jako osobnych `React.memo` komponentów,
+tym samym sprawdzonym wzorcem co `<StatTile>` tutaj.
+
+`tsc`/`jest` zielone (69 suit/895 testów, +4 nowe w `dashboardFormat.test.ts`). **Priorytet
+testu na urządzeniu**: dashboard z kilkoma skonfigurowanymi custom stat tiles (zwłaszcza
+`viz==='pixels'`/`'wave'`/`'compare'`) — sprawdź że każdy typ wykresu wygląda identycznie jak
+przed zmianą (0 zmian w logice renderowania, czysta ekstrakcja) i że strzałki zmiany roku na
+kafelku pixels dalej działają (`updateCustomTile`).
+
 ---
 
 *Powiązane notatki (prywatna pamięć asystenta): codebase_map, project_sapp,
